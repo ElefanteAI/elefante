@@ -78,12 +78,26 @@ class GraphStore:
             logger.error("failed_to_initialize_kuzu", error=str(e))
             raise
     
+    def _get_query_results(self, result) -> list:
+        """
+        Helper to extract all rows from a Kuzu QueryResult.
+        Kuzu 0.1.0 uses has_next() and get_next() instead of get_all()
+        """
+        rows = []
+        while result.has_next():
+            rows.append(result.get_next())
+        return rows
+    
     def _initialize_schema(self):
         """Initialize Kuzu schema (node and relationship tables)"""
         try:
-            # Create node tables
-            self._conn.execute("""
-                CREATE NODE TABLE IF NOT EXISTS Memory(
+            # Create node tables (Kuzu 0.1.0 doesn't support IF NOT EXISTS)
+            # We'll catch exceptions for already-existing tables
+            
+            tables_to_create = [
+                # Node tables
+                """
+                CREATE NODE TABLE Memory(
                     id STRING,
                     content STRING,
                     timestamp TIMESTAMP,
@@ -91,10 +105,9 @@ class GraphStore:
                     importance INT64,
                     PRIMARY KEY(id)
                 )
-            """)
-            
-            self._conn.execute("""
-                CREATE NODE TABLE IF NOT EXISTS Entity(
+                """,
+                """
+                CREATE NODE TABLE Entity(
                     id STRING,
                     name STRING,
                     type STRING,
@@ -102,50 +115,54 @@ class GraphStore:
                     created_at TIMESTAMP,
                     PRIMARY KEY(id)
                 )
-            """)
-            
-            self._conn.execute("""
-                CREATE NODE TABLE IF NOT EXISTS Session(
+                """,
+                """
+                CREATE NODE TABLE Session(
                     id STRING,
                     start_time TIMESTAMP,
                     end_time TIMESTAMP,
                     PRIMARY KEY(id)
                 )
-            """)
-            
-            # Create relationship tables
-            self._conn.execute("""
-                CREATE REL TABLE IF NOT EXISTS RELATES_TO(
+                """,
+                # Relationship tables
+                """
+                CREATE REL TABLE RELATES_TO(
                     FROM Memory TO Entity,
                     strength DOUBLE
                 )
-            """)
-            
-            self._conn.execute("""
-                CREATE REL TABLE IF NOT EXISTS PART_OF(
+                """,
+                """
+                CREATE REL TABLE PART_OF(
                     FROM Memory TO Session
                 )
-            """)
-            
-            self._conn.execute("""
-                CREATE REL TABLE IF NOT EXISTS DEPENDS_ON(
+                """,
+                """
+                CREATE REL TABLE DEPENDS_ON(
                     FROM Entity TO Entity,
                     description STRING
                 )
-            """)
-            
-            self._conn.execute("""
-                CREATE REL TABLE IF NOT EXISTS REFERENCES(
+                """,
+                """
+                CREATE REL TABLE REFERENCES(
                     FROM Memory TO Memory,
                     reference_type STRING
                 )
-            """)
-            
-            self._conn.execute("""
-                CREATE REL TABLE IF NOT EXISTS CREATED_IN(
+                """,
+                """
+                CREATE REL TABLE CREATED_IN(
                     FROM Entity TO Session
                 )
-            """)
+                """
+            ]
+            
+            for table_sql in tables_to_create:
+                try:
+                    self._conn.execute(table_sql)
+                except Exception as table_error:
+                    # Ignore "already exists" errors
+                    error_msg = str(table_error).lower()
+                    if "already exists" not in error_msg and "duplicate" not in error_msg:
+                        logger.warning("table_creation_warning", error=str(table_error))
             
             self._schema_initialized = True
             logger.info("kuzu_schema_initialized")
@@ -184,7 +201,7 @@ class GraphStore:
             "name": entity.name,
             "type": entity.type.value,
             "description": entity.description or "",
-            "created_at": entity.created_at.isoformat()
+            "created_at": entity.created_at  # Pass datetime object directly for Kuzu
         }
         
         try:
@@ -232,7 +249,7 @@ class GraphStore:
                 {"id": str(entity_id)}
             )
             
-            rows = result.get_all()
+            rows = self._get_query_results(result)
             if not rows:
                 return None
             
@@ -273,11 +290,12 @@ class GraphStore:
         
         rel_table = rel_type_map.get(relationship.relationship_type, "RELATES_TO")
         
+        # FIX: Kuzu 0.1.0 requires properties to be set during CREATE, not with SET afterward
+        # Properties must be included in the CREATE clause: CREATE ()-[r:TYPE {prop: value}]->()
         query = f"""
-            MATCH (from:Entity), (to:Entity)
-            WHERE from.id = $from_id AND to.id = $to_id
-            CREATE (from)-[r:{rel_table}]->(to)
-            SET r.strength = $strength
+            MATCH (fromNode:Entity), (toNode:Entity)
+            WHERE fromNode.id = $from_id AND toNode.id = $to_id
+            CREATE (fromNode)-[r:{rel_table} {{strength: $strength}}]->(toNode)
         """
         
         params = {
@@ -324,15 +342,15 @@ class GraphStore:
         
         if direction == "outgoing":
             query = """
-                MATCH (from:Entity)-[r]->(to:Entity)
-                WHERE from.id = $id
-                RETURN from.id, to.id, type(r), r.strength
+                MATCH (fromNode:Entity)-[r]->(toNode:Entity)
+                WHERE fromNode.id = $id
+                RETURN fromNode.id, toNode.id, type(r), r.strength
             """
         elif direction == "incoming":
             query = """
-                MATCH (from:Entity)-[r]->(to:Entity)
-                WHERE to.id = $id
-                RETURN from.id, to.id, type(r), r.strength
+                MATCH (fromNode:Entity)-[r]->(toNode:Entity)
+                WHERE toNode.id = $id
+                RETURN fromNode.id, toNode.id, type(r), r.strength
             """
         else:  # both
             query = """
@@ -349,7 +367,7 @@ class GraphStore:
             )
             
             relationships = []
-            for row in result.get_all():
+            for row in self._get_query_results(result):
                 rel = Relationship(
                     from_entity_id=UUID(row[0]),
                     to_entity_id=UUID(row[1]),
@@ -393,7 +411,7 @@ class GraphStore:
             
             # Convert results to list of dictionaries
             results = []
-            for row in result.get_all():
+            for row in self._get_query_results(result):
                 # Create dict from row (simplified - may need column names)
                 result_dict = {"values": row}
                 results.append(result_dict)
@@ -442,7 +460,7 @@ class GraphStore:
             )
             
             paths = []
-            for row in result.get_all():
+            for row in self._get_query_results(result):
                 # Extract entity IDs from path
                 # This is simplified - actual implementation depends on Kuzu's path format
                 path = [from_entity_id, to_entity_id]  # Placeholder
@@ -492,7 +510,7 @@ class GraphStore:
             )
             
             neighbors = []
-            for row in result.get_all():
+            for row in self._get_query_results(result):
                 entity = Entity(
                     id=UUID(row[0]),
                     name=row[1],
@@ -555,14 +573,16 @@ class GraphStore:
                 self._conn.execute,
                 "MATCH (e:Entity) RETURN count(e)"
             )
-            entity_count = entity_result.get_all()[0][0] if entity_result.get_all() else 0
+            entity_rows = self._get_query_results(entity_result)
+            entity_count = entity_rows[0][0] if entity_rows else 0
             
             # Count relationships
             rel_result = await asyncio.to_thread(
                 self._conn.execute,
                 "MATCH ()-[r]->() RETURN count(r)"
             )
-            rel_count = rel_result.get_all()[0][0] if rel_result.get_all() else 0
+            rel_rows = self._get_query_results(rel_result)
+            rel_count = rel_rows[0][0] if rel_rows else 0
             
             return {
                 "database_path": self.database_path,

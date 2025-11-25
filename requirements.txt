@@ -19,6 +19,7 @@ mcp>=0.1.0
 
 # Utilities
 python-dotenv>=1.0.0,<2.0.0
+structlog>=24.1.0,<25.0.0
 
 # Development Dependencies (optional)
 pytest>=7.4.0,<8.0.0

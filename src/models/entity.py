@@ -85,6 +85,7 @@ class RelationshipType(str, Enum):
     DEPENDS_ON = "DEPENDS_ON"
     PART_OF = "PART_OF"
     CREATED_BY = "CREATED_BY"
+    CREATED_IN = "CREATED_IN"  # Entity created in a session
     USES = "USES"
     BLOCKS = "BLOCKS"
     REFERENCES = "REFERENCES"

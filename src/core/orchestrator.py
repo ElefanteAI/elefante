@@ -138,7 +138,7 @@ class MemoryOrchestrator:
                     "content": content[:200],  # Store truncated content
                     "memory_type": memory_type,
                     "importance": importance,
-                    "timestamp": memory.metadata.timestamp.isoformat(),
+                    "timestamp": memory.metadata.timestamp,  # Pass datetime object directly
                     "entity_subtype": "memory"
                 }
             )
@@ -174,7 +174,7 @@ class MemoryOrchestrator:
                         from_entity_id=memory_entity.id,
                         to_entity_id=entity.id,
                         relationship_type=RelationshipType.RELATES_TO,
-                        properties={"created_at": datetime.utcnow().isoformat()}
+                        properties={"created_at": datetime.utcnow()}  # Pass datetime object directly
                     )
                     await self.graph_store.create_relationship(relationship)
                     
@@ -505,10 +505,12 @@ class MemoryOrchestrator:
                 LIMIT {limit}
                 """
             else:
+                # FIX: Entity schema has 'created_at' property, not 'timestamp'
+                # Must match the schema defined in graph_store.py
                 cypher = f"""
                 MATCH (m:Entity {{type: 'memory'}})
                 RETURN m
-                ORDER BY m.timestamp DESC
+                ORDER BY m.created_at DESC
                 LIMIT {limit}
                 """
             
