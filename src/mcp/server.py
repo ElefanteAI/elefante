@@ -64,7 +64,7 @@ class ElefanteMCPServer:
             return [
                 Tool(
                     name="addMemory",
-                    description="Store a new memory in the system. Memories are stored in both vector (semantic) and graph (structured) databases for hybrid retrieval.",
+                    description="Store a new memory in Elefante's dual-database system. Memories are persisted in ChromaDB (vector embeddings for semantic search) and Kuzu (knowledge graph for structured relationships), enabling powerful hybrid retrieval across both semantic similarity and explicit connections.",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -112,7 +112,21 @@ class ElefanteMCPServer:
                 ),
                 Tool(
                     name="searchMemories",
-                    description="Search memories using semantic similarity, structured queries, or hybrid mode. Hybrid mode intelligently combines both approaches for best results.",
+                    description="""**CRITICAL: USE THIS TOOL FOR ALL MEMORY QUERIES** - Search Elefante's memory system when user asks about their preferences, past conversations, or anything they want you to remember. DO NOT search workspace files for memory queries.
+
+**QUERY REWRITING REQUIREMENT:** Before calling this tool, you MUST rewrite the user's query to be standalone and specific. Replace ALL pronouns (it, that, this, he, she, they) and vague references with the actual entities from conversation context.
+
+**Bad Queries (will fail):**
+- "How do I install it?" → Missing: what is "it"?
+- "Fix that error" → Missing: which error?
+- "What did he say about the project?" → Missing: who is "he"?
+
+**Good Queries (will succeed):**
+- "How to install Elefante memory system on Windows"
+- "ChromaDB ImportError solution in Python"
+- "Jaime's preferences for development folder organization"
+
+This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using semantic, structured, or hybrid search modes. The database cannot infer context from pronouns - it needs explicit, searchable terms.""",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -150,6 +164,20 @@ class ElefanteMCPServer:
                                 "minimum": 0.0,
                                 "maximum": 1.0,
                                 "description": "Minimum similarity threshold"
+                            },
+                            "include_conversation": {
+                                "type": "boolean",
+                                "default": true,
+                                "description": "Include recent conversation context in search results"
+                            },
+                            "include_stored": {
+                                "type": "boolean",
+                                "default": true,
+                                "description": "Include stored memories from vector/graph databases"
+                            },
+                            "session_id": {
+                                "type": "string",
+                                "description": "Session UUID for conversation context (required if include_conversation=true)"
                             }
                         },
                         "required": ["query"]
@@ -157,7 +185,7 @@ class ElefanteMCPServer:
                 ),
                 Tool(
                     name="queryGraph",
-                    description="Execute Cypher-like queries on the knowledge graph for structured data retrieval. Use this for finding specific relationships and patterns.",
+                    description="Execute Cypher queries directly on Elefante's Kuzu knowledge graph for advanced structured data retrieval. Use this for complex relationship traversals, pattern matching, and graph analytics. Ideal for queries like 'Find all entities connected to X', 'Show the path between A and B', or 'List all relationships of type Y'.",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -175,7 +203,7 @@ class ElefanteMCPServer:
                 ),
                 Tool(
                     name="getContext",
-                    description="Retrieve comprehensive context for a session or task, including related memories, entities, and relationships.",
+                    description="Retrieve comprehensive context from Elefante's memory system for a specific session or task. Returns related memories from ChromaDB, connected entities and relationships from Kuzu graph, with configurable traversal depth. Use this to gather full context before making decisions or generating responses.",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -202,7 +230,7 @@ class ElefanteMCPServer:
                 ),
                 Tool(
                     name="createEntity",
-                    description="Create a new entity in the knowledge graph. Entities represent people, projects, files, concepts, etc.",
+                    description="Create a new entity node in Elefante's Kuzu knowledge graph. Entities represent people, projects, files, concepts, technologies, tasks, organizations, locations, or events. These nodes can be linked via relationships to build a rich semantic network of knowledge.",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -225,7 +253,7 @@ class ElefanteMCPServer:
                 ),
                 Tool(
                     name="createRelationship",
-                    description="Create a relationship between two entities in the knowledge graph.",
+                    description="Create a directed relationship edge in Elefante's Kuzu knowledge graph connecting two existing entities. Relationships define how entities relate (e.g., 'depends_on', 'part_of', 'created_by') and enable graph traversal queries to discover connections and patterns.",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -252,7 +280,7 @@ class ElefanteMCPServer:
                 ),
                 Tool(
                     name="getStats",
-                    description="Get statistics about the memory system, including database sizes and health status.",
+                    description="Get comprehensive statistics about Elefante's memory system health and usage. Returns metrics for ChromaDB (vector store size, embedding dimensions) and Kuzu (graph node/edge counts, relationship types), plus system performance indicators. Use for monitoring, debugging, or understanding memory system state.",
                     inputSchema={
                         "type": "object",
                         "properties": {}
@@ -336,13 +364,21 @@ class ElefanteMCPServer:
                 end_date=datetime.fromisoformat(filter_data["end_date"]) if "end_date" in filter_data else None
             )
         
-        # Search
+        # Parse session_id if provided
+        session_id = None
+        if "session_id" in args and args["session_id"]:
+            session_id = UUID(args["session_id"])
+        
+        # Search with conversation context support
         results = await self.orchestrator.search_memories(
             query=args["query"],
             mode=mode,
             limit=args.get("limit", 10),
             filters=filters,
-            min_similarity=args.get("min_similarity", 0.3)
+            min_similarity=args.get("min_similarity", 0.3),
+            include_conversation=args.get("include_conversation", True),
+            include_stored=args.get("include_stored", True),
+            session_id=session_id
         )
         
         return {

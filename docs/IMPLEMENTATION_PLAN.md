@@ -1,492 +1,677 @@
-# Elefante Implementation Plan
+# Hybrid Search Implementation Plan
 
-**Status**: Architecture Complete - Ready for Implementation  
-**Date**: 2025-11-25  
-**Phase**: 1 - Core Development  
+## Overview
+This document provides a step-by-step implementation plan for adding conversation context awareness to Elefante's search system. Each task is atomic, testable, and builds on previous work.
 
----
-
-## 📋 Implementation Checklist
-
-### ✅ Phase 0: Architecture & Design (COMPLETE)
-- [x] Create ARCHITECTURE.md with full system design
-- [x] Create README.md with user documentation
-- [x] Define data models (Memory, Entity, Relationship, Query)
-- [x] Design MCP tool schemas
-- [x] Create configuration templates
-- [x] Set up project structure
-
-### 🚧 Phase 1: Core Infrastructure (NEXT)
-
-#### 1.1 Configuration Management
-**Files to Create:**
-- [ ] `src/utils/__init__.py`
-- [ ] `src/utils/config.py` - Configuration loader and validator
-- [ ] `src/utils/logger.py` - Structured logging setup
-- [ ] `src/utils/validators.py` - Input validation utilities
-
-**Implementation Details:**
-```python
-# src/utils/config.py
-- Load config.yaml with environment variable overrides
-- Validate all configuration values
-- Provide singleton access to config
-- Support hot-reloading (optional)
-
-# src/utils/logger.py
-- Set up structlog with JSON formatting
-- Configure file rotation
-- Add context managers for request tracing
-```
-
-#### 1.2 Embedding Service
-**Files to Create:**
-- [ ] `src/core/__init__.py`
-- [ ] `src/core/embeddings.py` - Embedding generation service
-
-**Implementation Details:**
-```python
-# src/core/embeddings.py
-class EmbeddingService:
-    - Initialize sentence-transformers model
-    - Batch embedding generation
-    - Caching mechanism
-    - Fallback to OpenAI (optional)
-    - Async support with asyncio
-    
-Methods:
-    - async def generate_embedding(text: str) -> List[float]
-    - async def generate_embeddings_batch(texts: List[str]) -> List[List[float]]
-    - def get_embedding_dimension() -> int
-```
-
-**Dependencies:**
-- sentence-transformers
-- torch (CPU version)
-- numpy
-
-#### 1.3 Vector Store (ChromaDB)
-**Files to Create:**
-- [ ] `src/core/vector_store.py` - ChromaDB wrapper
-
-**Implementation Details:**
-```python
-# src/core/vector_store.py
-class VectorStore:
-    - Initialize ChromaDB with persistent storage
-    - Create/get collection
-    - CRUD operations for memories
-    - Similarity search with filters
-    - Metadata filtering
-    
-Methods:
-    - async def add_memory(memory: Memory) -> str
-    - async def search(query: str, limit: int, filters: dict) -> List[SearchResult]
-    - async def get_memory(memory_id: UUID) -> Optional[Memory]
-    - async def update_memory(memory_id: UUID, updates: dict) -> bool
-    - async def delete_memory(memory_id: UUID) -> bool
-    - async def get_stats() -> dict
-```
-
-**Key Features:**
-- Automatic embedding generation via EmbeddingService
-- Metadata filtering (type, importance, tags, dates)
-- Cosine similarity search
-- Batch operations for efficiency
-
-#### 1.4 Graph Store (Kuzu)
-**Files to Create:**
-- [ ] `src/core/graph_store.py` - Kuzu wrapper
-
-**Implementation Details:**
-```python
-# src/core/graph_store.py
-class GraphStore:
-    - Initialize Kuzu database
-    - Create schema (node types, relationship types)
-    - CRUD operations for entities and relationships
-    - Cypher-like query execution
-    - Graph traversal operations
-    
-Methods:
-    # Entity operations
-    - async def create_entity(entity: Entity) -> UUID
-    - async def get_entity(entity_id: UUID) -> Optional[Entity]
-    - async def update_entity(entity_id: UUID, updates: dict) -> bool
-    - async def delete_entity(entity_id: UUID) -> bool
-    
-    # Relationship operations
-    - async def create_relationship(rel: Relationship) -> UUID
-    - async def get_relationships(entity_id: UUID) -> List[Relationship]
-    - async def delete_relationship(rel_id: UUID) -> bool
-    
-    # Query operations
-    - async def execute_query(cypher: str, params: dict) -> List[dict]
-    - async def find_path(from_id: UUID, to_id: UUID, max_depth: int) -> List[dict]
-    - async def get_neighbors(entity_id: UUID, depth: int) -> List[Entity]
-```
-
-**Schema Setup:**
-```cypher
-// Node types
-CREATE NODE TABLE Memory(id STRING, content STRING, timestamp TIMESTAMP, type STRING, importance INT, PRIMARY KEY(id))
-CREATE NODE TABLE Entity(id STRING, name STRING, type STRING, description STRING, PRIMARY KEY(id))
-CREATE NODE TABLE Session(id STRING, start_time TIMESTAMP, end_time TIMESTAMP, PRIMARY KEY(id))
-
-// Relationship types
-CREATE REL TABLE RELATES_TO(FROM Memory TO Entity, strength DOUBLE)
-CREATE REL TABLE PART_OF(FROM Memory TO Session)
-CREATE REL TABLE DEPENDS_ON(FROM Entity TO Entity, description STRING)
-CREATE REL TABLE REFERENCES(FROM Memory TO Memory)
-```
-
-#### 1.5 Hybrid Orchestrator
-**Files to Create:**
-- [ ] `src/core/orchestrator.py` - Main orchestration layer
-
-**Implementation Details:**
-```python
-# src/core/orchestrator.py
-class MemoryOrchestrator:
-    - Coordinate between VectorStore and GraphStore
-    - Intelligent query routing
-    - Result merging and ranking
-    - Transaction management
-    
-Methods:
-    # Memory operations
-    - async def add_memory(content: str, **kwargs) -> Memory
-    - async def search(query: str, mode: QueryMode, **kwargs) -> List[SearchResult]
-    - async def get_context(session_id: UUID, depth: int) -> dict
-    
-    # Entity operations
-    - async def create_entity(name: str, type: EntityType, **kwargs) -> Entity
-    - async def create_relationship(from_id: UUID, to_id: UUID, rel_type: RelationshipType) -> Relationship
-    
-    # Query operations
-    - async def query_graph(cypher: str, params: dict) -> List[dict]
-    - def _analyze_query(query: str) -> QueryPlan
-    - async def _merge_results(vector_results, graph_results, plan: QueryPlan) -> List[SearchResult]
-```
-
-**Query Routing Logic:**
-```python
-def _analyze_query(self, query: str) -> QueryPlan:
-    # Semantic indicators
-    if any(kw in query.lower() for kw in ["similar", "like", "about", "related"]):
-        return QueryPlan(mode=QueryMode.SEMANTIC, vector_weight=0.8, graph_weight=0.2)
-    
-    # Structural indicators
-    elif any(kw in query.lower() for kw in ["who", "what", "when", "depends", "blocks"]):
-        return QueryPlan(mode=QueryMode.STRUCTURED, vector_weight=0.2, graph_weight=0.8)
-    
-    # Default: Hybrid
-    else:
-        return QueryPlan(mode=QueryMode.HYBRID, vector_weight=0.5, graph_weight=0.5)
-```
+**Reference:** See [`HYBRID_SEARCH_ARCHITECTURE.md`](HYBRID_SEARCH_ARCHITECTURE.md) for architectural details.
 
 ---
 
-### 🔌 Phase 2: MCP Integration
+## Phase 1: Foundation (Core Infrastructure)
 
-#### 2.1 MCP Server
-**Files to Create:**
-- [ ] `src/mcp/__init__.py`
-- [ ] `src/mcp/server.py` - MCP server implementation
-- [ ] `src/mcp/tools.py` - Tool definitions
-- [ ] `src/mcp/handlers.py` - Tool execution handlers
+### Task 1.1: Create Conversation Context Models
+**File:** `src/models/conversation.py` (NEW)
 
-**Implementation Details:**
-```python
-# src/mcp/server.py
-class ElefanteMCPServer:
-    - Initialize MCP server
-    - Register tools
-    - Handle tool calls
-    - Error handling and logging
-    
-# src/mcp/tools.py
-TOOLS = [
-    {
-        "name": "addMemory",
-        "description": "Store a new memory",
-        "inputSchema": {...}
-    },
-    {
-        "name": "searchMemories",
-        "description": "Search memories",
-        "inputSchema": {...}
-    },
-    # ... other tools
-]
-
-# src/mcp/handlers.py
-async def handle_add_memory(args: dict) -> dict
-async def handle_search_memories(args: dict) -> dict
-async def handle_query_graph(args: dict) -> dict
-async def handle_create_entity(args: dict) -> dict
-async def handle_create_relationship(args: dict) -> dict
-async def handle_get_context(args: dict) -> dict
-```
-
----
-
-### 🧪 Phase 3: Testing
-
-#### 3.1 Unit Tests
-**Files to Create:**
-- [ ] `tests/__init__.py`
-- [ ] `tests/test_vector_store.py`
-- [ ] `tests/test_graph_store.py`
-- [ ] `tests/test_orchestrator.py`
-- [ ] `tests/test_embeddings.py`
-- [ ] `tests/test_models.py`
-
-**Test Coverage:**
-- Vector store CRUD operations
-- Graph store CRUD operations
-- Embedding generation
-- Query routing logic
-- Result merging
-- Data model validation
-
-#### 3.2 Integration Tests
-**Files to Create:**
-- [ ] `tests/test_integration.py`
-- [ ] `tests/test_mcp_server.py`
-
-**Test Scenarios:**
-- End-to-end memory storage and retrieval
-- Hybrid search accuracy
-- MCP tool execution
-- Database synchronization
-- Error handling and recovery
-
-#### 3.3 Performance Tests
-**Files to Create:**
-- [ ] `tests/test_performance.py`
-
-**Benchmarks:**
-- Memory storage latency
-- Search query latency
-- Concurrent query handling
-- Memory usage profiling
-- Scalability (1k, 10k, 100k memories)
-
----
-
-### 🛠️ Phase 4: Utilities & Scripts
-
-#### 4.1 Initialization Scripts
-**Files to Create:**
-- [ ] `scripts/__init__.py`
-- [ ] `scripts/init_databases.py` - Initialize ChromaDB and Kuzu
-- [ ] `scripts/health_check.py` - System health verification
-- [ ] `scripts/migrate_data.py` - Data migration utilities
+**Objective:** Define data structures for conversation messages and search candidates
 
 **Implementation:**
 ```python
-# scripts/init_databases.py
-- Create data directories
-- Initialize ChromaDB collection
-- Create Kuzu schema
-- Verify connectivity
-- Load sample data (optional)
+from datetime import datetime
+from typing import List, Optional, Dict, Any
+from uuid import UUID, uuid4
+from pydantic import BaseModel, Field
 
-# scripts/health_check.py
-- Check database connectivity
-- Verify embedding service
-- Test basic operations
-- Report system status
+class Message(BaseModel):
+    """Represents a single conversation message"""
+    id: UUID = Field(default_factory=uuid4)
+    session_id: UUID
+    role: str  # "user" | "assistant" | "system"
+    content: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+class SearchCandidate(BaseModel):
+    """Unified search candidate from any source"""
+    text: str
+    score: float = Field(ge=0.0, le=1.0)
+    source: str  # "conversation" | "semantic" | "graph"
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    embedding: Optional[List[float]] = None
+    
+    # For deduplication
+    memory_id: Optional[UUID] = None
 ```
 
-#### 4.2 CLI Interface (Optional)
-**Files to Create:**
-- [ ] `src/cli.py` - Command-line interface
+**Tests:**
+- Create message with all fields
+- Validate score bounds (0-1)
+- Serialize/deserialize to JSON
 
-**Commands:**
-```bash
-elefante init          # Initialize databases
-elefante add "text"    # Add memory
-elefante search "query" # Search memories
-elefante stats         # Show statistics
-elefante health        # Health check
+**Estimated Time:** 30 minutes
+
+---
+
+### Task 1.2: Implement Conversation Context Retriever
+**File:** `src/core/conversation_context.py` (NEW)
+
+**Objective:** Extract and score conversation snippets for search
+
+**Implementation:**
+```python
+from typing import List, Optional
+from uuid import UUID
+from src.models.conversation import Message, SearchCandidate
+from src.core.vector_store import get_vector_store
+from src.utils.logger import get_logger
+
+class ConversationSearcher:
+    """Searches conversation context for relevant messages"""
+    
+    def __init__(self, max_window: int = 50):
+        self.max_window = max_window
+        self.vector_store = get_vector_store()
+        self.logger = get_logger(__name__)
+    
+    async def collect_candidates(
+        self,
+        query: str,
+        session_id: UUID,
+        limit: int = 10
+    ) -> List[SearchCandidate]:
+        """
+        Retrieve conversation messages and score by relevance
+        
+        Scoring:
+        - Recency: 0.5 (newer = higher)
+        - Keyword overlap: 0.3 (simple term matching)
+        - Role weight: 0.2 (user > assistant)
+        """
+        # 1. Fetch recent memories with session_id filter
+        # 2. Score each by recency + keyword overlap
+        # 3. Return top N as SearchCandidates
 ```
 
----
+**Key Methods:**
+- `collect_candidates()`: Main entry point
+- `_score_by_recency()`: Time-based scoring
+- `_score_by_keywords()`: Simple term matching
+- `_score_by_role()`: User messages prioritized
 
-### 📚 Phase 5: Documentation
+**Tests:**
+- Empty conversation returns empty list
+- Recent messages score higher
+- Keyword matches boost score
+- Respects limit parameter
 
-#### 5.1 API Documentation
-**Files to Create:**
-- [ ] `docs/API.md` - Complete API reference
-- [ ] `docs/EXAMPLES.md` - Usage examples
-- [ ] `docs/TROUBLESHOOTING.md` - Common issues
-
-#### 5.2 Additional Docs
-**Files to Create:**
-- [ ] `CONTRIBUTING.md` - Contribution guidelines
-- [ ] `LICENSE` - MIT License
-- [ ] `CHANGELOG.md` - Version history
+**Estimated Time:** 2 hours
 
 ---
 
-## 🎯 Implementation Priority
+### Task 1.3: Extend Query Models
+**File:** `src/models/query.py` (MODIFY)
 
-### Critical Path (Must Have for MVP)
-1. ✅ Configuration management (`src/utils/config.py`)
-2. ✅ Embedding service (`src/core/embeddings.py`)
-3. ✅ Vector store (`src/core/vector_store.py`)
-4. ✅ Graph store (`src/core/graph_store.py`)
-5. ✅ Orchestrator (`src/core/orchestrator.py`)
-6. ✅ MCP server (`src/mcp/server.py`)
-7. ✅ Initialization script (`scripts/init_databases.py`)
-8. ✅ Basic tests
+**Objective:** Add conversation-related parameters to search filters
 
-### Important (Should Have)
-- Health check script
-- Comprehensive test suite
-- API documentation
-- Error handling improvements
-
-### Nice to Have (Could Have)
-- CLI interface
-- Performance optimizations
-- Advanced graph algorithms
-- Web UI (future)
-
----
-
-## 🔧 Development Guidelines
-
-### Code Style
-- Use Black for formatting
-- Type hints for all functions
-- Docstrings (Google style)
-- Async/await for I/O operations
-
-### Error Handling
-- Use custom exceptions
-- Graceful degradation
-- Comprehensive logging
-- User-friendly error messages
-
-### Testing
-- Minimum 80% code coverage
-- Test edge cases
-- Mock external dependencies
-- Use pytest fixtures
-
-### Performance
-- Batch operations where possible
-- Cache embeddings
-- Use connection pooling
-- Profile critical paths
-
----
-
-## 📦 Dependencies to Install
-
-```bash
-# Core
-pip install chromadb kuzu sentence-transformers
-
-# MCP
-pip install mcp
-
-# Utilities
-pip install pyyaml python-dotenv structlog aiohttp numpy pydantic
-
-# Development
-pip install pytest pytest-asyncio pytest-cov black mypy
+**Changes:**
+```python
+# ADD to SearchFilters class:
+class SearchFilters(BaseModel):
+    # ... existing fields ...
+    
+    # NEW: Conversation context
+    session_id: Optional[UUID] = None
+    include_conversation: bool = True
+    include_stored: bool = True
+    conversation_weight: float = Field(default=0.3, ge=0.0, le=1.0)
 ```
 
+**Tests:**
+- Validate weight bounds
+- Serialize with new fields
+- Backward compatibility (old code still works)
+
+**Estimated Time:** 30 minutes
+
 ---
 
-## 🚀 Getting Started with Implementation
+### Task 1.4: Add Scoring Normalization Utilities
+**File:** `src/core/scoring.py` (NEW)
 
-### Step 1: Set Up Environment
-```bash
-cd Elefante
-python -m venv .venv
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
-pip install -r requirements.txt
+**Objective:** Normalize scores across heterogeneous sources
+
+**Implementation:**
+```python
+from typing import List, Dict
+from src.models.conversation import SearchCandidate
+
+class ScoreNormalizer:
+    """Normalizes and combines scores from multiple sources"""
+    
+    @staticmethod
+    def normalize_scores(
+        candidates: List[SearchCandidate],
+        weights: Dict[str, float]
+    ) -> List[SearchCandidate]:
+        """
+        Apply weighted scoring across sources
+        
+        weights = {
+            "conversation": 0.3,
+            "semantic": 0.4,
+            "graph": 0.3
+        }
+        """
+        # Group by source
+        # Apply weights
+        # Return normalized candidates
+    
+    @staticmethod
+    def adaptive_weights(
+        query: str,
+        has_session: bool
+    ) -> Dict[str, float]:
+        """
+        Determine optimal weights based on query characteristics
+        
+        Rules:
+        - Pronouns ("it", "that") → boost conversation
+        - Specific terms ("UUID", "named") → boost graph
+        - Questions → boost semantic
+        """
 ```
 
-### Step 2: Implement Core Components (in order)
-1. Start with `src/utils/config.py`
-2. Then `src/core/embeddings.py`
-3. Then `src/core/vector_store.py`
-4. Then `src/core/graph_store.py`
-5. Then `src/core/orchestrator.py`
-6. Finally `src/mcp/server.py`
+**Tests:**
+- Weights sum to 1.0
+- Adaptive weights adjust correctly
+- Edge cases (empty candidates, single source)
 
-### Step 3: Test Each Component
-- Write tests as you implement
-- Run `pytest tests/` frequently
-- Verify with `scripts/health_check.py`
-
-### Step 4: Integration
-- Connect all components
-- Test end-to-end workflows
-- Fix integration issues
-
-### Step 5: Documentation
-- Document all public APIs
-- Add usage examples
-- Create troubleshooting guide
+**Estimated Time:** 1.5 hours
 
 ---
 
-## 📊 Success Criteria
+### Task 1.5: Implement Embedding-Based Deduplication
+**File:** `src/core/deduplication.py` (NEW)
 
-### Functional Requirements
-- ✅ Store memories with metadata
-- ✅ Search memories semantically
-- ✅ Query knowledge graph
-- ✅ Hybrid search combining both
-- ✅ MCP tool integration
-- ✅ Persistent storage
+**Objective:** Remove near-duplicate results using embedding similarity
 
-### Non-Functional Requirements
-- ✅ < 100ms memory storage
-- ✅ < 300ms hybrid search
-- ✅ 100k+ memory capacity
-- ✅ 80%+ test coverage
-- ✅ Zero data loss
-- ✅ Graceful error handling
+**Implementation:**
+```python
+from typing import List
+from src.models.conversation import SearchCandidate
+from src.core.embeddings import get_embedding_service
 
----
+class ResultDeduplicator:
+    """Deduplicates search results using embedding similarity"""
+    
+    def __init__(self, threshold: float = 0.95):
+        self.threshold = threshold
+        self.embedding_service = get_embedding_service()
+    
+    async def deduplicate(
+        self,
+        candidates: List[SearchCandidate]
+    ) -> List[SearchCandidate]:
+        """
+        1. Generate embeddings for all candidates (if not present)
+        2. Compute pairwise cosine similarity
+        3. Group candidates with similarity > threshold
+        4. Keep highest-scored candidate from each group
+        5. Merge metadata (sources array)
+        """
+```
 
-## 🐛 Known Challenges & Solutions
+**Tests:**
+- Identical text deduplicates
+- Different text preserved
+- Metadata merged correctly
+- Respects threshold parameter
 
-### Challenge 1: Kuzu Python Bindings
-**Issue**: Kuzu is relatively new, documentation may be sparse  
-**Solution**: Use Kuzu examples, fallback to Neo4j if needed
-
-### Challenge 2: Embedding Model Size
-**Issue**: Sentence transformers models can be large  
-**Solution**: Use lightweight model (all-MiniLM-L6-v2), cache downloads
-
-### Challenge 3: Async ChromaDB
-**Issue**: ChromaDB may not have full async support  
-**Solution**: Use asyncio.to_thread() for blocking operations
-
-### Challenge 4: Result Merging
-**Issue**: Combining vector and graph results is complex  
-**Solution**: Normalize scores, use weighted combination, deduplicate
-
----
-
-## 📞 Next Steps
-
-1. **Review this plan** - Ensure all requirements are captured
-2. **Set up development environment** - Install dependencies
-3. **Start implementation** - Follow the priority order
-4. **Test continuously** - Write tests alongside code
-5. **Document as you go** - Keep docs up to date
-6. **Iterate and improve** - Refactor based on learnings
+**Estimated Time:** 2 hours
 
 ---
 
-**Ready to implement? Switch to Code mode and start with `src/utils/config.py`!**
+## Phase 2: Orchestrator Integration
+
+### Task 2.1: Extend Orchestrator Search Method
+**File:** `src/core/orchestrator.py` (MODIFY)
+
+**Objective:** Add conversation search to existing hybrid search
+
+**Changes to `search_memories()` signature:**
+```python
+async def search_memories(
+    self,
+    query: str,
+    mode: QueryMode = QueryMode.HYBRID,
+    limit: int = 10,
+    filters: Optional[SearchFilters] = None,
+    min_similarity: float = 0.3,
+    # NEW PARAMETERS
+    include_conversation: bool = True,
+    include_stored: bool = True,
+    session_id: Optional[UUID] = None,
+    return_debug: bool = False
+) -> Union[List[SearchResult], Tuple[List[SearchResult], Dict]]:
+```
+
+**Implementation Steps:**
+1. Extract new parameters from filters if provided
+2. Determine adaptive weights based on query
+3. Execute searches in parallel:
+   - Conversation search (if enabled)
+   - Stored search (existing logic)
+4. Normalize scores
+5. Deduplicate
+6. Apply limit
+7. Log telemetry
+8. Return results (+ debug if requested)
+
+**Tests:**
+- Conversation-only search works
+- Stored-only search works (backward compat)
+- Hybrid search merges correctly
+- Debug mode returns stats
+
+**Estimated Time:** 3 hours
+
+---
+
+### Task 2.2: Add Private Helper Methods
+**File:** `src/core/orchestrator.py` (MODIFY)
+
+**New Methods:**
+```python
+async def _collect_conversation_candidates(
+    self,
+    query: str,
+    session_id: UUID,
+    limit: int
+) -> List[SearchCandidate]:
+    """Wrapper for ConversationSearcher"""
+
+async def _convert_to_search_results(
+    self,
+    candidates: List[SearchCandidate]
+) -> List[SearchResult]:
+    """Convert SearchCandidate to SearchResult"""
+
+async def _merge_and_deduplicate(
+    self,
+    conversation_candidates: List[SearchCandidate],
+    stored_results: List[SearchResult],
+    weights: Dict[str, float]
+) -> List[SearchResult]:
+    """Core merging logic"""
+```
+
+**Tests:**
+- Each method tested in isolation
+- Integration test for full flow
+
+**Estimated Time:** 2 hours
+
+---
+
+### Task 2.3: Add Telemetry and Logging
+**File:** `src/core/orchestrator.py` (MODIFY)
+
+**Objective:** Comprehensive observability for hybrid search
+
+**Log Events:**
+```python
+# At start
+logger.info(
+    "hybrid_search_started",
+    query=query[:100],
+    mode=mode.value,
+    include_conversation=include_conversation,
+    include_stored=include_stored,
+    session_id=str(session_id) if session_id else None
+)
+
+# After each source
+logger.debug(
+    "conversation_search_completed",
+    count=len(conv_candidates),
+    avg_score=avg_score,
+    elapsed_ms=elapsed
+)
+
+# After merge
+logger.info(
+    "hybrid_search_completed",
+    conversation_count=conv_count,
+    stored_count=stored_count,
+    dedup_removed=dedup_count,
+    final_count=len(results),
+    top_source=results[0].source if results else None,
+    elapsed_ms=total_elapsed
+)
+```
+
+**Debug Response Format:**
+```python
+if return_debug:
+    return results, {
+        "query": query,
+        "sources": {
+            "conversation": {"count": X, "avg_score": Y},
+            "semantic": {"count": X, "avg_score": Y},
+            "graph": {"count": X, "avg_score": Y}
+        },
+        "deduplication": {
+            "before": X,
+            "after": Y,
+            "removed": Z
+        },
+        "weights": weights,
+        "elapsed_ms": elapsed
+    }
+```
+
+**Tests:**
+- Logs captured in test mode
+- Debug response structure validated
+
+**Estimated Time:** 1 hour
+
+---
+
+## Phase 3: MCP Server Updates
+
+### Task 3.1: Update searchMemories Tool Schema
+**File:** `src/mcp/server.py` (MODIFY)
+
+**Objective:** Expose new parameters via MCP tool
+
+**Changes to Tool definition:**
+```python
+Tool(
+    name="searchMemories",
+    description="""...(existing description)...""",
+    inputSchema={
+        "type": "object",
+        "properties": {
+            # ... existing fields ...
+            
+            # NEW FIELDS
+            "include_conversation": {
+                "type": "boolean",
+                "default": True,
+                "description": "Search current conversation context (session-scoped, recent messages)"
+            },
+            "include_stored": {
+                "type": "boolean",
+                "default": True,
+                "description": "Search long-term stored memories (persistent, cross-session)"
+            },
+            "session_id": {
+                "type": "string",
+                "description": "Session UUID for conversation context. If not provided, searches stored memories only."
+            },
+            "return_debug": {
+                "type": "boolean",
+                "default": False,
+                "description": "Include debug statistics in response (source counts, scores, dedup info)"
+            }
+        },
+        "required": ["query"]
+    }
+)
+```
+
+**Tests:**
+- Tool schema validates
+- MCP server accepts new parameters
+- Backward compatibility (old calls still work)
+
+**Estimated Time:** 1 hour
+
+---
+
+### Task 3.2: Update Tool Handler
+**File:** `src/mcp/server.py` (MODIFY)
+
+**Objective:** Pass new parameters to orchestrator
+
+**Changes to `_handle_search_memories()`:**
+```python
+async def _handle_search_memories(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    # Parse mode (existing)
+    mode_str = args.get("mode", "hybrid")
+    mode = QueryMode(mode_str)
+    
+    # Parse filters (existing)
+    filters = None
+    if "filters" in args:
+        # ... existing filter parsing ...
+    
+    # NEW: Parse session_id
+    session_id = None
+    if "session_id" in args:
+        session_id = UUID(args["session_id"])
+    
+    # NEW: Parse conversation flags
+    include_conversation = args.get("include_conversation", True)
+    include_stored = args.get("include_stored", True)
+    return_debug = args.get("return_debug", False)
+    
+    # Search with new parameters
+    result = await self.orchestrator.search_memories(
+        query=args["query"],
+        mode=mode,
+        limit=args.get("limit", 10),
+        filters=filters,
+        min_similarity=args.get("min_similarity", 0.3),
+        include_conversation=include_conversation,
+        include_stored=include_stored,
+        session_id=session_id,
+        return_debug=return_debug
+    )
+    
+    # Handle debug response
+    if return_debug:
+        results, debug_stats = result
+        return {
+            "success": True,
+            "count": len(results),
+            "results": [r.to_dict() for r in results],
+            "debug": debug_stats
+        }
+    else:
+        return {
+            "success": True,
+            "count": len(result),
+            "results": [r.to_dict() for r in result]
+        }
+```
+
+**Tests:**
+- Handler passes parameters correctly
+- Debug mode returns extra stats
+- Error handling for invalid session_id
+
+**Estimated Time:** 1 hour
+
+---
+
+## Phase 4: Testing & Validation
+
+### Task 4.1: Unit Tests
+**Files:** `tests/test_*.py` (NEW/MODIFY)
+
+**Test Coverage:**
+
+1. **`tests/test_conversation_context.py`** (NEW)
+   - Message creation and validation
+   - Candidate scoring (recency, keywords, role)
+   - Empty conversation handling
+   - Window limit enforcement
+
+2. **`tests/test_scoring.py`** (NEW)
+   - Score normalization
+   - Adaptive weight calculation
+   - Edge cases (empty, single source)
+
+3. **`tests/test_deduplication.py`** (NEW)
+   - Identical text deduplication
+   - Near-duplicate detection
+   - Metadata merging
+   - Threshold sensitivity
+
+4. **`tests/test_orchestrator.py`** (MODIFY)
+   - Conversation-only search
+   - Stored-only search
+   - Hybrid search with both sources
+   - Debug mode output
+
+**Estimated Time:** 4 hours
+
+---
+
+### Task 4.2: Integration Tests
+**File:** `tests/integration/test_hybrid_search.py` (NEW)
+
+**Test Scenarios:**
+
+1. **Scenario: Pronoun Resolution**
+   ```python
+   # Setup
+   - Add conversation: "I'm working on Elefante"
+   - Add stored memory: "Elefante is a memory system"
+   
+   # Query: "how do I install it?"
+   # Expected: Conversation result ranked higher (pronoun context)
+   ```
+
+2. **Scenario: Deduplication**
+   ```python
+   # Setup
+   - Add conversation: "Clean code is important"
+   - Add stored memory: "Clean code is important"
+   
+   # Query: "clean code"
+   # Expected: Single result with sources=["conversation", "semantic"]
+   ```
+
+3. **Scenario: Temporal Prioritization**
+   ```python
+   # Setup
+   - Old stored memory: "Use Python 3.8"
+   - Recent conversation: "Use Python 3.12"
+   
+   # Query: "which Python version?"
+   # Expected: Conversation result ranked higher (recency)
+   ```
+
+4. **Scenario: Specific Query**
+   ```python
+   # Setup
+   - Conversation: "I like clean folders"
+   - Stored memory with entity: "Jaime prefers clean development folders"
+   
+   # Query: "Jaime's development preferences"
+   # Expected: Stored result ranked higher (specific entity match)
+   ```
+
+**Estimated Time:** 3 hours
+
+---
+
+### Task 4.3: Performance Testing
+**File:** `tests/performance/test_search_latency.py` (NEW)
+
+**Metrics to Measure:**
+- Search latency (p50, p95, p99)
+- Embedding cache hit rate
+- Deduplication overhead
+- Memory usage
+
+**Target SLAs:**
+- p95 latency < 500ms
+- Cache hit rate > 80%
+- Memory growth < 10MB per 1000 searches
+
+**Estimated Time:** 2 hours
+
+---
+
+## Phase 5: Documentation & Deployment
+
+### Task 5.1: Update README
+**File:** `README.md` (MODIFY)
+
+**Sections to Add:**
+- Conversation context feature overview
+- Usage examples with `session_id`
+- Debug mode explanation
+- Performance characteristics
+
+**Estimated Time:** 1 hour
+
+---
+
+### Task 5.2: Create Usage Guide
+**File:** `docs/USAGE_GUIDE.md` (NEW)
+
+**Content:**
+- How to use conversation context
+- When to use conversation-only vs stored-only
+- Interpreting debug output
+- Best practices for session management
+
+**Estimated Time:** 1.5 hours
+
+---
+
+### Task 5.3: Update API Documentation
+**File:** `docs/API.md` (MODIFY)
+
+**Changes:**
+- Document new `searchMemories` parameters
+- Add examples for each search mode
+- Explain scoring and deduplication
+
+**Estimated Time:** 1 hour
+
+---
+
+## Summary
+
+### Total Estimated Time
+- **Phase 1 (Foundation):** 8.5 hours
+- **Phase 2 (Orchestrator):** 6 hours
+- **Phase 3 (MCP Server):** 2 hours
+- **Phase 4 (Testing):** 9 hours
+- **Phase 5 (Documentation):** 3.5 hours
+
+**Total:** ~29 hours (approximately 4 working days)
+
+### Critical Path
+1. Task 1.1 → 1.2 → 1.3 (Models + Context)
+2. Task 1.4 → 1.5 (Scoring + Dedup)
+3. Task 2.1 → 2.2 → 2.3 (Orchestrator)
+4. Task 3.1 → 3.2 (MCP Server)
+5. Task 4.1 → 4.2 → 4.3 (Testing)
+6. Task 5.1 → 5.2 → 5.3 (Docs)
+
+### Dependencies
+- All Phase 1 tasks must complete before Phase 2
+- Phase 2 must complete before Phase 3
+- Phase 3 must complete before Phase 4
+- Phase 5 can run in parallel with Phase 4
+
+### Risk Mitigation
+- **Risk:** Deduplication too slow
+  - **Mitigation:** Implement caching, limit candidate pool
+- **Risk:** Conversation context clutters long-term memory
+  - **Mitigation:** Use TTL, separate collection, or memory_type filter
+- **Risk:** Backward compatibility breaks
+  - **Mitigation:** All new parameters have defaults, extensive testing
+
+---
+
+**Document Status:** Ready for Implementation  
+**Author:** IBM Bob (Architect Mode)  
+**Date:** 2025-11-25  
+**Version:** 1.0

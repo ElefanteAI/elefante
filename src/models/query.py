@@ -108,6 +108,12 @@ class SearchFilters(BaseModel):
     project: Optional[str] = None
     file_path: Optional[str] = None
     
+    # NEW: Conversation context filters
+    session_id: Optional[UUID] = None
+    include_conversation: bool = True
+    include_stored: bool = True
+    conversation_weight: float = Field(default=0.3, ge=0.0, le=1.0)
+    
     class Config:
         json_encoders = {
             datetime: lambda v: v.isoformat(),

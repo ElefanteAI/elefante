@@ -10,7 +10,7 @@ This is the central intelligence layer that:
 
 import asyncio
 from typing import List, Optional, Dict, Any, Tuple
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import datetime
 
 from src.models.memory import Memory, MemoryType, MemoryMetadata
@@ -197,15 +197,21 @@ class MemoryOrchestrator:
         mode: QueryMode = QueryMode.HYBRID,
         limit: int = 10,
         filters: Optional[SearchFilters] = None,
-        min_similarity: float = 0.3
+        min_similarity: float = 0.3,
+        # NEW: Conversation context parameters
+        include_conversation: bool = True,
+        include_stored: bool = True,
+        session_id: Optional[UUID] = None,
+        return_debug: bool = False
     ) -> List[SearchResult]:
         """
-        Search memories using semantic and/or structured queries
+        Search memories using semantic, structured, and/or conversation context
         
-        This implements the core hybrid search logic:
+        This implements enhanced hybrid search with conversation awareness:
         - SEMANTIC: Vector similarity search only
         - STRUCTURED: Graph traversal only
         - HYBRID: Combined search with weighted scoring
+        - CONVERSATION: Recent session messages (when session_id provided)
         
         Args:
             query: Search query string
@@ -213,38 +219,64 @@ class MemoryOrchestrator:
             limit: Maximum number of results
             filters: Optional search filters
             min_similarity: Minimum similarity threshold (0.0-1.0)
+            include_conversation: Include conversation context in search
+            include_stored: Include stored memories in search
+            session_id: Session UUID for conversation context
+            return_debug: Return debug statistics with results
             
         Returns:
             List[SearchResult]: Ranked search results
         """
         validate_memory_content(query, min_length=1, max_length=1000)
         
+        # Extract conversation settings from filters if provided
+        if filters:
+            include_conversation = filters.include_conversation if filters.include_conversation is not None else include_conversation
+            include_stored = filters.include_stored if filters.include_stored is not None else include_stored
+            session_id = filters.session_id if filters.session_id else session_id
+        
         self.logger.info(
-            "Searching memories",
+            "Searching memories (enhanced)",
             query=query[:100],
             mode=mode.value,
             limit=limit,
-            has_filters=filters is not None
+            include_conversation=include_conversation,
+            include_stored=include_stored,
+            has_session=session_id is not None
         )
         
         try:
             # Create query plan
             plan = self._create_query_plan(query, mode, limit, filters, min_similarity)
             
-            # Execute search based on mode
-            if mode == QueryMode.SEMANTIC:
-                results = await self._search_semantic(query, plan)
-            elif mode == QueryMode.STRUCTURED:
-                results = await self._search_structured(query, plan)
-            else:  # HYBRID
-                results = await self._search_hybrid(query, plan)
+            # Execute searches based on flags
+            results = []
+            
+            if include_stored:
+                # Execute traditional search (semantic/structured/hybrid)
+                if mode == QueryMode.SEMANTIC:
+                    stored_results = await self._search_semantic(query, plan)
+                elif mode == QueryMode.STRUCTURED:
+                    stored_results = await self._search_structured(query, plan)
+                else:  # HYBRID
+                    stored_results = await self._search_hybrid(query, plan)
+                results.extend(stored_results)
+            
+            if include_conversation and session_id:
+                # Execute conversation context search
+                conversation_results = await self._search_conversation(query, session_id, limit)
+                results.extend(conversation_results)
+            
+            # Merge, normalize, and deduplicate results
+            if include_conversation and include_stored and session_id:
+                results = await self._merge_and_deduplicate(results, query, session_id is not None, mode.value)
             
             # Sort by score and limit
             results.sort(key=lambda r: r.score, reverse=True)
             results = results[:limit]
             
             self.logger.info(
-                f"Search completed",
+                "Search completed (enhanced)",
                 num_results=len(results),
                 top_score=results[0].score if results else 0.0
             )
@@ -457,6 +489,153 @@ class MemoryOrchestrator:
                 merged[memory_id] = result
         
         return list(merged.values())
+    
+    async def _search_conversation(
+        self,
+        query: str,
+        session_id: UUID,
+        limit: int
+    ) -> List[SearchResult]:
+        """
+        Search conversation context for relevant messages
+        
+        Args:
+            query: Search query
+            session_id: Session UUID
+            limit: Maximum results
+            
+        Returns:
+            List of SearchResult objects from conversation
+        """
+        from src.core.conversation_context import get_conversation_searcher
+        from src.models.conversation import SearchCandidate
+        
+        try:
+            searcher = get_conversation_searcher()
+            candidates = await searcher.collect_candidates(query, session_id, limit)
+            
+            # Convert SearchCandidates to SearchResults
+            results = []
+            for candidate in candidates:
+                # Create a minimal Memory object for the result
+                from src.models.memory import Memory, MemoryMetadata, MemoryType
+                
+                memory_metadata = MemoryMetadata(
+                    memory_type=MemoryType.CONVERSATION,
+                    importance=5,
+                    source=candidate.metadata.get("role", "user"),
+                    session_id=session_id
+                )
+                
+                memory = Memory(
+                    id=candidate.memory_id if candidate.memory_id else uuid4(),
+                    content=candidate.text,
+                    metadata=memory_metadata
+                )
+                
+                result = SearchResult(
+                    memory=memory,
+                    score=candidate.score,
+                    source="conversation",
+                    vector_score=None,
+                    graph_score=None
+                )
+                
+                results.append(result)
+            
+            self.logger.debug(
+                f"Conversation search completed",
+                session_id=str(session_id),
+                count=len(results)
+            )
+            
+            return results
+            
+        except Exception as e:
+            self.logger.error(f"Conversation search failed: {e}", exc_info=True)
+            return []
+    
+    async def _merge_and_deduplicate(
+        self,
+        results: List[SearchResult],
+        query: str,
+        has_session: bool,
+        mode: str
+    ) -> List[SearchResult]:
+        """
+        Merge results from multiple sources and remove duplicates
+        
+        Args:
+            results: Combined results from all sources
+            query: Original search query
+            has_session: Whether session context was used
+            mode: Search mode
+            
+        Returns:
+            Deduplicated and normalized results
+        """
+        from src.core.scoring import ScoreNormalizer
+        from src.core.deduplication import get_deduplicator
+        from src.models.conversation import SearchCandidate
+        
+        try:
+            # Convert SearchResults to SearchCandidates for processing
+            candidates = []
+            for result in results:
+                candidate = SearchCandidate(
+                    text=result.memory.content,
+                    score=result.score,
+                    source=result.source,
+                    metadata={
+                        "memory_id": str(result.memory.id),
+                        "timestamp": result.memory.metadata.timestamp.isoformat(),
+                        "memory_type": result.memory.metadata.memory_type.value
+                    },
+                    embedding=result.memory.embedding,
+                    memory_id=result.memory.id
+                )
+                candidates.append(candidate)
+            
+            # Calculate adaptive weights
+            weights = ScoreNormalizer.adaptive_weights(query, has_session, mode)
+            
+            # Normalize scores
+            candidates = ScoreNormalizer.normalize_scores(candidates, weights)
+            
+            # Deduplicate
+            deduplicator = get_deduplicator(threshold=0.95)
+            candidates = await deduplicator.deduplicate(candidates)
+            
+            # Convert back to SearchResults
+            final_results = []
+            for candidate in candidates:
+                # Find original result to preserve full memory object
+                original = next(
+                    (r for r in results if r.memory.id == candidate.memory_id),
+                    None
+                )
+                
+                if original:
+                    # Update score with normalized value
+                    original.score = candidate.score
+                    # Update source if merged
+                    if "sources" in candidate.metadata:
+                        original.source = "hybrid"
+                    final_results.append(original)
+            
+            self.logger.debug(
+                "Merge and deduplication completed",
+                original_count=len(results),
+                final_count=len(final_results),
+                weights=weights
+            )
+            
+            return final_results
+            
+        except Exception as e:
+            self.logger.error(f"Merge and deduplication failed: {e}", exc_info=True)
+            # Return original results if processing fails
+            return results
     
     async def get_context(
         self,
