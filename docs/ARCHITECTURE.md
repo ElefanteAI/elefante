@@ -23,17 +23,17 @@
 ## 2. System Architecture Overview
 
 ```mermaid
-graph TB
-    subgraph IDE["AI Assistant (Client)"]
+flowchart TB
+    subgraph IDE ["AI Assistant (Client)"]
         Agent[AI Agent]
         MCP_Client[MCP Client]
     end
 
-    subgraph Elefante["Elefante System"]
+    subgraph Elefante ["Elefante System"]
         MCP_Server[MCP Server]
         Orchestrator[Hybrid Orchestrator]
 
-        subgraph "Memory Layers"
+        subgraph MemoryLayers ["Memory Layers"]
             Vector[ChromaDB (Semantic)]
             Graph[Kuzu (Structured)]
             Context[Session Context]
