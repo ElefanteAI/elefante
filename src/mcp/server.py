@@ -334,7 +334,7 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
                 )
             ]
         
-            ]
+
         
         @self.server.call_tool()
         async def call_tool(name: str, arguments: Dict[str, Any]) -> Sequence[TextContent | ImageContent | EmbeddedResource]:
