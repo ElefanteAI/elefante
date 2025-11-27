@@ -120,9 +120,37 @@ Elefante uses a **triple-layer architecture** for comprehensive memory:
 | "Who created the Elefante project?" | **Graph** (Structured) | Exact fact retrieval |
 | "Everything about Elefante" | **Hybrid** (All Three) | Comprehensive context |
 
-### 🆕 Conversation Context (NEW!)
+### 🆕 Enterprise Features (v2.0)
 
-Elefante now includes **session-aware conversation context** that:
+Elefante has been upgraded with **production-grade intelligence**:
+
+1.  **🧠 Intelligent Ingestion**:
+    *   Automatically detects if a memory is `NEW`, `REDUNDANT`, or `RELATED`.
+    *   Creates `SIMILAR_TO` links in the graph automatically.
+    *   **No deletion**: Keeps all history but organizes it intelligently.
+
+2.  **👤 User Profile (Contextual Awareness)**:
+    *   Detects "I" statements (e.g., "I live in Canada").
+    *   Links them to a persistent **User** node.
+    *   **Global Context**: Automatically fetches user facts before every search.
+
+3.  **📅 Episodic Memory**:
+    *   Links every memory to a **Session** entity.
+    *   Enables temporal queries ("What did we do yesterday?").
+    *   New tool: `getEpisodes` for timeline browsing.
+
+4.  **🌍 Cross-Workspace Persistence**:
+    *   Data stored in `~/.elefante/data` (User Home).
+    *   Memories follow you across projects and IDEs (VS Code, Cursor, etc.).
+
+5.  **🛡️ Agent-Proof Search**:
+    *   Enhanced prompt engineering forces the agent to search before asking.
+    *   Automatic query rewriting for better results.
+
+---
+
+### 🆕 Conversation Context (Legacy)
+Elefante also includes session-aware conversation context that:
 - Tracks recent messages within the current session
 - Resolves pronouns and vague references automatically
 - Uses adaptive weighting based on query characteristics
