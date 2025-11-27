@@ -25,21 +25,18 @@
 ```mermaid
 flowchart TB
     subgraph IDE ["AI Assistant (Client)"]
-        Agent[AI Agent]
-        MCP_Client[MCP Client]
+        Agent["AI Agent"]
+        MCP_Client["MCP Client"]
     end
 
     subgraph Elefante ["Elefante System"]
-        MCP_Server[MCP Server]
-        Orchestrator[Hybrid Orchestrator]
+        MCP_Server["MCP Server"]
+        Orchestrator["Hybrid Orchestrator"]
+        Profile["User Profile"]
 
-        subgraph MemoryLayers ["Memory Layers"]
-            Vector[ChromaDB (Semantic)]
-            Graph[Kuzu (Structured)]
-            Context[Session Context]
-        end
-
-        Profile[User Profile]
+        Vector["ChromaDB (Semantic)"]
+        Graph["Kuzu (Structured)"]
+        Context["Session Context"]
     end
 
     Agent -->|Tool Calls| MCP_Client

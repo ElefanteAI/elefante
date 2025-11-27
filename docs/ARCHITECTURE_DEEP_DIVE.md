@@ -16,23 +16,23 @@ Elefante uses an **Orchestrator** pattern to route queries and manage data consi
 
 ```mermaid
 flowchart TD
-    User[User / AI Agent] -->|MCP Protocol| Server[MCP Server]
-    Server --> Orch[Orchestrator]
+    User["User / AI Agent"] -->|MCP Protocol| Server["MCP Server"]
+    Server --> Orch["Orchestrator"]
 
     subgraph CoreLogic ["Core Logic"]
-        Orchestrator --> Plan[Query Planner]
-        Orchestrator --> Scorer[Score Normalizer]
-        Orchestrator --> Dedup[Deduplicator]
-        Orchestrator --> Context[Conversation Context]
+        Orch --> Plan["Query Planner"]
+        Orch --> Scorer["Score Normalizer"]
+        Orch --> Dedup["Deduplicator"]
+        Orch --> Context["Conversation Context"]
     end
 
     subgraph StorageLayer ["Storage Layer"]
-        Orchestrator -->|Semantic Search| Vector[Vector Store (ChromaDB)]
-        Orchestrator -->|Graph Query| Graph[Graph Store (Kuzu)]
+        Orch -->|Semantic Search| Vector["Vector Store (ChromaDB)"]
+        Orch -->|Graph Query| Graph["Graph Store (Kuzu)"]
         Context -->|Recent Msgs| Vector
     end
 
-    Vector -->|Embeddings| Embed[Embedding Service]
+    Vector -->|Embeddings| Embed["Embedding Service"]
 ```
 
 ### Key Components
