@@ -114,22 +114,48 @@ class VectorStore:
             logger.debug("generating_embedding", memory_id=str(memory.id))
             memory.embedding = await self._embedding_service.generate_embedding(memory.content)
         
-        # Prepare metadata for ChromaDB
+        # Prepare metadata for ChromaDB (V2.0 Schema)
         metadata = {
-            "timestamp": memory.metadata.timestamp.isoformat(),
-            "memory_type": memory.metadata.memory_type.value,
+            # Layer 1: Core Identity
+            "created_at": memory.metadata.created_at.isoformat(),
+            "created_by": memory.metadata.created_by,
+            
+            # Layer 2: Classification (3-level taxonomy)
+            "domain": memory.metadata.domain.value if hasattr(memory.metadata.domain, 'value') else str(memory.metadata.domain),
+            "category": memory.metadata.category,
+            "memory_type": memory.metadata.memory_type.value if hasattr(memory.metadata.memory_type, 'value') else str(memory.metadata.memory_type),
+            "subcategory": memory.metadata.subcategory or "",
+            
+            # Layer 3: Semantic Metadata
+            "intent": memory.metadata.intent.value if hasattr(memory.metadata.intent, 'value') else str(memory.metadata.intent),
             "importance": memory.metadata.importance,
+            "urgency": memory.metadata.urgency,
+            "confidence": memory.metadata.confidence,
             "tags": ",".join(memory.metadata.tags) if memory.metadata.tags else "",
-            "source": memory.metadata.source,
+            "keywords": ",".join(memory.metadata.keywords) if memory.metadata.keywords else "",
+            
+            # Layer 4: Relationships (IDs only, graph stores full relationships)
+            "status": memory.metadata.status.value if hasattr(memory.metadata.status, 'value') else str(memory.metadata.status),
+            "parent_id": str(memory.metadata.parent_id) if memory.metadata.parent_id else "",
+            
+            # Layer 5: Source Attribution
+            "source": memory.metadata.source.value if hasattr(memory.metadata.source, 'value') else str(memory.metadata.source),
+            "source_reliability": memory.metadata.source_reliability,
+            "verified": memory.metadata.verified,
+            
+            # Layer 6: Context Anchoring
+            "project": memory.metadata.project or "",
+            "file_path": memory.metadata.file_path or "",
+            "session_id": str(memory.metadata.session_id) if memory.metadata.session_id else "",
+            
+            # Layer 7: Temporal Intelligence
+            "last_accessed": memory.metadata.last_accessed.isoformat(),
+            "access_count": memory.metadata.access_count,
+            
+            # Layer 8: Quality & Lifecycle
+            "version": memory.metadata.version,
+            "deprecated": memory.metadata.deprecated,
         }
-        
-        # Add optional metadata
-        if memory.metadata.session_id:
-            metadata["session_id"] = str(memory.metadata.session_id)
-        if memory.metadata.project:
-            metadata["project"] = memory.metadata.project
-        if memory.metadata.file_path:
-            metadata["file_path"] = memory.metadata.file_path
         
         # Add to collection
         try:
@@ -141,10 +167,15 @@ class VectorStore:
                 metadatas=[metadata]
             )
             
+            # Handle both enum and string types for memory_type
+            mem_type = memory.metadata.memory_type
+            if hasattr(mem_type, 'value'):
+                mem_type = mem_type.value
+            
             logger.info(
                 "memory_added",
                 memory_id=str(memory.id),
-                type=memory.metadata.memory_type.value
+                type=mem_type
             )
             
             return str(memory.id)
@@ -264,23 +295,60 @@ class VectorStore:
         return where if where else None
     
     def _reconstruct_memory(self, memory_id: str, content: str, metadata: Dict[str, Any]) -> Memory:
-        """Reconstruct Memory object from ChromaDB data"""
-        # Parse metadata
-        memory_metadata = MemoryMetadata(
-            timestamp=datetime.fromisoformat(metadata.get("timestamp", datetime.utcnow().isoformat())),
-            memory_type=metadata.get("memory_type", "conversation"),
-            importance=metadata.get("importance", 5),
-            tags=metadata.get("tags", "").split(",") if metadata.get("tags") else [],
-            source=metadata.get("source", "user"),
-        )
+        """Reconstruct Memory object from ChromaDB data (V2.0 Schema)"""
+        from src.models.memory import DomainType, MemoryType, IntentType, MemoryStatus, SourceType
         
-        # Add optional fields
-        if session_id := metadata.get("session_id"):
-            memory_metadata.session_id = UUID(session_id)
-        if project := metadata.get("project"):
-            memory_metadata.project = project
-        if file_path := metadata.get("file_path"):
-            memory_metadata.file_path = file_path
+        # Helper to safely get enum value
+        def get_enum_value(enum_class, value, default):
+            if not value:
+                return default
+            try:
+                return enum_class(value)
+            except (ValueError, KeyError):
+                return default
+        
+        # Parse V2 metadata with backward compatibility for V1
+        memory_metadata = MemoryMetadata(
+            # Layer 1: Core Identity
+            created_at=datetime.fromisoformat(metadata.get("created_at", metadata.get("timestamp", datetime.utcnow().isoformat()))),
+            created_by=metadata.get("created_by", "user"),
+            
+            # Layer 2: Classification
+            domain=get_enum_value(DomainType, metadata.get("domain"), DomainType.REFERENCE),
+            category=metadata.get("category", "general"),
+            memory_type=get_enum_value(MemoryType, metadata.get("memory_type"), MemoryType.CONVERSATION),
+            subcategory=metadata.get("subcategory") or None,
+            
+            # Layer 3: Semantic
+            intent=get_enum_value(IntentType, metadata.get("intent"), IntentType.REFERENCE),
+            importance=metadata.get("importance", 5),
+            urgency=metadata.get("urgency", 5),
+            confidence=metadata.get("confidence", 0.7),
+            tags=metadata.get("tags", "").split(",") if metadata.get("tags") else [],
+            keywords=metadata.get("keywords", "").split(",") if metadata.get("keywords") else [],
+            
+            # Layer 4: Relationships
+            status=get_enum_value(MemoryStatus, metadata.get("status"), MemoryStatus.NEW),
+            parent_id=UUID(metadata["parent_id"]) if metadata.get("parent_id") else None,
+            
+            # Layer 5: Source
+            source=get_enum_value(SourceType, metadata.get("source"), SourceType.USER_INPUT),
+            source_reliability=metadata.get("source_reliability", 0.9),
+            verified=metadata.get("verified", False),
+            
+            # Layer 6: Context
+            project=metadata.get("project") or None,
+            file_path=metadata.get("file_path") or None,
+            session_id=UUID(metadata["session_id"]) if metadata.get("session_id") else None,
+            
+            # Layer 7: Temporal
+            last_accessed=datetime.fromisoformat(metadata.get("last_accessed", datetime.utcnow().isoformat())),
+            access_count=metadata.get("access_count", 0),
+            
+            # Layer 8: Quality
+            version=metadata.get("version", 1),
+            deprecated=metadata.get("deprecated", False),
+        )
         
         # Create memory object
         memory = Memory(
@@ -417,6 +485,82 @@ class VectorStore:
         except Exception as e:
             logger.error("failed_to_get_stats", error=str(e))
             return {}
+    
+    async def get_all(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        filters: Optional[SearchFilters] = None
+    ) -> List[Memory]:
+        """
+        Retrieve all memories without semantic search filtering
+        
+        This method bypasses semantic search and returns memories directly
+        from ChromaDB. Useful for database inspection, debugging, or when
+        you need a complete memory dump.
+        
+        Args:
+            limit: Maximum number of memories to return
+            offset: Number of memories to skip (for pagination)
+            filters: Optional filters to apply
+            
+        Returns:
+            List of Memory objects
+        """
+        self._initialize_client()
+        
+        try:
+            # Build where clause from filters if provided
+            where_clause = self._build_where_clause(filters) if filters else None
+            
+            # Get all IDs first to support pagination
+            all_results = await asyncio.to_thread(
+                self._collection.get,
+                where=where_clause,
+                include=["documents", "metadatas"]
+            )
+            
+            if not all_results or not all_results['ids']:
+                logger.info("no_memories_found")
+                return []
+            
+            # Apply pagination
+            total_count = len(all_results['ids'])
+            start_idx = offset
+            end_idx = min(offset + limit, total_count)
+            
+            if start_idx >= total_count:
+                logger.info("offset_exceeds_total", offset=offset, total=total_count)
+                return []
+            
+            # Slice results for pagination
+            paginated_ids = all_results['ids'][start_idx:end_idx]
+            paginated_docs = all_results['documents'][start_idx:end_idx]
+            paginated_metadata = all_results['metadatas'][start_idx:end_idx]
+            
+            # Reconstruct memory objects
+            memories = []
+            for i, memory_id in enumerate(paginated_ids):
+                memory = self._reconstruct_memory(
+                    memory_id,
+                    paginated_docs[i],
+                    paginated_metadata[i]
+                )
+                memories.append(memory)
+            
+            logger.info(
+                "retrieved_all_memories",
+                count=len(memories),
+                total=total_count,
+                offset=offset,
+                limit=limit
+            )
+            
+            return memories
+            
+        except Exception as e:
+            logger.error("failed_to_get_all_memories", error=str(e))
+            raise
     
     async def clear(self) -> bool:
         """

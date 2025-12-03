@@ -10,6 +10,10 @@ interface Node {
   vx: number;
   vy: number;
   radius: number;
+  properties?: {
+    description?: string;
+    created_at?: string;
+  };
 }
 
 interface Edge {
@@ -192,16 +196,76 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
         ctx.fill();
         ctx.shadowBlur = 0; // Reset shadow
         
-        // Hover effect
+        // Always draw label for memories
+        ctx.fillStyle = '#fff';
+        ctx.font = '11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Truncate label if too long
+        let displayLabel = node.label;
+        if (displayLabel.startsWith('memory_')) {
+          // Extract first few words from description if available
+          const desc = node.properties?.description || '';
+          if (desc) {
+            const words = desc.split(' ').slice(0, 3).join(' ');
+            displayLabel = words.length > 20 ? words.substring(0, 20) + '...' : words;
+          } else {
+            displayLabel = 'Memory';
+          }
+        }
+        
+        // Draw label below node
+        ctx.fillText(displayLabel, node.x, node.y + node.radius + 12);
+        
+        // Hover effect - show full description
         if (hoveredNode?.id === node.id) {
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 2;
             ctx.stroke();
             
-            // Draw Label
+            // Draw detailed tooltip
+            const desc = node.properties?.description || node.label;
+            const maxWidth = 300;
+            const words = desc.split(' ');
+            let lines: string[] = [];
+            let currentLine = '';
+            
+            words.forEach((word: string) => {
+              const testLine = currentLine + (currentLine ? ' ' : '') + word;
+              const metrics = ctx.measureText(testLine);
+              if (metrics.width > maxWidth && currentLine) {
+                lines.push(currentLine);
+                currentLine = word;
+              } else {
+                currentLine = testLine;
+              }
+            });
+            if (currentLine) lines.push(currentLine);
+            
+            // Draw tooltip background
+            const padding = 10;
+            const lineHeight = 16;
+            const tooltipHeight = lines.length * lineHeight + padding * 2;
+            const tooltipWidth = maxWidth + padding * 2;
+            const tooltipX = node.x - tooltipWidth / 2;
+            const tooltipY = node.y - node.radius - tooltipHeight - 10;
+            
+            ctx.fillStyle = 'rgba(30, 41, 59, 0.95)';
+            ctx.fillRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight);
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight);
+            
+            // Draw tooltip text
             ctx.fillStyle = '#fff';
-            ctx.font = '12px Inter';
-            ctx.fillText(node.label, node.x + 15, node.y + 4);
+            ctx.font = '12px Inter, sans-serif';
+            ctx.textAlign = 'left';
+            lines.forEach((line, i) => {
+              ctx.fillText(line, tooltipX + padding, tooltipY + padding + i * lineHeight + 12);
+            });
+            
+            ctx.textAlign = 'center'; // Reset
         }
       });
       

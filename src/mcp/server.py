@@ -342,6 +342,49 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
                     }
                 ),
                 types.Tool(
+                    name="listAllMemories",
+                    description="Retrieve ALL memories from the database without semantic filtering. This tool bypasses semantic search and returns memories directly from ChromaDB, making it ideal for: database inspection, debugging, exporting all memories, browsing complete memory collection, or when you need a comprehensive view. For relevance-based search, use searchMemories instead. Supports pagination and optional filtering by memory_type, importance, etc.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "limit": {
+                                "type": "integer",
+                                "default": 100,
+                                "minimum": 1,
+                                "maximum": 500,
+                                "description": "Maximum number of memories to return"
+                            },
+                            "offset": {
+                                "type": "integer",
+                                "default": 0,
+                                "minimum": 0,
+                                "description": "Number of memories to skip (for pagination)"
+                            },
+                            "filters": {
+                                "type": "object",
+                                "properties": {
+                                    "memory_type": {
+                                        "type": "string",
+                                        "description": "Filter by memory type (conversation, fact, insight, code, decision, task, note)"
+                                    },
+                                    "min_importance": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 10,
+                                        "description": "Minimum importance level"
+                                    },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "description": "Filter by tags"
+                                    }
+                                },
+                                "description": "Optional filters to apply"
+                            }
+                        }
+                    }
+                ),
+                types.Tool(
                     name="openDashboard",
                     description="Launch and open the Elefante Knowledge Garden Dashboard in the user's browser. This visual interface allows the user to explore their memory graph, view connections between concepts, and filter by 'Spaces'. Use this when the user wants to 'see' their memory or explore the knowledge graph visually.",
                     inputSchema={
@@ -375,6 +418,8 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
                     result = await self._handle_create_relationship(arguments)
                 elif name == "getEpisodes":
                     result = await self._handle_get_episodes(arguments)
+                elif name == "listAllMemories":
+                    result = await self._handle_list_all_memories(arguments)
                 elif name == "getStats":
                     result = await self._handle_get_stats(arguments)
                 elif name == "consolidateMemories":
@@ -401,8 +446,9 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
                 )]
     
     async def _handle_add_memory(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle addMemory tool call"""
+        """Handle addMemory tool call - now uses shared singleton connection"""
         orchestrator = await self._get_orchestrator()
+        
         memory = await orchestrator.add_memory(
             content=args["content"],
             memory_type=args.get("memory_type", "conversation"),
@@ -415,7 +461,7 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
         return {
             "success": True,
             "memory_id": str(memory.id),
-            "message": "Memory stored successfully",
+            "message": "Memory stored successfully (shared connection with dashboard)",
             "memory": memory.to_dict()
         }
     
@@ -541,6 +587,34 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
             "stats": stats
         }
     
+    async def _handle_list_all_memories(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle listAllMemories tool call"""
+        orchestrator = await self._get_orchestrator()
+        
+        # Parse filters if provided
+        filters = None
+        if "filters" in args and args["filters"]:
+            filter_data = args["filters"]
+            filters = SearchFilters(
+                memory_type=filter_data.get("memory_type"),
+                min_importance=filter_data.get("min_importance"),
+                max_importance=filter_data.get("max_importance"),
+                tags=filter_data.get("tags")
+            )
+        
+        # Get all memories
+        memories = await orchestrator.list_all_memories(
+            limit=args.get("limit", 100),
+            offset=args.get("offset", 0),
+            filters=filters
+        )
+        
+        return {
+            "success": True,
+            "count": len(memories),
+            "memories": [memory.to_dict() for memory in memories]
+        }
+    
     async def _handle_consolidate_memories(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Handle consolidateMemories tool call"""
         orchestrator = await self._get_orchestrator()
@@ -618,6 +692,18 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
     async def run(self):
         """Run the MCP server"""
         self.logger.info("Starting Elefante MCP Server...")
+        
+        # Pre-initialize orchestrator to load embedding model BEFORE handling requests
+        # This prevents timeout issues on first tool call
+        self.logger.info("Pre-initializing orchestrator and embedding model...")
+        try:
+            orchestrator = await self._get_orchestrator()
+            # Trigger model loading by generating a test embedding
+            await orchestrator.embedding_service.generate_embedding("initialization test")
+            self.logger.info("Orchestrator and embedding model initialized successfully")
+        except Exception as e:
+            self.logger.error(f"Failed to pre-initialize orchestrator: {e}")
+            # Continue anyway - will lazy load on first request
         
         async with stdio_server() as (read_stream, write_stream):
             self.logger.info("MCP Server running on stdio")

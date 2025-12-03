@@ -103,6 +103,163 @@ def run_command(cmd, cwd=None, shell=False):
         return False
     except Exception as e:
         logger.log(f"❌ Execution error: {e}")
+
+def check_kuzu_compatibility(root_dir):
+    """
+    Pre-flight check for Kuzu 0.11+ compatibility issues
+    Prevents the "Database path cannot be a directory" error
+    """
+    logger.log("\n🔍 Checking Kuzu compatibility...")
+    
+    # Check if Kuzu database directory exists
+    kuzu_db_path = Path.home() / ".elefante" / "data" / "kuzu_db"
+    
+    if kuzu_db_path.exists() and kuzu_db_path.is_dir():
+        # Check if it's a valid Kuzu database or empty directory
+        kuzu_files = list(kuzu_db_path.glob("*.kz")) + list(kuzu_db_path.glob(".lock"))
+        
+        if kuzu_files:
+            logger.log(f"⚠️  Found existing Kuzu database at: {kuzu_db_path}")
+            logger.log("   Kuzu 0.11+ requires clean installation for path compatibility.")
+            logger.log("")
+            logger.log("   Options:")
+            logger.log("   1. Backup and remove (recommended)")
+            logger.log("   2. Skip and risk installation failure")
+            logger.log("")
+            
+            response = input("   Backup and remove existing database? (Y/n): ").strip().lower()
+            
+            if response in ['', 'y', 'yes']:
+                # Create backup
+                backup_path = kuzu_db_path.parent / f"kuzu_db.backup.{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                logger.log(f"📦 Creating backup at: {backup_path}")
+                shutil.copytree(kuzu_db_path, backup_path)
+                logger.log("✅ Backup created successfully")
+                
+                # Remove original
+                logger.log(f"🗑️  Removing original database...")
+                shutil.rmtree(kuzu_db_path)
+                logger.log("✅ Original database removed")
+                logger.log("")
+                return True
+            else:
+                logger.log("⚠️  Skipping database removal. Installation may fail.")
+                logger.log("   If installation fails, manually remove: " + str(kuzu_db_path))
+                logger.log("")
+                return False
+        else:
+            # Empty directory - safe to remove
+            logger.log(f"🗑️  Removing empty Kuzu directory: {kuzu_db_path}")
+            kuzu_db_path.rmdir()
+            logger.log("✅ Empty directory removed")
+            return True
+    else:
+        logger.log("✅ No Kuzu compatibility issues detected")
+        return True
+
+def check_dependency_versions(root_dir):
+    """
+    Check for known breaking changes in dependencies
+    """
+    logger.log("\n🔍 Checking dependency versions for breaking changes...")
+    
+    requirements_file = root_dir / "requirements.txt"
+    if not requirements_file.exists():
+        logger.log("⚠️  requirements.txt not found")
+        return True
+    
+    breaking_changes = {
+        "kuzu": {
+            "version": "0.11",
+            "issue": "Database path handling changed - cannot pre-create directories",
+            "fixed_by": "check_kuzu_compatibility()"
+        }
+    }
+    
+    with open(requirements_file, 'r') as f:
+        requirements = f.read()
+    
+    issues_found = []
+    for package, info in breaking_changes.items():
+        if package in requirements and info["version"] in requirements:
+            logger.log(f"⚠️  {package} {info['version']}+ detected")
+            logger.log(f"   Known issue: {info['issue']}")
+            logger.log(f"   Mitigation: {info['fixed_by']}")
+            issues_found.append(package)
+    
+    if not issues_found:
+        logger.log("✅ No known breaking changes detected")
+    
+    logger.log("")
+    return True
+
+def check_disk_space(root_dir):
+    """
+    Verify sufficient disk space for installation
+    """
+    logger.log("\n🔍 Checking disk space...")
+    
+    required_space = 5_000_000_000  # 5 GB
+    
+    if platform.system() == 'Windows':
+        import ctypes
+        free_bytes = ctypes.c_ulonglong(0)
+        ctypes.windll.kernel32.GetDiskFreeSpaceExW(
+            ctypes.c_wchar_p(str(root_dir)), 
+            None, 
+            None, 
+            ctypes.pointer(free_bytes)
+        )
+        available = free_bytes.value
+    else:
+        stat = os.statvfs(root_dir)
+        available = stat.f_bavail * stat.f_frsize
+    
+    available_gb = available / (1024**3)
+    required_gb = required_space / (1024**3)
+    
+    if available < required_space:
+        logger.log(f"❌ Insufficient disk space!")
+        logger.log(f"   Available: {available_gb:.2f} GB")
+        logger.log(f"   Required: {required_gb:.2f} GB")
+        return False
+    else:
+        logger.log(f"✅ Sufficient disk space: {available_gb:.2f} GB available")
+        return True
+
+def run_preflight_checks(root_dir):
+    """
+    Run all pre-flight checks before installation
+    """
+    print_header("PRE-FLIGHT CHECKS")
+    logger.log("Running automated checks to prevent common installation issues...")
+    
+    checks = [
+        ("Disk Space", lambda: check_disk_space(root_dir)),
+        ("Dependency Versions", lambda: check_dependency_versions(root_dir)),
+        ("Kuzu Compatibility", lambda: check_kuzu_compatibility(root_dir)),
+    ]
+    
+    all_passed = True
+    for check_name, check_func in checks:
+        try:
+            result = check_func()
+            if not result:
+                all_passed = False
+                logger.log(f"❌ {check_name} check failed")
+        except Exception as e:
+            logger.log(f"⚠️  {check_name} check error: {e}")
+            all_passed = False
+    
+    if all_passed:
+        logger.log("\n✅ All pre-flight checks passed!")
+        logger.log("="*60 + "\n")
+        return True
+    else:
+        logger.log("\n❌ Some pre-flight checks failed")
+        logger.log("Please resolve the issues above before continuing.")
+        logger.log("="*60 + "\n")
+        return False
         return False
 
 def get_python_cmd():
@@ -196,6 +353,12 @@ def main():
     print_header("ELEFANTE INSTALLATION WIZARD")
     logger.log(f"📂 Installation Directory: {root_dir}")
     logger.log(f"🐍 Python: {sys.version.split()[0]}")
+    
+    # 0. Pre-Flight Checks (NEW - Prevents Kuzu and other issues)
+    if not run_preflight_checks(root_dir):
+        logger.log("\n❌ Installation aborted due to pre-flight check failures.")
+        logger.log("Please resolve the issues above and try again.")
+        sys.exit(1)
     
     success = True
     

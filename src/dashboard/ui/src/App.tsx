@@ -33,11 +33,11 @@ function App() {
           {/* Stats */}
           <div className="grid grid-cols-2 gap-2 mb-4">
             <div className="bg-background/50 p-2 rounded-lg text-center">
-              <div className="text-xl font-bold text-accent">{stats?.total_memories || 0}</div>
+              <div className="text-xl font-bold text-accent">{stats?.vector_store?.total_memories || 0}</div>
               <div className="text-[10px] text-muted uppercase tracking-wider">Memories</div>
             </div>
             <div className="bg-background/50 p-2 rounded-lg text-center">
-              <div className="text-xl font-bold text-primary">{stats?.total_episodes || 0}</div>
+              <div className="text-xl font-bold text-primary">{stats?.graph_store?.total_entities || 0}</div>
               <div className="text-[10px] text-muted uppercase tracking-wider">Episodes</div>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import os
 import threading
+import traceback
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,6 +32,7 @@ async def get_graph(limit: int = 1000, space: Optional[str] = None):
     Fetch graph data (nodes and edges) for visualization.
     """
     try:
+        import traceback
         graph_store = get_graph_store()
         
         # Base query for nodes
@@ -49,47 +51,62 @@ async def get_graph(limit: int = 1000, space: Optional[str] = None):
         node_ids = set()
         
         for row in node_results:
-            entity = row.get("n")
-            if entity:
-                node_id = str(entity.id)
-                node_ids.add(node_id)
-                
-                # Determine visual type
-                visual_type = "memory" if entity.type.value == "memory" else "entity"
-                if entity.type.value == "session":
-                    visual_type = "session"
-                
-                nodes.append({
-                    "id": node_id,
-                    "label": entity.name,
-                    "type": visual_type,
-                    "entityType": entity.type.value,
-                    "properties": entity.properties
-                })
+            # Kuzu returns {'values': [entity_dict]}
+            values = row.get("values", [])
+            if values and len(values) > 0:
+                entity = values[0]  # Get first value which is the entity
+                if isinstance(entity, dict):
+                    node_id = str(entity.get("id", ""))
+                    if node_id:
+                        node_ids.add(node_id)
+                        
+                        # Determine visual type
+                        entity_type = entity.get("type", "entity")
+                        visual_type = "memory" if entity_type == "memory" else "entity"
+                        if entity_type == "session":
+                            visual_type = "session"
+                        
+                        nodes.append({
+                            "id": node_id,
+                            "label": entity.get("name", "Unknown"),
+                            "type": visual_type,
+                            "entityType": entity_type,
+                            "properties": {
+                                "description": entity.get("description", ""),
+                                "created_at": str(entity.get("created_at", ""))
+                            }
+                        })
         
         # Fetch Relationships
         # Only fetch relationships where both nodes are in our node set
+        # Note: Kuzu 0.11.x doesn't support type(r) function, we'll get relationship type differently
         edges_cypher = f"""
         MATCH (a:Entity)-[r]->(b:Entity)
-        RETURN a.id, b.id, type(r), r
+        RETURN a.id AS source_id, b.id AS target_id, r
         LIMIT {limit * 2}
         """
         edge_results = await graph_store.execute_query(edges_cypher)
         
         edges = []
         for row in edge_results:
-            source_id = row.get("a.id")
-            target_id = row.get("b.id")
-            rel_type = row.get("type(r)")
-            
-            # Kuzu might return IDs as strings or other types, ensure consistency
-            if str(source_id) in node_ids and str(target_id) in node_ids:
-                edges.append({
-                    "source": str(source_id),
-                    "target": str(target_id),
-                    "type": rel_type,
-                    "properties": row.get("r", {})
-                })
+            # Kuzu returns {'values': [source_id, target_id, relationship]}
+            values = row.get("values", [])
+            if values and len(values) >= 3:
+                source_id = str(values[0])
+                target_id = str(values[1])
+                rel = values[2]
+                
+                # Get relationship type from the relationship object
+                rel_type = rel.get("type", "relates_to") if isinstance(rel, dict) else "relates_to"
+                
+                # Only include edges where both nodes exist
+                if source_id in node_ids and target_id in node_ids:
+                    edges.append({
+                        "source": source_id,
+                        "target": target_id,
+                        "type": rel_type,
+                        "properties": rel if isinstance(rel, dict) else {}
+                    })
                 
         return {
             "nodes": nodes,
@@ -102,6 +119,7 @@ async def get_graph(limit: int = 1000, space: Optional[str] = None):
         
     except Exception as e:
         logger.error(f"Failed to fetch graph data: {e}", exc_info=True)
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/stats")

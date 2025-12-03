@@ -28,38 +28,88 @@ class GraphStore:
     Supports Cypher-like queries for complex graph traversal.
     """
     
-    def __init__(self, database_path: Optional[str] = None):
+    def __init__(self, database_path: Optional[str] = None, read_only: bool = False):
         """
         Initialize graph store
         
         Args:
             database_path: Path to Kuzu database directory
+            read_only: If True, open in read-only mode (NOT SUPPORTED BY KUZU - kept for future)
         """
         self.config = get_config()
         self.database_path = database_path or self.config.elefante.graph_store.database_path
         self.buffer_pool_size = self.config.elefante.graph_store.buffer_pool_size
+        self.read_only = read_only
         
         self._conn = None
         self._schema_initialized = False
+        self._lock = None  # For thread safety
         
         logger.info(
             "initializing_graph_store",
-            database_path=self.database_path
+            database_path=self.database_path,
+            read_only=read_only
         )
     
+    def _parse_buffer_size(self, size_str: str) -> int:
+        """
+        Parse buffer size string (e.g., '512MB') to bytes integer.
+        
+        Args:
+            size_str: Size string like '512MB', '1GB', etc.
+            
+        Returns:
+            Size in bytes as integer
+        """
+        if isinstance(size_str, int):
+            return size_str
+            
+        size_str = size_str.upper().strip()
+        
+        # Extract number and unit
+        import re
+        match = re.match(r'(\d+)\s*(MB|GB|KB|B)?', size_str)
+        if not match:
+            logger.warning(f"Invalid buffer size format: {size_str}, using default 512MB")
+            return 512 * 1024 * 1024
+        
+        number = int(match.group(1))
+        unit = match.group(2) or 'B'
+        
+        # Convert to bytes
+        multipliers = {
+            'B': 1,
+            'KB': 1024,
+            'MB': 1024 * 1024,
+            'GB': 1024 * 1024 * 1024
+        }
+        
+        return number * multipliers.get(unit, 1)
+    
     def _initialize_connection(self):
-        """Initialize Kuzu connection (lazy loading)"""
+        """Initialize Kuzu connection (lazy loading) with thread safety"""
         if self._conn is not None:
             return
+        
+        # Initialize lock for thread-safe access
+        if self._lock is None:
+            import threading
+            self._lock = threading.RLock()
         
         try:
             import kuzu
             
             # Create database parent directory if it doesn't exist
-            Path(self.database_path).parent.mkdir(parents=True, exist_ok=True)
+            db_path = Path(self.database_path)
+            db_path.parent.mkdir(parents=True, exist_ok=True)
             
-            # Initialize database
-            db = kuzu.Database(self.database_path)
+            # Kuzu expects the database path to be a directory that it manages
+            # The directory should exist and contain Kuzu database files
+            # Convert buffer_pool_size from string (e.g., "512MB") to bytes integer
+            buffer_size_bytes = self._parse_buffer_size(self.buffer_pool_size)
+            
+            # Initialize database - Kuzu will use the directory as-is
+            db = kuzu.Database(self.database_path, buffer_pool_size=buffer_size_bytes)
             self._conn = kuzu.Connection(db)
             
             # Initialize schema
@@ -74,6 +124,18 @@ class GraphStore:
                 "kuzu not installed. "
                 "Install with: pip install kuzu"
             )
+        except RuntimeError as e:
+            error_msg = str(e)
+            if "Could not set lock on file" in error_msg or "IO exception" in error_msg:
+                logger.error("kuzu_database_locked", error=error_msg)
+                raise RuntimeError(
+                    f"Kuzu database is locked by another process. "
+                    f"This usually means the dashboard server or another MCP instance is running. "
+                    f"Database path: {self.database_path}\n"
+                    f"Solution: Stop the dashboard server or other processes accessing the database."
+                ) from e
+            logger.error("failed_to_initialize_kuzu", error=error_msg)
+            raise
         except Exception as e:
             logger.error("failed_to_initialize_kuzu", error=str(e))
             raise
@@ -174,7 +236,7 @@ class GraphStore:
     
     async def create_entity(self, entity: Entity) -> UUID:
         """
-        Create an entity in the graph
+        Create an entity in the graph (DEPRECATED - use create_or_get_entity for deduplication)
         
         Args:
             entity: Entity object to create
@@ -232,6 +294,94 @@ class GraphStore:
             
         except Exception as e:
             logger.error("failed_to_create_entity", entity_id=str(entity.id), error=str(e))
+            raise
+    
+    async def create_or_get_entity(self, entity: Entity) -> UUID:
+        """
+        Create entity if not exists, or return existing entity ID (deduplication by name + type)
+        
+        This method prevents duplicate entities by checking if an entity with the same
+        name and type already exists. If found, returns the existing entity's ID.
+        If not found, creates a new entity.
+        
+        Args:
+            entity: Entity object to create
+            
+        Returns:
+            Entity ID (existing or newly created)
+        """
+        self._initialize_connection()
+        
+        # Validate entity name
+        validate_entity_name(entity.name)
+        
+        # First, try to find existing entity by name + type
+        query_find = """
+            MATCH (e:Entity)
+            WHERE e.name = $name AND e.type = $type
+            RETURN e.id
+        """
+        
+        try:
+            result = await asyncio.to_thread(
+                self._conn.execute,
+                query_find,
+                {"name": entity.name, "type": entity.type.value}
+            )
+            
+            rows = self._get_query_results(result)
+            if rows:
+                # Entity exists, return its ID
+                existing_id = UUID(rows[0][0])
+                logger.debug(
+                    "entity_already_exists",
+                    entity_name=entity.name,
+                    entity_type=entity.type.value,
+                    entity_id=str(existing_id)
+                )
+                return existing_id
+            
+            # Entity doesn't exist, create it
+            query_create = """
+                CREATE (e:Entity {
+                    id: $id,
+                    name: $name,
+                    type: $type,
+                    description: $description,
+                    created_at: $created_at
+                })
+            """
+            
+            params = {
+                "id": str(entity.id),
+                "name": entity.name,
+                "type": entity.type.value,
+                "description": entity.description or "",
+                "created_at": entity.created_at
+            }
+            
+            await asyncio.to_thread(
+                self._conn.execute,
+                query_create,
+                params
+            )
+            
+            logger.info(
+                "entity_created",
+                entity_id=str(entity.id),
+                name=entity.name,
+                type=entity.type.value
+            )
+            
+            return entity.id
+            
+        except Exception as e:
+            logger.error(
+                "failed_to_create_or_get_entity",
+                entity_name=entity.name,
+                entity_type=entity.type.value,
+                error=str(e)
+            )
             raise
     
     async def get_entity(self, entity_id: UUID) -> Optional[Entity]:

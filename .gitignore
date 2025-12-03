@@ -27,6 +27,7 @@ elefante_vector_store/
 logs/
 temp_benchmark_data/
 *.log
+*.log.*
 rejection.log
 data/
 test_kuzu_db/
@@ -35,3 +36,21 @@ lib/
 install.log
 install_verify.log
 install_verify_antigravity.log
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Dashboard
+src/dashboard/ui/dist/
+src/dashboard/ui/node_modules/
+
+# Database backups
+*.db.backup
+*_backup/
+
+# Temporary files
+temp_*
+*.tmp
+CLEANUP_PLAN.md

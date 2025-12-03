@@ -15,7 +15,10 @@ from typing import List, Optional, Dict, Any, Tuple
 from uuid import UUID, uuid4
 from datetime import datetime
 
-from src.models.memory import Memory, MemoryType, MemoryMetadata, MemoryStatus
+from src.models.memory import (
+    Memory, MemoryType, MemoryMetadata, MemoryStatus,
+    DomainType, IntentType, SourceType
+)
 from src.models.entity import Entity, EntityType, Relationship, RelationshipType
 from src.models.query import QueryMode, QueryPlan, SearchResult, SearchFilters
 from src.core.vector_store import VectorStore, get_vector_store
@@ -145,6 +148,7 @@ class MemoryOrchestrator:
         )
         
         try:
+<<<<<<< HEAD
             # Create standardized metadata
             std_metadata = StandardizedMetadata(
                 core=CoreMetadata(
@@ -161,17 +165,51 @@ class MemoryOrchestrator:
             )
             
             # Create memory object
+=======
+            # Create memory object with V2 metadata structure
+            # Extract V2 fields from metadata dict if provided
+            domain = None
+            category = None
+            intent = None
+            confidence = None
+            source = None
+            custom_metadata = {}
+            
+            if metadata:
+                # Map common V1 "custom" fields to V2 structured fields
+                domain = metadata.get("domain")
+                category = metadata.get("category")
+                intent = metadata.get("intent")
+                confidence = metadata.get("confidence")
+                source = metadata.get("source")
+                
+                # Everything else goes to custom_metadata
+                custom_metadata = {
+                    k: v for k, v in metadata.items()
+                    if k not in ["domain", "category", "intent", "confidence", "source"]
+                }
+            
+>>>>>>> 12e0497 (Elefante: Initial commit of AI Memory System)
             memory_metadata = MemoryMetadata(
                 memory_type=MemoryType(memory_type),
                 importance=importance,
                 status=status,
-                tags=tags or []
+                tags=tags or [],
+                domain=DomainType(domain) if domain else DomainType.REFERENCE,
+                category=category or "general",
+                intent=IntentType(intent) if intent else IntentType.REFERENCE,
+                confidence=confidence if confidence is not None else 0.7,
+                source=SourceType(source) if source else SourceType.USER_INPUT,
+                custom_metadata=custom_metadata
             )
             
+<<<<<<< HEAD
             if metadata:
                 for key, value in metadata.items():
                     memory_metadata.custom[key] = value
             
+=======
+>>>>>>> 12e0497 (Elefante: Initial commit of AI Memory System)
             memory = Memory(
                 content=content,
                 metadata=memory_metadata,
@@ -201,9 +239,15 @@ class MemoryOrchestrator:
                     "memory_type": memory_type,
                     "importance": importance,
                     "status": status.value,
+<<<<<<< HEAD
                     "timestamp": memory.metadata.timestamp
                 },
                 tags=tags
+=======
+                    "timestamp": memory.metadata.created_at,
+                    "entity_subtype": "memory"
+                }
+>>>>>>> 12e0497 (Elefante: Initial commit of AI Memory System)
             )
             await self.graph_store.create_entity(memory_entity)
             self.logger.debug(f"Memory node created: {entity_name}")
@@ -213,7 +257,7 @@ class MemoryOrchestrator:
                 await self.graph_executor.execute_analysis(analysis, memory.id)
             
             # Link to related memory if found
-            if related_id:
+            if related_id and similar_memories:
                 rel_type = RelationshipType.SIMILAR_TO
                 if status == MemoryStatus.REDUNDANT:
                     rel_type = RelationshipType.SIMILAR_TO # Could be specific "REDUNDANT_TO" if added to enum
@@ -224,7 +268,7 @@ class MemoryOrchestrator:
                     relationship_type=rel_type,
                     properties={
                         "created_at": datetime.utcnow(),
-                        "similarity": best_match.score if similar_memories else 0.0
+                        "similarity": similar_memories[0].score
                     }
                 ))
             
@@ -311,8 +355,8 @@ class MemoryOrchestrator:
                         properties=props
                     )
                     
-                    # Create or update entity
-                    await self.graph_store.create_entity(entity)
+                    # Create or get entity (with deduplication)
+                    await self.graph_store.create_or_get_entity(entity)
                     
                     # Create relationship: Memory -> Entity
                     relationship = Relationship(
@@ -733,7 +777,7 @@ class MemoryOrchestrator:
                     source=result.source,
                     metadata={
                         "memory_id": str(result.memory.id),
-                        "timestamp": result.memory.metadata.timestamp.isoformat(),
+                        "timestamp": result.memory.metadata.created_at.isoformat(),
                         "memory_type": result.memory.metadata.memory_type.value
                     },
                     embedding=result.memory.embedding,
@@ -1168,6 +1212,67 @@ class MemoryOrchestrator:
             "consolidated_count": len(new_memories),
             "new_memory_ids": [str(m.id) for m in new_memories]
         }
+    
+    async def list_all_memories(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        filters: Optional[SearchFilters] = None
+    ) -> List[Memory]:
+        """
+        List all memories without semantic search filtering
+        
+        This method retrieves memories directly from the vector store without
+        applying semantic similarity filtering. Useful for:
+        - Database inspection and debugging
+        - Exporting all memories
+        - Browsing complete memory collection
+        - Administrative tasks
+        
+        Args:
+            limit: Maximum number of memories to return (default: 100)
+            offset: Number of memories to skip for pagination (default: 0)
+            filters: Optional filters (memory_type, importance, etc.)
+            
+        Returns:
+            List[Memory]: List of memory objects
+            
+        Example:
+            # Get first 50 memories
+            memories = await orchestrator.list_all_memories(limit=50)
+            
+            # Get next 50 memories (pagination)
+            memories = await orchestrator.list_all_memories(limit=50, offset=50)
+            
+            # Filter by type
+            filters = SearchFilters(memory_type="decision")
+            memories = await orchestrator.list_all_memories(filters=filters)
+        """
+        self.logger.info(
+            "Listing all memories",
+            limit=limit,
+            offset=offset,
+            has_filters=filters is not None
+        )
+        
+        try:
+            memories = await self.vector_store.get_all(
+                limit=limit,
+                offset=offset,
+                filters=filters
+            )
+            
+            self.logger.info(
+                "Listed all memories",
+                count=len(memories),
+                offset=offset
+            )
+            
+            return memories
+            
+        except Exception as e:
+            self.logger.error(f"Failed to list all memories: {e}", exc_info=True)
+            raise
     
     async def get_stats(self) -> Dict[str, Any]:
         """

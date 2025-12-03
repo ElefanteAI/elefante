@@ -27,7 +27,8 @@ ELEFANTE_HOME.mkdir(exist_ok=True)
 # Ensure directories exist
 DATA_DIR.mkdir(exist_ok=True)
 CHROMA_DIR.mkdir(exist_ok=True)
-KUZU_DIR.mkdir(exist_ok=True)
+# Note: KUZU_DIR should NOT be created here - Kuzu creates its own directory structure
+# KUZU_DIR.mkdir(exist_ok=True)  # Commented out - causes conflict with Kuzu 0.11+
 LOGS_DIR.mkdir(exist_ok=True)
 
 
