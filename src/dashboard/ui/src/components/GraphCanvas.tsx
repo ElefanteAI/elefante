@@ -1,3 +1,28 @@
+// HELPER: Recursive JSON Parser
+const safeParseProps = (input: any): any => {
+  if (!input) return {};
+  if (typeof input === 'object') return input; // It's already an object
+  try {
+    const parsed = JSON.parse(input);
+    // RECURSIVE CHECK: If the result is STILL a string, parse again.
+    if (typeof parsed === 'string') return safeParseProps(parsed);
+    return parsed;
+  } catch (e) {
+    console.error("Failed to parse props:", input);
+    return {};
+  }
+};
+
+// HELPER: Smart Title Casing
+const toTitleCase = (str: string) => {
+  if (!str) return "";
+  return str.toLowerCase().split(' ').map(word => {
+    // Ignore small words unless it's the first word
+    if (['a', 'an', 'the', 'in', 'on', 'at', 'for', 'of', 'is'].includes(word)) return word;
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
+};
+
 import { useRef, useEffect, useState } from 'react';
 
 
@@ -10,16 +35,25 @@ interface Node {
   vx: number;
   vy: number;
   radius: number;
+  degree?: number; // Connection count for LOD
   properties?: {
     description?: string;
     created_at?: string;
   };
+  full_data?: any; // Full node data for inspector
+  color?: string; // DNA-mapped color from memory_type
+  opacity?: number; // DNA-mapped opacity from status
+  importance?: number; // DNA-mapped importance (1-10)
+  memoryType?: string; // DNA-mapped memory type (fact/episodic/procedural)
+  short_label?: string; // DNA-mapped short label
+  originalLabel?: string; // Original full label
 }
 
 interface Edge {
   source: string;
   target: string;
-  type: string;
+  type?: string;
+  similarity?: number;
 }
 
 interface GraphData {
@@ -31,6 +65,22 @@ interface GraphCanvasProps {
   space: string;
 }
 
+  // VIEW-LAYER LABEL CLEANER
+  const getCleanTitle = (node: any) => {
+    // Priority: Short Label -> Parsed Title -> Raw Label
+    let text = node.short_label || node.full_data?.parsed_props?.title || node.label || "Memory";
+    
+    // A. SPLIT COLON (Force Split)
+    if (text.includes(':')) text = text.split(':')[0];
+    
+    // B. REMOVE NOISE
+    text = text.replace(/^(User|The)\s+(is a|has|preference|is|values)\s?/i, '');
+    text = text.replace(/^User\s/i, '');
+    
+    // C. TITLE CASE
+    return toTitleCase(text.trim());
+  };
+
 const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [data, setData] = useState<GraphData>({ nodes: [], edges: [] });
@@ -40,35 +90,284 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
   
   // Interaction state
   const [hoveredNode, setHoveredNode] = useState<Node | null>(null);
+  const [hoveredEdge, setHoveredEdge] = useState<Edge | null>(null);
+  const [focusedNode, setFocusedNode] = useState<Node | null>(null);
+  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [visibleTypes, setVisibleTypes] = useState({
+    memory: true,
+    entity: false, // PURE THOUGHT MODE: Hide entities by default, show only memory mesh
+    session: false
+  });
   const draggingNode = useRef<Node | null>(null);
   const offset = useRef({ x: 0, y: 0 }); // Pan offset
   const scale = useRef(1); // Zoom scale
   const isDraggingCanvas = useRef(false);
+  
+  // Stats for visual debug overlay
+  const [nodeCount, setNodeCount] = useState(0);
+  const [orphanCount, setOrphanCount] = useState(0);
+  const [linkCount, setLinkCount] = useState(0);
   const lastMousePos = useRef({ x: 0, y: 0 });
 
   // Fetch Data
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch(`/api/graph?limit=500&space=${space === 'all' ? '' : space}`);
+        // CACHE BUSTING: Force fresh network request
+        const res = await fetch(`/api/graph?limit=500&space=${space === 'all' ? '' : space}&t=${Date.now()}`);
         const json = await res.json();
+        
+        console.log("🔍 RAW API RESPONSE:", { nodeCount: json.nodes.length, edgeCount: json.edges.length });
         
         // Initialize positions randomly
         const width = window.innerWidth;
         const height = window.innerHeight;
         
-        const newNodes = json.nodes.map((n: any) => ({
-          ...n,
-          x: Math.random() * width,
-          y: Math.random() * height,
-          vx: 0,
-          vy: 0,
-          radius: n.type === 'session' ? 20 : n.type === 'entity' ? 15 : 8
-        }));
+        // --- BEGIN GUILLOTINE PROTOCOL V3 ---
+        // 1. Define Allowed Nodes (Filter out User ENTITY only, keep memory nodes)
+        const allowedNodes = json.nodes.filter((n: any) => {
+          const label = (n.label || '').toLowerCase().trim();
+          const entityType = (n.entityType || '').toLowerCase();
+          const type = (n.type || '').toLowerCase();
+          
+          // ONLY exclude User entity nodes (not memory nodes about user)
+          const isUserEntity = (label === 'user' && type === 'entity') ||
+                               (entityType === 'person' && type === 'entity') ||
+                               (type === 'person');
+          
+          if (isUserEntity) {
+            console.log("🚫 GUILLOTINE V3: Removing User Entity:", n.label, "ID:", n.id);
+          }
+          return !isUserEntity;
+        });
         
-        nodesRef.current = newNodes;
-        edgesRef.current = json.edges;
-        setData(json);
+        const allowedNodeIds = new Set(allowedNodes.map((n: any) => n.id));
+        console.log(`✂️ Nodes after guillotine: ${json.nodes.length} → ${allowedNodes.length}`);
+        
+        // 2. Strict Edge Scrubbing (BOTH ends must exist in allowedNodes)
+        const cleanEdges = json.edges.filter((e: any) => {
+            // Handle D3 object references vs String IDs
+            const s = typeof e.source === 'object' ? e.source.id : e.source;
+            const t = typeof e.target === 'object' ? e.target.id : e.target;
+            
+            // ONLY keep edge if BOTH ends exist in allowedNodes
+            const bothEndsValid = allowedNodeIds.has(s) && allowedNodeIds.has(t);
+            return bothEndsValid;
+        });
+        
+        console.log(`✂️ Edges after guillotine: ${json.edges.length} → ${cleanEdges.length} (removed ${json.edges.length - cleanEdges.length} dangling edges)`);
+        // --- END GUILLOTINE PROTOCOL V2 ---
+        
+        // Calculate degree (connection count) for each node using clean edges
+        const degreeMap = new Map<string, number>();
+        cleanEdges.forEach((e: any) => {
+          const source = e.source || e.from;
+          const target = e.target || e.to;
+          degreeMap.set(source, (degreeMap.get(source) || 0) + 1);
+          degreeMap.set(target, (degreeMap.get(target) || 0) + 1);
+        });
+        
+        // 4. SPRINT 7: KEYWORD-BASED COLOR HEURISTICS
+        const getNodeColor = (node: any) => {
+          const props = node.full_data?.props ? (typeof node.full_data.props === 'string' ? JSON.parse(node.full_data.props) : node.full_data.props) : {};
+          const text = ((node.label || '') + (props.content || '')).toLowerCase();
+          
+          // 1. Priority: Explicit Metadata
+          if (props.memory_type === 'episodic') return '#10B981'; // Green
+          if (props.memory_type === 'procedural') return '#8B5CF6'; // Purple
+          
+          // 2. Fallback: Keyword Heuristics for semantic coloring
+          if (text.includes('code') || text.includes('python') || text.includes('mcp') || text.includes('programming')) return '#8B5CF6'; // Coding = Purple
+          if (text.includes('daughter') || text.includes('family') || text.includes('preference') || text.includes('personal')) return '#10B981'; // Personal = Green
+          if (text.includes('error') || text.includes('fix') || text.includes('fail') || text.includes('bug')) return '#EF4444'; // Problems = Red
+          
+          return '#3B82F6'; // Default = Blue (Facts)
+        };
+        
+        const processedNodes = allowedNodes.map((n: any) => {
+          try {
+            // SPRINT 22: DEEP PARSING - Recursive JSON parser
+            const fullData = n.full_data || {};
+            
+            // FORCE PARSE PROPS (Fixes "Fact/5/Neutral" bug)
+            const props = safeParseProps(fullData.props);
+            
+            // Update the node's reference to the parsed props so the Sidebar sees it
+            if (!n.full_data) n.full_data = {};
+            n.full_data.parsed_props = props; // Store it safely
+            
+            
+            
+            // Debug first node
+            if (n.id === allowedNodes[0]?.id) {
+              console.log("🔍 FIRST NODE PROPS:", props);
+            }
+          
+          // SIZE: Map Importance (1-10) to Radius (8px - 23px)
+          const importance = props.importance || 5;
+          const radius = 8 + (importance * 1.5);
+          
+          // COLOR: SPRINT 10 - Priority-based coloring with full metadata
+          let color;
+          if (n.type === 'memory') {
+            // Priority 1: Explicit memory type
+            if (props.memory_type === 'episodic') {
+              color = '#10B981'; // Green
+            } else if (props.memory_type === 'procedural') {
+              color = '#8B5CF6'; // Purple
+            }
+            // Priority 2: Tags (Core Identity)
+            else if (props.tags && props.tags.includes('identity')) {
+              color = '#F59E0B'; // Amber
+            }
+            // Priority 3: Keyword-based fallback
+            else {
+              color = getNodeColor(n);
+            }
+          } else {
+            color = n.type === 'entity' ? '#E6E6FA' : '#FFD700';
+          }
+          
+          // OPACITY: Handle "Redundant" status
+          const opacity = props.status === 'redundant' ? 0.5 : 1.0;
+          
+          // SPRINT 20: CONSISTENT LABELS - Single source of truth
+          // 1. Get best available raw title
+          let rawTitle = props.cognitive_analysis?.title || props.title || n.label || "Memory";
+          
+          // 2. SPLIT AT COLON (Critical Step)
+          // "IMPORTANCE SCALE CALIBRATION: Correct usage..." -> "IMPORTANCE SCALE CALIBRATION"
+          let cleanLabel = rawTitle.split(':')[0].trim();
+          
+          // 3. Remove noisy prefixes
+          cleanLabel = cleanLabel.replace(/^(User|The)\s+(is a|has|preference|is|values)\s?/i, '');
+          cleanLabel = cleanLabel.replace(/^User\s/i, '');
+          
+          // 4. Apply TITLE CASE
+          cleanLabel = toTitleCase(cleanLabel);
+          
+          // 5. Create two versions
+          const shortLabel = cleanLabel; // Full clean title for sidebar
+          const canvasLabel = cleanLabel.length > 20
+            ? cleanLabel.substring(0, 19) + "…"
+            : cleanLabel;
+          
+          return {
+            ...n,
+            label: canvasLabel, // Truncated for canvas
+            originalLabel: n.label,
+            short_label: shortLabel, // Full clean title for sidebar
+            canvas_label: canvasLabel, // Explicit canvas label
+            x: Math.random() * width,
+            y: Math.random() * height,
+            vx: 0,
+            vy: 0,
+            radius: radius,
+            color: color,
+            opacity: opacity,
+            degree: degreeMap.get(n.id) || 0,
+            importance: importance,
+            memoryType: props.memory_type || 'fact'
+          };
+          } catch (error) {
+            console.error("❌ Error processing node:", n.id, error);
+            // Return minimal node on error
+            return {
+              ...n,
+              label: n.label || 'Error',
+              short_label: n.label || 'Error',
+              x: Math.random() * width,
+              y: Math.random() * height,
+              vx: 0,
+              vy: 0,
+              radius: 12,
+              color: '#EF4444',
+              opacity: 1.0,
+              degree: 0,
+              importance: 5,
+              memoryType: 'fact'
+            };
+          }
+        });
+        
+        // 5. SPRINT 7: GHOST EDGE SCRUBBER - Strict memory-only whitelist
+        const memoryNodeIds = new Set(
+          processedNodes.filter((n: any) => n.type === 'memory').map((n: any) => n.id)
+        );
+        
+        const safeLinks = cleanEdges.filter((link: any) => {
+          // Handle both String IDs and D3 Object References
+          const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+          const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+          
+          // VELVET ROPE: If EITHER end is not a visible memory, KILL THE EDGE
+          return memoryNodeIds.has(sourceId) && memoryNodeIds.has(targetId);
+        });
+        
+        // SPRINT 24: ORBITAL TELEPORT - Hard-code orphan positions
+        const connectedIds = new Set<string>();
+        safeLinks.forEach((link: any) => {
+          connectedIds.add(typeof link.source === 'object' ? link.source.id : link.source);
+          connectedIds.add(typeof link.target === 'object' ? link.target.id : link.target);
+        });
+        
+        // Separate orphans and cluster
+        const orphans = processedNodes.filter((n: any) => !connectedIds.has(n.id));
+        const cluster = processedNodes.filter((n: any) => connectedIds.has(n.id));
+        
+        console.log(`🔧 DNA Mapping complete. Nodes: ${processedNodes.length}, Safe links: ${safeLinks.length}, Orphans: ${orphans.length}, Cluster: ${cluster.length}`);
+        
+        // SPRINT 25: ORBITAL ANCHOR - Lock orphans with fx/fy
+        const canvas = canvasRef.current;
+        if (canvas && orphans.length > 0) {
+          const width = canvas.width;
+          const height = canvas.height;
+          const radius = 300; // Reduced to 300px for safer viewport fit
+          const centerX = width / 2;
+          const centerY = height / 2;
+          const angleStep = (2 * Math.PI) / orphans.length;
+          
+          orphans.forEach((node: any, i: number) => {
+            const angle = i * angleStep;
+            
+            // CALCULATE POSITION
+            const targetX = centerX + Math.cos(angle) * radius;
+            const targetY = centerY + Math.sin(angle) * radius;
+            
+            // TELEPORT (Current Position)
+            node.x = targetX;
+            node.y = targetY;
+            
+            // *** THE FIX: ANCHOR (Physics Lock) ***
+            // Setting fx/fy overrides all simulation forces
+            node.fx = targetX;
+            node.fy = targetY;
+            
+            // Kill Velocity
+            node.vx = 0;
+            node.vy = 0;
+          });
+          
+          // UNLOCK The Cluster (Ensure center nodes can still move)
+          cluster.forEach((node: any) => {
+            node.fx = null; // Let physics handle the semantic mesh
+            node.fy = null;
+          });
+          
+          console.log(`⚓ Anchored ${orphans.length} orphans to ring at radius ${radius}px (PHYSICS LOCKED)`);
+          }
+          
+          const newNodes = processedNodes;
+          
+          // Update stats for visual debug overlay
+          setNodeCount(newNodes.length);
+          setOrphanCount(orphans.length);
+          setLinkCount(safeLinks.length);
+          
+          nodesRef.current = newNodes;
+          edgesRef.current = safeLinks;
+          setData({nodes: newNodes, edges: safeLinks});
       } catch (err) {
         console.error("Failed to fetch graph", err);
       }
@@ -93,17 +392,51 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
       const nodes = nodesRef.current;
       const edges = edgesRef.current;
       
-      // Repulsion
+      // Helper: Get label bounding box
+      const getLabelBounds = (node: Node) => {
+        ctx.font = '11px Inter, sans-serif';
+        const metrics = ctx.measureText(node.label);
+        return {
+          x: node.x - metrics.width / 2 - 4,
+          y: node.y + node.radius + 4,
+          width: metrics.width + 8,
+          height: 16
+        };
+      };
+      
+      // SPRINT 7: CEMENT PHYSICS - Gentle repulsion
       for (let i = 0; i < nodes.length; i++) {
         for (let j = i + 1; j < nodes.length; j++) {
           const dx = nodes[i].x - nodes[j].x;
           const dy = nodes[i].y - nodes[j].y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
           
-          if (dist < 200) {
-            const force = 100 / (dist * dist);
+          // Gentle repulsion (reduced from 500 to 300)
+          if (dist < 600) {
+            const force = 300 / (dist * dist);
             const fx = (dx / dist) * force;
             const fy = (dy / dist) * force;
+            
+            nodes[i].vx += fx;
+            nodes[i].vy += fy;
+            nodes[j].vx -= fx;
+            nodes[j].vy -= fy;
+          }
+          
+          // Bounding Box Collision Detection (label-aware)
+          const boundsA = getLabelBounds(nodes[i]);
+          const boundsB = getLabelBounds(nodes[j]);
+          
+          // AABB collision check
+          if (boundsA.x < boundsB.x + boundsB.width &&
+              boundsA.x + boundsA.width > boundsB.x &&
+              boundsA.y < boundsB.y + boundsB.height &&
+              boundsA.y + boundsA.height > boundsB.y) {
+            
+            // Apply strong separation force
+            const separationForce = 200 / (dist || 1);
+            const fx = (dx / dist) * separationForce;
+            const fy = (dy / dist) * separationForce;
             
             nodes[i].vx += fx;
             nodes[i].vy += fy;
@@ -113,7 +446,7 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
         }
       }
       
-      // Attraction (Edges)
+      // SPRINT 7: CEMENT PHYSICS - Loose springs
       edges.forEach(edge => {
         const source = nodes.find(n => n.id === edge.source);
         const target = nodes.find(n => n.id === edge.target);
@@ -123,7 +456,11 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
           const dy = target.y - source.y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
           
-          const force = (dist - 100) * 0.005; // Spring constant
+          // Loose springs (distance 150, strength 0.05)
+          const restLength = 150;
+          const springConstant = 0.05;
+          
+          const force = (dist - restLength) * springConstant;
           const fx = (dx / dist) * force;
           const fy = (dy / dist) * force;
           
@@ -134,18 +471,48 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
         }
       });
       
-      // Center Gravity
+      // SPRINT 23: DUAL PHYSICS - Gravity Ring for Orphans
       const cx = width / 2;
       const cy = height / 2;
+      
+      // Get connected IDs from edges
+      const connectedIds = new Set<string>();
+      edges.forEach((edge: any) => {
+        const sourceId = typeof edge.source === 'object' ? edge.source.id : edge.source;
+        const targetId = typeof edge.target === 'object' ? edge.target.id : edge.target;
+        connectedIds.add(sourceId);
+        connectedIds.add(targetId);
+      });
+      
       nodes.forEach(node => {
-        const dx = cx - node.x;
-        const dy = cy - node.y;
-        node.vx += dx * 0.0005;
-        node.vy += dy * 0.0005;
+        const isOrphan = !connectedIds.has(node.id);
         
-        // Velocity dampening
-        node.vx *= 0.9;
-        node.vy *= 0.9;
+        if (isOrphan) {
+          // ORPHAN PHYSICS: Radial gravity to form a ring
+          const dx = node.x - cx;
+          const dy = node.y - cy;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const targetRadius = 350; // Ring radius
+          
+          // Pull towards target radius
+          const radiusError = dist - targetRadius;
+          const pullStrength = 0.05; // Gentle pull
+          const fx = -(dx / dist) * radiusError * pullStrength;
+          const fy = -(dy / dist) * radiusError * pullStrength;
+          
+          node.vx += fx;
+          node.vy += fy;
+        } else {
+          // CONNECTED PHYSICS: Weak centering
+          const dx = cx - node.x;
+          const dy = cy - node.y;
+          node.vx += dx * 0.001;
+          node.vy += dy * 0.001;
+        }
+        
+        // CEMENT FRICTION: velocityDecay 0.9 (kills movement instantly)
+        node.vx *= 0.1; // 1 - 0.9 = 0.1 (90% friction)
+        node.vy *= 0.1;
         
         // Update position (unless dragging)
         if (draggingNode.current?.id !== node.id) {
@@ -160,63 +527,220 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
       ctx.translate(offset.current.x, offset.current.y);
       ctx.scale(scale.current, scale.current);
       
-      // Draw Edges
-      ctx.strokeStyle = 'rgba(148, 163, 184, 0.2)'; // Slate 400, low opacity
-      ctx.lineWidth = 1;
+      // Draw Edges (with semantic edge styling and focus mode)
+      const adjacentNodes = new Set<string>();
+      if (focusedNode) {
+        edges.forEach(edge => {
+          if (edge.source === focusedNode.id) adjacentNodes.add(edge.target);
+          if (edge.target === focusedNode.id) adjacentNodes.add(edge.source);
+        });
+      }
+      
       edges.forEach(edge => {
         const source = nodes.find(n => n.id === edge.source);
         const target = nodes.find(n => n.id === edge.target);
-        if (source && target) {
-          ctx.beginPath();
-          ctx.moveTo(source.x, source.y);
-          ctx.lineTo(target.x, target.y);
-          ctx.stroke();
+        if (!source || !target) return;
+        
+        const isConnected = focusedNode && (edge.source === focusedNode.id || edge.target === focusedNode.id);
+        const isSemantic = edge.type === 'semantic';
+        const isHovered = hoveredEdge?.source === edge.source && hoveredEdge?.target === edge.target;
+        
+        // HIGH CONTRAST: Style based on edge type
+        if (isSemantic) {
+          // AMBER/ORANGE for semantic similarity (high visibility)
+          ctx.strokeStyle = isHovered ? 'rgba(245, 158, 11, 1.0)' :  // Amber-500
+                           isConnected ? 'rgba(245, 158, 11, 0.8)' : 'rgba(245, 158, 11, 0.6)';
+          ctx.setLineDash([4, 4]); // Tighter dash
+          ctx.lineWidth = 1.5; // Thicker for visibility
+        } else {
+          // Solid grey for structural edges (reduced opacity to de-emphasize)
+          ctx.strokeStyle = isConnected ? 'rgba(16, 185, 129, 0.6)' : 'rgba(148, 163, 184, 0.15)';
+          ctx.setLineDash([]);
+          ctx.lineWidth = isConnected ? 2 : 0.5;
+        }
+        
+        ctx.beginPath();
+        ctx.moveTo(source.x, source.y);
+        ctx.lineTo(target.x, target.y);
+        ctx.stroke();
+        ctx.setLineDash([]); // Reset dash
+        
+        // SPRINT 14: Enhanced edge tooltip - Show WHY nodes are connected
+        if (isHovered && isSemantic && edge.similarity) {
+          const midX = (source.x + target.x) / 2;
+          const midY = (source.y + target.y) / 2;
+          
+          // Build tooltip with context
+          const similarity = (edge.similarity * 100).toFixed(0);
+          const sourceLabel = source.short_label || source.label;
+          const targetLabel = target.short_label || target.label;
+          
+          const lines = [
+            `${similarity}% Similar`,
+            `${sourceLabel} ↔ ${targetLabel}`
+          ];
+          
+          ctx.font = '11px Inter, sans-serif';
+          const maxWidth = Math.max(...lines.map(l => ctx.measureText(l).width));
+          const padding = 8;
+          const lineHeight = 16;
+          const tooltipHeight = lines.length * lineHeight + padding * 2;
+          
+          // Tooltip background - AMBER with shadow
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+          ctx.shadowBlur = 8;
+          ctx.fillStyle = 'rgba(245, 158, 11, 0.95)';
+          ctx.fillRect(midX - maxWidth/2 - padding, midY - tooltipHeight/2,
+                      maxWidth + padding*2, tooltipHeight);
+          ctx.shadowBlur = 0;
+          
+          // Tooltip text
+          ctx.fillStyle = '#fff';
+          ctx.textAlign = 'center';
+          lines.forEach((line, i) => {
+            ctx.fillText(line, midX, midY - tooltipHeight/2 + padding + (i + 0.7) * lineHeight);
+          });
         }
       });
       
-      // Draw Nodes
-      nodes.forEach(node => {
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
-        
-        // Color based on type
-        if (node.type === 'session') {
-          ctx.fillStyle = '#8b5cf6'; // Violet
-          ctx.shadowColor = '#8b5cf6';
-        } else if (node.type === 'entity') {
-          ctx.fillStyle = '#3b82f6'; // Blue
-          ctx.shadowColor = '#3b82f6';
+      // Semantic Zoom: Determine which labels to show based on scale
+      const getVisibleNodes = (currentScale: number, allNodes: Node[]) => {
+        if (currentScale < 0.5) {
+          // Far zoom: only high-degree entities
+          return allNodes.filter(n => n.type === 'entity' && (n.degree || 0) > 5);
+        } else if (currentScale < 1.0) {
+          // Medium zoom: entities and sessions
+          return allNodes.filter(n => n.type !== 'memory');
         } else {
-          ctx.fillStyle = '#10b981'; // Emerald (Memory)
-          ctx.shadowColor = '#10b981';
+          // Close zoom: all nodes
+          return allNodes;
+        }
+      };
+      
+      const visibleLabelNodes = getVisibleNodes(scale.current, nodes);
+      const visibleLabelIds = new Set(visibleLabelNodes.map(n => n.id));
+      
+      // SPRINT 8: FUNCTIONAL SEARCH FILTER
+      const matchesSearch = (node: Node) => {
+        if (!searchTerm) return true; // Show all if no search term
+        const term = searchTerm.toLowerCase();
+        
+        // Search EVERYTHING: Label, Content, Type
+        const props = node.full_data?.props || {};
+        return node.short_label?.toLowerCase().includes(term) ||
+               node.label?.toLowerCase().includes(term) ||
+               (props.content || '').toLowerCase().includes(term) ||
+               (node.properties?.description || '').toLowerCase().includes(term);
+      };
+      
+      // Filter nodes by visibility toggles
+      const visibleNodes = nodes.filter(n => visibleTypes[n.type as keyof typeof visibleTypes]);
+      
+      // Draw Nodes with shape mapping
+      visibleNodes.forEach(node => {
+        // Focus mode dimming
+        const isFocused = focusedNode?.id === node.id;
+        const isAdjacent = focusedNode && adjacentNodes.has(node.id);
+        const isDimmed = focusedNode && !isFocused && !isAdjacent;
+        const isSearchMatch = matchesSearch(node);
+        
+        // DNA MAPPING: Use color from metadata (memory_type)
+        let baseColor = node.color || '#10b981'; // Use DNA-mapped color or fallback to Emerald
+        
+        // SPRINT 8: Search-based opacity (ghost non-matches)
+        let searchOpacity = 1.0;
+        if (searchTerm && !isSearchMatch) {
+          searchOpacity = 0.1; // Ghost mode for non-matches
         }
         
-        // Glow effect
-        ctx.shadowBlur = 15;
-        ctx.fill();
+        // Apply opacity from DNA mapping (redundant status) + search filter
+        const opacity = (node.opacity || 1.0) * searchOpacity;
+        
+        // Apply dimming or search highlighting with DNA opacity
+        if (isSearchMatch && searchTerm) {
+          ctx.fillStyle = '#fbbf24'; // Amber for search matches
+          ctx.shadowColor = '#fbbf24';
+          ctx.shadowBlur = 20;
+          ctx.globalAlpha = 1.0;
+        } else if (isDimmed) {
+          ctx.fillStyle = baseColor;
+          ctx.shadowColor = baseColor;
+          ctx.shadowBlur = 5;
+          ctx.globalAlpha = 0.25 * opacity; // Combine dimming with DNA opacity
+        } else {
+          ctx.fillStyle = baseColor;
+          ctx.shadowColor = baseColor;
+          ctx.shadowBlur = isFocused ? 25 : 15;
+          ctx.globalAlpha = opacity; // Apply DNA opacity
+        }
+        
+        // Draw shape based on node type
+        ctx.save();
+        ctx.translate(node.x, node.y);
+        
+        if (node.type === 'entity') {
+          // Diamond shape for entities
+          ctx.beginPath();
+          ctx.moveTo(0, -node.radius);
+          ctx.lineTo(node.radius, 0);
+          ctx.lineTo(0, node.radius);
+          ctx.lineTo(-node.radius, 0);
+          ctx.closePath();
+          ctx.fill();
+        } else if (node.type === 'session') {
+          // Square shape for sessions
+          const size = node.radius * 0.8;
+          ctx.fillRect(-size, -size, size * 2, size * 2);
+        } else {
+          // Circle for memories
+          ctx.beginPath();
+          ctx.arc(0, 0, node.radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        
+        ctx.restore();
         ctx.shadowBlur = 0; // Reset shadow
         
-        // Always draw label for memories
-        ctx.fillStyle = '#fff';
-        ctx.font = '11px Inter, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        // Truncate label if too long
-        let displayLabel = node.label;
-        if (displayLabel.startsWith('memory_')) {
-          // Extract first few words from description if available
-          const desc = node.properties?.description || '';
-          if (desc) {
-            const words = desc.split(' ').slice(0, 3).join(' ');
-            displayLabel = words.length > 20 ? words.substring(0, 20) + '...' : words;
-          } else {
-            displayLabel = 'Memory';
+        // Draw labels only for visible nodes (semantic zoom)
+        if (visibleLabelIds.has(node.id) || isFocused || isSearchMatch) {
+          // SPRINT 7: Label sanitizer with pill background
+          let displayLabel = node.label;
+          if (displayLabel.startsWith('memory_')) {
+            const desc = node.properties?.description || '';
+            if (desc) {
+              const words = desc.split(' ').slice(0, 3).join(' ');
+              displayLabel = words.length > 20 ? words.substring(0, 20) + '...' : words;
+            } else {
+              displayLabel = 'Memory';
+            }
           }
+          // Strip "User" prefix
+          displayLabel = displayLabel.replace(/^User /i, '');
+          if (displayLabel.length > 15) {
+            displayLabel = displayLabel.substring(0, 14) + '…';
+          }
+          
+          // PILL BACKGROUND for readability
+          ctx.font = '11px Inter, sans-serif';
+          const textWidth = ctx.measureText(displayLabel).width;
+          const padding = 4;
+          const bgX = node.x - textWidth / 2 - padding;
+          const bgY = node.y + node.radius + 8;
+          const bgWidth = textWidth + padding * 2;
+          const bgHeight = 16;
+          
+          // Draw rounded pill background (80% black)
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+          ctx.beginPath();
+          ctx.roundRect(bgX, bgY, bgWidth, bgHeight, 4);
+          ctx.fill();
+          
+          // Draw label text
+          ctx.fillStyle = isDimmed ? '#94a3b8' : '#fff'; // Dimmed or white
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(displayLabel, node.x, bgY + bgHeight / 2);
         }
-        
-        // Draw label below node
-        ctx.fillText(displayLabel, node.x, node.y + node.radius + 12);
         
         // Hover effect - show full description
         if (hoveredNode?.id === node.id) {
@@ -308,6 +832,13 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
     
     if (hitNode) {
       draggingNode.current = hitNode;
+      // Click to focus (toggle)
+      if (e.shiftKey) {
+        setFocusedNode(focusedNode?.id === hitNode.id ? null : hitNode);
+      } else {
+        // Regular click opens inspector
+        setSelectedNode(hitNode);
+      }
     } else {
       isDraggingCanvas.current = true;
       lastMousePos.current = { x: e.clientX, y: e.clientY };
@@ -319,13 +850,43 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
     const x = (e.clientX - rect.left - offset.current.x) / scale.current;
     const y = (e.clientY - rect.top - offset.current.y) / scale.current;
     
-    // Hover check
+    // Hover check for nodes
     const hitNode = nodesRef.current.find(n => {
         const dx = n.x - x;
         const dy = n.y - y;
         return Math.sqrt(dx*dx + dy*dy) < n.radius + 5;
     });
     setHoveredNode(hitNode || null);
+    
+    // Hover check for edges (semantic edges only)
+    let hitEdge: Edge | null = null;
+    const edges = edgesRef.current;
+    const nodes = nodesRef.current;
+    
+    for (const edge of edges) {
+      if (edge.type !== 'semantic') continue;
+      
+      const source = nodes.find(n => n.id === edge.source);
+      const target = nodes.find(n => n.id === edge.target);
+      if (!source || !target) continue;
+      
+      // Check if mouse is near edge line (within 10px)
+      const dx = target.x - source.x;
+      const dy = target.y - source.y;
+      const length = Math.sqrt(dx*dx + dy*dy);
+      
+      // Project mouse point onto line
+      const t = Math.max(0, Math.min(1, ((x - source.x) * dx + (y - source.y) * dy) / (length * length)));
+      const projX = source.x + t * dx;
+      const projY = source.y + t * dy;
+      
+      const dist = Math.sqrt((x - projX)**2 + (y - projY)**2);
+      if (dist < 10) {
+        hitEdge = edge;
+        break;
+      }
+    }
+    setHoveredEdge(hitEdge);
     
     if (draggingNode.current) {
       draggingNode.current.x = x;
@@ -353,15 +914,165 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
   };
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="absolute top-0 left-0 w-full h-full cursor-crosshair"
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-      onWheel={handleWheel}
-    />
+    <div className="relative w-full h-full">
+      {/* Search Bar */}
+      <div className="absolute top-4 left-4 z-10 pointer-events-none">
+        <input
+          type="text"
+          placeholder="Search nodes... (Ctrl+F)"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="px-4 py-2 bg-slate-800 text-white border border-slate-600 rounded-lg focus:outline-none focus:border-emerald-500 w-64 pointer-events-auto"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setSearchTerm('');
+              setFocusedNode(null);
+            }
+          }}
+        />
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm('')}
+            className="absolute right-2 top-2 text-slate-400 hover:text-white"
+          >
+            ✕
+          </button>
+        )}
+      
+      {/* Visual Debug Overlay - Stats Box */}
+      <div className="absolute top-4 right-4 bg-slate-900/90 p-2 rounded border border-slate-700 text-xs font-mono z-50 pointer-events-none">
+        <div className="text-green-400">NODES: {nodeCount}</div>
+        <div className="text-orange-400">ORPHANS: {orphanCount}</div>
+        <div className="text-blue-400">LINKS: {linkCount}</div>
+      </div>
+      </div>
+      
+      {/* Node Type Toggles */}
+      <div className="absolute top-16 left-4 z-10 bg-slate-800 p-3 rounded-lg border border-slate-600 pointer-events-none">
+        <div className="text-sm font-bold mb-2 text-white">Node Types</div>
+        {(Object.keys(visibleTypes) as Array<keyof typeof visibleTypes>).map((type) => (
+          <label key={type} className="flex items-center gap-2 cursor-pointer text-slate-300 pointer-events-auto">
+            <input
+              type="checkbox"
+              checked={visibleTypes[type]}
+              onChange={() => setVisibleTypes(prev => ({...prev, [type]: !prev[type]}))}
+              className="pointer-events-auto"
+            />
+            <span className="capitalize">{type}</span>
+          </label>
+        ))}
+      </div>
+      
+      {/* Instructions */}
+      <div className="absolute top-4 right-4 z-10 bg-slate-800 text-slate-300 px-4 py-2 rounded-lg text-sm border border-slate-600 pointer-events-none">
+        <div><strong>Click</strong>: Inspect node</div>
+        <div><strong>Shift+Click</strong>: Focus mode</div>
+        <div><strong>Drag</strong>: Move nodes</div>
+        <div><strong>Scroll</strong>: Zoom</div>
+        <div><strong>Esc</strong>: Clear focus/search</div>
+      </div>
+      
+      {/* SPRINT 15: SIDEBAR REWRITE - Badges & Grid Layout */}
+      {selectedNode && (
+        <div className="fixed right-0 top-0 h-full w-96 bg-slate-900 border-l border-slate-700 shadow-2xl p-6 overflow-y-auto z-50">
+          
+          {/* 1. CLOSE BUTTON */}
+          <button onClick={() => setSelectedNode(null)} className="absolute top-4 right-4 text-slate-500 hover:text-white">✕</button>
+
+          {/* 2. HEADER CONCEPT (No Truncation) - VIEW-LAYER FORMATTING */}
+          <div className="mb-6 border-b border-slate-700 pb-4 mt-8">
+            <h2 className="text-2xl font-bold text-white leading-tight mb-2">
+              {getCleanTitle(selectedNode)}
+            </h2>
+            
+            {/* 3. METADATA BADGES - USE PARSED_PROPS */}
+            <div className="flex flex-wrap gap-2 mt-3">
+              {/* Memory Type Badge */}
+              <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wider
+                ${selectedNode.full_data?.parsed_props?.memory_type === 'episodic' ? 'bg-green-900 text-green-200' :
+                  selectedNode.full_data?.parsed_props?.memory_type === 'procedural' ? 'bg-purple-900 text-purple-200' :
+                  'bg-blue-900 text-blue-200'}`}>
+                {selectedNode.full_data?.parsed_props?.memory_type || 'FACT'}
+              </span>
+              
+              {/* Importance Badge */}
+              <span className="px-2 py-1 bg-slate-700 text-white text-xs rounded font-mono">
+                IMP: {selectedNode.full_data?.parsed_props?.importance || 0}/10
+              </span>
+
+              {/* Status Badge */}
+              <span className="px-2 py-1 bg-slate-700 text-slate-300 text-xs rounded capitalize">
+                {selectedNode.full_data?.parsed_props?.status || 'Active'}
+              </span>
+            </div>
+          </div>
+
+          {/* 4. KEY VARIABLES (Structured Data) - USE PARSED_PROPS */}
+          <div className="grid grid-cols-2 gap-4 mb-6 bg-slate-800/50 p-3 rounded-lg">
+            <div>
+              <label className="text-[10px] text-slate-500 uppercase font-bold">Created</label>
+              <div className="text-slate-300 text-sm">
+                {selectedNode.full_data?.created_at ? new Date(selectedNode.full_data.created_at).toLocaleDateString() : 'N/A'}
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] text-slate-500 uppercase font-bold">Mood</label>
+              <div className="text-slate-300 text-sm">
+                {selectedNode.full_data?.parsed_props?.cognitive_analysis?.emotional_context?.mood || 'Neutral'}
+              </div>
+            </div>
+          </div>
+
+          {/* 5. COGNITIVE ANALYSIS (Intent & Strategic Insight) - USE PARSED_PROPS */}
+          {(selectedNode.full_data?.parsed_props?.cognitive_analysis?.intent ||
+            selectedNode.full_data?.parsed_props?.cognitive_analysis?.strategic_insight) && (
+            <div className="mb-6 bg-slate-800/30 p-3 rounded border border-slate-700">
+              <h4 className="text-[10px] text-slate-500 uppercase font-bold mb-2">AI Analysis</h4>
+              
+              {/* Intent Badge */}
+              {selectedNode.full_data?.parsed_props?.cognitive_analysis?.intent && (
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs text-slate-400">Intent:</span>
+                  <span className="text-xs text-white bg-slate-700 px-2 py-0.5 rounded capitalize">
+                    {selectedNode.full_data.parsed_props.cognitive_analysis.intent}
+                  </span>
+                </div>
+              )}
+
+              {/* Strategic Insight (The "Deep Thought") */}
+              {selectedNode.full_data?.parsed_props?.cognitive_analysis?.strategic_insight && (
+                <div className="text-xs text-slate-300 italic mt-2">
+                  "{selectedNode.full_data.parsed_props.cognitive_analysis.strategic_insight}"
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 6. THE CONTENT (No Raw JSON) - USE PARSED_PROPS */}
+          <div className="mb-8">
+            <h3 className="text-xs font-bold text-cyan-400 uppercase mb-2">Core Memory Content</h3>
+            <div className="bg-slate-800 p-4 rounded border-l-2 border-cyan-500 text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
+              {selectedNode.full_data?.parsed_props?.content || selectedNode.full_data?.description || 'No content available'}
+            </div>
+          </div>
+
+          {/* 7. DEBUG DATA (Hidden/Small) */}
+          <div className="pt-4 border-t border-slate-800">
+            <span className="text-[10px] text-slate-600 font-mono">ID: {selectedNode.id}</span>
+          </div>
+        </div>
+      )}
+      
+      <canvas
+        ref={canvasRef}
+        className="absolute top-0 left-0 w-full h-full cursor-crosshair z-0"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onWheel={handleWheel}
+      />
+    </div>
   );
 };
 

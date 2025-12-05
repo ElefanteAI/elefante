@@ -17,47 +17,75 @@ function App() {
 
   return (
     <div className="w-full h-screen bg-background text-text overflow-hidden relative">
-      {/* Header / Control Bar */}
-      <div className="absolute top-4 left-4 z-10 flex flex-col gap-4">
-        <div className="bg-surface/80 backdrop-blur-md p-4 rounded-2xl border border-white/10 shadow-xl w-80">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-primary/20 rounded-lg text-primary">
-              <LayoutDashboard size={24} />
+      {/* CANARY: Visual Proof of New Code */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        background: 'red',
+        color: 'white',
+        zIndex: 9999,
+        textAlign: 'center',
+        fontWeight: 'bold',
+        padding: '8px',
+        fontSize: '14px'
+      }}>
+        🚨 DEBUG: VERSION 26.0 - TOPOLOGY PRIME (DATA SYNCED) 🚨
+      </div>
+      
+      {/* SPRINT 8: FIX UI COLLISION - Vertical Stack Layout */}
+      <div className="absolute top-4 left-4 z-50 flex flex-col gap-3 pointer-events-auto" style={{ marginTop: '40px' }}>
+        
+        {/* 1. Title Card */}
+        <div className="bg-slate-900/90 backdrop-blur-md p-4 rounded-xl border border-slate-700 shadow-xl w-80">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-cyan-500/20 rounded-lg text-cyan-400">
+              <LayoutDashboard size={20} />
             </div>
             <div>
-              <h1 className="font-bold text-lg">Knowledge Garden</h1>
-              <p className="text-xs text-muted">Elefante Local Brain</p>
+              <h1 className="font-bold text-base text-white">Knowledge Garden</h1>
+              <p className="text-[10px] text-slate-400">Elefante Local Brain</p>
             </div>
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            <div className="bg-background/50 p-2 rounded-lg text-center">
-              <div className="text-xl font-bold text-accent">{stats?.vector_store?.total_memories || 0}</div>
-              <div className="text-[10px] text-muted uppercase tracking-wider">Memories</div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-slate-800/50 p-2 rounded-lg text-center">
+              <div className="text-lg font-bold text-cyan-400">{stats?.vector_store?.total_memories || 0}</div>
+              <div className="text-[9px] text-slate-400 uppercase tracking-wider">Memories</div>
             </div>
-            <div className="bg-background/50 p-2 rounded-lg text-center">
-              <div className="text-xl font-bold text-primary">{stats?.graph_store?.total_entities || 0}</div>
-              <div className="text-[10px] text-muted uppercase tracking-wider">Episodes</div>
+            <div className="bg-slate-800/50 p-2 rounded-lg text-center">
+              <div className="text-lg font-bold text-emerald-400">{stats?.graph_store?.total_entities || 0}</div>
+              <div className="text-[9px] text-slate-400 uppercase tracking-wider">Entities</div>
             </div>
           </div>
+        </div>
 
-          {/* Filters */}
-          <div className="space-y-2">
-            <label className="text-xs text-muted font-medium flex items-center gap-2">
-              <Filter size={12} /> SPACES
-            </label>
-            <select 
-              className="w-full bg-background border border-white/10 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-              value={space}
-              onChange={(e) => setSpace(e.target.value)}
-            >
-              <option value="all">All Spaces</option>
-              <option value="personal">Personal</option>
-              <option value="work">Work</option>
-              <option value="learning">Learning</option>
-            </select>
-          </div>
+        {/* 2. Search Bar (Separate Card) */}
+        <div className="bg-slate-900/90 backdrop-blur-md p-3 rounded-xl border border-slate-700 shadow-xl w-80">
+          <input
+            type="text"
+            placeholder="🔍 Search memories..."
+            className="w-full bg-slate-800 text-white p-2 rounded-lg border border-slate-600 focus:border-cyan-500 outline-none text-sm placeholder-slate-500"
+          />
+        </div>
+
+        {/* 3. Filters (Separate Card) */}
+        <div className="bg-slate-900/90 backdrop-blur-md p-3 rounded-xl border border-slate-700 shadow-xl w-80">
+          <label className="text-xs text-slate-400 font-medium flex items-center gap-2 mb-2">
+            <Filter size={12} /> SPACES
+          </label>
+          <select
+            className="w-full bg-slate-800 border border-slate-600 rounded-lg p-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            value={space}
+            onChange={(e) => setSpace(e.target.value)}
+          >
+            <option value="all">All Spaces</option>
+            <option value="personal">Personal</option>
+            <option value="work">Work</option>
+            <option value="learning">Learning</option>
+          </select>
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 """
-Real-world test of Elefante with actual memories
+Real-world test of Elefante with example memories
 Demonstrates the full memory system capabilities
 """
 
@@ -17,7 +17,7 @@ from src.models.memory import Memory, MemoryMetadata, MemoryType
 from src.models.query import QueryMode
 
 async def test_real_memories():
-    """Test Elefante with real memories about Jaime"""
+    """Test Elefante with example memories"""
     
     orchestrator = get_orchestrator()
     
@@ -25,32 +25,32 @@ async def test_real_memories():
     print("🐘 ELEFANTE REAL-WORLD MEMORY TEST")
     print("="*60)
     
-    # Memory 1: About Jaime
-    print("\n📝 Adding Memory 1: About Jaime...")
+    # Memory 1: About a user
+    print("\n📝 Adding Memory 1: User profile...")
     memory1 = await orchestrator.add_memory(
-        content="Jaime Subiabre Cisterna is an IBM developer based in Toronto, Canada. He works on AI and automation projects.",
+        content="Alex Johnson is a software engineer based in Seattle, Washington. They work on cloud infrastructure and distributed systems.",
         memory_type=MemoryType.FACT,
         importance=10,
-        tags=["jaime", "ibm", "toronto", "developer"],
+        tags=["user", "profile", "seattle", "engineer"],
         entities=[
-            {"name": "Jaime Subiabre Cisterna", "type": "person"},
-            {"name": "IBM", "type": "organization"},
-            {"name": "Toronto", "type": "location"}
+            {"name": "Alex Johnson", "type": "person"},
+            {"name": "Seattle", "type": "location"},
+            {"name": "software engineer", "type": "role"}
         ]
     )
     print(f"✅ Memory 1 stored: {memory1}")
     
-    # Memory 2: About Elefante project
-    print("\n📝 Adding Memory 2: About Elefante...")
+    # Memory 2: About a project
+    print("\n📝 Adding Memory 2: Project information...")
     memory2 = await orchestrator.add_memory(
-        content="Elefante is a dual-database AI memory system that Jaime is building. It combines ChromaDB for semantic search with Kuzu graph database for structured relationships.",
+        content="CloudScale is a microservices platform that Alex is building. It uses Kubernetes for orchestration and implements service mesh patterns with Istio.",
         memory_type=MemoryType.FACT,
         importance=10,
-        tags=["elefante", "project", "chromadb", "kuzu"],
+        tags=["project", "cloudscale", "kubernetes", "microservices"],
         entities=[
-            {"name": "Elefante", "type": "project"},
-            {"name": "ChromaDB", "type": "technology"},
-            {"name": "Kuzu", "type": "technology"}
+            {"name": "CloudScale", "type": "project"},
+            {"name": "Kubernetes", "type": "technology"},
+            {"name": "Istio", "type": "technology"}
         ]
     )
     print(f"✅ Memory 2 stored: {memory2}")
@@ -58,13 +58,14 @@ async def test_real_memories():
     # Memory 3: Conversation context
     print("\n📝 Adding Memory 3: Conversation...")
     memory3 = await orchestrator.add_memory(
-        content="Jaime asked Bob (the AI assistant) to build Elefante and make it work end-to-end. Bob implemented the complete system with 8,500+ lines of code.",
+        content="Alex discussed implementing a new caching layer for the API gateway. The team decided to use Redis for session management and response caching.",
         memory_type=MemoryType.CONVERSATION,
         importance=8,
-        tags=["conversation", "bob", "development"],
+        tags=["conversation", "architecture", "caching"],
         entities=[
-            {"name": "Bob", "type": "person"},
-            {"name": "Jaime Subiabre Cisterna", "type": "person"}
+            {"name": "Alex Johnson", "type": "person"},
+            {"name": "Redis", "type": "technology"},
+            {"name": "API gateway", "type": "component"}
         ]
     )
     print(f"✅ Memory 3 stored: {memory3}")
@@ -72,13 +73,13 @@ async def test_real_memories():
     # Memory 4: Technical details
     print("\n📝 Adding Memory 4: Technical details...")
     memory4 = await orchestrator.add_memory(
-        content="Elefante uses MCP (Model Context Protocol) to integrate with IDEs like Claude Desktop. It provides 7 tools for memory operations.",
+        content="The CloudScale platform uses gRPC for inter-service communication. It provides automatic load balancing, health checks, and circuit breaker patterns.",
         memory_type=MemoryType.FACT,
         importance=7,
-        tags=["mcp", "integration", "tools"],
+        tags=["technical", "grpc", "architecture"],
         entities=[
-            {"name": "MCP", "type": "technology"},
-            {"name": "Claude Desktop", "type": "technology"}
+            {"name": "gRPC", "type": "technology"},
+            {"name": "CloudScale", "type": "project"}
         ]
     )
     print(f"✅ Memory 4 stored: {memory4}")
@@ -86,12 +87,12 @@ async def test_real_memories():
     # Memory 5: Project status
     print("\n📝 Adding Memory 5: Project status...")
     memory5 = await orchestrator.add_memory(
-        content="All 6 end-to-end tests are passing. The system successfully stores memories in both ChromaDB and Kuzu, performs semantic search, and creates entity relationships.",
+        content="The CloudScale platform is in beta testing with three pilot customers. Initial performance metrics show 99.9% uptime and sub-100ms response times.",
         memory_type=MemoryType.FACT,
         importance=9,
-        tags=["testing", "status", "success"],
+        tags=["status", "metrics", "performance"],
         entities=[
-            {"name": "Elefante", "type": "project"}
+            {"name": "CloudScale", "type": "project"}
         ]
     )
     print(f"✅ Memory 5 stored: {memory5}")
@@ -100,10 +101,10 @@ async def test_real_memories():
     print("🔍 TESTING SEMANTIC SEARCH")
     print("="*60)
     
-    # Test 1: Search about Jaime
-    print("\n❓ Query: 'Who is Jaime?'")
+    # Test 1: Search about the user
+    print("\n❓ Query: 'Who is Alex?'")
     results1 = await orchestrator.search_memories(
-        query="Who is Jaime?",
+        query="Who is Alex?",
         mode=QueryMode.SEMANTIC,
         limit=3
     )
@@ -113,9 +114,9 @@ async def test_real_memories():
         print(f"  {result.memory.content[:100]}...")
     
     # Test 2: Search about the project
-    print("\n❓ Query: 'What is Elefante and how does it work?'")
+    print("\n❓ Query: 'What is CloudScale and how does it work?'")
     results2 = await orchestrator.search_memories(
-        query="What is Elefante and how does it work?",
+        query="What is CloudScale and how does it work?",
         mode=QueryMode.SEMANTIC,
         limit=3
     )
@@ -125,9 +126,9 @@ async def test_real_memories():
         print(f"  {result.memory.content[:100]}...")
     
     # Test 3: Search about technologies
-    print("\n❓ Query: 'What databases does Elefante use?'")
+    print("\n❓ Query: 'What technologies are used in the platform?'")
     results3 = await orchestrator.search_memories(
-        query="What databases does Elefante use?",
+        query="What technologies are used in the platform?",
         mode=QueryMode.SEMANTIC,
         limit=3
     )
@@ -140,9 +141,9 @@ async def test_real_memories():
     print("🔗 TESTING HYBRID SEARCH (Vector + Graph)")
     print("="*60)
     
-    print("\n❓ Query: 'IBM developer Toronto'")
+    print("\n❓ Query: 'software engineer Seattle'")
     results4 = await orchestrator.search_memories(
-        query="IBM developer Toronto",
+        query="software engineer Seattle",
         mode=QueryMode.HYBRID,
         limit=3
     )
@@ -216,7 +217,7 @@ async def test_real_memories():
     print("🎉 TEST COMPLETE!")
     print("="*60)
     print("\n✅ Elefante successfully:")
-    print("   • Stored 5 real memories about Jaime and the project")
+    print("   • Stored 5 example memories about a user and project")
     print("   • Performed semantic search with high accuracy")
     print("   • Combined vector and graph search (hybrid mode)")
     print("   • Created entity relationships in the knowledge graph")

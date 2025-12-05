@@ -189,16 +189,18 @@ class VectorStore:
         query: str,
         limit: int = 10,
         filters: Optional[SearchFilters] = None,
-        min_similarity: Optional[float] = None
+        min_similarity: Optional[float] = None,
+        apply_temporal_decay: bool = True
     ) -> List[SearchResult]:
         """
-        Search for similar memories
+        Search for similar memories with optional temporal decay
         
         Args:
             query: Search query text
             limit: Maximum number of results
             filters: Optional filters to apply
             min_similarity: Minimum similarity threshold (0-1)
+            apply_temporal_decay: Apply temporal strength scoring (default: True)
             
         Returns:
             List of search results with scores
@@ -209,8 +211,18 @@ class VectorStore:
         limit = validate_limit(limit)
         min_similarity = min_similarity or self.config.elefante.orchestrator.min_similarity
         
+        # Check if temporal decay is enabled in config
+        temporal_enabled = (
+            apply_temporal_decay and
+            hasattr(self.config.elefante, 'temporal_decay') and
+            self.config.elefante.temporal_decay.enabled
+        )
+        
+        # Get more results if temporal decay is enabled (for re-ranking)
+        search_limit = limit * 2 if temporal_enabled else limit
+        
         # Generate query embedding
-        logger.debug("searching_memories", query=query[:50], limit=limit)
+        logger.debug("searching_memories", query=query[:50], limit=limit, temporal_decay=temporal_enabled)
         query_embedding = await self._embedding_service.generate_embedding(query)
         
         # Build where clause from filters
@@ -221,13 +233,14 @@ class VectorStore:
             results = await asyncio.to_thread(
                 self._collection.query,
                 query_embeddings=[query_embedding],
-                n_results=limit,
+                n_results=search_limit,
                 where=where_clause,
                 include=["documents", "metadatas", "distances"]
             )
             
             # Convert to SearchResult objects
             search_results = []
+            current_time = datetime.utcnow()
             
             if results and results['ids'] and len(results['ids'][0]) > 0:
                 for i in range(len(results['ids'][0])):
@@ -251,20 +264,41 @@ class VectorStore:
                     memory = self._reconstruct_memory(memory_id, content, metadata_dict)
                     memory.similarity_score = similarity
                     
+                    # Apply temporal decay if enabled
+                    final_score = similarity
+                    if temporal_enabled:
+                        # Calculate temporal strength
+                        temporal_score = memory.calculate_relevance_score(current_time)
+                        
+                        # Blend semantic and temporal scores
+                        semantic_weight = self.config.elefante.temporal_decay.semantic_weight
+                        temporal_weight = self.config.elefante.temporal_decay.temporal_weight
+                        final_score = (semantic_weight * similarity) + (temporal_weight * temporal_score)
+                        
+                        # Update access tracking
+                        memory.record_access()
+                        # Note: Access count update will be persisted by orchestrator
+                    
                     # Create search result
                     result = SearchResult(
                         memory=memory,
-                        score=similarity,
+                        score=final_score,
                         source="vector",
                         vector_score=similarity
                     )
                     
                     search_results.append(result)
             
+            # Re-sort by final score if temporal decay was applied
+            if temporal_enabled:
+                search_results.sort(key=lambda x: x.score, reverse=True)
+                search_results = search_results[:limit]
+            
             logger.info(
                 "search_completed",
                 query=query[:50],
-                results_count=len(search_results)
+                results_count=len(search_results),
+                temporal_decay=temporal_enabled
             )
             
             return search_results
@@ -426,6 +460,13 @@ class VectorStore:
             if "tags" in updates:
                 memory.metadata.tags = updates["tags"]
             
+            # Update temporal fields
+            if "last_accessed" in updates:
+                memory.metadata.last_accessed = updates["last_accessed"]
+            
+            if "access_count" in updates:
+                memory.metadata.access_count = updates["access_count"]
+            
             # Delete old and add updated
             await self.delete_memory(memory_id)
             await self.add_memory(memory)
@@ -436,6 +477,24 @@ class VectorStore:
         except Exception as e:
             logger.error("failed_to_update_memory", memory_id=str(memory_id), error=str(e))
             return False
+    
+    async def update_memory_access(self, memory: Memory) -> bool:
+        """
+        Update memory access tracking (lightweight update for temporal decay)
+        
+        Args:
+            memory: Memory object with updated access metadata
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        return await self.update_memory(
+            memory.id,
+            {
+                "last_accessed": memory.metadata.last_accessed,
+                "access_count": memory.metadata.access_count
+            }
+        )
     
     async def delete_memory(self, memory_id: UUID) -> bool:
         """

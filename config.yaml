@@ -79,6 +79,19 @@ elefante:
     consolidation_threshold: 1000 # Number of memories before consolidation
     importance_decay: false # Decay importance over time (future feature)
     max_age_days: 365 # Maximum age before archival (0 = never)
+  
+  # Temporal Memory Decay & Reinforcement (v1.2.0)
+  temporal_decay:
+    enabled: true # Enable adaptive memory strength
+    default_decay_rate: 0.01 # 1% per day (0.0-1.0)
+    default_reinforcement_factor: 0.1 # 10% boost per access (0.0-1.0)
+    semantic_weight: 0.7 # Weight for semantic similarity (0.0-1.0)
+    temporal_weight: 0.3 # Weight for temporal strength (0.0-1.0)
+    consolidation:
+      enabled: false # Background archival of low-strength memories
+      interval_hours: 24 # Run every 24 hours
+      strength_threshold: 0.1 # Archive memories below this strength (0.0-1.0)
+      archive_threshold_days: 180 # Only archive memories older than this
 
   # Performance Tuning
   performance:

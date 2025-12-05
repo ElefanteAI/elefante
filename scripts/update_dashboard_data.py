@@ -3,6 +3,7 @@ import sys
 import os
 import json
 from datetime import datetime
+import chromadb
 
 # Add src to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -11,73 +12,153 @@ from src.core.graph_store import GraphStore
 from src.utils.config import get_config
 
 async def main():
-    print("🐘 Connecting to KuzuDB...")
+    """
+    Generate dashboard snapshot from BOTH data stores:
+    1. ChromaDB (vector store) - Contains ALL memories (primary source)
+    2. Kuzu (graph store) - Contains entities and relationships
+    
+    This ensures all 70+ memories are visible, not just graph entities.
+    """
     config = get_config()
-    # Initialize GraphStore directly to avoid Orchestrator overhead
-    store = GraphStore(config.elefante.graph_store.database_path)
-    
-    # Fetch all nodes
-    print("Fetching nodes...")
-    # Note: Kuzu returns all properties as a dictionary in the result
-    nodes_query = "MATCH (n:Entity) RETURN n"
-    nodes_result = await store.execute_query(nodes_query)
-    
     nodes = []
-    for row in nodes_result:
-        # row is a dict with column names, e.g. {'n': {...}}
-        entity = row.get('n')
-        if entity:
-            # Handle Kuzu Node object or dict
-            props = {}
-            if hasattr(entity, 'get'):
-                # It's likely a dict or dict-like
-                props = dict(entity)
-                # Clean up internal Kuzu fields
-                props = {k: v for k, v in props.items() if not k.startswith('_')}
-            
-            # Parse 'properties' JSON string if it exists
-            if 'properties' in props and isinstance(props['properties'], str):
-                try:
-                    extra_props = json.loads(props['properties'])
-                    props.update(extra_props)
-                except:
-                    pass
-            
-            nodes.append(props)
-
-    print(f"Found {len(nodes)} nodes.")
-
-    # Fetch all edges
-    print("Fetching edges...")
-    # We need to get source and target IDs. 
-    # MATCH (a)-[r]->(b) RETURN a.id, b.id, label(r)
-    edges_query = "MATCH (a)-[r]->(b) RETURN a.id, b.id, label(r)"
-    edges_result = await store.execute_query(edges_query)
-    
     edges = []
-    for row in edges_result:
-        # row keys depend on the return clause
-        # Kuzu python API might return them as 'a.id', 'b.id', 'label(r)' or similar
-        # Let's inspect the first row if needed, but usually it matches the return names
+    seen_ids = set()
+    
+    # =========================================================================
+    # STEP 1: Fetch ALL memories from ChromaDB (PRIMARY SOURCE)
+    # =========================================================================
+    print("🐘 Step 1: Fetching memories from ChromaDB...")
+    
+    chroma_path = config.elefante.vector_store.persist_directory
+    client = chromadb.PersistentClient(path=chroma_path)
+    collection = client.get_collection("memories")
+    
+    # Get ALL memories (no limit)
+    all_memories = collection.get(include=["documents", "metadatas"])
+    
+    memory_count = len(all_memories["ids"])
+    print(f"   Found {memory_count} memories in ChromaDB")
+    
+    for i, memory_id in enumerate(all_memories["ids"]):
+        doc = all_memories["documents"][i] if all_memories["documents"] else ""
+        meta = all_memories["metadatas"][i] if all_memories["metadatas"] else {}
         
-        # GraphStore.execute_query returns a list of dicts
-        # The keys will be the variable names in RETURN
-        src = row.get('a.id')
-        dst = row.get('b.id')
-        lbl = row.get('label(r)')
+        # Create node for this memory
+        # Truncate name for display (first 50 chars)
+        name = doc[:50] + "..." if len(doc) > 50 else doc
         
-        if src and dst:
-            edges.append({
-                "from": src,
-                "to": dst,
-                "label": lbl or "RELATED"
-            })
-
-    print(f"Found {len(edges)} edges.")
-
-    # Save to JSON
+        node = {
+            "id": memory_id,
+            "name": name,
+            "type": "memory",
+            "description": doc,
+            "created_at": meta.get("created_at", meta.get("timestamp", "")),
+            "properties": {
+                "content": doc,
+                "memory_type": meta.get("memory_type", "unknown"),
+                "importance": meta.get("importance", 5),
+                "tags": meta.get("tags", ""),
+                "source": "chromadb"
+            }
+        }
+        nodes.append(node)
+        seen_ids.add(memory_id)
+    
+    # =========================================================================
+    # STEP 2: Fetch entities from Kuzu (SUPPLEMENTARY)
+    # =========================================================================
+    print("🔗 Step 2: Fetching entities from Kuzu...")
+    
+    try:
+        store = GraphStore(config.elefante.graph_store.database_path)
+        
+        # Fetch entity nodes (but skip if already in ChromaDB)
+        nodes_query = "MATCH (n:Entity) RETURN n"
+        nodes_result = await store.execute_query(nodes_query)
+        
+        entity_count = 0
+        for row in nodes_result:
+            entity = row.get('n')
+            if entity:
+                props = dict(entity) if hasattr(entity, 'get') else {}
+                props = {k: v for k, v in props.items() if not k.startswith('_')}
+                
+                entity_id = props.get('id', '')
+                
+                # Skip if already added from ChromaDB
+                if entity_id in seen_ids:
+                    continue
+                
+                # Parse props JSON if exists
+                if 'props' in props and isinstance(props['props'], str):
+                    try:
+                        extra = json.loads(props['props'])
+                        # Check if this is actually a memory (has content)
+                        if extra.get('content') or extra.get('full_content'):
+                            # Already have memories from ChromaDB, skip duplicates
+                            continue
+                        props.update(extra)
+                    except:
+                        pass
+                
+                # Determine if this is a real entity (person, tech, project) not a memory
+                entity_type = props.get('type', 'entity')
+                if entity_type == 'memory':
+                    continue  # Skip, already got from ChromaDB
+                
+                node = {
+                    "id": entity_id,
+                    "name": props.get('name', entity_id[:50]),
+                    "type": entity_type,
+                    "description": props.get('description', ''),
+                    "created_at": props.get('created_at', ''),
+                    "properties": {"source": "kuzu"}
+                }
+                nodes.append(node)
+                seen_ids.add(entity_id)
+                entity_count += 1
+        
+        print(f"   Found {entity_count} additional entities in Kuzu")
+        
+        # =========================================================================
+        # STEP 3: Fetch relationships from Kuzu
+        # =========================================================================
+        print("🔗 Step 3: Fetching relationships from Kuzu...")
+        
+        edges_query = "MATCH (a)-[r]->(b) RETURN a.id, b.id, label(r)"
+        edges_result = await store.execute_query(edges_query)
+        
+        for row in edges_result:
+            src = row.get('a.id')
+            dst = row.get('b.id')
+            lbl = row.get('label(r)')
+            
+            if src and dst:
+                edges.append({
+                    "from": src,
+                    "to": dst,
+                    "label": lbl or "RELATED"
+                })
+        
+        print(f"   Found {len(edges)} relationships")
+        
+    except Exception as e:
+        print(f"   ⚠️ Kuzu error (non-fatal): {e}")
+        print("   Continuing with ChromaDB data only...")
+    
+    # =========================================================================
+    # STEP 4: Save snapshot
+    # =========================================================================
+    print("💾 Step 4: Saving snapshot...")
+    
     snapshot = {
         "generated_at": datetime.utcnow().isoformat(),
+        "stats": {
+            "total_nodes": len(nodes),
+            "memories": sum(1 for n in nodes if n["type"] == "memory"),
+            "entities": sum(1 for n in nodes if n["type"] != "memory"),
+            "edges": len(edges)
+        },
         "nodes": nodes,
         "edges": edges
     }
@@ -93,8 +174,12 @@ async def main():
 
     with open(output_path, "w") as f:
         json.dump(snapshot, f, indent=2, cls=DateTimeEncoder)
-        
-    print(f"✅ Dashboard snapshot saved to {output_path}")
+    
+    print(f"\n✅ Dashboard snapshot saved to {output_path}")
+    print(f"   📊 Total nodes: {len(nodes)}")
+    print(f"   🧠 Memories: {snapshot['stats']['memories']}")
+    print(f"   🔗 Entities: {snapshot['stats']['entities']}")
+    print(f"   ➡️  Edges: {len(edges)}")
 
 if __name__ == "__main__":
     asyncio.run(main())

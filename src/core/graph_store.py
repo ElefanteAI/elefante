@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 from src.models.entity import Entity, EntityType, Relationship, RelationshipType
-from src.models.memory import Memory
+from src.models.memory import Memory, MemoryMetadata, MemoryType
 from src.utils.config import get_config
 from src.utils.logger import get_logger
 from src.utils.validators import validate_entity_name, validate_cypher_query
@@ -175,7 +175,7 @@ class GraphStore:
                     type STRING,
                     description STRING,
                     created_at TIMESTAMP,
-                    properties STRING,
+                    props STRING,
                     PRIMARY KEY(id)
                 )
                 """,
@@ -250,37 +250,38 @@ class GraphStore:
         # Validate entity name
         validate_entity_name(entity.name)
         
-        query = """
-            CREATE (e:Entity {
-                id: $id,
-                name: $name,
-                type: $type,
-                description: $description,
-                created_at: $created_at,
-                properties: $properties
-            })
-        """
-        
         # Helper for JSON serialization
         def json_serializer(obj):
             if isinstance(obj, datetime):
                 return obj.isoformat()
             raise TypeError(f"Type {type(obj)} not serializable")
-
-        params = {
-            "id": str(entity.id),
-            "name": entity.name,
-            "type": entity.type.value,
-            "description": entity.description or "",
-            "created_at": entity.created_at,  # Pass datetime object directly for Kuzu
-            "properties": json.dumps(entity.properties, default=json_serializer) # Serialize properties to JSON string
-        }
+        
+        # Escape single quotes in strings for Cypher
+        def escape_string(s):
+            if s is None:
+                return ""
+            return str(s).replace("'", "\\'")
+        
+        # Use string interpolation instead of parameters to avoid Kuzu binding issues
+        # Kuzu has issues with parameterized queries when property names match parameter names
+        props_json = json.dumps(entity.properties, default=json_serializer).replace("'", "\\'")
+        created_at_iso = entity.created_at.isoformat() if entity.created_at else datetime.now().isoformat()
+        
+        query = f"""
+            CREATE (e:Entity {{
+                id: '{str(entity.id)}',
+                name: '{escape_string(entity.name)}',
+                type: '{entity.type.value}',
+                description: '{escape_string(entity.description or "")}',
+                created_at: '{created_at_iso}',
+                props: '{props_json}'
+            }})
+        """
         
         try:
             await asyncio.to_thread(
                 self._conn.execute,
-                query,
-                params
+                query
             )
             
             logger.info(
@@ -734,6 +735,101 @@ class GraphStore:
         except Exception as e:
             logger.error("failed_to_delete_entity", entity_id=str(entity_id), error=str(e))
             return False
+    async def search_memories(
+        self,
+        query: str,
+        limit: int = 10,
+        apply_temporal_decay: bool = True
+    ) -> List[Memory]:
+        """
+        Search memories in graph store with optional temporal decay
+        
+        Args:
+            query: Search query string
+            limit: Maximum number of results
+            apply_temporal_decay: Apply temporal strength scoring (default: True)
+            
+        Returns:
+            List of Memory objects
+        """
+        self._initialize_connection()
+        
+        # Check if temporal decay is enabled in config
+        config = get_config()
+        temporal_enabled = (
+            apply_temporal_decay and 
+            hasattr(config.elefante, 'temporal_decay') and
+            config.elefante.temporal_decay.enabled
+        )
+        
+        # Get more results if temporal decay is enabled (for re-ranking)
+        search_limit = limit * 2 if temporal_enabled else limit
+        
+        # Search for memories containing query text
+        cypher = """
+            MATCH (m:Memory)
+            WHERE m.content CONTAINS $query
+            RETURN m.id, m.content, m.timestamp, m.memory_type, m.importance
+            ORDER BY m.importance DESC
+            LIMIT $limit
+        """
+        
+        try:
+            result = await asyncio.to_thread(
+                self._conn.execute,
+                cypher,
+                {"query": query, "limit": search_limit}
+            )
+            
+            memories = []
+            current_time = datetime.utcnow()
+            
+            for row in self._get_query_results(result):
+                # Reconstruct memory from graph data
+                memory_metadata = MemoryMetadata(
+                    created_at=row[2] if isinstance(row[2], datetime) else datetime.fromisoformat(row[2]),
+                    memory_type=MemoryType(row[3]) if row[3] else MemoryType.CONVERSATION,
+                    importance=row[4] if row[4] else 5
+                )
+                
+                memory = Memory(
+                    id=UUID(row[0]),
+                    content=row[1],
+                    metadata=memory_metadata
+                )
+                
+                # Apply temporal decay if enabled
+                if temporal_enabled:
+                    # Calculate temporal strength
+                    temporal_score = memory.calculate_relevance_score(current_time)
+                    memory.relevance_score = temporal_score
+                    
+                    # Update access tracking
+                    memory.record_access()
+                else:
+                    # Use importance as relevance score
+                    memory.relevance_score = memory.metadata.importance / 10.0
+                
+                memories.append(memory)
+            
+            # Re-sort by relevance score if temporal decay was applied
+            if temporal_enabled:
+                memories.sort(key=lambda m: m.relevance_score or 0, reverse=True)
+                memories = memories[:limit]
+            
+            logger.info(
+                "graph_search_completed",
+                query=query[:50],
+                results_count=len(memories),
+                temporal_decay=temporal_enabled
+            )
+            
+            return memories
+            
+        except Exception as e:
+            logger.error("graph_search_failed", query=query[:50], error=str(e))
+            return []
+    
     
     async def get_stats(self) -> Dict[str, Any]:
         """

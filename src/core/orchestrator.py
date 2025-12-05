@@ -148,24 +148,6 @@ class MemoryOrchestrator:
         )
         
         try:
-<<<<<<< HEAD
-            # Create standardized metadata
-            std_metadata = StandardizedMetadata(
-                core=CoreMetadata(
-                    memory_type=StdMemoryType(memory_type),
-                    importance=importance,
-                    tags=tags or []
-                ),
-                context=ContextMetadata(
-                    session_id=metadata.get("session_id") if metadata else None,
-                    project=metadata.get("project") if metadata else None,
-                    file_path=metadata.get("file_path") if metadata else None
-                ),
-                custom=metadata or {}
-            )
-            
-            # Create memory object
-=======
             # Create memory object with V2 metadata structure
             # Extract V2 fields from metadata dict if provided
             domain = None
@@ -189,7 +171,15 @@ class MemoryOrchestrator:
                     if k not in ["domain", "category", "intent", "confidence", "source"]
                 }
             
->>>>>>> 12e0497 (Elefante: Initial commit of AI Memory System)
+            # Safely convert intent, mapping unknown values to REFERENCE
+            intent_value = IntentType.REFERENCE
+            if intent:
+                try:
+                    intent_value = IntentType(intent)
+                except ValueError:
+                    self.logger.warning(f"Unknown intent '{intent}', using REFERENCE")
+                    intent_value = IntentType.REFERENCE
+            
             memory_metadata = MemoryMetadata(
                 memory_type=MemoryType(memory_type),
                 importance=importance,
@@ -197,19 +187,12 @@ class MemoryOrchestrator:
                 tags=tags or [],
                 domain=DomainType(domain) if domain else DomainType.REFERENCE,
                 category=category or "general",
-                intent=IntentType(intent) if intent else IntentType.REFERENCE,
+                intent=intent_value,
                 confidence=confidence if confidence is not None else 0.7,
                 source=SourceType(source) if source else SourceType.USER_INPUT,
                 custom_metadata=custom_metadata
             )
             
-<<<<<<< HEAD
-            if metadata:
-                for key, value in metadata.items():
-                    memory_metadata.custom[key] = value
-            
-=======
->>>>>>> 12e0497 (Elefante: Initial commit of AI Memory System)
             memory = Memory(
                 content=content,
                 metadata=memory_metadata,
@@ -218,9 +201,6 @@ class MemoryOrchestrator:
             
             # Store in Vector DB
             await self.vector_store.add_memory(memory)
-            
-            # Store in Metadata Store
-            await self.metadata_store.add_metadata(memory.id, std_metadata, content)
             
             # Create Graph Node (Entity)
             # Use the extracted TITLE as the name, falling back to ID if needed
@@ -233,21 +213,15 @@ class MemoryOrchestrator:
                 description=analysis.get("summary", content[:200]),
                 properties={
                     "content": content[:200],
-                    "full_content": content, # Store full content in properties for graph retrieval
+                    "full_content": content,
                     "title": title,
-                    "cognitive_analysis": analysis, # Store full analysis
+                    "cognitive_analysis": analysis,
                     "memory_type": memory_type,
                     "importance": importance,
                     "status": status.value,
-<<<<<<< HEAD
-                    "timestamp": memory.metadata.timestamp
-                },
-                tags=tags
-=======
                     "timestamp": memory.metadata.created_at,
                     "entity_subtype": "memory"
                 }
->>>>>>> 12e0497 (Elefante: Initial commit of AI Memory System)
             )
             await self.graph_store.create_entity(memory_entity)
             self.logger.debug(f"Memory node created: {entity_name}")
@@ -391,16 +365,18 @@ class MemoryOrchestrator:
         include_conversation: bool = True,
         include_stored: bool = True,
         session_id: Optional[UUID] = None,
-        return_debug: bool = False
+        return_debug: bool = False,
+        apply_temporal_decay: bool = True
     ) -> List[SearchResult]:
         """
-        Search memories using semantic, structured, and/or conversation context
+        Search memories using semantic, structured, and/or conversation context with temporal decay
         
-        This implements enhanced hybrid search with conversation awareness:
+        This implements enhanced hybrid search with conversation awareness and adaptive memory strength:
         - SEMANTIC: Vector similarity search only
         - STRUCTURED: Graph traversal only
         - HYBRID: Combined search with weighted scoring
         - CONVERSATION: Recent session messages (when session_id provided)
+        - TEMPORAL DECAY: Adaptive memory strength based on recency and access patterns
         
         Args:
             query: Search query string
@@ -412,6 +388,7 @@ class MemoryOrchestrator:
             include_stored: Include stored memories in search
             session_id: Session UUID for conversation context
             return_debug: Return debug statistics with results
+            apply_temporal_decay: Apply temporal strength scoring (default: True)
             
         Returns:
             List[SearchResult]: Ranked search results
@@ -442,13 +419,13 @@ class MemoryOrchestrator:
             results = []
             
             if include_stored:
-                # Execute traditional search (semantic/structured/hybrid)
+                # Execute traditional search (semantic/structured/hybrid) with temporal decay
                 if mode == QueryMode.SEMANTIC:
-                    stored_results = await self._search_semantic(query, plan)
+                    stored_results = await self._search_semantic(query, plan, apply_temporal_decay)
                 elif mode == QueryMode.STRUCTURED:
-                    stored_results = await self._search_structured(query, plan)
+                    stored_results = await self._search_structured(query, plan, apply_temporal_decay)
                 else:  # HYBRID
-                    stored_results = await self._search_hybrid(query, plan)
+                    stored_results = await self._search_hybrid(query, plan, apply_temporal_decay)
                 results.extend(stored_results)
             
             if include_conversation and session_id:
@@ -525,9 +502,10 @@ class MemoryOrchestrator:
     async def _search_semantic(
         self,
         query: str,
-        plan: QueryPlan
+        plan: QueryPlan,
+        apply_temporal_decay: bool = True
     ) -> List[SearchResult]:
-        """Execute semantic search via vector store"""
+        """Execute semantic search via vector store with optional temporal decay"""
         # Build metadata filters
         metadata_filter = {}
         if plan.memory_types:
@@ -537,10 +515,11 @@ class MemoryOrchestrator:
         if plan.min_importance:
             metadata_filter["importance"] = {"$gte": plan.min_importance}
         
-        # Search vector store - returns List[SearchResult]
+        # Search vector store with temporal decay - returns List[SearchResult]
         results = await self.vector_store.search(
             query=query,
-            limit=plan.limit * 2  # Get more for filtering
+            limit=plan.limit * 2,  # Get more for filtering
+            apply_temporal_decay=apply_temporal_decay
         )
         
         # Filter by minimum similarity
@@ -549,14 +528,20 @@ class MemoryOrchestrator:
             if result.score >= plan.min_similarity
         ]
         
+        # Update access counts for retrieved memories
+        if apply_temporal_decay:
+            for result in filtered_results:
+                await self.vector_store.update_memory_access(result.memory)
+        
         return filtered_results
     
     async def _search_structured(
         self,
         query: str,
-        plan: QueryPlan
+        plan: QueryPlan,
+        apply_temporal_decay: bool = True
     ) -> List[SearchResult]:
-        """Execute structured search via graph store"""
+        """Execute structured search via graph store with optional temporal decay"""
         # Build Cypher query based on filters
         cypher_parts = ["MATCH (m:Entity {type: 'memory'})"]
         where_clauses = []
@@ -615,20 +600,21 @@ class MemoryOrchestrator:
     async def _search_hybrid(
         self,
         query: str,
-        plan: QueryPlan
+        plan: QueryPlan,
+        apply_temporal_decay: bool = True
     ) -> List[SearchResult]:
         """
-        Execute hybrid search combining vector and graph results
+        Execute hybrid search combining vector and graph results with temporal decay
         
         This is the most powerful search mode:
         1. Run semantic and structured searches in parallel
         2. Merge results by memory ID
-        3. Calculate weighted scores
+        3. Calculate weighted scores (including temporal strength)
         4. Deduplicate and rank
         """
-        # Execute both searches in parallel
-        semantic_task = self._search_semantic(query, plan)
-        structured_task = self._search_structured(query, plan)
+        # Execute both searches in parallel with temporal decay
+        semantic_task = self._search_semantic(query, plan, apply_temporal_decay)
+        structured_task = self._search_structured(query, plan, apply_temporal_decay)
         
         semantic_results, structured_results = await asyncio.gather(
             semantic_task,

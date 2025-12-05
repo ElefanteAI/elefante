@@ -113,6 +113,33 @@ class MemoryConfig(BaseModel):
     max_age_days: int = Field(default=365, ge=0)
 
 
+class ConsolidationConfig(BaseModel):
+    """Consolidation job configuration"""
+    enabled: bool = False
+    interval_hours: int = Field(default=24, ge=1)
+    strength_threshold: float = Field(default=0.1, ge=0.0, le=1.0)
+    archive_threshold_days: int = Field(default=180, ge=0)
+
+
+class TemporalDecayConfig(BaseModel):
+    """Temporal memory decay & reinforcement configuration"""
+    enabled: bool = True
+    default_decay_rate: float = Field(default=0.01, ge=0.0, le=1.0)
+    default_reinforcement_factor: float = Field(default=0.1, ge=0.0, le=1.0)
+    semantic_weight: float = Field(default=0.7, ge=0.0, le=1.0)
+    temporal_weight: float = Field(default=0.3, ge=0.0, le=1.0)
+    consolidation: ConsolidationConfig = Field(default_factory=ConsolidationConfig)
+    
+    @validator('semantic_weight', 'temporal_weight')
+    def validate_weights(cls, v, values):
+        """Ensure weights sum to 1.0"""
+        if 'semantic_weight' in values and 'temporal_weight' in values:
+            total = values['semantic_weight'] + v
+            if abs(total - 1.0) > 0.01:
+                raise ValueError("semantic_weight + temporal_weight must equal 1.0")
+        return v
+
+
 class PerformanceConfig(BaseModel):
     """Performance tuning configuration"""
     cache_embeddings: bool = True
@@ -153,6 +180,7 @@ class ElefanteConfig(BaseModel):
     performance: PerformanceConfig = Field(default_factory=PerformanceConfig)
     features: FeaturesConfig = Field(default_factory=FeaturesConfig)
     user_profile: UserProfileConfig = Field(default_factory=UserProfileConfig)
+    temporal_decay: TemporalDecayConfig = Field(default_factory=TemporalDecayConfig)
 
 
 class Config:

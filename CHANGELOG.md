@@ -5,6 +5,63 @@ All notable changes to the Elefante project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-12-04
+
+### 🔧 Fixed
+- **CRITICAL: Kuzu Reserved Word Bug** - Fixed `properties` field causing runtime errors
+  - Root cause: `properties` is reserved in Cypher but valid in SQL schema
+  - Solution: Renamed `properties` → `props` in Entity schema
+  - Impact: All entity creation operations now work correctly
+  - File: `src/core/graph_store.py` (lines 178, 274)
+
+### 📚 Added
+- **Comprehensive Example System** - Complete rewrite of examples with generic content
+  - `examples/comprehensive_demo.py` (547 lines) - Full system demonstration
+    - 8 parts covering memory types, query modes, limitations, workarounds, best practices
+    - Real-world code review scenario
+    - Production-ready patterns
+  - `examples/seed_preferences.py` - Generic user preferences (115 lines)
+  - `examples/validate_system.py` - Generic validation with Alex/CloudScale scenario (239 lines)
+  - `examples/interactive_demo.py` - Updated with generic examples
+
+### 📖 Documentation
+- **Critical Bug Analysis** - `docs/debug/kuzu-reserved-words-issue.md` (329 lines)
+  - Complete root cause analysis of Kuzu SQL/Cypher hybrid anomaly
+  - Proof of concept tests demonstrating the issue
+  - Step-by-step fix with migration path
+  - Prevention strategies for future development
+- **Best Practices Guide** - `docs/technical/kuzu-best-practices.md` (254 lines)
+  - Comprehensive list of Cypher reserved words to avoid
+  - Safe alternatives and naming conventions
+  - Testing checklist for new properties
+  - Common errors and solutions
+  - Quick reference for Kuzu operations
+
+### 🧪 Testing
+- **Test Scripts** - Verification tools for Kuzu behavior
+  - `test_kuzu_create.py` - Proves `properties` is reserved word
+  - `test_kuzu_syntax.py` - Confirms Cypher CREATE works, SQL INSERT doesn't
+  - `reset_kuzu_schema.py` - Helper for clean database reset
+
+### 🎓 Key Learnings
+- Kuzu uses SQL DDL for schema, Cypher DML for operations
+- Property names valid in SQL schema can be invalid in Cypher operations
+- Reserved words are context-dependent and create semantic traps
+- Always test both schema definition AND data operations
+- String interpolation more reliable than parameterized queries in Kuzu
+
+### ⚠️ Breaking Changes
+- **Database Schema Change** - `properties` field renamed to `props`
+- **Migration Required** - Existing databases must be reset and re-initialized
+- **Action Required**: Run `python reset_kuzu_schema.py && python scripts/init_databases.py`
+
+### 🔗 Related Issues
+- Fixes entity creation failures in graph store
+- Resolves "Cannot find property properties for e" error
+- Enables all graph operations to work correctly
+
+---
+
 ## [1.1.0] - 2025-12-03
 
 ### Added

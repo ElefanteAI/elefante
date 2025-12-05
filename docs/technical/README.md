@@ -36,19 +36,22 @@ The "Soul" of Elefante - how AI memory works:
 
 ### Installation & Setup
 
-#### [`installation.md`](installation.md)
-Step-by-step installation guide:
-- Prerequisites
-- Automated Installation (install.bat/install.sh)
-- Manual Installation
-- IDE Configuration (VSCode, Cursor, Bob)
+#### [`installation.md`](installation.md) ⭐ **START HERE**
+Complete installation guide with step-by-step instructions:
+- Prerequisites and system requirements
+- Automated installation (recommended)
+- Manual installation steps
+- IDE configuration (VSCode, Cursor, Bob)
+- Verification and troubleshooting
+- Uninstallation guide
 
 #### [`installation-safeguards.md`](installation-safeguards.md)
-Automated safeguards that prevent common installation failures:
-- Pre-flight Checks
-- Kuzu 0.11.x Compatibility
-- Dependency Validation
-- Disk Space Verification
+Technical deep-dive into automated protection systems:
+- Pre-flight check implementation
+- Kuzu 0.11.x compatibility handling
+- Breaking changes database
+- Developer guide for adding new safeguards
+- Lessons learned from installation failures
 
 ---
 
@@ -96,15 +99,24 @@ Knowledge Garden Dashboard documentation:
 
 ---
 
-### Implementation Details
+### Features & Implementation
+
+#### [`temporal-memory-decay.md`](temporal-memory-decay.md) 🆕
+Adaptive memory strength system (v1.1.0):
+- How temporal decay works
+- Memory strength formula
+- Reinforcement through access
+- Background consolidation
+- Configuration and usage examples
+- Performance impact analysis
 
 #### [`technical-implementation.md`](technical-implementation.md)
 Deep technical implementation details:
-- Code Changes
-- Pre-Flight Check System
-- Error Handling
-- Performance Metrics
-- Testing Framework
+- Code architecture
+- Pre-flight check system
+- Error handling patterns
+- Performance metrics
+- Testing framework
 
 ---
 
@@ -144,17 +156,32 @@ Deep technical implementation details:
 
 ---
 
+## 🆕 What's New in v1.1.0
+
+- **Temporal Memory Decay**: Adaptive memory strength system
+- **Installation Safeguards**: Automated protection against common failures
+- **Enhanced Documentation**: Complete technical reference
+- **Protocol Enforcement**: 5-layer system for AI behavior (see [`../debug/README.md`](../debug/README.md))
+
 ## 🎯 Next Steps
 
-After reading the technical documentation:
-1. Try the examples in `usage.md`
-2. Explore the dashboard using `dashboard.md`
-3. Build your first knowledge graph following `walkthrough.md`
+### For New Users
+1. **Install**: Follow [`installation.md`](installation.md)
+2. **Learn**: Read [`walkthrough.md`](walkthrough.md)
+3. **Explore**: Try [`dashboard.md`](dashboard.md)
 
-For troubleshooting, see [`../debug/README.md`](../debug/README.md)
+### For Developers
+1. **Architecture**: Understand [`architecture.md`](architecture.md)
+2. **Schema**: Study [`memory-schema-v2.md`](memory-schema-v2.md)
+3. **Features**: Explore [`temporal-memory-decay.md`](temporal-memory-decay.md)
+
+### For Troubleshooting
+- **Installation Issues**: [`installation-safeguards.md`](installation-safeguards.md)
+- **General Debugging**: [`../debug/README.md`](../debug/README.md)
+- **Protocol Issues**: [`../debug/general/PROTOCOL-ENFORCEMENT-FINAL.md`](../debug/general/PROTOCOL-ENFORCEMENT-FINAL.md)
 
 ---
 
-**Version**: 1.1.0  
-**Last Updated**: 2025-12-03  
+**Version**: 1.1.0
+**Last Updated**: 2025-12-04
 **Status**: Production Ready

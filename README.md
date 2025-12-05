@@ -1,6 +1,8 @@
-# 🐘 Elefante
+# 🐘 Elefante v1.2.0
 
 **Local-First AI Memory System with Perfect Recall**
+
+> **Latest Release:** v1.2.0 - Critical bug fix + comprehensive documentation ([Release Notes](RELEASE_NOTES_v1.2.md))
 
 Elefante gives AI agents a stateful brain by combining semantic search, knowledge graphs, and conversation context—all running 100% locally on your machine. No cloud. No data egress. Just pure, private memory.
 

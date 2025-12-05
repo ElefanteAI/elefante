@@ -13,7 +13,7 @@ async def chat_loop():
     print("\n🐘 Elefante Memory System - Interactive Demo")
     print("---------------------------------------------")
     print("Type a message to store it. Type 'exit' to quit.")
-    print("Try: 'I live in Longueuil' or 'My name is Jay'")
+    print("Try: 'I live in Seattle' or 'My favorite color is blue'")
     print("---------------------------------------------\n")
 
     try:

@@ -1,6 +1,7 @@
 """
-Store critical user preferences in Elefante
-This ensures the AI assistant remembers important working style preferences
+Store user preferences in Elefante
+This demonstrates how to store important working style preferences
+that the AI assistant should remember
 """
 
 import asyncio
@@ -19,7 +20,7 @@ from src.core.orchestrator import get_orchestrator
 from src.models.memory import MemoryType
 
 async def store_preferences():
-    """Store Jaime's critical working preferences"""
+    """Store example user preferences"""
     
     orchestrator = get_orchestrator()
     
@@ -27,69 +28,84 @@ async def store_preferences():
     print("🐘 STORING USER PREFERENCES IN ELEFANTE")
     print("="*70 + "\n")
     
-    # Critical preference about clean environment
-    print("📝 Storing CRITICAL preference: Clean environment...")
+    # Preference 1: Communication style
+    print("📝 Storing preference: Communication style...")
     memory1 = await orchestrator.add_memory(
         content=(
-            "CRITICAL: Jaime is extremely picky about keeping the development environment clean. "
-            "He HATES leftover files, test artifacts, and garbage that makes the environment "
-            "hard to understand and prone to errors. The AI must avoid creating unnecessary files "
-            "and always clean up after testing. This is MANDATORY and a key factor for successful development."
+            "The user prefers clear, concise communication with technical details. "
+            "They appreciate step-by-step explanations and want to understand the "
+            "reasoning behind decisions. Avoid unnecessary verbosity but provide "
+            "sufficient context for complex topics."
         ),
         memory_type=MemoryType.NOTE,
-        importance=10,  # Maximum importance
-        tags=["CRITICAL", "environment", "cleanliness", "development-style", "best-practices"],
+        importance=9,
+        tags=["preference", "communication", "style"],
         entities=[
-            {"name": "Jaime Subiabre Cisterna", "type": "person"},
-            {"name": "development environment", "type": "concept"},
-            {"name": "clean code", "type": "concept"}
+            {"name": "User", "type": "person"},
+            {"name": "communication style", "type": "concept"}
         ]
     )
     print(f"✅ Stored: {memory1.id}\n")
     
-    # Additional context about working style
-    print("📝 Storing working philosophy...")
+    # Preference 2: Code organization
+    print("📝 Storing preference: Code organization...")
     memory2 = await orchestrator.add_memory(
         content=(
-            "Jaime's development philosophy: Keep the codebase clean and organized. "
-            "Remove test files after validation. Avoid cluttering the workspace with "
-            "temporary files. The AI should proactively suggest cleanup and maintain "
-            "a pristine working environment."
+            "The user values clean, well-organized code with proper documentation. "
+            "They prefer modular design patterns and appreciate when code follows "
+            "established best practices. Comments should explain 'why' not 'what'."
         ),
         memory_type=MemoryType.NOTE,
-        importance=9,
-        tags=["philosophy", "organization", "cleanup", "workspace"],
+        importance=8,
+        tags=["preference", "code", "organization", "best-practices"],
         entities=[
-            {"name": "Jaime Subiabre Cisterna", "type": "person"},
-            {"name": "clean code", "type": "concept"}
+            {"name": "User", "type": "person"},
+            {"name": "code quality", "type": "concept"}
         ]
     )
     print(f"✅ Stored: {memory2.id}\n")
     
-    # Best practices reminder
-    print("📝 Storing collaboration best practices...")
+    # Preference 3: Working hours
+    print("📝 Storing preference: Working schedule...")
     memory3 = await orchestrator.add_memory(
         content=(
-            "When working with Jaime: Always ask before creating test files. "
-            "Clean up immediately after testing. Suggest removing unnecessary files. "
-            "Keep the project structure minimal and organized. This prevents confusion "
-            "and maintains code quality."
+            "The user typically works during standard business hours in their timezone. "
+            "They prefer to batch similar tasks together and appreciate reminders "
+            "about pending items at the start of work sessions."
         ),
         memory_type=MemoryType.FACT,
-        importance=9,
-        tags=["best-practices", "workflow", "collaboration"],
+        importance=7,
+        tags=["preference", "schedule", "workflow"],
         entities=[
-            {"name": "Jaime Subiabre Cisterna", "type": "person"},
-            {"name": "AI assistant", "type": "concept"}
+            {"name": "User", "type": "person"},
+            {"name": "work schedule", "type": "concept"}
         ]
     )
     print(f"✅ Stored: {memory3.id}\n")
+    
+    # Preference 4: Learning style
+    print("📝 Storing preference: Learning approach...")
+    memory4 = await orchestrator.add_memory(
+        content=(
+            "The user learns best through practical examples and hands-on experimentation. "
+            "They appreciate when new concepts are demonstrated with working code samples "
+            "and real-world use cases rather than abstract theory."
+        ),
+        memory_type=MemoryType.NOTE,
+        importance=8,
+        tags=["preference", "learning", "education"],
+        entities=[
+            {"name": "User", "type": "person"},
+            {"name": "learning style", "type": "concept"}
+        ]
+    )
+    print(f"✅ Stored: {memory4.id}\n")
     
     print("="*70)
     print("✅ ALL PREFERENCES STORED SUCCESSFULLY")
     print("="*70)
     print("\nThese preferences will now be automatically retrieved")
-    print("whenever Bob (AI assistant) works with you!")
+    print("whenever the AI assistant works with you!")
     print("="*70 + "\n")
 
 if __name__ == "__main__":

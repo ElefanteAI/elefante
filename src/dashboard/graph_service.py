@@ -9,6 +9,7 @@ from typing import Dict, List, Tuple
 from pathlib import Path
 from datetime import datetime
 import kuzu
+import numpy as np
 from src.utils.config import get_config
 
 class GraphService:
@@ -43,36 +44,29 @@ class GraphService:
             with open(snapshot_path, "r") as f:
                 data = json.load(f)
                 
-            # 1. Deduplicate Nodes & Build Canonical Map
-            canonical_map = {} # (name, type) -> canonical_id
-            node_registry = {} # canonical_id -> node_data
+            # 1. Build Node Registry by UNIQUE ID (not name - names can collide!)
+            # FIXED: Previously used (name, type) which caused deduplication of
+            # memories with similar content (same first 50 chars = same name)
+            node_registry = {}  # id -> node_data
             
             for n in data.get("nodes", []):
-                key = (n["name"], n["type"])
-                if key not in canonical_map:
-                    canonical_map[key] = n["id"]
-                    node_registry[n["id"]] = n
+                node_id = n.get("id")
+                if node_id and node_id not in node_registry:
+                    node_registry[node_id] = n
             
             # 2. Process Edges & Calculate Degree
             processed_edges = []
             node_degrees = {nid: 0 for nid in node_registry}
             
-            # Re-build lookup
-            id_map = {}
-            for n in data.get("nodes", []):
-                key = (n["name"], n["type"])
-                if key in canonical_map:
-                    id_map[n["id"]] = canonical_map[key]
-            
             for e in data.get("edges", []):
-                src = id_map.get(e["from"])
-                dst = id_map.get(e["to"])
-                if src and dst and src != dst:
+                src = e.get("from")
+                dst = e.get("to")
+                if src and dst and src != dst and src in node_registry and dst in node_registry:
                     processed_edges.append({
                         "from": src,
                         "to": dst,
-                        "label": e["label"],
-                        "title": e["label"]
+                        "label": e.get("label", "RELATED"),
+                        "title": e.get("label", "RELATED")
                     })
                     node_degrees[src] = node_degrees.get(src, 0) + 1
                     node_degrees[dst] = node_degrees.get(dst, 0) + 1
@@ -83,7 +77,18 @@ class GraphService:
             debug_log.append(msg)
             with open("rejection.log", "a") as logf: logf.write(msg + "\n")
             
+            # NUCLEAR OPTION: Remove User entity from backend
+            user_node_id = None
             for nid, n in node_registry.items():
+                if n.get("type", "").lower() == "person" and n.get("name", "").lower() == "user":
+                    user_node_id = nid
+                    debug_log.append(f"BACKEND: Found User node (ID: {nid}), will exclude from output")
+                    break
+            
+            for nid, n in node_registry.items():
+                # Skip User entity entirely
+                if nid == user_node_id:
+                    continue
                 # Parse properties if string
                 if isinstance(n.get("properties"), str):
                     try:
@@ -169,10 +174,13 @@ class GraphService:
                     "cognitive": cognitive_data # Pass extracted cognitive data
                 })
 
-            # 4. Finalize Edges
+            # 4. Finalize Edges (exclude User entity edges)
             edges = []
             visible_ids = {n["id"] for n in nodes}
             for e in processed_edges:
+                # Skip edges connected to User entity
+                if user_node_id and (e["from"] == user_node_id or e["to"] == user_node_id):
+                    continue
                 if e["from"] in visible_ids and e["to"] in visible_ids:
                     edges.append(e)
                 else:
@@ -180,6 +188,12 @@ class GraphService:
                     pass
                     
             # DUMMY NODE REMOVED
+            
+            # 5. Compute Semantic Similarity Edges
+            semantic_edges = self._compute_similarity_edges(nodes, top_k=3, min_threshold=0.5)
+            edges.extend(semantic_edges)
+            
+            debug_log.append(f"Added {len(semantic_edges)} semantic similarity edges")
             
             return nodes, edges, debug_log # Return debug_log
             
@@ -235,3 +249,94 @@ class GraphService:
             }
         except:
             return {"nodes": 0, "edges": 0}
+    
+    def _compute_similarity_edges(self, nodes: List[Dict], top_k: int = 3, min_threshold: float = 0.5) -> List[Dict]:
+        """
+        Compute semantic similarity edges using Top-K neighbor approach
+        
+        Strategy: For each memory, connect to its K most similar neighbors (if similarity > min_threshold).
+        This guarantees mesh structure even with diverse datasets.
+        
+        Args:
+            nodes: List of node dicts with embeddings
+            top_k: Number of nearest neighbors per node (default 3)
+            min_threshold: Minimum similarity to consider (default 0.5)
+        
+        Returns:
+            List of edge dicts with {from, to, label, similarity, type: 'semantic'}
+        """
+        try:
+            from sklearn.metrics.pairwise import cosine_similarity
+            
+            # Filter memory nodes with embeddings
+            memory_nodes = [n for n in nodes if n.get('group') == 'memory']
+            
+            # Extract embeddings from full_data
+            nodes_with_embeddings = []
+            for node in memory_nodes:
+                full_data = node.get('full_data', {})
+                # Try to get embedding from properties or direct field
+                embedding = None
+                if isinstance(full_data.get('properties'), dict):
+                    embedding = full_data['properties'].get('embedding')
+                if not embedding:
+                    embedding = full_data.get('embedding')
+                
+                if embedding and isinstance(embedding, list) and len(embedding) > 0:
+                    nodes_with_embeddings.append({
+                        'id': node['id'],
+                        'embedding': embedding
+                    })
+            
+            if len(nodes_with_embeddings) < 2:
+                return []
+            
+            # Build embedding matrix
+            embeddings = np.array([n['embedding'] for n in nodes_with_embeddings])
+            node_ids = [n['id'] for n in nodes_with_embeddings]
+            
+            # Compute pairwise similarities
+            sim_matrix = cosine_similarity(embeddings)
+            
+            # Top-K neighbor approach: For each node, find K most similar
+            edges = []
+            seen_pairs = set()  # Avoid duplicate edges
+            
+            for i in range(len(node_ids)):
+                # Get similarities for this node (excluding self)
+                similarities = sim_matrix[i].copy()
+                similarities[i] = -1  # Exclude self
+                
+                # Get indices of top-K most similar nodes
+                top_indices = np.argsort(similarities)[-top_k:][::-1]
+                
+                for j in top_indices:
+                    similarity = float(sim_matrix[i][j])
+                    
+                    # Only add if above minimum threshold
+                    if similarity < min_threshold:
+                        continue
+                    
+                    # Create canonical pair (smaller ID first) to avoid duplicates
+                    pair = tuple(sorted([node_ids[i], node_ids[j]]))
+                    if pair in seen_pairs:
+                        continue
+                    
+                    seen_pairs.add(pair)
+                    edges.append({
+                        'from': pair[0],
+                        'to': pair[1],
+                        'label': f'similar ({similarity:.2f})',
+                        'title': f'Semantic similarity: {similarity:.2f}',
+                        'similarity': similarity,
+                        'type': 'semantic'
+                    })
+            
+            return edges
+            
+        except ImportError:
+            logger.warning("scikit-learn not installed, skipping similarity edges")
+            return []
+        except Exception as e:
+            logger.error(f"Failed to compute similarity edges: {e}")
+            return []
