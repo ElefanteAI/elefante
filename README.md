@@ -1,26 +1,26 @@
-# 🐘 Elefante v1.2.0
+# Elefante v1.0.0
 
 **Local-First AI Memory System with Perfect Recall**
 
-> **Latest Release:** v1.2.0 - Critical bug fix + comprehensive documentation ([Release Notes](RELEASE_NOTES_v1.2.md))
+> **Current Release:** v1.0.0 - Production baseline
 
 Elefante gives AI agents a stateful brain by combining semantic search, knowledge graphs, and conversation context—all running 100% locally on your machine. No cloud. No data egress. Just pure, private memory.
 
 ---
 
-## ⚡ Why Elefante?
+## Why Elefante?
 
 AI agents are stateless by default. They forget everything between sessions. Elefante solves this by providing:
 
-- **🧠 Triple-Layer Memory**: Semantic (ChromaDB) + Graph (Kuzu) + Context = Perfect Recall
-- **🔒 Privacy First**: Your data never leaves your machine (`./data` directory)
-- **🔌 MCP Native**: Plug-and-play for Cursor, Claude Desktop, Bob IDE
-- **🎯 Adaptive Intelligence**: Dynamically adjusts retrieval based on query intent
-- **📊 Visual Dashboard**: Interactive knowledge graph visualization
+- **Triple-Layer Memory**: Semantic (ChromaDB) + Graph (Kuzu) + Context = Perfect Recall
+- **Privacy First**: Your data never leaves your machine (`~/.elefante/data`)
+- **MCP Native**: Plug-and-play for VS Code, Cursor, Claude Desktop
+- **Adaptive Intelligence**: Dynamically adjusts retrieval based on query intent
+- **Visual Dashboard**: Interactive knowledge graph visualization
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Installation (2 minutes)
 
@@ -52,24 +52,25 @@ Elefante handles the rest—storing, indexing, and retrieving with perfect accur
 
 ---
 
-## 📚 Documentation
+## Documentation
 
-### 🎯 Start Here
+### Start Here
 
 - **New Users**: [`docs/technical/installation.md`](docs/technical/installation.md) - Complete setup guide
 - **Understanding the System**: [`docs/technical/architecture.md`](docs/technical/architecture.md) - How it works
 - **Using the API**: [`docs/technical/usage.md`](docs/technical/usage.md) - MCP tools & examples
 - **Visual Dashboard**: [`docs/technical/dashboard.md`](docs/technical/dashboard.md) - Knowledge graph UI
 
-### 📖 Complete Documentation
+### Complete Documentation
 
 - **Technical Docs**: [`docs/technical/`](docs/technical/) - Architecture, schema, API reference
-- **Debug Docs**: [`docs/debug/`](docs/debug/) - Troubleshooting, development logs
+- **Debug Docs**: [`docs/debug/`](docs/debug/) - Neural Registers & troubleshooting
+- **Planning**: [`docs/planning/`](docs/planning/) - Roadmap & future plans
 - **Archive**: [`docs/archive/`](docs/archive/) - Historical documentation
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ```
 User Query
@@ -97,7 +98,7 @@ See [`docs/technical/architecture.md`](docs/technical/architecture.md) for detai
 
 ---
 
-## 🔌 MCP Tools (11 Total)
+## MCP Tools (11 Total)
 
 Once installed, your AI agent gets these tools:
 
@@ -126,7 +127,7 @@ See [`docs/technical/usage.md`](docs/technical/usage.md) for complete API refere
 
 ---
 
-## 📊 Visual Dashboard
+## Visual Dashboard
 
 Launch the interactive knowledge graph:
 
@@ -141,53 +142,59 @@ Open http://127.0.0.1:8000 to explore:
 - Filter by spaces/categories
 - Real-time statistics
 
-**Auto-refresh**: Add memories via MCP, refresh browser (F5), see updates instantly.
-
 See [`docs/technical/dashboard.md`](docs/technical/dashboard.md) for complete guide.
 
 ---
 
-## 🛠️ Development Status
+## Development Status
 
-**Current Version**: v1.1.0 (Production)
+**Current Version**: v1.0.0 (Production)
 
-**Completed Features**:
+### Implemented
 - ✅ Triple-layer architecture (ChromaDB + Kuzu + Context)
-- ✅ MCP server with 10+ tools
-- ✅ Cognitive memory model (entity extraction, relationships)
-- ✅ Visual dashboard with interactive graph
+- ✅ MCP server with 11 tools
+- ✅ Cognitive memory model (LLM extracts emotions, intent, entities, relationships)
+- ✅ Temporal decay (memories fade, reinforced on access)
+- ✅ Visual dashboard
 - ✅ Automated installation safeguards
-- ✅ Comprehensive documentation
 
-**Next Priority** (from [`docs/debug/general/task-roadmap.md`](docs/debug/general/task-roadmap.md)):
-- [ ] Advanced Memory Intelligence Pipeline
-  - [ ] Enhanced LLM extraction
-  - [ ] Smart UPDATE (merge logic)
-  - [ ] Smart EXTEND (link logic)
+### Partial
+- 🟡 Memory Schema V2 - Schema defined, but domain/category auto-classification not implemented
+- 🟡 Dashboard UX - Functional but needs visual improvements
 
----
+### Planned (v1.1.0)
+- [ ] Auto-classification of domain/category via LLM
+- [ ] Smart UPDATE (merge instead of duplicate)
+- [ ] Dashboard semantic zoom
 
-## 🤝 Contributing
-
-Elefante is under active development. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for guidelines.
-
-**Development Docs**: [`docs/debug/`](docs/debug/) - Organized by topic (installation, dashboard, database, memory, general)
+See [`docs/planning/roadmap.md`](docs/planning/roadmap.md) for full roadmap.
 
 ---
 
-## 📄 License
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for guidelines.
+
+**Documentation Structure**:
+- `docs/technical/` - How things work now
+- `docs/debug/` - Neural Registers (lessons from failures)
+- `docs/planning/` - Future roadmap
+
+---
+
+## License
 
 See [`LICENSE`](LICENSE)
 
 ---
 
-## 🔗 Links
+## Links
 
 - **Repository**: https://github.com/jsubiabreIBM/Elefante
 - **Technical Docs**: [`docs/technical/README.md`](docs/technical/README.md)
-- **Debug Docs**: [`docs/debug/README.md`](docs/debug/README.md)
-- **Changelog**: [`CHANGELOG.md`](CHANGELOG.md)
+- **Roadmap**: [`docs/planning/roadmap.md`](docs/planning/roadmap.md)
+- **Releases**: [`RELEASES.md`](RELEASES.md)
 
 ---
 
-**Built with ❤️ for AI agents that never forget**
+**Built for AI agents that never forget**
