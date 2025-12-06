@@ -127,7 +127,7 @@ kuzu_db                     (single file - CORRUPTED!)
 ### LAW #5: Connection Lifecycle Management
 **Statement**: GraphStore MUST implement proper connection cleanup.
 
-**Missing Implementation** (as of v1.2.0):
+**Missing Implementation** (as of v1.0.0):
 - ❌ No `close()` method for explicit cleanup
 - ❌ No `__enter__`/`__exit__` for context manager support
 - ❌ No `__del__` for destructor cleanup
@@ -211,7 +211,7 @@ class GraphStore:
 
 ### Entity Creation Success Rate
 - **Before Fix**: 0% (all operations failed)
-- **After Fix**: 100% (v1.2.0+)
+- **After Fix**: 100% (v1.0.0+)
 
 ### Lock-Related Issues
 - **Before Documentation**: Frequent user confusion

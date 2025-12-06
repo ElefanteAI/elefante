@@ -1,34 +1,55 @@
 # Archived Documentation
 
-**Status:** Cleaned 2025-12-05  
-**Policy:** Keep only raw forensic evidence not captured elsewhere
+**Status:** Reorganized 2025-12-06  
+**Policy:** Preserve historical records, session logs, version changelogs
+
+---
+
+## Structure
+
+```
+archive/
+├── historical/     # Session logs, completed task lists
+├── releases/       # Version changelog notes
+└── raw_logs/       # Raw installation logs (forensic evidence)
+```
 
 ---
 
 ## Contents
 
+### historical/
+| File | Purpose |
+|------|---------|
+| `first-install-walkthrough.md` | Original M4 Silicon installation session (2025-11-27) |
+| `2025-11-27-implementation-log.md` | Technical implementation details from first setup |
+| `task-roadmap-completed.md` | Historical checkbox list of completed tasks |
+
+### releases/
+| File | Purpose |
+|------|---------|
+| `dashboard-v27-changelog.md` | Dashboard v27 semantic topology upgrade notes |
+
 ### raw_logs/
-| File | Purpose | Why Kept |
-|------|---------|----------|
-| `install.log` | Original installation output (2025-11-27) | Raw pip versions, timestamps - forensic evidence if install breaks |
-
----
-
-## What Was Removed
-
-All markdown files were deleted because their information was **extracted and consolidated** into:
-
-- **Neural Registers** - `docs/debug/*_NEURAL_REGISTER.md`
-- **Domain Compendiums** - `docs/debug/*/compendium.md`
-- **Technical Docs** - `docs/technical/`
-- **Main README** - `README.md`
+| File | Purpose |
+|------|---------|
+| `install.log` | Original pip installation output (forensic evidence) |
 
 ---
 
 ## Policy
 
-> **If information is documented elsewhere, the source file has no purpose.**
+**Archive = Historical Record**
+- Information that WAS true at a point in time
+- Session logs from debugging/installation
+- Superseded design documents
+- Version-specific changelogs
 
-Only keep:
-- Raw logs (forensic evidence)
-- Files with unique information not captured in consolidated docs
+**NOT for Archive:**
+- Active documentation (use `technical/`)
+- Future plans (use `planning/`)
+- Recurring failure patterns (use `debug/`)
+
+---
+
+**Last Updated**: 2025-12-06

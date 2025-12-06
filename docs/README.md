@@ -1,10 +1,10 @@
 # Elefante Documentation
 
-**Complete documentation index for Elefante AI Memory System v1.2.0**
+**Complete documentation index for Elefante AI Memory System v1.0.0**
 
 ---
 
-## 🚀 Quick Navigation
+## Quick Navigation
 
 | I want to... | Go to... |
 |--------------|----------|
@@ -13,7 +13,7 @@
 | Use the MCP tools | [`technical/usage.md`](technical/usage.md) |
 | Open the dashboard | [`technical/dashboard.md`](technical/dashboard.md) |
 | Learn from failures | [`debug/`](debug/) - **Neural Registers** |
-| See what's next | [`planning/NEXT_STEPS.md`](planning/NEXT_STEPS.md) |
+| See what's next | [`planning/roadmap.md`](planning/roadmap.md) |
 
 ---
 
@@ -34,9 +34,7 @@
 - [`kuzu-best-practices.md`](technical/kuzu-best-practices.md) - Database best practices
 - [`memory-schema-v2.md`](technical/memory-schema-v2.md) - Database schema
 - [`v2-schema-simple.md`](technical/v2-schema-simple.md) - Schema simplified
-- [`technical-implementation.md`](technical/technical-implementation.md) - Implementation details
 - [`temporal-memory-decay.md`](technical/temporal-memory-decay.md) - Memory decay algorithm
-- [`walkthrough.md`](technical/walkthrough.md) - Step-by-step guide
 
 **See**: [`technical/README.md`](technical/README.md) for complete index
 
@@ -45,12 +43,12 @@
 ### [`debug/`](debug/) - Neural Registers (System Immunity)
 **"Lessons from Failures"** - Immutable laws extracted from debugging sessions
 
-**🧠 Master Neural Registers** (5 registers):
-- [`INSTALLATION_NEURAL_REGISTER.md`](debug/INSTALLATION_NEURAL_REGISTER.md) - Installation failure laws
-- [`DATABASE_NEURAL_REGISTER.md`](debug/DATABASE_NEURAL_REGISTER.md) - Database failure laws
-- [`DASHBOARD_NEURAL_REGISTER.md`](debug/DASHBOARD_NEURAL_REGISTER.md) - Dashboard failure laws
-- [`MCP_CODE_NEURAL_REGISTER.md`](debug/MCP_CODE_NEURAL_REGISTER.md) - MCP protocol failure laws
-- [`MEMORY_NEURAL_REGISTER.md`](debug/MEMORY_NEURAL_REGISTER.md) - Memory system failure laws
+**Master Neural Registers** (5 registers):
+- [`installation-neural-register.md`](debug/installation-neural-register.md) - Installation failure laws
+- [`database-neural-register.md`](debug/database-neural-register.md) - Database failure laws
+- [`dashboard-neural-register.md`](debug/dashboard-neural-register.md) - Dashboard failure laws
+- [`mcp-code-neural-register.md`](debug/mcp-code-neural-register.md) - MCP protocol failure laws
+- [`memory-neural-register.md`](debug/memory-neural-register.md) - Memory system failure laws
 
 **Source Documents by Topic**:
 - **[`installation/`](debug/installation/)** (6 files) - Installation troubleshooting
@@ -67,8 +65,7 @@
 **"What We Will Build"** - Future plans and strategic direction
 
 **Active Roadmaps**:
-- [`NEXT_STEPS.md`](planning/NEXT_STEPS.md) - Immediate next steps
-- [`task-roadmap.md`](planning/task-roadmap.md) - Task breakdown
+- [`roadmap.md`](planning/roadmap.md) - Main development roadmap
 - [`dashboard-improvement-roadmap.md`](planning/dashboard-improvement-roadmap.md) - Dashboard enhancements
 - [`sprint2-knowledge-topology-plan.md`](planning/sprint2-knowledge-topology-plan.md) - Knowledge graph design
 
@@ -79,12 +76,10 @@
 ### [`archive/`](archive/) - Historical Documentation
 **"What Happened"** - Preserved historical documents and session logs
 
-**Contents**:
-- Installation reports from 2025-11-27
-- Sprint 26 handoff documents
-- Historical troubleshooting logs
-- v1.2.0 release notes
-- Deployment debug logs
+**Structure**:
+- `historical/` - Session logs, completed task lists
+- `releases/` - Version changelog notes
+- `raw_logs/` - Raw installation logs
 
 **See**: [`archive/README.md`](archive/README.md) for complete index
 
@@ -132,23 +127,21 @@ Elefante provides **11 MCP tools** for AI agents:
 
 ### "I want to contribute"
 1. Read [`../CONTRIBUTING.md`](../CONTRIBUTING.md) - Guidelines
-2. Check [`planning/task-roadmap.md`](planning/task-roadmap.md) - Active tasks
-3. Review [`planning/NEXT_STEPS.md`](planning/NEXT_STEPS.md) - Roadmap
-4. See [`../CHANGELOG.md`](../CHANGELOG.md) - Recent changes
+2. Check [`planning/roadmap.md`](planning/roadmap.md) - Development roadmap
 
 ---
 
-## 🎯 Current Development Status
+## Current Development Status
 
-**Version**: v1.2.0 (Production)  
-**Next**: v1.3.0 - Enhanced Intelligence Pipeline
+**Version**: v1.0.0 (Production)  
+**Next**: v1.1.0 - Complete Schema V2 Auto-Classification
 
-**Priority Features** (from [`planning/NEXT_STEPS.md`](planning/NEXT_STEPS.md)):
-- Enhanced LLM extraction
+**Priority Features** (from [`planning/roadmap.md`](planning/roadmap.md)):
+- Auto-classification of domain/category
 - Smart UPDATE (merge logic)
-- Smart EXTEND (link logic)
+- Dashboard UX improvements
 
-**Active Roadmap**: [`planning/task-roadmap.md`](planning/task-roadmap.md)
+**Active Roadmap**: [`planning/roadmap.md`](planning/roadmap.md)
 
 ---
 
@@ -170,29 +163,27 @@ Immutable "Laws" extracted from debugging sessions - the system's immune memory.
 
 ---
 
-## 📊 Documentation Statistics
+## Documentation Statistics
 
-- **Technical Docs**: 13 production documents
+- **Technical Docs**: 10 production documents
 - **Neural Registers**: 5 master registers
-- **Debug Source Docs**: 29 debugging documents
-- **Planning Docs**: 4 roadmap documents
-- **Archive**: 19 historical documents
-- **Total**: 70+ documents
+- **Debug Source Docs**: 5 compendium folders
+- **Planning Docs**: 3 roadmap documents
+- **Archive**: Historical/releases folders
 - **MCP Tools**: 11 fully documented
-- **Code Examples**: 100+ across all docs
 
 ---
 
-## 🔍 Search Tips
+## Search Tips
 
 **Looking for specific topics**:
-- Installation → `technical/installation.md` or `debug/INSTALLATION_NEURAL_REGISTER.md`
+- Installation → `technical/installation.md` or `debug/installation-neural-register.md`
 - API/Tools → `technical/usage.md` (all 11 tools)
 - Architecture → `technical/architecture.md`
-- Dashboard → `technical/dashboard.md` or `debug/DASHBOARD_NEURAL_REGISTER.md`
-- Database → `technical/kuzu-best-practices.md` or `debug/DATABASE_NEURAL_REGISTER.md`
+- Dashboard → `technical/dashboard.md` or `debug/dashboard-neural-register.md`
+- Database → `technical/kuzu-best-practices.md` or `debug/database-neural-register.md`
 - Troubleshooting → `debug/` Neural Registers
-- Roadmap → `planning/task-roadmap.md`
+- Roadmap → `planning/roadmap.md`
 
 **File naming convention**: All files use kebab-case (lowercase-with-hyphens)
 
@@ -278,17 +269,17 @@ archive/protocol-enforcement-v2.md
 
 ---
 
-## 📝 Maintenance
+## Maintenance
 
-**Last Updated**: 2025-12-05  
-**Documentation Version**: v1.2.0  
+**Last Updated**: 2025-12-06  
+**Documentation Version**: v1.0.0  
 **Status**: ✅ Complete and up-to-date
 
-**Major Changes in v1.2.0**:
-- ✅ Introduced Neural Register architecture
+**Changes in v1.0.0**:
 - ✅ Reorganized into technical/debug/planning/archive taxonomy
-- ✅ Synthesized 29 debug docs into 5 Master Neural Registers
-- ✅ Cleaned root directory (34 → 14 files)
+- ✅ Introduced Neural Register architecture
+- ✅ Standardized kebab-case naming
+- ✅ Moved historical logs to archive/
 
 **Maintainers**: Elefante Core Team
 

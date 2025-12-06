@@ -247,6 +247,6 @@ rm -rf ~/.elefante/
 
 ---
 
-**Version**: 1.1.0
+**Version**: 1.0.0
 **Last Updated**: 2025-12-04
 **Status**: Production Ready

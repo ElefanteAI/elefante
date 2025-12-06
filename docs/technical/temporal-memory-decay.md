@@ -1,6 +1,6 @@
 # Temporal Memory Decay & Reinforcement
 
-**Feature Version**: 1.1.0  
+**Feature Version**: 1.0.0  
 **Status**: Production Ready  
 **Date**: 2025-12-04
 

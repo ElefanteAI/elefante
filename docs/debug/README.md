@@ -1,12 +1,12 @@
 # Debug Documentation Index
 
-**Neural Registers & Debug Compendiums for Elefante v1.2.0**
+**Neural Registers & Debug Compendiums for Elefante v1.0.0**
 
-> **Last Optimized:** 2025-12-05 | Unified post-mortem structure across all domains
+> **Last Optimized:** 2025-12-06 | Unified post-mortem structure across all domains
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 docs/debug/
@@ -18,27 +18,27 @@ docs/debug/
 
 ---
 
-## 🧠 Neural Registers (System Immunity)
+## Neural Registers (System Immunity)
 
 **What are Neural Registers?**  
 Immutable "Laws" extracted from debugging sessions - the system's immune memory that prevents recurring failures.
 
 | Register | Purpose | Key Laws |
 |----------|---------|----------|
-| [**INSTALLATION_NEURAL_REGISTER.md**](INSTALLATION_NEURAL_REGISTER.md) | Installation failure prevention | Kuzu Path Conflict, Pre-Flight Checks |
-| [**DATABASE_NEURAL_REGISTER.md**](DATABASE_NEURAL_REGISTER.md) | Database failure prevention | Reserved Words, Single-Writer Lock |
-| [**DASHBOARD_NEURAL_REGISTER.md**](DASHBOARD_NEURAL_REGISTER.md) | Dashboard failure prevention | Data Path Separation, Snapshot Pattern |
-| [**MCP_CODE_NEURAL_REGISTER.md**](MCP_CODE_NEURAL_REGISTER.md) | MCP protocol enforcement | Mode Restrictions, Layer 5 Verification |
-| [**MEMORY_NEURAL_REGISTER.md**](MEMORY_NEURAL_REGISTER.md) | Memory system reliability | Export Bypass, ChromaDB vs Kuzu |
+| [`installation-neural-register.md`](installation-neural-register.md) | Installation failure prevention | Kuzu Path Conflict, Pre-Flight Checks |
+| [`database-neural-register.md`](database-neural-register.md) | Database failure prevention | Reserved Words, Single-Writer Lock |
+| [`dashboard-neural-register.md`](dashboard-neural-register.md) | Dashboard failure prevention | Data Path Separation, Snapshot Pattern |
+| [`mcp-code-neural-register.md`](mcp-code-neural-register.md) | MCP protocol enforcement | Mode Restrictions, Layer 5 Verification |
+| [`memory-neural-register.md`](memory-neural-register.md) | Memory system reliability | Export Bypass, ChromaDB vs Kuzu |
 
 **Format**: Laws → Failure Patterns → Safeguards → Metrics → Source Documents
 
 ---
 
-## 📚 Domain Compendiums (One File Per Domain)
+## Domain Compendiums (One File Per Domain)
 
 Each compendium follows the **Unified Post-Mortem Structure**:
-- 🚨 Critical Laws table
+- Critical Laws table
 - Issues #1, #2, #3... (scalable)
 - Each issue: Problem → Symptom → Root Cause → Solution → Lesson
 - Methodology Failures section
@@ -47,15 +47,15 @@ Each compendium follows the **Unified Post-Mortem Structure**:
 
 | Domain | Compendium | Issues | Status |
 |--------|-----------|--------|--------|
-| 🎨 Dashboard | [`dashboard/dashboard-compendium.md`](dashboard/dashboard-compendium.md) | 5 issues | ✅ Active |
-| 💾 Database | [`database/database-compendium.md`](database/database-compendium.md) | 6 issues | ✅ Active |
-| 🏗️ Installation | [`installation/installation-compendium.md`](installation/installation-compendium.md) | 4 issues | ✅ Active |
-| 🧠 Memory | [`memory/memory-compendium.md`](memory/memory-compendium.md) | 5 issues | ✅ Active |
-| 🤖 AI Behavior | [`general/ai-behavior-compendium.md`](general/ai-behavior-compendium.md) | 5 issues | ✅ Active |
+| Dashboard | [`dashboard/dashboard-compendium.md`](dashboard/dashboard-compendium.md) | 5 issues | ✅ Active |
+| Database | [`database/database-compendium.md`](database/database-compendium.md) | 6 issues | ✅ Active |
+| Installation | [`installation/installation-compendium.md`](installation/installation-compendium.md) | 4 issues | ✅ Active |
+| Memory | [`memory/memory-compendium.md`](memory/memory-compendium.md) | 5 issues | ✅ Active |
+| AI Behavior | [`general/ai-behavior-compendium.md`](general/ai-behavior-compendium.md) | 5 issues | ✅ Active |
 
 ---
 
-## 📝 Unified Post-Mortem Structure
+## Unified Post-Mortem Structure
 
 All compendiums follow this scalable format:
 
@@ -183,4 +183,4 @@ docs/debug/
 
 ---
 
-*Last verified: 2025-12-05 | Elefante v1.2.0 | 10 active debug documents*
+*Last verified: 2025-12-06 | Elefante v1.0.0 | 10 active debug documents*

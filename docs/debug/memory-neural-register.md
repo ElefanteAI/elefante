@@ -89,7 +89,7 @@ def calculate_decayed_importance(
     return original_importance * decay_factor * reinforcement
 ```
 
-**Implementation Status**: Designed but not yet deployed (as of v1.2.0)
+**Implementation Status**: Designed but not yet deployed (as of v1.0.0)
 
 **Rationale**: Prevent memory bloat, prioritize recent/frequently-accessed information
 
@@ -146,7 +146,7 @@ results = {
    - CONTRADICTORY: Flag for user review, store with conflict marker
 ```
 
-**Implementation**: `src/core/deduplication.py` (v1.2.0+)
+**Implementation**: `src/core/deduplication.py` (planned)
 
 **Metrics**:
 - Duplicate detection rate: ~15% of ingestion attempts
