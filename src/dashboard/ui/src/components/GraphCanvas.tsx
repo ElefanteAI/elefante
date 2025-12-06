@@ -25,6 +25,24 @@ const toTitleCase = (str: string) => {
 
 import { useRef, useEffect, useState } from 'react';
 
+// V28: PULSE ANIMATION - Critical memories breathe
+let pulsePhase = 0;
+const PULSE_SPEED = 0.05;
+
+// V28: TEMPORAL HEAT - Calculate memory "warmth" based on recency
+const calculateTemporalHeat = (createdAt: string, lastAccessed?: string): number => {
+  const now = Date.now();
+  const created = new Date(createdAt).getTime();
+  const accessed = lastAccessed ? new Date(lastAccessed).getTime() : created;
+  
+  // Use most recent interaction
+  const lastInteraction = Math.max(created, accessed);
+  const daysSince = (now - lastInteraction) / (1000 * 60 * 60 * 24);
+  
+  // Heat decays over 30 days (1.0 = hot/recent, 0.0 = cold/old)
+  return Math.max(0, 1 - (daysSince / 30));
+};
+
 
 interface Node {
   id: string;
@@ -168,22 +186,7 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
           degreeMap.set(target, (degreeMap.get(target) || 0) + 1);
         });
         
-        // 4. SPRINT 7: KEYWORD-BASED COLOR HEURISTICS
-        const getNodeColor = (node: any) => {
-          const props = node.full_data?.props ? (typeof node.full_data.props === 'string' ? JSON.parse(node.full_data.props) : node.full_data.props) : {};
-          const text = ((node.label || '') + (props.content || '')).toLowerCase();
-          
-          // 1. Priority: Explicit Metadata
-          if (props.memory_type === 'episodic') return '#10B981'; // Green
-          if (props.memory_type === 'procedural') return '#8B5CF6'; // Purple
-          
-          // 2. Fallback: Keyword Heuristics for semantic coloring
-          if (text.includes('code') || text.includes('python') || text.includes('mcp') || text.includes('programming')) return '#8B5CF6'; // Coding = Purple
-          if (text.includes('daughter') || text.includes('family') || text.includes('preference') || text.includes('personal')) return '#10B981'; // Personal = Green
-          if (text.includes('error') || text.includes('fix') || text.includes('fail') || text.includes('bug')) return '#EF4444'; // Problems = Red
-          
-          return '#3B82F6'; // Default = Blue (Facts)
-        };
+        // 4. SPRINT 7: KEYWORD-BASED COLOR HEURISTICS (REMOVED - Now using v27 color spectrum)
         
         const processedNodes = allowedNodes.map((n: any) => {
           try {
@@ -204,26 +207,41 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
               console.log("🔍 FIRST NODE PROPS:", props);
             }
           
-          // SIZE: Map Importance (1-10) to Radius (8px - 23px)
+          // V27.0 SEMANTIC TOPOLOGY: ORBITAL HIERARCHY
           const importance = props.importance || 5;
-          const radius = 8 + (importance * 1.5);
           
-          // COLOR: SPRINT 10 - Priority-based coloring with full metadata
+          // SIZE: Enforce Gravity Hierarchy (SUN → PLANET → SATELLITE)
+          let radius;
+          if (importance >= 10) {
+            radius = 20; // SUN (Critical Laws/Persona)
+          } else if (importance >= 8) {
+            radius = 12; // PLANET (Preferences/Insights)
+          } else {
+            radius = 6;  // SATELLITE (Facts/Logs)
+          }
+          
+          // COLOR: Enforce Spectrum by Memory Type
           let color;
           if (n.type === 'memory') {
-            // Priority 1: Explicit memory type
-            if (props.memory_type === 'episodic') {
-              color = '#10B981'; // Green
-            } else if (props.memory_type === 'procedural') {
-              color = '#8B5CF6'; // Purple
-            }
-            // Priority 2: Tags (Core Identity)
-            else if (props.tags && props.tags.includes('identity')) {
-              color = '#F59E0B'; // Amber
-            }
-            // Priority 3: Keyword-based fallback
-            else {
-              color = getNodeColor(n);
+            const memType = props.memory_type || 'fact';
+            switch(memType) {
+              case 'decision':
+                color = '#ef4444'; // Red (Laws/Decisions)
+                break;
+              case 'insight':
+                color = '#a855f7'; // Purple (Wisdom)
+                break;
+              case 'preference':
+                color = '#eab308'; // Gold (User Style)
+                break;
+              case 'episodic':
+                color = '#10B981'; // Green (Personal)
+                break;
+              case 'procedural':
+                color = '#8B5CF6'; // Purple (How-To)
+                break;
+              default:
+                color = '#3b82f6'; // Blue (Facts)
             }
           } else {
             color = n.type === 'entity' ? '#E6E6FA' : '#FFD700';
@@ -647,6 +665,19 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
         // DNA MAPPING: Use color from metadata (memory_type)
         let baseColor = node.color || '#10b981'; // Use DNA-mapped color or fallback to Emerald
         
+        // V28: PULSE ANIMATION for critical memories (importance >= 9)
+        const isCritical = (node.importance || 0) >= 9;
+        let pulseGlow = 0;
+        if (isCritical) {
+          pulsePhase += PULSE_SPEED;
+          pulseGlow = Math.sin(pulsePhase) * 0.5 + 0.5; // 0 to 1 oscillation
+        }
+        
+        // V28: TEMPORAL HEAT - Warmer colors for recent memories
+        const createdAt = node.full_data?.created_at || node.properties?.created_at;
+        const lastAccessed = node.full_data?.parsed_props?.last_accessed;
+        const heat = createdAt ? calculateTemporalHeat(createdAt, lastAccessed) : 0.5;
+        
         // SPRINT 8: Search-based opacity (ghost non-matches)
         let searchOpacity = 1.0;
         if (searchTerm && !isSearchMatch) {
@@ -667,11 +698,18 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
           ctx.shadowColor = baseColor;
           ctx.shadowBlur = 5;
           ctx.globalAlpha = 0.25 * opacity; // Combine dimming with DNA opacity
+        } else if (isCritical) {
+          // V28: PULSE EFFECT for critical memories
+          ctx.fillStyle = baseColor;
+          ctx.shadowColor = baseColor;
+          ctx.shadowBlur = 15 + (pulseGlow * 25); // Pulse between 15-40px glow
+          ctx.globalAlpha = 0.8 + (pulseGlow * 0.2); // Pulse between 0.8-1.0 opacity
         } else {
           ctx.fillStyle = baseColor;
           ctx.shadowColor = baseColor;
-          ctx.shadowBlur = isFocused ? 25 : 15;
-          ctx.globalAlpha = opacity; // Apply DNA opacity
+          // V28: TEMPORAL HEAT affects glow intensity
+          ctx.shadowBlur = isFocused ? 25 : (10 + heat * 10); // Warmer = more glow
+          ctx.globalAlpha = opacity * (0.7 + heat * 0.3); // Warmer = more visible
         }
         
         // Draw shape based on node type
@@ -972,93 +1010,177 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
         <div><strong>Esc</strong>: Clear focus/search</div>
       </div>
       
-      {/* SPRINT 15: SIDEBAR REWRITE - Badges & Grid Layout */}
+      {/* V28: COGNITIVE MIRROR SIDEBAR - Enhanced Inspector */}
       {selectedNode && (
-        <div className="fixed right-0 top-0 h-full w-96 bg-slate-900 border-l border-slate-700 shadow-2xl p-6 overflow-y-auto z-50">
+        <div className="fixed right-0 top-0 h-full w-[420px] bg-gradient-to-b from-slate-900 to-slate-950 border-l border-cyan-500/30 shadow-2xl overflow-y-auto z-50">
           
-          {/* 1. CLOSE BUTTON */}
-          <button onClick={() => setSelectedNode(null)} className="absolute top-4 right-4 text-slate-500 hover:text-white">✕</button>
+          {/* Gradient Header */}
+          <div className="bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-pink-500/20 p-6 border-b border-slate-700/50">
+            {/* Close Button */}
+            <button onClick={() => setSelectedNode(null)} className="absolute top-4 right-4 p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors">
+              <span className="text-lg">✕</span>
+            </button>
 
-          {/* 2. HEADER CONCEPT (No Truncation) - VIEW-LAYER FORMATTING */}
-          <div className="mb-6 border-b border-slate-700 pb-4 mt-8">
-            <h2 className="text-2xl font-bold text-white leading-tight mb-2">
-              {getCleanTitle(selectedNode)}
-            </h2>
+            {/* Title with Memory Type Icon */}
+            <div className="flex items-start gap-3 mt-2">
+              <div className={`p-3 rounded-xl ${
+                selectedNode.full_data?.parsed_props?.memory_type === 'decision' ? 'bg-red-500/20 text-red-400' :
+                selectedNode.full_data?.parsed_props?.memory_type === 'insight' ? 'bg-purple-500/20 text-purple-400' :
+                selectedNode.full_data?.parsed_props?.memory_type === 'preference' ? 'bg-yellow-500/20 text-yellow-400' :
+                selectedNode.full_data?.parsed_props?.memory_type === 'episodic' ? 'bg-emerald-500/20 text-emerald-400' :
+                'bg-blue-500/20 text-blue-400'
+              }`}>
+                {selectedNode.full_data?.parsed_props?.memory_type === 'decision' ? '⚖️' :
+                 selectedNode.full_data?.parsed_props?.memory_type === 'insight' ? '💡' :
+                 selectedNode.full_data?.parsed_props?.memory_type === 'preference' ? '⭐' :
+                 selectedNode.full_data?.parsed_props?.memory_type === 'episodic' ? '📝' :
+                 '📚'}
+              </div>
+              <div className="flex-1">
+                <h2 className="text-xl font-bold text-white leading-tight">
+                  {getCleanTitle(selectedNode)}
+                </h2>
+                <p className="text-xs text-slate-400 mt-1 uppercase tracking-wider">
+                  {selectedNode.full_data?.parsed_props?.memory_type || 'FACT'} • {selectedNode.full_data?.parsed_props?.category || 'General'}
+                </p>
+              </div>
+            </div>
             
-            {/* 3. METADATA BADGES - USE PARSED_PROPS */}
-            <div className="flex flex-wrap gap-2 mt-3">
-              {/* Memory Type Badge */}
-              <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wider
-                ${selectedNode.full_data?.parsed_props?.memory_type === 'episodic' ? 'bg-green-900 text-green-200' :
-                  selectedNode.full_data?.parsed_props?.memory_type === 'procedural' ? 'bg-purple-900 text-purple-200' :
-                  'bg-blue-900 text-blue-200'}`}>
-                {selectedNode.full_data?.parsed_props?.memory_type || 'FACT'}
-              </span>
+            {/* Importance & Heat Indicators */}
+            <div className="flex items-center gap-3 mt-4">
+              {/* Importance Bar */}
+              <div className="flex-1">
+                <div className="flex justify-between text-[10px] text-slate-500 mb-1">
+                  <span>IMPORTANCE</span>
+                  <span className="font-mono">{selectedNode.full_data?.parsed_props?.importance || 5}/10</span>
+                </div>
+                <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all ${
+                      (selectedNode.full_data?.parsed_props?.importance || 5) >= 9 ? 'bg-gradient-to-r from-red-500 to-orange-500 animate-pulse' :
+                      (selectedNode.full_data?.parsed_props?.importance || 5) >= 7 ? 'bg-gradient-to-r from-yellow-500 to-amber-500' :
+                      'bg-gradient-to-r from-cyan-500 to-blue-500'
+                    }`}
+                    style={{ width: `${(selectedNode.full_data?.parsed_props?.importance || 5) * 10}%` }}
+                  />
+                </div>
+              </div>
               
-              {/* Importance Badge */}
-              <span className="px-2 py-1 bg-slate-700 text-white text-xs rounded font-mono">
-                IMP: {selectedNode.full_data?.parsed_props?.importance || 0}/10
-              </span>
-
               {/* Status Badge */}
-              <span className="px-2 py-1 bg-slate-700 text-slate-300 text-xs rounded capitalize">
+              <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                selectedNode.full_data?.parsed_props?.status === 'verified' ? 'bg-emerald-500/20 text-emerald-400' :
+                selectedNode.full_data?.parsed_props?.status === 'contradictory' ? 'bg-red-500/20 text-red-400' :
+                'bg-slate-700/50 text-slate-300'
+              }`}>
                 {selectedNode.full_data?.parsed_props?.status || 'Active'}
               </span>
             </div>
           </div>
 
-          {/* 4. KEY VARIABLES (Structured Data) - USE PARSED_PROPS */}
-          <div className="grid grid-cols-2 gap-4 mb-6 bg-slate-800/50 p-3 rounded-lg">
-            <div>
-              <label className="text-[10px] text-slate-500 uppercase font-bold">Created</label>
-              <div className="text-slate-300 text-sm">
-                {selectedNode.full_data?.created_at ? new Date(selectedNode.full_data.created_at).toLocaleDateString() : 'N/A'}
-              </div>
-            </div>
-            <div>
-              <label className="text-[10px] text-slate-500 uppercase font-bold">Mood</label>
-              <div className="text-slate-300 text-sm">
-                {selectedNode.full_data?.parsed_props?.cognitive_analysis?.emotional_context?.mood || 'Neutral'}
-              </div>
-            </div>
-          </div>
-
-          {/* 5. COGNITIVE ANALYSIS (Intent & Strategic Insight) - USE PARSED_PROPS */}
-          {(selectedNode.full_data?.parsed_props?.cognitive_analysis?.intent ||
-            selectedNode.full_data?.parsed_props?.cognitive_analysis?.strategic_insight) && (
-            <div className="mb-6 bg-slate-800/30 p-3 rounded border border-slate-700">
-              <h4 className="text-[10px] text-slate-500 uppercase font-bold mb-2">AI Analysis</h4>
-              
-              {/* Intent Badge */}
-              {selectedNode.full_data?.parsed_props?.cognitive_analysis?.intent && (
+          <div className="p-6 space-y-6">
+            {/* ACTIONABLE INSIGHT - What This Memory Means */}
+            {selectedNode.full_data?.parsed_props?.cognitive_analysis?.strategic_insight && (
+              <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 p-4 rounded-xl border border-purple-500/30">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs text-slate-400">Intent:</span>
-                  <span className="text-xs text-white bg-slate-700 px-2 py-0.5 rounded capitalize">
-                    {selectedNode.full_data.parsed_props.cognitive_analysis.intent}
-                  </span>
+                  <span className="text-purple-400">🎯</span>
+                  <h4 className="text-xs text-purple-400 uppercase font-bold tracking-wider">Actionable Insight</h4>
                 </div>
-              )}
-
-              {/* Strategic Insight (The "Deep Thought") */}
-              {selectedNode.full_data?.parsed_props?.cognitive_analysis?.strategic_insight && (
-                <div className="text-xs text-slate-300 italic mt-2">
+                <p className="text-sm text-slate-200 leading-relaxed">
                   "{selectedNode.full_data.parsed_props.cognitive_analysis.strategic_insight}"
+                </p>
+              </div>
+            )}
+
+            {/* MEMORY CONTENT - The Core */}
+            <div>
+              <h3 className="flex items-center gap-2 text-xs font-bold text-cyan-400 uppercase mb-3">
+                <span>📄</span> Memory Content
+              </h3>
+              <div className="bg-slate-800/50 p-4 rounded-xl border-l-4 border-cyan-500 text-slate-300 text-sm leading-relaxed">
+                {selectedNode.full_data?.parsed_props?.content || selectedNode.full_data?.description || 'No content available'}
+              </div>
+            </div>
+
+            {/* METADATA GRID - Quick Facts */}
+            <div>
+              <h3 className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase mb-3">
+                <span>📊</span> Metadata
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-800/30 p-3 rounded-lg">
+                  <div className="text-[10px] text-slate-500 uppercase">Created</div>
+                  <div className="text-sm text-slate-300 font-mono">
+                    {selectedNode.full_data?.created_at ? new Date(selectedNode.full_data.created_at).toLocaleDateString() : 'N/A'}
+                  </div>
                 </div>
-              )}
+                <div className="bg-slate-800/30 p-3 rounded-lg">
+                  <div className="text-[10px] text-slate-500 uppercase">Domain</div>
+                  <div className="text-sm text-slate-300 capitalize">
+                    {selectedNode.full_data?.parsed_props?.domain || 'General'}
+                  </div>
+                </div>
+                <div className="bg-slate-800/30 p-3 rounded-lg">
+                  <div className="text-[10px] text-slate-500 uppercase">Intent</div>
+                  <div className="text-sm text-slate-300 capitalize">
+                    {selectedNode.full_data?.parsed_props?.cognitive_analysis?.intent || selectedNode.full_data?.parsed_props?.intent || 'Reference'}
+                  </div>
+                </div>
+                <div className="bg-slate-800/30 p-3 rounded-lg">
+                  <div className="text-[10px] text-slate-500 uppercase">Access Count</div>
+                  <div className="text-sm text-slate-300 font-mono">
+                    {selectedNode.full_data?.parsed_props?.access_count || 0}×
+                  </div>
+                </div>
+              </div>
             </div>
-          )}
 
-          {/* 6. THE CONTENT (No Raw JSON) - USE PARSED_PROPS */}
-          <div className="mb-8">
-            <h3 className="text-xs font-bold text-cyan-400 uppercase mb-2">Core Memory Content</h3>
-            <div className="bg-slate-800 p-4 rounded border-l-2 border-cyan-500 text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
-              {selectedNode.full_data?.parsed_props?.content || selectedNode.full_data?.description || 'No content available'}
+            {/* TAGS */}
+            {selectedNode.full_data?.parsed_props?.tags && (
+              <div>
+                <h3 className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase mb-3">
+                  <span>🏷️</span> Tags
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {(typeof selectedNode.full_data.parsed_props.tags === 'string' 
+                    ? selectedNode.full_data.parsed_props.tags.split(',') 
+                    : selectedNode.full_data.parsed_props.tags
+                  ).map((tag: string, i: number) => (
+                    <span key={i} className="px-2 py-1 bg-slate-800 text-cyan-400 text-xs rounded-full border border-cyan-500/30">
+                      {tag.trim()}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* QUICK ACTIONS - What You Can Do */}
+            <div className="pt-4 border-t border-slate-800">
+              <h3 className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase mb-3">
+                <span>⚡</span> Quick Actions
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                <button className="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg text-xs font-medium transition-colors border border-emerald-500/30">
+                  ↑ Reinforce Memory
+                </button>
+                <button className="p-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-lg text-xs font-medium transition-colors border border-amber-500/30">
+                  🔗 Find Related
+                </button>
+                <button className="p-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 rounded-lg text-xs font-medium transition-colors border border-purple-500/30">
+                  ✏️ Edit Memory
+                </button>
+                <button className="p-2 bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 rounded-lg text-xs font-medium transition-colors border border-slate-500/30">
+                  📦 Archive
+                </button>
+              </div>
             </div>
-          </div>
 
-          {/* 7. DEBUG DATA (Hidden/Small) */}
-          <div className="pt-4 border-t border-slate-800">
-            <span className="text-[10px] text-slate-600 font-mono">ID: {selectedNode.id}</span>
+            {/* DEBUG INFO - Collapsed */}
+            <details className="pt-4 border-t border-slate-800">
+              <summary className="text-[10px] text-slate-600 cursor-pointer hover:text-slate-400">Debug Info</summary>
+              <div className="mt-2 p-2 bg-slate-950 rounded text-[10px] font-mono text-slate-600 break-all">
+                ID: {selectedNode.id}
+              </div>
+            </details>
           </div>
         </div>
       )}

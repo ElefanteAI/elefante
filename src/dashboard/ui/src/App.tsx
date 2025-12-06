@@ -23,41 +23,120 @@ function App() {
         top: 0,
         left: 0,
         width: '100%',
-        background: 'red',
+        background: 'linear-gradient(90deg, #06b6d4, #8b5cf6, #ec4899)',
         color: 'white',
         zIndex: 9999,
         textAlign: 'center',
         fontWeight: 'bold',
         padding: '8px',
-        fontSize: '14px'
+        fontSize: '14px',
+        letterSpacing: '2px'
       }}>
-        🚨 DEBUG: VERSION 26.0 - TOPOLOGY PRIME (DATA SYNCED) 🚨
+        🧠 VERSION 28.0 - COGNITIVE MIRROR - SECOND BRAIN ACTIVE 🧠
+      </div>
+      
+      {/* V28.0 COGNITIVE MIRROR - MEMORY TYPE LEGEND */}
+      <div className="absolute top-4 right-4 bg-slate-900/95 p-4 rounded-xl border border-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.15)] text-xs font-mono z-50" style={{ marginTop: '40px', minWidth: '220px' }}>
+        <div className="font-bold text-cyan-400 mb-3 text-sm">🧠 SECOND BRAIN</div>
+        
+        {/* Stats Row */}
+        <div className="flex justify-between mb-3 pb-2 border-b border-slate-700">
+          <div className="text-center">
+            <div className="text-lg font-bold text-white">{stats?.vector_store?.total_memories || 0}</div>
+            <div className="text-[9px] text-slate-500">MEMORIES</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-bold text-emerald-400">{stats?.graph_store?.total_entities || 0}</div>
+            <div className="text-[9px] text-slate-500">ENTITIES</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-bold text-amber-400">{stats?.graph_store?.total_relationships || 0}</div>
+            <div className="text-[9px] text-slate-500">LINKS</div>
+          </div>
+        </div>
+
+        {/* Memory Type Legend */}
+        <div className="mb-3">
+          <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Memory Types</div>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.5)]"></div>
+              <span className="text-slate-300">Decision / Law</span>
+              <span className="text-[9px] text-slate-600 ml-auto">MUST FOLLOW</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-purple-500 shadow-[0_0_6px_rgba(168,85,247,0.5)]"></div>
+              <span className="text-slate-300">Insight / Wisdom</span>
+              <span className="text-[9px] text-slate-600 ml-auto">LEARNED</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-yellow-500 shadow-[0_0_6px_rgba(234,179,8,0.5)]"></div>
+              <span className="text-slate-300">Preference</span>
+              <span className="text-[9px] text-slate-600 ml-auto">YOUR STYLE</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]"></div>
+              <span className="text-slate-300">Episodic</span>
+              <span className="text-[9px] text-slate-600 ml-auto">PERSONAL</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_6px_rgba(59,130,246,0.5)]"></div>
+              <span className="text-slate-300">Fact / Reference</span>
+              <span className="text-[9px] text-slate-600 ml-auto">KNOWLEDGE</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Size Legend */}
+        <div className="pt-2 border-t border-slate-700">
+          <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Importance</div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1">
+              <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[8px]">●</div>
+              <span className="text-[9px] text-slate-500">Low</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-4 h-4 rounded-full bg-white/40 flex items-center justify-center text-[8px]">●</div>
+              <span className="text-[9px] text-slate-500">Med</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-full bg-white/60 animate-pulse"></div>
+              <span className="text-[9px] text-slate-500">Critical</span>
+            </div>
+          </div>
+        </div>
       </div>
       
       {/* SPRINT 8: FIX UI COLLISION - Vertical Stack Layout */}
       <div className="absolute top-4 left-4 z-50 flex flex-col gap-3 pointer-events-auto" style={{ marginTop: '40px' }}>
         
-        {/* 1. Title Card */}
-        <div className="bg-slate-900/90 backdrop-blur-md p-4 rounded-xl border border-slate-700 shadow-xl w-80">
+        {/* 1. Title Card - COGNITIVE MIRROR */}
+        <div className="bg-slate-900/90 backdrop-blur-md p-4 rounded-xl border border-cyan-500/30 shadow-xl w-80">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-cyan-500/20 rounded-lg text-cyan-400">
-              <LayoutDashboard size={20} />
+            <div className="p-2 bg-gradient-to-br from-cyan-500/30 to-purple-500/30 rounded-lg text-cyan-400 animate-pulse">
+              <LayoutDashboard size={24} />
             </div>
             <div>
-              <h1 className="font-bold text-base text-white">Knowledge Garden</h1>
-              <p className="text-[10px] text-slate-400">Elefante Local Brain</p>
+              <h1 className="font-bold text-lg text-white">Cognitive Mirror</h1>
+              <p className="text-[10px] text-cyan-400/80">Your Second Brain • Elefante v28</p>
             </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="bg-gradient-to-r from-cyan-500/10 to-purple-500/10 p-3 rounded-lg mb-3 border border-cyan-500/20">
+            <div className="text-[10px] text-cyan-400 uppercase tracking-wider mb-1">💡 Quick Tip</div>
+            <div className="text-xs text-slate-300">Click any node to inspect. Shift+Click to focus and see connections.</div>
           </div>
 
           {/* Stats */}
           <div className="grid grid-cols-2 gap-2">
-            <div className="bg-slate-800/50 p-2 rounded-lg text-center">
+            <div className="bg-slate-800/50 p-2 rounded-lg text-center border border-slate-700/50 hover:border-cyan-500/50 transition-colors">
               <div className="text-lg font-bold text-cyan-400">{stats?.vector_store?.total_memories || 0}</div>
-              <div className="text-[9px] text-slate-400 uppercase tracking-wider">Memories</div>
+              <div className="text-[9px] text-slate-400 uppercase tracking-wider">Thoughts</div>
             </div>
-            <div className="bg-slate-800/50 p-2 rounded-lg text-center">
-              <div className="text-lg font-bold text-emerald-400">{stats?.graph_store?.total_entities || 0}</div>
-              <div className="text-[9px] text-slate-400 uppercase tracking-wider">Entities</div>
+            <div className="bg-slate-800/50 p-2 rounded-lg text-center border border-slate-700/50 hover:border-emerald-500/50 transition-colors">
+              <div className="text-lg font-bold text-emerald-400">{stats?.graph_store?.total_relationships || 0}</div>
+              <div className="text-[9px] text-slate-400 uppercase tracking-wider">Connections</div>
             </div>
           </div>
         </div>

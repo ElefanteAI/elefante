@@ -27,7 +27,7 @@ async def main():
     # =========================================================================
     # STEP 1: Fetch ALL memories from ChromaDB (PRIMARY SOURCE)
     # =========================================================================
-    print("🐘 Step 1: Fetching memories from ChromaDB...")
+    print("[*] Step 1: Fetching memories from ChromaDB...")
     
     chroma_path = config.elefante.vector_store.persist_directory
     client = chromadb.PersistentClient(path=chroma_path)
@@ -44,8 +44,16 @@ async def main():
         meta = all_memories["metadatas"][i] if all_memories["metadatas"] else {}
         
         # Create node for this memory
-        # Truncate name for display (first 50 chars)
-        name = doc[:50] + "..." if len(doc) > 50 else doc
+        # Generate 3-5 word title from content
+        words = doc.split()[:5]
+        name = " ".join(words) if words else "Untitled Memory"
+        
+        # CRITICAL: Typecast importance to INTEGER
+        importance_raw = meta.get("importance", 5)
+        try:
+            importance = int(importance_raw) if importance_raw is not None else 5
+        except (ValueError, TypeError):
+            importance = 5
         
         node = {
             "id": memory_id,
@@ -56,7 +64,7 @@ async def main():
             "properties": {
                 "content": doc,
                 "memory_type": meta.get("memory_type", "unknown"),
-                "importance": meta.get("importance", 5),
+                "importance": importance,  # INTEGER, not string
                 "tags": meta.get("tags", ""),
                 "source": "chromadb"
             }
@@ -67,7 +75,7 @@ async def main():
     # =========================================================================
     # STEP 2: Fetch entities from Kuzu (SUPPLEMENTARY)
     # =========================================================================
-    print("🔗 Step 2: Fetching entities from Kuzu...")
+    print("[*] Step 2: Fetching entities from Kuzu...")
     
     try:
         store = GraphStore(config.elefante.graph_store.database_path)
@@ -123,7 +131,7 @@ async def main():
         # =========================================================================
         # STEP 3: Fetch relationships from Kuzu
         # =========================================================================
-        print("🔗 Step 3: Fetching relationships from Kuzu...")
+        print("[*] Step 3: Fetching relationships from Kuzu...")
         
         edges_query = "MATCH (a)-[r]->(b) RETURN a.id, b.id, label(r)"
         edges_result = await store.execute_query(edges_query)
@@ -143,13 +151,13 @@ async def main():
         print(f"   Found {len(edges)} relationships")
         
     except Exception as e:
-        print(f"   ⚠️ Kuzu error (non-fatal): {e}")
+        print(f"   [!] Kuzu error (non-fatal): {e}")
         print("   Continuing with ChromaDB data only...")
     
     # =========================================================================
     # STEP 4: Save snapshot
     # =========================================================================
-    print("💾 Step 4: Saving snapshot...")
+    print("[*] Step 4: Saving snapshot...")
     
     snapshot = {
         "generated_at": datetime.utcnow().isoformat(),
@@ -175,11 +183,11 @@ async def main():
     with open(output_path, "w") as f:
         json.dump(snapshot, f, indent=2, cls=DateTimeEncoder)
     
-    print(f"\n✅ Dashboard snapshot saved to {output_path}")
-    print(f"   📊 Total nodes: {len(nodes)}")
-    print(f"   🧠 Memories: {snapshot['stats']['memories']}")
-    print(f"   🔗 Entities: {snapshot['stats']['entities']}")
-    print(f"   ➡️  Edges: {len(edges)}")
+    print(f"\n[OK] Dashboard snapshot saved to {output_path}")
+    print(f"   [*] Total nodes: {len(nodes)}")
+    print(f"   [*] Memories: {snapshot['stats']['memories']}")
+    print(f"   [*] Entities: {snapshot['stats']['entities']}")
+    print(f"   [*] Edges: {len(edges)}")
 
 if __name__ == "__main__":
     asyncio.run(main())

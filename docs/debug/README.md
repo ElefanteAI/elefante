@@ -1,169 +1,186 @@
 # Debug Documentation Index
 
-This directory contains all debugging, troubleshooting, and protocol documentation for the Elefante project.
+**Neural Registers & Debug Compendiums for Elefante v1.2.0**
+
+> **Last Optimized:** 2025-12-05 | Unified post-mortem structure across all domains
+
+---
+
+## 🏗️ Architecture
+
+```
+docs/debug/
+├── README.md                          ← You are here
+├── 5 Neural Registers                 ← LAWS (start here when debugging)
+├── 5 Domain Compendiums               ← SOURCE (scalable issue tracking)
+└── Unified Post-Mortem Format         ← STRUCTURE (consistent across all)
+```
+
+---
+
+## 🧠 Neural Registers (System Immunity)
+
+**What are Neural Registers?**  
+Immutable "Laws" extracted from debugging sessions - the system's immune memory that prevents recurring failures.
+
+| Register | Purpose | Key Laws |
+|----------|---------|----------|
+| [**INSTALLATION_NEURAL_REGISTER.md**](INSTALLATION_NEURAL_REGISTER.md) | Installation failure prevention | Kuzu Path Conflict, Pre-Flight Checks |
+| [**DATABASE_NEURAL_REGISTER.md**](DATABASE_NEURAL_REGISTER.md) | Database failure prevention | Reserved Words, Single-Writer Lock |
+| [**DASHBOARD_NEURAL_REGISTER.md**](DASHBOARD_NEURAL_REGISTER.md) | Dashboard failure prevention | Data Path Separation, Snapshot Pattern |
+| [**MCP_CODE_NEURAL_REGISTER.md**](MCP_CODE_NEURAL_REGISTER.md) | MCP protocol enforcement | Mode Restrictions, Layer 5 Verification |
+| [**MEMORY_NEURAL_REGISTER.md**](MEMORY_NEURAL_REGISTER.md) | Memory system reliability | Export Bypass, ChromaDB vs Kuzu |
+
+**Format**: Laws → Failure Patterns → Safeguards → Metrics → Source Documents
+
+---
+
+## 📚 Domain Compendiums (One File Per Domain)
+
+Each compendium follows the **Unified Post-Mortem Structure**:
+- 🚨 Critical Laws table
+- Issues #1, #2, #3... (scalable)
+- Each issue: Problem → Symptom → Root Cause → Solution → Lesson
+- Methodology Failures section
+- Prevention Protocol
+- Appendix with issue template
+
+| Domain | Compendium | Issues | Status |
+|--------|-----------|--------|--------|
+| 🎨 Dashboard | [`dashboard/dashboard-compendium.md`](dashboard/dashboard-compendium.md) | 5 issues | ✅ Active |
+| 💾 Database | [`database/database-compendium.md`](database/database-compendium.md) | 6 issues | ✅ Active |
+| 🏗️ Installation | [`installation/installation-compendium.md`](installation/installation-compendium.md) | 4 issues | ✅ Active |
+| 🧠 Memory | [`memory/memory-compendium.md`](memory/memory-compendium.md) | 5 issues | ✅ Active |
+| 🤖 AI Behavior | [`general/ai-behavior-compendium.md`](general/ai-behavior-compendium.md) | 5 issues | ✅ Active |
+
+---
+
+## 📝 Unified Post-Mortem Structure
+
+All compendiums follow this scalable format:
+
+```markdown
+# [Domain] Debug Compendium
+
+> **Domain:** [Name]
+> **Last Updated:** YYYY-MM-DD
+> **Total Issues Documented:** N
+> **Maintainer:** Add new issues following Issue #N template at bottom
+
+---
+
+## 🚨 CRITICAL LAWS (Extracted from Pain)
+
+| # | Law | Violation Cost |
+|---|-----|----------------|
+| 1 | [Law statement] | [Cost in time/effort] |
+
+---
+
+## Issue #1: [Title]
+
+**Date:** YYYY-MM-DD
+**Duration:** X hours/minutes
+**Severity:** LOW | MEDIUM | HIGH | CRITICAL
+**Status:** 🔴 OPEN | 🟡 IN PROGRESS | ✅ FIXED | ⚠️ DOCUMENTED
+
+### Problem
+[One sentence]
+
+### Symptom
+[What user sees / error message]
+
+### Root Cause
+[Technical WHY]
+
+### Solution
+[Code changes or steps]
+
+### Why This Took So Long
+[Honest reflection]
+
+### Lesson
+> [One-line takeaway in blockquote]
+
+---
+
+## Appendix: Issue Template
+[Copy-paste template for new issues]
+```
+
+---
+
+## 🔑 How to Use This System
+
+### When Debugging a New Issue
+
+1. **Check Neural Register first** → Find relevant laws
+2. **Search compendium** → Has this been seen before?
+3. **If new issue** → Add to compendium using template
+4. **If pattern emerges** → Extract new law to Neural Register
+
+### When Adding New Issues
+
+1. Open the relevant compendium
+2. Copy the issue template from Appendix
+3. Fill in all sections honestly
+4. Add to Critical Laws table if significant
+5. Update Neural Register if new law discovered
+
+### When Reviewing Debug History
+
+- **Start with Neural Registers** for quick rules
+- **Dive into Compendiums** for full context
+- **Check Methodology Failures** for meta-lessons
+- **Use Prevention Protocols** proactively
+
+---
+
+## 📊 Consolidation Summary
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| Total debug files | 29 | 10 | 66% reduction |
+| Files per domain | 3-13 | 2 (register + compendium) | Standardized |
+| Structure variations | 5+ | 1 unified | Consistent |
+| Scalability | Poor (new files) | Good (append to compendium) | Maintainable |
+
+---
+
+## 🚫 Anti-Patterns to Avoid
+
+| ❌ Don't | ✅ Do |
+|----------|-------|
+| Create new file per issue | Append to domain compendium |
+| Write narrative prose | Use structured Issue #N format |
+| Skip "Why This Took So Long" | Include honest reflection |
+| Forget the Lesson blockquote | Extract actionable takeaway |
+| Leave compendium outdated | Update after each debug session |
+
+---
 
 ## 📁 Directory Structure
 
 ```
-debug/
-├── README.md (this file)
-├── dashboard/          # Dashboard-specific issues
-├── database/           # Database-specific issues
-├── general/            # General debugging & protocols
-├── installation/       # Installation issues
-└── memory/            # Memory system issues
+docs/debug/
+├── README.md                              ← Index (you are here)
+├── INSTALLATION_NEURAL_REGISTER.md        ← Laws: Installation
+├── DATABASE_NEURAL_REGISTER.md            ← Laws: Database
+├── DASHBOARD_NEURAL_REGISTER.md           ← Laws: Dashboard
+├── MCP_CODE_NEURAL_REGISTER.md            ← Laws: MCP/Code
+├── MEMORY_NEURAL_REGISTER.md              ← Laws: Memory
+├── dashboard/
+│   └── dashboard-compendium.md            ← Source: Dashboard issues
+├── database/
+│   └── database-compendium.md             ← Source: Database issues
+├── installation/
+│   └── installation-compendium.md         ← Source: Installation issues
+├── memory/
+│   └── memory-compendium.md               ← Source: Memory issues
+└── general/
+    └── ai-behavior-compendium.md          ← Source: AI behavior issues
 ```
-
-## 🎯 Quick Navigation
-
-### Protocol Enforcement (START HERE)
-- **[PROTOCOL-ENFORCEMENT-FINAL.md](general/PROTOCOL-ENFORCEMENT-FINAL.md)** ⭐ **READ THIS FIRST**
-  - Complete guide to Bob's 5-layer protocol system
-  - Prevents repeated mistakes
-  - Enforces: Query → Verify → State → Execute → Verify → Store
-  - **Status**: Production Ready
-
-### Protocol Evolution
-- [protocol-enforcement-v3.md](general/protocol-enforcement-v3.md) - Layer 5 addition (Forced Execution)
-- [protocol-enforcement-v2.md](general/protocol-enforcement-v2.md) - Layer 4 addition (Memory Compliance)
-- [protocol-enforcement.md](general/protocol-enforcement.md) - Original 3-layer system
-
-### Root Cause Analysis
-- [root-cause-self-analysis.md](root-cause-self-analysis.md) - Why errors occurred despite having knowledge
-- [elefante-reinforcement-strategy.md](elefante-reinforcement-strategy.md) - Strategy for using Elefante effectively
-
-### Temporal Decay Feature
-- [temporal-decay-issues.md](temporal-decay-issues.md) - Issues found during implementation
-
-## 📂 By Category
-
-### Dashboard Issues
-- [dashboard-build-failure-2025-11-28.md](dashboard/dashboard-build-failure-2025-11-28.md)
-- [dashboard-postmortem.md](dashboard/dashboard-postmortem.md)
-
-### Database Issues
-- **[kuzu-reserved-words-issue.md](kuzu-reserved-words-issue.md)** ⭐ **CRITICAL** - Kuzu SQL/Cypher hybrid anomaly
-- [database-corruption-2025-12-02.md](database/database-corruption-2025-12-02.md)
-- [duplicate-entity-analysis.md](database/duplicate-entity-analysis.md)
-- [kuzu-critical-discovery.md](database/kuzu-critical-discovery.md)
-- [kuzu-lock-analysis.md](database/kuzu-lock-analysis.md)
-
-### General Debugging
-- [critical-analysis.md](general/critical-analysis.md)
-- [current-status.md](general/current-status.md)
-- [debug-handoff.md](general/debug-handoff.md)
-- [dev-journal.md](general/dev-journal.md)
-- [diagnosis.md](general/diagnosis.md)
-- [fixes-applied.md](general/fixes-applied.md)
-- [implementation-plan.md](general/implementation-plan.md)
-- [problem-summary.md](general/problem-summary.md)
-- [session-summary-2025-12-02.md](general/session-summary-2025-12-02.md)
-- [task-roadmap.md](general/task-roadmap.md)
-- [troubleshooting.md](general/troubleshooting.md)
-
-### Installation Issues
-- [installation-debug-2025-11-27.md](installation/installation-debug-2025-11-27.md)
-- [installation-fix.md](installation/installation-fix.md)
-- [installation-success-2025-11-27.md](installation/installation-success-2025-11-27.md)
-- [never-again-guide.md](installation/never-again-guide.md)
-- [root-cause-analysis.md](installation/root-cause-analysis.md)
-- [visual-journey.md](installation/visual-journey.md)
-
-### Memory System Issues
-- [memory_retrieval_investigation.md](memory/memory_retrieval_investigation.md)
-
-## 🔑 Key Concepts
-
-### The 5-Layer Protocol System
-
-1. **Layer 1**: Protocol Checklist - Reference document
-2. **Layer 2**: Verification Triggers - Automatic keywords
-3. **Layer 3**: Dual-Memory Protocol - Query conversation + Elefante
-4. **Layer 4**: Memory Compliance - Apply retrieved knowledge
-5. **Layer 5**: Action Verification - FORCED EXECUTION
-
-### The Three Gaps
-
-1. **Knowledge Gap**: Not having information → Fixed by Elefante
-2. **Application Gap**: Not using retrieved information → Fixed by Layer 4
-3. **Execution Gap**: Not acting on stated intentions → Fixed by Layer 5
-
-### Critical Rules
-
-1. Never assume - Always verify
-2. Never "should" - Always do
-3. Never claim done - Always prove
-4. Never ask twice - Always check memory
-5. Never analyze only - Always execute
-
-## 📊 Documentation Standards
-
-### File Naming
-- Use kebab-case: `protocol-enforcement-v3.md`
-- Include dates for time-specific docs: `session-summary-2025-12-02.md`
-- Use descriptive names: `kuzu-lock-analysis.md` not `issue-1.md`
-
-### Organization
-- Group by topic (dashboard, database, general, installation, memory)
-- Keep related files together
-- Archive outdated docs to `../archive/`
-
-### Content Structure
-- Start with executive summary
-- Include date and status
-- Provide examples (wrong vs right)
-- Link to related docs
-- End with lessons learned
-
-## 🎓 Learning from Mistakes
-
-### Common Patterns
-1. **Claiming done without verification** → Use Layer 2 triggers
-2. **Ignoring stored preferences** → Use Layer 4 compliance
-3. **Analysis without action** → Use Layer 5 execution
-4. **Repeated questions** → Use Layer 3 dual-memory
-
-### Success Metrics
-- ✅ Elefante queried before responding
-- ✅ Retrieved memories applied
-- ✅ Actions executed immediately
-- ✅ Success verified with proof
-- ✅ New learnings stored
-
-## 🔄 Maintenance
-
-### When to Add New Docs
-- New failure pattern discovered
-- Protocol enhancement needed
-- Major debugging session completed
-- Lessons learned from mistakes
-
-### When to Archive
-- Doc superseded by newer version
-- Issue permanently resolved
-- Historical context only
-
-### Review Schedule
-- Protocol docs: After every 100 executions
-- Issue docs: When issue recurs
-- General docs: Quarterly
-
-## 📞 Quick Reference
-
-**Need to understand the protocol?**  
-→ Read [PROTOCOL-ENFORCEMENT-FINAL.md](general/PROTOCOL-ENFORCEMENT-FINAL.md)
-
-**Experiencing repeated mistakes?**  
-→ Check [root-cause-self-analysis.md](root-cause-self-analysis.md)
-
-**Want to use Elefante effectively?**  
-→ Read [elefante-reinforcement-strategy.md](elefante-reinforcement-strategy.md)
-
-**Debugging specific issue?**  
-→ Check category subdirectories (dashboard/, database/, etc.)
 
 ---
 
-**Last Updated**: 2025-12-04  
-**Total Documents**: 30+  
-**Status**: Active Development
+*Last verified: 2025-12-05 | Elefante v1.2.0 | 10 active debug documents*
