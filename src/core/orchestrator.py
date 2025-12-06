@@ -171,19 +171,13 @@ class MemoryOrchestrator:
                     if k not in ["domain", "category", "intent", "confidence", "source"]
                 }
             
-            # AUTO-CLASSIFICATION: If domain/category not provided, use LLM
-            if not domain or not category:
-                try:
-                    classification = await self.llm_service.classify_memory(content, tags)
-                    if not domain:
-                        domain = classification.get("domain", "reference")
-                    if not category:
-                        category = classification.get("category", "general")
-                    self.logger.info(f"Auto-classified: domain={domain}, category={category}")
-                except Exception as e:
-                    self.logger.warning(f"Auto-classification failed: {e}")
-                    domain = domain or "reference"
-                    category = category or "general"
+            # AGENT-PROVIDED CLASSIFICATION: The calling AI agent classifies the memory
+            # Agent IS the brain - no need for redundant LLM call
+            # Fallback to defaults only if agent didn't provide (legacy/batch imports)
+            if not domain:
+                domain = "reference"
+            if not category:
+                category = tags[0] if tags else "general"
             
             # Safely convert intent, mapping unknown values to REFERENCE
             intent_value = IntentType.REFERENCE

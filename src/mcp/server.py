@@ -79,7 +79,17 @@ class ElefanteMCPServer:
             tools = [
                 types.Tool(
                     name="addMemory",
-                    description="Store a new memory in Elefante's dual-database system. INTELLIGENT INGESTION: This tool automatically analyzes the new memory against existing knowledge. It will flag the memory as 'NEW', 'REDUNDANT', 'RELATED', or 'CONTRADICTORY' and link it to existing concepts in the graph. You do not need to check for duplicates yourself; just add the memory and the system will handle the organization.",
+                    description="""Store a new memory in Elefante's dual-database system.
+
+**YOU ARE ELEFANTE'S BRAIN** - You must classify the memory as you store it:
+- **domain**: What context? work/personal/learning/project/reference/system
+- **category**: What topic? Use lowercase-hyphenated (e.g., 'elefante', 'python', 'debugging')
+- **memory_type**: What kind? fact/insight/decision/preference/code/task/note
+- **importance**: How critical? 1-10 (8+ for preferences, decisions, critical facts)
+
+ALWAYS provide domain, category, and memory_type. You understand the content - classify it.
+
+INTELLIGENT INGESTION: The system automatically detects duplicates (REDUNDANT), related memories (RELATED), or contradictions (CONTRADICTORY) and links to existing knowledge.""",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -89,26 +99,25 @@ class ElefanteMCPServer:
                             },
                             "memory_type": {
                                 "type": "string",
-                                "enum": ["conversation", "fact", "insight", "code", "decision", "task", "note"],
+                                "enum": ["conversation", "fact", "insight", "code", "decision", "task", "note", "preference"],
                                 "default": "conversation",
-                                "description": "Type of memory"
+                                "description": "Type of memory - YOU MUST CLASSIFY THIS"
                             },
                             "domain": {
                                 "type": "string",
                                 "enum": ["work", "personal", "learning", "project", "reference", "system"],
-                                "default": "reference",
-                                "description": "High-level context domain"
+                                "description": "High-level context - YOU MUST CLASSIFY THIS"
                             },
                             "category": {
                                 "type": "string",
-                                "description": "Mid-level grouping (e.g., 'elefante', 'ai-ml', 'debugging')"
+                                "description": "Topic grouping (e.g., 'elefante', 'python', 'user-preferences') - YOU MUST CLASSIFY THIS"
                             },
                             "importance": {
                                 "type": "integer",
                                 "minimum": 1,
                                 "maximum": 10,
                                 "default": 5,
-                                "description": "Importance level (1-10)"
+                                "description": "Importance level (1-10). Use 8+ for preferences, decisions, critical facts"
                             },
                             "tags": {
                                 "type": "array",
