@@ -82,12 +82,14 @@ class ElefanteMCPServer:
                     description="""Store a new memory in Elefante's dual-database system.
 
 **YOU ARE ELEFANTE'S BRAIN** - You must classify the memory as you store it:
-- **domain**: What context? work/personal/learning/project/reference/system
-- **category**: What topic? Use lowercase-hyphenated (e.g., 'elefante', 'python', 'debugging')
-- **memory_type**: What kind? fact/insight/decision/preference/code/task/note
+- **layer**: self (who), world (what), intent (do)
+- **sublayer**: 
+  - SELF: identity, preference, constraint
+  - WORLD: fact, failure, method
+  - INTENT: rule, goal, anti-pattern
 - **importance**: How critical? 1-10 (8+ for preferences, decisions, critical facts)
 
-ALWAYS provide domain, category, and memory_type. You understand the content - classify it.
+ALWAYS provide layer and sublayer. You understand the content - classify it.
 
 INTELLIGENT INGESTION: The system automatically detects duplicates (REDUNDANT), related memories (RELATED), or contradictions (CONTRADICTORY) and links to existing knowledge.""",
                     inputSchema={
@@ -96,6 +98,15 @@ INTELLIGENT INGESTION: The system automatically detects duplicates (REDUNDANT), 
                             "content": {
                                 "type": "string",
                                 "description": "The memory content to store"
+                            },
+                            "layer": {
+                                "type": "string",
+                                "enum": ["self", "world", "intent"],
+                                "description": "Memory layer (self/world/intent)"
+                            },
+                            "sublayer": {
+                                "type": "string",
+                                "description": "Memory sublayer (e.g. identity, fact, rule)"
                             },
                             "memory_type": {
                                 "type": "string",
@@ -412,6 +423,24 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
                         "type": "object",
                         "properties": {}
                     }
+                ),
+                types.Tool(
+                    name="migrateMemoriesV3",
+                    description="[ADMIN] Migrate all memories to V3 Schema (Layer/Sublayer). Runs in-process to avoid database locks. Iterates through all memories, re-classifies them, and updates both Vector and Graph stores.",
+                    inputSchema={
+                         "type": "object",
+                         "properties": {
+                             "limit": {"type": "integer", "default": 500}
+                         }
+                    }
+                ),
+                types.Tool(
+                    name="refreshDashboardData",
+                    description="Regenerate the 'dashboard_snapshot.json' data file used by the visualization. Consolidates data from ChromaDB (memories) and Kuzu (graph relationships). Call this after adding new memories or when the dashboard looks out of sync.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {}
+                    }
                 )
             ]
             self.logger.info(f"=== Returning {len(tools)} tools to MCP client ===")
@@ -447,6 +476,10 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
                     result = await self._handle_consolidate_memories(arguments)
                 elif name == "openDashboard":
                     result = await self._handle_open_dashboard(arguments)
+                elif name == "migrateMemoriesV3":
+                    result = await self._handle_migrate_memories_v3(arguments)
+                elif name == "refreshDashboardData":
+                    result = await self._handle_refresh_dashboard_data(arguments)
                 else:
                     raise ValueError(f"Unknown tool: {name}")
                 
@@ -467,7 +500,7 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
                 )]
     
     async def _handle_add_memory(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle addMemory tool call - now uses shared singleton connection"""
+        """Handle addMemory tool call - Authoritative Pipeline"""
         orchestrator = await self._get_orchestrator()
         
         # Build metadata with domain/category if provided
@@ -476,6 +509,15 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
             metadata["domain"] = args["domain"]
         if args.get("category"):
             metadata["category"] = args["category"]
+            
+        # Add layer/sublayer to metadata - AUTHORITATIVE
+        if args.get("layer"):
+            metadata["layer"] = args["layer"]
+        if args.get("sublayer"):
+            metadata["sublayer"] = args["sublayer"]
+            
+        # Note: We removed the local classifier fallback. 
+        # The Orchestrator's 5-Step Pipeline handles validation and defaults.
         
         memory = await orchestrator.add_memory(
             content=args["content"],
@@ -486,11 +528,36 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
             metadata=metadata if metadata else None
         )
         
+        # Handle case where memory was IGNORED by cognitive pipeline
+        if memory is None:
+            return {
+                "status": "ignored",
+                "classification": "IGNORE",
+                "entity_count": 0,
+                "relationship_count": 0,
+                "embedding_id": None,
+                "graph_ids": [],
+                "message": "Memory filtered by Intelligence Pipeline"
+            }
+        
+        # Authoritative Output Format
+        # Count entities passed in + auto-generated (approximation)
+        entity_count = len(args.get("entities", []))
+        
+        # Handle status as either enum or string
+        status_value = memory.metadata.status.value if hasattr(memory.metadata.status, 'value') else str(memory.metadata.status)
+        
         return {
-            "success": True,
-            "memory_id": str(memory.id),
-            "message": "Memory stored successfully (shared connection with dashboard)",
-            "memory": memory.to_dict()
+            "status": "stored",
+            "classification": status_value.upper(),  # NEW|REDUNDANT|RELATED|CONTRADICTORY
+            "entity_count": entity_count,
+            "relationship_count": entity_count,  # 1 relationship per entity
+            "embedding_id": str(memory.id),
+            "graph_ids": [str(memory.id)],  # Memory node ID
+            "layer": memory.metadata.layer,
+            "sublayer": memory.metadata.sublayer,
+            "importance": memory.metadata.importance,
+            "memory_id": str(memory.id)
         }
     
     async def _handle_search_memories(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -719,6 +786,223 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
             "success": True,
             "message": message,
             "url": url
+        }
+
+    async def _handle_migrate_memories_v3(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle migrateMemoriesV3 tool call"""
+        self.logger.info("Starting V3 Migration (In-Process)...")
+        orchestrator = await self._get_orchestrator()
+        
+        limit = args.get("limit", 500)
+        offset = 0
+        total_migrated = 0
+        errors = 0
+        
+        from src.core.classifier import classify_memory
+        
+        # Helper for JSON serialization
+        def json_serializer(obj):
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            if hasattr(obj, 'value'): # Enum
+                return obj.value
+            raise TypeError(f"Type {type(obj)} not serializable")
+            
+        while True:
+            # Fetch batch
+            try:
+                memories = await orchestrator.vector_store.get_all(limit=limit, offset=offset)
+            except Exception as e:
+                # Fallback if get_all not available or fails
+                self.logger.error(f"Failed to fetch memories: {e}")
+                break
+                
+            if not memories:
+                break
+                
+            for mem in memories:
+                try:
+                    # Classify
+                    content = mem.content
+                    layer, sublayer = classify_memory(content)
+                    
+                    # Update Metadata
+                    mem.metadata.layer = layer
+                    mem.metadata.sublayer = sublayer
+                    
+                    # Update Vector Store (Delete + Add)
+                    await orchestrator.vector_store.delete_memory(mem.id)
+                    await orchestrator.vector_store.add_memory(mem)
+                    
+                    # Update Graph Store properties
+                    props = {
+                        "content": content[:200],
+                        "full_content": content,
+                        "title": mem.metadata.custom_metadata.get("title", f"Memory {mem.id}"),
+                        "layer": layer,
+                        "sublayer": sublayer,
+                        "memory_type": mem.metadata.memory_type.value if hasattr(mem.metadata.memory_type, "value") else str(mem.metadata.memory_type),
+                        "importance": mem.metadata.importance,
+                        "status": mem.metadata.status.value if hasattr(mem.metadata.status, "value") else str(mem.metadata.status),
+                        "timestamp": mem.metadata.created_at.isoformat() if isinstance(mem.metadata.created_at, datetime) else mem.metadata.created_at,
+                        "entity_subtype": "memory"
+                    }
+                    
+                    props_json = json.dumps(props, default=json_serializer).replace("'", "\\'")
+                    
+                    cypher = f"MATCH (e:Entity) WHERE e.id = '{str(mem.id)}' SET e.props = '{props_json}' RETURN e.id"
+                    await orchestrator.graph_store.execute_query(cypher)
+                    
+                    total_migrated += 1
+                    
+                except Exception as e:
+                    self.logger.error(f"Error migrating {mem.id}: {e}")
+                    errors += 1
+            
+            offset += limit
+            if len(memories) < limit:
+                break
+                
+        return {
+            "success": True,
+            "migrated_count": total_migrated,
+            "errors": errors,
+            "message": f"Migrated {total_migrated} memories to V3 Schema"
+        }
+
+    async def _handle_refresh_dashboard_data(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle refreshDashboardData tool call"""
+        import os
+        orchestrator = await self._get_orchestrator()
+        
+        # 1. Fetch ALL memories from ChromaDB
+        # We can use get_all() which we verified earlier
+        memories = await orchestrator.vector_store.get_all(limit=1000)
+        
+        nodes = []
+        edges = []
+        seen_ids = set()
+        
+        # Convert memories to nodes
+        for mem in memories:
+            # Generate title if missing
+            if mem.metadata.custom_metadata.get("title"):
+                name = mem.metadata.custom_metadata.get("title")
+            else:
+                 words = mem.content.split()[:5]
+                 name = " ".join(words) if words else "Untitled Memory"
+            
+            node = {
+                "id": str(mem.id),
+                "name": name,
+                "type": "memory",
+                "description": mem.content,
+                "created_at": mem.metadata.created_at.isoformat(),
+                "properties": {
+                    "content": mem.content,
+                    "memory_type": mem.metadata.memory_type.value if hasattr(mem.metadata.memory_type, "value") else str(mem.metadata.memory_type),
+                    "importance": mem.metadata.importance,
+                    "layer": getattr(mem.metadata, "layer", "world"),
+                    "sublayer": getattr(mem.metadata, "sublayer", "fact"),
+                    "tags": ",".join(mem.metadata.tags) if mem.metadata.tags else "",
+                    "source": "chromadb"
+                }
+            }
+            nodes.append(node)
+            seen_ids.add(str(mem.id))
+            
+        # 2. Fetch Entities from Kuzu (Supplementary)
+        # Using execute_query on orchestrator's graph store
+        try:
+             results = await orchestrator.graph_store.execute_query("MATCH (n:Entity) RETURN n")
+             
+             for row in results:
+                 entity = row.get("n")
+                 if not entity: continue
+                 
+                 # Kuzu returns Node object, need to parse properties
+                 # Assuming entity is a Node object or dict-like
+                 # Based on graph_store.py: execute_query returns dicts
+                 # row['n'] is presumably a Kuzu Node object
+                 
+                 # Extract properties safely
+                 props = {}
+                 eid = str(entity.id)
+                 
+                 if eid in seen_ids: continue
+                 
+                 # Parse JSON props if string
+                 extra = {}
+                 if "props" in entity.properties and isinstance(entity.properties["props"], str):
+                     try:
+                         extra = json.loads(entity.properties["props"])
+                     except:
+                         pass
+                 
+                 # Skip if it's a memory (already have it)
+                 etype = entity.properties.get("type", "entity")
+                 if etype == "memory" or extra.get("entity_subtype") == "memory":
+                     continue
+                 
+                 node = {
+                     "id": eid,
+                     "name": entity.properties.get("name", eid[:20]),
+                     "type": etype,
+                     "description": entity.properties.get("description", ""),
+                     "created_at": str(entity.properties.get("created_at", "")),
+                     "properties": {"source": "kuzu"}
+                 }
+                 # Merge extra props
+                 node["properties"].update(extra)
+                 
+                 nodes.append(node)
+                 seen_ids.add(eid)
+                 
+             # 3. Fetch Relationships
+             edge_results = await orchestrator.graph_store.execute_query("MATCH (a)-[r]->(b) RETURN a.id, b.id, label(r)")
+             
+             for row in edge_results:
+                 # Note: result keys depend on query return clause
+                 # In graph_store.py execute_query maps columns
+                 src = row.get("a.id")
+                 dst = row.get("b.id")
+                 lbl = row.get("label(r)")
+                 
+                 if src and dst:
+                     edges.append({
+                         "from": src,
+                         "to": dst,
+                         "label": lbl or "RELATED"
+                     })
+                     
+        except Exception as e:
+            self.logger.error(f"Error fetching graph data: {e}")
+            # Continue with what we have
+            
+        # 4. Save Snapshot
+        snapshot = {
+            "generated_at": datetime.utcnow().isoformat(),
+            "stats": {
+                "total_nodes": len(nodes),
+                "memories": sum(1 for n in nodes if n["type"] == "memory"),
+                "entities": sum(1 for n in nodes if n["type"] != "memory"),
+                "edges": len(edges)
+            },
+            "nodes": nodes,
+            "edges": edges
+        }
+        
+        output_path = "data/dashboard_snapshot.json"
+        # Ensure dir exists
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        with open(output_path, "w") as f:
+            json.dump(snapshot, f, indent=2, default=str)
+            
+        return {
+            "success": True,
+            "message": f"Dashboard data refreshed. Nodes: {len(nodes)}, Edges: {len(edges)}",
+            "stats": snapshot["stats"]
         }
     
     async def run(self):

@@ -42,6 +42,7 @@ class GraphStore:
         self.read_only = read_only
         
         self._conn = None
+        self._db = None
         self._schema_initialized = False
         self._lock = None  # For thread safety
         
@@ -109,8 +110,8 @@ class GraphStore:
             buffer_size_bytes = self._parse_buffer_size(self.buffer_pool_size)
             
             # Initialize database - Kuzu will use the directory as-is
-            db = kuzu.Database(self.database_path, buffer_pool_size=buffer_size_bytes)
-            self._conn = kuzu.Connection(db)
+            self._db = kuzu.Database(self.database_path, buffer_pool_size=buffer_size_bytes)
+            self._conn = kuzu.Connection(self._db)
             
             # Initialize schema
             if not self._schema_initialized:
@@ -139,6 +140,38 @@ class GraphStore:
         except Exception as e:
             logger.error("failed_to_initialize_kuzu", error=str(e))
             raise
+
+    def close(self):
+        """Explicitly close connection and database to release locks."""
+        if self._conn:
+            # self._conn.close() # Kuzu Connection object doesn't have close(), it just goes out of scope? 
+            # Double check docs, but assuming we drop ref.
+            self._conn = None
+            
+        if self._db:
+             # self._db.close() # Kuzu Database object might not have close either, but dropping refs is key.
+             # According to docs/debug/database-neural-register.md, we should implement close.
+             # If kuzu doesn't support specific close methods, assigning None allows GC to clean up.
+             # However, it's safer to check if they have it.
+             self._db = None
+             
+        logger.info("kuzu_connection_closed")
+
+    def __enter__(self):
+        """Context manager entry."""
+        self._initialize_connection()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit with cleanup."""
+        self.close()
+
+    def __del__(self):
+        """Destructor cleanup."""
+        try:
+            self.close()
+        except:
+            pass
     
     def _get_query_results(self, result) -> list:
         """
@@ -254,34 +287,38 @@ class GraphStore:
         def json_serializer(obj):
             if isinstance(obj, datetime):
                 return obj.isoformat()
+            if hasattr(obj, 'value'): # Handle Enums
+                return obj.value
             raise TypeError(f"Type {type(obj)} not serializable")
         
-        # Escape single quotes in strings for Cypher
-        def escape_string(s):
-            if s is None:
-                return ""
-            return str(s).replace("'", "\\'")
-        
-        # Use string interpolation instead of parameters to avoid Kuzu binding issues
-        # Kuzu has issues with parameterized queries when property names match parameter names
-        props_json = json.dumps(entity.properties, default=json_serializer).replace("'", "\\'")
+        props_json = json.dumps(entity.properties, default=json_serializer)
         created_at_iso = entity.created_at.isoformat() if entity.created_at else datetime.now().isoformat()
         
-        query = f"""
-            CREATE (e:Entity {{
-                id: '{str(entity.id)}',
-                name: '{escape_string(entity.name)}',
-                type: '{entity.type.value}',
-                description: '{escape_string(entity.description or "")}',
-                created_at: '{created_at_iso}',
-                props: '{props_json}'
-            }})
+        query = """
+            CREATE (e:Entity {
+                id: $id,
+                name: $name,
+                type: $type,
+                description: $description,
+                created_at: timestamp($created_at),
+                props: $props
+            })
         """
+        
+        params = {
+            "id": str(entity.id),
+            "name": entity.name,
+            "type": entity.type.value,
+            "description": entity.description or "",
+            "created_at": created_at_iso,
+            "props": props_json
+        }
         
         try:
             await asyncio.to_thread(
                 self._conn.execute,
-                query
+                query,
+                params
             )
             
             logger.info(

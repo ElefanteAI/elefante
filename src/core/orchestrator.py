@@ -82,13 +82,40 @@ class MemoryOrchestrator:
         importance: int = 1
     ) -> Optional[Memory]:
         """
-        Add a new memory to the system with Cognitive Intelligence Pipeline.
+        Add a new memory via the Authoritative 5-Step Pipeline.
+        
+        Pipeline:
+        1. PARSE & CLASSIFY: Validate input and extract Layer/Sublayer from metadata.
+        2. INTEGRITY: Check for duplicates (REDUNDANT) and contradictions (CONTRADICTORY).
+        3. WRITE: Construct Memory object with V2 metadata (Layers).
+        4. REINFORCE: Initialize plasticity (access_count=1) and decay signals.
+        5. GRAPH: Create Entity nodes and Relationships.
         """
         from src.core.graph_executor import GraphExecutor
         if not hasattr(self, 'graph_executor'):
             self.graph_executor = GraphExecutor(self.graph_store)
 
-        # 1. Cognitive Pipeline: Deep Analysis
+        # ==================================================================================
+        # STEP 1: PARSE & CLASSIFY
+        # ==================================================================================
+        validate_memory_content(content)
+        
+        if metadata is None:
+            metadata = {}
+            
+        # Extract Authoritative Classification (Layer/Sublayer)
+        # We prefer the classification provided by the Agent (via metadata)
+        layer = metadata.get("layer")
+        sublayer = metadata.get("sublayer")
+        
+        # If Agent failed to classify, we mark it but don't block (system resilience)
+        if not layer or not sublayer:
+             self.logger.warning("Memory missing explicit Layer/Sublayer classification. Using defaults.")
+             if not layer: layer = "world"
+             if not sublayer: sublayer = "fact"
+
+        # 1b. Cognitive Analysis (Optional Enrichment)
+        # We still use the LLM to get a Title and deeper intent, but we don't let it override the Agent's layer
         try:
             analysis = await self.llm_service.analyze_memory(content)
             
@@ -96,109 +123,96 @@ class MemoryOrchestrator:
             if analysis.get("action") == "IGNORE":
                 self.logger.info(f"Memory ignored by Intelligence Pipeline: {content[:50]}...")
                 return None
-                
-            # Extract Metadata
+            
             title = analysis.get("title", f"Memory {datetime.utcnow().isoformat()}")
-            extracted_tags = [] # Tags are now implicit in entities/relationships
             
             # Update metadata with cognitive context
-            if metadata is None:
-                metadata = {}
-            
             metadata["title"] = title
             metadata["intent"] = analysis.get("intent")
             metadata["emotional_context"] = analysis.get("emotional_context")
             metadata["strategic_insight"] = analysis.get("strategic_insight")
             
-            self.logger.info(f"Cognitive Analysis: Title='{title}', Intent='{analysis.get('intent')}'")
-            
         except Exception as e:
-            self.logger.warning(f"Intelligence Pipeline failed: {e}. Proceeding with raw memory.")
-            title = f"memory_{uuid4()}" # Fallback
+            self.logger.warning(f"Intelligence Pipeline enrichment failed: {e}. Proceeding with raw memory.")
+            title = f"memory_{uuid4()}"
             analysis = {}
-        
-        # 2. Generate embedding
+
+        # ==================================================================================
+        # STEP 2: INTEGRITY (Duplicate & Contradiction Check)
+        # ==================================================================================
         embedding = await self.embedding_service.generate_embedding(content)
         
-        # 3. Check for similar memories (Deduplication/Linking)
         similar_memories = await self.vector_store.search(
             query=content,
-            limit=1,
-            min_similarity=0.85
+            limit=3, 
+            min_similarity=0.65  # Threshold
         )
         
         status = MemoryStatus.NEW
         related_id = None
+        contradiction_details = None
         
         if similar_memories:
             best_match = similar_memories[0]
+            
+            # Check for redundancy
             if best_match.score >= 0.95:
                 status = MemoryStatus.REDUNDANT
                 related_id = best_match.memory.id
-                self.logger.info(f"Found redundant memory: {best_match.memory.id}")
-            elif best_match.score >= 0.8:
-                status = MemoryStatus.RELATED
-                related_id = best_match.memory.id
-        
-        self.logger.info(
-            "Adding memory",
-            memory_type=memory_type,
-            importance=importance,
-            status=status.value
-        )
-        
+                self.logger.info(f"Found redundant memory: {best_match.memory.id} (Score: {best_match.score})")
+            
+            # Check for contradiction (High similarity but conflicting content)
+            elif best_match.score >= 0.75:
+                is_contradiction = self._detect_contradiction(content, best_match.memory.content)
+                if is_contradiction:
+                    status = MemoryStatus.CONTRADICTORY
+                    related_id = best_match.memory.id
+                    contradiction_details = {
+                        "conflicting_memory_id": str(best_match.memory.id),
+                        "conflicting_content": best_match.memory.content[:200],
+                        "similarity": best_match.score
+                    }
+                    self.logger.warning(f"CONTRADICTORY memory detected vs {best_match.memory.id}")
+                else:
+                    status = MemoryStatus.RELATED
+                    related_id = best_match.memory.id
+
+        # ==================================================================================
+        # STEP 3: WRITE (Construct Memory Object)
+        # ==================================================================================
         try:
-            # Create memory object with V2 metadata structure
-            # Extract V2 fields from metadata dict if provided
-            domain = None
-            category = None
-            intent = None
-            confidence = None
-            source = None
-            custom_metadata = {}
+            # Map common V1 "custom" fields to V2 structured fields
+            domain = metadata.get("domain", "reference")
+            category = metadata.get("category", tags[0] if tags else "general")
+            confidence = metadata.get("confidence", 0.7)
+            source = metadata.get("source", "user_input")
             
-            if metadata:
-                # Map common V1 "custom" fields to V2 structured fields
-                domain = metadata.get("domain")
-                category = metadata.get("category")
-                intent = metadata.get("intent")
-                confidence = metadata.get("confidence")
-                source = metadata.get("source")
-                
-                # Everything else goes to custom_metadata
-                custom_metadata = {
-                    k: v for k, v in metadata.items()
-                    if k not in ["domain", "category", "intent", "confidence", "source"]
-                }
+            custom_metadata = {
+                k: v for k, v in metadata.items()
+                if k not in ["domain", "category", "intent", "confidence", "source", "layer", "sublayer"]
+            }
             
-            # AGENT-PROVIDED CLASSIFICATION: The calling AI agent classifies the memory
-            # Agent IS the brain - no need for redundant LLM call
-            # Fallback to defaults only if agent didn't provide (legacy/batch imports)
-            if not domain:
-                domain = "reference"
-            if not category:
-                category = tags[0] if tags else "general"
-            
-            # Safely convert intent, mapping unknown values to REFERENCE
-            intent_value = IntentType.REFERENCE
-            if intent:
-                try:
-                    intent_value = IntentType(intent)
-                except ValueError:
-                    self.logger.warning(f"Unknown intent '{intent}', using REFERENCE")
-                    intent_value = IntentType.REFERENCE
-            
+            # Create V2 Metadata
             memory_metadata = MemoryMetadata(
                 memory_type=MemoryType(memory_type),
                 importance=importance,
                 status=status,
                 tags=tags or [],
                 domain=DomainType(domain) if domain else DomainType.REFERENCE,
-                category=category or "general",
-                intent=intent_value,
-                confidence=confidence if confidence is not None else 0.7,
-                source=SourceType(source) if source else SourceType.USER_INPUT,
-                custom_metadata=custom_metadata
+                category=category,
+                # Enforce Layer/Sublayer
+                layer=layer,
+                sublayer=sublayer,
+                intent=IntentType.REFERENCE, # Default, refined by analysis if avail
+                confidence=confidence,
+                source=SourceType(source),
+                custom_metadata=custom_metadata,
+                # ==================================================================================
+                # STEP 4: REINFORCE (Plasticity & Decay)
+                # ==================================================================================
+                access_count=1,          # Initialize 'used once' (creation counts as use)
+                last_accessed=datetime.utcnow(),
+                decay_rate=0.01          # Standard Plasticity
             )
             
             memory = Memory(
@@ -207,11 +221,14 @@ class MemoryOrchestrator:
                 embedding=embedding
             )
             
-            # Store in Vector DB
+            # Persist to Vector DB
             await self.vector_store.add_memory(memory)
             
-            # Create Graph Node (Entity)
-            # Use the extracted TITLE as the name, falling back to ID if needed
+            # ==================================================================================
+            # STEP 5: GRAPH LINKS (Entities & Relationships)
+            # ==================================================================================
+            
+            # 5a. Create Memory Node
             entity_name = title if title and "Memory" not in title else f"memory_{memory.id}"
             
             memory_entity = Entity(
@@ -221,71 +238,60 @@ class MemoryOrchestrator:
                 description=analysis.get("summary", content[:200]),
                 properties={
                     "content": content[:200],
-                    "full_content": content,
-                    "title": title,
-                    "cognitive_analysis": analysis,
-                    "memory_type": memory_type,
+                    "layer": layer,
+                    "sublayer": sublayer,
                     "importance": importance,
                     "status": status.value,
-                    "timestamp": memory.metadata.created_at,
-                    "entity_subtype": "memory"
+                    "timestamp": memory.metadata.created_at
                 }
             )
             await self.graph_store.create_entity(memory_entity)
-            self.logger.debug(f"Memory node created: {entity_name}")
             
-            # [NEW] Execute Cognitive Graph Updates
-            if analysis:
-                await self.graph_executor.execute_analysis(analysis, memory.id)
-            
-            # Link to related memory if found
-            if related_id and similar_memories:
-                rel_type = RelationshipType.SIMILAR_TO
+            # 5b. Link to Contradiction/Redundancy
+            if related_id:
+                rel_type = RelationshipType.RELATES_TO
+                props = {"similarity": similar_memories[0].score}
+                
                 if status == MemoryStatus.REDUNDANT:
-                    rel_type = RelationshipType.SIMILAR_TO # Could be specific "REDUNDANT_TO" if added to enum
+                    rel_type = RelationshipType.SIMILAR_TO
+                elif status == MemoryStatus.CONTRADICTORY:
+                    rel_type = RelationshipType.CONTRADICTS
+                    props["resolved"] = False
                 
                 await self.graph_store.create_relationship(Relationship(
                     from_entity_id=memory.id,
                     to_entity_id=related_id,
                     relationship_type=rel_type,
-                    properties={
-                        "created_at": datetime.utcnow(),
-                        "similarity": similar_memories[0].score
-                    }
+                    properties=props
                 ))
             
-            # [NEW] Auto-link to User Entity for first-person memories
-            # This ensures "I live in Canada" is linked to the User node
-            if self._is_first_person_statement(content):
-                # Get configured user name
-                user_name = self.config.elefante.user_profile.user_name
-                
-                # Ensure User entity exists
-                user_entity = Entity(
-                    name=user_name,
-                    type=EntityType.PERSON,
-                    properties={"description": "The user interacting with the system", "is_user_profile": True}
-                )
-                # create_entity is idempotent (updates if exists)
-                await self.graph_store.create_entity(user_entity)
-                
-                # Link Memory -> User (RELATES_TO)
-                user_rel = Relationship(
-                    from_entity_id=memory_entity.id,
-                    to_entity_id=user_entity.id,
-                    relationship_type=RelationshipType.RELATES_TO,
-                    properties={"created_at": datetime.utcnow(), "auto_linked": True}
-                )
-                await self.graph_store.create_relationship(user_rel)
-                self.logger.debug(f"Auto-linked memory {memory.id} to User entity ({user_name})")
-
-            # [NEW] Link to Session Entity (Episodic Memory)
+            # 5c. Link to Provided Entities
+            if entities:
+                for entity_data in entities:
+                    ent_name = entity_data.get("name")
+                    ent_type = entity_data.get("type", "concept")
+                    
+                    if ent_name:
+                         # Create/Get Entity
+                        linked_entity = Entity(
+                            name=ent_name,
+                            type=EntityType(ent_type) if ent_type in EntityType.__members__ else EntityType.CONCEPT,
+                            properties={}
+                        )
+                        await self.graph_store.create_or_get_entity(linked_entity)
+                        
+                        # Link Memory -> Entity
+                        await self.graph_store.create_relationship(Relationship(
+                            from_entity_id=memory.id,
+                            to_entity_id=linked_entity.id,
+                            relationship_type=RelationshipType.RELATES_TO
+                        ))
+            
             if memory.metadata.session_id:
                 session_id = str(memory.metadata.session_id)
                 now_iso = datetime.utcnow().isoformat()
                 
                 # Use MERGE to create or update Session entity with stats
-                # This tracks interaction count and last active time
                 session_cypher = f"""
                 MERGE (s:Entity {{id: '{session_id}'}})
                 ON CREATE SET 
@@ -314,52 +320,13 @@ class MemoryOrchestrator:
                     await self.graph_store.create_relationship(session_rel)
                     self.logger.debug(f"Linked memory {memory.id} to Session {session_id}")
                 except Exception as e:
-                    self.logger.warning(f"Failed to update Session entity: {e}")
+                    self.logger.warning(f"Failed to update Session entity: {e}") 
 
-            # Create entity nodes and relationships if provided
-            if entities:
-                for entity_data in entities:
-                    # Parse entity type
-                    entity_type_str = entity_data.get("type", "concept")
-                    try:
-                        entity_type = EntityType(entity_type_str)
-                    except ValueError:
-                        entity_type = EntityType.CUSTOM
-                    
-                    # Get properties safely
-                    props = entity_data.get("properties", {})
-                    if not isinstance(props, dict):
-                        props = {}
-                    
-                    entity = Entity(
-                        name=entity_data["name"],
-                        type=entity_type,
-                        properties=props
-                    )
-                    
-                    # Create or get entity (with deduplication)
-                    await self.graph_store.create_or_get_entity(entity)
-                    
-                    # Create relationship: Memory -> Entity
-                    relationship = Relationship(
-                        from_entity_id=memory_entity.id,
-                        to_entity_id=entity.id,
-                        relationship_type=RelationshipType.RELATES_TO,
-                        properties={"created_at": datetime.utcnow()}
-                    )
-                    await self.graph_store.create_relationship(relationship)
-                    
-                    self.logger.debug(
-                        f"Linked memory to entity",
-                        entity_name=entity.name,
-                        entity_type=entity.type
-                    )
-            
-            self.logger.info(f"Memory added successfully: {memory.id} (Status: {status.value})")
+            self.logger.info(f"Memory stored successfully: {memory.id} [{layer}/{sublayer}]")
             return memory
             
         except Exception as e:
-            self.logger.error(f"Failed to add memory: {e}", exc_info=True)
+            self.logger.error(f"Failed to store memory: {e}", exc_info=True)
             raise
     
     async def search_memories(
@@ -603,6 +570,29 @@ class MemoryOrchestrator:
                     graph_score=score
                 ))
         
+        # Apply Temporal Decay & Reinforcement (Read-Side Plasticity)
+        if apply_temporal_decay:
+            for result in results:
+                # Calculate temporal score (even if just based on current time for graph results)
+                current_time = datetime.utcnow()
+                temporal_score = result.memory.calculate_relevance_score(current_time)
+                
+                # Blend with graph score (importance-based)
+                # Config defaults: semantic=0.7, temporal=0.3
+                # For graph, we treat importance as the "semantic" signal
+                semantic_weight = 0.7 
+                temporal_weight = 0.3
+                
+                # Re-calculate score
+                result.score = (semantic_weight * result.score) + (temporal_weight * temporal_score)
+                
+                # REINFORCEMENT: Update access stats in Vector Store
+                # This ensures graph-found memories also get "stronger"
+                await self.vector_store.update_memory_access(result.memory)
+                
+            # Re-sort after decay application
+            results.sort(key=lambda r: r.score, reverse=True)
+
         return results
     
     async def _search_hybrid(
@@ -905,45 +895,89 @@ class MemoryOrchestrator:
                     # Fallback to graph query if needed, but for now we proceed
                     
             else:
-                # FIX: Entity schema has 'created_at' property, not 'timestamp'
-                # Must match the schema defined in graph_store.py
-                cypher = f"""
-                MATCH (m:Entity {{type: 'memory'}})
-                RETURN m
-                ORDER BY m.created_at DESC
-                LIMIT {limit}
-                """
-            
-                # Get memories from graph
-                results = await self.graph_store.execute_query(cypher)
+                # AUTHORITATIVE: Use recursive traversal based on depth
+                # Determine anchor points. If no session, rely on recency (flat) or relevant entities
                 
-                for row in results:
-                    # GraphStore now returns dict with column names
-                    entity = row.get("m")
-                    if entity:
-                        # Handle Kuzu Node object
-                        props = {}
-                        # Check if 'properties' field exists in the node (it's a string column)
-                        if hasattr(entity, 'get') and entity.get('properties'):
-                            try:
-                                props = json.loads(entity.get('properties'))
-                            except:
-                                props = {}
-                        # Also merge other fields if they exist as keys
-                        elif isinstance(entity, dict):
-                             if 'properties' in entity and isinstance(entity['properties'], str):
+                if session_id:
+                     # Start from Session entity and traverse out
+                     cypher = f"""
+                     MATCH (s:Entity {{id: '{session_id}'}})-[r*1..{depth}]-(m:Entity)
+                     WHERE m.type = 'memory' OR m.type = 'fact' OR m.type = 'person'
+                     RETURN m, r
+                     LIMIT {limit}
+                     """
+                else:
+                    # Fallback to recent memories if no session anchor
+                    # But we can still find their related entities up to depth
+                    cypher = f"""
+                    MATCH (m:Entity {{type: 'memory'}})
+                    WITH m
+                    ORDER BY m.created_at DESC
+                    LIMIT 10
+                    MATCH (m)-[r*1..{depth}]-(related:Entity)
+                    RETURN m, related, r
+                    LIMIT {limit}
+                    """
+            
+                # Get memories/entities from graph
+                try:
+                    results = await self.graph_store.execute_query(cypher)
+                    
+                    for row in results:
+                         # Handle Kuzu results which can be complex with var-length paths
+                         # We'll flatten the results
+                        
+                        entities_to_process = []
+                        if session_id:
+                            # pattern: m, r (where r is list of rels, m is node)
+                            # Actually Kuzu might return individual rows for paths
+                            if "m" in row: entities_to_process.append(row["m"])
+                        else:
+                            if "m" in row: entities_to_process.append(row["m"])
+                            if "related" in row: entities_to_process.append(row["related"])
+                            
+                        for entity in entities_to_process:
+                            # Skip if already added
+                            e_id = entity.get('id') if isinstance(entity, dict) else getattr(entity, 'id', None)
+                            if not e_id or str(e_id) in [e["id"] for e in context["entities"]]:
+                                continue
+                                
+                            # Safe property extraction
+                            props = {}
+                            if hasattr(entity, 'get') and entity.get('properties'):
+                                try:
+                                    props = json.loads(entity.get('properties'))
+                                except:
+                                    props = {}
+                            elif isinstance(entity, dict) and 'properties' in entity and isinstance(entity['properties'], str):
                                 try:
                                     props = json.loads(entity['properties'])
                                 except:
                                     pass
-                        
-                        memory_ids.append(entity.get('id'))
-                        context["entities"].append({
-                            "id": str(entity.get('id')),
-                            "name": entity.get('name'),
-                            "type": entity.get('type'),
-                            "properties": props
-                        })
+                            
+                            # Add to context
+                            context["entities"].append({
+                                "id": str(e_id),
+                                "name": entity.get('name'),
+                                "type": entity.get('type'),
+                                "properties": props
+                            })
+                            
+                            if entity.get('type') == 'memory':
+                                memory_ids.append(e_id)
+                                
+                except Exception as e:
+                     self.logger.warning(f"Recursive graph traversal failed: {e}. Falling back to flat search.")
+                     # Fallback code
+                     fallback_cypher = f"MATCH (m:Entity {{type: 'memory'}}) RETURN m ORDER BY m.created_at DESC LIMIT {limit}"
+                     results = await self.graph_store.execute_query(fallback_cypher)
+                     # (Simple processing for fallback - minimal implementation to prevent crash)
+                     for row in results:
+                         m = row.get("m")
+                         if m:
+                             memory_ids.append(m.get("id"))
+                             context["entities"].append({"id": str(m.get("id")), "type": "memory", "name": m.get("name")})
+
             
             # [NEW] Fetch User Profile Context
             # Always try to find the "User" entity and its direct facts (location, role, preferences)
@@ -1076,6 +1110,56 @@ class MemoryOrchestrator:
             self.logger.error(f"Failed to retrieve context: {e}", exc_info=True)
             raise
 
+    def _detect_contradiction(self, new_content: str, existing_content: str) -> bool:
+        """
+        Detect if new_content semantically contradicts existing_content.
+        Uses fast regex-based heuristics (no LLM call).
+        
+        Contradiction patterns:
+        1. Negation: "X is not Y" vs "X is Y"
+        2. Opposite sentiment: "I like X" vs "I don't like X"
+        3. Factual conflict: "X lives in A" vs "X lives in B"
+        """
+        import re
+        
+        new_lower = new_content.lower()
+        existing_lower = existing_content.lower()
+        
+        # Pattern 1: Direct negation markers
+        negation_markers = [
+            r"\bnot\b", r"\bno\b", r"\bnever\b", r"\bdon't\b", r"\bdoesn't\b",
+            r"\bwon't\b", r"\bcan't\b", r"\bisn't\b", r"\baren't\b", r"\bwasn't\b",
+            r"\bweren't\b", r"\bshouldn't\b", r"\bwouldn't\b", r"\bcouldn't\b",
+            r"\bhate\b", r"\bdislike\b", r"\bavoid\b", r"\bstop\b", r"\bquit\b"
+        ]
+        
+        new_has_negation = any(re.search(p, new_lower) for p in negation_markers)
+        existing_has_negation = any(re.search(p, existing_lower) for p in negation_markers)
+        
+        # XOR: One has negation, other doesn't = potential contradiction
+        if new_has_negation != existing_has_negation:
+            # Extract subject to verify it's about the same thing
+            # Simple heuristic: check if they share significant words
+            new_words = set(re.findall(r'\b\w{4,}\b', new_lower))  # Words 4+ chars
+            existing_words = set(re.findall(r'\b\w{4,}\b', existing_lower))
+            
+            # Remove common stopwords
+            stopwords = {'that', 'this', 'with', 'from', 'have', 'been', 'were', 'will', 'would', 'could', 'should'}
+            new_words -= stopwords
+            existing_words -= stopwords
+            
+            overlap = new_words & existing_words
+            
+            # If significant overlap + negation difference = contradiction
+            if len(overlap) >= 2:
+                self.logger.debug(
+                    f"Contradiction detected via negation",
+                    overlap=list(overlap)[:5]
+                )
+                return True
+        
+        return False
+
     def _is_first_person_statement(self, content: str) -> bool:
         """
         Check if content contains first-person statements using robust regex.
@@ -1134,11 +1218,8 @@ class MemoryOrchestrator:
         Returns:
             Entity: Created entity
         """
-        # Parse entity type
-        try:
-            parsed_type = EntityType(entity_type)
-        except ValueError:
-            parsed_type = EntityType.CUSTOM
+        # Parse entity type (STRICT)
+        parsed_type = EntityType(entity_type)
         
         entity = Entity(
             name=name,
@@ -1146,8 +1227,9 @@ class MemoryOrchestrator:
             properties=properties or {}
         )
         
-        await self.graph_store.create_entity(entity)
-        self.logger.info(f"Entity created: {name} ({entity_type})")
+        # Use idempotent creation (MERGE behavior)
+        await self.graph_store.create_or_get_entity(entity)
+        self.logger.info(f"Entity created/retrieved: {name} ({entity_type})")
         
         return entity
     
@@ -1170,11 +1252,8 @@ class MemoryOrchestrator:
         Returns:
             Relationship: Created relationship
         """
-        # Parse relationship type
-        try:
-            parsed_rel_type = RelationshipType(relationship_type)
-        except ValueError:
-            parsed_rel_type = RelationshipType.CUSTOM
+        # Parse relationship type (STRICT)
+        parsed_rel_type = RelationshipType(relationship_type)
         
         relationship = Relationship(
             from_entity_id=from_entity_id,

@@ -73,23 +73,27 @@ class MemoryConsolidator:
         ])
         
         system_prompt = """
-        You are an expert memory analyst. Analyze the provided list of recent user memories/interactions.
-        Identify key themes, decisions, facts, and patterns.
-        Synthesize them into a set of concise "Insights" or "Facts".
-        Ignore trivial chit-chat. Focus on long-term value.
+        You are Elefante's Memory Authority. Consolidate the provided recent memories into high-level insights.
         
-        Return a JSON object with a list of "insights":
+        CRITICAL RULES:
+        1. CONFLICT RESOLUTION: If memories contradict, valid facts/decisions override chat. Recent overrides older.
+        2. IGNORE CHIT-CHAT: Focus only on lasting knowledge (facts, decisions, preferences).
+        3. CLASSIFY STRICTLY: You MUST provide 'layer' and 'sublayer' for each insight.
+           - Layers: self (who), world (what), intent (do)
+           - Sublayers:
+             * SELF: identity, preference, constraint
+             * WORLD: fact, failure, method
+             * INTENT: rule, goal, anti-pattern
+        
+        Return a JSON object:
         {
             "insights": [
                 {
-                    "content": "The user prefers Python for backend development.",
-                    "type": "fact",
+                    "content": "User decided to use Python for backend.",
+                    "type": "decision",
+                    "layer": "intent",
+                    "sublayer": "rule",
                     "source_memory_ids": ["id1", "id2"]
-                },
-                {
-                    "content": "Project Elefante is a local-first memory system using Kuzu and ChromaDB.",
-                    "type": "insight",
-                    "source_memory_ids": ["id3"]
                 }
             ]
         }
@@ -112,38 +116,43 @@ class MemoryConsolidator:
         
         # 4. Store new insights
         from src.core.orchestrator import get_orchestrator
-        orchestrator = get_orchestrator() # Use orchestrator to add new memories properly
+        orchestrator = get_orchestrator() 
         
         for insight in insights:
             content = insight.get("content")
             m_type = insight.get("type", "insight")
+            layer = insight.get("layer", "world")
+            sublayer = insight.get("sublayer", "fact")
             source_ids = insight.get("source_memory_ids", [])
             
             if not content:
                 continue
                 
-            self.logger.info(f"Created new insight: {content[:50]}...")
+            # Prepare metadata with Authoritative fields
+            memory_meta = {
+                "source_memory_ids": source_ids,
+                "layer": layer,
+                "sublayer": sublayer
+            }
             
             # Add the new memory
             new_memory = await orchestrator.add_memory(
                 content=content,
                 memory_type=m_type,
-                importance=8, # High importance for consolidated insights
+                importance=8, 
                 tags=["consolidated", "auto-generated"],
-                metadata={"source_memory_ids": source_ids}
+                metadata=memory_meta
             )
             new_memories.append(new_memory)
             
-            # Link back to source memories (CONSOLIDATED_FROM)
-            # We need to manually create these relationships as add_memory doesn't handle ID linking
+            # Link back to source memories
             for source_id in source_ids:
                 try:
-                    # Mark source as consolidated (optional, maybe just link them)
-                    # For now, we just link them
+                    # Insight is PARENT_OF source memories (Hierarchy of knowledge)
                     await orchestrator.create_relationship(
                         from_entity_id=new_memory.id,
                         to_entity_id=UUID(source_id) if isinstance(source_id, str) else source_id,
-                        relationship_type="consolidated_from" # Custom type
+                        relationship_type="PARENT_OF" # Valid Enum Value
                     )
                     
                     # Mark source as consolidated in Graph

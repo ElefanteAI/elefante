@@ -6,7 +6,11 @@ Handles interactions with Language Models (OpenAI, etc.) for memory consolidatio
 import json
 import os
 from typing import List, Dict, Any, Optional
-from openai import AsyncOpenAI
+try:
+    from openai import AsyncOpenAI
+except ImportError:
+    AsyncOpenAI = None  # Graceful fallback
+
 from src.utils.config import get_config
 from src.utils.logger import get_logger
 
@@ -26,6 +30,10 @@ class LLMService:
         
     def _initialize_client(self):
         """Initialize OpenAI client"""
+        if AsyncOpenAI is None:
+             logger.warning("OpenAI module not installed. LLM features disabled.")
+             return
+
         api_key = self.config.elefante.llm.api_key or os.getenv("OPENAI_API_KEY")
         if not api_key:
             logger.warning("No LLM API key found. LLM features will be disabled.")
