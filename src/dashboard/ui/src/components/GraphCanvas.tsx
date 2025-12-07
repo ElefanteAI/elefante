@@ -574,7 +574,6 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
              if (anchor) {
                  const dx = anchor.x - node.x;
                  const dy = anchor.y - node.y;
-                 const dist = Math.sqrt(dx*dx + dy*dy) || 1;
                  
                  // Strong pull (gravity)
                  // V28: TEMPORAL HEAT check? No, purely structural for now.

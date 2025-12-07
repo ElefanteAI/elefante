@@ -9,7 +9,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from typing import Dict, Any, List, Optional
 
-from src.core.embeddings import get_embedding_service
+# LAW #1: Dashboard does NOT import core services that access databases
+# from src.core.embeddings import get_embedding_service  # DISABLED
 from src.utils.logger import get_logger
 from src.utils.config import get_config
 
@@ -18,58 +19,14 @@ logger = get_logger(__name__)
 async def compute_semantic_edges(memory_nodes: List[Dict], top_k: int = 5, min_threshold: float = 0.1) -> List[Dict]:
     """
     Compute semantic similarity edges between memory nodes using embeddings.
-    AGGRESSIVE MESHING: top_k=5, threshold=0.1 to force connections.
-    """
-    if len(memory_nodes) < 2:
-        return []
     
-    try:
-        embedding_service = get_embedding_service()
-        
-        # Extract descriptions for embedding
-        texts = []
-        node_map = {}
-        for i, node in enumerate(memory_nodes):
-            desc = node.get("properties", {}).get("description", "")
-            if desc:
-                texts.append(desc)
-                node_map[i] = node["id"]
-        
-        if len(texts) < 2:
-            return []
-        
-        # Generate embeddings
-        embeddings = await embedding_service.generate_embeddings_batch(texts)
-        embeddings_array = np.array(embeddings)
-        
-        # Compute cosine similarity matrix
-        from sklearn.metrics.pairwise import cosine_similarity
-        similarities = cosine_similarity(embeddings_array)
-        
-        # Generate edges: For each node, connect to top_k most similar neighbors
-        semantic_edges = []
-        for i in range(len(similarities)):
-            # Get similarity scores for this node
-            sim_scores = similarities[i]
-            
-            # Find top_k most similar (excluding self)
-            top_indices = np.argsort(sim_scores)[::-1][1:top_k+1]  # Skip self (index 0)
-            
-            for j in top_indices:
-                similarity = float(sim_scores[j])
-                if similarity >= min_threshold:
-                    semantic_edges.append({
-                        "source": node_map[i],
-                        "target": node_map[j],
-                        "type": "semantic",
-                        "properties": {"similarity": similarity}
-                    })
-        
-        return semantic_edges
-        
-    except Exception as e:
-        logger.error(f"Failed to compute semantic edges: {e}")
-        return []
+    LAW #1 ENFORCEMENT: This function is DISABLED at runtime to prevent
+    database locks. Semantic edges should be pre-computed in the snapshot
+    generation script (scripts/update_dashboard_data.py) instead.
+    """
+    # DISABLED: Runtime embedding computation causes lock contention
+    # TODO: Move semantic edge computation to snapshot generation script
+    return []
 
 app = FastAPI(title="Elefante Knowledge Garden")
 
@@ -160,11 +117,35 @@ async def get_graph(limit: int = 1000, space: Optional[str] = None):
 
 @app.get("/api/stats")
 async def get_stats():
-    """Get system statistics"""
+    """Get system statistics from snapshot (LAW #1: No direct DB access)"""
+    import json
+    from pathlib import Path
+    
     try:
-        from src.core.orchestrator import get_orchestrator
-        orchestrator = get_orchestrator()
-        return await orchestrator.get_stats()
+        snapshot_path = Path("data/dashboard_snapshot.json")
+        
+        if not snapshot_path.exists():
+            return {"error": "Snapshot not found. Run update_dashboard_data.py first."}
+        
+        with open(snapshot_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        return {
+            "success": True,
+            "stats": {
+                "vector_store": {
+                    "total_memories": data.get("stats", {}).get("memories", 0),
+                },
+                "graph_store": {
+                    "total_entities": data.get("stats", {}).get("entities", 0),
+                    "total_relationships": data.get("stats", {}).get("edges", 0),
+                },
+                "snapshot": {
+                    "generated_at": data.get("generated_at", "unknown"),
+                    "total_nodes": data.get("stats", {}).get("total_nodes", 0),
+                }
+            }
+        }
     except Exception as e:
         logger.error(f"Failed to fetch stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))

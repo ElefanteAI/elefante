@@ -1,4 +1,5 @@
 # 🧠 MCP CODE NEURAL REGISTER
+
 ## System Immunity: MCP Protocol Failure Laws
 
 **Purpose**: Permanent record of MCP protocol violations and enforcement strategies  
@@ -10,11 +11,13 @@
 ## 📜 THE LAWS (Immutable Truths)
 
 ### LAW #1: Type Signature Exactness
+
 **Statement**: MCP tool handlers MUST return `list[types.Tool]`, not `list[Tool]` or `List[types.Tool]`.
 
 **The Python Type System Trap**: MCP SDK uses strict runtime type checking.
 
 **Correct Signature**:
+
 ```python
 from mcp import types
 
@@ -24,6 +27,7 @@ async def list_tools() -> list[types.Tool]:  # ✅ Correct
 ```
 
 **Common Errors**:
+
 ```python
 # ❌ Wrong: Missing types prefix
 async def list_tools() -> list[Tool]:
@@ -46,9 +50,11 @@ async def list_tools():
 ---
 
 ### LAW #2: Protocol Layer 5 - Action Verification
+
 **Statement**: Every tool execution MUST verify the action was completed before returning success.
 
 **The 5-Layer Protocol**:
+
 ```
 Layer 1: Tool Registration (list_tools)
 Layer 2: Input Validation (call_tool receives arguments)
@@ -58,6 +64,7 @@ Layer 5: Action Verification (confirm state change) ← CRITICAL
 ```
 
 **Anti-Pattern**: Assuming success without verification
+
 ```python
 # ❌ Wrong: No verification
 async def call_tool(name: str, arguments: dict):
@@ -66,16 +73,17 @@ async def call_tool(name: str, arguments: dict):
 ```
 
 **Correct Pattern**: Verify state change
+
 ```python
 # ✅ Correct: Verify action
 async def call_tool(name: str, arguments: dict):
     memory_id = memory_store.add_memory(arguments["content"])
-    
+
     # Layer 5: Verify
     retrieved = memory_store.get_memory(memory_id)
     if not retrieved:
         raise RuntimeError("Memory add failed verification")
-    
+
     return [types.TextContent(text=f"Memory {memory_id} added and verified")]
 ```
 
@@ -84,15 +92,18 @@ async def call_tool(name: str, arguments: dict):
 ---
 
 ### LAW #3: Error Context Enrichment
+
 **Statement**: MCP errors MUST include actionable context for debugging.
 
 **Minimal Error** (Anti-Pattern):
+
 ```python
 except Exception as e:
     return [types.TextContent(text=f"Error: {str(e)}")]
 ```
 
 **Enriched Error** (Correct Pattern):
+
 ```python
 except Exception as e:
     error_context = {
@@ -104,7 +115,7 @@ except Exception as e:
         "timestamp": datetime.now().isoformat()
     }
     logger.error(f"Tool execution failed: {error_context}")
-    
+
     return [types.TextContent(
         text=f"❌ {name} failed: {str(e)}\n"
              f"Context: {json.dumps(error_context, indent=2)}"
@@ -112,6 +123,7 @@ except Exception as e:
 ```
 
 **Required Context**:
+
 - Tool name and arguments (what was attempted)
 - Error type and message (what failed)
 - Stack trace (where it failed)
@@ -120,11 +132,13 @@ except Exception as e:
 ---
 
 ### LAW #4: Async/Await Consistency
+
 **Statement**: MCP handlers are async. ALL database operations MUST be awaited or wrapped.
 
 **The Async Trap**: Forgetting `await` causes silent failures.
 
 **Synchronous Database** (Kuzu, ChromaDB):
+
 ```python
 # ❌ Wrong: Blocking call in async function
 async def call_tool(name: str, arguments: dict):
@@ -136,14 +150,15 @@ import asyncio
 async def call_tool(name: str, arguments: dict):
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(
-        None, 
-        graph_store.create_entity, 
+        None,
+        graph_store.create_entity,
         ...
     )
     return [types.TextContent(text="Done")]
 ```
 
 **Asynchronous Database** (hypothetical):
+
 ```python
 # ✅ Correct: Native async
 async def call_tool(name: str, arguments: dict):
@@ -156,9 +171,11 @@ async def call_tool(name: str, arguments: dict):
 ---
 
 ### LAW #5: Tool Schema Completeness
+
 **Statement**: Tool schemas MUST document ALL parameters with types, descriptions, and examples.
 
 **Minimal Schema** (Anti-Pattern):
+
 ```python
 types.Tool(
     name="addMemory",
@@ -173,6 +190,7 @@ types.Tool(
 ```
 
 **Complete Schema** (Correct Pattern):
+
 ```python
 types.Tool(
     name="addMemory",
@@ -206,17 +224,51 @@ types.Tool(
 ```
 
 **Required Elements**:
+
 - Clear description of tool purpose
 - Parameter types with constraints (enum, min/max)
 - Default values for optional parameters
 - Human-readable descriptions
 - Required vs optional distinction
+- Required vs optional distinction
+
+---
+
+### LAW #6: STDOUT PURITY (The JSON-RPC Sanctity)
+
+**Statement**: The MCP Server process MUST NEVER write to `stdout` except for JSON-RPC messages. All logs/debugs MUST go to `stderr`.
+
+**The Stdio Trap**:
+MCP communicates via stdin/stdout. Any stray `print()` or `logging.StreamHandler(sys.stdout)` corrupts the protocol stream.
+
+**The Symptom**:
+`connection closed: calling "tools/call": client is closing: invalid character 'I' looking for beginning of value`  
+(The 'I' usually comes from `INFO: ...` or `ImportError: ...` or `Initializing...` printed to stdout).
+
+**Correct Pattern**:
+
+```python
+# ❌ WRONG
+print("Initializing server...")  # BREAKS MCP
+logging.basicConfig(stream=sys.stdout) # BREAKS MCP
+
+# ✅ CORRECT
+import sys
+import logging
+# Use stderr for logs
+logging.basicConfig(stream=sys.stderr)
+print("Initializing...", file=sys.stderr)
+```
+
+**Failure Mode**: Immediate connection death on tool call.
+**Resolution**: Grep for `print(` and check logging config. Redirect all library logs to stderr.
 
 ---
 
 ## 🔬 FAILURE PATTERNS (Documented Cases)
 
 ### Pattern #1: Silent Type Mismatch (2025-12-02)
+
 **Trigger**: Using `list[Tool]` instead of `list[types.Tool]`  
 **Symptom**: Tools not appearing in IDE, no error messages  
 **Root Cause**: MCP protocol layer silently rejects mismatched types  
@@ -225,6 +277,7 @@ types.Tool(
 **Prevention**: Type checking in CI/CD, linting rules
 
 ### Pattern #2: Unverified Memory Addition (2025-12-02)
+
 **Trigger**: Adding memory without checking if it persisted  
 **Symptom**: User reports "memory not saved" but no errors  
 **Root Cause**: ChromaDB silent failure (disk full, permissions)  
@@ -233,6 +286,7 @@ types.Tool(
 **Prevention**: Integration tests with failure injection
 
 ### Pattern #3: Blocking Database Calls (2025-12-02)
+
 **Trigger**: Synchronous Kuzu operations in async handler  
 **Symptom**: Server hangs, timeouts  
 **Root Cause**: Event loop blocked by I/O  
@@ -245,16 +299,19 @@ types.Tool(
 ## 🛡️ SAFEGUARDS (Active Protections)
 
 ### Safeguard #1: Type Validation Tests
+
 **Location**: `scripts/debug/test_tools.py`  
 **Action**: Verify tool handler return types  
 **Response**: Catch type mismatches before deployment
 
 ### Safeguard #2: Action Verification Protocol
+
 **Location**: `src/mcp/server.py` (Layer 5 implementation)  
 **Action**: Verify state change after every write operation  
 **Response**: Fail fast with clear error if verification fails
 
 ### Safeguard #3: Debug Logging
+
 **Location**: MCP server startup (`src/mcp/__main__.py`)  
 **Action**: Enable verbose logging in development  
 **Response**: Surface silent failures for debugging
@@ -264,14 +321,17 @@ types.Tool(
 ## 📊 METRICS
 
 ### Tool Visibility Rate
+
 - **Before Fix**: 0% (type mismatch)
 - **After Fix**: 100% (correct signatures)
 
 ### Data Loss Incidents
+
 - **Before Verification**: 3 reported cases
 - **After Verification**: 0 incidents
 
 ### Server Stability
+
 - **Before Async Fix**: Frequent hangs
 - **After Async Fix**: 99.9% uptime
 
@@ -280,6 +340,7 @@ types.Tool(
 ## 🎯 PROTOCOL ENFORCEMENT CHECKLIST
 
 ### Pre-Deployment Validation
+
 - [ ] All handlers return `list[types.Tool]` or `list[types.TextContent]`
 - [ ] All write operations include Layer 5 verification
 - [ ] All errors include enriched context
@@ -287,6 +348,7 @@ types.Tool(
 - [ ] All tool schemas include complete documentation
 
 ### Runtime Monitoring
+
 - [ ] MCP debug logging enabled in development
 - [ ] Error rate tracking (should be <1%)
 - [ ] Response time monitoring (should be <500ms)
@@ -315,4 +377,4 @@ types.Tool(
 
 **Neural Register Status**: ✅ ACTIVE  
 **Enforcement**: Type checking, integration tests, code review  
-**Last Validation**: 2025-12-05
+**Last Validation**: 2025-12-06

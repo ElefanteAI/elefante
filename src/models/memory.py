@@ -5,7 +5,7 @@ Enhanced with 3-level taxonomy, relationship tracking, and temporal intelligence
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 from uuid import UUID, uuid4
 from pydantic import BaseModel, Field, validator
 
@@ -134,6 +134,8 @@ class MemoryMetadata(BaseModel):
     created_by: str = "user"
     
     # Layer 2: Classification (3-level taxonomy)
+    layer: Literal["self", "world", "intent"] = "world"
+    sublayer: str = "fact"
     domain: DomainType = DomainType.REFERENCE
     category: str = "general"
     memory_type: MemoryType = MemoryType.CONVERSATION

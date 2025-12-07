@@ -27,7 +27,7 @@ async def main():
     # =========================================================================
     # STEP 1: Fetch ALL memories from ChromaDB (PRIMARY SOURCE)
     # =========================================================================
-    print("[*] Step 1: Fetching memories from ChromaDB...")
+    print("[*] Step 1: Fetching memories from ChromaDB...", file=sys.stderr)
     
     chroma_path = config.elefante.vector_store.persist_directory
     client = chromadb.PersistentClient(path=chroma_path)
@@ -37,7 +37,7 @@ async def main():
     all_memories = collection.get(include=["documents", "metadatas"])
     
     memory_count = len(all_memories["ids"])
-    print(f"   Found {memory_count} memories in ChromaDB")
+    print(f"   Found {memory_count} memories in ChromaDB", file=sys.stderr)
     
     for i, memory_id in enumerate(all_memories["ids"]):
         doc = all_memories["documents"][i] if all_memories["documents"] else ""
@@ -66,6 +66,8 @@ async def main():
                 "memory_type": meta.get("memory_type", "unknown"),
                 "importance": importance,  # INTEGER, not string
                 "tags": meta.get("tags", ""),
+                "layer": meta.get("layer", "world"),
+                "sublayer": meta.get("sublayer", "fact"),
                 "source": "chromadb"
             }
         }
@@ -75,7 +77,7 @@ async def main():
     # =========================================================================
     # STEP 2: Fetch entities from Kuzu (SUPPLEMENTARY)
     # =========================================================================
-    print("[*] Step 2: Fetching entities from Kuzu...")
+    print("[*] Step 2: Fetching entities from Kuzu...", file=sys.stderr)
     
     try:
         store = GraphStore(config.elefante.graph_store.database_path)
@@ -126,12 +128,12 @@ async def main():
                 seen_ids.add(entity_id)
                 entity_count += 1
         
-        print(f"   Found {entity_count} additional entities in Kuzu")
+        print(f"   Found {entity_count} additional entities in Kuzu", file=sys.stderr)
         
         # =========================================================================
         # STEP 3: Fetch relationships from Kuzu
         # =========================================================================
-        print("[*] Step 3: Fetching relationships from Kuzu...")
+        print("[*] Step 3: Fetching relationships from Kuzu...", file=sys.stderr)
         
         edges_query = "MATCH (a)-[r]->(b) RETURN a.id, b.id, label(r)"
         edges_result = await store.execute_query(edges_query)
@@ -148,16 +150,16 @@ async def main():
                     "label": lbl or "RELATED"
                 })
         
-        print(f"   Found {len(edges)} relationships")
+        print(f"   Found {len(edges)} relationships", file=sys.stderr)
         
     except Exception as e:
-        print(f"   [!] Kuzu error (non-fatal): {e}")
-        print("   Continuing with ChromaDB data only...")
+        print(f"   [!] Kuzu error (non-fatal): {e}", file=sys.stderr)
+        print("   Continuing with ChromaDB data only...", file=sys.stderr)
     
     # =========================================================================
     # STEP 4: Save snapshot
     # =========================================================================
-    print("[*] Step 4: Saving snapshot...")
+    print("[*] Step 4: Saving snapshot...", file=sys.stderr)
     
     snapshot = {
         "generated_at": datetime.utcnow().isoformat(),
@@ -183,11 +185,14 @@ async def main():
     with open(output_path, "w") as f:
         json.dump(snapshot, f, indent=2, cls=DateTimeEncoder)
     
-    print(f"\n[OK] Dashboard snapshot saved to {output_path}")
-    print(f"   [*] Total nodes: {len(nodes)}")
-    print(f"   [*] Memories: {snapshot['stats']['memories']}")
-    print(f"   [*] Entities: {snapshot['stats']['entities']}")
-    print(f"   [*] Edges: {len(edges)}")
+    print(f"\n[OK] Dashboard snapshot saved to {output_path}", file=sys.stderr)
+    print(f"   [*] Total nodes: {len(nodes)}", file=sys.stderr)
+    print(f"   [*] Memories: {snapshot['stats']['memories']}", file=sys.stderr)
+    print(f"   [*] Entities: {snapshot['stats']['entities']}", file=sys.stderr)
+    print(f"   [*] Edges: {len(edges)}", file=sys.stderr)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    from contextlib import redirect_stdout
+    # LAW #6: STDOUT PURITY - Redirect EVERYTHING to stderr
+    with redirect_stdout(sys.stderr):
+        asyncio.run(main())

@@ -198,7 +198,7 @@ class GraphService:
             return nodes, edges, debug_log # Return debug_log
             
         except Exception as e:
-            print(f"Error in get_graph_data: {e}")
+            logger.error(f"Error in get_graph_data: {e}")
             msg = f"Critical error in get_graph_data: {e}"
             debug_log.append(msg)
             return [], [], debug_log # Return debug_log even on error

@@ -67,8 +67,13 @@ class EmbeddingService:
         try:
             from sentence_transformers import SentenceTransformer
             
+            import sys
+            from contextlib import redirect_stdout
+            
             logger.info("loading_sentence_transformer", model=self.model_name)
-            self._model = SentenceTransformer(self.model_name, device=self.device)
+            # LAW #6: STDOUT PURITY - Redirect 3rd party library prints to stderr
+            with redirect_stdout(sys.stderr):
+                self._model = SentenceTransformer(self.model_name, device=self.device)
             self._dimension = self._model.get_sentence_embedding_dimension()
             
             logger.info(

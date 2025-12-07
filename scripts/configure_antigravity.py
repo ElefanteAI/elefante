@@ -50,12 +50,14 @@ def configure_mcp():
         return False
         
     # Prepare Elefante config
+    # Use absolute path to the current python executable (in .venv)
     elefante_config = {
-        "command": "python",
+        "command": sys.executable,
         "args": ["-m", "src.mcp.server"],
         "cwd": str(elefante_path),
         "env": {
-            "PYTHONPATH": str(elefante_path)
+            "PYTHONPATH": str(elefante_path),
+            "unbuffer": "true" 
         }
     }
     
