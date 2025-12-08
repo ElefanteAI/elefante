@@ -81,7 +81,7 @@ def configure_mcp():
         
         # Prepare Elefante config
         elefante_config = {
-            "command": "python",
+            "command": sys.executable,
             "args": ["-m", "src.mcp.server"],
             "cwd": str(elefante_path),
             "env": {

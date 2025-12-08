@@ -261,6 +261,31 @@ def run_preflight_checks(root_dir):
         logger.log("="*60 + "\n")
         return False
         return False
+        return False
+
+def purge_bytecode(root_dir):
+    """Purge compiled bytecode to prevent stale execution"""
+    logger.log("\n🧹 Purging bytecode...")
+    count = 0
+    try:
+        # Walk and delete __pycache__ folders
+        for path in root_dir.rglob("__pycache__"):
+            if path.is_dir():
+                shutil.rmtree(path)
+                count += 1
+        
+        # Walk and delete .pyc files
+        for path in root_dir.rglob("*.pyc"):
+             if path.is_file():
+                 path.unlink()
+                 count += 1
+                 
+        logger.log(f"✅ Cleaned {count} stale bytecode artifacts.")
+        return True
+    except Exception as e:
+        logger.log(f"⚠️  Bytecode purge failed: {e}")
+        return False
+
 
 def get_python_cmd():
     """Get the correct python command"""
@@ -353,6 +378,9 @@ def main():
     print_header("ELEFANTE INSTALLATION WIZARD")
     logger.log(f"📂 Installation Directory: {root_dir}")
     logger.log(f"🐍 Python: {sys.version.split()[0]}")
+    
+    # 0a. Purge Bytecode (Prevent Stale Code)
+    purge_bytecode(root_dir)
     
     # 0. Pre-Flight Checks (NEW - Prevents Kuzu and other issues)
     if not run_preflight_checks(root_dir):

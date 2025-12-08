@@ -1,8 +1,8 @@
 # Dashboard Debug Compendium
 
 > **Domain:** Dashboard & Visualization  
-> **Last Updated:** 2025-12-05  
-> **Total Issues Documented:** 5  
+> **Last Updated:** 2025-12-07  
+> **Total Issues Documented:** 6  
 > **Status:** Production Reference  
 > **Maintainer:** Add new issues following Issue #N template at bottom
 
@@ -10,13 +10,15 @@
 
 ## 🚨 CRITICAL LAWS (Extracted from Pain)
 
-| # | Law | Violation Cost |
-|---|-----|----------------|
-| 1 | Dashboard reads from SNAPSHOT file, never query database directly | 3 hours |
-| 2 | ChromaDB = memories (70+), Kuzu = entities (17) - DIFFERENT DATA | 2 hours |
-| 3 | Always run `update_dashboard_data.py` after memory changes | Stale data |
-| 4 | Verify BOTH producer AND consumer when debugging data flow | Circular debugging |
-| 5 | Hard refresh browser after frontend changes (`Ctrl+Shift+R`) | "It's still broken!" |
+| #   | Law                                                                            | Violation Cost       |
+| --- | ------------------------------------------------------------------------------ | -------------------- |
+| 1   | Dashboard reads from SNAPSHOT file, never query database directly              | 3 hours              |
+| 2   | ChromaDB = memories (70+), Kuzu = entities (17) - DIFFERENT DATA               | 2 hours              |
+| 3   | Always run `update_dashboard_data.py` after memory changes                     | Stale data           |
+| 4   | Verify BOTH producer AND consumer when debugging data flow                     | Circular debugging   |
+| 5   | Hard refresh browser after frontend changes (`Ctrl+Shift+R`)                   | "It's still broken!" |
+| 6   | Frontend reads `n.properties`, NOT `n.full_data.props` - check ALL occurrences | 8 hours              |
+| 7   | Long-running servers cache imports - restart after code changes                | Silent failures      |
 
 ---
 
@@ -27,6 +29,7 @@
 - [Issue #3: Memory Labels Missing](#issue-3-memory-labels-missing)
 - [Issue #4: Dashboard Shows 11 Instead of 71](#issue-4-dashboard-shows-11-instead-of-71)
 - [Issue #5: API Bypassed Snapshot File](#issue-5-api-bypassed-snapshot-file)
+- [Issue #6: V3 Metadata Display Bug Chain](#issue-6-v3-metadata-display-bug-chain)
 - [Methodology Failures](#methodology-failures)
 - [Prevention Protocol](#prevention-protocol)
 - [Appendix: Issue Template](#appendix-issue-template)
@@ -41,17 +44,21 @@
 **Status:** ✅ FIXED
 
 ### Problem
+
 Kuzu 0.11.x changed from directory-based to single-file database format.
 
 ### Symptom
+
 ```
 RuntimeError: Database path cannot be a directory
 ```
 
 ### Root Cause
+
 Old directory-based database incompatible with new Kuzu version. The `config.py` was pre-creating directories that Kuzu 0.11+ needs to create itself.
 
 ### Solution
+
 ```python
 # config.py - REMOVED this line:
 # KUZU_DIR.mkdir(exist_ok=True)  # Kuzu 0.11.x cannot have pre-existing directory
@@ -62,11 +69,13 @@ def _parse_buffer_size(self):
 ```
 
 ### Why This Took So Long
+
 - Error message was misleading ("cannot be a directory" sounds like permissions)
 - Focused on `graph_store.py` instead of `config.py`
 - Didn't check version changelog
 
 ### Lesson
+
 > **Version upgrades can break database formats. Always check changelogs.**
 
 ---
@@ -79,33 +88,44 @@ def _parse_buffer_size(self):
 **Status:** ✅ FIXED
 
 ### Problem
+
 Dashboard showed "0 MEMORIES" despite 17 memories existing.
 
 ### Symptom
+
 Stats panel displayed zero for all counts.
 
 ### Root Cause
+
 Frontend reading wrong API response fields:
+
 ```typescript
 // API returns:
-{vector_store: {total_memories: 17}}
+{
+  vector_store: {
+    total_memories: 17;
+  }
+}
 
 // Frontend was reading:
-stats.total_memories  // ❌ undefined
+stats.total_memories; // ❌ undefined
 
 // Should read:
-stats.vector_store.total_memories  // ✅
+stats.vector_store.total_memories; // ✅
 ```
 
 ### Solution
+
 Updated `App.tsx` line 36 to read nested fields correctly.
 
 ### Why This Took So Long
+
 - API test passed (correct data returned)
 - Assumed frontend would work if API worked
 - Didn't inspect actual browser console
 
 ### Lesson
+
 > **API working ≠ Dashboard working. Test the COMPLETE user experience.**
 
 ---
@@ -118,15 +138,19 @@ Updated `App.tsx` line 36 to read nested fields correctly.
 **Status:** ✅ FIXED
 
 ### Problem
+
 Green dots had no labels - user couldn't identify memories.
 
 ### Symptom
+
 User saw "meaningless dots" with no context.
 
 ### Root Cause
+
 Canvas only showed labels on hover, not by default. Technical implementation worked but UX was broken.
 
 ### Solution
+
 ```typescript
 // GraphCanvas.tsx modifications:
 // - Display truncated labels (first 3 words) below each node by default
@@ -135,11 +159,13 @@ Canvas only showed labels on hover, not by default. Technical implementation wor
 ```
 
 ### Why This Took So Long
+
 - Dots rendered = "working" in developer mind
 - Didn't consider "what does user NEED to see?"
 - Focused on technical correctness over usability
 
 ### Lesson
+
 > **Technical correctness ≠ User satisfaction. Consider UX, not just functionality.**
 
 ---
@@ -152,9 +178,11 @@ Canvas only showed labels on hover, not by default. Technical implementation wor
 **Status:** ✅ FIXED
 
 ### Problem
+
 User had 71+ memories but dashboard only showed 11 nodes.
 
 ### Symptom
+
 ```
 Dashboard: 11 nodes visible
 ChromaDB: 71 memories exist
@@ -162,6 +190,7 @@ Kuzu: 17 entities exist
 ```
 
 ### Root Cause
+
 `update_dashboard_data.py` was querying **Kuzu only** (entities) instead of **ChromaDB** (memories). Fundamental confusion between data stores.
 
 **The Data Architecture Reality:**
@@ -171,7 +200,9 @@ Kuzu: 17 entities exist
 | Kuzu | Entities (graph relations) | 17 |
 
 ### Solution
+
 Rewrote `scripts/update_dashboard_data.py` to pull from ChromaDB:
+
 ```python
 # Before: Only queried Kuzu
 # After: Pulls from ChromaDB directly
@@ -180,11 +211,13 @@ results = collection.get(include=["metadatas", "documents"])
 ```
 
 ### Why This Took So Long
+
 - Wasted 30 min on `graph_service.py` (dead code!)
 - Assumed script name meant script was correct
 - Didn't verify which data source was being queried
 
 ### Lesson
+
 > **Verify the DATA SOURCE before debugging the data flow.**
 
 ---
@@ -197,13 +230,17 @@ results = collection.get(include=["metadatas", "documents"])
 **Status:** ✅ FIXED
 
 ### Problem
+
 Even after fixing `update_dashboard_data.py`, dashboard still showed wrong count.
 
 ### Symptom
+
 Snapshot file had 71 nodes, but API returned 17.
 
 ### Root Cause
+
 `server.py /api/graph` was querying Kuzu directly instead of reading the snapshot:
+
 ```python
 # WRONG - what server.py was doing:
 async with kuzu_conn as conn:
@@ -214,7 +251,9 @@ snapshot = json.load(open("data/dashboard_snapshot.json"))
 ```
 
 ### Solution
+
 Complete rewrite of `/api/graph` endpoint:
+
 ```python
 @router.get("/graph")
 async def get_graph():
@@ -226,40 +265,148 @@ async def get_graph():
 ```
 
 ### Why This Took So Long
+
 - Fixed producer (`update_dashboard_data.py`) but not consumer (`server.py`)
 - Didn't trace data path END to END
 - Assumed fixing one file would fix the whole flow
 
 ### Lesson
+
 > **Fix BOTH producer AND consumer when debugging data flow.**
+
+---
+
+## Issue #6: V3 Metadata Display Bug Chain
+
+**Date:** 2025-12-07  
+**Duration:** 8+ hours across multiple sessions  
+**Severity:** CRITICAL  
+**Status:** ✅ FIXED
+
+### Problem
+
+Dashboard showed "FACT • General" and "5/10" importance for ALL nodes despite correct V3 classification in database.
+
+### Symptom
+
+```
+User clicks on multiple nodes → All show:
+- Layer: WORLD (blue color only)
+- Sublayer: fact
+- Importance: 5/10
+- Category: General
+
+Despite ChromaDB containing:
+- 27 SELF, 39 WORLD, 12 INTENT nodes
+- Varied sublayers (identity, preference, method, rule, fact)
+- Importance ranging from 4-10
+```
+
+### Root Cause
+
+**6-Layer Bug Chain** - Each bug hid the next:
+
+| #   | Location                            | Issue                                               | Hidden By                     |
+| --- | ----------------------------------- | --------------------------------------------------- | ----------------------------- |
+| 1   | `classifier.py`                     | Only 5 regex patterns → 90% defaulted to world/fact | "Migration succeeded" message |
+| 2   | `VectorStore.add_memory()`          | Missing `layer`/`sublayer` in metadata dict         | Data never saved              |
+| 3   | `VectorStore._reconstruct_memory()` | Missing `layer`/`sublayer` in reconstruction        | Even if saved, not read back  |
+| 4   | MCP Server (12h running)            | Cached old code → migration used unfixed code       | Tool reported success         |
+| 5   | `GraphCanvas.tsx` colors            | Read `n.full_data.props` not `n.properties`         | Frontend path mismatch        |
+| 6   | `GraphCanvas.tsx` sidebar           | Same path mismatch in different code location       | Same bug, different place     |
+
+### Solution
+
+**6 Sequential Fixes:**
+
+```python
+# Fix 1: Expanded classifier.py with 20+ patterns
+if re.search(r'^i (am|live|speak|work)\b', content_lower):
+    return "self", "identity"
+
+# Fix 2: Added to VectorStore.add_memory()
+metadata = {
+    "layer": memory.metadata.layer,
+    "sublayer": memory.metadata.sublayer,
+    # ... other fields
+}
+
+# Fix 3: Added to VectorStore._reconstruct_memory()
+layer=metadata.get("layer", "world"),
+sublayer=metadata.get("sublayer", "fact"),
+
+# Fix 4: Created standalone migration script
+# scripts/migrate_v3_direct.py (bypasses MCP cache)
+
+# Fix 5: Fixed GraphCanvas.tsx colors
+const layer = n.properties?.layer ?? props.layer ?? 'world';
+
+# Fix 6: Added getProp helper for sidebar
+const getProp = (key: string, fallback: any) => {
+  const props = selectedNode.properties as Record<string, any>;
+  return props?.[key] ?? selectedNode.full_data?.parsed_props?.[key] ?? fallback;
+};
+```
+
+### Why This Took So Long
+
+- **6 bugs in sequence**: Fixing one revealed the next
+- **False positives**: Migration tool reported "78 migrated, 0 errors" but data unchanged (cached code)
+- **Same bug twice**: `n.properties` vs `n.full_data.props` appeared in BOTH color AND sidebar code
+- **No end-to-end verification**: Only checked one layer at a time instead of full pipeline
+- **Server cache**: 12+ hour running server had old code cached
+
+### Lesson
+
+> **Data flows through 8 layers: Classifier → add_memory → ChromaDB → reconstruct → Snapshot → API → Frontend → Sidebar. Verify at EACH layer, not just endpoints.**
+
+### Prevention Checklist
+
+```bash
+# Verify ChromaDB has correct data
+python3 -c "import chromadb; ..."
+
+# Verify snapshot has correct data
+cat data/dashboard_snapshot.json | python3 -c "..."
+
+# Restart long-running servers after code changes
+# Hard refresh browser: Cmd+Shift+R
+
+# When fixing property paths, grep for ALL occurrences
+grep -r "full_data.props" src/dashboard/ui/
+```
 
 ---
 
 ## Methodology Failures
 
 ### Pattern 1: Testing API Without Testing UI
-| What I Did | What I Should Do |
-|------------|------------------|
+
+| What I Did                       | What I Should Do                             |
+| -------------------------------- | -------------------------------------------- |
 | Tested API endpoint in isolation | Test complete flow: API → Frontend → Browser |
-| Assumed API working = UI working | Verify actual user-facing behavior |
+| Assumed API working = UI working | Verify actual user-facing behavior           |
 
 ### Pattern 2: Fixing Wrong Files
-| What I Did | What I Should Do |
-|------------|------------------|
+
+| What I Did                         | What I Should Do                              |
+| ---------------------------------- | --------------------------------------------- |
 | Spent 30 min on `graph_service.py` | Verify file is actually USED before debugging |
-| Assumed file name = purpose | Check imports and call sites |
+| Assumed file name = purpose        | Check imports and call sites                  |
 
 ### Pattern 3: Confusing Data Stores
-| What I Did | What I Should Do |
-|------------|------------------|
+
+| What I Did                        | What I Should Do                           |
+| --------------------------------- | ------------------------------------------ |
 | Treated Kuzu and ChromaDB as same | Remember: ChromaDB=memories, Kuzu=entities |
-| Queried wrong database | Check data architecture diagram |
+| Queried wrong database            | Check data architecture diagram            |
 
 ### Pattern 4: Premature Success Claims
-| What I Did | What I Should Do |
-|------------|------------------|
-| Said "fixed" after API test passed | Only claim success after USER confirms |
-| Trusted my tests over user feedback | User's environment ≠ test environment |
+
+| What I Did                          | What I Should Do                       |
+| ----------------------------------- | -------------------------------------- |
+| Said "fixed" after API test passed  | Only claim success after USER confirms |
+| Trusted my tests over user feedback | User's environment ≠ test environment  |
 
 ---
 
@@ -316,24 +463,30 @@ Write-Host "API nodes: $($response.nodes.Count)"
 **Status:** 🔴 OPEN | 🟡 IN PROGRESS | ✅ FIXED | ⚠️ DOCUMENTED
 
 ### Problem
+
 [One sentence: what is broken]
 
 ### Symptom
+
 [What the user sees / exact error message]
 
 ### Root Cause
+
 [Technical explanation of WHY it broke]
 
 ### Solution
+
 [Code changes or steps that fixed it]
 
 ### Why This Took So Long
+
 [Honest reflection on methodology mistakes]
 
 ### Lesson
+
 > [One-line takeaway in blockquote format]
 ```
 
 ---
 
-*Last verified: 2025-12-05 | Run `python scripts/health_check.py` to validate dashboard data path*
+_Last verified: 2025-12-05 | Run `python scripts/health_check.py` to validate dashboard data path_

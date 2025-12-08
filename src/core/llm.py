@@ -261,6 +261,147 @@ class LLMService:
                 "category": tags[0] if tags else "general"
             }
 
+    async def generate_semantic_title(
+        self, 
+        content: str, 
+        layer: str = "world", 
+        sublayer: str = "fact",
+        max_chars: int = 30
+    ) -> str:
+        """
+        Generate a semantic title in Subject-Aspect-Qualifier format.
+        Max 30 chars, no truncation ever. Uses LLM for quality.
+        
+        Format: Subject-Aspect-Qualifier (separated by hyphens)
+        Example: "DevEtiquette-CleanEnv-Protocol"
+        """
+        if not self.client:
+            # Fallback: regex-based title generation
+            return self._fallback_title(content, layer, sublayer, max_chars)
+
+        system_prompt = f"""You are a semantic title generator for a "Second Brain" memory system.
+
+Generate a title in format: Subject-Aspect-Qualifier
+- Subject: The core topic (e.g., Python, MCP, DevEtiquette, Self)
+- Aspect: The type/category (e.g., Preference, Method, Rule, Identity)
+- Qualifier: The specific detail (e.g., TypeHints, Export, Clean)
+
+CRITICAL RULES:
+1. Maximum {max_chars} characters TOTAL including hyphens
+2. NO SPACES - use CamelCase within each part
+3. Separator is hyphen "-"
+4. Capture the ESSENCE of the memory, not just keywords
+5. If layer is 'self', Subject can be 'Self' or the specific identity aspect
+6. If layer is 'intent', Aspect should be Rule/Goal/Protocol
+7. If too long, drop Qualifier first, then shorten Aspect
+
+8. DETERMINISM: Identical concepts MUST have identical titles.
+9. QUALIFIER RULE: Use the OBJECT noun, NOT an adjective. 
+   - BAD: "Self-Pref-Favorite" (Favorite what?)
+   - BAD: "Self-Pref-Really" (Vague)
+   - GOOD: "Self-Pref-Color" (Specific)
+   - GOOD: "Self-Pref-ElectricBlue" (Specific)
+
+EXAMPLES:
+"I am a senior software architect" → "Self-Identity-Architect"
+"I prefer Python type hints" → "Python-Pref-TypeHints"
+"Always verify MCP actions before claiming done" → "MCP-Rule-Verification"
+"I like my environment clean and non-redundant" → "DevEtiquette-CleanEnv"
+"The project uses Kuzu for graph database" → "Project-Tech-Kuzu"
+"I speak Spanish, French and English" → "Self-Languages-Trilingual"
+
+Return ONLY the title string, nothing else."""
+
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Layer: {layer}, Sublayer: {sublayer}\nContent: {content}"}
+                ],
+                temperature=0.3,
+                max_tokens=50
+            )
+            
+            title = response.choices[0].message.content.strip()
+            
+            # Validation: ensure no truncation
+            if len(title) > max_chars:
+                # LLM failed constraint - try to fix
+                parts = title.split('-')
+                if len(parts) >= 3:
+                    # Drop qualifier
+                    title = f"{parts[0]}-{parts[1]}"
+                if len(title) > max_chars and len(parts) >= 2:
+                    # Shorten
+                    title = parts[0][:max_chars]
+            
+            # Ensure no spaces
+            title = title.replace(' ', '')
+            
+            return title[:max_chars]  # Final safety
+            
+        except Exception as e:
+            logger.error(f"Title generation failed: {e}")
+            return self._fallback_title(content, layer, sublayer, max_chars)
+
+    def _fallback_title(self, content: str, layer: str, sublayer: str, max_chars: int = 30) -> str:
+        """Regex-based fallback title generation when LLM unavailable."""
+        import re
+        
+        # Extract key nouns/verbs
+        content_lower = content.lower()
+        
+        # Subject mapping based on layer
+        if layer == 'self':
+            subject = 'Self'
+        elif layer == 'intent':
+            subject = 'Rule'
+        else:
+            # Try to extract a topic
+            tech_match = re.search(r'\b(python|kuzu|chromadb|mcp|react|typescript|elefante)\b', content_lower)
+            if tech_match:
+                subject = tech_match.group(1).capitalize()
+            else:
+                subject = 'Memory'
+        
+        # Aspect from sublayer
+        aspect_map = {
+            'identity': 'Identity',
+            'preference': 'Pref',
+            'constraint': 'Limit',
+            'fact': 'Fact',
+            'failure': 'Debug',
+            'method': 'Method',
+            'rule': 'Rule',
+            'goal': 'Goal',
+            'anti-pattern': 'Avoid'
+        }
+        aspect = aspect_map.get(sublayer, 'Info')
+        
+        # Qualifier: first significant noun (skip stop words)
+        words = re.findall(r'\b[A-Za-z]{4,}\b', content)
+        skip_words = {
+            'really', 'actually', 'favorite', 'definitely', 'probably', 
+            'however', 'because', 'should', 'would', 'could', 'about',
+            'think', 'guess', 'maybe', 'having', 'making', 'doing'
+        }
+        
+        qualifier = 'Gen'
+        for w in words:
+            if w.lower() not in skip_words:
+                qualifier = w[:8].capitalize()
+                break
+        
+        # Build title respecting max_chars
+        title = f"{subject}-{aspect}-{qualifier}"
+        if len(title) > max_chars:
+            title = f"{subject}-{aspect}"
+        if len(title) > max_chars:
+            title = subject[:max_chars]
+        
+        return title
+
 
 # Global singleton
 _llm_service: Optional[LLMService] = None

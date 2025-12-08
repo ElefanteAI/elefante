@@ -124,13 +124,34 @@ class MemoryOrchestrator:
                 self.logger.info(f"Memory ignored by Intelligence Pipeline: {content[:50]}...")
                 return None
             
-            title = analysis.get("title", f"Memory {datetime.utcnow().isoformat()}")
+            # Generate strict Subject-Aspect-Qualifier title
+            title = await self.llm_service.generate_semantic_title(content, layer, sublayer)
             
             # Update metadata with cognitive context
             metadata["title"] = title
             metadata["intent"] = analysis.get("intent")
             metadata["emotional_context"] = analysis.get("emotional_context")
             metadata["strategic_insight"] = analysis.get("strategic_insight")
+            
+            # ==================================================================================
+            # STEP 1.5: LOGIC-LEVEL DEDUPLICATION (Pattern #5 Fix)
+            # ==================================================================================
+            # Check if this exact Concept Title already exists
+            existing_memory = await self.vector_store.find_by_title(title)
+            
+            if existing_memory:
+                self.logger.info(f"♻️ LOGIC-LEVEL DEDUPLICATION: '{title}' already exists as {existing_memory.id}. Reinforcing.")
+                
+                # Reinforce existing memory (update timestamp, access count)
+                existing_memory.metadata.last_accessed = datetime.utcnow()
+                existing_memory.metadata.access_count += 1
+                
+                # If content is significantly different but title is same, we might want to append?
+                # For now, we assume the Title is the source of truth for the Concept.
+                # We could ideally merge the new content into "notes" or "history".
+                
+                await self.vector_store.update_memory_access(existing_memory)
+                return existing_memory
             
         except Exception as e:
             self.logger.warning(f"Intelligence Pipeline enrichment failed: {e}. Proceeding with raw memory.")

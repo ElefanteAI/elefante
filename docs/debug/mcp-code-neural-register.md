@@ -4,7 +4,7 @@
 
 **Purpose**: Permanent record of MCP protocol violations and enforcement strategies  
 **Status**: Active Neural Register  
-**Last Updated**: 2025-12-05
+**Last Updated**: 2025-12-07
 
 ---
 
@@ -293,6 +293,15 @@ print("Initializing...", file=sys.stderr)
 **Impact**: Server unresponsive, requires restart  
 **Resolution**: Wrap in `run_in_executor`  
 **Prevention**: Async linting, performance monitoring
+
+### Pattern #4: Long-Running Server Code Caching (2025-12-07)
+
+**Trigger**: MCP server running 12+ hours, code files edited  
+**Symptom**: Migration tool reports success, but data unchanged  
+**Root Cause**: Python imports are cached; server uses OLD code version  
+**Impact**: 8+ hours debugging - tool "worked" but used stale logic  
+**Resolution**: Created standalone script (`scripts/migrate_v3_direct.py`) to bypass cache  
+**Prevention**: Restart servers after code changes; use `--reload` flag in development
 
 ---
 

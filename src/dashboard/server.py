@@ -131,19 +131,16 @@ async def get_stats():
             data = json.load(f)
         
         return {
-            "success": True,
-            "stats": {
-                "vector_store": {
-                    "total_memories": data.get("stats", {}).get("memories", 0),
-                },
-                "graph_store": {
-                    "total_entities": data.get("stats", {}).get("entities", 0),
-                    "total_relationships": data.get("stats", {}).get("edges", 0),
-                },
-                "snapshot": {
-                    "generated_at": data.get("generated_at", "unknown"),
-                    "total_nodes": data.get("stats", {}).get("total_nodes", 0),
-                }
+            "vector_store": {
+                "total_memories": data.get("stats", {}).get("memories", 0),
+            },
+            "graph_store": {
+                "total_entities": data.get("stats", {}).get("entities", 0),
+                "total_relationships": data.get("stats", {}).get("edges", 0),
+            },
+            "snapshot": {
+                "generated_at": data.get("generated_at", "unknown"),
+                "total_nodes": data.get("stats", {}).get("total_nodes", 0),
             }
         }
     except Exception as e:
@@ -161,11 +158,11 @@ else:
     def index():
         return {"message": "Elefante Dashboard API is running. Frontend not found (run 'npm run build' in src/dashboard/ui)."}
 
-def start_server(host: str = "127.0.0.1", port: int = 8000):
+def start_server(host: str = "0.0.0.0", port: int = 8000):
     """Start the dashboard server"""
     uvicorn.run(app, host=host, port=port, log_level="info")
 
-def serve_dashboard_in_thread(host: str = "127.0.0.1", port: int = 8000):
+def serve_dashboard_in_thread(host: str = "0.0.0.0", port: int = 8000):
     """Start the dashboard server in a background thread"""
     thread = threading.Thread(target=start_server, args=(host, port), daemon=True)
     thread.start()

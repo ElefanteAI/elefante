@@ -228,19 +228,23 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
             }
           
           // V27.0 SEMANTIC TOPOLOGY: ORBITAL HIERARCHY
-          const importance = props.importance || 5;
-          const layer = props.layer || 'world';
-          const sublayer = props.sublayer || 'fact';
+          // FIX: Check BOTH n.properties (API snapshot) and props (full_data.props)
+          const importance = props.importance || n.properties?.importance || 5;
+          const layer = props.layer || n.properties?.layer || 'world';
+          const sublayer = props.sublayer || n.properties?.sublayer || 'fact';
           
-          // SIZE: Enforce Gravity Hierarchy (SUN → PLANET → SATELLITE)
-          let radius;
-          if (importance >= 10) {
-            radius = 20; // SUN (Critical Laws/Persona)
-          } else if (importance >= 8) {
-            radius = 12; // PLANET (Preferences/Insights)
-          } else {
-            radius = 6;  // SATELLITE (Facts/Logs)
+          // Debug: Log layer/sublayer for first node
+          if (n.id === allowedNodes[0]?.id) {
+            console.log("🎨 COLOR DEBUG:", { layer, sublayer, propsLayer: props.layer, nodePropsLayer: n.properties?.layer });
           }
+          
+          // SIZE: POWER LAW HIERARCHY (User Request: "Nodes bigger... confusing")
+          // Formula: r = Base + (Importance^2 * Factor)
+          // Imp 1:  8 + 0.4  = 8.4px  (Detail)
+          // Imp 5:  8 + 10   = 18px   (Concept)
+          // Imp 8:  8 + 25.6 = 33.6px (Core)
+          // Imp 10: 8 + 40   = 48px   (Landmark)
+          const radius = 8 + (importance * importance * 0.4);
           
           // V3 COLOR SCHEME: Layer-aware Gradients
           // SELF: Red-Orange-Yellow
@@ -296,11 +300,14 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
           // 4. Apply TITLE CASE
           cleanLabel = toTitleCase(cleanLabel);
           
-          // 5. Create two versions
+          // 5. Add Layer Emoji prefix for quick V3 context
+          const layerEmoji = layer === 'self' ? '🔴' : layer === 'intent' ? '⚪' : '🔵';
+          
+          // 6. Create two versions
           const shortLabel = cleanLabel; // Full clean title for sidebar
-          const canvasLabel = cleanLabel.length > 20
-            ? cleanLabel.substring(0, 19) + "…"
-            : cleanLabel;
+          const canvasLabel = cleanLabel.length > 18
+            ? `${layerEmoji} ${cleanLabel.substring(0, 16)}…`
+            : `${layerEmoji} ${cleanLabel}`;
           
           return {
             ...n,
@@ -462,9 +469,9 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
           const dy = nodes[i].y - nodes[j].y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
           
-          // Gentle repulsion (reduced from 500 to 300)
-          if (dist < 600) {
-            const force = 300 / (dist * dist);
+          // Gentle repulsion (reduced from 500 to 300) -> NOW: 1000 (Strong Spread)
+          if (dist < 800) {
+            const force = 1000 / (dist * dist); // Stronger inverse square
             const fx = (dx / dist) * force;
             const fy = (dy / dist) * force;
             
@@ -539,15 +546,18 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
         const isOrphan = !connectedIds.has(node.id);
         
         if (isOrphan) {
-          // ORPHAN PHYSICS: Radial gravity to form a ring
+          // OORT CLOUD PHYSICS: Scattered orbital bands
           const dx = node.x - cx;
           const dy = node.y - cy;
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const targetRadius = 350; // Ring radius
           
-          // Pull towards target radius
-          const radiusError = dist - targetRadius;
-          const pullStrength = 0.05; // Gentle pull
+          // Deterministic randomness based on ID
+          const hash = node.id.split('').reduce((a,b)=>a+b.charCodeAt(0),0);
+          const orbitalBand = 400 + (hash % 200); // 400px to 600px
+          
+          // Pull towards target orbital band
+          const radiusError = dist - orbitalBand;
+          const pullStrength = 0.02; // Very gentle drift
           const fx = -(dx / dist) * radiusError * pullStrength;
           const fy = -(dy / dist) * radiusError * pullStrength;
           
@@ -561,9 +571,10 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
           node.vy += dy * 0.001;
         }
         
-        // CEMENT FRICTION: velocityDecay 0.9 (kills movement instantly)
-        node.vx *= 0.1; // 1 - 0.9 = 0.1 (90% friction)
-        node.vy *= 0.1;
+        // MUDDY SAND FRICTION: High viscosity, but allow some settling
+        // 0.9 = Ice, 0.1 = Concrete. 0.4 = Mud.
+        node.vx *= 0.4; 
+        node.vy *= 0.4;
         
         // V3 LAYER GRAVITY: Pull memories to their Anchor
         if (node.type === 'memory' && node.layer) {
@@ -614,25 +625,35 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
         const isSemantic = edge.type === 'semantic';
         const isHovered = hoveredEdge?.source === edge.source && hoveredEdge?.target === edge.target;
         
-        // HIGH CONTRAST: Style based on edge type
-        if (isSemantic) {
-          // AMBER/ORANGE for semantic similarity (high visibility)
-          ctx.strokeStyle = isHovered ? 'rgba(245, 158, 11, 1.0)' :  // Amber-500
-                           isConnected ? 'rgba(245, 158, 11, 0.8)' : 'rgba(245, 158, 11, 0.6)';
-          ctx.setLineDash([4, 4]); // Tighter dash
-          ctx.lineWidth = 1.5; // Thicker for visibility
-        } else {
-          // Solid grey for structural edges (reduced opacity to de-emphasize)
-          ctx.strokeStyle = isConnected ? 'rgba(16, 185, 129, 0.6)' : 'rgba(148, 163, 184, 0.15)';
-          ctx.setLineDash([]);
-          ctx.lineWidth = isConnected ? 2 : 0.5;
-        }
+        // ELECTRIC EDGES: Gradient + Pulse
+        const gradient = ctx.createLinearGradient(source.x, source.y, target.x, target.y);
+        gradient.addColorStop(0, source.color || '#94a3b8');
+        gradient.addColorStop(1, target.color || '#94a3b8');
         
         ctx.beginPath();
         ctx.moveTo(source.x, source.y);
         ctx.lineTo(target.x, target.y);
+        
+        // Base Line (Sleek Gradient)
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = isSemantic ? 2 : (isConnected ? 2.5 : 0.5);
+        ctx.globalAlpha = isSemantic ? 0.6 : 0.2;
         ctx.stroke();
-        ctx.setLineDash([]); // Reset dash
+        
+        // Electric Current Effect (Pulse Layer)
+        if (isSemantic || isConnected) {
+             const pulseFreq = isConnected ? 0.01 : 0.002;
+             const phaseOffset = (edge.source.charCodeAt(0) + edge.target.charCodeAt(0)); 
+             const pulse = (Math.sin(Date.now() * pulseFreq + phaseOffset) + 1) / 2; // 0 to 1
+             
+             ctx.strokeStyle = '#ffffff';
+             ctx.lineWidth = isConnected ? 2 : 1;
+             ctx.globalAlpha = pulse * (isConnected ? 0.8 : 0.3);
+             ctx.stroke();
+        }
+        
+        ctx.setLineDash([]); // Reset
+        ctx.globalAlpha = 1.0; // Reset
         
         // SPRINT 14: Enhanced edge tooltip - Show WHY nodes are connected
         if (isHovered && isSemantic && edge.similarity) {
@@ -1058,6 +1079,28 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
         ))}
       </div>
       
+      {/* V3 Layer Legend */}
+      <div className="absolute bottom-4 left-4 z-10 bg-slate-800/90 p-3 rounded-lg border border-slate-600 pointer-events-none">
+        <div className="text-xs font-bold mb-2 text-white">V3 Layer Legend</div>
+        <div className="space-y-1 text-[10px]">
+          <div className="flex items-center gap-4">
+            <span className="text-red-400">🔴 SELF</span>
+            <span className="text-slate-400">identity • preference • constraint</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-blue-400">🔵 WORLD</span>
+            <span className="text-slate-400">fact • failure • method</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-white">⚪ INTENT</span>
+            <span className="text-slate-400">rule • goal • anti-pattern</span>
+          </div>
+        </div>
+        <div className="mt-2 pt-2 border-t border-slate-700 text-[10px] text-slate-500">
+          Node size = Importance (1-10)
+        </div>
+      </div>
+      
       {/* Instructions */}
       <div className="absolute top-4 right-4 z-10 bg-slate-800 text-slate-300 px-4 py-2 rounded-lg text-sm border border-slate-600 pointer-events-none">
         <div><strong>Click</strong>: Inspect node</div>
@@ -1068,7 +1111,16 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
       </div>
       
       {/* V28: COGNITIVE MIRROR SIDEBAR - Enhanced Inspector */}
-      {selectedNode && (
+      {selectedNode && (() => {
+        // Helper: Get prop from n.properties (API) first, then n.full_data.parsed_props (legacy)
+        const getProp = (key: string, fallback: any = null) => {
+          const props = selectedNode.properties as Record<string, any> | undefined;
+          return props?.[key] 
+              ?? selectedNode.full_data?.parsed_props?.[key] 
+              ?? fallback;
+        };
+        
+        return (
         <div className="fixed right-0 top-0 h-full w-[420px] bg-gradient-to-b from-slate-900 to-slate-950 border-l border-cyan-500/30 shadow-2xl overflow-y-auto z-50">
           
           {/* Gradient Header */}
@@ -1081,16 +1133,16 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
             {/* Title with Memory Type Icon */}
             <div className="flex items-start gap-3 mt-2">
               <div className={`p-3 rounded-xl ${
-                selectedNode.full_data?.parsed_props?.memory_type === 'decision' ? 'bg-red-500/20 text-red-400' :
-                selectedNode.full_data?.parsed_props?.memory_type === 'insight' ? 'bg-purple-500/20 text-purple-400' :
-                selectedNode.full_data?.parsed_props?.memory_type === 'preference' ? 'bg-yellow-500/20 text-yellow-400' :
-                selectedNode.full_data?.parsed_props?.memory_type === 'episodic' ? 'bg-emerald-500/20 text-emerald-400' :
+                getProp('memory_type') === 'decision' ? 'bg-red-500/20 text-red-400' :
+                getProp('memory_type') === 'insight' ? 'bg-purple-500/20 text-purple-400' :
+                getProp('memory_type') === 'preference' ? 'bg-yellow-500/20 text-yellow-400' :
+                getProp('memory_type') === 'episodic' ? 'bg-emerald-500/20 text-emerald-400' :
                 'bg-blue-500/20 text-blue-400'
               }`}>
-                {selectedNode.full_data?.parsed_props?.memory_type === 'decision' ? '⚖️' :
-                 selectedNode.full_data?.parsed_props?.memory_type === 'insight' ? '💡' :
-                 selectedNode.full_data?.parsed_props?.memory_type === 'preference' ? '⭐' :
-                 selectedNode.full_data?.parsed_props?.memory_type === 'episodic' ? '📝' :
+                {getProp('memory_type') === 'decision' ? '⚖️' :
+                 getProp('memory_type') === 'insight' ? '💡' :
+                 getProp('memory_type') === 'preference' ? '⭐' :
+                 getProp('memory_type') === 'episodic' ? '📝' :
                  '📚'}
               </div>
               <div className="flex-1">
@@ -1098,7 +1150,7 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
                   {getCleanTitle(selectedNode)}
                 </h2>
                 <p className="text-xs text-slate-400 mt-1 uppercase tracking-wider">
-                  {selectedNode.full_data?.parsed_props?.memory_type || 'FACT'} • {selectedNode.full_data?.parsed_props?.category || 'General'}
+                  {getProp('layer', 'WORLD').toUpperCase()}.{getProp('sublayer', 'fact')} • {getProp('memory_type', 'fact')}
                 </p>
               </div>
             </div>
@@ -1109,27 +1161,27 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
               <div className="flex-1">
                 <div className="flex justify-between text-[10px] text-slate-500 mb-1">
                   <span>IMPORTANCE</span>
-                  <span className="font-mono">{selectedNode.full_data?.parsed_props?.importance || 5}/10</span>
+                  <span className="font-mono">{getProp('importance', 5)}/10</span>
                 </div>
                 <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
                   <div 
                     className={`h-full rounded-full transition-all ${
-                      (selectedNode.full_data?.parsed_props?.importance || 5) >= 9 ? 'bg-gradient-to-r from-red-500 to-orange-500 animate-pulse' :
-                      (selectedNode.full_data?.parsed_props?.importance || 5) >= 7 ? 'bg-gradient-to-r from-yellow-500 to-amber-500' :
+                      getProp('importance', 5) >= 9 ? 'bg-gradient-to-r from-red-500 to-orange-500 animate-pulse' :
+                      getProp('importance', 5) >= 7 ? 'bg-gradient-to-r from-yellow-500 to-amber-500' :
                       'bg-gradient-to-r from-cyan-500 to-blue-500'
                     }`}
-                    style={{ width: `${(selectedNode.full_data?.parsed_props?.importance || 5) * 10}%` }}
+                    style={{ width: `${getProp('importance', 5) * 10}%` }}
                   />
                 </div>
               </div>
               
               {/* Status Badge */}
               <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider ${
-                selectedNode.full_data?.parsed_props?.status === 'verified' ? 'bg-emerald-500/20 text-emerald-400' :
-                selectedNode.full_data?.parsed_props?.status === 'contradictory' ? 'bg-red-500/20 text-red-400' :
+                getProp('status') === 'verified' ? 'bg-emerald-500/20 text-emerald-400' :
+                getProp('status') === 'contradictory' ? 'bg-red-500/20 text-red-400' :
                 'bg-slate-700/50 text-slate-300'
               }`}>
-                {selectedNode.full_data?.parsed_props?.status || 'Active'}
+                {getProp('status', 'Active')}
               </span>
             </div>
           </div>
@@ -1154,16 +1206,28 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
                 <span>📄</span> Memory Content
               </h3>
               <div className="bg-slate-800/50 p-4 rounded-xl border-l-4 border-cyan-500 text-slate-300 text-sm leading-relaxed">
-                {selectedNode.full_data?.parsed_props?.content || selectedNode.full_data?.description || 'No content available'}
+                {getProp('content') || selectedNode.full_data?.description || 'No content available'}
               </div>
             </div>
 
-            {/* METADATA GRID - Quick Facts */}
+            {/* METADATA GRID - Second Brain Metrics */}
             <div>
               <h3 className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase mb-3">
-                <span>📊</span> Metadata
+                <span>🧠</span> Second Brain Metrics
               </h3>
               <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-800/30 p-3 rounded-lg">
+                  <div className="text-[10px] text-slate-500 uppercase">Layer</div>
+                  <div className="text-sm text-slate-300 uppercase font-bold">
+                    {getProp('layer', 'world')}.{getProp('sublayer', 'fact')}
+                  </div>
+                </div>
+                <div className="bg-slate-800/30 p-3 rounded-lg">
+                  <div className="text-[10px] text-slate-500 uppercase">Recalls</div>
+                  <div className="text-sm text-slate-300 font-mono">
+                    {getProp('access_count', 0)}× used
+                  </div>
+                </div>
                 <div className="bg-slate-800/30 p-3 rounded-lg">
                   <div className="text-[10px] text-slate-500 uppercase">Created</div>
                   <div className="text-sm text-slate-300 font-mono">
@@ -1173,34 +1237,34 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
                 <div className="bg-slate-800/30 p-3 rounded-lg">
                   <div className="text-[10px] text-slate-500 uppercase">Domain</div>
                   <div className="text-sm text-slate-300 capitalize">
-                    {selectedNode.full_data?.parsed_props?.domain || 'General'}
+                    {getProp('domain', 'General')}
                   </div>
                 </div>
                 <div className="bg-slate-800/30 p-3 rounded-lg">
-                  <div className="text-[10px] text-slate-500 uppercase">Intent</div>
-                  <div className="text-sm text-slate-300 capitalize">
-                    {selectedNode.full_data?.parsed_props?.cognitive_analysis?.intent || selectedNode.full_data?.parsed_props?.intent || 'Reference'}
-                  </div>
-                </div>
-                <div className="bg-slate-800/30 p-3 rounded-lg">
-                  <div className="text-[10px] text-slate-500 uppercase">Access Count</div>
+                  <div className="text-[10px] text-slate-500 uppercase">Connections</div>
                   <div className="text-sm text-slate-300 font-mono">
-                    {selectedNode.full_data?.parsed_props?.access_count || 0}×
+                    {selectedNode.degree || 0} links
+                  </div>
+                </div>
+                <div className="bg-slate-800/30 p-3 rounded-lg">
+                  <div className="text-[10px] text-slate-500 uppercase">Type</div>
+                  <div className="text-sm text-slate-300 capitalize">
+                    {getProp('memory_type', 'fact')}
                   </div>
                 </div>
               </div>
             </div>
 
             {/* TAGS */}
-            {selectedNode.full_data?.parsed_props?.tags && (
+            {getProp('tags') && (
               <div>
                 <h3 className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase mb-3">
                   <span>🏷️</span> Tags
                 </h3>
                 <div className="flex flex-wrap gap-2">
-                  {(typeof selectedNode.full_data.parsed_props.tags === 'string' 
-                    ? selectedNode.full_data.parsed_props.tags.split(',') 
-                    : selectedNode.full_data.parsed_props.tags
+                  {(typeof getProp('tags') === 'string' 
+                    ? getProp('tags').split(',') 
+                    : getProp('tags')
                   ).map((tag: string, i: number) => (
                     <span key={i} className="px-2 py-1 bg-slate-800 text-cyan-400 text-xs rounded-full border border-cyan-500/30">
                       {tag.trim()}
@@ -1240,7 +1304,8 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ space }) => {
             </details>
           </div>
         </div>
-      )}
+        );
+      })()}
       
       <canvas
         ref={canvasRef}

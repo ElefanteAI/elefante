@@ -4,7 +4,7 @@
 
 **Purpose**: Permanent record of dashboard architecture failures and visual design principles  
 **Status**: Active Neural Register  
-**Last Updated**: 2025-12-05
+**Last Updated**: 2025-12-07
 
 ---
 
@@ -137,10 +137,52 @@ Zoom Level 3 (Near):  Show full subgraph with relationships (500+ nodes)
 
 **Failure Case** (2025-11-28):
 
-- Vite updated from 5.0.0 → 5.1.0
 - Breaking change in dev server API
 - Dashboard build failed
 - Resolution: Pin to 5.0.0, commit lock file
+
+---
+
+### LAW #6: Zero-Zero Binding Protocol
+
+**Statement**: Dashboard Server MUST bind to `0.0.0.0`, NEVER `127.0.0.1` or `localhost`.
+
+**Visual Physics Principle**: Modern browsers (Chrome/Safari) default to IPv6 `[::1]` for `localhost`. Python `uvicorn` defaults to IPv4 `127.0.0.1`.
+
+**Failure Mode**:
+
+- Server runs on `127.0.0.1:8000`
+- Browser connects to `[::1]:8000`
+- Result: **Connection Refused** (Blank Screen)
+- Debugging Trap: `curl localhost:8000` works (IPv4 fallback), but Browser fails.
+
+**Implementation**:
+
+```python
+uvicorn.run(app, host="0.0.0.0", port=8000)
+```
+
+---
+
+### LAW #7: API Symmetry (No Wrappers)
+
+**Statement**: Backend API response shape MUST match Frontend interface shape exactly.
+
+**Anti-Pattern**:
+
+- Backend: `return {"success": True, "data": stats}`
+- Frontend: `setStats(response)` (Expects `stats` directly)
+
+**Result**: Silent Failure. Frontend receives `{success: True...}` but tries to read `stats.memories`. `undefined`.
+
+**Correct Pattern**:
+
+- Backend: `return stats`
+- Frontend: `setStats(response)` (Matches 1:1)
+
+**Implementation**:
+
+- Flatten JSON responses. Remove "envelope" wrappers unless strictly typed in shared schema.
 
 ---
 
@@ -181,6 +223,15 @@ Zoom Level 3 (Near):  Show full subgraph with relationships (500+ nodes)
 **Impact**: Development blocked  
 **Resolution**: Pin exact versions, commit lock file  
 **Prevention**: Dependency audit, lock file validation
+
+### Pattern #5: V3 Metadata Property Path Mismatch (2025-12-07)
+
+**Trigger**: Frontend reading from `n.full_data.props` while API sends data in `n.properties`  
+**Symptom**: All nodes show "FACT • General" and "5/10" despite varied data in database  
+**Root Cause**: Snapshot API changed property structure, frontend not updated  
+**Impact**: 8+ hours debugging across 6 sequential bugs  
+**Resolution**: Added `getProp()` helper to check both paths; grep for ALL occurrences  
+**Prevention**: Document API response structure; grep for property paths when fixing one
 
 ---
 

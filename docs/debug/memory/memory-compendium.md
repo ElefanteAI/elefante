@@ -1,8 +1,8 @@
 # Memory System Debug Compendium
 
 > **Domain:** Memory Retrieval, Storage & Reinforcement  
-> **Last Updated:** 2025-12-05  
-> **Total Issues Documented:** 5  
+> **Last Updated:** 2025-12-07  
+> **Total Issues Documented:** 6  
 > **Status:** Production Reference  
 > **Maintainer:** Add new issues following Issue #N template at bottom
 
@@ -10,14 +10,15 @@
 
 ## 🚨 CRITICAL LAWS (Extracted from Pain)
 
-| # | Law | Violation Cost |
-|---|-----|----------------|
-| 1 | Use `min_similarity=0` to get ALL memories | Partial exports |
-| 2 | ChromaDB stores memories, Kuzu stores entities - DIFFERENT | Data confusion |
-| 3 | Use `collection.get()` for complete export, not `searchMemories` | Missing data |
-| 4 | Search Elefante BEFORE implementing, not after | Repeated mistakes |
-| 5 | Verify code works BEFORE claiming completion | User frustration |
-| 6 | Memory metadata has 40+ fields - don't assume structure | Silent data loss |
+| #   | Law                                                                        | Violation Cost    |
+| --- | -------------------------------------------------------------------------- | ----------------- |
+| 1   | Use `min_similarity=0` to get ALL memories                                 | Partial exports   |
+| 2   | ChromaDB stores memories, Kuzu stores entities - DIFFERENT                 | Data confusion    |
+| 3   | Use `collection.get()` for complete export, not `searchMemories`           | Missing data      |
+| 4   | Search Elefante BEFORE implementing, not after                             | Repeated mistakes |
+| 5   | Verify code works BEFORE claiming completion                               | User frustration  |
+| 6   | Memory metadata has 40+ fields - don't assume structure                    | Silent data loss  |
+| 7   | V3 Schema: layer/sublayer must be saved in BOTH add_memory AND reconstruct | 8 hours           |
 
 ---
 
@@ -28,6 +29,7 @@
 - [Issue #3: Memory Not Used for Decision Making](#issue-3-memory-not-used-for-decision-making)
 - [Issue #4: Temporal Decay Implementation Failure](#issue-4-temporal-decay-implementation-failure)
 - [Issue #5: Memory Schema Mismatch](#issue-5-memory-schema-mismatch)
+- [Issue #6: V3 Layer Metadata Not Persisting](#issue-6-v3-layer-metadata-not-persisting)
 - [Memory Export Guide](#memory-export-guide)
 - [Reinforcement Protocol](#reinforcement-protocol)
 - [Prevention Protocol](#prevention-protocol)
@@ -43,9 +45,11 @@
 **Status:** ✅ DOCUMENTED
 
 ### Problem
+
 Attempts to export "all memories" return only a subset (3-10 instead of 71).
 
 ### Symptom
+
 ```python
 # User expects 71 memories
 result = searchMemories("all memories", limit=1000)
@@ -53,12 +57,15 @@ result = searchMemories("all memories", limit=1000)
 ```
 
 ### Root Cause
+
 `searchMemories` uses **semantic similarity filtering**:
-- Default `min_similarity=0.3` 
+
+- Default `min_similarity=0.3`
 - Query "all memories" only matches memories semantically similar to that phrase
 - Most memories have similarity < 0.3 to "all memories"
 
 ### Solution
+
 ```python
 # ✅ CORRECT: Use min_similarity=0 to disable filtering
 result = await mcp_client.call_tool("searchMemories", {
@@ -73,11 +80,13 @@ results = collection.get(include=["metadatas", "documents"])
 ```
 
 ### Why This Keeps Happening
+
 - `searchMemories` name implies "find memories" not "filter memories"
 - Default min_similarity not obvious
 - API designed for relevance, not completeness
 
 ### Lesson
+
 > **Semantic search ≠ List all. Use `collection.get()` for complete export.**
 
 ---
@@ -90,29 +99,34 @@ results = collection.get(include=["metadatas", "documents"])
 **Status:** ✅ FIXED
 
 ### Problem
+
 Dashboard/export code queried Kuzu instead of ChromaDB, returning entities instead of memories.
 
 ### Symptom
+
 ```
 Expected: 71 memories
 Got: 17 entities
 ```
 
 ### Root Cause
+
 Confusion between data stores:
 
-| Store | Contains | Count | Purpose |
-|-------|----------|-------|---------|
-| ChromaDB | Memories | 71 | Semantic search, content storage |
-| Kuzu | Entities | 17 | Graph relationships, concepts |
+| Store    | Contains | Count | Purpose                          |
+| -------- | -------- | ----- | -------------------------------- |
+| ChromaDB | Memories | 71    | Semantic search, content storage |
+| Kuzu     | Entities | 17    | Graph relationships, concepts    |
 
 Code was doing:
+
 ```python
 # ❌ WRONG
 query = "MATCH (e:Entity) RETURN e"  # Returns entities, NOT memories
 ```
 
 ### Solution
+
 ```python
 # ✅ CORRECT
 collection = vector_store._collection
@@ -120,11 +134,13 @@ results = collection.get(include=["metadatas", "documents"])
 ```
 
 ### Why This Happened
+
 - Both stores are "databases" in the system
 - Entity extraction creates Kuzu entries from memories
 - Easy to confuse "17 entities" with "17 memories"
 
 ### Lesson
+
 > **ChromaDB = memories (user content). Kuzu = entities (extracted concepts).**
 
 ---
@@ -137,21 +153,26 @@ results = collection.get(include=["metadatas", "documents"])
 **Status:** ⚠️ DOCUMENTED (Behavioral)
 
 ### Problem
+
 AI has Elefante access but treats it as storage, not decision support.
 
 ### Symptom
+
 - Repeated mistakes that are documented in memory
 - "I should have checked Elefante first"
 - User frustration: "Why do you keep making the same mistake?"
 
 ### Root Cause
+
 **Wrong Mental Model:**
+
 ```
 Current: Task → Implement → Store lessons (POST-HOC)
 Correct: Task → Search Elefante → Implement with context → Update
 ```
 
 ### Solution
+
 **The 5-Phase Reinforcement Protocol:**
 
 ```
@@ -181,11 +202,13 @@ Phase 5: REINFORCEMENT
 ```
 
 ### Why This Pattern Persists
+
 - Easier to implement than to research
 - Time pressure favors action over preparation
 - Memory system feels like "extra step"
 
 ### Lesson
+
 > **Elefante should be the FIRST tool, not the last resort.**
 
 ---
@@ -198,9 +221,11 @@ Phase 5: REINFORCEMENT
 **Status:** ✅ FIXED
 
 ### Problem
+
 Claimed temporal decay was "ready" without verification, discovered critical errors.
 
 ### Symptom
+
 ```python
 # Code claimed complete, but:
 # - Had merge conflict markers in source
@@ -209,9 +234,11 @@ Claimed temporal decay was "ready" without verification, discovered critical err
 ```
 
 ### Root Cause
+
 **Premature completion claims.** Specific failures:
 
 1. **Merge conflict markers not detected:**
+
    ```python
    <<<<<<< HEAD
    old_code()
@@ -221,6 +248,7 @@ Claimed temporal decay was "ready" without verification, discovered critical err
    ```
 
 2. **Import not tested:**
+
    ```python
    # Never ran:
    python -c "from src.core.orchestrator import MemoryOrchestrator"
@@ -228,12 +256,13 @@ Claimed temporal decay was "ready" without verification, discovered critical err
 
 3. **LLM output not validated:**
    ```python
-   # LLM returned: "REFERENCE_INFO" 
+   # LLM returned: "REFERENCE_INFO"
    # Enum expected: "REFERENCE"
    intent_value = IntentType(intent)  # ValueError!
    ```
 
 ### Solution
+
 **Verification Checklist (MANDATORY before claiming done):**
 
 ```bash
@@ -258,12 +287,14 @@ print(f'Found {len(results)} results')
 ```
 
 ### Why This Took So Long
+
 - Assumed "I wrote it, it works"
 - Didn't run basic import test
 - Ignored merge conflict possibility
 - Trusted LLM output without validation
 
 ### Lesson
+
 > **VERIFY, DON'T ASSUME. Code is not done until tests pass.**
 
 ---
@@ -276,9 +307,11 @@ print(f'Found {len(results)} results')
 **Status:** ⚠️ DOCUMENTED
 
 ### Problem
+
 Memory model has 40+ fields but code often assumes simpler structure.
 
 ### Symptom
+
 ```python
 # Code assumes:
 memory.importance  # Direct attribute
@@ -288,7 +321,9 @@ memory["metadata"]["importance"]  # Nested in metadata dict
 ```
 
 ### Root Cause
+
 ChromaDB stores everything in flat structure:
+
 ```python
 {
     "id": "uuid",
@@ -303,7 +338,9 @@ ChromaDB stores everything in flat structure:
 ```
 
 ### Solution
+
 Always use model helpers:
+
 ```python
 # ❌ WRONG: Direct access
 importance = result["metadata"]["importance"]
@@ -315,20 +352,108 @@ importance = memory.importance
 
 ### Memory Metadata Fields (9 Categories)
 
-| Category | Fields |
-|----------|--------|
-| **Core** | id, content, created_at, created_by |
-| **Classification** | domain, category, memory_type, subcategory, intent |
-| **Importance** | importance (1-10), urgency, confidence |
-| **Relationship** | relationship_type, parent_id, related_memory_ids, conflict_ids, supersedes_id |
-| **Temporal** | last_accessed, last_modified, access_count, decay_rate, reinforcement_factor |
-| **Source** | source, source_detail, source_reliability, verified, verified_by |
-| **Context** | session_id, author, project, workspace, file_path, line_number, url |
-| **Lifecycle** | version, deprecated, archived, status |
-| **Extensibility** | tags, keywords, entities, summary, sentiment, quality_score |
+| Category           | Fields                                                                        |
+| ------------------ | ----------------------------------------------------------------------------- |
+| **Core**           | id, content, created_at, created_by                                           |
+| **Classification** | domain, category, memory_type, subcategory, intent                            |
+| **Importance**     | importance (1-10), urgency, confidence                                        |
+| **Relationship**   | relationship_type, parent_id, related_memory_ids, conflict_ids, supersedes_id |
+| **Temporal**       | last_accessed, last_modified, access_count, decay_rate, reinforcement_factor  |
+| **Source**         | source, source_detail, source_reliability, verified, verified_by              |
+| **Context**        | session_id, author, project, workspace, file_path, line_number, url           |
+| **Lifecycle**      | version, deprecated, archived, status                                         |
+| **Extensibility**  | tags, keywords, entities, summary, sentiment, quality_score                   |
 
 ### Lesson
+
 > **Always use model classes for data translation. Never assume field structure.**
+
+---
+
+## Issue #6: V3 Layer Metadata Not Persisting
+
+**Date:** 2025-12-07  
+**Duration:** 8+ hours (shared with dashboard debugging)  
+**Severity:** CRITICAL  
+**Status:** ✅ FIXED
+
+### Problem
+
+V3 Schema fields (`layer`, `sublayer`) not persisting through memory lifecycle despite being set by classifier.
+
+### Symptom
+
+```python
+# Classifier correctly returns:
+classify_memory("I am a developer") → ("self", "identity")
+
+# But ChromaDB shows:
+metadata["layer"] → "world"  # Wrong!
+metadata["sublayer"] → "fact"  # Wrong!
+```
+
+### Root Cause
+
+**Two missing field mappings:**
+
+1. **VectorStore.add_memory()** - metadata dict construction missed layer/sublayer:
+
+```python
+# ❌ BEFORE: Fields not in dict
+metadata = {
+    "domain": memory.metadata.domain,
+    "category": memory.metadata.category,
+    # layer/sublayer MISSING!
+}
+
+# ✅ AFTER: Added explicitly
+metadata = {
+    "layer": memory.metadata.layer,
+    "sublayer": memory.metadata.sublayer,
+    # ... other fields
+}
+```
+
+2. **VectorStore.\_reconstruct_memory()** - reconstruction didn't read layer/sublayer:
+
+```python
+# ❌ BEFORE: Not reading from metadata
+MemoryMetadata(
+    domain=metadata.get("domain"),
+    # layer/sublayer MISSING!
+)
+
+# ✅ AFTER: Reading back
+MemoryMetadata(
+    layer=metadata.get("layer", "world"),
+    sublayer=metadata.get("sublayer", "fact"),
+)
+```
+
+### Solution
+
+1. **Added layer/sublayer to add_memory()** metadata dict (lines 123-128)
+2. **Added layer/sublayer to \_reconstruct_memory()** constructor (lines 362-367)
+3. **Created standalone migration script** `scripts/migrate_v3_direct.py` to bypass MCP cache
+4. **Expanded classifier.py** with 20+ regex patterns and `calculate_importance()` function
+
+### Why This Took So Long
+
+- **Migration tool lied**: Reported "78 migrated, 0 errors" but data unchanged (used cached code)
+- **Assumption**: Assumed if field was in `Memory.metadata`, it would be saved automatically
+- **No roundtrip test**: Never verified `add_memory()` → `get_memory()` preserved fields
+
+### Lesson
+
+> **Every metadata field must be explicitly mapped in BOTH add_memory (write) AND \_reconstruct_memory (read). Test roundtrip preservation.**
+
+### V3 Schema Reference
+
+| Layer    | Sublayers                        | Meaning             |
+| -------- | -------------------------------- | ------------------- |
+| `self`   | identity, preference, constraint | Who the user IS     |
+| `world`  | fact, failure, method            | What the user KNOWS |
+| `intent` | rule, goal, anti-pattern         | What the user DOES  |
 
 ---
 
@@ -370,7 +495,7 @@ result = await mcp_client.call_tool("searchMemories", {
 # ❌ Using searchMemories with default min_similarity
 searchMemories("all memories")  # Returns ~3-10, not 71
 
-# ❌ Querying Kuzu instead of ChromaDB  
+# ❌ Querying Kuzu instead of ChromaDB
 "MATCH (e:Entity) RETURN e"  # Returns 17 entities, not 71 memories
 
 # ❌ Using dashboard snapshot
@@ -465,24 +590,30 @@ assert count > 0, 'No memories found!'
 **Status:** 🔴 OPEN | 🟡 IN PROGRESS | ✅ FIXED | ⚠️ DOCUMENTED
 
 ### Problem
+
 [One sentence: what is broken]
 
 ### Symptom
+
 [What the user sees / exact error message]
 
 ### Root Cause
+
 [Technical explanation of WHY it broke]
 
 ### Solution
+
 [Code changes or steps that fixed it]
 
 ### Why This Took So Long
+
 [Honest reflection on methodology mistakes]
 
 ### Lesson
+
 > [One-line takeaway in blockquote format]
 ```
 
 ---
 
-*Last verified: 2025-12-05 | Memory count: 71 | ChromaDB version: check requirements.txt*
+_Last verified: 2025-12-05 | Memory count: 71 | ChromaDB version: check requirements.txt_

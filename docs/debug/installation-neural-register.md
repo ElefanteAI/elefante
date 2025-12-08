@@ -212,3 +212,60 @@ import sys
 ```
 
 **Implementation**: `scripts/configure_antigravity.py` patched to use `sys.executable`.
+
+---
+
+### LAW #7: Robust Kuzu Initialization Law
+
+**Statement**: Do NOT rely on users or scripts to keep the database path clean. The application code MUST auto-heal by handling empty directory or file conflicts.
+
+**Origin**: 2025-12-08 - "Clean Install Crash" due to file/folder confusion
+**Root Cause**: Kuzu 0.11+ is strict about path states (requires non-existent or valid DB). Users/Scripts often pre-create `kuzu_db` as an empty folder or file.
+**Symptom**: `[Errno 21] Is a directory` or `Path is already a directory` (or `kuzu.Database` creating a file if path is missing extension).
+
+**Prevention Protocol**:
+In `GraphStore.__init__`:
+
+1. If path is **Empty Directory**: `rmdir` (Fixes "created by install script" crash).
+2. If path is **Empty File** (size 0): `unlink` (Fixes "created by touch").
+3. If path works > 0 bytes: **PRESERVE** (Prevent data loss).
+
+**Implementation**: `src/core/graph_store.py` (Robust Init Block).
+
+---
+
+### LAW #8: Absolute Python Path Protocol
+
+**Statement**: NEVER use `"command": "python"` in MCP or critical script configurations. ALWAYS use `sys.executable` to resolve the absolute path.
+
+**Origin**: 2025-12-08 - "Windows Environment Leak"
+**Root Cause**: Using "python" relies on the system PATH. On developer machines, this often resolves to a Global Python (System32/Homebrew) instead of the project's Virtual Environment, leading to dependency mismatches (e.g., ChromaDB schema errors).
+**Symptom**: `ImportError`, `sqlite3` version mismatches, or `RuntimeError` due to missing/wrong libraries despite "clean install".
+
+**Prevention Protocol**:
+
+```python
+# ❌ INCORRECT (Ambiguous)
+"command": "python"
+
+# ✅ CORRECT (Deterministic)
+import sys
+"command": sys.executable
+```
+
+**Implementation**: Updated `scripts/configure_vscode_bob.py` and `scripts/configure_antigravity.py`.
+
+---
+
+### LAW #9: Bytecode Hygiene (The Ghost in the Machine)
+
+**Statement**: A "Clean Install" is NOT clean unless compiled bytecode (`__pycache__`, `.pyc`) is purged.
+
+**Origin**: 2025-12-08 - Persistent errors despite code fixes
+**Root Cause**: Python may load stale bytecode metadata even after source code updates if timestamps are close or file system logic is quirky.
+**Symptom**: "I fixed the code but the error persists."
+
+**Prevention Protocol**:
+Installation scripts MUST aggressively purge `__pycache__` and `.pyc` files BEFORE starting operations.
+
+**Implementation**: `scripts/install.py::purge_bytecode()`

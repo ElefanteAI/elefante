@@ -121,6 +121,8 @@ class VectorStore:
             "created_by": memory.metadata.created_by,
             
             # Layer 2: Classification (3-level taxonomy)
+            "layer": memory.metadata.layer,  # V3 Schema
+            "sublayer": memory.metadata.sublayer,  # V3 Schema
             "domain": memory.metadata.domain.value if hasattr(memory.metadata.domain, 'value') else str(memory.metadata.domain),
             "category": memory.metadata.category,
             "memory_type": memory.metadata.memory_type.value if hasattr(memory.metadata.memory_type, 'value') else str(memory.metadata.memory_type),
@@ -156,6 +158,12 @@ class VectorStore:
             "version": memory.metadata.version,
             "deprecated": memory.metadata.deprecated,
         }
+        
+        # Merge custom metadata (flattened for ChromaDB)
+        if memory.metadata.custom_metadata:
+            for k, v in memory.metadata.custom_metadata.items():
+                if k not in metadata: # Don't overwrite core fields
+                    metadata[k] = str(v) if not isinstance(v, (str, int, float, bool)) else v
         
         # Add to collection
         try:
@@ -347,6 +355,16 @@ class VectorStore:
             except (ValueError, KeyError):
                 return default
         
+        # Identify custom metadata (unknown fields) for restoration
+        known_keys = {
+            "created_at", "timestamp", "created_by", "layer", "sublayer", "domain", 
+            "category", "memory_type", "subcategory", "intent", "importance", 
+            "urgency", "confidence", "tags", "keywords", "status", "parent_id", 
+            "source", "source_reliability", "verified", "project", "file_path", 
+            "session_id", "last_accessed", "access_count", "version", "deprecated"
+        }
+        custom_metadata = {k: v for k, v in metadata.items() if k not in known_keys}
+        
         # Parse V2 metadata with backward compatibility for V1
         memory_metadata = MemoryMetadata(
             # Layer 1: Core Identity
@@ -354,6 +372,8 @@ class VectorStore:
             created_by=metadata.get("created_by", "user"),
             
             # Layer 2: Classification
+            layer=metadata.get("layer", "world"),  # V3 Schema
+            sublayer=metadata.get("sublayer", "fact"),  # V3 Schema
             domain=get_enum_value(DomainType, metadata.get("domain"), DomainType.REFERENCE),
             category=metadata.get("category", "general"),
             memory_type=get_enum_value(MemoryType, metadata.get("memory_type"), MemoryType.CONVERSATION),
@@ -388,6 +408,7 @@ class VectorStore:
             # Layer 8: Quality
             version=metadata.get("version", 1),
             deprecated=metadata.get("deprecated", False),
+            custom_metadata=custom_metadata,
         )
         
         # Create memory object
@@ -399,6 +420,46 @@ class VectorStore:
         
         return memory
     
+    async def find_by_title(self, title: str) -> Optional[Memory]:
+        """
+        Find a memory by its exact semantic title
+        
+        Args:
+            title: The exact semantic title to search for
+            
+        Returns:
+            Memory object if found, None otherwise
+        """
+        self._initialize_client()
+        
+        try:
+            # Query by metadata title
+            result = await asyncio.to_thread(
+                self._collection.get,
+                where={"title": title},
+                include=["documents", "metadatas", "embeddings"],
+                limit=1
+            )
+            
+            if result and result['ids'] and len(result['ids']) > 0:
+                memory = self._reconstruct_memory(
+                    result['ids'][0],
+                    result['documents'][0],
+                    result['metadatas'][0]
+                )
+                # Handle embeddings check safely (numpy array safe)
+                embeddings = result.get('embeddings')
+                if embeddings is not None and len(embeddings) > 0:
+                    memory.embedding = embeddings[0]
+                else:
+                    memory.embedding = None
+                return memory
+                
+            return None
+            
+        except Exception as e:
+            logger.error(f"failed_to_find_by_title: {e}")
+            return None
     async def get_memory(self, memory_id: UUID) -> Optional[Memory]:
         """
         Get a specific memory by ID
@@ -424,8 +485,14 @@ class VectorStore:
                     result['documents'][0],
                     result['metadatas'][0]
                 )
-                memory.embedding = result['embeddings'][0] if result['embeddings'] else None
                 
+                # Handle embeddings check safely (numpy array safe)
+                embeddings = result.get('embeddings')
+                if embeddings is not None and len(embeddings) > 0:
+                    memory.embedding = embeddings[0]
+                else:
+                    memory.embedding = None
+                    
                 return memory
             
             return None

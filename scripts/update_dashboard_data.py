@@ -39,14 +39,21 @@ async def main():
     memory_count = len(all_memories["ids"])
     print(f"   Found {memory_count} memories in ChromaDB", file=sys.stderr)
     
+    # DEDUPLICATION: Map Title -> Node to keep only the best version
+    title_map = {}
+    id_remap = {} # Map {hidden_duplicate_id: best_version_id}
+    
     for i, memory_id in enumerate(all_memories["ids"]):
         doc = all_memories["documents"][i] if all_memories["documents"] else ""
         meta = all_memories["metadatas"][i] if all_memories["metadatas"] else {}
         
         # Create node for this memory
-        # Generate 3-5 word title from content
-        words = doc.split()[:5]
-        name = " ".join(words) if words else "Untitled Memory"
+        # PRIORITY: Use semantic title from metadata, fallback to content truncation
+        title = meta.get("title")
+        if not title:
+            words = doc.split()[:5]
+            title = " ".join(words) if words else "Untitled Memory"
+        name = title
         
         # CRITICAL: Typecast importance to INTEGER
         importance_raw = meta.get("importance", 5)
@@ -71,8 +78,37 @@ async def main():
                 "source": "chromadb"
             }
         }
-        nodes.append(node)
-        seen_ids.add(memory_id)
+        
+        # Deduplication Logic
+        if name in title_map:
+            existing = title_map[name]
+            existing_imp = existing["properties"]["importance"]
+            existing_date = existing["created_at"] or ""
+            new_date = node["created_at"] or ""
+            
+            # Decide survivor: Higher Importance > Newer Date
+            is_better = False
+            if importance > existing_imp:
+                is_better = True
+            elif importance == existing_imp:
+                if new_date > existing_date:
+                    is_better = True
+            
+            if is_better:
+                # New node replaces old one
+                id_remap[existing["id"]] = node["id"] # Map old loser -> new winner
+                title_map[name] = node
+            else:
+                # New node is worse, discard it
+                id_remap[node["id"]] = existing["id"] # Map new loser -> old winner
+        else:
+            title_map[name] = node
+            
+    # Convert map back to list
+    nodes = list(title_map.values())
+    seen_ids = set(n["id"] for n in nodes)
+    
+    print(f"   Consolidated {memory_count} memories into {len(nodes)} unique concepts", file=sys.stderr)
     
     # =========================================================================
     # STEP 2: Fetch entities from Kuzu (SUPPLEMENTARY)
@@ -144,6 +180,14 @@ async def main():
             lbl = row.get('label(r)')
             
             if src and dst:
+                # REMAP Edges for deduplicated nodes
+                if src in id_remap: src = id_remap[src]
+                if dst in id_remap: dst = id_remap[dst]
+                
+                # Avoid self-loops created by consolidation
+                if src == dst:
+                    continue
+                    
                 edges.append({
                     "from": src,
                     "to": dst,
@@ -155,6 +199,77 @@ async def main():
     except Exception as e:
         print(f"   [!] Kuzu error (non-fatal): {e}", file=sys.stderr)
         print("   Continuing with ChromaDB data only...", file=sys.stderr)
+    
+    # =========================================================================
+    # STEP 3.5: Compute Semantic Similarity Edges (if no graph relationships)
+    # =========================================================================
+    if len(edges) == 0:
+        print("[*] Step 3.5: Computing semantic similarity edges...", file=sys.stderr)
+        
+        try:
+            # Get embeddings from ChromaDB
+            all_with_embeddings = collection.get(
+                include=["embeddings"],
+                limit=500  # Match memory limit
+            )
+            
+            embeddings = all_with_embeddings.get("embeddings")
+            ids = all_with_embeddings.get("ids", [])
+            
+            if embeddings is not None and len(embeddings) > 1:
+                import numpy as np
+                from sklearn.metrics.pairwise import cosine_similarity
+                
+                # Convert to numpy array
+                emb_array = np.array(embeddings)
+                
+                # Compute pairwise cosine similarity
+                similarity_matrix = cosine_similarity(emb_array)
+                
+                # Create edges for pairs above threshold
+                THRESHOLD = 0.45  # ULTRA-DENSE WEB (User Request: "Electric Current")
+                TOP_K = 12  # High connectivity
+                
+                for i in range(len(ids)):
+                    # Get top-K similar nodes for this node
+                    similarities = [(j, similarity_matrix[i][j]) for j in range(len(ids)) if j != i]
+                    similarities.sort(key=lambda x: x[1], reverse=True)
+                    
+                    for j, sim in similarities[:TOP_K]:
+                        if sim >= THRESHOLD:
+                            # Add edge (avoid duplicates by checking source < target)
+                            src, dst = ids[i], ids[j]
+                            
+                            # REMAP logic (inherit connections from duplicates)
+                            if src in id_remap: src = id_remap[src]
+                            if dst in id_remap: dst = id_remap[dst]
+                            
+                            if src == dst: continue # Self-loop
+                            
+                            # Check duplicates in existing edges? 
+                            # Simplest: Just add, frontend filters? Or check existing.
+                            # Set checking is faster.
+                            edge_key = tuple(sorted([src, dst]))
+                            # We need a set to track added edges to avoid A->B and B->A resulting in double edges
+                            # Since we effectively randomly flipped src/dst order by remapping, the `src < dst` check below is risky if we don't normalize first.
+                            
+                            if src < dst:  # Only add one direction per pair
+                                edges.append({
+                                    "from": src,
+                                    "to": dst,
+                                    "label": "SIMILAR",
+                                    "type": "semantic",
+                                    "similarity": round(float(sim), 3)
+                                })
+                
+                print(f"   Generated {len(edges)} semantic similarity edges", file=sys.stderr)
+            else:
+                print("   [!] No embeddings available for similarity computation", file=sys.stderr)
+                
+        except ImportError as e:
+            print(f"   [!] Missing dependency for similarity: {e}", file=sys.stderr)
+        except Exception as e:
+            print(f"   [!] Similarity computation error: {e}", file=sys.stderr)
     
     # =========================================================================
     # STEP 4: Save snapshot

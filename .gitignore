@@ -59,5 +59,9 @@ CLEANUP_PLAN.md
 RELEASE_V1.1.0_PREPARATION.md
 *_SUMMARY_*.md
 
+
 # Session notes
 CURRENT_SESSION_*.md
+
+# Local ChromaDB (generated if path config misses)
+chroma_db/

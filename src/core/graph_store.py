@@ -103,6 +103,23 @@ class GraphStore:
             # Create database parent directory if it doesn't exist
             db_path = Path(self.database_path)
             db_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # --- ROBUST INIT START ---
+            # Fix for Kuzu 0.11+ "clean install crash"
+            # Issue: If kuzu_db exists as an empty directory (from manual mkdir) or file, Kuzu fails.
+            if db_path.exists():
+                if db_path.is_file():
+                    if db_path.stat().st_size == 0:
+                        logger.warning(f"kuzu_path_conflict: Removing empty file at {db_path}.")
+                        db_path.unlink()
+                    else:
+                        logger.info(f"kuzu_path_check: Found existing file at {db_path}. Assuming valid DB.")
+                elif db_path.is_dir() and not any(db_path.iterdir()):
+                    logger.info(f"kuzu_clean_init: Removing empty pre-created directory at {db_path}.")
+                    db_path.rmdir()
+            # --- ROBUST INIT END ---
+
+
             
             # Kuzu expects the database path to be a directory that it manages
             # The directory should exist and contain Kuzu database files

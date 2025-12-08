@@ -32,12 +32,12 @@ function App() {
         fontSize: '14px',
         letterSpacing: '2px'
       }}>
-        🧠 VERSION 29.0 - AUTHORITATIVE BRAIN - SECOND BRAIN ACTIVE 🧠
+        🧠 VERSION 30.0 - V3 LEGEND IMPLEMENTATION - PROTOCOL ACTIVE 🧠
       </div>
       
-      {/* V28.0 COGNITIVE MIRROR - MEMORY TYPE LEGEND */}
+      {/* V3.0 COGNITIVE MIRROR - V3 LEGEND */}
       <div className="absolute top-4 right-4 bg-slate-900/95 p-4 rounded-xl border border-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.15)] text-xs font-mono z-50" style={{ marginTop: '40px', minWidth: '220px' }}>
-        <div className="font-bold text-cyan-400 mb-3 text-sm">🧠 SECOND BRAIN</div>
+        <div className="font-bold text-cyan-400 mb-3 text-sm">🧠 V30 LEGEND</div>
         
         {/* Stats Row */}
         <div className="flex justify-between mb-3 pb-2 border-b border-slate-700">
@@ -55,34 +55,41 @@ function App() {
           </div>
         </div>
 
-        {/* Memory Type Legend */}
+        {/* Memory Type Legend - V3 LAYERS */}
         <div className="mb-3">
-          <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Memory Types</div>
+          <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">V3 Layers</div>
           <div className="space-y-1.5">
+            {/* SELF LAYER */}
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.5)]"></div>
-              <span className="text-slate-300">Decision / Law</span>
-              <span className="text-[9px] text-slate-600 ml-auto">MUST FOLLOW</span>
+              <span className="text-slate-300">SELF (Identity)</span>
+              <span className="text-[9px] text-red-500 ml-auto">WHO</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-purple-500 shadow-[0_0_6px_rgba(168,85,247,0.5)]"></div>
-              <span className="text-slate-300">Insight / Wisdom</span>
-              <span className="text-[9px] text-slate-600 ml-auto">LEARNED</span>
+              <div className="w-3 h-3 rounded-full bg-orange-500 shadow-[0_0_6px_rgba(249,115,22,0.5)]"></div>
+              <span className="text-slate-300">SELF (Pref)</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-yellow-500 shadow-[0_0_6px_rgba(234,179,8,0.5)]"></div>
-              <span className="text-slate-300">Preference</span>
-              <span className="text-[9px] text-slate-600 ml-auto">YOUR STYLE</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]"></div>
-              <span className="text-slate-300">Episodic</span>
-              <span className="text-[9px] text-slate-600 ml-auto">PERSONAL</span>
-            </div>
-            <div className="flex items-center gap-2">
+
+            {/* WORLD LAYER */}
+            <div className="flex items-center gap-2 mt-2">
               <div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_6px_rgba(59,130,246,0.5)]"></div>
-              <span className="text-slate-300">Fact / Reference</span>
-              <span className="text-[9px] text-slate-600 ml-auto">KNOWLEDGE</span>
+              <span className="text-slate-300">WORLD (Fact)</span>
+              <span className="text-[9px] text-blue-500 ml-auto">WHAT</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-purple-600 shadow-[0_0_6px_rgba(124,58,237,0.5)]"></div>
+              <span className="text-slate-300">WORLD (Fail)</span>
+            </div>
+
+            {/* INTENT LAYER */}
+            <div className="flex items-center gap-2 mt-2">
+              <div className="w-3 h-3 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.5)]"></div>
+              <span className="text-slate-300">INTENT (Rule)</span>
+              <span className="text-[9px] text-white ml-auto">HOW</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.5)]"></div>
+              <span className="text-slate-300">INTENT (Goal)</span>
             </div>
           </div>
         </div>

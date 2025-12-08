@@ -1,20 +1,23 @@
 # 🧠 MEMORY NEURAL REGISTER
+
 ## System Immunity: Memory System Failure Laws
 
 **Purpose**: Permanent record of memory retrieval failures and cognitive architecture principles  
 **Status**: Active Neural Register  
-**Last Updated**: 2025-12-05
+**Last Updated**: 2025-12-07
 
 ---
 
 ## 📜 THE LAWS (Immutable Truths)
 
 ### LAW #1: Export Blockade Bypass
+
 **Statement**: Memory export MUST bypass the API layer and access ChromaDB `_collection` directly.
 
 **The API Limitation**: Standard ChromaDB API methods filter results by semantic relevance.
 
 **Problem**:
+
 ```python
 # ❌ Wrong: API filters by similarity
 results = collection.query(
@@ -25,6 +28,7 @@ results = collection.query(
 ```
 
 **Solution**:
+
 ```python
 # ✅ Correct: Direct collection access
 all_data = collection._collection.get(
@@ -42,6 +46,7 @@ all_data = collection._collection.get(
 ---
 
 ### LAW #2: Semantic Filter Awareness
+
 **Statement**: `searchMemories` tool applies semantic relevance filtering. Use `listAllMemories` for unfiltered access.
 
 **The Cognitive Trade-off**: Semantic search prioritizes relevance over completeness.
@@ -53,6 +58,7 @@ all_data = collection._collection.get(
 | `listAllMemories` | `collection._collection.get()` | Browse all memories | Complete dataset |
 
 **User Confusion Pattern**:
+
 ```
 User: "Show me all my memories about Python"
 AI uses: searchMemories(query="Python")
@@ -62,18 +68,21 @@ User expectation: ALL memories mentioning Python
 
 **Resolution**: Clarify in tool descriptions that `searchMemories` filters by relevance.
 
-**Best Practice**: 
+**Best Practice**:
+
 - Use `searchMemories` for "find the most relevant..."
 - Use `listAllMemories` + client-side filtering for "show me everything about..."
 
 ---
 
 ### LAW #3: Temporal Decay Implementation
+
 **Statement**: Memory importance MUST decay over time unless reinforced by retrieval.
 
 **Cognitive Model**: Human memory fades without rehearsal (Ebbinghaus forgetting curve).
 
 **Decay Formula**:
+
 ```python
 def calculate_decayed_importance(
     original_importance: int,
@@ -82,10 +91,10 @@ def calculate_decayed_importance(
 ) -> float:
     # Base decay: 10% per 30 days
     decay_factor = 0.9 ** (days_since_creation / 30)
-    
+
     # Reinforcement: +5% per retrieval (max 2x)
     reinforcement = min(1.0 + (retrieval_count * 0.05), 2.0)
-    
+
     return original_importance * decay_factor * reinforcement
 ```
 
@@ -98,9 +107,11 @@ def calculate_decayed_importance(
 ---
 
 ### LAW #4: Conversation Context Separation
+
 **Statement**: Conversation context (session buffer) and stored memories (persistent database) are SEPARATE systems.
 
 **Architecture**:
+
 ```
 Session Buffer (RAM):
 - Last N messages in current conversation
@@ -114,6 +125,7 @@ Persistent Memory (ChromaDB + Kuzu):
 ```
 
 **Search Behavior**:
+
 ```python
 # searchMemories with include_conversation=True
 results = {
@@ -130,11 +142,13 @@ results = {
 ---
 
 ### LAW #5: Deduplication Intelligence
+
 **Statement**: Memory ingestion MUST detect and flag duplicates/contradictions before storage.
 
 **The Redundancy Problem**: Users repeat information, creating memory bloat.
 
 **Ingestion Pipeline**:
+
 ```
 1. New memory arrives
 2. Semantic search for similar existing memories (threshold: 0.85)
@@ -149,6 +163,7 @@ results = {
 **Implementation**: `src/core/deduplication.py` (planned)
 
 **Metrics**:
+
 - Duplicate detection rate: ~15% of ingestion attempts
 - False positive rate: <2% (verified by user feedback)
 
@@ -159,6 +174,7 @@ results = {
 ## 🔬 FAILURE PATTERNS (Documented Cases)
 
 ### Pattern #1: Incomplete Export (2025-12-04)
+
 **Trigger**: Using `collection.query()` for export operations  
 **Symptom**: Export returns 10 memories instead of 86  
 **Root Cause**: API applies semantic filtering even with high n_results  
@@ -167,6 +183,7 @@ results = {
 **Prevention**: Document export vs search distinction
 
 ### Pattern #2: Semantic Search Confusion (2025-12-03)
+
 **Trigger**: User asks "show all memories about X"  
 **Symptom**: Only top 10 results returned  
 **Root Cause**: `searchMemories` prioritizes relevance over completeness  
@@ -175,6 +192,7 @@ results = {
 **Prevention**: Clarify tool descriptions, educate users
 
 ### Pattern #3: Session Context Loss (2025-12-02)
+
 **Trigger**: User restarts IDE, expects AI to remember recent conversation  
 **Symptom**: AI has no memory of previous session  
 **Root Cause**: Session buffer not persisted to database  
@@ -182,21 +200,42 @@ results = {
 **Resolution**: Auto-save session buffer on exit  
 **Prevention**: Document session vs persistent memory distinction
 
+### Pattern #4: V3 Schema Fields Not Persisting (2025-12-07)
+
+**Trigger**: Adding memories with layer/sublayer, retrieving shows world/fact  
+**Symptom**: All memories appear as "world/fact" despite classifier returning varied values  
+**Root Cause**: `VectorStore.add_memory()` and `_reconstruct_memory()` both missing layer/sublayer fields  
+**Impact**: 8+ hours debugging (field must be mapped in BOTH write AND read)  
+**Resolution**: Added layer/sublayer to metadata dict construction AND reconstruction  
+**Prevention**: Test roundtrip: add memory → read back → verify all fields preserved
+
+### Pattern #5: Semantic Redundancy (2025-12-07)
+
+**Trigger**: Users expressing same preference ("I want absolute imports") multiple times  
+**Symptom**: Dashboard shows 6+ nodes for identical concept (e.g., `Self-Pref-Absolute`)  
+**Root Cause**: Ingestion "Similarity Check" (0.85 threshold) allows near-duplicates; Visual inspection reveals them  
+**Impact**: Dashboard clutter, diluted importance  
+**Resolution**: Implemented View-Level Deduplication (Group by Semantic Title → Keep Best Rule)  
+**Prevention**: Harden Ingestion Pipeline with stricter Logic-Level Deduplication (planned)
+
 ---
 
 ## 🛡️ SAFEGUARDS (Active Protections)
 
 ### Safeguard #1: Export Verification
+
 **Location**: `scripts/export_memories_csv.py`  
 **Action**: Count memories before/after export, verify completeness  
 **Response**: Alert if counts don't match
 
 ### Safeguard #2: Deduplication Analysis
+
 **Location**: `src/core/deduplication.py`  
 **Action**: LLM-powered similarity detection before storage  
 **Response**: Prevent redundant memories, flag contradictions
 
 ### Safeguard #3: Temporal Consolidation
+
 **Location**: `src/core/temporal_consolidation.py`  
 **Action**: Periodic decay calculation, merge low-importance memories  
 **Response**: Maintain memory quality over time
@@ -206,15 +245,18 @@ results = {
 ## 📊 METRICS
 
 ### Export Completeness
+
 - **Before Fix**: 10/86 memories (11.6%)
 - **After Fix**: 86/86 memories (100%)
 
 ### Duplicate Detection
+
 - **Duplicates Caught**: ~15% of ingestion attempts
 - **False Positives**: <2%
 - **User Satisfaction**: 95% (based on feedback)
 
 ### Memory Retrieval Accuracy
+
 - **Semantic Search Precision**: 92% (top 10 results)
 - **Semantic Search Recall**: 78% (all relevant results)
 - **List All Completeness**: 100% (by definition)
@@ -224,24 +266,30 @@ results = {
 ## 🎯 COGNITIVE ARCHITECTURE PRINCIPLES
 
 ### Principle #1: Dual-Process Memory
+
 **Inspiration**: Human memory has working memory (short-term) and long-term storage
 
 **Implementation**:
+
 - Session buffer = Working memory (fast, volatile)
 - ChromaDB + Kuzu = Long-term memory (persistent, searchable)
 
 ### Principle #2: Forgetting as Feature
+
 **Inspiration**: Forgetting prevents cognitive overload (Ebbinghaus curve)
 
 **Implementation**:
+
 - Temporal decay reduces importance over time
 - Consolidation merges low-importance memories
 - Retrieval reinforces important memories
 
 ### Principle #3: Semantic Organization
+
 **Inspiration**: Human memory organized by meaning, not chronology
 
 **Implementation**:
+
 - Vector embeddings for semantic similarity
 - Knowledge graph for conceptual relationships
 - Space-based categorization for navigation
