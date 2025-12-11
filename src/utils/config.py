@@ -70,7 +70,7 @@ class OrchestratorConfig(BaseModel):
 
 class MCPServerConfig(BaseModel):
     """MCP server configuration"""
-    name: str = "elefante-memory"
+    name: str = "elefante"
     version: str = "1.0.0"
     description: str = "Local AI Memory System with Vector and Graph Storage"
     port: Optional[int] = None

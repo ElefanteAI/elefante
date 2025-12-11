@@ -36,7 +36,7 @@ elefante:
 
   # MCP Server Configuration
   mcp_server:
-    name: "elefante-memory"
+    name: "elefante"
     version: "1.0.0"
     description: "Local AI Memory System with Vector and Graph Storage"
     # Optional HTTP endpoint (leave commented for stdio only)

@@ -57,7 +57,7 @@ class ElefanteMCPServer:
     
     def __init__(self):
         """Initialize MCP server with lazy loading"""
-        self.server = Server("elefante-memory")
+        self.server = Server("elefante")
         self.orchestrator = None # Lazy loaded
         self.logger = get_logger(self.__class__.__name__)
         self.mode_manager = get_mode_manager()  # Elefante Mode manager (v1.0.1)
