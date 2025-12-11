@@ -1,6 +1,6 @@
 # Technical Documentation Index
 
-**Status**: ✅ Production (v1.0.0)  
+**Status**: ✅ Production (v1.0.1)  
 **Purpose**: Complete technical reference for Elefante AI Memory System
 
 ---
@@ -58,7 +58,9 @@
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Dual Storage (ChromaDB + Kuzu) | ✅ | Production |
-| MCP Server (11 tools) | ✅ | Production |
+| MCP Server (14 tools) | ✅ | Production |
+| ELEFANTE_MODE (Multi-IDE Safety) | ✅ | v1.0.1 |
+| Auto-Inject Pitfalls | ✅ | v1.0.1 |
 | Cognitive Analysis (emotions, intent) | ✅ | Requires OpenAI API key |
 | Temporal Decay | ✅ | Production |
 | Entity/Relationship Extraction | ✅ | Production |
@@ -76,5 +78,5 @@
 
 ---
 
-**Version**: 1.0.0  
-**Last Updated**: 2025-12-06
+**Version**: 1.0.1  
+**Last Updated**: 2025-12-11

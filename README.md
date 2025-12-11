@@ -1,8 +1,8 @@
-# Elefante v1.0.0
+# Elefante v1.0.1
 
 **Local-First AI Memory System with Perfect Recall**
 
-> **Current Release:** v1.0.0 - Production baseline
+> **Current Release:** v1.0.1 - Multi-IDE Safety & Protocol Enforcement
 
 Elefante gives AI agents a stateful brain by combining semantic search, knowledge graphs, and conversation context—all running 100% locally on your machine. No cloud. No data egress. Just pure, private memory.
 
@@ -98,7 +98,7 @@ See [`docs/technical/architecture.md`](docs/technical/architecture.md) for detai
 
 ---
 
-## MCP Tools (11 Total)
+## MCP Tools (14 Total)
 
 Once installed, your AI agent gets these tools:
 
@@ -115,6 +115,9 @@ Once installed, your AI agent gets these tools:
 | `consolidateMemories` | Merge duplicates & resolve contradictions | (Auto-triggered or manual) |
 | `listAllMemories` | Export/inspect all memories (no filtering) | "List all memories for backup" |
 | `openDashboard` | Launch visual Knowledge Garden UI | "Open the dashboard" |
+| `enableElefante` | Acquire exclusive locks, enable memory ops | "Enable Elefante" |
+| `disableElefante` | Release locks, safe for IDE switch | "Disable Elefante" |
+| `getElefanteStatus` | Check mode status and lock info | "Is Elefante enabled?" |
 
 **Key Features**:
 - **Intelligent Ingestion**: `addMemory` auto-detects NEW/REDUNDANT/RELATED/CONTRADICTORY
@@ -122,6 +125,7 @@ Once installed, your AI agent gets these tools:
 - **Hybrid Search**: Combines semantic (ChromaDB) + structured (Kuzu) + context
 - **Graph Analytics**: Direct Cypher query support via `queryGraph`
 - **Visual Exploration**: Interactive dashboard via `openDashboard`
+- **Multi-IDE Safety**: ELEFANTE_MODE prevents lock conflicts between IDEs
 
 See [`docs/technical/usage.md`](docs/technical/usage.md) for complete API reference.
 
@@ -148,11 +152,13 @@ See [`docs/technical/dashboard.md`](docs/technical/dashboard.md) for complete gu
 
 ## Development Status
 
-**Current Version**: v1.0.0 (Production)
+**Current Version**: v1.0.1 (Production)
 
 ### Implemented
 - ✅ Triple-layer architecture (ChromaDB + Kuzu + Context)
-- ✅ MCP server with 11 tools
+- ✅ MCP server with 14 tools
+- ✅ ELEFANTE_MODE (Multi-IDE safety with exclusive locking)
+- ✅ Auto-Inject Pitfalls (Protocol enforcement in responses)
 - ✅ Cognitive memory model (LLM extracts emotions, intent, entities, relationships)
 - ✅ Temporal decay (memories fade, reinforced on access)
 - ✅ Visual dashboard

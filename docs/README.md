@@ -1,6 +1,6 @@
 # Elefante Documentation
 
-**Complete documentation index for Elefante AI Memory System v1.0.0**
+**Complete documentation index for Elefante AI Memory System v1.0.1**
 
 ---
 
@@ -87,7 +87,7 @@
 
 ## 🔌 MCP Tools Reference
 
-Elefante provides **11 MCP tools** for AI agents:
+Elefante provides **14 MCP tools** for AI agents:
 
 | Tool | Purpose |
 |------|---------|
@@ -102,6 +102,9 @@ Elefante provides **11 MCP tools** for AI agents:
 | `consolidateMemories` | Merge duplicates & resolve contradictions |
 | `listAllMemories` | Export/inspect all memories (no filtering) |
 | `openDashboard` | Launch visual Knowledge Garden UI |
+| `enableElefante` | Acquire exclusive locks, enable memory operations |
+| `disableElefante` | Release locks, safe for IDE switching |
+| `getElefanteStatus` | Check mode status and lock information |
 
 **Complete API reference**: [`technical/usage.md`](technical/usage.md)
 
@@ -133,7 +136,7 @@ Elefante provides **11 MCP tools** for AI agents:
 
 ## Current Development Status
 
-**Version**: v1.0.0 (Production)  
+**Version**: v1.0.1 (Production)  
 **Next**: v1.1.0 - Complete Schema V2 Auto-Classification
 
 **Priority Features** (from [`planning/roadmap.md`](planning/roadmap.md)):
@@ -166,11 +169,11 @@ Immutable "Laws" extracted from debugging sessions - the system's immune memory.
 ## Documentation Statistics
 
 - **Technical Docs**: 10 production documents
-- **Neural Registers**: 5 master registers
+- **Neural Registers**: 5 master registers (12+ Laws)
 - **Debug Source Docs**: 5 compendium folders
 - **Planning Docs**: 3 roadmap documents
 - **Archive**: Historical/releases folders
-- **MCP Tools**: 11 fully documented
+- **MCP Tools**: 14 fully documented
 
 ---
 
@@ -271,9 +274,15 @@ archive/protocol-enforcement-v2.md
 
 ## Maintenance
 
-**Last Updated**: 2025-12-06  
-**Documentation Version**: v1.0.0  
+**Last Updated**: 2025-12-11  
+**Documentation Version**: v1.0.1  
 **Status**: ✅ Complete and up-to-date
+
+**Changes in v1.0.1**:
+- ✅ Added ELEFANTE_MODE (3 new tools for multi-IDE safety)
+- ✅ Added Auto-Inject Pitfalls (protocol enforcement)
+- ✅ Updated tool count to 14
+- ✅ LAW 5 file hygiene audit completed
 
 **Changes in v1.0.0**:
 - ✅ Reorganized into technical/debug/planning/archive taxonomy

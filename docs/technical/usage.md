@@ -13,9 +13,9 @@ Once connected to your IDE, use natural language to interact with Elefante.
 
 ---
 
-## 2. MCP Tools (11 Total)
+## 2. MCP Tools (14 Total)
 
-The MCP server exposes 11 tools to your AI agent:
+The MCP server exposes 14 tools to your AI agent:
 
 ### Core Memory Operations
 
@@ -255,6 +255,63 @@ RETURN p
 **Example**:
 ```
 "Open the dashboard" or "Show me my knowledge graph"
+```
+
+---
+
+### ELEFANTE_MODE Operations (Multi-IDE Safety)
+
+#### `enableElefante`
+**Purpose**: Acquire exclusive locks and enable memory operations
+
+**CRITICAL**: Server starts in OFF mode by default. User must call this tool before any memory operations work.
+
+**Behavior**:
+- Acquires exclusive locks on ChromaDB and Kuzu databases
+- Stores lock holder info (PID, timestamp)
+- Enables all memory tools
+
+**Parameters**: None
+
+**Returns**:
+- Success: Lock acquired, mode enabled
+- Failure: Another IDE holds locks (shows holder info)
+
+**Example**:
+```
+"Enable Elefante" or "Start memory system"
+```
+
+#### `disableElefante`
+**Purpose**: Release exclusive locks and return to OFF state
+
+**Use Case**: Before switching to another IDE (VS Code → Cursor → Claude Desktop)
+
+**Behavior**:
+- Releases all database locks
+- Cleans up lock files
+- Returns server to OFF state
+
+**Parameters**: None
+
+**Example**:
+```
+"Disable Elefante" or "Release memory locks"
+```
+
+#### `getElefanteStatus`
+**Purpose**: Check current mode, lock status, and holder information
+
+**Returns**:
+- Current mode (ON/OFF)
+- Lock file status
+- If locked by another process: PID, timestamp, holder info
+
+**Parameters**: None
+
+**Example**:
+```
+"Is Elefante enabled?" or "Check memory system status"
 ```
 
 ---
