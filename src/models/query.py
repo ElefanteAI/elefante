@@ -6,7 +6,7 @@ from enum import Enum
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from uuid import UUID
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.models.memory import Memory
 
@@ -36,19 +36,22 @@ class QueryPlan(BaseModel):
     
     # Graph-specific
     max_depth: int = Field(default=2, ge=1, le=5)
-    
-    def __post_init__(self):
-        """Validate weights sum to 1.0"""
-        total = self.vector_weight + self.graph_weight
+
+    @model_validator(mode="after")
+    def normalize_weights(self):
+        """Ensure vector_weight + graph_weight ~= 1.0 (normalize if needed)."""
+        total = float(self.vector_weight) + float(self.graph_weight)
+        if total <= 0.0:
+            self.vector_weight = 0.5
+            self.graph_weight = 0.5
+            return self
+
         if abs(total - 1.0) > 0.01:
-            # Normalize weights
-            self.vector_weight = self.vector_weight / total
-            self.graph_weight = self.graph_weight / total
+            self.vector_weight = float(self.vector_weight) / total
+            self.graph_weight = float(self.graph_weight) / total
+        return self
     
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat(),
-        }
+    model_config = ConfigDict()
 
 
 class SearchResult(BaseModel):
@@ -65,10 +68,7 @@ class SearchResult(BaseModel):
     matched_entities: List[UUID] = Field(default_factory=list)
     relationship_path: Optional[List[str]] = None
     
-    class Config:
-        json_encoders = {
-            UUID: lambda v: str(v),
-        }
+    model_config = ConfigDict()
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
@@ -116,11 +116,7 @@ class SearchFilters(BaseModel):
     include_stored: bool = True
     conversation_weight: float = Field(default=0.3, ge=0.0, le=1.0)
     
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat(),
-            UUID: lambda v: str(v),
-        }
+    model_config = ConfigDict()
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for database queries"""
