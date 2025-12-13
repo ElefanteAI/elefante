@@ -10,12 +10,15 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
-- Local LLM support via OpenAI-compatible endpoints (e.g., Ollama) with best-effort auto-detect when `OPENAI_API_KEY` is not set.
-- LLM env overrides: `ELEFANTE_LLM_PROVIDER`, `ELEFANTE_LLM_BASE_URL`, `ELEFANTE_LLM_MODEL`, `ELEFANTE_LLM_API_KEY`.
+- Agent-managed enrichment architecture: Elefante never calls an LLM; agents pass enrichment via tool inputs.
 
 ### Changed
 - MCP tool names standardized with an `elefante*` prefix (see MCP tool list in `src/mcp/server.py`).
 - Protocol injection key standardized to `MANDATORY_PROTOCOLS_READ_THIS_FIRST`.
+
+### Removed
+- Internal LLM connectivity and config/env overrides for LLM providers.
+- OpenAI-based embeddings provider path (embeddings are local-only via sentence-transformers).
 
 ## [1.0.1] - 2025-12-11
 
@@ -87,7 +90,7 @@ First stable production release with comprehensive documentation cleanup.
   - `migrateMemoriesV3` - Admin schema migration to V3
 
 - **Cognitive Memory Model**
-  - LLM-powered extraction of emotions, intent, entities, relationships
+  - Agent-managed enrichment of emotions, intent, entities, relationships (no internal LLM calls)
   - Strategic insight generation
   - ADD/UPDATE/IGNORE action logic
 

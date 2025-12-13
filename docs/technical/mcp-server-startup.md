@@ -42,7 +42,7 @@ The MCP Server:
 
 1. Starts and waits for connections on **stdin/stdout** (stdio protocol)
 2. Receives JSON-RPC requests from the IDE (VS Code, Cursor, Bob)
-3. Exposes 11 MCP tools for memory operations
+3. Exposes 15 MCP tools for memory operations
 4. Returns JSON-RPC responses
 
 ### What It Does NOT Do
@@ -211,90 +211,9 @@ python -m src.mcp.server
 
 **Fix**:
 
-**For VS Code (Built-in MCP)** (edit `mcp.json`):
+All IDE-specific MCP config file paths and JSON formats are documented here:
 
-You can open the correct file from the Command Palette:
-
-- `MCP: Open User Configuration`
-- `MCP: Open Workspace Folder Configuration`
-
-Common user configuration locations:
-
-- macOS (stable): `~/Library/Application Support/Code/User/mcp.json`
-- macOS (Insiders): `~/Library/Application Support/Code - Insiders/User/mcp.json`
-- Windows (stable): `%APPDATA%\\Code\\User\\mcp.json`
-- Windows (Insiders): `%APPDATA%\\Code - Insiders\\User\\mcp.json`
-- Linux (stable): `~/.config/Code/User/mcp.json`
-- Linux (Insiders): `~/.config/Code - Insiders/User/mcp.json`
-
-Example `mcp.json` configuration:
-
-```json
-{
-  "servers": {
-    "elefante": {
-      "type": "stdio",
-      "command": "/absolute/path/to/Elefante/.venv/bin/python",
-      "args": ["-m", "src.mcp.server"],
-      "env": {
-        "PYTHONPATH": "/absolute/path/to/Elefante",
-        "ELEFANTE_CONFIG_PATH": "/absolute/path/to/Elefante/config.yaml"
-      }
-    }
-  }
-}
-```
-
-**For VS Code (Roo-Cline Extension)** (edit `.vscode/settings.json`):
-
-```json
-{
-  "roo-cline.mcpServers": {
-    "elefante": {
-      "command": "/absolute/path/to/Elefante/.venv/bin/python",
-      "args": ["-m", "src.mcp.server"],
-      "cwd": "/absolute/path/to/Elefante",
-      "env": {
-        "PYTHONPATH": "/absolute/path/to/Elefante"
-      }
-    }
-  }
-}
-```
-
-**For Cursor/Bob** (edit `mcp_config.json`):
-
-```json
-{
-  "mcpServers": {
-    "elefante": {
-      "command": "/absolute/path/to/Elefante/.venv/bin/python",
-      "args": ["-m", "src.mcp.server"],
-      "cwd": "/absolute/path/to/Elefante",
-      "env": {
-        "PYTHONPATH": "/absolute/path/to/Elefante"
-      }
-    }
-  }
-}
-```
-
-**For Antigravity (Google)** (edit `~/.gemini/antigravity/mcp_config.json`):
-
-On Windows, this file is typically:
-
-- `%USERPROFILE%\\.gemini\\antigravity\\mcp_config.json`
-
-Antigravity uses an MCP config file similar to Cursor/Bob. You can generate/update it with:
-
-```bash
-python scripts/configure_antigravity.py
-```
-
-**For Bob-IDE (IBM Bob)**:
-
-Some Bob-IDE distributions store MCP servers in `mcp_settings.json` (a separate file from `settings.json`).
-The auto-config script updates it when present.
+- See [docs/technical/ide-mcp-configuration.md](docs/technical/ide-mcp-configuration.md)
 
 **Key Points**:
 

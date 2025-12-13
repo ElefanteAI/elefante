@@ -1,7 +1,7 @@
 # Elefante Development Roadmap
 
-**Current Version**: v1.0.0  
-**Last Updated**: 2025-12-10
+**Current Version**: v1.0.1  
+**Last Updated**: 2025-12-13
 
 ---
 
@@ -24,7 +24,7 @@
 ## Current State (v1.0.0)
 
 ###  Implemented Features
-- **Cognitive Memory Model** - LLM extracts emotional context, intent, entities, relationships
+- **Cognitive Memory Model** - Agent-managed enrichment (agent supplies intent/entities/relationships)
 - **Temporal Decay** - Memories decay over time, reinforced on access
 - **Dual Storage** - ChromaDB (vectors) + Kuzu (graph)
 - **MCP Server** - 15 tools for IDE integration
@@ -41,9 +41,9 @@
 ## Next Phase: v1.1.0 - Complete Schema V2
 
 ### Priority 1: Auto-Classification (HIGH)
-**Goal**: LLM automatically detects domain and category
+**Goal**: Agent automatically detects domain/category and passes them into Elefante (Elefante remains LLM-free).
 
-#### 1. Enhanced LLM Extraction
+#### 1. Enhanced Agent Extraction
 **Goal**: Deeper semantic understanding of memories
 
 **Tasks**:
@@ -54,21 +54,17 @@
   - Extract implicit knowledge (assumptions, implications)
 
 **Technical Approach**:
-- Enhance LLM prompts for deeper analysis
+- Improve agent prompts/workflow for deeper analysis
 - Add multi-pass extraction (entities -> relationships -> implications)
 - Implement confidence scoring for extracted information
 
-#### 2. Smart UPDATE (Merge Logic)
-**Goal**: Intelligently merge new information with existing memories
+#### 2. Agent Enrichment Contract (No internal LLM)
+**Goal**: Make the agent-to-Elefante contract explicit and stable.
 
 **Tasks**:
-- [ ] Update `llm.py` prompt to detect domain (work/personal/learning/project/reference)
-- [ ] Update `llm.py` prompt to suggest category based on content
-- [ ] Update `orchestrator.py` to apply LLM suggestions to metadata
-
-**Files to Modify**:
-- `src/core/llm.py` - Add domain/category to analysis prompt
-- `src/core/orchestrator.py` - Apply extracted domain/category
+- [ ] Document the minimal agent-supplied fields that improve storage quality (e.g., `metadata.title`, `metadata.layer`, `metadata.sublayer`, `metadata.domain`, `metadata.category`, `entities`, `relationships`).
+- [ ] Ensure Elefante accepts/round-trips these fields deterministically.
+- [ ] Keep Elefante runtime free of LLM provider calls; enrichment belongs in the calling agent.
 
 ---
 

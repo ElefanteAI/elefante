@@ -50,33 +50,9 @@ Simply talk to your AI agent:
 
 Elefante handles the rest—storing, indexing, and retrieving with perfect accuracy.
 
-### Local LLM (No Paid API Keys)
+### Agent-Managed LLM (No Internal LLM Calls)
 
-Elefante uses an LLM internally as an “agent brain” for titles, summaries, and categorization. You can run that locally.
-
-#### Ollama (recommended)
-
-1) Start Ollama
-
-```bash
-ollama serve
-```
-
-1) Pull a model
-
-```bash
-ollama pull llama3.1:8b
-```
-
-1) Point Elefante at Ollama’s OpenAI-compatible endpoint
-
-```bash
-export ELEFANTE_LLM_PROVIDER=local
-export ELEFANTE_LLM_BASE_URL=http://localhost:11434/v1
-export ELEFANTE_LLM_MODEL=llama3.1:8b
-```
-
-If `OPENAI_API_KEY` is not set, Elefante will also auto-detect a local Ollama server at `http://localhost:11434/v1` (best-effort) and use it.
+Elefante never connects to an LLM. The calling agent handles any LLM connectivity and passes the results into Elefante via MCP tool arguments (e.g., `metadata.title`, `metadata.layer`, `metadata.sublayer`, `entities`).
 
 ---
 
@@ -85,9 +61,16 @@ If `OPENAI_API_KEY` is not set, Elefante will also auto-detect a local Ollama se
 ### Start Here
 
 - **New Users**: [`docs/technical/installation.md`](docs/technical/installation.md) - Complete setup guide
+- **IDE MCP setup (VS Code / Cursor / Bob / Antigravity)**: [`docs/technical/ide-mcp-configuration.md`](docs/technical/ide-mcp-configuration.md)
 - **Understanding the System**: [`docs/technical/architecture.md`](docs/technical/architecture.md) - How it works
 - **Using the API**: [`docs/technical/usage.md`](docs/technical/usage.md) - MCP tools & examples
 - **Visual Dashboard**: [`docs/technical/dashboard.md`](docs/technical/dashboard.md) - Knowledge graph UI
+- **Developer Etiquette (canonical rules)**: [`docs/technical/developer-etiquette.md`](docs/technical/developer-etiquette.md)
+
+### Safety (Production Defaults)
+
+- Destructive maintenance scripts are designed to be **safe-by-default** (dry-run unless explicitly opted in).
+- When you see `--apply` / `--confirm DELETE` / `ELEFANTE_PRIVILEGED=1`, those are intentional safety gates to prevent accidental data loss.
 
 ### Complete Documentation
 
@@ -169,7 +152,11 @@ Launch the interactive knowledge graph:
 
 ```bash
 cd Elefante
+# Windows
 .venv\Scripts\python.exe -m src.dashboard.server
+
+# macOS/Linux
+.venv/bin/python -m src.dashboard.server
 ```
 
 Open http://127.0.0.1:8000 to explore:
@@ -191,7 +178,7 @@ See [`docs/technical/dashboard.md`](docs/technical/dashboard.md) for complete gu
 -  MCP server with 15 tools
 -  ELEFANTE_MODE (Multi-IDE safety with exclusive locking)
 -  Auto-Inject Pitfalls (Protocol enforcement in responses)
--  Cognitive memory model (LLM extracts emotions, intent, entities, relationships)
+-  Agent-driven enrichment (agent supplies intent/emotions/entities/relationships when desired)
 -  Temporal decay (memories fade, reinforced on access)
 -  Visual dashboard
 -  Automated installation safeguards
@@ -201,7 +188,7 @@ See [`docs/technical/dashboard.md`](docs/technical/dashboard.md) for complete gu
 -  Dashboard UX - Functional but needs visual improvements
 
 ### Planned (v1.1.0)
-- [ ] Auto-classification of domain/category via LLM
+- [ ] Auto-classification of domain/category via agent enrichment
 - [ ] Smart UPDATE (merge instead of duplicate)
 - [ ] Dashboard semantic zoom
 

@@ -1,10 +1,11 @@
-# Memory Schema V3 (Authoritative)
+# Memory Schema V3 (Superseded)
 
 **Version**: 3.0.0
-**Status**: ACTIVE
+**Status**: SUPERSEDED (See `memory-schema-v4.md`)
 **Supersedes**: `memory-schema-v2.md`
+**Superseded By**: `memory-schema-v4.md`
 
-> **Note**: This is the strict, authoritative schema used by the "Second Brain" version of Elefante. All memories MUST be classified into this hierarchy.
+> **Note**: V3 defines the taxonomy (layer/sublayer) but does not fully enforce canonicalization (one active memory per concept) or namespace isolation for test data. V4 formalizes those missing invariants.
 
 ---
 

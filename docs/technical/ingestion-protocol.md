@@ -26,10 +26,10 @@ Every memory ingestion (`add_memory`) MUST pass through these five stages:
 3.  **INTEGRITY (Logic-Level Deduplication)**
 
     - **Goal**: Prevent "Bag of Dots" (redundancy).
-    - **Method**: `Subject-Aspect-Qualifier` (SAQ) Title Generaton.
-    - **Check**: Does a memory with this **SAQ Title** already exist?
-      - **YES**: Trigger **Reinforcement Protocol**.
-      - **NO**: Proceed to Creation.
+        - **Method**: Deterministic `Subject-Aspect-Qualifier` (SAQ) key generation.
+        - **Check**: Does an ACTIVE memory with this **canonical key** already exist (in the same namespace)?
+                - **YES**: Trigger **Reinforcement Protocol**.
+                - **NO**: Proceed to Creation.
 
 4.  **WRITE (Storage)**
 
@@ -45,9 +45,9 @@ Every memory ingestion (`add_memory`) MUST pass through these five stages:
 
 ---
 
-## Semantic Title Generation (SAQ)
+## Canonical Key Generation (SAQ)
 
-Titles are the Primary Key for deduplication. They must follow the **SAQ Pattern**:
+The SAQ string is the canonical key for deduplication. It must follow the **SAQ Pattern**:
 
 **Format**: `{Subject}-{Aspect}-{Qualifier}`
 **Max Length**: 30 chars
@@ -63,24 +63,31 @@ Titles are the Primary Key for deduplication. They must follow the **SAQ Pattern
 
 ---
 
-## Logic-Level Deduplication (The Update Path)
+## Logic-Level Deduplication (Reinforce vs Supersede)
 
 The system distinguishes between **New Knowledge** and **Reinforced Knowledge**.
 
 ```python
-# Pseudo-code logic in Orchestrator
-title = llm.generate_title(content)
-existing = vector_store.find_by_title(title)
+# Pseudo-code logic in Orchestrator (LLM-free)
+canonical_key = agent_or_rules_generate_saq(content)
+namespace = route_namespace(content, tags, source)
 
-if existing:
-    # REINFORCEMENT PATH
-    print(f" Reinforcing existing memory: {existing.id}")
-    orchestrator.update_access(existing.id)
-    return existing.id
-else:
-    # CREATION PATH
-    print(f" Creating new memory: {title}")
-    return vector_store.add(content, title, ...)
+active = vector_store.find_active_by_canonical_key(
+    canonical_key=canonical_key,
+    namespace=namespace,
+)
+
+if active is None:
+    return vector_store.add(content, canonical_key=canonical_key, namespace=namespace, ...)
+
+if hash(normalize(content)) == active.content_hash:
+    orchestrator.update_access(active.id)
+    return active.id
+
+# New version of same concept
+new_id = vector_store.add(content, canonical_key=canonical_key, namespace=namespace, supersedes_id=active.id, ...)
+vector_store.mark_superseded(active.id, superseded_by_id=new_id)
+return new_id
 ```
 
 **Why this matters**:

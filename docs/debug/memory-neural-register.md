@@ -164,7 +164,7 @@ results = {
 ```
 1. New memory arrives
 2. Semantic search for similar existing memories (threshold: 0.85)
-3. LLM analysis: NEW | REDUNDANT | RELATED | CONTRADICTORY
+3. Agent-managed analysis (no internal LLM calls): NEW | REDUNDANT | RELATED | CONTRADICTORY
 4. Action:
    - NEW: Store normally
    - REDUNDANT: Merge with existing, increment reinforcement
@@ -243,7 +243,7 @@ results = {
 ### Safeguard #2: Deduplication Analysis
 
 **Location**: `src/core/deduplication.py`  
-**Action**: LLM-powered similarity detection before storage  
+**Action**: Agent-managed similarity detection before storage (no internal LLM calls)  
 **Response**: Prevent redundant memories, flag contradictions
 
 ### Safeguard #3: Temporal Consolidation

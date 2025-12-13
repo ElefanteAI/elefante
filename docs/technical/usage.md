@@ -198,18 +198,21 @@ RETURN p
 ```
 
 #### `elefanteMemoryConsolidate`
-**Purpose**: Trigger background process to analyze, merge duplicates, resolve contradictions
+**Purpose**: Deterministic, LLM-free memory cleanup (canonicalize + de-duplicate)
 
 **Use Cases**:
 - User getting inconsistent information
 - Memory search returns too many near-identical results
 - Periodic maintenance
 
-**Process**:
-- Uses LLM to synthesize facts
-- Updates knowledge graph
-- Merges duplicate memories
-- Resolves contradictions
+**What it does (V4-compatible)**:
+- Assigns stable `canonical_key` (prefers existing SAQ `custom_metadata.title`)
+- Quarantines test/E2E memories into a `test` namespace (stored in `custom_metadata.namespace`)
+- Marks duplicates as `redundant`/`archived` and links them to the canonical winner
+
+**Safety**:
+- Default is **dry-run** (`force=false`) so you can inspect stats before changing data
+- Set `force=true` to apply cleanup updates
 
 **Parameters**:
 - `force` (optional): Force consolidation even if threshold not met (default: false)

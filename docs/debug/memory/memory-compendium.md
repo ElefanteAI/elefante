@@ -724,7 +724,7 @@ if "etiquette" in memory.content.lower():
 
 **Option 3: Better embedding model**
 ```python
-# Consider: text-embedding-3-small (OpenAI) or larger sentence-transformers
+# Consider: a larger local sentence-transformers model if needed
 embedding_model = "BAAI/bge-base-en-v1.5"  # Better for retrieval
 ```
 

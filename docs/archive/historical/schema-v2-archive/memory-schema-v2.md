@@ -11,7 +11,7 @@
 
 This document specifies the enhanced memory schema for Elefante, designed to support a comprehensive "second brain" system with:
 - **3-level taxonomy** (domain -> category -> type)
-- **Automatic relationship detection** (LLM-powered)
+- **Automatic relationship detection** (agent-managed; no internal LLM calls)
 - **Confidence tracking** (verification & reliability)
 - **Temporal intelligence** (access patterns, decay, reinforcement)
 
@@ -423,7 +423,7 @@ CREATE REL TABLE ABOUT (FROM Memory TO Entity, centrality DOUBLE)
 
 ## Automatic Relationship Detection
 
-### LLM-Powered Analysis
+### Agent-Managed Analysis (LLM outside Elefante)
 
 When a new memory is added, the system:
 
@@ -588,7 +588,7 @@ async def migrate_v1_to_v2():
 - [ ] Add ChromaDB schema repair (topic column)
 
 ### Phase 3: Relationship Detection
-- [ ] Implement LLM-powered analysis
+- [ ] Implement agent-managed analysis (LLM outside Elefante)
 - [ ] Create fallback similarity-based detection
 - [ ] Add relationship edge creation in Kuzu
 
