@@ -20,6 +20,10 @@ from mcp.types import (
     TextContent,
     ImageContent,
     EmbeddedResource,
+    Prompt,
+    PromptMessage,
+    PromptArgument,
+    GetPromptResult,
 )
 import webbrowser
 from src.dashboard.server import serve_dashboard_in_thread
@@ -131,24 +135,19 @@ class ElefanteMCPServer:
             tools = [
                 types.Tool(
                     name="elefanteMemoryAdd",
-                    description="""Store a new memory in Elefante - the user's second brain.
+                    description="""Store a new memory in Elefante's dual-database system.
 
-**PRIMARY TRIGGER: "elefante:"**
-When user says "elefante: [anything]" with intent to SAVE, use this tool.
+**YOU ARE ELEFANTE'S BRAIN** - You must classify the memory as you store it:
+- **layer**: self (who), world (what), intent (do)
+- **sublayer**: 
+  - SELF: identity, preference, constraint
+  - WORLD: fact, failure, method
+  - INTENT: rule, goal, anti-pattern
+- **importance**: How critical? 1-10 (8+ for preferences, decisions, critical facts)
 
-Examples that MUST trigger this tool:
-- "elefante: remember this"
-- "elefante: save this"  
-- "elefante: store this"
-- "elefante: note that I prefer X"
-- "elefante: I always want Y"
+ALWAYS provide layer and sublayer. You understand the content - classify it.
 
-Secondary triggers: "remember this", "don't forget", "keep in mind"
-
-**CLASSIFICATION (required):**
-- layer: self (who I am), world (facts), intent (rules)
-- sublayer: identity/preference/constraint (self), fact/failure/method (world), rule/goal/anti-pattern (intent)
-- importance: 1-10 (use 8+ for preferences, decisions)""",
+INTELLIGENT INGESTION: The system automatically detects duplicates (REDUNDANT), related memories (RELATED), or contradictions (CONTRADICTORY) and links to existing knowledge.""",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -219,28 +218,28 @@ Secondary triggers: "remember this", "don't forget", "keep in mind"
                 ),
                 types.Tool(
                     name="elefanteMemorySearch",
-                    description="""Search Elefante - the user's second brain.
+                    description="""**CRITICAL: USE THIS TOOL FOR ALL MEMORY QUERIES** - Search Elefante's memory system when user asks about their preferences, past conversations, or anything they want you to remember. DO NOT search workspace files for memory queries.
 
-**PRIMARY TRIGGER: "elefante:"**
-When user says "elefante: [anything]" with intent to RETRIEVE, use this tool.
+**QUERY REWRITING REQUIREMENT:** Before calling this tool, you MUST rewrite the user's query to be standalone and specific. Replace ALL pronouns (it, that, this, he, she, they) and vague references with the actual entities from conversation context.
 
-Examples that MUST trigger this tool:
-- "elefante: what do you know about X"
-- "elefante: recall my preference for Y"
-- "elefante: check if we discussed Z"
-- "elefante: how do I like to do X"
-- "elefante: what did I say about Y"
+**Bad Queries (will fail):**
+- "How do I install it?" → Missing: what is "it"?
+- "Fix that error" → Missing: which error?
+- "What did he say about the project?" → Missing: who is "he"?
 
-Secondary triggers: "my preference", "we decided", "last time", "how I like"
+**Good Queries (will succeed):**
+- "How to install Elefante memory system on Windows"
+- "ChromaDB ImportError solution in Python"
+- "Jaime's preferences for development folder organization"
 
-**ALSO SEARCH when user asks about:**
-- Code style, formatting, naming conventions
-- Project decisions, architecture choices
-- "how should I" or "what's the best way" questions
-
-**WHEN IN DOUBT, SEARCH.** Fast. Better to find nothing than miss knowledge.
-
-**QUERY FORMAT:** Rewrite vague queries to be specific. No pronouns.""",
+This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using semantic, structured, or hybrid search modes. The database cannot infer context from pronouns - it needs explicit, searchable terms.
+                    
+**AUTOMATIC USAGE RULES:**
+1.  **ALWAYS** call this tool when the user asks an open-ended question about the project (e.g., "How does the auth system work?", "What are the coding standards?").
+2.  **ALWAYS** call this tool when the user refers to past decisions or preferences (e.g., "Do it like we discussed", "Use the usual style").
+3.  **NEVER** assume you know the answer if it might be in the memory. Check first.
+4.  **IF RESULTS ARE CONTRADICTORY:** The most recent memory (by timestamp) usually takes precedence, but check for "decision" or "fact" types over "conversation".
+5.  **IF RESULTS ARE IRRELEVANT:** Try a broader query or switch to `mode="semantic"` to catch fuzzy matches.""",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -674,8 +673,119 @@ Required fields:
             self.logger.info(f"=== Returning {len(tools)} tools to MCP client ===")
             return tools
         
-
+        # =========================================================================
+        # MCP PROMPTS - Inject grounding behavior into LLM context
+        # =========================================================================
         
+        @self.server.list_prompts()
+        async def list_prompts() -> list[Prompt]:
+            """List available prompts that inject memory-aware behavior"""
+            self.logger.info("=== list_prompts() handler called ===")
+            return [
+                Prompt(
+                    name="elefante-grounding",
+                    title="Elefante Memory Grounding",
+                    description="ALWAYS use this prompt at the start of conversations. It injects memory-aware behavior so the AI automatically checks memories before answering.",
+                    arguments=[]
+                ),
+                Prompt(
+                    name="elefante-context",
+                    title="Get Context Before Answering",
+                    description="Use this before answering any question about user preferences, past decisions, or project knowledge. Searches memories first.",
+                    arguments=[
+                        PromptArgument(
+                            name="topic",
+                            description="What topic to retrieve context for",
+                            required=True
+                        )
+                    ]
+                )
+            ]
+        
+        @self.server.get_prompt()
+        async def get_prompt(name: str, arguments: dict | None) -> GetPromptResult:
+            """Return prompt content for injection into LLM context"""
+            self.logger.info(f"=== get_prompt({name}) called ===")
+            
+            if name == "elefante-grounding":
+                return GetPromptResult(
+                    description="Elefante Memory Grounding Instructions",
+                    messages=[
+                        PromptMessage(
+                            role="user",
+                            content=TextContent(
+                                type="text",
+                                text="""# ELEFANTE MEMORY SYSTEM - ACTIVE
+
+You have access to a persistent memory system called **Elefante** - the user's second brain.
+
+## AUTOMATIC BEHAVIOR REQUIRED
+
+**BEFORE answering ANY question about:**
+- User preferences (coding style, tools, formatting)
+- Past decisions or discussions
+- Project-specific knowledge ("how we do X")
+- "The usual way" or "like we discussed"
+
+**YOU MUST first call `elefanteMemorySearch`** with a specific query.
+
+## RULE: When in doubt, SEARCH.
+- Memory search is FAST (< 100ms)
+- Better to search and find nothing than miss critical context
+- The user has invested time teaching you - use that knowledge
+
+## TRIGGER PATTERNS
+- "elefante:" prefix → ALWAYS act on this
+- "remember", "recall", "what did I say" → SEARCH first
+- "preference", "decision", "how do I like" → SEARCH first
+
+## NEVER DO THIS
+- Answer from general knowledge when user asks about THEIR preferences
+- Assume you know the answer without checking memories
+- Skip the memory search to be faster"""
+                            )
+                        )
+                    ]
+                )
+            
+            elif name == "elefante-context":
+                topic = arguments.get("topic", "") if arguments else ""
+                # Actually search memories and include results
+                try:
+                    orchestrator = await self._get_orchestrator()
+                    from src.models.query import QueryMode
+                    results = await orchestrator.search(
+                        query=topic,
+                        mode=QueryMode.HYBRID,
+                        limit=5,
+                        min_similarity=0.3
+                    )
+                    
+                    if results:
+                        memory_text = "\\n\\n".join([
+                            f"**Memory [{i+1}]** (score: {r.score:.2f}):\\n{r.content}"
+                            for i, r in enumerate(results)
+                        ])
+                        context_msg = f"# Relevant Memories for: {topic}\\n\\n{memory_text}\\n\\n---\\nUse this context to answer the user's question."
+                    else:
+                        context_msg = f"# No memories found for: {topic}\\n\\nNo relevant memories in the database. You may proceed with general knowledge, but note this is a gap in the user's knowledge base."
+                except Exception as e:
+                    context_msg = f"# Memory search failed\\n\\nError: {e}\\n\\nProceed with caution."
+                
+                return GetPromptResult(
+                    description=f"Memory context for: {topic}",
+                    messages=[
+                        PromptMessage(
+                            role="user",
+                            content=TextContent(
+                                type="text",
+                                text=context_msg
+                            )
+                        )
+                    ]
+                )
+            
+            raise ValueError(f"Unknown prompt: {name}")        
         @self.server.call_tool()
         async def call_tool(name: str, arguments: Dict[str, Any]) -> Sequence[TextContent | ImageContent | EmbeddedResource]:
             """Handle tool calls"""
