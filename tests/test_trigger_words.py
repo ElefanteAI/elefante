@@ -43,31 +43,31 @@ class TestTriggerWords:
         """Test memory fixtures - isolated with TEST_PREFIX"""
         return [
             {
-                "content": f"{TEST_PREFIX}User prefers Black formatter with line-length 100",
+                "content": f"{TEST_PREFIX}User prefers Black formatter for Python code formatting with line-length 100. This is the Python code style preference.",
                 "layer": "self",
                 "sublayer": "preference",
                 "importance": 8,
                 "category": TEST_NAMESPACE,
                 "memory_type": "preference",
-                "tags": ["test", "formatting", "python"],
+                "tags": ["test", "formatting", "python", "black"],
             },
             {
-                "content": f"{TEST_PREFIX}User decided to use pytest over unittest",
+                "content": f"{TEST_PREFIX}User decided to use pytest over unittest for Python testing framework. This is the testing decision.",
                 "layer": "intent",
                 "sublayer": "rule",
                 "importance": 7,
                 "category": TEST_NAMESPACE,
                 "memory_type": "decision",
-                "tags": ["test", "testing", "python"],
+                "tags": ["test", "testing", "python", "pytest"],
             },
             {
-                "content": f"{TEST_PREFIX}User's coding style: explicit over implicit",
+                "content": f"{TEST_PREFIX}User's coding style preference: explicit over implicit. Always be explicit in code, avoid implicit behavior.",
                 "layer": "self",
                 "sublayer": "preference",
                 "importance": 9,
                 "category": TEST_NAMESPACE,
                 "memory_type": "preference",
-                "tags": ["test", "style", "coding"],
+                "tags": ["test", "style", "coding", "explicit"],
             },
         ]
     
