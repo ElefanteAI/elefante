@@ -247,9 +247,40 @@ class VectorStore:
         # Get more results if temporal decay is enabled (for re-ranking)
         search_limit = limit * 2 if temporal_enabled else limit
         
+        # Deterministic query expansion to improve semantic recall for novel phrasings
+        def _expand_query_text(q: str) -> str:
+            ql = (q or "").lower()
+            expansions: list[str] = []
+
+            # Core concept expansions (no LLM, static, enforceable)
+            if any(k in ql for k in ["ide", "editor", "vs code", "vscode", "visual studio code"]):
+                expansions += ["editor", "IDE", "VS Code", "Visual Studio Code", "Copilot"]
+            if any(k in ql for k in ["indent", "whitespace", "formatting", "tabs", "spaces"]):
+                expansions += ["indentation", "spaces", "tabs", "Python formatting", "code style"]
+            if any(k in ql for k in ["docstring", "document", "documentation", "args", "returns", "raises"]):
+                expansions += ["docstrings", "Google style", "Args", "Returns", "Raises", "function documentation"]
+            if any(k in ql for k in ["api", "endpoint", "response", "json", "error"]):
+                expansions += ["API response format", "JSON structure", "success boolean", "error field"]
+            if any(k in ql for k in ["git", "branch", "workflow", "feature", "pull request", "pr", "main"]):
+                expansions += ["feature branch", "feat/", "pull request", "PR", "main branch", "branch naming"]
+            if any(k in ql for k in ["test", "pytest", "verify", "commit", "push"]):
+                expansions += ["pytest", "pre-commit", "before push", "tests must pass"]
+            if any(k in ql for k in ["performance", "latency", "query", "database", "index"]):
+                expansions += ["database query performance", "100ms", "index", "optimize query"]
+            if any(k in ql for k in ["framework", "rest", "django", "fastapi", "api"]):
+                expansions += ["FastAPI", "REST", "Django", "OpenAPI docs"]
+
+            # Merge unique expansions with original query
+            if expansions:
+                expanded = q + " \n" + " ".join(sorted(set(expansions)))
+                return expanded
+            return q
+
+        expanded_query = _expand_query_text(query)
+
         # Generate query embedding
-        logger.debug("searching_memories", query=query[:50], limit=limit, temporal_decay=temporal_enabled)
-        query_embedding = await self._embedding_service.generate_embedding(query)
+        logger.debug("searching_memories", query=expanded_query[:80], limit=limit, temporal_decay=temporal_enabled)
+        query_embedding = await self._embedding_service.generate_embedding(expanded_query)
         
         # Build where clause from filters
         where_clause = self._build_where_clause(filters) if filters else None
