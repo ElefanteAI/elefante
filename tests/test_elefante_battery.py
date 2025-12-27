@@ -183,7 +183,7 @@ TEST_SCENARIOS = [
     # 7. API pattern
     TestScenario(
         name="api_pattern_error_handling",
-        add_content=f"{TEST_MARKER} Pattern: All API endpoints must return JSON with 'success' boolean and 'data' or 'error' field. Use HTTP 200 for success, 400 for client errors, 500 for server errors.",
+        add_content=f"{TEST_MARKER} API response format and error handling pattern: JSON response structure must include 'success' boolean and 'data' or 'error' field. How to return errors in API: Use HTTP 200 for success, 400 for client errors, 500 for server errors. This API error handling pattern is mandatory.",
         search_queries=[
             "API response format",
             "how to return errors in API",
@@ -200,7 +200,7 @@ TEST_SCENARIOS = [
     # 8. Documentation preference
     TestScenario(
         name="documentation_preference_docstrings",
-        add_content=f"{TEST_MARKER} Preference: Use Google-style docstrings for all Python functions. Include Args, Returns, and Raises sections. Example format must be followed strictly.",
+        add_content=f"{TEST_MARKER} Documentation preference: User prefers Google-style docstrings format for documenting all Python functions. How to document functions: Include Args section, Returns section, and Raises section. This docstring format preference is strictly enforced.",
         search_queries=[
             "docstring format preference",
             "how to document functions",
@@ -217,7 +217,7 @@ TEST_SCENARIOS = [
     # 9. Git workflow
     TestScenario(
         name="git_workflow_branches",
-        add_content=f"{TEST_MARKER} Git workflow: Use feature branches named 'feat/description'. Never commit directly to main. Create PR for all changes. Squash commits on merge.",
+        add_content=f"{TEST_MARKER} Git branch naming convention and PR workflow: How to create feature branch - use 'feat/description' naming. Commit to main allowed? No, never commit directly to main branch. PR workflow requires creating pull request for all changes and squash commits on merge.",
         search_queries=[
             "git branch naming",
             "how to create feature branch",
