@@ -7,24 +7,93 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased] - Planned for v1.2.0
+## [1.2.0] - 2025-12-27
 
-### Added
-- Agent-managed enrichment architecture: Elefante never calls an LLM; agents pass enrichment via tool inputs.
-- Auto-classification of domain/category via LLM
+### Summary
+
+Embedding model upgrade to `thenlper/gte-base` (768-dim) for improved semantic search quality.
+
+### The Problem Solved
+
+The previous embedding model (`all-MiniLM-L6-v2`, 384-dim) had lower semantic precision:
+- Fuzzy queries often missed relevant memories
+- Similar concepts had weak similarity scores
+- Edge cases (version numbers, acronyms) performed poorly
+
+### The Solution
+
+Rigorous benchmarking of 10 embedding models (1485 queries) identified `thenlper/gte-base` as the optimal choice:
+
+| Model | Dimensions | MRR | Hit@5 | Latency |
+|-------|------------|-----|-------|---------|
+| **thenlper/gte-base** | 768 | **0.337** | 49.8% | ~15ms |
+| all-MiniLM-L6-v2 | 384 | 0.310 | 45.2% | ~8ms |
+| BAAI/bge-base-en-v1.5 | 768 | 0.328 | 48.1% | ~14ms |
+
+Live testing (35 queries, 24 memories) confirmed:
+- **Global Avg Similarity: 0.803** (excellent)
+- **Hit Rate: 100%** (all queries returned relevant results)
+- **Fuzzy query handling**: "remember that thing about the database lock" → 0.845 similarity
+
+### Changes
+
+#### Configuration Updates
+- **`config.yaml`**: `embedding_model: "thenlper/gte-base"`, `embedding_dimension: 768`
+- **`src/utils/config.py`**: Updated `VectorStoreConfig` and `EmbeddingsConfig` defaults
+- **`.env.example`**: Updated example value
+- **`docs/technical/architecture.md`**: Model reference updated
+
+#### Migration Script
+- **`scripts/migrate_embeddings_gte_base.py`**: Re-embeds all memories with new model
+  - Creates timestamped backup before migration
+  - Batch processing with progress indication
+  - Verification of count match
+
+#### Documentation Fixes (Ghost Links)
+During workspace audit, discovered v2 schema files were archived Dec 11 but documentation still linked to them:
+- **`docs/README.md`**: v2 schema → v3/v4/v5 references
+- **`docs/technical/README.md`**: Removed dead v2 links
+- **`docs/debug/memory-neural-register.md`**: v2 → v3
+- **`docs/technical/temporal-memory-decay.md`**: v2 → v3
+
+#### Safeguards Added
+- **`docs/pitfall-index.md`**: Added Documentation category with "archive without index update" pitfall
+- **`docs/technical/developer-etiquette.md`**: Added LAW 6.5 (mandatory grep-before-archive rule)
+
+#### Test Tooling
+- **`scripts/test_embedding_battery.py`**: 35-query test battery across 8 categories
+  - Identity, Preferences, Project, Technical, Decisions, Workflow, Fuzzy, Edge
+
+### Migration
+
+**BREAKING**: Existing ChromaDB databases have 384-dim embeddings incompatible with new 768-dim model.
+
+To migrate:
+```bash
+PYTHONPATH=. .venv/bin/python scripts/migrate_embeddings_gte_base.py
+```
+
+The script:
+1. Creates backup: `memories_backup_YYYYMMDD_HHMMSS`
+2. Re-embeds all memories with `gte-base`
+3. Verifies count match
+
+To delete backup after verification:
+```bash
+python -c "import chromadb; c=chromadb.PersistentClient('~/.elefante/data/chroma'); c.delete_collection('memories_backup_...')"
+```
+
+---
+
+## [Unreleased] - Planned for v1.3.0
+
+### Planned
+- Auto-classification of domain/category via agent
 - Smart UPDATE (merge instead of duplicate)
 - Automatic relationship inference
 - Knowledge clustering
-
-### Changed
-- MCP tool names standardized with an `elefante*` prefix (see MCP tool list in `src/mcp/server.py`).
-- Protocol injection key standardized to `MANDATORY_PROTOCOLS_READ_THIS_FIRST`.
 - Dashboard semantic zoom
 - Improved label rendering
-
-### Removed
-- Internal LLM connectivity and config/env overrides for LLM providers.
-- OpenAI-based embeddings provider path (embeddings are local-only via sentence-transformers).
 
 ---
 
