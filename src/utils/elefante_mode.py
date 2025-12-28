@@ -263,7 +263,7 @@ class ElefanteModeManager:
         """Get current status."""
         return {
             "enabled": True,  # Always enabled in v1.1.0
-            "version": "1.3.0",
+            "version": "1.4.0",
             "mode": "transaction-scoped",
             "startup_time": self._startup_time.isoformat(),
             "lock_timeout_seconds": self._lock_timeout,

@@ -150,6 +150,14 @@ class MemoryMetadata(BaseModel):
     keywords: List[str] = Field(default_factory=list)
     entities: List[str] = Field(default_factory=list)
     
+    # Layer 3b: Cognitive Retrieval (V4 Schema)
+    concepts: List[str] = Field(default_factory=list, description="3-5 key terms for graph edges")
+    surfaces_when: List[str] = Field(default_factory=list, description="Query patterns that trigger this memory")
+    co_activated_with: List[UUID] = Field(default_factory=list, description="Memories often retrieved together")
+    authority_score: float = Field(default=0.5, ge=0.0, le=1.0, description="importance × access × freshness")
+    contradicts: List[UUID] = Field(default_factory=list, description="Memories with opposing info")
+    supports: List[UUID] = Field(default_factory=list, description="Memories that reinforce this one")
+    
     # Layer 4: Relationship Tracking
     status: MemoryStatus = MemoryStatus.NEW
     relationship_type: Optional[RelationshipType] = None

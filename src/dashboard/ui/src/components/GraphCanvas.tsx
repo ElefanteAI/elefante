@@ -1587,7 +1587,10 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
           const linesRaw: string[] = [];
           linesRaw.push(title);
-          linesRaw.push(summary ? summary : '(no curated summary yet)');
+          // Show summary for all nodes (memories have curated summaries, entities have descriptions)
+          if (summary) {
+            linesRaw.push(summary);
+          }
           if (metaLine) linesRaw.push(metaLine);
           if (counts.total === 0) {
             linesRaw.push('Visible links: 0 (check toggles/filters)');

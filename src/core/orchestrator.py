@@ -28,6 +28,7 @@ from src.core.vector_store import VectorStore, get_vector_store
 from src.core.graph_store import GraphStore, get_graph_store
 from src.core.embeddings import EmbeddingService, get_embedding_service
 from src.core.classifier import classify_memory_full
+from src.core.retrieval import CognitiveRetriever, MemoryCandidate, QueryAnalysis
 from src.utils.logger import get_logger
 from src.utils.config import get_config
 from src.utils.validators import validate_memory_content, validate_uuid
@@ -69,6 +70,9 @@ class MemoryOrchestrator:
         self.config = get_config()
         self.logger = get_logger(self.__class__.__name__)
         self.metadata_store = get_metadata_store()
+        
+        # V4 Cognitive Retriever - multi-signal scoring engine
+        self.cognitive_retriever = CognitiveRetriever()
 
         self._metadata_init_task: Optional[asyncio.Task] = None
         self._metadata_initialized: bool = False
@@ -430,6 +434,31 @@ class MemoryOrchestrator:
                 summary_text = generate_summary(content=content, max_len=220)
                 metadata["summary"] = summary_text
             
+            # ==================================================================================
+            # STEP 3.25: V4 COGNITIVE RETRIEVAL FIELDS
+            # Auto-populate concepts, surfaces_when for better retrieval
+            # ==================================================================================
+            from src.utils.curation import extract_concepts, infer_surfaces_when, classify_memory_type, compute_authority_score
+            
+            concepts = metadata.get("concepts")
+            if not concepts or not isinstance(concepts, list):
+                concepts = extract_concepts(content, max_concepts=5)
+                metadata["concepts"] = concepts
+            
+            surfaces_when = metadata.get("surfaces_when")
+            if not surfaces_when or not isinstance(surfaces_when, list):
+                surfaces_when = infer_surfaces_when(content, concepts)
+                metadata["surfaces_when"] = surfaces_when
+            
+            # Compute initial authority score
+            authority_score = compute_authority_score(
+                importance=importance,
+                access_count=1,  # New memory
+                days_since_created=0,
+                days_since_accessed=0,
+            )
+            metadata["authority_score"] = authority_score
+            
             custom_metadata = {
                 k: v for k, v in metadata.items()
                 if k not in ["domain", "category", "intent", "confidence", "source", "layer", "sublayer"]
@@ -451,6 +480,10 @@ class MemoryOrchestrator:
             # in VectorStore.add_memory (title/summary are used by dashboard + dedup).
             custom_metadata["title"] = title
             custom_metadata["summary"] = summary_text
+            # V4 Cognitive Retrieval Fields
+            custom_metadata["concepts"] = concepts
+            custom_metadata["surfaces_when"] = surfaces_when
+            custom_metadata["authority_score"] = authority_score
             
             # Create V2 Metadata
             memory_metadata = MemoryMetadata(
@@ -677,6 +710,12 @@ class MemoryOrchestrator:
             if include_conversation and include_stored and session_id:
                 results = await self._merge_and_deduplicate(results, query, session_id is not None, mode.value)
             
+            # =============================================================
+            # V4 COGNITIVE SCORING - Multi-signal re-ranking
+            # =============================================================
+            if results and include_stored:
+                results = self._apply_cognitive_scoring(query, results)
+            
             # Sort by score and limit
             results.sort(key=lambda r: r.score, reverse=True)
             results = results[:limit]
@@ -738,6 +777,83 @@ class MemoryOrchestrator:
                 "end": filters.end_date if filters.end_date else datetime.max
             } if filters and (filters.start_date or filters.end_date) else None
         )
+    
+    def _apply_cognitive_scoring(
+        self,
+        query: str,
+        results: List[SearchResult]
+    ) -> List[SearchResult]:
+        """
+        Apply V4 cognitive multi-signal scoring to search results.
+        
+        Transforms raw vector scores into composite scores using:
+        - vector_similarity (0.30): Original ChromaDB score
+        - concept_overlap (0.20): Jaccard overlap with query concepts
+        - domain_match (0.15): Domain alignment
+        - co_activation (0.15): Retrieved-together history
+        - authority (0.10): Importance + access patterns
+        - temporal (0.10): Recency and freshness
+        """
+        if not results:
+            return results
+        
+        # Analyze query to extract concepts, domain, intent
+        query_analysis = self.cognitive_retriever.analyze_query(query)
+        
+        self.logger.debug(
+            "Cognitive scoring",
+            query_concepts=query_analysis.concepts,
+            inferred_domain=query_analysis.inferred_domain,
+            inferred_intent=query_analysis.inferred_intent,
+            num_results=len(results)
+        )
+        
+        # Convert each SearchResult to MemoryCandidate, score, update
+        scored_results = []
+        for result in results:
+            memory = result.memory
+            metadata = memory.metadata if memory.metadata else {}
+            
+            # Build MemoryCandidate from Memory object
+            candidate = MemoryCandidate(
+                id=str(memory.id),
+                content=memory.content,
+                title=metadata.title if hasattr(metadata, 'title') else str(memory.id)[:8],
+                summary=metadata.summary if hasattr(metadata, 'summary') else memory.content[:100],
+                concepts=metadata.concepts if hasattr(metadata, 'concepts') and metadata.concepts else [],
+                domain=metadata.domain.value if hasattr(metadata, 'domain') and metadata.domain and hasattr(metadata.domain, 'value') else (metadata.domain if hasattr(metadata, 'domain') and isinstance(metadata.domain, str) else "general"),
+                importance=metadata.importance if hasattr(metadata, 'importance') else 5,
+                access_count=metadata.access_count if hasattr(metadata, 'access_count') else 1,
+                created_at=metadata.created_at if hasattr(metadata, 'created_at') and metadata.created_at else datetime.utcnow(),
+                last_accessed=metadata.last_accessed if hasattr(metadata, 'last_accessed') and metadata.last_accessed else datetime.utcnow(),
+                vector_score=result.score,  # Original vector similarity score
+            )
+            
+            # Score candidate using cognitive retriever
+            scored_candidate = self.cognitive_retriever.score_candidate(
+                candidate,
+                query_analysis,
+                recent_memory_ids=[]  # TODO: Track recent retrievals for co-activation
+            )
+            
+            # Preserve original vector_score, update score with composite
+            result.vector_score = result.score
+            result.score = scored_candidate.composite_score
+            
+            # Log score breakdown for debugging
+            self.logger.debug(
+                "Scored memory",
+                memory_id=str(memory.id)[:8],
+                vector=f"{scored_candidate.vector_score:.3f}",
+                concept=f"{scored_candidate.concept_score:.3f}",
+                domain=f"{scored_candidate.domain_score:.3f}",
+                authority=f"{scored_candidate.authority_score:.3f}",
+                composite=f"{scored_candidate.composite_score:.3f}"
+            )
+            
+            scored_results.append(result)
+        
+        return scored_results
     
     async def _search_semantic(
         self,

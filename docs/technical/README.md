@@ -53,8 +53,9 @@
 |------|---------|--------|
 | [`cognitive-memory-model.md`](cognitive-memory-model.md) | Agent-managed enrichment contract (no internal LLM calls) |  Implemented |
 | [`temporal-memory-decay.md`](temporal-memory-decay.md) | Access-based reinforcement, decay over time |  Implemented |
-| [`memory-schema-v3.md`](memory-schema-v3.md) | Current memory schema |  Production |
+| [`memory-schema-v3.md`](memory-schema-v3.md) | Layer/sublayer taxonomy |  Production |
 | [`memory-schema-v4.md`](memory-schema-v4.md) | Canonical keys, versioning, namespaces (prod/test), TTL |  Proposed |
+| [`memory-schema-v4-cognitive.md`](memory-schema-v4-cognitive.md) | **V4 Cognitive Retrieval: concepts, surfaces_when, authority_score** |  **Implemented** |
 | [`memory-schema-v5-topology.md`](memory-schema-v5-topology.md) | Rings/topics/types topology fields for dashboard |  Draft |
 
 ### Database

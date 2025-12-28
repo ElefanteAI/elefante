@@ -69,7 +69,7 @@ class OrchestratorConfig(BaseModel):
 class MCPServerConfig(BaseModel):
     """MCP server configuration"""
     name: str = "elefante"
-    version: str = "1.3.0"
+    version: str = "1.4.0"
     description: str = "Local AI Memory System with Vector and Graph Storage"
     port: Optional[int] = None
     host: Optional[str] = None
@@ -172,7 +172,7 @@ class UserProfileConfig(BaseModel):
 
 class ElefanteConfig(BaseModel):
     """Main Elefante configuration"""
-    version: str = "1.3.0"
+    version: str = "1.4.0"
     data_dir: str = str(DATA_DIR)
     anonymized_telemetry: bool = False
     vector_store: VectorStoreConfig = Field(default_factory=VectorStoreConfig)
