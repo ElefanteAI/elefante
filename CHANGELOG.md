@@ -7,6 +7,47 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.4.0] - 2025-12-27
+
+### Summary
+
+V4 Cognitive Retrieval Engine - 6-signal composite scoring replaces raw vector similarity.
+
+### The Problem Solved
+
+Raw vector similarity alone is naive. A memory can be semantically similar but:
+- Temporally stale (hasn't been accessed in months)
+- Low authority (user never reinforced it)
+- Disconnected (no graph relationships)
+
+### The Solution
+
+`CognitiveRetriever` in `src/core/retrieval.py` applies 6 weighted signals:
+
+| Signal | Weight | Source |
+|--------|--------|--------|
+| Vector Similarity | 0.35 | ChromaDB cosine distance |
+| Concept Match | 0.15 | Keyword/concept overlap |
+| Domain Alignment | 0.10 | Domain field match |
+| Coactivation | 0.15 | Graph relationship density |
+| Authority | 0.15 | Reinforcement history |
+| Temporal Recency | 0.10 | Decay-adjusted freshness |
+
+### Verified Results
+
+- Composite scores differ from vector scores by -0.32 to -0.45
+- High-authority, recently-accessed memories rank higher
+- Graph-connected memories get coactivation boost
+
+### Changes
+
+- **NEW**: `src/core/retrieval.py` - CognitiveRetriever class
+- **MODIFIED**: `src/core/orchestrator.py` - Wired `_apply_cognitive_scoring()`
+- **CLEANUP**: Archived 40+ one-off scripts to `scripts/archive/historical/`
+- **CLEANUP**: Removed 26 old data exports from `data/`
+
+---
+
 ## [1.3.0] - 2025-12-27
 
 ### Summary

@@ -158,8 +158,8 @@ Elefante provides **15 MCP tools** for AI agents:
 
 ## Current Development Status
 
-**Version**: v1.3.0 (Production)  
-**Next**: v1.2.0 - Smart UPDATE (merge logic)
+**Version**: v1.4.0 (Production)  
+**Next**: v1.5.0 - Enhanced Graph Traversal
 
 **v1.1.0 Features** (see [CHANGELOG.md](../CHANGELOG.md)):
 
@@ -303,8 +303,8 @@ archive/protocol-enforcement-v2.md
 
 ## Maintenance
 
-**Last Updated**: 2025-12-26  
-**Documentation Version**: v1.3.0  
+**Last Updated**: 2025-12-27  
+**Documentation Version**: v1.4.0  
 **Status**: Complete and up-to-date
 
 **Changes in v1.1.0**:

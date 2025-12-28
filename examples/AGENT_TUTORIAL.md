@@ -1,6 +1,6 @@
 # Elefante Agent Tutorial
 
-> **Version:** 1.3.0  
+> **Version:** 1.4.0  
 > **Audience:** AI Agents using MCP tools
 
 ---
