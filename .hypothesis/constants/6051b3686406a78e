@@ -1,0 +1,4 @@
+# file: /Volumes/X10Pro/X10-2025/Documents2025/Elefante_early_dec2025/src/models/entity.py
+# hypothesis_version: 6.148.8
+
+[0.0, 1.0, 'BLOCKS', 'CHILD_OF', 'CREATED_BY', 'CREATED_IN', 'CUSTOM', 'DEPENDS_ON', 'Entity', 'LOCATED_IN', 'PARENT_OF', 'PART_OF', 'REFERENCES', 'RELATES_TO', 'Relationship', 'SIMILAR_TO', 'USES', 'WORKS_ON', 'company', 'concept', 'created_at', 'custom', 'description', 'event', 'file', 'from_entity_id', 'goal', 'id', 'location', 'memory', 'metric', 'name', 'organization', 'person', 'project', 'properties', 'protocol', 'relationship_type', 'role', 'rule', 'session', 'strength', 'tags', 'task', 'technology', 'to_entity_id', 'type', 'updated_at']

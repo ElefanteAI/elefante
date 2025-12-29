@@ -1,6 +1,6 @@
 # Technical Documentation Index
 
-**Status**:  Production (v1.4.0)  
+**Status**:  Production (v1.6.0)  
 **Purpose**: Complete technical reference for Elefante AI Memory System
 
 ---
@@ -32,6 +32,12 @@
 | [`mcp-server-startup.md`](mcp-server-startup.md) | **Start MCP server, verification, troubleshooting** |  NEW |
 | [`dashboard-startup.md`](dashboard-startup.md) | **Start Dashboard, verification, troubleshooting** |  NEW |
 | [`kuzu-lock-monitoring.md`](kuzu-lock-monitoring.md) | **Prevent single-writer lock deadlocks** |  NEW |
+
+### Release Safety
+
+| File | Purpose |
+|------|---------|
+| [`rollback.md`](rollback.md) | Roll back to the v1.6.0 baseline (code + data) |
 
 ### Core System
 
@@ -72,8 +78,10 @@
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Dual Storage (ChromaDB + Kuzu) |  | Production |
-| MCP Server (15 tools) |  | Production |
+| MCP Server (18 tools) |  | Production |
+| MCP Prompts (2) |  | Production |
 | Transaction-Scoped Locking |  | v1.1.0 (replaced session-based locks) |
+| **Compliance Gate** |  | **v1.6.0 (search-before-write enforcement)** |
 | Auto-Inject Pitfalls |  | v1.0.1 |
 | Cognitive Analysis (emotions, intent) |  | Agent-managed (passed via tool inputs) |
 | Temporal Decay |  | Production |
@@ -92,5 +100,5 @@
 
 ---
 
-**Version**: 1.4.0  
-**Last Updated**: 2025-12-27
+**Version**: 1.6.0  
+**Last Updated**: 2025-12-28

@@ -204,7 +204,7 @@ query = f"CREATE (e:Entity {{name: '{escape_string(user_input)}'}})"
 
 ##  Related Documentation
 
-- [kuzu-reserved-words-issue.md](../debug/kuzu-reserved-words-issue.md) - Full analysis of the `properties` bug
+- [database-compendium.md (Reserved Word Collision)](../debug/database/database-compendium.md#issue-1-reserved-word-collision) - Full analysis of the `properties` bug
 - [Kuzu Official Docs](https://kuzudb.com/docs/) - Official documentation
 - [OpenCypher Spec](https://opencypher.org/) - Cypher language specification
 

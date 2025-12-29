@@ -1,0 +1,4 @@
+# file: /Volumes/X10Pro/X10-2025/Documents2025/Elefante_early_dec2025/src/models/query.py
+# hypothesis_version: 6.148.8
+
+[0.0, 0.01, 0.3, 0.5, 1.0, 100, 'after', 'category', 'domain', 'end_date', 'explanation', 'file_path', 'graph_score', 'hybrid', 'matched_entities', 'max_importance', 'memory', 'memory_type', 'min_importance', 'project', 'related_entities', 'relationship_path', 'score', 'semantic', 'source', 'start_date', 'structured', 'tags', 'vector_score']

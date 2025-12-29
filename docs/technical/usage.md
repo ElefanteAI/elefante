@@ -13,36 +13,51 @@ Once connected to your IDE, use natural language to interact with Elefante.
 
 ---
 
-## 2. MCP Tools (20 Total)
+## 2. MCP Tools (18 Total)
 
-The MCP server exposes 20 tools to your AI agent:
+The MCP server exposes 18 tools to your AI agent:
 
 ### Core Memory Operations
 
 #### `elefanteMemoryAdd`
 **Purpose**: Store new information with intelligent ingestion.
 
-**YOU ARE ELEFANTE'S BRAIN**: You must classify the memory as you store it.
-- **layer**: self (who), world (what), intent (do)
-- **sublayer**: 
-  - SELF: identity, preference, constraint
-  - WORLD: fact, failure, method
-  - INTENT: rule, goal, anti-pattern
+**YOU ARE ELEFANTE'S BRAIN**: You must classify every memory as you store it. All fields below are expected by default.
 
-**Parameters**:
-- `content` (required): The memory content to store
-- `layer` (optional): Memory layer (self/world/intent) - **HIGHLY RECOMMENDED**
-- `sublayer` (optional): Memory sublayer (e.g. identity, fact, rule) - **HIGHLY RECOMMENDED**
-- `memory_type` (optional): Type of memory: `conversation`, `fact`, `insight`, `code`, `decision`, `task`, `note`, `preference`, `question`, `answer`, `hypothesis`, `observation`
-- `domain` (optional): High-level context: `work`, `personal`, `learning`, `project`, `reference`, `system`
-- `category` (optional): Topic grouping (e.g., 'elefante', 'python')
-- `importance` (optional): Importance level 1-10 (default: 5)
-- `tags` (optional): Array of tags for categorization
-- `entities` (optional): Array of entities to link in knowledge graph
-- `metadata` (optional): Additional metadata object
-- `force_new` (optional): If true, bypass deduplication (default: false)
+---
 
-**Example**:
+**Parameters** (all expected by default):
+
+| Parameter | Purpose | Values |
+|-----------|---------|--------|
+| `content` | The actual text to remember | Free text |
+| `layer` | High-level classification: who/what/do | `self`, `world`, `intent` |
+| `sublayer` | Fine-grained classification within layer | See table below |
+| `memory_type` | Kind of knowledge | `preference`, `fact`, `decision`, `task`, `insight`, `code`, `note`, `conversation` |
+| `domain` | Context where this applies | `work`, `personal`, `project`, `learning`, `reference`, `system` |
+| `importance` | Priority 1–10 | Use 8+ for critical items |
+| `category` | Topic grouping | e.g. `elefante`, `python`, `user-preferences` |
+| `tags` | Keywords for filtering | Array of strings |
+| `entities` | Graph links | Array of `{name, type}` |
+
+**Layer/sublayer reference**:
+
+| Layer | Sublayers | When to use |
+|-------|-----------|-------------|
+| `self` | `identity`, `preference`, `constraint` | About the user: who they are, what they like, limits |
+| `world` | `fact`, `failure`, `method` | Objective knowledge: truths, errors encountered, how-tos |
+| `intent` | `rule`, `goal`, `anti-pattern` | Directives: what to do, what to avoid |
+
+**Advanced parameters** (for special cases only):
+
+| Parameter | Purpose | Default |
+|-----------|---------|--------|
+| `metadata` | Extra key-value data | `{}` |
+| `force_new` | Bypass deduplication (create even if duplicate) | `false` |
+
+---
+
+**Example** (complete, production-ready):
 ```json
 {
   "content": "I prefer using async/await over callbacks",
@@ -51,7 +66,12 @@ The MCP server exposes 20 tools to your AI agent:
   "memory_type": "preference",
   "domain": "work",
   "importance": 8,
-  "tags": ["python", "async"]
+  "category": "python",
+  "tags": ["python", "async", "coding-style"],
+  "entities": [
+    {"name": "Python", "type": "technology"},
+    {"name": "async/await", "type": "concept"}
+  ]
 }
 ```
 
@@ -171,6 +191,18 @@ RETURN p
 "Link Bob to Elefante as Maintainer"
 ```
 
+#### `elefanteGraphConnect`
+**Purpose**: Upsert entities and create relationships in one idempotent call.
+
+**Use Cases**:
+- Create a small, consistent graph workflow (entities + edges) in one call
+- Reduce tool-chaining when building graphs
+
+**Parameters**:
+- `entities` (optional): Entities to upsert (use stable `ref` keys)
+- `relationships` (optional): Relationships to create
+- `include_system_status` (optional): If true, include `elefanteSystemStatusGet` output
+
 ---
 
 ### Session & History Operations
@@ -235,6 +267,19 @@ RETURN p
 ```
 "Consolidate my memories to remove duplicates"
 ```
+
+#### `elefanteMemoryListAll`
+**Purpose**: Retrieve ALL memories without semantic filtering (direct inspection/export).
+
+**Use Cases**:
+- Export the full memory store
+- Debug what is actually stored (bypass ranking)
+- Verify migrations/cleanup results
+
+**Parameters**:
+- `limit` (optional): Maximum number of memories to return (default: 100)
+- `offset` (optional): Pagination offset (default: 0)
+- `filters` (optional): Filter by `memory_type`, `min_importance`, `tags`
 
 ---
 
@@ -333,6 +378,18 @@ RETURN p
 ```
 
 **Status Check**: Use `elefanteSystemStatusGet` to check system status and statistics.
+
+---
+
+## 2.1 MCP Prompts (2 Total)
+
+These are MCP **prompts** (not tools). Some IDEs can inject them into the model context to enforce memory-aware behavior.
+
+### `elefante-grounding`
+**Purpose**: Default grounding prompt that reminds the agent to use Elefante before answering.
+
+### `elefante-context`
+**Purpose**: A prompt template that fetches context for a given topic before answering.
 
 ---
 

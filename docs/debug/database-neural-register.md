@@ -278,12 +278,10 @@ ps aux | grep <PID>
 
 ##  SOURCE DOCUMENTS
 
-- `docs/debug/general/kuzu-reserved-words-issue.md` (329 lines)
-- `docs/technical/kuzu-best-practices.md` (254 lines)
-- `docs/debug/database/kuzu-critical-discovery.md`
-- `docs/debug/database/database-corruption-2025-12-02.md`
-- `docs/debug/database/kuzu-lock-analysis.md`
-- `docs/debug/database/duplicate-entity-analysis.md`
+- `docs/debug/kuzu-reserved-words-issue.md`
+- `docs/debug/database-compendium.md`
+- `docs/technical/kuzu-best-practices.md`
+- `docs/technical/kuzu-lock-monitoring.md`
 
 ---
 

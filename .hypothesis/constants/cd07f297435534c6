@@ -1,0 +1,4 @@
+# file: /Volumes/X10Pro/X10-2025/Documents2025/Elefante_early_dec2025/src/core/etl.py
+# hypothesis_version: 6.148.8
+
+[500, 1000, 'Memory not found', 'agent', 'classified_by', 'content', 'created_at', 'error', 'failed', 'id', 'importance', 'knowledge_type', 'layer', 'memory_classified', 'memory_id', 'memory_type', 'owner-jay', 'owner_id', 'processed', 'processed_at', 'processing', 'processing_error', 'processing_status', 'raw', 'ring', 'status', 'sublayer', 'success', 'summary', 'tags', 'title', 'topic', 'total', 'unclassified', 'value']

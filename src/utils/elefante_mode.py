@@ -30,6 +30,7 @@ from contextlib import contextmanager
 import threading
 
 from src.utils.config import get_config, DATA_DIR, ELEFANTE_HOME
+from src.utils.version import PACKAGE_VERSION
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -263,7 +264,7 @@ class ElefanteModeManager:
         """Get current status."""
         return {
             "enabled": True,  # Always enabled in v1.1.0
-            "version": "1.4.0",
+            "version": PACKAGE_VERSION,
             "mode": "transaction-scoped",
             "startup_time": self._startup_time.isoformat(),
             "lock_timeout_seconds": self._lock_timeout,

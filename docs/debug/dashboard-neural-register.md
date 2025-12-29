@@ -327,9 +327,7 @@ uvicorn.run(app, host="0.0.0.0", port=8000)
 
 ##  SOURCE DOCUMENTS
 
-- `docs/debug/dashboard/dashboard-postmortem.md` (detailed failure analysis)
-- `docs/debug/dashboard/dashboard-build-failure-2025-11-28.md` (build issues)
-- `docs/technical/dashboard-improvement-roadmap.md` (future enhancements)
+- `docs/debug/dashboard-compendium.md` (detailed failure analysis, build issues)
 - `docs/technical/dashboard.md` (architecture documentation)
 
 ---

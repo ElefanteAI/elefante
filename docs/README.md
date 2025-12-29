@@ -2,7 +2,7 @@
 
 ## Overview
 
-Complete documentation index for Elefante AI Memory System v1.1.0.
+Complete documentation index for Elefante AI Memory System v1.5.0.
 
 ---
 
@@ -33,7 +33,7 @@ Complete documentation index for Elefante AI Memory System v1.1.0.
 - [`architecture.md`](technical/architecture.md) - System design & triple-layer architecture
 - [`cognitive-memory-model.md`](technical/cognitive-memory-model.md) - AI memory model
 - [`installation.md`](technical/installation.md) - Installation guide
-- [`usage.md`](technical/usage.md) - **Complete API reference (15 MCP tools)**
+- [`usage.md`](technical/usage.md) - **Complete API reference (18 MCP tools + 2 prompts)**
 - [`dashboard.md`](technical/dashboard.md) - Visual knowledge graph guide
 
 **Advanced Documentation**:
@@ -103,7 +103,7 @@ Complete documentation index for Elefante AI Memory System v1.1.0.
 
 ## MCP Tools Reference
 
-Elefante provides **15 MCP tools** for AI agents:
+Elefante provides **18 MCP tools** for AI agents:
 
 
 | Tool | Purpose |
@@ -121,8 +121,20 @@ Elefante provides **15 MCP tools** for AI agents:
 | `elefanteDashboardOpen` | Open dashboard (optionally refresh snapshot) |
 | `elefanteGraphConnect` | Upsert entities + create relationships in one call |
 | `elefanteMemoryMigrateToV3` | Admin schema migration to V3 |
-| `elefanteSystemEnable` | *(v1.1.0: No-op)* Backward compatibility shim |
-| `elefanteSystemDisable` | *(v1.1.0: No-op)* Backward compatibility shim |
+| `elefanteSystemEnable` | *(v1.1.0+: optional)* Initialize mode manager / (force) clear stale locks |
+| `elefanteSystemDisable` | Clear resources (release DB handles) for safe IDE switching |
+| `elefanteETLProcess` | Get raw memories for agent topology classification |
+| `elefanteETLClassify` | Store the agent's classification (V5 topology fields) |
+| `elefanteETLStatus` | ETL processing statistics (raw/processing/processed/failed) |
+
+## MCP Prompts (2)
+
+These are MCP **prompts** (not tools):
+
+| Prompt | Purpose |
+|------|---------|
+| `elefante-grounding` | Memory-aware grounding prompt |
+| `elefante-context` | Context-before-answering prompt template |
 
 **Complete API reference**: [`technical/usage.md`](technical/usage.md)
 
@@ -158,8 +170,8 @@ Elefante provides **15 MCP tools** for AI agents:
 
 ## Current Development Status
 
-**Version**: v1.4.0 (Production)  
-**Next**: v1.5.0 - Enhanced Graph Traversal
+**Version**: v1.5.0 (Production)  
+**Next**: TBD (see roadmap)
 
 **v1.1.0 Features** (see [CHANGELOG.md](../CHANGELOG.md)):
 
@@ -199,7 +211,7 @@ Immutable "Laws" extracted from debugging sessions - the system's immune memory.
 - **Debug Source Docs**: 5 compendium folders
 - **Planning Docs**: 3 roadmap documents
 - **Archive**: Historical/releases folders
-- **MCP Tools**: 15 fully documented
+- **MCP Tools**: 18 fully documented (+ 2 prompts)
 
 ---
 
@@ -208,7 +220,7 @@ Immutable "Laws" extracted from debugging sessions - the system's immune memory.
 **Looking for specific topics**:
 
 - Installation -> `technical/installation.md` or `debug/installation-neural-register.md`
-- API/Tools -> `technical/usage.md` (all 15 tools)
+- API/Tools -> `technical/usage.md` (all 18 tools + 2 prompts)
 - Architecture -> `technical/architecture.md`
 - Dashboard -> `technical/dashboard.md` or `debug/dashboard-neural-register.md`
 - Database -> `technical/kuzu-best-practices.md` or `debug/database-neural-register.md`
@@ -303,8 +315,8 @@ archive/protocol-enforcement-v2.md
 
 ## Maintenance
 
-**Last Updated**: 2025-12-27  
-**Documentation Version**: v1.4.0  
+**Last Updated**: 2025-12-28  
+**Documentation Version**: v1.5.0  
 **Status**: Complete and up-to-date
 
 **Changes in v1.1.0**:

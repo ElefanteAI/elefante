@@ -1,0 +1,4 @@
+# file: /Volumes/X10Pro/X10-2025/Documents2025/Elefante_early_dec2025/src/core/refinery.py
+# hypothesis_version: 6.148.8
+
+[0.0, 500, '-', 'Self-Limit-Emojis', 'World-Fact-General', '[^a-z0-9]+', '\\s+', 'applied', 'archived', 'avoid jargon', 'brief', 'canonical_key', 'canonical_key_set', 'changed', 'concise', 'constraint', 'count', 'custom_metadata', 'deprecated', 'do not claim', 'duplicate_groups', 'e2e', 'emoji', 'emojis', 'ephemeral', 'failed', 'generated_at', 'groups', 'layer', 'member_ids', 'minimal', 'minimal wording', 'namespace', 'namespace_set', 'no fluff', 'no jargon', 'plain language', 'planned_updates', 'preference', 'processed', 'processing', 'processing_status', 'prod', 'raw', 'redundant_marked', 'refinery_applied', 'relationship_type', 'self', 'self-pref-always', 'short', 'simple language', 'simple terms', 'stats', 'status', 'straightforward', 'sublayer', 'success', 'superseded_by_id', 'test', 'title', 'total_memories', 'utf-8', 'winner_id']

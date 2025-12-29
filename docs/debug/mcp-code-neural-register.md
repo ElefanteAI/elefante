@@ -4,7 +4,7 @@
 
 **Purpose**: Permanent record of MCP protocol violations and enforcement strategies  
 **Status**: Active Neural Register  
-**Last Updated**: 2025-12-26
+**Last Updated**: 2025-12-28 (v1.6.0 Compliance Gate)
 
 ---
 
@@ -353,6 +353,57 @@ print("Initializing...", file=sys.stderr)
 
 ---
 
+### LAW #8: Compliance Gate - Search Before Write (v1.6.0)
+
+**Statement**: Write operations MUST be blocked until a search has been performed in the current session.
+
+**The Agent Drift Problem**: Agents using Elefante tools often skip `elefanteMemorySearch` entirely, leading to:
+- Duplicate memories (same info stored multiple times)
+- Lost context (agent doesn't know what's already stored)
+- Instruction drift (agents ignore "search first" prompts to save tokens)
+
+**Instructions-Only** (Anti-Pattern):
+```
+# .github/copilot-instructions.md
+"You MUST call elefanteMemorySearch before elefanteMemoryAdd"
+# Agent: "Understood!" *proceeds to call elefanteMemoryAdd directly*
+```
+
+**Compliance Gate** (v1.6.0 Correct Pattern):
+```python
+# Server-side enforcement - MECHANICAL, not instruction-based
+_compliance_state = {"search_performed": False, ...}
+
+def _check_compliance_gate(self, tool_name):
+    GATED_TOOLS = {"elefanteMemoryAdd", "elefanteGraphEntityCreate", ...}
+    if tool_name in GATED_TOOLS and not self._compliance_state["search_performed"]:
+        return {
+            "success": False,
+            "error": "COMPLIANCE GATE: Search required before write",
+            "gate_status": "BLOCKED",
+            "action_required": "Call elefanteMemorySearch first"
+        }
+    return None  # Gate passes
+
+# Search handler unlocks the gate
+async def _handle_search_memories(self, args):
+    # ... perform search ...
+    self._compliance_state["search_performed"] = True
+    response["gate_status"] = "UNLOCKED"
+    return response
+```
+
+**Gated Tools**: `elefanteMemoryAdd`, `elefanteGraphEntityCreate`, `elefanteGraphRelationshipCreate`, `elefanteGraphConnect`  
+**Gate Unlocker**: `elefanteMemorySearch`  
+**Layered Defense**: `.github/copilot-instructions.md` provides instructions; gate provides enforcement
+
+**Failure Symptom**: Agent receives `gate_status: BLOCKED` when trying to write  
+**Root Cause**: Agent skipped search step  
+**Resolution**: Agent must call `elefanteMemorySearch` first, then retry write  
+**Prevention**: Gate is mechanical - cannot be bypassed by reasoning
+
+---
+
 ##  FAILURE PATTERNS (Documented Cases)
 
 ### Pattern #1: Silent Type Mismatch (2025-12-02)
@@ -400,6 +451,36 @@ print("Initializing...", file=sys.stderr)
 **Resolution**: Configure Uvicorn logging to use `sys.stderr` explicitly
 **Prevention**: **ALWAYS** configure `log_config` for any subprocess or library that might print to stdout. **NEVER** assume a library is silent.
 
+### Pattern #6: Agent Drift - Ignoring Memory Search (2025-12-28) [v1.6.0]
+
+**Trigger**: Agent using Elefante MCP tools without calling search first
+**Symptom**: Duplicate memories created, context ignored, agent operates on stale knowledge
+**Root Cause**: Instructions-only enforcement leads to "drift" - agents skip search to save tokens/time
+**Impact**: Memory pollution, redundant data, lost context that was already stored
+**Resolution**: **Compliance Gate** - Server-side enforcement that BLOCKS write operations until search is performed
+**Prevention**: Gate is mechanical, not instruction-based. Cannot be bypassed by agent reasoning.
+
+**Implementation** (v1.6.0):
+```python
+# Session state tracking
+_compliance_state = {
+    "search_performed": False,
+    "search_count": 0,
+    "search_timestamp": None,
+    "last_query": None
+}
+
+# Gate check before write
+def _check_compliance_gate(tool_name):
+    GATED_TOOLS = {"elefanteMemoryAdd", "elefanteGraphEntityCreate", ...}
+    if tool_name in GATED_TOOLS and not _compliance_state["search_performed"]:
+        return {"success": False, "gate_status": "BLOCKED", ...}
+    return None  # Gate passes
+```
+
+**Gated Tools**: `elefanteMemoryAdd`, `elefanteGraphEntityCreate`, `elefanteGraphRelationshipCreate`, `elefanteGraphConnect`
+**Gate Unlocker**: `elefanteMemorySearch` (sets `search_performed=True`)
+
 ---
 
 ##  SAFEGUARDS (Active Protections)
@@ -421,6 +502,14 @@ print("Initializing...", file=sys.stderr)
 **Location**: MCP server startup (`src/mcp/__main__.py`)  
 **Action**: Enable verbose logging in development  
 **Response**: Surface silent failures for debugging
+
+### Safeguard #4: Compliance Gate (v1.6.0)
+
+**Location**: `src/mcp/server.py` (`_check_compliance_gate`, `_compliance_state`)  
+**Action**: Block write operations until search is performed  
+**Response**: Return structured error with `gate_status: BLOCKED` and actionable hint  
+**Layered Defense**: `.github/copilot-instructions.md` injected into Copilot requests  
+**Test Coverage**: `tests/test_compliance_gate.py` (6 tests)
 
 ---
 
@@ -471,13 +560,7 @@ print("Initializing...", file=sys.stderr)
 
 ##  SOURCE DOCUMENTS
 
-- `docs/debug/general/fixes-applied.md` (type signature fixes)
-- `docs/debug/general/critical-analysis.md` (Layer 5 protocol)
-- `docs/debug/general/protocol-enforcement.md` (v1)
-- `docs/debug/general/protocol-enforcement-v2.md` (v2)
-- `docs/debug/general/protocol-enforcement-v3.md` (v3)
-- `docs/debug/general/PROTOCOL-ENFORCEMENT-FINAL.md` (final version)
-- `docs/debug/general/code-mode-mcp-limitation.md` (async issues)
+- `docs/debug/ai-behavior-compendium.md` (protocol enforcement, type fixes, async issues)
 
 ---
 

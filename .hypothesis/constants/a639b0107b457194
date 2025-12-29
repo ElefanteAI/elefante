@@ -1,0 +1,4 @@
+# file: /Volumes/X10Pro/X10-2025/Documents2025/Elefante_early_dec2025/src/__init__.py
+# hypothesis_version: 6.148.8
+
+['1.5.0', 'Entity', 'Memory', 'MemoryType', 'Relationship', 'Your Name', 'get_orchestrator']

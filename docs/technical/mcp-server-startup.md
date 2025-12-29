@@ -42,7 +42,7 @@ The MCP Server:
 
 1. Starts and waits for connections on **stdin/stdout** (stdio protocol)
 2. Receives JSON-RPC requests from the IDE (VS Code, Cursor, Bob)
-3. Exposes 15 MCP tools for memory operations
+3. Exposes 18 MCP tools for memory operations
 4. Returns JSON-RPC responses
 
 ### What It Does NOT Do
@@ -133,7 +133,7 @@ asyncio.run(list_tools())
 **Expected Output**:
 
 ```text
-Available MCP Tools: 15
+Available MCP Tools: 18
   - elefanteMemoryAdd
   - elefanteMemorySearch
   - elefanteGraphQuery
@@ -142,13 +142,16 @@ Available MCP Tools: 15
   - elefanteGraphRelationshipCreate
   - elefanteSessionsList
   - elefanteSystemStatusGet
-  - elefanteDashboardOpen
-  - elefanteGraphConnect
   - elefanteMemoryConsolidate
   - elefanteMemoryListAll
   - elefanteMemoryMigrateToV3
+  - elefanteDashboardOpen
+  - elefanteGraphConnect
   - elefanteSystemEnable
   - elefanteSystemDisable
+  - elefanteETLProcess
+  - elefanteETLClassify
+  - elefanteETLStatus
 ```
 
 ---

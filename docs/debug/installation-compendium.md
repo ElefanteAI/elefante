@@ -452,3 +452,32 @@ See `docs/archive/historical/install-escape-2025-12-11/` for the 6 scripts that 
 ---
 
 *Last verified: 2025-12-05 | Tested on: Windows 11, Python 3.10, Kuzu 0.11.x*
+
+---
+
+## Extracted Learnings (from installation safeguards)
+
+### Lessons Learned
+
+1. **Pre-Flight Checks Are Essential**
+    - Detect issues before they cause problems
+    - Automated checks beat “read the docs” fixes
+
+2. **User Experience Matters**
+    - Clear errors + automated remediations save time
+    - Backups provide safety and confidence
+
+3. **Breaking Changes Need Proactive Handling**
+    - Version updates can break installs
+    - Encode known issues + mitigations in code
+
+4. **Fast Failure Beats Late Failure**
+    - Fail in seconds, not minutes
+    - Abort early with remediation steps
+
+### Future Improvements
+
+1. **Automated Rollback**: restore from backup if install fails
+2. **Pre-Installation Report**: emit a detailed system state report for debugging
+3. **Interactive Mode**: guided install flow (optional)
+4. **Remote Diagnostics**: opt-in, privacy-respecting telemetry for recurring failures

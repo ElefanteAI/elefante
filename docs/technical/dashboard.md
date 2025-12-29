@@ -215,6 +215,6 @@ results = await orchestrator.search_memories(
 
 For issues or questions:
 
-1. Check logs in `C:\Users\JaimeSubiabreCistern\.elefante\logs\`
-2. Review `DEBUG/DASHBOARD_DEBUGGING_POSTMORTEM.md` for common issues
+1. Check logs in `~/.elefante/logs/` (or your configured logs directory)
+2. Review [`docs/debug/dashboard-compendium.md`](../debug/dashboard-compendium.md) for common issues
 3. Ensure only one process accesses the database at a time

@@ -179,10 +179,8 @@ KUZU_DIR.mkdir(exist_ok=True)  # Pre-creates directory
 
 ##  SOURCE DOCUMENTS
 
-- `docs/debug/installation/never-again-guide.md` (318 lines)
-- `docs/technical/installation-safeguards.md` (449 lines)
-- `docs/debug/installation/visual-journey.md`
-- `docs/debug/installation/root-cause-analysis.md`
+- `docs/debug/installation-compendium.md` (consolidated)
+- `docs/technical/installation-safeguards.md`
 
 ---
 
@@ -346,4 +344,4 @@ subprocess.run(['.venv/bin/pip', 'install', '-r', 'requirements.txt'])
 
 **Implementation**: See `docs/archive/historical/install-escape-2025-12-11/` for escape script examples.
 
-**Source Document**: `docs/debug/installation/installation-compendium.md` Issue #5
+**Source Document**: `docs/debug/installation-compendium.md` Issue #5

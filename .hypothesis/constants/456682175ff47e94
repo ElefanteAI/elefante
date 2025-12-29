@@ -1,0 +1,4 @@
+# file: /Volumes/X10Pro/X10-2025/Documents2025/Elefante_early_dec2025/src/models/conversation.py
+# hypothesis_version: 6.148.8
+
+[0.0, 1.0, 'Message', 'SearchCandidate', 'content', 'has_embedding', 'id', 'memory_id', 'metadata', 'role', 'score', 'session_id', 'source', 'text', 'timestamp']

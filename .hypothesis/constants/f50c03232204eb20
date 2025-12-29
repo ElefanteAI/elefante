@@ -1,0 +1,4 @@
+# file: /Volumes/X10Pro/X10-2025/Documents2025/Elefante_early_dec2025/src/core/graph_store.py
+# hypothesis_version: 6.148.8
+
+[1.0, 10.0, 100, 512, 1024, 'B', 'CREATED_IN', 'DEPENDS_ON', 'GB', 'IO exception', 'KB', 'MB', 'REFERENCES', 'RELATES_TO', 'already exists', 'both', 'created_at', 'database_path', 'description', 'duplicate', 'entity_created', 'entity_deleted', 'failed_to_find_path', 'failed_to_get_entity', 'failed_to_get_stats', 'from_id', 'graph_search_failed', 'id', 'incoming', 'kuzu_database_locked', 'kuzu_initialized', 'kuzu_not_installed', 'limit', 'name', 'outgoing', 'paths_found', 'props', 'query', 'query_executed', 'relationship_created', 'schema_initialized', 'strength', 'temporal_decay', 'to_id', 'total_entities', 'total_relationships', 'type', 'value', 'values']

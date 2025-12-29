@@ -324,56 +324,15 @@ def run_preflight_checks(root_dir):
 - [ ] Multiple Kuzu versions (0.1.x, 0.11.x)
 - [ ] All platforms (Windows, macOS, Linux)
 
----
 
-##  LESSONS LEARNED
+## Learnings (moved to debug)
 
-### What We Learned From The Original Failure
+This document is the authoritative spec for safeguards and automation.
 
-1. **Pre-Flight Checks Are Essential**
-   - Don't wait for failures to happen
-   - Detect issues before they cause problems
-   - Automated checks are better than documentation
+Incident learnings, “why it took so long”, and future improvement ideas live in:
 
-2. **User Experience Matters**
-   - Clear error messages save time
-   - Automated solutions beat manual fixes
-   - Backups provide peace of mind
-
-3. **Breaking Changes Need Proactive Handling**
-   - Version updates can break installations
-   - Document known issues in code
-   - Provide automated mitigations
-
-4. **Fast Failure Is Better Than Late Failure**
-   - Fail in seconds, not minutes
-   - Abort early if issues detected
-   - Save user time and frustration
-
----
-
-##  FUTURE IMPROVEMENTS
-
-### Planned Enhancements
-
-1. **Automated Rollback**
-   - If installation fails, automatically restore from backup
-   - No manual recovery needed
-
-2. **Pre-Installation Report**
-   - Generate detailed report of system state
-   - Include all check results
-   - Save for debugging if needed
-
-3. **Interactive Mode**
-   - Guided installation with explanations
-   - Educational for new users
-   - Optional for experienced users
-
-4. **Remote Diagnostics**
-   - Optional telemetry for common issues
-   - Help improve safeguards over time
-   - Privacy-respecting (opt-in only)
+- [`docs/debug/installation-compendium.md`](../debug/installation-compendium.md)
+- [`docs/debug/installation-neural-register.md`](../debug/installation-neural-register.md)
 
 ---
 

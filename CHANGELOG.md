@@ -7,6 +7,128 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.6.0] - 2025-12-28
+
+### Summary
+
+Compliance Gate - Enforced search-before-write to ensure agents retrieve context before storing memories.
+
+### The Problem Solved
+
+Agents using Elefante MCP tools often skip memory retrieval entirely:
+- Memories are stored without checking for duplicates
+- Context is ignored because search is never called
+- No mechanical enforcement existed - only "instructions" which agents drift from
+
+### The Solution
+
+**Server-Side Compliance Gate** in `src/mcp/server.py`:
+- Session state tracks whether `elefanteMemorySearch` has been called
+- Write operations (`elefanteMemoryAdd`, `elefanteGraphEntityCreate`, `elefanteGraphRelationshipCreate`, `elefanteGraphConnect`) are **BLOCKED** if no prior search
+- Search handler sets `search_performed=True` and returns a compliance stamp
+- Gate resets on session end
+
+**Layered Defense** via `.github/copilot-instructions.md`:
+- Injected into every GitHub Copilot request in this repository
+- Documents the mandatory search-first protocol
+- Defines the compliance stamp format
+
+### Compliance Stamp Format
+
+```
+[ELEFANTE] Searched: Found {N} relevant memories
+[ELEFANTE] Searched: No relevant memories found
+```
+
+### Changes
+
+- **NEW**: `_compliance_state` dict in ElefanteMCPServer (`search_performed`, `search_count`, `search_timestamp`, `last_query`)
+- **NEW**: `_check_compliance_gate()` method - returns error if search not performed
+- **NEW**: `_reset_compliance_gate()` method - resets session state
+- **MODIFIED**: `_handle_search_memories` - sets compliance flag and adds stamp to response
+- **MODIFIED**: `_handle_add_memory` - gate check before write
+- **MODIFIED**: `_handle_create_entity` - gate check before write
+- **MODIFIED**: `_handle_create_relationship` - gate check before write  
+- **MODIFIED**: `_handle_set_elefante_connection` - gate check before write
+- **NEW**: `.github/copilot-instructions.md` - Copilot-injected protocol instructions
+
+### Gated Tools
+
+| Tool | Gate Enforced |
+|------|---------------|
+| `elefanteMemoryAdd` | ✅ Yes |
+| `elefanteGraphEntityCreate` | ✅ Yes |
+| `elefanteGraphRelationshipCreate` | ✅ Yes |
+| `elefanteGraphConnect` | ✅ Yes |
+| `elefanteMemorySearch` | ❌ No (this unlocks the gate) |
+| `elefanteContextGet` | ❌ No (read-only) |
+| `elefanteGraphQuery` | ❌ No (read-only) |
+
+### Error Response (Gate Blocked)
+
+```json
+{
+  "success": false,
+  "error": "⛔ COMPLIANCE GATE: Search required before write operations.",
+  "gate_status": "BLOCKED",
+  "action_required": "Call elefanteMemorySearch first to check for existing/related memories.",
+  "reason": "This prevents duplicate memories and ensures you have full context before adding new knowledge."
+}
+```
+
+---
+
+## [1.5.0] - 2025-12-27
+
+### Summary
+
+V5 Cognitive Features - Retrieval Explanation, Memory Health, Conflict Detection, Proactive Surfacing.
+
+### The Problem Solved
+
+V4 returns cognitive scores but doesn't explain WHY. Users can't audit the system:
+- Why did this memory rank higher than another?
+- Which memories are stale or orphaned?
+- Are any memories contradicting each other?
+- What should surface proactively based on context?
+
+### The Solution
+
+4 new features via 2 consolidated components:
+
+**CognitiveRetriever Extensions** (`src/core/retrieval.py`):
+- `RetrievalExplanation` - Full breakdown of 6 signals with reasons
+- `ProactiveSurfacer` - Suggests memories based on temporal/domain/concept triggers
+
+**MemoryHealthAnalyzer** (`src/utils/curation.py`):
+- `compute_health()` - 4 states: 🟢 healthy, 🟡 stale, 🔴 at_risk, ⚪ orphan
+- `detect_potential_conflict()` - Flags same-domain memories with 60%+ concept overlap
+
+### Property-Based Testing
+
+8 properties verified with Hypothesis (700+ test iterations):
+- P1: Explanation completeness (6 signals always present)
+- P2: Explanation accuracy (matched concepts correct)
+- P3: Health exhaustiveness (exactly 4 states)
+- P4: Health determinism (same inputs → same output)
+- P5: Conflict symmetry (conflict(a,b) ⇔ conflict(b,a))
+- P6: Threshold monotonicity (higher threshold → fewer conflicts)
+- P7: Trigger types (exactly 3: temporal, domain, recurring_concept)
+- P8: Confidence bounds (always 0.0-1.0)
+
+### Changes
+
+- **NEW**: `RetrievalExplanation` dataclass in retrieval.py
+- **NEW**: `ProactiveSuggestion` + `ProactiveSurfacer` in retrieval.py
+- **NEW**: `HealthStatus`, `HealthReport`, `ConflictReport`, `MemoryHealthAnalyzer` in curation.py
+- **MODIFIED**: `score_candidate()` now returns `(candidate, explanation)` tuple
+- **MODIFIED**: Orchestrator attaches explanations to SearchResult
+- **NEW**: tests/test_v5_explanation.py (7 tests)
+- **NEW**: tests/test_v5_health.py (14 tests)
+- **NEW**: tests/test_v5_proactive.py (14 tests)
+
+---
+
 ## [1.4.0] - 2025-12-27
 
 ### Summary
@@ -126,7 +248,7 @@ python -c "import chromadb; c=chromadb.PersistentClient('~/.elefante/data/chroma
 
 ---
 
-## [Unreleased] - Planned for v1.4.0
+## [Unreleased]
 
 ### Planned
 - Auto-classification of domain/category via agent

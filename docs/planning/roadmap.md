@@ -1,7 +1,7 @@
 # Elefante Development Roadmap
 
-**Current Version**: v1.1.0  
-**Last Updated**: 2025-12-26
+**Current Version**: v1.5.0  
+**Last Updated**: 2025-12-28
 
 ---
 
@@ -14,7 +14,7 @@
 | Transaction-scoped locking | ✅ DONE | Per-operation locks (ms) instead of per-session (hours) |
 | Stale lock auto-expiry | ✅ DONE | Locks > 30 seconds auto-cleared |
 | Dead PID detection | ✅ DONE | Orphaned locks from crashed processes cleared |
-| Backward compatibility | ✅ DONE | `enable()`/`disable()` are no-ops |
+| Backward compatibility | ✅ DONE | `enable()`/`disable()` remain safe; semantics evolved after v1.1.0 |
 
 ---
 
@@ -28,21 +28,25 @@
 | **Low Similarity Scores** | HIGH | Exact topic matches score 0.37-0.39 (should be 0.7+) - retrieval broken |
 | **No Action Guidance** | HIGH | Raw JSON dump with no summary - agent can't use results effectively |
 
-**Source**: See `docs/debug/memory/memory-compendium.md` Issues #7, #8, #9
+**Source**: See `docs/debug/memory-compendium.md` Issues #7, #8, #9
 
 **Priority**: These MUST be fixed before any new feature work.
 
 ---
 
-## Current State (v1.1.0)
+## Current State (v1.5.0)
 
 ###  Implemented Features
 - **Transaction-Scoped Locking** (v1.1.0) - Per-operation locks with auto-expiry
 - **Cognitive Memory Model** - Agent-managed enrichment (agent supplies intent/entities/relationships)
 - **Temporal Decay** - Memories decay over time, reinforced on access
 - **Dual Storage** - ChromaDB (vectors) + Kuzu (graph)
-- **MCP Server** - 15 tools for IDE integration
+- **MCP Server** - 18 tools for IDE integration (+ 2 prompts)
 - **Dashboard** - React/Vite visualization (functional but needs UX work)
+
+###  Recently Added
+- **Cognitive Retrieval (V4/V5)** - Composite scoring and retrieval explanations
+- **Agent ETL Classification (V5 topology)** - Raw → classified via agent tools
 
 ###  Partial Implementation
 - **Memory Schema V2** - Schema defined, but 3-level taxonomy (domain/category) defaults only
@@ -52,7 +56,7 @@
 
 ---
 
-## Next Phase: v1.2.0 - Complete Schema V2
+## Next Phase (TBD)
 
 ### Priority 1: Auto-Classification (HIGH)
 **Goal**: Agent automatically detects domain/category and passes them into Elefante (Elefante remains LLM-free).
@@ -136,10 +140,10 @@ Previous roadmap content archived at: `docs/archive/historical/task-roadmap-comp
 
 ---
 
-**Last Updated**: 2025-12-03  
-**Status**: Planning Phase  
-**Target Release**: v1.2.0 (TBD)
+**Last Updated**: 2025-12-28  
+**Status**: Active Development  
+**Current Release**: v1.6.0
 
 ---
 
-For current development status, see [`docs/debug/general/task-roadmap.md`](docs/debug/general/task-roadmap.md)
+For roadmap and vision, see [`docs/planning/vision.md`](vision.md)

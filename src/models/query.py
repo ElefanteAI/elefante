@@ -64,6 +64,9 @@ class SearchResult(BaseModel):
     vector_score: Optional[float] = None
     graph_score: Optional[float] = None
     
+    # V5: Retrieval explanation (Req-1)
+    explanation: Optional[Dict[str, Any]] = None
+    
     # Context information
     matched_entities: List[UUID] = Field(default_factory=list)
     relationship_path: Optional[List[str]] = None
@@ -72,7 +75,7 @@ class SearchResult(BaseModel):
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
-        return {
+        result = {
             "memory": self.memory.to_dict(),
             "score": self.score,
             "source": self.source,
@@ -81,6 +84,10 @@ class SearchResult(BaseModel):
             "matched_entities": [str(e) for e in self.matched_entities],
             "relationship_path": self.relationship_path,
         }
+        # V5: Include explanation if present
+        if self.explanation:
+            result["explanation"] = self.explanation
+        return result
     
     def __str__(self) -> str:
         return f"SearchResult(score={self.score:.3f}, source={self.source}, memory_id={self.memory.id})"

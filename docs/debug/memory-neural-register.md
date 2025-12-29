@@ -16,7 +16,7 @@
 | 2 | **Low Similarity**: Exact topic matches score 0.37-0.39 (should be 0.7+) | Poor retrieval |  OPEN |
 | 3 | **No Action Guidance**: Raw JSON dump, no summary or suggested actions | Integration fail |  OPEN |
 
-**See**: `docs/debug/memory/memory-compendium.md` Issues #7, #8, #9 for full analysis.
+**See**: `docs/debug/memory-compendium.md` Issues #7, #8, #9 for full analysis.
 
 ---
 
@@ -317,7 +317,7 @@ results = {
 
 ##  SOURCE DOCUMENTS
 
-- `docs/debug/memory/memory_retrieval_investigation.md` (export blockade discovery)
+- `docs/debug/memory-compendium.md` (export blockade discovery)
 - `docs/technical/temporal-memory-decay.md` (decay algorithm design)
 - `docs/technical/cognitive-memory-model.md` (architecture principles)
 - `docs/technical/memory-schema-v3.md` (current memory schema)

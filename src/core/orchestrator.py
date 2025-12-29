@@ -786,6 +786,8 @@ class MemoryOrchestrator:
         """
         Apply V4 cognitive multi-signal scoring to search results.
         
+        V5: Now attaches RetrievalExplanation to each result.
+        
         Transforms raw vector scores into composite scores using:
         - vector_similarity (0.30): Original ChromaDB score
         - concept_overlap (0.20): Jaccard overlap with query concepts
@@ -829,16 +831,21 @@ class MemoryOrchestrator:
                 vector_score=result.score,  # Original vector similarity score
             )
             
-            # Score candidate using cognitive retriever
-            scored_candidate = self.cognitive_retriever.score_candidate(
+            # V5: Score candidate and get explanation
+            scored_candidate, explanation = self.cognitive_retriever.score_candidate(
                 candidate,
                 query_analysis,
-                recent_memory_ids=[]  # TODO: Track recent retrievals for co-activation
+                recent_memory_ids=[],  # TODO: Track recent retrievals for co-activation
+                include_explanation=True
             )
             
             # Preserve original vector_score, update score with composite
             result.vector_score = result.score
             result.score = scored_candidate.composite_score
+            
+            # V5: Attach explanation to result
+            if explanation:
+                result.explanation = explanation.to_dict()
             
             # Log score breakdown for debugging
             self.logger.debug(

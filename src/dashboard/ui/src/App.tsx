@@ -21,6 +21,8 @@ function App() {
       .catch(err => console.error("Failed to fetch stats", err));
   }, []);
 
+  const versionLabel = stats?.elefante?.package_version || stats?.elefante?.config_version || 'unknown';
+
   return (
     <div className="w-full h-screen bg-background text-text overflow-hidden relative">
       <div className="absolute top-0 left-0 right-0 z-20 pointer-events-none">
@@ -163,6 +165,12 @@ function App() {
         onGraphStats={setGraphStats}
         command={canvasCommand}
       />
+
+      <div className="absolute bottom-0 left-0 right-0 z-30 flex justify-center pb-4 pointer-events-none">
+        <div className="pointer-events-auto px-4 py-2 rounded-full shadow-2xl border border-white/20 text-white text-sm font-semibold bg-gradient-to-r from-sky-500 via-indigo-500 to-pink-500 animate-pulse">
+          Elefante v{versionLabel}
+        </div>
+      </div>
     </div>
   );
 }

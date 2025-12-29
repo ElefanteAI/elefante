@@ -271,3 +271,218 @@ def compute_authority_score(
     )
     
     return round(min(1.0, max(0.0, score)), 3)
+
+
+# ============================================================================
+# V5 MEMORY HEALTH ANALYZER
+# ============================================================================
+
+from enum import Enum
+from dataclasses import dataclass
+
+
+class HealthStatus(str, Enum):
+    """Memory health status (V5 Req-2)."""
+    HEALTHY = "healthy"   # 🟢 Active, connected, recently used
+    STALE = "stale"       # 🟡 Not accessed in 90+ days
+    AT_RISK = "at_risk"   # 🔴 Superseded or has unresolved conflicts
+    ORPHAN = "orphan"     # ⚪ No graph connections
+
+
+@dataclass
+class HealthReport:
+    """Health analysis result for a memory."""
+    status: HealthStatus
+    icon: str
+    reasons: list[str]
+
+
+@dataclass
+class ConflictReport:
+    """Potential conflict between two memories (V5 Req-3)."""
+    memory_a_id: str
+    memory_b_id: str
+    overlap: float
+    shared_concepts: list[str]
+    reason: str
+
+
+class MemoryHealthAnalyzer:
+    """
+    Analyzes memory health and detects potential conflicts.
+    
+    V5 Features: Req-2 (Health), Req-3 (Conflicts)
+    
+    Used by: update_dashboard_data.py (snapshot generation)
+    """
+    
+    ICONS = {
+        HealthStatus.HEALTHY: "🟢",
+        HealthStatus.STALE: "🟡",
+        HealthStatus.AT_RISK: "🔴",
+        HealthStatus.ORPHAN: "⚪",
+    }
+    
+    def __init__(self, stale_days: int = 90, conflict_threshold: float = 0.6):
+        """
+        Args:
+            stale_days: Days without access before memory is STALE
+            conflict_threshold: Jaccard overlap threshold for conflict detection
+        """
+        self.stale_days = stale_days
+        self.conflict_threshold = conflict_threshold
+    
+    def compute_health(
+        self,
+        *,
+        superseded_by_id: Optional[str] = None,
+        potential_conflicts: Optional[list[str]] = None,
+        days_since_access: int = 0,
+        connection_count: int = 0,
+    ) -> HealthReport:
+        """
+        Compute health status for a single memory.
+        
+        Priority order:
+        1. AT_RISK if superseded
+        2. AT_RISK if has unresolved conflicts
+        3. STALE if not accessed in 90+ days
+        4. ORPHAN if no connections
+        5. HEALTHY otherwise
+        """
+        potential_conflicts = potential_conflicts or []
+        
+        if superseded_by_id:
+            return HealthReport(
+                status=HealthStatus.AT_RISK,
+                icon=self.ICONS[HealthStatus.AT_RISK],
+                reasons=["Superseded by newer memory"]
+            )
+        
+        if potential_conflicts:
+            return HealthReport(
+                status=HealthStatus.AT_RISK,
+                icon=self.ICONS[HealthStatus.AT_RISK],
+                reasons=[f"Has {len(potential_conflicts)} unresolved conflict(s)"]
+            )
+        
+        if days_since_access > self.stale_days:
+            return HealthReport(
+                status=HealthStatus.STALE,
+                icon=self.ICONS[HealthStatus.STALE],
+                reasons=[f"Not accessed in {days_since_access} days"]
+            )
+        
+        if connection_count == 0:
+            return HealthReport(
+                status=HealthStatus.ORPHAN,
+                icon=self.ICONS[HealthStatus.ORPHAN],
+                reasons=["No connections to other memories"]
+            )
+        
+        return HealthReport(
+            status=HealthStatus.HEALTHY,
+            icon=self.ICONS[HealthStatus.HEALTHY],
+            reasons=["Active and connected"]
+        )
+    
+    def detect_potential_conflict(
+        self,
+        memory_a_id: str,
+        memory_a_concepts: list[str],
+        memory_a_domain: str,
+        memory_b_id: str,
+        memory_b_concepts: list[str],
+        memory_b_domain: str,
+    ) -> Optional[ConflictReport]:
+        """
+        Check if two memories MIGHT conflict.
+        
+        Returns ConflictReport if:
+        - Same domain AND
+        - Concept overlap > threshold (default 60%)
+        
+        Soft detection only - flags for user review, never auto-asserts.
+        """
+        # Different domains can't conflict (different contexts)
+        if memory_a_domain != memory_b_domain:
+            return None
+        
+        set_a = set(memory_a_concepts) if memory_a_concepts else set()
+        set_b = set(memory_b_concepts) if memory_b_concepts else set()
+        
+        # Need concepts to detect conflict
+        if not set_a or not set_b:
+            return None
+        
+        # Jaccard similarity
+        intersection = set_a & set_b
+        union = set_a | set_b
+        overlap = len(intersection) / len(union)
+        
+        if overlap < self.conflict_threshold:
+            return None
+        
+        shared = list(intersection)[:3]
+        return ConflictReport(
+            memory_a_id=memory_a_id,
+            memory_b_id=memory_b_id,
+            overlap=overlap,
+            shared_concepts=shared,
+            reason=f"High concept overlap ({overlap:.0%}): {', '.join(shared)}"
+        )
+    
+    def analyze_all(
+        self,
+        memories: list[dict],
+    ) -> tuple[dict[str, HealthReport], list[ConflictReport]]:
+        """
+        Batch analyze: compute health for all + detect all conflicts.
+        
+        Args:
+            memories: List of dicts with keys:
+                - id: str
+                - concepts: list[str]
+                - domain: str
+                - days_since_access: int
+                - connection_count: int
+                - superseded_by_id: Optional[str]
+                - potential_conflicts: Optional[list[str]]
+        
+        Returns:
+            - health_map: {memory_id: HealthReport}
+            - conflicts: list of ConflictReport
+        """
+        health_map: dict[str, HealthReport] = {}
+        conflicts: list[ConflictReport] = []
+        
+        # First pass: compute health for each memory
+        for mem in memories:
+            health = self.compute_health(
+                superseded_by_id=mem.get("superseded_by_id"),
+                potential_conflicts=mem.get("potential_conflicts"),
+                days_since_access=mem.get("days_since_access", 0),
+                connection_count=mem.get("connection_count", 0),
+            )
+            health_map[mem["id"]] = health
+        
+        # Second pass: detect conflicts between pairs (O(n²) but n is small)
+        n = len(memories)
+        for i in range(n):
+            for j in range(i + 1, n):
+                mem_a = memories[i]
+                mem_b = memories[j]
+                
+                conflict = self.detect_potential_conflict(
+                    memory_a_id=mem_a["id"],
+                    memory_a_concepts=mem_a.get("concepts", []),
+                    memory_a_domain=mem_a.get("domain", "general"),
+                    memory_b_id=mem_b["id"],
+                    memory_b_concepts=mem_b.get("concepts", []),
+                    memory_b_domain=mem_b.get("domain", "general"),
+                )
+                
+                if conflict:
+                    conflicts.append(conflict)
+        
+        return health_map, conflicts

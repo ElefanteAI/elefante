@@ -12,6 +12,8 @@ from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field, model_validator
 from dotenv import load_dotenv
 
+from src.utils.version import PACKAGE_VERSION
+
 # Define absolute paths relative to user home directory for global persistence
 # This ensures databases are shared across all workspaces
 USER_HOME = Path.home()
@@ -69,7 +71,7 @@ class OrchestratorConfig(BaseModel):
 class MCPServerConfig(BaseModel):
     """MCP server configuration"""
     name: str = "elefante"
-    version: str = "1.4.0"
+    version: str = PACKAGE_VERSION
     description: str = "Local AI Memory System with Vector and Graph Storage"
     port: Optional[int] = None
     host: Optional[str] = None
@@ -172,7 +174,7 @@ class UserProfileConfig(BaseModel):
 
 class ElefanteConfig(BaseModel):
     """Main Elefante configuration"""
-    version: str = "1.4.0"
+    version: str = PACKAGE_VERSION
     data_dir: str = str(DATA_DIR)
     anonymized_telemetry: bool = False
     vector_store: VectorStoreConfig = Field(default_factory=VectorStoreConfig)

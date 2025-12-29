@@ -1,0 +1,4 @@
+# file: /Volumes/X10Pro/X10-2025/Documents2025/Elefante_early_dec2025/src/utils/config.py
+# hypothesis_version: 6.148.8
+
+[0.0, 0.01, 0.1, 0.3, 0.5, 0.7, 1.0, 100, 128, 180, 365, 768, 1000, '.', '.elefante', '1', '1.4.0', '10MB', '512MB', 'Config', 'ELEFANTE_CONFIG_PATH', 'ELEFANTE_DATA_DIR', 'ELEFANTE_DEVICE', 'ELEFANTE_LOG_LEVEL', 'ELEFANTE_MCP_PORT', 'ELEFANTE_MODE', 'INFO', 'ON', 'TRUE', 'User', 'Y', 'YES', 'after', 'agent-managed', 'chroma', 'chromadb', 'config.yaml', 'cosine', 'cpu', 'data', 'data_dir', 'device', 'elefante', 'elefante.log', 'elefante_mode', 'embeddings', 'enabled', 'hybrid', 'json', 'kuzu', 'kuzu_db', 'level', 'logging', 'logs', 'mcp_server', 'memories', 'model', 'port', 'r', 'thenlper/gte-base', 'user_default']

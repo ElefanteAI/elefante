@@ -71,10 +71,18 @@ class ElefanteMCPServer:
         self.logger = get_logger(self.__class__.__name__)
         self.mode_manager = get_mode_manager()  # Elefante Mode manager (v1.1.0 - transaction-scoped)
         
+        # v1.6.0 Compliance Gate: Session state for search-before-write enforcement
+        self._compliance_state = {
+            "search_performed": False,
+            "search_count": 0,
+            "search_timestamp": None,
+            "last_query": None
+        }
+        
         # Register tool handlers
         self._register_handlers()
         
-        self.logger.info("Elefante MCP Server initialized (v1.1.0 - transaction-scoped locking)")
+        self.logger.info("Elefante MCP Server initialized (v1.6.0 - Compliance Gate)")
 
     def _inject_pitfalls(self, result: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
         """
@@ -116,6 +124,49 @@ class ElefanteMCPServer:
         )
         result["MANDATORY_PROTOCOLS_READ_THIS_FIRST"] = pitfalls
         return result
+
+    def _check_compliance_gate(self, tool_name: str) -> Dict[str, Any] | None:
+        """
+        v1.6.0 Compliance Gate: Enforce search-before-write rule.
+        
+        Returns None if gate passes, or an error dict if gate blocks.
+        Write operations are blocked until elefanteMemorySearch has been called.
+        """
+        # Tools that require prior search (write operations)
+        GATED_TOOLS = {
+            "elefanteMemoryAdd",
+            "elefanteGraphEntityCreate", 
+            "elefanteGraphRelationshipCreate",
+            "elefanteGraphConnect",
+        }
+        
+        if tool_name not in GATED_TOOLS:
+            return None  # Gate passes - not a gated tool
+        
+        if self._compliance_state["search_performed"]:
+            return None  # Gate passes - search was performed
+        
+        # GATE BLOCKED
+        self.logger.warning(f"Compliance Gate BLOCKED: {tool_name} called without prior search")
+        return {
+            "success": False,
+            "error": "⛔ COMPLIANCE GATE: Search required before write operations.",
+            "gate_status": "BLOCKED",
+            "action_required": "Call elefanteMemorySearch first to check for existing/related memories.",
+            "reason": "This prevents duplicate memories and ensures you have full context before adding new knowledge.",
+            "blocked_tool": tool_name,
+            "hint": f"Try: elefanteMemorySearch with a query related to what you want to store."
+        }
+    
+    def _reset_compliance_gate(self):
+        """Reset compliance state (e.g., after session ends or on explicit reset)"""
+        self._compliance_state = {
+            "search_performed": False,
+            "search_count": 0,
+            "search_timestamp": None,
+            "last_query": None
+        }
+        self.logger.info("Compliance Gate reset")
 
     async def _get_orchestrator(self):
         """Lazy load the orchestrator"""
@@ -908,7 +959,12 @@ You have access to a persistent memory system called **Elefante** - the user's s
         return status
 
     async def _handle_add_memory(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteMemoryAdd tool call - Authoritative Pipeline (v2.0.0: transaction-scoped)"""
+        """Handle elefanteMemoryAdd tool call - Authoritative Pipeline (v1.6.0: Compliance Gate)"""
+        # v1.6.0 Compliance Gate Check
+        gate_result = self._check_compliance_gate("elefanteMemoryAdd")
+        if gate_result is not None:
+            return gate_result
+        
         # Acquire write lock for duration of operation
         with write_lock() as lock:
             if not lock.acquired:
@@ -1022,6 +1078,20 @@ You have access to a persistent memory system called **Elefante** - the user's s
             "count": len(results),
             "results": [result.to_dict() for result in results]
         }
+        
+        # v1.6.0 Compliance Gate: Mark search as performed
+        self._compliance_state["search_performed"] = True
+        self._compliance_state["search_count"] = len(results)
+        self._compliance_state["search_timestamp"] = datetime.utcnow()
+        self._compliance_state["last_query"] = args["query"]
+        
+        # Add compliance stamp to response
+        if len(results) > 0:
+            response["compliance_stamp"] = f"[ELEFANTE] Searched: Found {len(results)} relevant memories"
+        else:
+            response["compliance_stamp"] = "[ELEFANTE] Searched: No relevant memories found"
+        
+        response["gate_status"] = "UNLOCKED"  # Write operations now allowed
 
         return response
     
@@ -1058,7 +1128,12 @@ You have access to a persistent memory system called **Elefante** - the user's s
         }
     
     async def _handle_create_entity(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteGraphEntityCreate tool call (v2.0.0: transaction-scoped)"""
+        """Handle elefanteGraphEntityCreate tool call (v1.6.0: Compliance Gate)"""
+        # v1.6.0 Compliance Gate Check
+        gate_result = self._check_compliance_gate("elefanteGraphEntityCreate")
+        if gate_result is not None:
+            return gate_result
+        
         with write_lock() as lock:
             if not lock.acquired:
                 return {
@@ -1082,7 +1157,12 @@ You have access to a persistent memory system called **Elefante** - the user's s
             }
     
     async def _handle_create_relationship(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteGraphRelationshipCreate tool call (v2.0.0: transaction-scoped)"""
+        """Handle elefanteGraphRelationshipCreate tool call (v1.6.0: Compliance Gate)"""
+        # v1.6.0 Compliance Gate Check
+        gate_result = self._check_compliance_gate("elefanteGraphRelationshipCreate")
+        if gate_result is not None:
+            return gate_result
+        
         with write_lock() as lock:
             if not lock.acquired:
                 return {
@@ -1535,7 +1615,12 @@ You have access to a persistent memory system called **Elefante** - the user's s
         return result
 
     async def _handle_set_elefante_connection(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteGraphConnect tool call (v2.0.0: transaction-scoped)"""
+        """Handle elefanteGraphConnect tool call (v1.6.0: Compliance Gate)"""
+        # v1.6.0 Compliance Gate Check
+        gate_result = self._check_compliance_gate("elefanteGraphConnect")
+        if gate_result is not None:
+            return gate_result
+        
         with write_lock() as lock:
             if not lock.acquired:
                 return {
