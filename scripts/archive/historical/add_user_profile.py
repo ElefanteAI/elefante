@@ -125,4 +125,3 @@ async def add_user_profile():
 if __name__ == "__main__":
     asyncio.run(add_user_profile())
 
-# Made with Bob

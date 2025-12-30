@@ -290,13 +290,13 @@ async def main():
     print(f"Global Hit Rate (≥0.3):    {global_hit_rate:.2%}")
     
     if global_avg >= 0.35:
-        print(f"Status: ✅ EXCELLENT - Model performing well")
+        print(f"Status:  EXCELLENT - Model performing well")
     elif global_avg >= 0.25:
-        print(f"Status: ✅ GOOD - Model acceptable")
+        print(f"Status:  GOOD - Model acceptable")
     elif global_avg >= 0.15:
-        print(f"Status: ⚠️  MARGINAL - Consider tuning")
+        print(f"Status:   MARGINAL - Consider tuning")
     else:
-        print(f"Status: ❌ POOR - Model needs review")
+        print(f"Status:  POOR - Model needs review")
     
     print(f"\n{'='*100}")
 

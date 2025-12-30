@@ -379,4 +379,3 @@ def reload_config(config_path: Optional[str] = None) -> Config:
     _config_instance.reload(config_path)
     return _config_instance
 
-# Made with Bob

@@ -7,6 +7,105 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.6.3] - 2025-12-30
+
+### Summary
+
+Neural Web Visualization - Dashboard graph transformed from rigid "Solar System" to organic "Neural Web" layout.
+
+### The Problem Solved
+
+v1.6.2's ring-based layout forced memories into concentric orbits. The exponential node sizing (`r = 8 + importance^2 * 0.4`) made high-importance nodes overwhelmingly large. The result was visually cluttered and didn't represent how a "second brain" thinks.
+
+### The Solution
+
+1. **Linear Sizing**: Changed formula to `r = 10 + importance * 1.5` (max 25px vs. 48px)
+2. **Neural Physics**: Removed ring gravity and core locking - nodes float organically based on connections
+3. **Status Indicators**: Added visual borders for processing status (emerald=processed, amber=pending)
+4. **Recency Pulse**: White pulsing ring for very recent memories (heat > 0.9)
+5. **Cleaned Render**: Disabled ring guide backgrounds for cleaner brain visualization
+
+### Changes
+
+- **MODIFIED**: `src/dashboard/ui/src/components/GraphCanvas.tsx`
+  - Node radius: Linear scaling replaces power law
+  - Physics: Core nodes no longer locked (`fx`/`fy` removed)
+  - Ring gravity: Disabled (commented out)
+  - Ring guides: Disabled (commented out)
+  - Added: Recency pulse ring (white, animated)
+  - Added: Processing status border (green/amber dashed)
+
+### Visual Impact
+
+Before: Rigid orbits, giant nodes, cluttered labels
+After: Organic clusters, balanced sizes, semantic grouping
+
+---
+
+## [1.6.2] - 2025-12-29
+
+### Summary
+
+Cognitive Visual Enablement - Dashboard now displays cognitive fields (concepts, surfaces_when, authority_score) in the memory inspector sidebar.
+
+### The Problem Solved
+
+v1.6.1 ensured cognitive fields are stored and reconstructed correctly, but users couldn't SEE them in the dashboard. The data existed in ChromaDB and the snapshot, but the UI didn't render it.
+
+### The Solution
+
+Updated `src/dashboard/ui/src/components/GraphCanvas.tsx` to display:
+- **Concepts**: Clickable cyan chips showing extracted concepts (search on click)
+- **Surfaces When**: Purple bullet list showing when memory surfaces
+- **Authority Score**: Progress bar (0-1 scale) with color gradient
+
+### Changes
+
+- **MODIFIED**: `GraphCanvas.tsx` - Added Cognitive Fields section after Tags
+- **NEW**: JSON array parser for ChromaDB-stored lists
+- **NEW**: Visual design matching existing inspector aesthetic
+
+### Visual Output
+
+When clicking a memory node in the dashboard, the sidebar now shows:
+```
+🧬 Cognitive Fields                           v1.6.2
+  🎯 Concepts: [elefante] [mcp] [law] [protocol]
+  ⚡ Surfaces When:
+    • "when user asks about development rules"
+    • "on etiquette or protocol questions"
+  📊 Authority Score: [=====-----] 0.850
+```
+
+---
+
+## [1.6.1] - 2025-12-29
+
+### Summary
+
+Cognitive Field Standardization - Ensured `concepts`, `surfaces_when`, and `authority_score` persist correctly and are available for V4 Cognitive Retrieval scoring.
+
+### The Problem Solved
+
+V4 Cognitive Retrieval uses concept overlap (0.20 weight) for scoring, but:
+- Concepts were sometimes stored in inconsistent formats (JSON, repr(), comma-separated)
+- Some memories had missing or malformed cognitive fields
+- Dashboard snapshot didn't include these fields
+
+### The Solution
+
+1. **Standardized Storage**: All cognitive fields stored as JSON strings in ChromaDB metadata
+2. **Migration Script**: `scripts/migrate_cognitive_fields_v161.py` to fix existing memories
+3. **Snapshot Update**: `scripts/update_dashboard_data.py` now includes cognitive fields
+
+### Changes
+
+- **NEW**: `scripts/migrate_cognitive_fields_v161.py` - Migrates all memories to v1.6.1 format
+- **MODIFIED**: `scripts/update_dashboard_data.py` - Added concepts, surfaces_when, authority_score to node properties
+- **MIGRATED**: 34 memories (9 updated, 25 already compliant)
+
+---
+
 ## [1.6.0] - 2025-12-28
 
 ### Summary
@@ -56,20 +155,20 @@ Agents using Elefante MCP tools often skip memory retrieval entirely:
 
 | Tool | Gate Enforced |
 |------|---------------|
-| `elefanteMemoryAdd` | ✅ Yes |
-| `elefanteGraphEntityCreate` | ✅ Yes |
-| `elefanteGraphRelationshipCreate` | ✅ Yes |
-| `elefanteGraphConnect` | ✅ Yes |
-| `elefanteMemorySearch` | ❌ No (this unlocks the gate) |
-| `elefanteContextGet` | ❌ No (read-only) |
-| `elefanteGraphQuery` | ❌ No (read-only) |
+| `elefanteMemoryAdd` |  Yes |
+| `elefanteGraphEntityCreate` |  Yes |
+| `elefanteGraphRelationshipCreate` |  Yes |
+| `elefanteGraphConnect` |  Yes |
+| `elefanteMemorySearch` |  No (this unlocks the gate) |
+| `elefanteContextGet` |  No (read-only) |
+| `elefanteGraphQuery` |  No (read-only) |
 
 ### Error Response (Gate Blocked)
 
 ```json
 {
   "success": false,
-  "error": "⛔ COMPLIANCE GATE: Search required before write operations.",
+  "error": " COMPLIANCE GATE: Search required before write operations.",
   "gate_status": "BLOCKED",
   "action_required": "Call elefanteMemorySearch first to check for existing/related memories.",
   "reason": "This prevents duplicate memories and ensures you have full context before adding new knowledge."
@@ -78,7 +177,7 @@ Agents using Elefante MCP tools often skip memory retrieval entirely:
 
 ---
 
-## [1.5.0] - 2025-12-27
+## [1.5.0] - 2025-12-28
 
 ### Summary
 
@@ -101,7 +200,7 @@ V4 returns cognitive scores but doesn't explain WHY. Users can't audit the syste
 - `ProactiveSurfacer` - Suggests memories based on temporal/domain/concept triggers
 
 **MemoryHealthAnalyzer** (`src/utils/curation.py`):
-- `compute_health()` - 4 states: 🟢 healthy, 🟡 stale, 🔴 at_risk, ⚪ orphan
+- `compute_health()` - 4 states:  healthy,  stale,  at_risk,  orphan
 - `detect_potential_conflict()` - Flags same-domain memories with 60%+ concept overlap
 
 ### Property-Based Testing
@@ -248,6 +347,26 @@ python -c "import chromadb; c=chromadb.PersistentClient('~/.elefante/data/chroma
 
 ---
 
+## [1.2.0] - 2025-12-27
+
+### Summary
+
+Minor fixes and preparation work for schema/migration operations, plus embedding model benchmarking.
+
+This release focused on reducing migration risk by validating candidate embedding models before shipping an embedding change.
+
+### What Changed
+
+- **Preparation for schema and migration flows** (stability work before larger changes)
+- **Embedding model benchmarking** across multiple candidates using repeatable test queries
+- **Decision milestone**: `thenlper/gte-base` (768-dim) selected as the best option to ship next
+
+### Notes
+
+- The embedding model upgrade itself is documented in **v1.3.0**.
+
+---
+
 ## [Unreleased]
 
 ### Planned
@@ -370,7 +489,7 @@ Agent calls: elefanteSystemDisable -> Releases locks -> Safe for other IDE
 
 ---
 
-## [1.0.0] - 2025-12-06
+## [1.0.0] - 2025-12-05
 
 ### Summary
 First stable production release with comprehensive documentation cleanup.

@@ -306,4 +306,3 @@ def sanitize_filename(filename: str) -> str:
     
     return filename or 'unnamed'
 
-# Made with Bob

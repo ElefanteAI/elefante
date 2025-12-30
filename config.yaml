@@ -1,12 +1,12 @@
 # Elefante Memory System Configuration
-# Version: 1.4.0
+# Version: 1.6.2
 #
 # NOTE: Paths are now automatically resolved to absolute paths by config.py
 # to prevent database "amnesia" when starting from different directories.
 # You can override these with environment variables if needed.
 
 elefante:
-  version: "1.4.0"
+  version: "1.6.2"
   # data_dir is auto-set to absolute path in config.py
   anonymized_telemetry: false
 
@@ -37,7 +37,7 @@ elefante:
   # MCP Server Configuration
   mcp_server:
     name: "elefante"
-    version: "1.4.0"
+    version: "1.6.2"
     description: "Local AI Memory System with Vector and Graph Storage"
     # Optional HTTP endpoint (leave commented for stdio only)
     # port: 3000
@@ -117,4 +117,3 @@ elefante:
     user_id: "enterprise_user_001"
     auto_link_first_person: true
     detect_code_blocks: true
-# Made with Bob

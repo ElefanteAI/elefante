@@ -76,12 +76,12 @@ PROTOCOL:
 
     # Mock the LLM service to return our perfect analysis
     async def mock_analyze(content):
-        print("🤖 Using Hand-Crafted Cognitive Analysis for Protocol")
+        print(" Using Hand-Crafted Cognitive Analysis for Protocol")
         return cognitive_payload
 
     orchestrator.llm_service.analyze_memory = mock_analyze
 
-    print("🚀 Ingesting User Protocol...")
+    print(" Ingesting User Protocol...")
     memory = await orchestrator.add_memory(
         protocol_content, 
         tags=["protocol", "identity", "rules", "critical"],
@@ -89,12 +89,12 @@ PROTOCOL:
     )
 
     if memory:
-        print(f"✅ Protocol Ingested successfully! Memory ID: {memory.id}")
+        print(f" Protocol Ingested successfully! Memory ID: {memory.id}")
         print("Cognitive Graph Updated:")
         for rel in cognitive_payload["relationships"]:
             print(f"  - {rel['source']} -[{rel['type']}]-> {rel['target']}")
     else:
-        print("❌ Failed to ingest protocol.")
+        print(" Failed to ingest protocol.")
 
 if __name__ == "__main__":
     asyncio.run(main())

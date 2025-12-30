@@ -61,7 +61,7 @@ The topology repair script (`scripts/utils/repair_graph_topology.py`) creates ed
   - Size: 20px radius
   - Examples: "NEVER use 'properties' as column name", "User Persona"
   
-- 🪐 **PLANET** (Importance 8-9): Insights, Preferences
+-  **PLANET** (Importance 8-9): Insights, Preferences
   - Size: 12px radius
   - Examples: "Documentation Architecture", "Workflow Patterns"
   
@@ -137,7 +137,7 @@ HUBS (Imp 10): X
 ENTITIES: 17
 HIERARCHY:
    SUN (10): Critical Laws
-  🪐 PLANET (8-9): Insights
+   PLANET (8-9): Insights
    SAT (<8): Facts
 ```
 

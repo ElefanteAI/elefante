@@ -55,4 +55,3 @@ python -m src.mcp.server
 
 pause
 
-@REM Made with Bob

@@ -278,7 +278,7 @@ class ElefanteBatteryTest:
     async def cleanup(self):
         """Remove all test data"""
         if not CLEANUP_ENABLED:
-            print("\n⚠️  CLEANUP DISABLED - Test data preserved for inspection")
+            print("\n  CLEANUP DISABLED - Test data preserved for inspection")
             return
             
         print("\n" + "-"*50)
@@ -290,14 +290,14 @@ class ElefanteBatteryTest:
                 await self.vector_store.delete_memory(memory_id)
                 deleted_count += 1
             except Exception as e:
-                print(f"  ⚠️  Failed to delete {memory_id}: {e}")
+                print(f"    Failed to delete {memory_id}: {e}")
                 
         print(f"  ✓ Deleted {deleted_count}/{len(self.added_memory_ids)} test memories")
         print("-"*50)
         
     async def run_single_scenario(self, scenario: TestScenario) -> TestResult:
         """Run a single test scenario"""
-        print(f"\n📋 Testing: {scenario.name}")
+        print(f"\n Testing: {scenario.name}")
         print(f"   Category: {scenario.category}")
         
         result = TestResult(
@@ -369,7 +369,7 @@ class ElefanteBatteryTest:
                             best_results = [{"query": query, "score": sr.score, "content_preview": sr.memory.content[:100]}]
                             
             except Exception as e:
-                print(f"   ⚠️  Search query failed: {query} - {e}")
+                print(f"     Search query failed: {query} - {e}")
                 
         result.search_time_ms = total_search_time / len(scenario.search_queries) if scenario.search_queries else 0
         result.best_score = best_score
@@ -416,31 +416,31 @@ class ElefanteBatteryTest:
             print(f"{r.scenario_name:<35} {add_status:^8} {search_status:^8} {score:^8}")
             
         print("-"*70)
-        print(f"\n📊 ADD SUCCESS:    {add_successes}/{total} ({100*add_successes/total:.0f}%)")
-        print(f"📊 SEARCH SUCCESS: {search_successes}/{total} ({100*search_successes/total:.0f}%)")
+        print(f"\n ADD SUCCESS:    {add_successes}/{total} ({100*add_successes/total:.0f}%)")
+        print(f" SEARCH SUCCESS: {search_successes}/{total} ({100*search_successes/total:.0f}%)")
         
         # Calculate average scores
         scores = [r.best_score for r in self.results if r.best_score > 0]
         if scores:
-            print(f"📊 AVG SCORE:      {sum(scores)/len(scores):.3f}")
+            print(f" AVG SCORE:      {sum(scores)/len(scores):.3f}")
         
         # Overall verdict
         print("\n" + "="*70)
         if add_successes == total and search_successes == total:
-            print("🎉 VERDICT: ALL TESTS PASSED (100%)")
+            print(" VERDICT: ALL TESTS PASSED (100%)")
             print("   Elefante triggers reliably in normal usage scenarios!")
         elif search_successes >= total * 0.8:
-            print(f"⚠️  VERDICT: MOSTLY PASSING ({100*search_successes/total:.0f}%)")
+            print(f"  VERDICT: MOSTLY PASSING ({100*search_successes/total:.0f}%)")
             print("   Some scenarios need tuning but core functionality works.")
         else:
-            print(f"❌ VERDICT: FAILING ({100*search_successes/total:.0f}%)")
+            print(f" VERDICT: FAILING ({100*search_successes/total:.0f}%)")
             print("   MCP needs fixes - retrieval not reliable enough!")
         print("="*70)
         
         # List failures for debugging
         failures = [r for r in self.results if not r.search_success]
         if failures:
-            print("\n🔍 FAILED SCENARIOS (need investigation):")
+            print("\n FAILED SCENARIOS (need investigation):")
             for r in failures:
                 print(f"   - {r.scenario_name}: best_score={r.best_score:.3f}")
                 

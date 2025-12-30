@@ -29,4 +29,3 @@ Then follow: examples/AGENT_TUTORIAL.md
 
 ---
 
-Made with Bob 🐘

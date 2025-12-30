@@ -17,7 +17,7 @@ def log(msg):
     print(f"[{time.strftime('%H:%M:%S')}] {msg}")
 
 def verify_architecture():
-    log("🖥️  Checking System Architecture...")
+    log("  Checking System Architecture...")
     system = platform.system()
     machine = platform.machine()
     processor = platform.processor()
@@ -27,14 +27,14 @@ def verify_architecture():
     print(f"   Processor: {processor}")
     
     if system == "Darwin" and machine == "arm64":
-        log("✅ Detected macOS Apple Silicon (M-series).")
+        log(" Detected macOS Apple Silicon (M-series).")
         return True
     else:
-        log(f"ℹ️  Detected {system} {machine}. Not strictly M-series, but proceeding.")
+        log(f"  Detected {system} {machine}. Not strictly M-series, but proceeding.")
         return False
 
 def verify_sentence_transformers():
-    log("\n🧠 Verifying Sentence Transformers (PyTorch)...")
+    log("\n Verifying Sentence Transformers (PyTorch)...")
     try:
         from sentence_transformers import SentenceTransformer
         
@@ -47,14 +47,14 @@ def verify_sentence_transformers():
         embeddings = model.encode(["This is a test sentence for M4 verification."])
         
         shape = embeddings.shape
-        log(f"   ✅ Embedding generated. Shape: {shape}")
+        log(f"    Embedding generated. Shape: {shape}")
         return True
     except Exception as e:
-        log(f"   ❌ Sentence Transformers failed: {e}")
+        log(f"    Sentence Transformers failed: {e}")
         return False
 
 def verify_chromadb():
-    log("\n💾 Verifying ChromaDB (Vector Store)...")
+    log("\n Verifying ChromaDB (Vector Store)...")
     try:
         import chromadb
         from chromadb.config import Settings
@@ -85,21 +85,21 @@ def verify_chromadb():
         )
         
         if results['ids'][0][0] == 'id1':
-            log("   ✅ ChromaDB read/write successful.")
+            log("    ChromaDB read/write successful.")
             return True
         else:
-            log("   ❌ ChromaDB query returned unexpected results.")
+            log("    ChromaDB query returned unexpected results.")
             return False
             
     except Exception as e:
-        log(f"   ❌ ChromaDB failed: {e}")
+        log(f"    ChromaDB failed: {e}")
         # Common M1/M2/M3/M4 issue: SQLite version
         import sqlite3
-        log(f"   ℹ️  SQLite version: {sqlite3.sqlite_version}")
+        log(f"     SQLite version: {sqlite3.sqlite_version}")
         return False
 
 def verify_kuzu():
-    log("\n🕸️  Verifying Kuzu (Graph DB)...")
+    log("\n  Verifying Kuzu (Graph DB)...")
     try:
         import kuzu
         import shutil
@@ -130,7 +130,7 @@ def verify_kuzu():
         
         row = results.get_next()
         if row[0] == 'Alice' and row[1] == 30:
-            log("   ✅ Kuzu read/write successful.")
+            log("    Kuzu read/write successful.")
             # Cleanup
             conn = None
             db = None
@@ -140,16 +140,16 @@ def verify_kuzu():
                 os.remove(db_path)
             return True
         else:
-            log("   ❌ Kuzu query returned unexpected results.")
+            log("    Kuzu query returned unexpected results.")
             return False
             
     except Exception as e:
-        log(f"   ❌ Kuzu failed: {e}")
+        log(f"    Kuzu failed: {e}")
         return False
 
 def main():
     print("============================================================")
-    print("🚀 ELEFANTE M4 SILICON COMPATIBILITY CHECK")
+    print(" ELEFANTE M4 SILICON COMPATIBILITY CHECK")
     print("============================================================")
     
     verify_architecture()
@@ -159,18 +159,18 @@ def main():
     kuzu_ok = verify_kuzu()
     
     print("\n============================================================")
-    print("📊 SUMMARY")
+    print(" SUMMARY")
     print("============================================================")
-    print(f"Sentence Transformers: {'✅ PASS' if st_ok else '❌ FAIL'}")
-    print(f"ChromaDB:              {'✅ PASS' if chroma_ok else '❌ FAIL'}")
-    print(f"Kuzu Graph DB:         {'✅ PASS' if kuzu_ok else '❌ FAIL'}")
+    print(f"Sentence Transformers: {' PASS' if st_ok else ' FAIL'}")
+    print(f"ChromaDB:              {' PASS' if chroma_ok else ' FAIL'}")
+    print(f"Kuzu Graph DB:         {' PASS' if kuzu_ok else ' FAIL'}")
     print("============================================================")
     
     if st_ok and chroma_ok and kuzu_ok:
-        print("\n✅ System is fully compatible with M4 Silicon.")
+        print("\n System is fully compatible with M4 Silicon.")
         sys.exit(0)
     else:
-        print("\n❌ Compatibility issues detected.")
+        print("\n Compatibility issues detected.")
         sys.exit(1)
 
 if __name__ == "__main__":

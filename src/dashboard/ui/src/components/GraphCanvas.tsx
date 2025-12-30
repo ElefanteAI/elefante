@@ -146,7 +146,7 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
   const [storyFocusNode, setStoryFocusNode] = useState<Node | null>(null);
   const [visibleTypes, setVisibleTypes] = useState({
     memory: true,
-    signal: true,
+    signal: false, // V1.6.2: Hide signal hubs by default - they clutter the solar system view
     entity: false, // PURE THOUGHT MODE: Hide entities by default, show only memory mesh
     cluster: false,
     session: false
@@ -577,25 +577,24 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
           // Formula: r = Base + (Importance^2 * Factor)
           // Imp 1:  8 + 0.4  = 8.4px  (Detail)
           // Imp 5:  8 + 10   = 18px   (Concept)
-          // Imp 8:  8 + 25.6 = 33.6px (Core)
-          // Imp 10: 8 + 40   = 48px   (Landmark)
-          let radius = 8 + (importance * importance * 0.4);
+          // Imp 8:  10 + 12 = 22px (Core)
+          // Imp 10: 10 + 15 = 25px (Landmark)
+          // CEO DIRECTIVE: Linear scaling for "Neural Web" balance
+          let radius = 10 + (importance * 1.5);
           
            // COLOR:
            // - V3: Layer-aware gradients
-           // - V5: Knowledge-type semantics
+           // - V5: RING-BASED coloring (visual hierarchy)
            let color = '#3b82f6'; // Default Blue
 
            if (n.type === 'memory') {
             if (viewMode === 'v5') {
-              const kt = String(knowledgeType || 'unknown').toLowerCase();
-              if (kt.includes('decision')) color = '#EF4444';
-              else if (kt.includes('preference')) color = '#F59E0B';
-              else if (kt.includes('rule')) color = '#22C55E';
-              else if (kt.includes('goal')) color = '#10B981';
-              else if (kt.includes('insight')) color = '#A855F7';
-              else if (kt.includes('failure') || kt.includes('anti')) color = '#F43F5E';
-              else color = '#3B82F6';
+              // V1.6.2: COLOR BY RING (not knowledge_type) - Makes hierarchy VISIBLE
+              const r = String(ring || 'leaf').toLowerCase();
+              if (r === 'core') color = '#F59E0B';        // Amber/Gold - Sun
+              else if (r === 'domain') color = '#06B6D4'; // Cyan - Planets
+              else if (r === 'topic') color = '#A855F7';  // Purple - Moons
+              else color = '#3B82F6';                      // Blue - Asteroids (leaf)
             } else {
               if (layer === 'self') {
                 switch(sublayer) {
@@ -749,11 +748,12 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
           const centerY = height / 2;
 
           if (viewMode === 'v5') {
+            // V1.6.2: RADII match visual ring guides
             const ringRadii: Record<string, number> = {
-              core: 0,
-              domain: 160,
-              topic: 280,
-              leaf: 380
+              core: 50,      // Center zone
+              domain: 180,   // Inner orbit
+              topic: 300,    // Middle orbit
+              leaf: 420      // Outer orbit
             };
 
             const memoryNodes = processedNodes.filter((n: any) => n.type === 'memory');
@@ -767,39 +767,38 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
             for (const [ringName, ringNodes] of byRing.entries()) {
               const radius = ringRadii[ringName] ?? ringRadii.leaf;
               const angleStep = (2 * Math.PI) / Math.max(1, ringNodes.length);
-              const innerJitter = ringName === 'core' ? 40 : 0;
+              // V1.6.2: More jitter for visual interest, but keep within ring zone
+              const jitterRange = ringName === 'core' ? 30 : (ringName === 'domain' ? 40 : 60);
 
               ringNodes.forEach((node: any, i: number) => {
-                const angle = i * angleStep;
-                const r = radius + innerJitter;
+                const angle = i * angleStep + (Math.random() - 0.5) * 0.3; // Angle jitter
+                const jitter = (Math.random() - 0.5) * jitterRange;
+                const r = radius + jitter;
 
                 const targetX = centerX + Math.cos(angle) * r;
                 const targetY = centerY + Math.sin(angle) * r;
 
                 node.x = targetX;
                 node.y = targetY;
-                node.fx = targetX;
-                node.fy = targetY;
+                // V1.6.3: NEURAL WEB - No locking. Everything floats.
+                // Core is no longer locked.
+                node.fx = null;
+                node.fy = null;
                 node.vx = 0;
                 node.vy = 0;
               });
             }
 
-            // Place signal hubs on an outer ring for readability (not locked)
+            // V1.6.2: HIDE signal hubs in V5 mode - they clutter the view
+            // Memories ARE the nodes; signals are redundant meta-clusters
             const signalNodes = processedNodes.filter((n: any) => n.type === 'signal');
-            if (signalNodes.length > 0) {
-              const signalRadius = 520;
-              const step = (2 * Math.PI) / Math.max(1, signalNodes.length);
-              signalNodes.forEach((node: any, i: number) => {
-                const angle = i * step;
-                node.x = centerX + Math.cos(angle) * signalRadius;
-                node.y = centerY + Math.sin(angle) * signalRadius;
-                node.vx = 0;
-                node.vy = 0;
-                node.fx = null;
-                node.fy = null;
-              });
-            }
+            signalNodes.forEach((node: any) => {
+              // Move far off-screen (will be filtered by visibility anyway)
+              node.x = -9999;
+              node.y = -9999;
+              node.fx = -9999;
+              node.fy = -9999;
+            });
           } else if (orphans.length > 0) {
             // SPRINT 25: ORBITAL ANCHOR - Lock orphans with fx/fy
             const radius = 300; // Reduced to 300px for safer viewport fit
@@ -1203,6 +1202,33 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
           node.vy += dy * 0.001;
         }
         
+        // V1.6.2: RING GRAVITY - Keep memories in their ring zones (V5 mode)
+        // V1.6.3: NEURAL WEB - Ring Gravity Disabled
+        // We want nodes to find their own semantic clusters, not be forced into rings.
+        /*
+        if (viewMode === 'v5' && node.type === 'memory') {
+          const ringRadii: Record<string, number> = {
+            core: 50, domain: 180, topic: 300, leaf: 420
+          };
+          const ringZone = 60; // How far from target radius is OK
+          const targetRadius = ringRadii[node.ring || 'leaf'] ?? 420;
+          
+          const dx = node.x - cx;
+          const dy = node.y - cy;
+          const currentDist = Math.sqrt(dx * dx + dy * dy) || 1;
+          
+          // Only apply force if outside zone
+          const distError = currentDist - targetRadius;
+          if (Math.abs(distError) > ringZone) {
+            const pullStrength = 0.015; // Gentle radial force
+            const fx = -(dx / currentDist) * distError * pullStrength;
+            const fy = -(dy / currentDist) * distError * pullStrength;
+            node.vx += fx;
+            node.vy += fy;
+          }
+        }
+        */
+        
         // MUDDY SAND FRICTION: High viscosity, but allow some settling
         // 0.9 = Ice, 0.1 = Concrete. 0.4 = Mud.
         node.vx *= 0.4; 
@@ -1248,6 +1274,58 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
       ctx.save();
       ctx.translate(offset.current.x, offset.current.y);
       ctx.scale(scale.current, scale.current);
+
+      // V1.6.3: NEURAL WEB - No Ring Guides
+      // We are abandoning the solar system metaphor for a cleaner "brain" look.
+      /*
+      if (viewMode === 'v5') {
+        const ringGuides = [
+          { name: 'leaf', radius: 450, color: 'rgba(59, 130, 246, 0.06)', strokeColor: 'rgba(59, 130, 246, 0.15)', label: 'FACTS & PREFERENCES', sublabel: 'Individual memories - most changeable' },
+          { name: 'topic', radius: 320, color: 'rgba(168, 85, 247, 0.08)', strokeColor: 'rgba(168, 85, 247, 0.2)', label: 'TOPICS', sublabel: 'Subject clusters' },
+          { name: 'domain', radius: 200, color: 'rgba(6, 182, 212, 0.10)', strokeColor: 'rgba(6, 182, 212, 0.25)', label: 'DOMAINS', sublabel: 'Major life/work areas' },
+          { name: 'core', radius: 80, color: 'rgba(245, 158, 11, 0.15)', strokeColor: 'rgba(245, 158, 11, 0.4)', label: 'CORE', sublabel: 'Your fundamental laws' },
+        ];
+        
+        // Draw from outer to inner (so inner overlays)
+        ringGuides.forEach((guide, idx) => {
+          // Fill
+          ctx.beginPath();
+          ctx.arc(cx, cy, guide.radius, 0, Math.PI * 2);
+          ctx.fillStyle = guide.color;
+          ctx.fill();
+          
+          // Stroke (ring border)
+          ctx.strokeStyle = guide.strokeColor;
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([8, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          
+          // Ring label at top
+          ctx.font = 'bold 11px Inter, sans-serif';
+          ctx.fillStyle = guide.strokeColor;
+          ctx.textAlign = 'center';
+          ctx.fillText(guide.label, cx, cy - guide.radius + 18);
+          
+          // Sublabel (smaller, below main label)
+          if (idx < 2) { // Only for outer rings where there's space
+            ctx.font = '9px Inter, sans-serif';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.fillText(guide.sublabel, cx, cy - guide.radius + 30);
+          }
+        });
+        
+        // Center glow for CORE with stronger presence
+        const coreGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 120);
+        coreGlow.addColorStop(0, 'rgba(245, 158, 11, 0.25)');
+        coreGlow.addColorStop(0.5, 'rgba(245, 158, 11, 0.1)');
+        coreGlow.addColorStop(1, 'rgba(245, 158, 11, 0)');
+        ctx.beginPath();
+        ctx.arc(cx, cy, 120, 0, Math.PI * 2);
+        ctx.fillStyle = coreGlow;
+        ctx.fill();
+      }
+      */
 
       const visibleNodes = activeNodes;
       const visibleEdges = activeEdges;
@@ -1494,6 +1572,36 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
           ctx.beginPath();
           ctx.arc(0, 0, node.radius, 0, Math.PI * 2);
           ctx.fill();
+        }
+
+        // V1.6.3: STATUS & RECENCY INDICATORS
+        if (!isDimmed) {
+            // 1. Recency Ring (White Pulse for very recent items)
+            if (heat > 0.9) {
+                 ctx.beginPath();
+                 ctx.arc(0, 0, node.radius + 4, 0, Math.PI * 2);
+                 ctx.strokeStyle = `rgba(255, 255, 255, ${0.3 + Math.sin(pulsePhase * 2) * 0.2})`;
+                 ctx.lineWidth = 2;
+                 ctx.stroke();
+            }
+            
+            // 2. Processing Status (Border)
+            const pStatus = (node.processingStatus || '').toLowerCase();
+            if (pStatus === 'processed') {
+                 ctx.beginPath();
+                 ctx.arc(0, 0, node.radius + 2, 0, Math.PI * 2);
+                 ctx.strokeStyle = '#10B981'; // Emerald
+                 ctx.lineWidth = 1.5;
+                 ctx.stroke();
+            } else if (pStatus === 'unprocessed' || pStatus === 'pending') {
+                 ctx.beginPath();
+                 ctx.arc(0, 0, node.radius + 2, 0, Math.PI * 2);
+                 ctx.strokeStyle = '#F59E0B'; // Amber
+                 ctx.lineWidth = 1.5;
+                 ctx.setLineDash([3, 3]);
+                 ctx.stroke();
+                 ctx.setLineDash([]);
+            }
         }
         
         ctx.restore();
@@ -1970,29 +2078,26 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
               ) : (
                 <div className="space-y-1 text-[11px]">
                   <div className="flex items-center justify-between">
-                    <span className="text-yellow-300">⭐ CORE</span>
-                    <span className="text-slate-400">anchors</span>
+                    <span className="text-amber-400">CORE</span>
+                    <span className="text-slate-400">Your fundamental laws & beliefs</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-purple-300">🟣 DOMAIN</span>
-                    <span className="text-slate-400">major areas</span>
+                    <span className="text-cyan-400">DOMAIN</span>
+                    <span className="text-slate-400">Major life/work areas</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sky-300">🔷 TOPIC</span>
-                    <span className="text-slate-400">topic clusters</span>
+                    <span className="text-purple-400">TOPIC</span>
+                    <span className="text-slate-400">Subject clusters</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-200">⚪ LEAF</span>
-                    <span className="text-slate-400">individual memories</span>
+                    <span className="text-blue-400">LEAF</span>
+                    <span className="text-slate-400">Individual facts & preferences</span>
                   </div>
                   <div className="mt-2 pt-2 border-t border-slate-800">
-                    <div className="text-[10px] text-slate-300 font-bold mb-1">Signals (hex hubs)</div>
-                    <div className="flex items-center gap-3 text-[11px]">
-                      <span className="text-cyan-300">topic</span>
-                      <span className="text-purple-300">knowledge_type</span>
-                      <span className="text-amber-300">ring</span>
+                    <div className="text-[10px] text-slate-500">
+                      Center = most stable. Outer = most changeable.
                     </div>
-                    <div className="mt-2 text-[10px] text-slate-500">Node size = Importance (1–10)</div>
+                    <div className="mt-1 text-[10px] text-slate-500">Node size = Importance (1-10)</div>
                   </div>
                 </div>
               )}
@@ -2022,6 +2127,34 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
         <div className="text-blue-400">{graphStats.avgConnections} avg links</div>
         <div className="text-slate-400 mt-1">{graphStats.visibleEdges} visible edges</div>
       </div>
+
+      {/* V1.6.2: KNOWLEDGE MAP GUIDE - Bottom left explanation */}
+      {viewMode === 'v5' && !selectedNode && (
+        <div className="absolute bottom-20 left-4 bg-slate-900/95 p-4 rounded-lg border border-slate-700 text-xs z-50 max-w-xs pointer-events-none">
+          <div className="text-amber-400 font-bold mb-2 text-sm">YOUR KNOWLEDGE MAP</div>
+          <div className="space-y-2 text-slate-300">
+            <div className="flex items-start gap-2">
+              <span className="text-amber-400 font-bold">Center:</span>
+              <span>Your core beliefs and laws - the foundation of who you are</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-cyan-400 font-bold">Inner:</span>
+              <span>Major domains of your life and work</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-purple-400 font-bold">Middle:</span>
+              <span>Topic clusters - specific subject areas</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-blue-400 font-bold">Outer:</span>
+              <span>Individual facts and preferences - the details</span>
+            </div>
+          </div>
+          <div className="mt-3 pt-2 border-t border-slate-700 text-slate-400">
+            Click any node to explore. Closer to center = more fundamental.
+          </div>
+        </div>
+      )}
 
       {/* Story Focus Badge */}
       {storyFocusOn && storyFocusNode && (
@@ -2418,6 +2551,112 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
                 </div>
               </div>
             )}
+
+            {/* v1.6.2: COGNITIVE FIELDS - Concepts, Surfaces When, Authority Score */}
+            {(() => {
+              // Parse cognitive fields from snapshot data
+              const conceptsRaw = getProp('concepts');
+              const surfacesWhenRaw = getProp('surfaces_when');
+              const authorityScoreRaw = getProp('authority_score');
+
+              // Safe JSON parse for array fields (stored as JSON strings in ChromaDB)
+              const parseJsonArray = (raw: any): string[] => {
+                if (!raw) return [];
+                if (Array.isArray(raw)) return raw.map(String);
+                if (typeof raw === 'string') {
+                  try {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) return parsed.map(String);
+                  } catch {
+                    // Not JSON, try comma-separated
+                    if (raw.includes(',')) return raw.split(',').map((s: string) => s.trim()).filter(Boolean);
+                  }
+                }
+                return [];
+              };
+
+              const concepts = parseJsonArray(conceptsRaw);
+              const surfacesWhen = parseJsonArray(surfacesWhenRaw);
+              const authorityScore = typeof authorityScoreRaw === 'number' 
+                ? authorityScoreRaw 
+                : parseFloat(String(authorityScoreRaw || '0')) || 0;
+
+              const hasCognitiveData = concepts.length > 0 || surfacesWhen.length > 0 || authorityScore > 0;
+
+              if (!hasCognitiveData) return null;
+
+              return (
+                <div className="bg-gradient-to-r from-purple-500/10 to-cyan-500/10 p-4 rounded-xl border border-purple-500/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-purple-300">🧬</span>
+                    <h4 className="text-xs text-purple-300 uppercase font-bold tracking-wider">Cognitive Fields</h4>
+                    <span className="text-[9px] text-slate-500 ml-auto">v1.6.2</span>
+                  </div>
+
+                  {/* CONCEPTS */}
+                  {concepts.length > 0 && (
+                    <div className="mb-3">
+                      <div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-2">🎯 Concepts</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {concepts.slice(0, 10).map((concept: string, i: number) => (
+                          <span 
+                            key={i} 
+                            className="px-2 py-0.5 bg-cyan-500/20 text-cyan-300 text-[11px] rounded-full border border-cyan-500/30 cursor-pointer hover:bg-cyan-500/30 transition-colors"
+                            onClick={() => onSearchTermChange?.(concept)}
+                            title={`Search for "${concept}"`}
+                          >
+                            {concept}
+                          </span>
+                        ))}
+                        {concepts.length > 10 && (
+                          <span className="text-[10px] text-slate-500">+{concepts.length - 10} more</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SURFACES WHEN */}
+                  {surfacesWhen.length > 0 && (
+                    <div className="mb-3">
+                      <div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-2">⚡ Surfaces When</div>
+                      <div className="space-y-1">
+                        {surfacesWhen.slice(0, 5).map((trigger: string, i: number) => (
+                          <div 
+                            key={i} 
+                            className="text-[11px] text-slate-300 pl-3 border-l-2 border-purple-500/40"
+                          >
+                            {trigger}
+                          </div>
+                        ))}
+                        {surfacesWhen.length > 5 && (
+                          <div className="text-[10px] text-slate-500 pl-3">+{surfacesWhen.length - 5} more triggers</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* AUTHORITY SCORE */}
+                  {authorityScore > 0 && (
+                    <div>
+                      <div className="flex justify-between text-[10px] mb-1">
+                        <span className="text-slate-400 uppercase tracking-wider font-bold">📊 Authority Score</span>
+                        <span className="font-mono text-slate-300">{authorityScore.toFixed(3)}</span>
+                      </div>
+                      <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full transition-all ${
+                            authorityScore >= 0.8 ? 'bg-gradient-to-r from-emerald-500 to-cyan-500' :
+                            authorityScore >= 0.5 ? 'bg-gradient-to-r from-blue-500 to-cyan-500' :
+                            'bg-gradient-to-r from-slate-500 to-slate-400'
+                          }`}
+                          style={{ width: `${Math.min(100, authorityScore * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* QUICK ACTIONS - What You Can Do */}
             <div className="pt-4 border-t border-slate-800">

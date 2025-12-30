@@ -98,4 +98,3 @@ class SearchCandidate(BaseModel):
         return self.__str__()
 
 
-# Made with Bob

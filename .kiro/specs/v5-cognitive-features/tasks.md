@@ -6,11 +6,11 @@
 
 **Implementation Order**: Req-1 → Req-2 → Req-3 → Req-4 (lowest to highest risk)
 
-**STATUS: ✅ COMPLETE** - Shipped as v1.5.0
+**STATUS:  COMPLETE** - Shipped as v1.5.0
 
 ---
 
-## Phase 1: Retrieval Explanation (Req-1) ✅
+## Phase 1: Retrieval Explanation (Req-1) 
 
 - [x] **1. Add RetrievalExplanation dataclass to retrieval.py**
 - [x] **1.1 Implement _build_explanation() in CognitiveRetriever**
@@ -24,7 +24,7 @@
 
 ---
 
-## Phase 2: Memory Health Score (Req-2) ✅
+## Phase 2: Memory Health Score (Req-2) 
 
 - [x] **2. Add MemoryHealthAnalyzer class to curation.py**
 - [x] **2.1 Implement compute_health() method**
@@ -34,7 +34,7 @@
 
 ---
 
-## Phase 3: Potential Conflict Detection (Req-3) ✅
+## Phase 3: Potential Conflict Detection (Req-3) 
 
 - [x] **3. Implement detect_potential_conflict() in MemoryHealthAnalyzer**
 - [x] **3.1 Add ConflictReport dataclass**
@@ -44,7 +44,7 @@
 
 ---
 
-## Phase 4: Proactive Memory Surfacing (Req-4) ✅
+## Phase 4: Proactive Memory Surfacing (Req-4) 
 
 - [x] **4. Add ProactiveSuggestion + ProactiveSurfacer to retrieval.py**
 - [x] **4.1 Implement check_temporal_trigger(), check_domain_trigger(), check_concept_trigger()**
@@ -54,7 +54,7 @@
 
 ---
 
-## Checkpoint: Run Full Test Suite ✅
+## Checkpoint: Run Full Test Suite 
 
 - [x] **5. Final Verification**
   - 69/69 tests PASS
@@ -68,11 +68,11 @@
 
 | Phase | Status | Tests |
 |-------|--------|-------|
-| 1: Explanation | ✅ | 7 PASS |
-| 2: Health | ✅ | 14 PASS |
-| 3: Conflicts | ✅ | (in health) |
-| 4: Proactive | ✅ | 14 PASS |
-| Full Suite | ✅ | 69 PASS |
+| 1: Explanation |  | 7 PASS |
+| 2: Health |  | 14 PASS |
+| 3: Conflicts |  | (in health) |
+| 4: Proactive |  | 14 PASS |
+| Full Suite |  | 69 PASS |
 
 ---
 

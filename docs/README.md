@@ -2,7 +2,7 @@
 
 ## Overview
 
-Complete documentation index for Elefante AI Memory System v1.5.0.
+Complete documentation index for Elefante AI Memory System v1.6.2.
 
 ---
 
@@ -170,10 +170,16 @@ These are MCP **prompts** (not tools):
 
 ## Current Development Status
 
-**Version**: v1.5.0 (Production)  
+**Version**: v1.6.2 (Production)  
 **Next**: TBD (see roadmap)
 
-**v1.1.0 Features** (see [CHANGELOG.md](../CHANGELOG.md)):
+**v1.6.2 Features** (see [CHANGELOG.md](../CHANGELOG.md)):
+
+- Compliance Gate: Server-side search-before-write enforcement
+- Blocks write operations until `elefanteMemorySearch` is called
+- `.github/copilot-instructions.md` for layered defense
+
+**v1.1.0 Features**:
 
 - Transaction-scoped locking (multi-IDE safety without deadlocks)
 - Auto-expiry of stale locks (no more 12-day orphan locks!)
@@ -316,7 +322,7 @@ archive/protocol-enforcement-v2.md
 ## Maintenance
 
 **Last Updated**: 2025-12-28  
-**Documentation Version**: v1.5.0  
+**Documentation Version**: v1.6.2  
 **Status**: Complete and up-to-date
 
 **Changes in v1.1.0**:

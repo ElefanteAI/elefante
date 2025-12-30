@@ -224,4 +224,3 @@ def _init_default_logging():
 # Auto-initialize logging when module is imported
 _init_default_logging()
 
-# Made with Bob

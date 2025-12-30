@@ -1,4 +1,4 @@
-# Elefante v1.6.0
+# Elefante v1.6.3
 
 Local-first, privacy-first memory for AI agents.
 
@@ -10,7 +10,7 @@ Elefante runs on your machine and gives your agent durable memory across session
 
 It is MCP-native: your IDE launches the server and the agent calls tools.
 
-> **Current release:** v1.6.0 (Compliance Gate)
+> **Current release:** v1.6.3 (Neural Web Visualization)
 
 ---
 

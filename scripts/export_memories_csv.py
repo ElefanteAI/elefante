@@ -155,11 +155,11 @@ async def export_memories():
             if (i + 1) % 10 == 0:
                 print(f"Exported {i + 1}/{len(results['ids'])} memories...")
     
-    print(f"\n✅ Export complete: {output_file}")
+    print(f"\n Export complete: {output_file}")
     print(f"Total memories exported: {len(results['ids'])}")
     
     # Print summary statistics
-    print("\n📊 Summary Statistics:")
+    print("\n Summary Statistics:")
     memory_types = {}
     statuses = {}
     for meta in results['metadatas']:
@@ -180,4 +180,3 @@ async def export_memories():
 if __name__ == "__main__":
     asyncio.run(export_memories())
 
-# Made with Bob

@@ -70,7 +70,7 @@ Topology uses explicit relationship types in the graph (when persisted) and may 
 | `BELONGS_TO` | Leaf → Topic/Domain | Hierarchical containment |
 | `DERIVES_FROM` | Specific → General | A derived rule comes from a broader principle |
 | `SUPPORTS` | Memory → Memory | Evidence or justification |
-| `CONTRADICTS` | Memory ↔ Memory | Conflict (requires resolution policy) |
+| `CONTRADICTS` | Memory  Memory | Conflict (requires resolution policy) |
 | `SUPERSEDES` | New → Old | Versioning / replacement |
 | `REQUIRES` | Memory → Memory | Dependency |
 | `IMPLEMENTS` | Method → Principle | A process embodies a value |

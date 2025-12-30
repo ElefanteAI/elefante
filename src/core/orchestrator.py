@@ -438,17 +438,27 @@ class MemoryOrchestrator:
             # STEP 3.25: V4 COGNITIVE RETRIEVAL FIELDS
             # Auto-populate concepts, surfaces_when for better retrieval
             # ==================================================================================
-            from src.utils.curation import extract_concepts, infer_surfaces_when, classify_memory_type, compute_authority_score
+            from src.utils.curation import (
+                extract_concepts,
+                infer_surfaces_when,
+                compute_authority_score,
+                canonicalize_concepts,
+                canonicalize_surfaces_when,
+            )
             
             concepts = metadata.get("concepts")
             if not concepts or not isinstance(concepts, list):
                 concepts = extract_concepts(content, max_concepts=5)
-                metadata["concepts"] = concepts
+
+            concepts = canonicalize_concepts(concepts, max_concepts=5)
+            metadata["concepts"] = concepts
             
             surfaces_when = metadata.get("surfaces_when")
             if not surfaces_when or not isinstance(surfaces_when, list):
                 surfaces_when = infer_surfaces_when(content, concepts)
-                metadata["surfaces_when"] = surfaces_when
+
+            surfaces_when = canonicalize_surfaces_when(surfaces_when)
+            metadata["surfaces_when"] = surfaces_when
             
             # Compute initial authority score
             authority_score = compute_authority_score(
@@ -499,6 +509,10 @@ class MemoryOrchestrator:
                 intent=intent_enum,
                 confidence=confidence,
                 source=SourceType(source),
+                # V4 cognitive retrieval (typed)
+                concepts=concepts,
+                surfaces_when=surfaces_when,
+                authority_score=authority_score,
                 custom_metadata=custom_metadata,
                 summary=summary_text,
                 # ==================================================================================
@@ -1898,4 +1912,3 @@ def get_orchestrator() -> MemoryOrchestrator:
     return _orchestrator
 
 
-# Made with Bob

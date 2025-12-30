@@ -102,12 +102,12 @@ FINANCIAL STATUS: Non-Expert. Requires "CFO-Level" guidance, not "Banking 101."
 
     # Mock the LLM service
     async def mock_analyze(content):
-        print("🤖 Using Hand-Crafted Cognitive Analysis for Portfolio")
+        print(" Using Hand-Crafted Cognitive Analysis for Portfolio")
         return cognitive_payload
 
     orchestrator.llm_service.analyze_memory = mock_analyze
 
-    print("🚀 Ingesting Venture Portfolio...")
+    print(" Ingesting Venture Portfolio...")
     memory = await orchestrator.add_memory(
         portfolio_content, 
         tags=["portfolio", "finance", "strategy", "protocol"],
@@ -115,12 +115,12 @@ FINANCIAL STATUS: Non-Expert. Requires "CFO-Level" guidance, not "Banking 101."
     )
 
     if memory:
-        print(f"✅ Portfolio Ingested successfully! Memory ID: {memory.id}")
+        print(f" Portfolio Ingested successfully! Memory ID: {memory.id}")
         print("Cognitive Graph Updated:")
         for rel in cognitive_payload["relationships"]:
             print(f"  - {rel['source']} -[{rel['type']}]-> {rel['target']}")
     else:
-        print("❌ Failed to ingest portfolio.")
+        print(" Failed to ingest portfolio.")
 
 if __name__ == "__main__":
     asyncio.run(main())

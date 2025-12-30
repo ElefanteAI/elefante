@@ -13,7 +13,7 @@ from src.core.orchestrator import MemoryOrchestrator as Orchestrator
 
 
 async def _run_dedup_live():
-    print("\n🧪 STARTING LIVE DEDUPLICATION TEST...")
+    print("\n STARTING LIVE DEDUPLICATION TEST...")
 
     # 1. Initialize Components
     orchestrator = Orchestrator()
@@ -38,13 +38,13 @@ async def _run_dedup_live():
     test_content_1 = "My favorite color is definitely Electric Blue."
     test_content_2 = "I really love Electric Blue, it is my favorite color."
 
-    print(f"📝 Ingesting Memory 1: '{test_content_1}'")
+    print(f" Ingesting Memory 1: '{test_content_1}'")
     mem_result_1 = await orchestrator.add_memory(
         content=test_content_1,
         metadata={"source": "user_input", "layer": "self", "sublayer": "preference"}
     )
     mem_id_1 = str(mem_result_1.id)
-    print(f"   ✅ Memory 1 Created: {mem_id_1}")
+    print(f"    Memory 1 Created: {mem_id_1}")
 
     # Verify title
     mem1 = await orchestrator.vector_store.find_by_title("Self-Pref-Color")  # LLM likely generates this or similar
@@ -52,30 +52,30 @@ async def _run_dedup_live():
         # Fallback if title is slightly different, let's just get by ID
         mem1 = await orchestrator.vector_store.get_memory(UUID(mem_id_1))
         # Title is stored in custom_metadata in V2 schema
-        print(f"   ℹ️  Title generated: {mem1.metadata.custom_metadata.get('title')}")
+        print(f"     Title generated: {mem1.metadata.custom_metadata.get('title')}")
 
     title_1 = mem1.metadata.custom_metadata.get('title')
-    print(f"   ℹ️  Concept Title: {title_1}")
+    print(f"     Concept Title: {title_1}")
 
-    print(f"\n📝 Ingesting Memory 2 (Semantic Duplicate): '{test_content_2}'")
+    print(f"\n Ingesting Memory 2 (Semantic Duplicate): '{test_content_2}'")
     mem_result_2 = await orchestrator.add_memory(
         content=test_content_2,
         metadata={"source": "user_input", "layer": "self", "sublayer": "preference"}
     )
     mem_id_2 = str(mem_result_2.id)
-    print(f"   ❓ Memory 2 Result ID: {mem_id_2}")
+    print(f"    Memory 2 Result ID: {mem_id_2}")
 
     # VERIFICATION
     if mem_id_1 == mem_id_2:
-        print(f"\n✅ SUCCESS: Deduplication Worked! IDs match ({mem_id_1})")
+        print(f"\n SUCCESS: Deduplication Worked! IDs match ({mem_id_1})")
 
         # Check access count
         mem2 = await orchestrator.vector_store.get_memory(UUID(mem_id_1))
-        print(f"   📊 Access Count: {mem2.metadata.access_count} (Expected > 0)")
+        print(f"    Access Count: {mem2.metadata.access_count} (Expected > 0)")
         if mem2.metadata.access_count > 0:
-            print("   ✅ Reinforcement verified.")
+            print("    Reinforcement verified.")
     else:
-        print("\n❌ FAILURE: Duplication occurred. IDs differ.")
+        print("\n FAILURE: Duplication occurred. IDs differ.")
         print(f"   ID 1: {mem_id_1}")
         print(f"   ID 2: {mem_id_2}")
 

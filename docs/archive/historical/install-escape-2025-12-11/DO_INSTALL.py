@@ -5,7 +5,7 @@ from pathlib import Path
 os.chdir("/Volumes/X10Pro/X10-2025/Documents2025/Elefante_early_dec2025")
 venv = Path(".venv")
 
-print("🚀 STARTING AUTONOMOUS INSTALL")
+print(" STARTING AUTONOMOUS INSTALL")
 print(f"Current dir: {os.getcwd()}")
 print(f"Python: /opt/homebrew/bin/python3.11")
 
@@ -35,6 +35,6 @@ print("Running health check...")
 result = subprocess.run([str(python), "scripts/health_check.py"], capture_output=True, text=True, timeout=120)
 print(result.stdout[-500:] if result.stdout else "No output")
 
-print("\n✅ COMPLETE")
+print("\n COMPLETE")
 print(f"Venv: {venv.absolute()}")
 print(f"Python: {python.absolute()}")

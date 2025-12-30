@@ -110,7 +110,7 @@ def apply_titles():
         except Exception as e:
             print(f"Error updating {mem_id}: {e}")
 
-    print(f"✅ Successfully updated {updated} memory titles")
+    print(f" Successfully updated {updated} memory titles")
 
 if __name__ == "__main__":
     apply_titles()

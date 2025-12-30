@@ -65,4 +65,3 @@ def test_auto_refresh():
 if __name__ == "__main__":
     asyncio.run(_run_auto_refresh())
 
-# Made with Bob

@@ -10,7 +10,7 @@ from src.core.orchestrator import MemoryOrchestrator
 from src.utils.config import get_config
 
 async def main():
-    print("🐘 Verifying Memory Intelligence Pipeline...")
+    print(" Verifying Memory Intelligence Pipeline...")
     
     orchestrator = MemoryOrchestrator()
     
@@ -37,7 +37,7 @@ async def main():
         }
     
     orchestrator.llm_service.analyze_memory = mock_analyze
-    print("🤖 Mocked LLM Service for verification")
+    print(" Mocked LLM Service for verification")
     
     # Test Content
     content = "I absolutely hate Python because of the GIL, but I love Rust for its memory safety and speed."
@@ -48,10 +48,10 @@ async def main():
     memory = await orchestrator.add_memory(content, tags=["test"])
     
     if not memory:
-        print("❌ Memory was ignored!")
+        print(" Memory was ignored!")
         return
         
-    print(f"✅ Memory Added: {memory.id}")
+    print(f" Memory Added: {memory.id}")
     
     # Verify Graph Node
     print("\nVerifying Graph Node...")
@@ -68,17 +68,17 @@ async def main():
             
             # Check for Cognitive Analysis
             if "cognitive_analysis" in props:
-                print("✅ SUCCESS: Cognitive Analysis stored in properties!")
+                print(" SUCCESS: Cognitive Analysis stored in properties!")
                 ca = props["cognitive_analysis"]
                 print(f"   Intent: {ca.get('intent')}")
                 print(f"   Mood: {ca.get('emotional_context', {}).get('mood')}")
                 print(f"   Insight: {ca.get('strategic_insight')}")
             else:
-                print("⚠️ WARNING: No cognitive_analysis found in properties.")
+                print(" WARNING: No cognitive_analysis found in properties.")
             break
             
     if not found_memory:
-        print("❌ Failed to find the new memory entity.")
+        print(" Failed to find the new memory entity.")
         
     # Check for Created Relationships (Graph Execution)
     print("\nVerifying Graph Execution (Entities & Relationships)...")
@@ -89,15 +89,15 @@ async def main():
     for entity in context.get("entities", []):
         if entity["name"] == "Python":
             found_python = True
-            print("✅ Found Entity: Python")
+            print(" Found Entity: Python")
         if entity["name"] == "Rust":
             found_rust = True
-            print("✅ Found Entity: Rust")
+            print(" Found Entity: Rust")
             
     if found_python and found_rust:
-        print("✅ SUCCESS: Graph Executor created derived entities!")
+        print(" SUCCESS: Graph Executor created derived entities!")
     else:
-        print("⚠️ WARNING: Derived entities not found.")
+        print(" WARNING: Derived entities not found.")
 
 if __name__ == "__main__":
     asyncio.run(main())

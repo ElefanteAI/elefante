@@ -13,12 +13,12 @@ log() {
 }
 
 echo "============================================================" > "$LOG_FILE"
-echo "🐘 ELEFANTE INSTALLATION LOG" >> "$LOG_FILE"
+echo " ELEFANTE INSTALLATION LOG" >> "$LOG_FILE"
 echo "Started at: $(date)" >> "$LOG_FILE"
 echo "============================================================" >> "$LOG_FILE"
 
 log "============================================================"
-log "🐘 ELEFANTE INSTALLER"
+log " ELEFANTE INSTALLER"
 log "============================================================"
 log ""
 

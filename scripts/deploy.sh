@@ -173,7 +173,6 @@ echo "  - README.md - Quick start guide"
 echo "  - ARCHITECTURE.md - System design"
 echo "  - DEPLOYMENT_GUIDE.md - Detailed deployment steps"
 echo ""
-print_success "Happy memory building! 🐘"
+print_success "Happy memory building! "
 echo ""
 
-# Made with Bob

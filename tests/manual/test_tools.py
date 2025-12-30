@@ -88,4 +88,3 @@ if __name__ == "__main__":
     success = asyncio.run(_run_tool_registration())
     exit(0 if success else 1)
 
-# Made with Bob

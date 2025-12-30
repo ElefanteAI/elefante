@@ -43,4 +43,3 @@ python tests/manual/test_auto_refresh.py --write-test-memory
 
 ---
 
-Made with Bob 🐘

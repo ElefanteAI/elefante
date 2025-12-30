@@ -15,7 +15,7 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 async def run_test():
-    print("🧪 STARTING LIVE TEST: Semantic Title Generation")
+    print(" STARTING LIVE TEST: Semantic Title Generation")
     print("-" * 50)
     
     # 1. Setup Dependencies
@@ -23,14 +23,14 @@ async def run_test():
     # Actually ChromaDB might lock if sqlite... but usually handled better. Let's see.
     try:
         vector_store = get_vector_store()
-        print("✅ VectorStore initialized")
+        print(" VectorStore initialized")
     except Exception as e:
-        print(f"❌ VectorStore failed: {e}")
+        print(f" VectorStore failed: {e}")
         return
 
     # Use REAL LLM Service (Crucial for title generation)
     llm_service = get_llm_service()
-    print(f"✅ LLMService initialized (Model: {llm_service.model})")
+    print(f" LLMService initialized (Model: {llm_service.model})")
 
     # MOCK GraphStore (To avoid Kuzu Lock)
     # We need AsyncMock behavior because orchestrator awaits these calls
@@ -46,7 +46,7 @@ async def run_test():
     mock_graph_store.create_or_get_entity = MagicMock(side_effect=async_mock_create)
     mock_graph_store.execute_query = MagicMock(side_effect=async_mock_create)
     
-    print("✅ GraphStore mocked (Bypassing Kuzu Lock)")
+    print(" GraphStore mocked (Bypassing Kuzu Lock)")
 
     # 2. Initialize Orchestrator
     orchestrator = MemoryOrchestrator(
@@ -59,7 +59,7 @@ async def run_test():
     
     # 3. Define Test Input - A clear preference that should trigger a specific title
     test_content = "I absolutely prefer using Pytest over Unittest because the syntax is much cleaner and less boilerplate."
-    print(f"\n📥 Adding Memory: '{test_content}'")
+    print(f"\n Adding Memory: '{test_content}'")
     
     # 4. Execute add_memory
     try:
@@ -69,7 +69,7 @@ async def run_test():
         )
         
         if not memory:
-            print("❌ Memory was None (Ignored?)")
+            print(" Memory was None (Ignored?)")
             return
 
         # 5. Verify Title
@@ -80,17 +80,17 @@ async def run_test():
         # The MemoryMetadata class usually puts unknown fields in custom_metadata.
         # Let's check where it ended up.
         
-        print(f"\n📤 Resulting Title: {title}")
+        print(f"\n Resulting Title: {title}")
         print(f"   Full Metadata: {memory.metadata}")
         
         # Validation Logic
         if title and "-" in title and len(title) <= 30:
-            print("\n✅ TEST PASSED: Title follows Semantic Format!")
+            print("\n TEST PASSED: Title follows Semantic Format!")
         else:
-            print(f"\n⚠️ TEST WARNING: Title '{title}' might not be compliant.")
+            print(f"\n TEST WARNING: Title '{title}' might not be compliant.")
             
     except Exception as e:
-        print(f"\n❌ TEST FAILED with Exception: {e}")
+        print(f"\n TEST FAILED with Exception: {e}")
         import traceback
         traceback.print_exc()
 

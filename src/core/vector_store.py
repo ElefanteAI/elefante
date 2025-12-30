@@ -5,6 +5,8 @@ Provides semantic memory storage and retrieval using vector embeddings.
 """
 
 import asyncio
+import ast
+import json
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime
@@ -175,6 +177,24 @@ class VectorStore:
         metadata["owner_id"] = cm.get("owner_id", "owner-jay")
         # Also preserve title at top level
         metadata["title"] = cm.get("title", "")
+
+        # V4 Cognitive Retrieval fields (Chroma metadata values must be primitives).
+        # Store list fields as JSON strings and reconstruct on read.
+        concepts = memory.metadata.concepts or cm.get("concepts")
+        if isinstance(concepts, list):
+            metadata["concepts"] = json.dumps(concepts)
+        elif isinstance(concepts, str) and concepts.strip():
+            metadata["concepts"] = concepts
+
+        surfaces_when = memory.metadata.surfaces_when or cm.get("surfaces_when")
+        if isinstance(surfaces_when, list):
+            metadata["surfaces_when"] = json.dumps(surfaces_when)
+        elif isinstance(surfaces_when, str) and surfaces_when.strip():
+            metadata["surfaces_when"] = surfaces_when
+
+        authority_score = memory.metadata.authority_score
+        if authority_score is not None:
+            metadata["authority_score"] = float(authority_score)
         
         # Merge custom metadata (flattened for ChromaDB)
         if memory.metadata.custom_metadata:
@@ -430,7 +450,9 @@ class VectorStore:
             "urgency", "confidence", "tags", "keywords", "status", "parent_id", 
             "relationship_type", "related_memory_ids", "conflict_ids", "supersedes_id", "superseded_by_id",
             "source", "source_reliability", "verified", "project", "file_path", 
-            "session_id", "last_accessed", "last_modified", "access_count", "version", "deprecated", "archived"
+            "session_id", "last_accessed", "last_modified", "access_count", "version", "deprecated", "archived",
+            # V4 Cognitive Retrieval
+            "concepts", "surfaces_when", "authority_score",
         }
         custom_metadata = {k: v for k, v in metadata.items() if k not in known_keys}
 
@@ -470,6 +492,66 @@ class VectorStore:
                 return out
             return []
 
+        def parse_string_list(value: Any) -> List[str]:
+            if value is None:
+                return []
+            if isinstance(value, list):
+                return [str(x).strip() for x in value if str(x).strip()]
+            if isinstance(value, str):
+                s = value.strip()
+                if not s:
+                    return []
+                # JSON list (preferred)
+                if s.startswith("[") and s.endswith("]"):
+                    try:
+                        parsed = json.loads(s)
+                        if isinstance(parsed, list):
+                            return [str(x).strip() for x in parsed if str(x).strip()]
+                    except Exception:
+                        # Python repr list fallback
+                        try:
+                            parsed = ast.literal_eval(s)
+                            if isinstance(parsed, list):
+                                return [str(x).strip() for x in parsed if str(x).strip()]
+                        except Exception:
+                            pass
+                # Comma-joined fallback
+                if "," in s:
+                    return [p.strip() for p in s.split(",") if p.strip()]
+                return [s]
+            return []
+
+        # V4 cognitive fields (prefer top-level; fall back to custom_metadata)
+        raw_concepts = metadata.get("concepts")
+        if raw_concepts is None:
+            raw_concepts = custom_metadata.get("concepts")
+        concepts = parse_string_list(raw_concepts)
+
+        raw_surfaces = metadata.get("surfaces_when")
+        if raw_surfaces is None:
+            raw_surfaces = custom_metadata.get("surfaces_when")
+        surfaces_when = parse_string_list(raw_surfaces)
+
+        raw_authority = metadata.get("authority_score")
+        if raw_authority is None:
+            raw_authority = custom_metadata.get("authority_score")
+        authority_score = 0.5
+        if raw_authority is not None and str(raw_authority).strip() != "":
+            try:
+                authority_score = float(raw_authority)
+            except Exception:
+                authority_score = 0.5
+        authority_score = max(0.0, min(1.0, authority_score))
+
+        # Canonicalize for stable concept-overlap scoring (safe, does not rewrite content).
+        try:
+            from src.utils.curation import canonicalize_concepts, canonicalize_surfaces_when
+
+            concepts = canonicalize_concepts(concepts)
+            surfaces_when = canonicalize_surfaces_when(surfaces_when)
+        except Exception:
+            pass
+
         # Parse V2 metadata with backward compatibility for V1
         memory_metadata = MemoryMetadata(
             # Layer 1: Core Identity
@@ -491,6 +573,11 @@ class VectorStore:
             confidence=metadata.get("confidence", 0.7),
             tags=metadata.get("tags", "").split(",") if metadata.get("tags") else [],
             keywords=metadata.get("keywords", "").split(",") if metadata.get("keywords") else [],
+
+            # Layer 3b: Cognitive Retrieval (V4 Schema)
+            concepts=concepts,
+            surfaces_when=surfaces_when,
+            authority_score=authority_score,
             
             # Layer 4: Relationships
             status=get_enum_value(MemoryStatus, metadata.get("status"), MemoryStatus.NEW),
@@ -904,4 +991,3 @@ def reset_vector_store():
     global _vector_store
     _vector_store = None
 
-# Made with Bob

@@ -3,12 +3,12 @@
 **Generated on:** 2025-12-28
 **Target Environment:** VS Code + GitHub Copilot (No native "stop-hooks")
 
-## 🌍 Project One-Liner
+##  Project One-Liner
 Build a **"Token-Based Compliance Gate"** inside the MCP Server that forces the agent to "earn" the right to complete a task by performing a memory search, mechanically enforcing the "Ralph-style" loop via tool dependencies.
 
 ---
 
-## 🧠 The Core Problem & Solution
+##  The Core Problem & Solution
 **Problem:** In VS Code, we cannot intercept the agent's final text output to block it (no "stop-hook"). We cannot force a loop *after* generation.
 **Solution:** We move the enforcement **upstream** into the tool chain. We make the "Compliance Stamp" (which the user requires) impossible to forge. The agent *must* call a specific tool to generate the stamp, and that tool *will fail* if a search hasn't happened.
 
@@ -24,7 +24,7 @@ Instead of a wrapper script looping the agent, the **Agent loops itself** agains
 
 ---
 
-## ⚙️ Technical Architecture
+##  Technical Architecture
 
 ### 1. Server-Side State Tracking (`src/mcp/server.py`)
 The MCP Server will maintain a lightweight, transient state for the active session:
@@ -47,7 +47,7 @@ A new MCP tool that the agent is instructed to call at the end of every coding t
 
 **Logic:**
 - **IF** `search_token_valid == False`:
-    - **RETURN:** `{"status": "FAIL", "message": "⛔ GATE CLOSED. You have not searched Elefante in this turn. You MUST call 'elefanteMemorySearch' before I can issue the Compliance Stamp."}`
+    - **RETURN:** `{"status": "FAIL", "message": " GATE CLOSED. You have not searched Elefante in this turn. You MUST call 'elefanteMemorySearch' before I can issue the Compliance Stamp."}`
 - **IF** `search_token_valid == True`:
     - **CONSUME TOKEN:** Set `search_token_valid = False` (One-time use per search).
     - **GENERATE STAMP:**
@@ -57,7 +57,7 @@ A new MCP tool that the agent is instructed to call at the end of every coding t
 
 ---
 
-## 📝 Implementation Steps
+##  Implementation Steps
 
 ### Phase 1: Server State & Tool Logic
 1.  **Modify `ElefanteMCPServer` class:** Add `_reset_compliance_state()` and the state dictionary.
@@ -76,10 +76,10 @@ A new MCP tool that the agent is instructed to call at the end of every coding t
 
 ---
 
-## 🚦 Feasibility
+##  Feasibility
 - **VS Code Compatible:** Yes. Relies only on standard MCP tool calls.
 - **Enforcement Level:** **High**. The agent cannot "guess" the stamp if we make the stamp format strict or include a dynamic hash (optional, but "YES/ZERO" is the user requirement).
 - **Friction:** Adds 1 extra tool call step to the agent's workflow. Acceptable for the safety guarantee.
 
-## ⏭️ Next Action
+##  Next Action
 Wait for user approval to proceed with **Phase 1 (Server Implementation)**.

@@ -1,6 +1,6 @@
 # Debug Documentation Index
 
-**Neural Registers & Debug Compendiums for Elefante v1.6.0**
+**Neural Registers & Debug Compendiums for Elefante v1.6.2**
 
 > **Last Updated:** 2025-12-28
 
@@ -28,7 +28,7 @@ Immutable "Laws" extracted from debugging sessions - prevents recurring failures
 | [installation-neural-register.md](installation-neural-register.md) | Installation failure prevention |
 | [database-neural-register.md](database-neural-register.md) | Database failure prevention |
 | [dashboard-neural-register.md](dashboard-neural-register.md) | Dashboard failure prevention |
-| [mcp-code-neural-regiseural-register.md) | MCP protocol enforcement |
+| [mcp-code-neural-register.md](mcp-code-neural-register.md) | MCP protocol enforcement |
 | [memory-neural-register.md](memory-neural-register.md) | Memory system reliability |
 
 ---
@@ -52,7 +52,7 @@ Each compendium follows the **Unified Post-Mortem Structure**:
 
 | File | Purpose |
 |------|---------|
-| [kuzu-reserved-words-issue.md](kuzu-reserved-words-i| [dashboard-neural-register.md](dlicts |
+| [kuzu-reserved-words-issue.md](kuzu-reserved-words-issue.md) | Kuzu property naming conflicts |
 
 ---
 
@@ -88,4 +88,4 @@ docs/debug/
 
 ---
 
-*Last verified: 2025-12-28 | Elefante v1.6.0*
+*Last verified: 2025-12-29 | Elefante v1.6.2*

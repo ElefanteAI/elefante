@@ -20,12 +20,12 @@ V4 adds **cognitive retrieval fields** to make memories discoverable not just by
 
 | Field | Type | Purpose | Auto-populated |
 |-------|------|---------|----------------|
-| `concepts` | `string[]` | 3-5 key terms extracted from content | ✅ Yes |
-| `surfaces_when` | `string[]` | Query patterns that should trigger this memory | ✅ Yes |
-| `authority_score` | `float` | Composite score (0-1) for ranking | ✅ Yes |
-| `co_activated_with` | `uuid[]` | Memories often retrieved together | ❌ Runtime |
-| `contradicts` | `uuid[]` | Memories with opposing information | ❌ Runtime |
-| `supports` | `uuid[]` | Memories that reinforce this one | ❌ Runtime |
+| `concepts` | `string[]` | 3-5 key terms extracted from content |  Yes |
+| `surfaces_when` | `string[]` | Query patterns that should trigger this memory |  Yes |
+| `authority_score` | `float` | Composite score (0-1) for ranking |  Yes |
+| `co_activated_with` | `uuid[]` | Memories often retrieved together |  Runtime |
+| `contradicts` | `uuid[]` | Memories with opposing information |  Runtime |
+| `supports` | `uuid[]` | Memories that reinforce this one |  Runtime |
 
 ---
 

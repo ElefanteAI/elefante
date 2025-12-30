@@ -197,4 +197,3 @@ def get_temporal_consolidator() -> TemporalConsolidator:
         _consolidator_instance = TemporalConsolidator()
     return _consolidator_instance
 
-# Made with Bob

@@ -245,4 +245,3 @@ def reset_embedding_service():
     global _embedding_service
     _embedding_service = None
 
-# Made with Bob

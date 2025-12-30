@@ -41,15 +41,15 @@ async def migrate_titles():
         return
     
     total = len(all_data["ids"])
-    print(f"\n📊 Found {total} memories to process\n")
+    print(f"\n Found {total} memories to process\n")
     
     # Initialize LLM service
     llm = get_llm_service()
     
     if not llm.client:
-        print("⚠️  LLM not configured - using fallback title generation")
+        print("  LLM not configured - using fallback title generation")
     else:
-        print(f"✅ LLM configured with model: {llm.model}")
+        print(f" LLM configured with model: {llm.model}")
     
     # Track results
     updated = 0
@@ -101,18 +101,18 @@ async def migrate_titles():
                 print(f"  Processed {i + 1}/{total}...")
                 
         except Exception as e:
-            print(f"  ❌ Error processing {mem_id}: {e}")
+            print(f"   Error processing {mem_id}: {e}")
             errors += 1
     
     # Summary
     print("\n" + "=" * 60)
     print("MIGRATION COMPLETE")
     print("=" * 60)
-    print(f"✅ Updated: {updated}/{total}")
-    print(f"❌ Errors: {errors}")
+    print(f" Updated: {updated}/{total}")
+    print(f" Errors: {errors}")
     
     if title_lengths:
-        print(f"\n📏 Title Length Stats:")
+        print(f"\n Title Length Stats:")
         print(f"  Min: {min(title_lengths)} chars")
         print(f"  Max: {max(title_lengths)} chars")
         print(f"  Avg: {sum(title_lengths)/len(title_lengths):.1f} chars")
@@ -120,18 +120,18 @@ async def migrate_titles():
         # Check for truncation (none should exceed 30)
         over_30 = sum(1 for l in title_lengths if l > 30)
         if over_30 > 0:
-            print(f"  ⚠️  OVER 30 CHARS: {over_30} (SHOULD BE ZERO)")
+            print(f"    OVER 30 CHARS: {over_30} (SHOULD BE ZERO)")
         else:
-            print(f"  ✅ All titles within 30 char limit")
+            print(f"   All titles within 30 char limit")
     
-    print(f"\n📝 Sample Titles:")
+    print(f"\n Sample Titles:")
     for s in sample_titles:
         print(f"\n  Layer: {s['layer']}")
         print(f"  Content: {s['content']}")
         print(f"  Old: {s['old']}")
         print(f"  New: {s['new']}")
     
-    print("\n💡 Run 'python scripts/update_dashboard_data.py' to refresh dashboard")
+    print("\n Run 'python scripts/update_dashboard_data.py' to refresh dashboard")
 
 
 if __name__ == "__main__":

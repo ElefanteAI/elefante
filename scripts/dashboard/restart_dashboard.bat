@@ -20,4 +20,3 @@ echo Press Ctrl+C in the dashboard window to stop it.
 echo.
 pause
 
-@REM Made with Bob

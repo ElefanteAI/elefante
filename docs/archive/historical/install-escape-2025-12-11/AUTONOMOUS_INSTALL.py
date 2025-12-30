@@ -28,7 +28,7 @@ def log_clear():
 def run_cmd(cmd, desc=""):
     """Run command and return result"""
     if desc:
-        log_write(f"\n▶️  {desc}")
+        log_write(f"\n  {desc}")
     log_write(f"   Command: {' '.join(cmd)}")
     
     try:
@@ -46,7 +46,7 @@ def run_cmd(cmd, desc=""):
                     log_write(f"   {line}")
         
         if result.returncode != 0:
-            log_write(f"   ❌ Exit code: {result.returncode}")
+            log_write(f"    Exit code: {result.returncode}")
             if result.stderr:
                 log_write(f"   Error: {result.stderr[:200]}")
             return False
@@ -54,14 +54,14 @@ def run_cmd(cmd, desc=""):
         log_write(f"   ✓ Success")
         return True
     except Exception as e:
-        log_write(f"   ❌ Exception: {e}")
+        log_write(f"    Exception: {e}")
         return False
 
 def main():
     os.chdir(PROJECT_ROOT)
     log_clear()
     
-    log_write("🚀 AUTONOMOUS ELEFANTE INSTALLATION")
+    log_write(" AUTONOMOUS ELEFANTE INSTALLATION")
     log_write(f"Project root: {PROJECT_ROOT}")
     log_write(f"Python: {sys.executable}")
     log_write("="*60)
@@ -69,7 +69,7 @@ def main():
     # 1. Verify Python 3.11
     python_exe = "/opt/homebrew/bin/python3.11"
     if not os.path.exists(python_exe):
-        log_write(f"❌ Python 3.11 not found at {python_exe}")
+        log_write(f" Python 3.11 not found at {python_exe}")
         return False
     
     result = subprocess.run([python_exe, "--version"], capture_output=True, text=True)
@@ -78,17 +78,17 @@ def main():
     # 2. Remove broken .venv
     venv_path = f"{PROJECT_ROOT}/.venv"
     if os.path.exists(venv_path):
-        log_write(f"\n🗑️  Removing broken .venv...")
+        log_write(f"\n  Removing broken .venv...")
         try:
             shutil.rmtree(venv_path, ignore_errors=True)
             subprocess.run(["rm", "-rf", venv_path], timeout=30)
             log_write("✓ Removed .venv")
         except Exception as e:
-            log_write(f"❌ Error removing: {e}")
+            log_write(f" Error removing: {e}")
             return False
     
     # 3. Create fresh venv
-    log_write(f"\n📦 Creating Python 3.11 virtual environment...")
+    log_write(f"\n Creating Python 3.11 virtual environment...")
     if not run_cmd([python_exe, "-m", "venv", venv_path], "Create venv"):
         return False
     
@@ -97,32 +97,32 @@ def main():
     python_venv = f"{venv_path}/bin/python"
     
     if not os.path.exists(pip_exe):
-        log_write(f"❌ pip not found in venv")
+        log_write(f" pip not found in venv")
         return False
     log_write(f"✓ Venv created at {venv_path}")
     
     # 5. Upgrade pip
-    log_write(f"\n📥 Upgrading pip...")
+    log_write(f"\n Upgrading pip...")
     run_cmd([pip_exe, "install", "--upgrade", "pip"], "Upgrade pip")
     
     # 6. Install requirements
-    log_write(f"\n📚 Installing requirements.txt...")
+    log_write(f"\n Installing requirements.txt...")
     if not run_cmd([pip_exe, "install", "-r", f"{PROJECT_ROOT}/requirements.txt"], "Install deps"):
-        log_write("⚠️  Some deps may have failed, continuing...")
+        log_write("  Some deps may have failed, continuing...")
     
     # 7. Verify Python version
     result = subprocess.run([python_venv, "--version"], capture_output=True, text=True)
     log_write(f"\n✓ Venv Python: {result.stdout.strip()}")
     if "3.11" not in result.stdout:
-        log_write(f"❌ Wrong Python version in venv!")
+        log_write(f" Wrong Python version in venv!")
         return False
     
     # 8. Initialize databases
-    log_write(f"\n💽 Initializing databases...")
+    log_write(f"\n Initializing databases...")
     run_cmd([python_venv, f"{PROJECT_ROOT}/scripts/init_databases.py"], "Init databases")
     
     # 9. Health check
-    log_write(f"\n🏥 Running health check...")
+    log_write(f"\n Running health check...")
     result = subprocess.run(
         [python_venv, f"{PROJECT_ROOT}/scripts/health_check.py"],
         capture_output=True,
@@ -134,11 +134,11 @@ def main():
     if "operational" in result.stdout.lower() or result.returncode == 0:
         log_write("✓ Health check passed")
     else:
-        log_write("⚠️  Health check output unclear")
+        log_write("  Health check output unclear")
     
     # Final summary
     log_write("\n" + "="*60)
-    log_write("✅ INSTALLATION COMPLETE")
+    log_write(" INSTALLATION COMPLETE")
     log_write("="*60)
     log_write(f"Virtual environment: {venv_path}")
     log_write(f"Python executable: {python_venv}")

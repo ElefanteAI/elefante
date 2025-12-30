@@ -364,4 +364,3 @@ def create_v1_compatible_memory(
     return Memory(content=content, metadata=metadata)
 
 
-# Made with Bob - V2.0 Schema

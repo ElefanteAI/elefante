@@ -1,6 +1,6 @@
 # Elefante Architecture
 
-**Version:** 1.5.0 | **Status:** Production Ready
+**Version:** 1.6.2 | **Status:** Production Ready
 
 ## 1. System Overview
 

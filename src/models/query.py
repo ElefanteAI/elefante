@@ -156,4 +156,3 @@ class SearchFilters(BaseModel):
             
         return filters
 
-# Made with Bob

@@ -1,7 +1,65 @@
 # Elefante Development Roadmap
 
-**Current Version**: v1.5.0  
-**Last Updated**: 2025-12-28
+**Current Version**: v1.6.3  
+**Last Updated**: 2025-12-30
+
+---
+
+## v1.7.0 PLANNING: Cognitive Hub Dashboard
+
+**Vision**: Transform dashboard from static snapshot viewer into dynamic "Cognitive Hub" with AI-powered insights, temporal awareness, and configurable views.
+
+### Core Pillars
+
+| Pillar | Goal |
+|--------|------|
+| **Simplicity** | Clean UI, minimal clutter, immediate understanding |
+| **Smarts** | AI-driven queries, pattern detection, summaries |
+| **Configurability** | Custom views, filters, export options |
+| **Impact** | Surface trends, health metrics, actionable insights |
+
+### Feature Matrix
+
+| Feature | Priority | Description |
+|---------|----------|-------------|
+| Multi-View Layouts | HIGH | Force/hierarchy/timeline graph modes |
+| Semantic Search Bar | HIGH | In-dashboard search with instant filtering |
+| AI Summaries | HIGH | "Top 3 intent rules", "Rising tasks this week" |
+| Temporal Filters | MEDIUM | "Since last week", "Most accessed" |
+| Health Metrics | MEDIUM | Duplicate detection, staleness alerts |
+| Node Editing | LOW | Preview edits via MCP (with confirmation) |
+| Export | LOW | JSON/PNG snapshots |
+
+### Data Enhancements Required
+
+| Field | Storage | Purpose |
+|-------|---------|---------|
+| `last_accessed` | ChromaDB metadata | Temporal queries, usage ranking |
+| `access_count` | ChromaDB metadata | Hot memory detection |
+| `confidence` | ChromaDB metadata (0-1) | Reliability weighting |
+| `version` | ChromaDB metadata | Change history |
+| `edge_weight` | Kuzu property | Usage-based relationship strength |
+
+### AI Agent Workflow (MCP-Driven)
+
+1. **Analyze**: `elefanteGraphQuery` + `elefanteMemorySearch` to map data
+2. **Design**: Generate schemas/prototypes via prompts
+3. **Implement**: Batch upsert via `elefanteGraphConnect`, build features
+4. **Test**: `elefanteSystemStatusGet` for health, `elefanteDashboardOpen` for validation
+
+---
+
+## v1.6.3 SHIPPED (2025-12-30)
+
+**Neural Web Visualization** - Dashboard graph transformed from rigid "Solar System" to organic "Neural Web".
+
+| Feature | Status | Impact |
+|---------|--------|--------|
+| Linear node sizing |  DONE | Balanced sizes (max 25px vs. 48px) |
+| Neural physics |  DONE | Nodes float organically, no ring locks |
+| Recency pulse |  DONE | White ring for very recent memories |
+| Status borders |  DONE | Green=processed, amber=pending |
+| Ring guides disabled |  DONE | Cleaner brain visualization |
 
 ---
 
@@ -11,10 +69,10 @@
 
 | Feature | Status | Impact |
 |---------|--------|--------|
-| Transaction-scoped locking | ✅ DONE | Per-operation locks (ms) instead of per-session (hours) |
-| Stale lock auto-expiry | ✅ DONE | Locks > 30 seconds auto-cleared |
-| Dead PID detection | ✅ DONE | Orphaned locks from crashed processes cleared |
-| Backward compatibility | ✅ DONE | `enable()`/`disable()` remain safe; semantics evolved after v1.1.0 |
+| Transaction-scoped locking |  DONE | Per-operation locks (ms) instead of per-session (hours) |
+| Stale lock auto-expiry |  DONE | Locks > 30 seconds auto-cleared |
+| Dead PID detection |  DONE | Orphaned locks from crashed processes cleared |
+| Backward compatibility |  DONE | `enable()`/`disable()` remain safe; semantics evolved after v1.1.0 |
 
 ---
 
@@ -34,7 +92,7 @@
 
 ---
 
-## Current State (v1.5.0)
+## Current State (v1.6.2)
 
 ###  Implemented Features
 - **Transaction-Scoped Locking** (v1.1.0) - Per-operation locks with auto-expiry
@@ -142,7 +200,7 @@ Previous roadmap content archived at: `docs/archive/historical/task-roadmap-comp
 
 **Last Updated**: 2025-12-28  
 **Status**: Active Development  
-**Current Release**: v1.6.0
+**Current Release**: v1.6.2
 
 ---
 

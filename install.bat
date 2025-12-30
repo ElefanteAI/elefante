@@ -7,12 +7,12 @@ setlocal enabledelayedexpansion
 set LOG_FILE=%~dp0install.log
 
 echo ============================================================ > "%LOG_FILE%"
-echo 🐘 ELEFANTE INSTALLATION LOG >> "%LOG_FILE%"
+echo  ELEFANTE INSTALLATION LOG >> "%LOG_FILE%"
 echo Started at: %DATE% %TIME% >> "%LOG_FILE%"
 echo ============================================================ >> "%LOG_FILE%"
 
 echo ============================================================
-echo 🐘 ELEFANTE INSTALLER
+echo  ELEFANTE INSTALLER
 echo ============================================================
 echo.
 

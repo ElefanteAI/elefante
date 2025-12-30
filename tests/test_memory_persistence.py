@@ -159,6 +159,42 @@ class TestMemoryPersistence:
         assert len(results) > 0
         found = any(str(r.memory.id) == str(memory_id) for r in results)
         assert found, "Memory not found after orchestrator restart"
+
+    @pytest.mark.asyncio
+    async def test_cognitive_fields_roundtrip_in_vector_store(self, orchestrator):
+        """V4 cognitive fields should persist and reconstruct as typed lists."""
+        test_content = f"Cognitive fields persistence test {uuid4()}"
+
+        memory = await orchestrator.add_memory(
+            content=test_content,
+            memory_type="fact",
+            importance=6,
+            metadata={
+                "concepts": ["Memory", "Souvenir", "Vector DB"],
+                "surfaces_when": ["How to recall memory", "vector db retrieval"],
+                "authority_score": 0.9,
+            },
+        )
+
+        assert memory is not None
+        assert isinstance(memory.metadata.concepts, list)
+        assert isinstance(memory.metadata.surfaces_when, list)
+        assert memory.metadata.concepts, "Expected non-empty concepts"
+        assert memory.metadata.surfaces_when, "Expected non-empty surfaces_when"
+
+        # New VectorStore instance simulates a restart / new process.
+        new_vector_store = VectorStore(
+            collection_name=orchestrator._test_collection_name,
+            persist_directory=str(orchestrator._test_chroma_dir),
+        )
+        reloaded = await new_vector_store.get_memory(memory.id)
+        assert reloaded is not None
+
+        assert isinstance(reloaded.metadata.concepts, list)
+        assert isinstance(reloaded.metadata.surfaces_when, list)
+        assert reloaded.metadata.concepts == memory.metadata.concepts
+        assert reloaded.metadata.surfaces_when == memory.metadata.surfaces_when
+        assert abs(float(reloaded.metadata.authority_score) - float(memory.metadata.authority_score)) < 1e-9
     
     @pytest.mark.asyncio
     async def test_add_memory_with_entities_creates_relationships(self, orchestrator):
@@ -259,4 +295,3 @@ class TestAbsolutePathResolution:
         assert db_path.is_absolute(), "Graph store database_path is not absolute"
 
 
-# Made with Bob

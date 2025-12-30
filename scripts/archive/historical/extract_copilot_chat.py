@@ -10,7 +10,7 @@ Features:
 - Auto-detects current workspace from CWD
 - Handles special characters (Unicode, emoji, escape sequences)
 - Preserves tables and code blocks
-- Detects milestones (✅, DONE, COMPLETED, etc.)
+- Detects milestones (, DONE, COMPLETED, etc.)
 - Works with any conversation - just run from any workspace
 
 Usage:
@@ -56,17 +56,17 @@ VSCODE_PATHS = {
 
 # Milestone detection patterns
 MILESTONE_PATTERNS = [
-    (r"✅", "COMPLETED"),
-    (r"☑️", "COMPLETED"),
+    (r"", "COMPLETED"),
+    (r"", "COMPLETED"),
     (r"\bDONE\b", "DONE"),
     (r"\bCOMPLETED?\b", "COMPLETED"),
     (r"\bFIXED\b", "FIXED"),
     (r"\bIMPLEMENTED\b", "IMPLEMENTED"),
     (r"\bVERIFIED\b", "VERIFIED"),
     (r"\bSHIPPED\b", "SHIPPED"),
-    (r"🚀", "SHIPPED"),
-    (r"⚠️", "WARNING"),
-    (r"❌", "FAILED"),
+    (r"", "SHIPPED"),
+    (r"", "WARNING"),
+    (r"", "FAILED"),
     (r"\bFAILED\b", "FAILED"),
     (r"\bBLOCKED\b", "BLOCKED"),
 ]

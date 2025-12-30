@@ -382,4 +382,3 @@ class TestGetConversationSearcher:
         assert searcher1 is searcher2
 
 
-# Made with Bob

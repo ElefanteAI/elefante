@@ -9,7 +9,7 @@ from src.mcp.server import ElefanteMCPServer
 from src.core.graph_store import GraphStore
 
 async def simulate_add_memory():
-    print("🤖 SIMULATING ADD MEMORY (Debugging Lock/Crash)")
+    print(" SIMULATING ADD MEMORY (Debugging Lock/Crash)")
     print("---------------------------------------------")
     
     # 1. Initialize Server (which initializes GraphStore)
@@ -23,7 +23,7 @@ async def simulate_add_memory():
         # But let's try to add memory via the tool handler directly.
         
     except Exception as e:
-        print(f"❌ CRITICAL: Server initialization failed: {e}")
+        print(f" CRITICAL: Server initialization failed: {e}")
         return
 
     # 2. Prepare Payload
@@ -46,11 +46,11 @@ async def simulate_add_memory():
         # async def _handle_add_memory(self, arguments: dict) -> list[types.TextContent]
         
         result = await server._handle_add_memory(args)
-        print("   ✅ SUCCESS! Result:")
+        print("    SUCCESS! Result:")
         print(result)
         
     except Exception as e:
-        print(f"   ❌ FAILED: {e}")
+        print(f"    FAILED: {e}")
         import traceback
         traceback.print_exc()
 
@@ -58,6 +58,6 @@ if __name__ == "__main__":
     try:
         asyncio.run(simulate_add_memory())
     except KeyboardInterrupt:
-        print("\n⚠ Interrupted")
+        print("\n Interrupted")
     except Exception as e:
-        print(f"\n❌ Script crash: {e}")
+        print(f"\n Script crash: {e}")

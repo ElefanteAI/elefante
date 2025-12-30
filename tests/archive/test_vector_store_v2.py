@@ -66,7 +66,7 @@ class TestVectorStoreV2Metadata:
             assert memory_id is not None
             assert memory_id == str(sample_memory_v2.id)
             
-            print(f"✅ Successfully added V2 memory: {memory_id}")
+            print(f" Successfully added V2 memory: {memory_id}")
         except Exception as e:
             pytest.fail(f"Failed to add V2 memory: {e}")
     
@@ -96,7 +96,7 @@ class TestVectorStoreV2Metadata:
         assert retrieved.metadata.source == SourceType.USER_INPUT
         assert retrieved.metadata.verified is True
         
-        print(f"✅ Successfully retrieved and validated V2 memory")
+        print(f" Successfully retrieved and validated V2 memory")
     
     @pytest.mark.asyncio
     async def test_backward_compatibility_v1_memory(self, vector_store):
@@ -125,7 +125,7 @@ class TestVectorStoreV2Metadata:
         assert retrieved.metadata.domain == DomainType.PROJECT  # Inferred from project
         assert retrieved.metadata.intent == IntentType.REFERENCE  # Default
         
-        print(f"✅ V1 backward compatibility verified")
+        print(f" V1 backward compatibility verified")
     
     @pytest.mark.asyncio
     async def test_search_with_v2_filters(self, vector_store, sample_memory_v2):
@@ -142,7 +142,7 @@ class TestVectorStoreV2Metadata:
         assert len(results) > 0
         assert any(r.memory.content == sample_memory_v2.content for r in results)
         
-        print(f"✅ Search with V2 schema successful, found {len(results)} results")
+        print(f" Search with V2 schema successful, found {len(results)} results")
     
     @pytest.mark.asyncio
     async def test_metadata_serialization(self, vector_store, sample_memory_v2):
@@ -164,7 +164,7 @@ class TestVectorStoreV2Metadata:
         assert "status" in metadata
         assert "source" in metadata
         
-        print(f"✅ All V2 metadata fields serialize correctly")
+        print(f" All V2 metadata fields serialize correctly")
 
 
 class TestVectorStoreCleanup:
@@ -177,12 +177,11 @@ class TestVectorStoreCleanup:
         # This test just verifies the reset method exists and works
         try:
             await vector_store.reset()
-            print(f"✅ Vector store reset successful")
+            print(f" Vector store reset successful")
         except Exception as e:
-            print(f"⚠️  Reset warning (may be expected): {e}")
+            print(f"  Reset warning (may be expected): {e}")
 
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
 
-# Made with Bob

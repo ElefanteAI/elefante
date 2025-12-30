@@ -5,7 +5,7 @@ A dual-database memory system combining semantic search (ChromaDB)
 with structured knowledge graphs (Kuzu) for comprehensive AI memory.
 """
 
-__version__ = "1.6.0"
+__version__ = "1.6.3"
 __author__ = "Your Name"
 
 # LAW #1 ENFORCEMENT: Do NOT import orchestrator at package level
@@ -31,4 +31,3 @@ __all__ = [
     "Relationship",
 ]
 
-# Made with Bob

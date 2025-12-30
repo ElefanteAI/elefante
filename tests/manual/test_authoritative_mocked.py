@@ -133,10 +133,10 @@ async def test_retrieval_plasticity():
     
     await orchestrator._search_semantic("query", plan, apply_temporal_decay=True)
     
-    print(f"   - Vector Store Access Update Called: {'✅' if vector_store.update_memory_access.called else '❌'}")
+    print(f"   - Vector Store Access Update Called: {'' if vector_store.update_memory_access.called else ''}")
 
 async def test_graph_authoritative():
-    print("\n🧪 TESTING GRAPH AUTHORITATIVE (MOCKED)")
+    print("\n TESTING GRAPH AUTHORITATIVE (MOCKED)")
     
     orchestrator = MemoryOrchestrator(
         vector_store=AsyncMock(),
@@ -146,25 +146,25 @@ async def test_graph_authoritative():
     
     # Test 1: Idempotency (create_or_get_entity used)
     await orchestrator.create_entity("TestEntity", "project")
-    print(f"   - create_or_get_entity Called: {'✅' if orchestrator.graph_store.create_or_get_entity.called else '❌'}")
+    print(f"   - create_or_get_entity Called: {'' if orchestrator.graph_store.create_or_get_entity.called else ''}")
     
     # Test 2: Strict Schema (Entity)
     try:
         await orchestrator.create_entity("InvalidEntity", "invalid_type")
-        print("   - Entity Type Strictness: ❌ (Should have failed)")
+        print("   - Entity Type Strictness:  (Should have failed)")
     except ValueError:
-        print("   - Entity Type Strictness: ✅ (Caught invalid type)")
+        print("   - Entity Type Strictness:  (Caught invalid type)")
         
     # Test 3: Strict Schema (Relationship)
     from uuid import uuid4
     try:
         await orchestrator.create_relationship(uuid4(), uuid4(), "invalid_rel")
-        print("   - Relationship Type Strictness: ❌ (Should have failed)")
+        print("   - Relationship Type Strictness:  (Should have failed)")
     except ValueError:
-        print("   - Relationship Type Strictness: ✅ (Caught invalid type)")
+        print("   - Relationship Type Strictness:  (Caught invalid type)")
 
 async def test_maintenance_authoritative():
-    print("\n🧪 TESTING MAINTENANCE AUTHORITATIVE (MOCKED)")
+    print("\n TESTING MAINTENANCE AUTHORITATIVE (MOCKED)")
     
     # Mock LLM and Stores
     llm_service = AsyncMock()
@@ -213,12 +213,12 @@ async def test_maintenance_authoritative():
     call_kwargs = orchestrator.add_memory.call_args[1]
     metadata_arg = call_kwargs.get('metadata', {})
     
-    print(f"   - Layer Passed: {metadata_arg.get('layer')} -> {'✅' if metadata_arg.get('layer') == 'world' else '❌'}")
-    print(f"   - Sublayer Passed: {metadata_arg.get('sublayer')} -> {'✅' if metadata_arg.get('sublayer') == 'fact' else '❌'}")
+    print(f"   - Layer Passed: {metadata_arg.get('layer')} -> {'' if metadata_arg.get('layer') == 'world' else ''}")
+    print(f"   - Sublayer Passed: {metadata_arg.get('sublayer')} -> {'' if metadata_arg.get('sublayer') == 'fact' else ''}")
     
     # Verify PARENT_OF relationship
     rel_call_args = orchestrator.create_relationship.call_args[1]
-    print(f"   - Relationship Type: {rel_call_args.get('relationship_type')} -> {'✅' if rel_call_args.get('relationship_type') == 'PARENT_OF' else '❌'}")
+    print(f"   - Relationship Type: {rel_call_args.get('relationship_type')} -> {'' if rel_call_args.get('relationship_type') == 'PARENT_OF' else ''}")
 
 if __name__ == "__main__":
     asyncio.run(test_authoritative_pipeline())

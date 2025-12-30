@@ -197,6 +197,10 @@ async def main():
                 "summary": _redact_secrets(meta.get("summary", "") or ""),
                 "owner_id": meta.get("owner_id"),
                 "processing_status": meta.get("processing_status"),
+                # V4 cognitive retrieval fields (v1.6.1)
+                "concepts": meta.get("concepts"),
+                "surfaces_when": meta.get("surfaces_when"),
+                "authority_score": meta.get("authority_score"),
                 "source": "chromadb"
             }
         }
@@ -653,7 +657,7 @@ async def main():
             signal_index: dict[tuple[str, str], str] = {}
 
             # Track which memory nodes belong to which signal hub so we can add
-            # deterministic, explainable memory↔memory cohesion edges.
+            # deterministic, explainable memorymemory cohesion edges.
             signal_members: dict[str, set[str]] = {}
             signal_kind_by_id: dict[str, str] = {}
 
@@ -730,7 +734,7 @@ async def main():
                     sid = _ensure_signal_node("ring", ring.strip())
                     _add_signal_edge(mem_id, sid, "IN_RING")
 
-            # Deterministic memory↔memory cohesion edges derived from shared signals.
+            # Deterministic memorymemory cohesion edges derived from shared signals.
             ENABLE_COHESION = _env_bool("ELEFANTE_SNAPSHOT_COHESION_EDGES", True)
             if ENABLE_COHESION:
                 try:

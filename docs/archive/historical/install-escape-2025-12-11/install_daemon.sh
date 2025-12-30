@@ -7,7 +7,7 @@ LOG="$PROJECT/install_daemon.log"
 # Redirect all output
 exec > "$LOG" 2>&1
 
-echo "🚀 Starting daemon installation at $(date)"
+echo " Starting daemon installation at $(date)"
 cd "$PROJECT" || exit 1
 
 # Kill any existing Python processes in this project
@@ -38,6 +38,6 @@ echo "Initializing databases..."
 echo "Running health check..."
 ./.venv/bin/python scripts/health_check.py
 
-echo "✅ Installation complete at $(date)"
+echo " Installation complete at $(date)"
 echo "Log: $LOG"
 echo "Venv: $PROJECT/.venv"

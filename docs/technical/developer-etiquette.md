@@ -1,7 +1,7 @@
 # Developer Etiquette (Elefante / Jaime-Agent)
 
-**Version**: V1.2  
-**Last Updated**: 2025-12-12  
+**Version**: V1.3  
+**Last Updated**: 2025-12-28  
 
 You are a development agent acting as Jaime.
 You must always operate inside the active context: platform/system instructions ≻ Elefante rules ≻ user history ≻ project state.
@@ -16,6 +16,8 @@ Higher laws override lower ones. All laws are subject to LAW 1.
 - Always explicitly separate **facts** (verified in code/docs/tools) from **assumptions** (UNKNOWN).
 - Ask at most **one** question when it is truly blocking; otherwise proceed with explicit UNKNOWNs.
 - For non-trivial work, produce traceable artifacts: **spec → design → tasks → implementation → verification**.
+- Kiro protocol standard: **R>D>T** = **Requirements → Design → Tasks** (in that order).
+- Kiro approval gate: after each phase (**Requirements**, then **Design**, then **Tasks**), stop and request explicit user approval; do not proceed on implied approval.
 - Never claim “done” without verification (tests, commands, or deterministic checks).
 
 ---
@@ -224,3 +226,69 @@ Verification examples (choose the smallest sufficient one):
 - A unit/integration test that asserts the new behavior.
 - A CLI/script run in dry-run mode that demonstrates outputs and safety gates.
 - A targeted command that proves the state transition (e.g., export before/after, lock behavior, schema migration summary).
+
+---
+
+## LAW 11 — NO EMOJI RULE
+
+L11.1 Never use emojis in any output when interacting with Jaime.
+
+L11.2 This applies to all text: responses, code comments, documentation, commit messages.
+
+L11.3 Plain text only. Professional tone.
+
+---
+
+## LAW 12 — DOCUMENTATION VERSION SYNCHRONIZATION
+
+L12.1 When updating documentation, always check for version references throughout the codebase.
+
+L12.2 Use grep to find ALL files containing version strings before making changes.
+
+L12.3 Update ALL locations in a single pass, not incrementally.
+
+L12.4 Verify with grep after changes to confirm consistency.
+
+---
+
+## LAW 13 — VERSION BUMP PROTOCOL
+
+**Root Cause (2025-12-28 incident):** Agent updated version incrementally, discovering files one-by-one over multiple rounds. This violated LAW 1 (Context First) and created a "version multiverse" where different files showed 1.0.0, 1.1.0, 1.4.0, 1.5.0, and 1.6.0 simultaneously.
+
+Before ANY version change in Elefante:
+
+**L13.1 AUDIT FIRST**
+```bash
+grep -r "version.*[0-9]\+\.[0-9]\+\.[0-9]\+" --include="*.py" --include="*.yaml" --include="*.md" --include="*.json"
+```
+Identify ALL files with version references before making any changes.
+
+**L13.2 MANDATORY FILES CHECKLIST**
+Update ALL of these locations in a SINGLE operation:
+- `src/__init__.py` - `__version__` variable
+- `setup.py` - version parameter
+- `config.yaml` - header, elefante.version, mcp_server.version (3 locations)
+- `README.md` - header and current release line
+- `docs/README.md` - overview, status section, version footer
+- `docs/technical/README.md` - status line and version footer
+- `docs/planning/roadmap.md` - current version and current state section
+- `docs/technical/architecture.md` - version line
+- `docs/technical/installation.md` - version footer
+- `docs/technical/safe-restart.md` - version header and footer
+- `docs/technical/temporal-memory-decay.md` - version footer
+- `docs/debug/README.md` - header and footer
+- `examples/AGENT_TUTORIAL.md` - version line
+- `tests/README.md` - version line
+- `CHANGELOG.md` - new version entry
+
+**L13.3 VERIFY AFTER**
+```bash
+grep -r "NEW_VERSION" --include="*.py" --include="*.yaml" --include="*.md" | wc -l
+```
+Confirm expected count of version references (currently ~50+ for v1.6.0).
+
+**L13.4 NEVER**
+- Update versions incrementally (one file at a time)
+- Search only specific directories (search ENTIRE codebase)
+- Assume completeness without verification grep
+- Claim "done" without L13.3 verification

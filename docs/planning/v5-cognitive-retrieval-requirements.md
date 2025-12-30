@@ -13,7 +13,7 @@ Transform Elefante from a **storage system** to a **cognitive retrieval system**
 
 ---
 
-## Part A: V4 Implementation (VERIFIED ✅)
+## Part A: V4 Implementation (VERIFIED )
 
 ### A.1 Problem Solved
 Memories were stored as raw text. Search only matched words. No understanding of meaning or connections.
@@ -22,14 +22,14 @@ Memories were stored as raw text. Search only matched words. No understanding of
 
 | Feature | File | Status |
 |---------|------|--------|
-| Concept extraction | `src/utils/curation.py` | ✅ Verified |
-| Query pattern inference | `src/utils/curation.py` | ✅ Verified |
-| Authority scoring | `src/utils/curation.py` | ✅ Verified |
-| Cognitive retriever | `src/core/retrieval.py` | ✅ Built (not wired to MCP) |
-| Auto-populate on add | `src/core/orchestrator.py` | ✅ Verified |
-| SHARES_CONCEPT edges | `scripts/update_dashboard_data.py` | ✅ Verified (24 edges) |
-| Migration script | `scripts/migrate_v4_cognitive.py` | ✅ Done |
-| Documentation | `docs/technical/memory-schema-v4-cognitive.md` | ✅ Done |
+| Concept extraction | `src/utils/curation.py` |  Verified |
+| Query pattern inference | `src/utils/curation.py` |  Verified |
+| Authority scoring | `src/utils/curation.py` |  Verified |
+| Cognitive retriever | `src/core/retrieval.py` |  Built (not wired to MCP) |
+| Auto-populate on add | `src/core/orchestrator.py` |  Verified |
+| SHARES_CONCEPT edges | `scripts/update_dashboard_data.py` |  Verified (24 edges) |
+| Migration script | `scripts/migrate_v4_cognitive.py` |  Done |
+| Documentation | `docs/technical/memory-schema-v4-cognitive.md` |  Done |
 
 ### A.3 New Metadata Fields
 
@@ -161,10 +161,10 @@ def compute_health(memory) -> HealthStatus:
 #### Dashboard Integration
 | Health | Icon | Color | Action |
 |--------|------|-------|--------|
-| Healthy | 🟢 | Green | None |
-| Stale | 🟡 | Yellow | "Review this memory" |
-| At Risk | 🔴 | Red | "Resolve conflict" |
-| Orphan | ⚪ | Gray | "Connect or archive" |
+| Healthy |  | Green | None |
+| Stale |  | Yellow | "Review this memory" |
+| At Risk |  | Red | "Resolve conflict" |
+| Orphan |  | Gray | "Connect or archive" |
 
 #### Files to Modify
 - `src/utils/curation.py` - Add `compute_health()`
@@ -218,7 +218,7 @@ POTENTIAL_OPPOSING_PATTERNS = [
 #### Resolution Flow
 1. System detects potential conflict
 2. Adds to `potential_conflicts` field (not `contradicts`)
-3. Dashboard shows "⚠️ Review conflict?" badge
+3. Dashboard shows " Review conflict?" badge
 4. User reviews and resolves: 
    - **Confirm conflict** → move to `contradicts`
    - **Dismiss** → remove flag
@@ -412,8 +412,8 @@ Flag potential issues for user review rather than auto-asserting. The system sug
 
 | Metric | Current | Target | Notes |
 |--------|---------|--------|-------|
-| V4 fields populated | 100% | 100% | ✅ Achieved |
-| SHARES_CONCEPT edges | 24 | - | ✅ Achieved |
+| V4 fields populated | 100% | 100% |  Achieved |
+| SHARES_CONCEPT edges | 24 | - |  Achieved |
 | Search uses multi-signal scoring | No | Yes | Phase 0 |
 | Search includes explanation | No | Yes | Phase 1 |
 | Potential conflicts flagged | 0 | All detected | Phase 2 |

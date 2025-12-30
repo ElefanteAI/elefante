@@ -117,4 +117,3 @@ if __name__ == "__main__":
     success = auto_repair_chromadb()
     sys.exit(0 if success else 1)
 
-# Made with Bob

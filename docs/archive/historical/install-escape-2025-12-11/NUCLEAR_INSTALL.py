@@ -20,7 +20,7 @@ root = Path("{root}")
 os.chdir(root)
 
 # Step 1: Nuclear delete with system tools
-print("\\n🔥 NUCLEAR PURGE OF .venv")
+print("\\n NUCLEAR PURGE OF .venv")
 subprocess.run(["find", ".venv", "-type", "f", "-delete"], timeout=60)
 subprocess.run(["find", ".venv", "-type", "d", "-delete"], timeout=60)
 subprocess.run(["rm", "-rf", ".venv"], timeout=30)
@@ -34,7 +34,7 @@ if Path(".venv").exists():
 print("✓ .venv deleted")
 
 # Step 2: Create fresh Python 3.11 venv
-print("\\n📦 Creating fresh venv with Python 3.11...")
+print("\\n Creating fresh venv with Python 3.11...")
 result = subprocess.run(
     ["/opt/homebrew/bin/python3.11", "-m", "venv", ".venv"],
     timeout=120
@@ -45,18 +45,18 @@ if result.returncode != 0:
 print("✓ Venv created")
 
 # Step 3: Install dependencies
-print("\\n📚 Installing dependencies...")
+print("\\n Installing dependencies...")
 subprocess.run([".venv/bin/pip", "install", "--upgrade", "pip"], timeout=120)
 subprocess.run([".venv/bin/pip", "install", "-r", "requirements.txt"], timeout=600, check=False)
 print("✓ Dependencies installed")
 
 # Step 4: Initialize databases
-print("\\n💽 Initializing databases...")
+print("\\n Initializing databases...")
 subprocess.run([".venv/bin/python", "scripts/init_databases.py"], timeout=300, check=False)
 print("✓ Databases initialized")
 
 # Step 5: Health check
-print("\\n🏥 Running health check...")
+print("\\n Running health check...")
 result = subprocess.run(
     [".venv/bin/python", "scripts/health_check.py"],
     capture_output=True,
@@ -66,10 +66,10 @@ result = subprocess.run(
 if result.returncode == 0 or "operational" in result.stdout.lower():
     print("✓ Health check PASSED")
 else:
-    print("⚠️  Health check status unclear")
+    print("  Health check status unclear")
 
 print("\\n" + "="*70)
-print("✅ INSTALLATION SUCCESSFUL")
+print(" INSTALLATION SUCCESSFUL")
 print("="*70)
 print(f"Venv: {{root}}/.venv")
 print(f"To activate: source {{root}}/.venv/bin/activate")

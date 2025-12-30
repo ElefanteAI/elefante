@@ -24,20 +24,20 @@ def check_install():
     for pkg in required:
         try:
             __import__(pkg)
-            log(f"✅ Package `{pkg}` is importable.")
+            log(f" Package `{pkg}` is importable.")
         except ImportError as e:
-            log(f"❌ Package `{pkg}` FAILED: {e}")
+            log(f" Package `{pkg}` FAILED: {e}")
             missing.append(pkg)
             
     if missing:
-        log(f"⚠️ Missing packages: {', '.join(missing)}. Attempting FORCE install...")
+        log(f" Missing packages: {', '.join(missing)}. Attempting FORCE install...")
         try:
             subprocess.check_call([sys.executable, "-m", "pip", "install"] + missing)
-            log("✅ Force install completed.")
+            log(" Force install completed.")
         except Exception as e:
-            log(f"🔥 Force install failed: {e}")
+            log(f" Force install failed: {e}")
     else:
-        log("✅ All critical dependencies verified.")
+        log(" All critical dependencies verified.")
 
 if __name__ == "__main__":
     check_install()

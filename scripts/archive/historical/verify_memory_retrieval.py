@@ -8,7 +8,7 @@ sys.path.append(os.getcwd())
 from src.mcp.server import ElefanteMCPServer
 
 async def list_recent_memories():
-    print("📋 VERIFYING MEMORY ADDITION")
+    print(" VERIFYING MEMORY ADDITION")
     print("----------------------------")
     
     server = ElefanteMCPServer()
@@ -35,12 +35,12 @@ async def list_recent_memories():
         
         # Check if content matches
         if result and "safe_mode" in str(result):
-            print("\n✅ VERIFICATION PASSED: Memory found.")
+            print("\n VERIFICATION PASSED: Memory found.")
         else:
-            print("\n❌ VERIFICATION FAILED: Memory not found.")
+            print("\n VERIFICATION FAILED: Memory not found.")
             
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f" Error: {e}")
 
 if __name__ == "__main__":
     asyncio.run(list_recent_memories())

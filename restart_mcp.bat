@@ -33,4 +33,3 @@ echo 3. If issues persist, restart Bob IDE completely
 echo.
 pause
 
-@REM Made with Bob

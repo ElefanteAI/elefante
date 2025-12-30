@@ -321,7 +321,7 @@ def main():
         logger.info("\n[5/5] Skipping verification (use --verify to enable)")
     
     logger.info("\n" + "=" * 60)
-    logger.info("✅ Elefante restart completed successfully")
+    logger.info(" Elefante restart completed successfully")
     logger.info("=" * 60)
     
     return 0

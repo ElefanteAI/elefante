@@ -314,7 +314,7 @@ Red-Yellow Blue-Purple Black-Green
 
 ---
 
-## 9. ⏭ Exact Next Steps
+## 9.  Exact Next Steps
 
 ### Step 1: Update Memory Model Schema
 **File**: `src/models/memory.py`

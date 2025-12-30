@@ -97,7 +97,7 @@ def main():
     logger.info("Running health check...")
     run_command([python_venv_exe, "scripts/health_check.py"])
 
-    logger.info("✅ Clean installation complete!")
+    logger.info(" Clean installation complete!")
 
 if __name__ == "__main__":
     main()

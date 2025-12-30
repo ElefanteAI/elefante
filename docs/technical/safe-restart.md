@@ -1,6 +1,6 @@
 # Elefante Safe Restart
 
-**Version**: 1.5.0  
+**Version**: 1.6.2  
 **Script**: `scripts/restart_elefante.py`  
 **Purpose**: Safely restart MCP server to pick up code changes
 
@@ -17,13 +17,13 @@ The Safe Restart utility cleanly restarts the Elefante MCP server without corrup
 
 ## Features
 
-✅ **Graceful Shutdown**: Uses SIGTERM for clean exit  
-✅ **Resource Cleanup**: Clears orchestrator references  
-✅ **Lock Management**: Removes stale locks safely  
-✅ **Transaction Safety**: Respects v1.1.0+ transaction-scoped locking  
-✅ **No Data Loss**: All data persists in ChromaDB/Kuzu  
-✅ **Verification**: Optional startup verification  
-✅ **Force Option**: Fallback SIGKILL if needed
+ **Graceful Shutdown**: Uses SIGTERM for clean exit  
+ **Resource Cleanup**: Clears orchestrator references  
+ **Lock Management**: Removes stale locks safely  
+ **Transaction Safety**: Respects v1.1.0+ transaction-scoped locking  
+ **No Data Loss**: All data persists in ChromaDB/Kuzu  
+ **Verification**: Optional startup verification  
+ **Force Option**: Fallback SIGKILL if needed
 
 ---
 
@@ -283,10 +283,10 @@ Arguments: {
 
 | Action | Purpose | Code Reload | Data Loss |
 |--------|---------|-------------|-----------|
-| **Disable/Enable** | Switch IDEs | ❌ No | ❌ No |
-| **Restart** | Load new code | ✅ Yes | ❌ No |
-| **Kill/Start** | Emergency | ✅ Yes | ⚠️ Risk if mid-write |
-| **Safe Restart** | Best practice | ✅ Yes | ❌ No |
+| **Disable/Enable** | Switch IDEs |  No |  No |
+| **Restart** | Load new code |  Yes |  No |
+| **Kill/Start** | Emergency |  Yes |  Risk if mid-write |
+| **Safe Restart** | Best practice |  Yes |  No |
 
 ---
 
@@ -298,6 +298,6 @@ Arguments: {
 
 ---
 
-**Version**: 1.5.0  
-**Last Updated**: 2025-12-27  
+**Version**: 1.6.2
+**Last Updated**: 2025-12-29
 **Status**: Production Ready

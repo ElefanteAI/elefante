@@ -2,7 +2,7 @@
 
 This repository uses **Elefante**, a persistent memory system that stores user preferences, decisions, and project knowledge.
 
-## 🚨 MANDATORY PROTOCOL
+##  MANDATORY PROTOCOL
 
 Before answering ANY question about:
 - User preferences (coding style, tools, formatting)
@@ -13,13 +13,13 @@ Before answering ANY question about:
 
 **You MUST call `elefanteMemorySearch` FIRST** with a relevant query.
 
-## 🔒 Compliance Gate (v1.6.0)
+##  Compliance Gate (v1.6.0)
 
 The Elefante MCP server enforces a **Compliance Gate**:
 - Write operations (`elefanteMemoryAdd`, `elefanteGraphEntityCreate`, etc.) are **BLOCKED** until you perform a search
 - This prevents duplicate memories and ensures you have full context
 
-## ✅ Required Compliance Stamp
+##  Required Compliance Stamp
 
 After searching, include ONE of these stamps in your response:
 
@@ -33,7 +33,7 @@ After searching, include ONE of these stamps in your response:
 [ELEFANTE] Searched: No relevant memories found
 ```
 
-## 🎯 Trigger Patterns
+##  Trigger Patterns
 
 ALWAYS search when the user mentions:
 - "remember", "recall", "what did I say"
@@ -42,21 +42,21 @@ ALWAYS search when the user mentions:
 - "elefante:" prefix (explicit trigger)
 - References to past conversations or decisions
 
-## ❌ NEVER Do This
+##  NEVER Do This
 
 - Answer from general knowledge when user asks about THEIR preferences
 - Assume you know the project conventions without checking
 - Skip the memory search to be faster
 - Store new memories without first searching for existing ones
 
-## 📝 Query Guidelines
+##  Query Guidelines
 
 When calling `elefanteMemorySearch`:
 - Use **explicit, standalone queries** (no pronouns)
 - Be specific about what you're looking for
 - Example: "user preferences for Python code formatting" NOT "how do they like it"
 
-## 🔄 Workflow Example
+##  Workflow Example
 
 ```
 User: "Create a new component using our usual pattern"

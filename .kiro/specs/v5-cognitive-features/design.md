@@ -152,10 +152,10 @@ from typing import Optional
 from dataclasses import dataclass
 
 class HealthStatus(str, Enum):
-    HEALTHY = "healthy"   # 🟢
-    STALE = "stale"       # 🟡
-    AT_RISK = "at_risk"   # 🔴
-    ORPHAN = "orphan"     # ⚪
+    HEALTHY = "healthy"   # 
+    STALE = "stale"       # 
+    AT_RISK = "at_risk"   # 
+    ORPHAN = "orphan"     # 
 
 
 @dataclass
@@ -184,10 +184,10 @@ class MemoryHealthAnalyzer:
     """
     
     ICONS = {
-        HealthStatus.HEALTHY: "🟢",
-        HealthStatus.STALE: "🟡",
-        HealthStatus.AT_RISK: "🔴",
-        HealthStatus.ORPHAN: "⚪",
+        HealthStatus.HEALTHY: "",
+        HealthStatus.STALE: "",
+        HealthStatus.AT_RISK: "",
+        HealthStatus.ORPHAN: "",
     }
     
     def __init__(self, stale_days: int = 90, conflict_threshold: float = 0.6):
@@ -206,17 +206,17 @@ class MemoryHealthAnalyzer:
         reasons = []
         
         if superseded_by_id:
-            return HealthReport(HealthStatus.AT_RISK, "🔴", ["Superseded by newer memory"])
+            return HealthReport(HealthStatus.AT_RISK, "", ["Superseded by newer memory"])
         if potential_conflicts:
-            return HealthReport(HealthStatus.AT_RISK, "🔴", 
+            return HealthReport(HealthStatus.AT_RISK, "", 
                               [f"Has {len(potential_conflicts)} unresolved conflict(s)"])
         if days_since_access > self.stale_days:
-            return HealthReport(HealthStatus.STALE, "🟡", 
+            return HealthReport(HealthStatus.STALE, "", 
                               [f"Not accessed in {days_since_access} days"])
         if connection_count == 0:
-            return HealthReport(HealthStatus.ORPHAN, "⚪", ["No connections to other memories"])
+            return HealthReport(HealthStatus.ORPHAN, "", ["No connections to other memories"])
         
-        return HealthReport(HealthStatus.HEALTHY, "🟢", ["Active and connected"])
+        return HealthReport(HealthStatus.HEALTHY, "", ["Active and connected"])
     
     def detect_potential_conflict(
         self,
@@ -300,7 +300,7 @@ class SearchResult:
     "title": "...",
     "concepts": ["elefante", "config", "paths"],
     "health": "healthy",           // NEW: healthy|stale|at_risk|orphan
-    "health_icon": "🟢",           // NEW: Visual badge
+    "health_icon": "",           // NEW: Visual badge
     "potential_conflicts": []      // NEW: List of memory IDs
   }
 }

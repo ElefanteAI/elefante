@@ -101,7 +101,7 @@ Elefante V5 transforms the memory system from **passive retrieval** to **active 
 
 7. THE system SHALL compute health during the dashboard snapshot generation process.
 
-8. THE system SHALL display health as a visual badge: 🟢 healthy, 🟡 stale, 🔴 at_risk, ⚪ orphan.
+8. THE system SHALL display health as a visual badge:  healthy,  stale,  at_risk,  orphan.
 
 ---
 
@@ -115,7 +115,7 @@ Elefante V5 transforms the memory system from **passive retrieval** to **active 
 
 2. WHEN a potential conflict is detected, THE system SHALL store the pair in a `potential_conflicts` field—NOT in `contradicts`.
 
-3. THE system SHALL display potential conflicts in the dashboard with a "⚠️ Review conflict?" badge.
+3. THE system SHALL display potential conflicts in the dashboard with a " Review conflict?" badge.
 
 4. WHEN a user reviews a potential conflict, THE system SHALL offer three resolution options: confirm conflict, dismiss, or mark as contextual exception.
 

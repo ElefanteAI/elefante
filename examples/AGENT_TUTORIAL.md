@@ -1,6 +1,6 @@
 # Elefante Agent Tutorial
 
-> **Version:** 1.4.0  
+> **Version:** 1.6.2  
 > **Audience:** AI Agents using MCP tools
 
 ---
@@ -77,8 +77,8 @@ Arguments: {
 ```
 
 **CRITICAL:** Rewrite vague queries to be specific:
-- ❌ Bad: `"How do I install it?"` 
-- ✅ Good: `"How to install Elefante memory system"`
+-  Bad: `"How do I install it?"` 
+-  Good: `"How to install Elefante memory system"`
 
 **Required fields:**
 - `query` - Natural language search (explicit, no pronouns)
@@ -353,4 +353,3 @@ Arguments: {}
 
 ---
 
-Made with Bob 🐘

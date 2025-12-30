@@ -19,4 +19,3 @@ __all__ = [
     "SearchResult",
 ]
 
-# Made with Bob

@@ -9,6 +9,7 @@ Keep these functions cheap, stable, and side-effect free.
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Optional
 
 
@@ -102,6 +103,106 @@ _TECH_TERMS = frozenset([
     "mongodb", "redis", "elasticsearch", "chromadb", "kuzu", "llm",
     "gpt", "claude", "openai", "anthropic", "mcp", "elefante",
 ])
+
+
+# Optional synonym/alias registry for concept normalization.
+# Keep this small and deterministic; expand intentionally as UX evidence accumulates.
+_DEFAULT_CONCEPT_ALIASES: dict[str, str] = {}
+
+
+def _strip_accents(text: str) -> str:
+    if not text:
+        return ""
+    normalized = unicodedata.normalize("NFKD", text)
+    return "".join(ch for ch in normalized if not unicodedata.combining(ch))
+
+
+def normalize_label(text: str) -> str:
+    """Normalize a label for consistent matching (deterministic, language-agnostic).
+
+    - casefold
+    - strip accents
+    - keep alphanumerics, dash, underscore, and spaces
+    - collapse whitespace
+    """
+    text = collapse_ws(_strip_accents(text).casefold())
+    text = re.sub(r"[^a-z0-9_\-\s]+", " ", text)
+    return collapse_ws(text)
+
+
+def canonicalize_concepts(
+    concepts: list[str],
+    *,
+    aliases: Optional[dict[str, str]] = None,
+    max_concepts: int = 5,
+) -> list[str]:
+    """Canonicalize concept labels.
+
+    Goal: stable labeling for concept-overlap scoring and graph edges.
+    Does NOT change memory content.
+    """
+    aliases = aliases or _DEFAULT_CONCEPT_ALIASES
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in concepts or []:
+        if not isinstance(raw, str):
+            continue
+        label = normalize_label(raw)
+        if not label:
+            continue
+
+        # Normalize via alias map (keys are normalized labels).
+        label = normalize_label(aliases.get(label, label))
+
+        if label in _STOP_WORDS or len(label) < 2:
+            continue
+        if label in seen:
+            continue
+        seen.add(label)
+        out.append(label)
+        if len(out) >= max_concepts:
+            break
+    return out
+
+
+def canonicalize_surfaces_when(
+    surfaces_when: list[str],
+    *,
+    aliases: Optional[dict[str, str]] = None,
+    max_surfaces: int = 12,
+) -> list[str]:
+    """Canonicalize surface triggers.
+
+    These are short query patterns; we normalize tokens for consistency.
+    """
+    aliases = aliases or _DEFAULT_CONCEPT_ALIASES
+    out: list[str] = []
+    seen: set[str] = set()
+
+    for raw in surfaces_when or []:
+        if not isinstance(raw, str):
+            continue
+        phrase = normalize_label(raw)
+        if not phrase:
+            continue
+
+        # Apply aliases token-by-token to preserve the phrase structure.
+        tokens = []
+        for tok in phrase.split():
+            tok_norm = normalize_label(tok)
+            tok_norm = normalize_label(aliases.get(tok_norm, tok_norm))
+            if tok_norm:
+                tokens.append(tok_norm)
+        phrase = " ".join(tokens)
+
+        if not phrase or phrase in seen:
+            continue
+        seen.add(phrase)
+        out.append(phrase)
+        if len(out) >= max_surfaces:
+            break
+
+    return out
 
 
 def extract_concepts(content: str, max_concepts: int = 5) -> list[str]:
@@ -283,10 +384,10 @@ from dataclasses import dataclass
 
 class HealthStatus(str, Enum):
     """Memory health status (V5 Req-2)."""
-    HEALTHY = "healthy"   # 🟢 Active, connected, recently used
-    STALE = "stale"       # 🟡 Not accessed in 90+ days
-    AT_RISK = "at_risk"   # 🔴 Superseded or has unresolved conflicts
-    ORPHAN = "orphan"     # ⚪ No graph connections
+    HEALTHY = "healthy"   #  Active, connected, recently used
+    STALE = "stale"       #  Not accessed in 90+ days
+    AT_RISK = "at_risk"   #  Superseded or has unresolved conflicts
+    ORPHAN = "orphan"     #  No graph connections
 
 
 @dataclass
@@ -317,10 +418,10 @@ class MemoryHealthAnalyzer:
     """
     
     ICONS = {
-        HealthStatus.HEALTHY: "🟢",
-        HealthStatus.STALE: "🟡",
-        HealthStatus.AT_RISK: "🔴",
-        HealthStatus.ORPHAN: "⚪",
+        HealthStatus.HEALTHY: "",
+        HealthStatus.STALE: "",
+        HealthStatus.AT_RISK: "",
+        HealthStatus.ORPHAN: "",
     }
     
     def __init__(self, stale_days: int = 90, conflict_threshold: float = 0.6):

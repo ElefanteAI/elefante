@@ -172,4 +172,3 @@ def check_clean_repo():
 if __name__ == "__main__":
     sys.exit(check_clean_repo())
 
-# Made with Bob

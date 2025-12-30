@@ -116,7 +116,7 @@ class TestSemanticAgnostic:
             print("="*70)
             
             for scenario in AGNOSTIC_SCENARIOS:
-                print(f"\n📋 {scenario['name']}")
+                print(f"\n {scenario['name']}")
                 print(f"   Content: {scenario['content'][:60]}...")
                 
                 for query in scenario["novel_queries"]:
@@ -162,11 +162,11 @@ class TestSemanticAgnostic:
             print("="*70)
             
             if success_rate >= 80:
-                print("✅ PASS: Semantic understanding works with novel queries")
+                print(" PASS: Semantic understanding works with novel queries")
             elif success_rate >= 60:
-                print("⚠️  PARTIAL: Some semantic matching, room for improvement")
+                print("  PARTIAL: Some semantic matching, room for improvement")
             else:
-                print("❌ FAIL: Poor semantic generalization")
+                print(" FAIL: Poor semantic generalization")
             
             # Must pass at least 60% to be considered working
             assert success_rate >= 60, f"Semantic matching too weak: {success_rate:.0f}%"

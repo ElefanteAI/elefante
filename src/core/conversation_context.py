@@ -310,4 +310,3 @@ def get_conversation_searcher() -> ConversationSearcher:
     return _conversation_searcher
 
 
-# Made with Bob

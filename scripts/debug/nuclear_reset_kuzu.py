@@ -133,4 +133,3 @@ if __name__ == "__main__":
     success = nuclear_reset_kuzu(apply=bool(args.apply), confirm=str(args.confirm))
     exit(0 if success else 1)
 
-# Made with Bob

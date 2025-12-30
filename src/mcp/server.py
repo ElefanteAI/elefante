@@ -150,7 +150,7 @@ class ElefanteMCPServer:
         self.logger.warning(f"Compliance Gate BLOCKED: {tool_name} called without prior search")
         return {
             "success": False,
-            "error": "⛔ COMPLIANCE GATE: Search required before write operations.",
+            "error": " COMPLIANCE GATE: Search required before write operations.",
             "gate_status": "BLOCKED",
             "action_required": "Call elefanteMemorySearch first to check for existing/related memories.",
             "reason": "This prevents duplicate memories and ensures you have full context before adding new knowledge.",
@@ -1484,7 +1484,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 sid = _ensure_signal_node("ring", props["ring"].strip())
                 _add_edge(mem_id, sid, "IN_RING")
 
-        # Deterministic memory↔memory cohesion edges derived from shared signals.
+        # Deterministic memorymemory cohesion edges derived from shared signals.
         try:
             max_per_signal = int(os.getenv("ELEFANTE_SNAPSHOT_COHESION_MAX_PER_SIGNAL", "200"))
         except Exception:
@@ -1929,4 +1929,3 @@ if __name__ == "__main__":
     asyncio.run(main())
 
 
-# Made with Bob

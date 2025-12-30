@@ -100,4 +100,3 @@ def inspect_chromadb():
 if __name__ == "__main__":
     inspect_chromadb()
 
-# Made with Bob
