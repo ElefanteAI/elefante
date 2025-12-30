@@ -322,6 +322,69 @@ async def main():
         
         print(f"   Found {len(edges)} relationships", file=sys.stderr)
         
+        # =========================================================================
+        # STEP 3.25: Fetch Concept nodes from Kuzu (v1.6.4 Cognitive Hub)
+        # =========================================================================
+        print("[*] Step 3.25: Fetching Concept nodes from Kuzu...", file=sys.stderr)
+        
+        try:
+            concepts_query = "MATCH (c:Concept) RETURN c.id, c.name, c.canonical_name, c.usage_count, c.created_at"
+            concepts_result = await store.execute_query(concepts_query)
+            
+            concept_count = 0
+            for row in concepts_result:
+                concept_id = row.get('c.id')
+                if not concept_id or concept_id in seen_ids:
+                    continue
+                
+                node = {
+                    "id": concept_id,
+                    "name": row.get('c.name') or row.get('c.canonical_name') or concept_id[:20],
+                    "type": "concept",
+                    "description": f"Shared concept: {row.get('c.canonical_name', '')}",
+                    "created_at": row.get('c.created_at') or "",
+                    "properties": {
+                        "source": "kuzu",
+                        "canonical_name": row.get('c.canonical_name'),
+                        "usage_count": row.get('c.usage_count') or 0,
+                        "is_concept_hub": True,
+                    }
+                }
+                nodes.append(node)
+                seen_ids.add(concept_id)
+                concept_count += 1
+            
+            print(f"   Found {concept_count} Concept nodes", file=sys.stderr)
+            
+            # Fetch HAS_CONCEPT edges
+            has_concept_query = "MATCH (e:Entity)-[r:HAS_CONCEPT]->(c:Concept) RETURN e.id, c.id"
+            has_concept_result = await store.execute_query(has_concept_query)
+            
+            has_concept_count = 0
+            for row in has_concept_result:
+                src = row.get('e.id')
+                dst = row.get('c.id')
+                
+                if src and dst:
+                    if src in id_remap: src = id_remap[src]
+                    if dst in id_remap: dst = id_remap[dst]
+                    
+                    if src == dst:
+                        continue
+                    
+                    edges.append({
+                        "from": src,
+                        "to": dst,
+                        "label": "HAS_CONCEPT",
+                        "type": "concept"
+                    })
+                    has_concept_count += 1
+            
+            print(f"   Found {has_concept_count} HAS_CONCEPT edges", file=sys.stderr)
+            
+        except Exception as e:
+            print(f"   [!] Concept graph fetch error (non-fatal): {e}", file=sys.stderr)
+        
     except Exception as e:
         print(f"   [!] Kuzu error (non-fatal): {e}", file=sys.stderr)
         print("   Continuing with ChromaDB data only...", file=sys.stderr)

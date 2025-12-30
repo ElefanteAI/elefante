@@ -597,6 +597,19 @@ class MemoryOrchestrator:
                             relationship_type=RelationshipType.RELATES_TO
                         ))
             
+            # 5d. Link to Concepts (v1.6.4 Cognitive Hub)
+            # Creates shared Concept nodes for memory clustering
+            if concepts and isinstance(concepts, list) and len(concepts) > 0:
+                try:
+                    edges_created = await self.graph_store.link_memory_to_concepts(
+                        memory_id=memory.id,
+                        concepts=concepts
+                    )
+                    if edges_created > 0:
+                        self.logger.debug(f"Linked memory {memory.id} to {edges_created} concepts")
+                except Exception as e:
+                    self.logger.warning(f"Failed to link concepts: {e}")
+            
             if memory.metadata.session_id:
                 session_id = str(memory.metadata.session_id)
                 now_iso = datetime.utcnow().isoformat()

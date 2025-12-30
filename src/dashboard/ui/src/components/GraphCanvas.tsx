@@ -48,7 +48,7 @@ const calculateTemporalHeat = (createdAt: string, lastAccessed?: string): number
 interface Node {
   id: string;
   label: string;
-  type: 'memory' | 'entity' | 'signal' | 'cluster' | 'session' | 'anchor';
+  type: 'memory' | 'entity' | 'signal' | 'cluster' | 'session' | 'anchor' | 'concept';
   x: number;
   y: number;
   vx: number;
@@ -101,6 +101,7 @@ interface GraphCanvasProps {
   hideTestArtifacts?: boolean;
   onGraphStats?: (stats: { memories: number; signalCoverage: number; avgConnections: number }) => void;
   command?: { type: 'zoomIn' | 'zoomOut' | 'resetView'; nonce: number } | null;
+  timeRange?: 'all' | '24h' | '7d' | '30d';
 }
 
   // VIEW-LAYER LABEL CLEANER
@@ -127,7 +128,8 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
   status = 'all',
   hideTestArtifacts = true,
   onGraphStats,
-  command
+  command,
+  timeRange = 'all'
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [data, setData] = useState<GraphData>({ nodes: [], edges: [] });
@@ -149,7 +151,8 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
     signal: false, // V1.6.2: Hide signal hubs by default - they clutter the solar system view
     entity: false, // PURE THOUGHT MODE: Hide entities by default, show only memory mesh
     cluster: false,
-    session: false
+    session: false,
+    concept: true, // v1.6.4: Show concept hubs by default for clustering
   });
   const [viewMode, setViewMode] = useState<'v3' | 'v5'>('v5');
 
@@ -193,6 +196,7 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
   const environmentRef = useRef(environment);
   const statusRef = useRef(status);
   const viewModeRef = useRef(viewMode);
+  const timeRangeRef = useRef(timeRange);
 
   useEffect(() => {
     hoveredEdgeRef.current = hoveredEdge;
@@ -249,6 +253,10 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
   useEffect(() => {
     viewModeRef.current = viewMode;
   }, [viewMode]);
+
+  useEffect(() => {
+    timeRangeRef.current = timeRange;
+  }, [timeRange]);
   const draggingNode = useRef<Node | null>(null);
   const offset = useRef({ x: 0, y: 0 }); // Pan offset
   const scale = useRef(1); // Zoom scale
@@ -906,6 +914,25 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
       const environment = environmentRef.current;
       const status = statusRef.current;
       const viewMode = viewModeRef.current;
+      const timeRange = timeRangeRef.current;
+
+      // v1.6.4: Time range filter helper
+      const isWithinTimeRange = (node: Node): boolean => {
+        if (timeRange === 'all') return true;
+        const createdAt = node.full_data?.created_at || node.properties?.created_at;
+        if (!createdAt) return true; // Show if no timestamp
+        
+        const created = new Date(createdAt).getTime();
+        const now = Date.now();
+        const msPerHour = 1000 * 60 * 60;
+        
+        switch (timeRange) {
+          case '24h': return (now - created) <= msPerHour * 24;
+          case '7d': return (now - created) <= msPerHour * 24 * 7;
+          case '30d': return (now - created) <= msPerHour * 24 * 30;
+          default: return true;
+        }
+      };
 
       // "Touch focus": if no locked focus (shift+click), hovering temporarily focuses.
       const activeFocusNode = focusedNode || hoveredNode;
@@ -959,7 +986,9 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
           const kind = (n.signalType || 'unknown') as keyof typeof visibleSignalKinds | 'unknown';
           if (kind === 'unknown') return true;
           return !!(visibleSignalKinds as any)[kind];
-        });
+        })
+        // v1.6.4: Time range filter
+        .filter(n => n.type !== 'memory' || isWithinTimeRange(n));
 
       // Optional Story Focus: further restrict to a readable neighborhood.
       let storyFilteredNodes = activeNodes;

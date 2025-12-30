@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 import GraphCanvas from './components/GraphCanvas';
-import { LayoutDashboard, Filter, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import { LayoutDashboard, Filter, ZoomIn, ZoomOut, Maximize, Clock } from 'lucide-react';
 
 function App() {
   const [stats, setStats] = useState<any>(null);
@@ -12,6 +12,8 @@ function App() {
   const [status, setStatus] = useState<'all' | 'processed' | 'unprocessed'>('all');
   const [hideTestArtifacts, setHideTestArtifacts] = useState<boolean>(true);
   const [canvasCommand, setCanvasCommand] = useState<{ type: 'zoomIn' | 'zoomOut' | 'resetView'; nonce: number } | null>(null);
+  // v1.6.4: Temporal filter
+  const [timeRange, setTimeRange] = useState<'all' | '24h' | '7d' | '30d'>('all');
 
   useEffect(() => {
     // Fetch stats
@@ -130,6 +132,22 @@ function App() {
                 <option value="unprocessed">Unprocessed</option>
               </select>
             </label>
+
+            {/* v1.6.4: Temporal Filter */}
+            <label className="flex items-center gap-2 text-slate-400">
+              <Clock size={12} />
+              <span className="text-[11px] uppercase tracking-wide">Time</span>
+              <select
+                className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                value={timeRange}
+                onChange={(e) => setTimeRange(e.target.value as any)}
+              >
+                <option value="all">All Time</option>
+                <option value="24h">Last 24h</option>
+                <option value="7d">Last Week</option>
+                <option value="30d">Last Month</option>
+              </select>
+            </label>
           </div>
 
           <div className="flex items-center gap-2 ml-auto">
@@ -164,6 +182,7 @@ function App() {
         hideTestArtifacts={hideTestArtifacts}
         onGraphStats={setGraphStats}
         command={canvasCommand}
+        timeRange={timeRange}
       />
 
       <div className="absolute bottom-0 left-0 right-0 z-30 flex justify-center pb-4 pointer-events-none">

@@ -237,6 +237,17 @@ class GraphStore:
                     PRIMARY KEY(id)
                 )
                 """,
+                # v1.6.4: Concept node for shared concept clustering
+                """
+                CREATE NODE TABLE Concept(
+                    id STRING,
+                    name STRING,
+                    canonical_name STRING,
+                    created_at TIMESTAMP,
+                    usage_count INT64,
+                    PRIMARY KEY(id)
+                )
+                """,
                 # Relationship tables
                 """
                 CREATE REL TABLE RELATES_TO(
@@ -264,6 +275,19 @@ class GraphStore:
                 """
                 CREATE REL TABLE CREATED_IN(
                     FROM Entity TO Entity
+                )
+                """,
+                # v1.6.4: HAS_CONCEPT edges (Memory/Entity -> Concept)
+                """
+                CREATE REL TABLE HAS_CONCEPT(
+                    FROM Entity TO Concept,
+                    created_at TIMESTAMP
+                )
+                """,
+                """
+                CREATE REL TABLE HAS_CONCEPT_MEM(
+                    FROM Memory TO Concept,
+                    created_at TIMESTAMP
                 )
                 """
             ]
@@ -921,6 +945,261 @@ class GraphStore:
         except Exception as e:
             logger.error("failed_to_get_stats", error=str(e))
             return {}
+    
+    # =========================================================================
+    # v1.6.4: CONCEPT GRAPH METHODS
+    # =========================================================================
+    
+    async def create_or_get_concept(self, concept_name: str) -> str:
+        """
+        Create a Concept node if not exists, or return existing ID.
+        
+        Concepts are canonicalized (lowercase, trimmed) for deduplication.
+        
+        Args:
+            concept_name: Raw concept name (e.g., "Elefante", "Python")
+            
+        Returns:
+            Concept node ID (UUID string)
+        """
+        self._initialize_connection()
+        from uuid import uuid4
+        
+        canonical = concept_name.strip().lower()
+        
+        # Try to find existing concept
+        query_find = """
+            MATCH (c:Concept)
+            WHERE c.canonical_name = $canonical
+            RETURN c.id, c.usage_count
+        """
+        
+        try:
+            result = await asyncio.to_thread(
+                self._conn.execute,
+                query_find,
+                {"canonical": canonical}
+            )
+            
+            rows = self._get_query_results(result)
+            if rows:
+                # Concept exists - increment usage count
+                concept_id = rows[0][0]
+                current_count = rows[0][1] or 0
+                
+                query_update = """
+                    MATCH (c:Concept)
+                    WHERE c.id = $id
+                    SET c.usage_count = $count
+                """
+                await asyncio.to_thread(
+                    self._conn.execute,
+                    query_update,
+                    {"id": concept_id, "count": current_count + 1}
+                )
+                
+                logger.debug("concept_reused", name=concept_name, id=concept_id)
+                return concept_id
+            
+            # Create new concept
+            concept_id = str(uuid4())
+            query_create = """
+                CREATE (c:Concept {
+                    id: $id,
+                    name: $name,
+                    canonical_name: $canonical,
+                    created_at: $created_at,
+                    usage_count: 1
+                })
+            """
+            
+            await asyncio.to_thread(
+                self._conn.execute,
+                query_create,
+                {
+                    "id": concept_id,
+                    "name": concept_name.strip(),
+                    "canonical": canonical,
+                    "created_at": datetime.utcnow()
+                }
+            )
+            
+            logger.info("concept_created", name=concept_name, id=concept_id)
+            return concept_id
+            
+        except Exception as e:
+            logger.error("failed_to_create_concept", name=concept_name, error=str(e))
+            raise
+    
+    async def link_memory_to_concepts(
+        self,
+        memory_id: UUID,
+        concepts: List[str]
+    ) -> int:
+        """
+        Link a memory to multiple concepts via HAS_CONCEPT edges.
+        
+        Creates Concept nodes if they don't exist.
+        
+        Args:
+            memory_id: Memory UUID
+            concepts: List of concept names
+            
+        Returns:
+            Number of edges created
+        """
+        self._initialize_connection()
+        
+        if not concepts:
+            return 0
+        
+        edges_created = 0
+        
+        for concept_name in concepts:
+            if not concept_name or not concept_name.strip():
+                continue
+            
+            try:
+                # Create or get concept node
+                concept_id = await self.create_or_get_concept(concept_name)
+                
+                # Check if edge already exists
+                query_check = """
+                    MATCH (e:Entity {id: $mem_id})-[r:HAS_CONCEPT]->(c:Concept {id: $concept_id})
+                    RETURN count(r)
+                """
+                
+                result = await asyncio.to_thread(
+                    self._conn.execute,
+                    query_check,
+                    {"mem_id": str(memory_id), "concept_id": concept_id}
+                )
+                
+                rows = self._get_query_results(result)
+                if rows and rows[0][0] > 0:
+                    continue  # Edge already exists
+                
+                # Create HAS_CONCEPT edge
+                query_edge = """
+                    MATCH (e:Entity {id: $mem_id}), (c:Concept {id: $concept_id})
+                    CREATE (e)-[r:HAS_CONCEPT {created_at: $created_at}]->(c)
+                """
+                
+                await asyncio.to_thread(
+                    self._conn.execute,
+                    query_edge,
+                    {
+                        "mem_id": str(memory_id),
+                        "concept_id": concept_id,
+                        "created_at": datetime.utcnow()
+                    }
+                )
+                
+                edges_created += 1
+                
+            except Exception as e:
+                logger.warning(
+                    "failed_to_link_concept",
+                    memory_id=str(memory_id),
+                    concept=concept_name,
+                    error=str(e)
+                )
+        
+        if edges_created > 0:
+            logger.info(
+                "concepts_linked",
+                memory_id=str(memory_id),
+                count=edges_created
+            )
+        
+        return edges_created
+    
+    async def get_memories_by_concept(
+        self,
+        concept_name: str,
+        limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all memories linked to a concept.
+        
+        Args:
+            concept_name: Concept name to search
+            limit: Maximum results
+            
+        Returns:
+            List of memory info dicts
+        """
+        self._initialize_connection()
+        
+        canonical = concept_name.strip().lower()
+        
+        query = """
+            MATCH (m:Entity)-[:HAS_CONCEPT]->(c:Concept)
+            WHERE c.canonical_name = $canonical
+            RETURN m.id, m.name, m.description, m.created_at
+            LIMIT $limit
+        """
+        
+        try:
+            result = await asyncio.to_thread(
+                self._conn.execute,
+                query,
+                {"canonical": canonical, "limit": limit}
+            )
+            
+            memories = []
+            for row in self._get_query_results(result):
+                memories.append({
+                    "id": row[0],
+                    "name": row[1],
+                    "description": row[2],
+                    "created_at": row[3]
+                })
+            
+            return memories
+            
+        except Exception as e:
+            logger.error("failed_to_get_memories_by_concept", concept=concept_name, error=str(e))
+            return []
+    
+    async def get_all_concepts(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Get all concepts with usage counts.
+        
+        Returns:
+            List of concept info dicts sorted by usage
+        """
+        self._initialize_connection()
+        
+        query = """
+            MATCH (c:Concept)
+            RETURN c.id, c.name, c.canonical_name, c.usage_count, c.created_at
+            ORDER BY c.usage_count DESC
+            LIMIT $limit
+        """
+        
+        try:
+            result = await asyncio.to_thread(
+                self._conn.execute,
+                query,
+                {"limit": limit}
+            )
+            
+            concepts = []
+            for row in self._get_query_results(result):
+                concepts.append({
+                    "id": row[0],
+                    "name": row[1],
+                    "canonical_name": row[2],
+                    "usage_count": row[3] or 0,
+                    "created_at": row[4]
+                })
+            
+            return concepts
+            
+        except Exception as e:
+            logger.error("failed_to_get_concepts", error=str(e))
+            return []
     
     def __repr__(self) -> str:
         return f"GraphStore(database_path={self.database_path})"
