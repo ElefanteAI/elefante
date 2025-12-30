@@ -1,4 +1,4 @@
-# Requirements: V1.7.0 Concept Graph
+# Requirements: V1.6.4 Cognitive Hub
 
 *Methodology: Kiro Spec-Driven Development (R>D>T = Requirements -> Design -> Tasks)*
 

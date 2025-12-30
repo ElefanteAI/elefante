@@ -5,7 +5,7 @@
 
 ---
 
-## v1.7.0 PLANNING: Cognitive Hub Dashboard
+## v1.6.4 PLANNING: Cognitive Hub Dashboard
 
 **Vision**: Transform dashboard from static snapshot viewer into dynamic "Cognitive Hub" with AI-powered insights, temporal awareness, and configurable views.
 
@@ -198,9 +198,9 @@ Previous roadmap content archived at: `docs/archive/historical/task-roadmap-comp
 
 ---
 
-**Last Updated**: 2025-12-28  
+**Last Updated**: 2025-12-30  
 **Status**: Active Development  
-**Current Release**: v1.6.2
+**Current Release**: v1.6.3
 
 ---
 
