@@ -82,7 +82,7 @@ class ElefanteMCPServer:
         # Register tool handlers
         self._register_handlers()
         
-        self.logger.info("Elefante MCP Server initialized (v1.6.0 - Compliance Gate)")
+        self.logger.info("Elefante MCP Server initialized (v1.7.0 - Task Orchestration)")
 
     def _inject_pitfalls(self, result: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
         """
@@ -639,6 +639,101 @@ This will gracefully close connections and clear all locks.""",
                     }
                 ),
                 # =====================================================================
+                # TASK ORCHESTRATION TOOLS (v1.7.0 - Agentic Decomposition)
+                # =====================================================================
+                types.Tool(
+                    name="elefanteTaskCreate",
+                    description="""Create a new task in Elefante's orchestration graph. Tasks are stored as Kuzu nodes and can form hierarchies (parent/child) and dependency chains (blocked_by). Use this to register a unit of work that agents will execute.""",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "description": {
+                                "type": "string",
+                                "description": "What needs to be done"
+                            },
+                            "parent_id": {
+                                "type": "string",
+                                "description": "Parent task ID (creates a subtask relationship)"
+                            },
+                            "priority": {
+                                "type": "integer",
+                                "default": 1,
+                                "minimum": 1,
+                                "maximum": 10,
+                                "description": "Priority 1-10 (10 = highest)"
+                            },
+                            "assigned_agent": {
+                                "type": "string",
+                                "description": "Which agent or role handles this task"
+                            }
+                        },
+                        "required": ["description"]
+                    }
+                ),
+                types.Tool(
+                    name="elefanteTaskDecompose",
+                    description="""Break a parent task into subtasks. Takes a parent task ID and an array of subtask descriptions. Each subtask becomes a Task node linked to the parent via TASK_PARENT. Use this to turn a big goal into actionable steps.""",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "parent_task_id": {
+                                "type": "string",
+                                "description": "The ID of the parent task to decompose"
+                            },
+                            "subtasks": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "description": {"type": "string", "description": "What this subtask does"},
+                                        "priority": {"type": "integer", "default": 1},
+                                        "assigned_agent": {"type": "string"}
+                                    },
+                                    "required": ["description"]
+                                },
+                                "description": "Array of subtasks to create under the parent"
+                            }
+                        },
+                        "required": ["parent_task_id", "subtasks"]
+                    }
+                ),
+                types.Tool(
+                    name="elefanteTaskUpdate",
+                    description="""Update a task's status or output. Use this to mark tasks as in_progress, completed, failed, or blocked. Optionally attach output text (result summary, error message, etc.).""",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "task_id": {
+                                "type": "string",
+                                "description": "The task ID to update"
+                            },
+                            "status": {
+                                "type": "string",
+                                "enum": ["pending", "in_progress", "completed", "failed", "blocked"],
+                                "description": "New status for the task"
+                            },
+                            "output": {
+                                "type": "string",
+                                "description": "Result or output from the task execution"
+                            }
+                        },
+                        "required": ["task_id"]
+                    }
+                ),
+                types.Tool(
+                    name="elefanteTaskGraph",
+                    description="""Get the task hierarchy. Without a task_id, returns all root tasks (top-level goals). With a task_id, returns that task and its direct subtasks. Use this to see what's planned, in progress, and completed.""",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "task_id": {
+                                "type": "string",
+                                "description": "Optional: specific task ID to inspect. Omit to see all root tasks."
+                            }
+                        }
+                    }
+                ),
+                # =====================================================================
                 # ETL TOOLS (Agent-Brain Classification)
                 # =====================================================================
                 types.Tool(
@@ -889,6 +984,15 @@ You have access to a persistent memory system called **Elefante** - the user's s
                     result = await self._handle_etl_classify(arguments)
                 elif name == "elefanteETLStatus":
                     result = await self._handle_etl_status(arguments)
+                # Task Orchestration Tools (v1.7.0)
+                elif name == "elefanteTaskCreate":
+                    result = await self._handle_task_create(arguments)
+                elif name == "elefanteTaskDecompose":
+                    result = await self._handle_task_decompose(arguments)
+                elif name == "elefanteTaskUpdate":
+                    result = await self._handle_task_update(arguments)
+                elif name == "elefanteTaskGraph":
+                    result = await self._handle_task_graph(arguments)
                 else:
                     raise ValueError(f"Unknown tool: {name}")
                 
@@ -1890,6 +1994,84 @@ You have access to a persistent memory system called **Elefante** - the user's s
             "success": True,
             **stats,
             "message": f"Total: {stats['total']}, Raw: {stats['raw']}, Processed: {stats['processed']}, Failed: {stats['failed']}"
+        }
+
+    # =========================================================================
+    # TASK ORCHESTRATION HANDLERS (v1.7.0)
+    # =========================================================================
+
+    async def _handle_task_create(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle elefanteTaskCreate - Create a new task node"""
+        with write_lock() as lock:
+            if not lock.acquired:
+                return {"success": False, "error": "Could not acquire write lock", "retry": True}
+            
+            orchestrator = await self._get_orchestrator()
+            task_id = await orchestrator.create_task(
+                description=args["description"],
+                parent_id=args.get("parent_id"),
+                priority=args.get("priority", 1),
+                assigned_agent=args.get("assigned_agent")
+            )
+            
+            return {
+                "success": True,
+                "task_id": task_id,
+                "description": args["description"],
+                "status": "pending",
+                "message": f"Task created: {task_id}"
+            }
+
+    async def _handle_task_decompose(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle elefanteTaskDecompose - Break a task into subtasks"""
+        with write_lock() as lock:
+            if not lock.acquired:
+                return {"success": False, "error": "Could not acquire write lock", "retry": True}
+            
+            orchestrator = await self._get_orchestrator()
+            subtask_ids = await orchestrator.decompose_task(
+                parent_task_id=args["parent_task_id"],
+                subtasks=args["subtasks"]
+            )
+            
+            return {
+                "success": True,
+                "parent_task_id": args["parent_task_id"],
+                "subtask_ids": subtask_ids,
+                "count": len(subtask_ids),
+                "message": f"Created {len(subtask_ids)} subtasks under {args['parent_task_id']}"
+            }
+
+    async def _handle_task_update(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle elefanteTaskUpdate - Update task status/output"""
+        with write_lock() as lock:
+            if not lock.acquired:
+                return {"success": False, "error": "Could not acquire write lock", "retry": True}
+            
+            orchestrator = await self._get_orchestrator()
+            success = await orchestrator.update_task(
+                task_id=args["task_id"],
+                status=args.get("status"),
+                output=args.get("output")
+            )
+            
+            return {
+                "success": success,
+                "task_id": args["task_id"],
+                "updated_status": args.get("status"),
+                "message": f"Task {args['task_id']} updated" if success else f"Task {args['task_id']} not found"
+            }
+
+    async def _handle_task_graph(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle elefanteTaskGraph - Get task hierarchy"""
+        orchestrator = await self._get_orchestrator()
+        result = await orchestrator.get_task_graph(
+            task_id=args.get("task_id")
+        )
+        
+        return {
+            "success": True,
+            "data": result
         }
 
 

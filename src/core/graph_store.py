@@ -289,6 +289,29 @@ class GraphStore:
                     FROM Memory TO Concept,
                     created_at TIMESTAMP
                 )
+                """,
+                # v1.7.0: Task Orchestration
+                """
+                CREATE NODE TABLE Task(
+                    id STRING,
+                    description STRING,
+                    status STRING,
+                    created_at TIMESTAMP,
+                    updated_at TIMESTAMP,
+                    assigned_agent STRING,
+                    priority INT64,
+                    PRIMARY KEY(id)
+                )
+                """,
+                """
+                CREATE REL TABLE TASK_PARENT(
+                    FROM Task TO Task
+                )
+                """,
+                """
+                CREATE REL TABLE TASK_BLOCKED_BY(
+                    FROM Task TO Task
+                )
                 """
             ]
             

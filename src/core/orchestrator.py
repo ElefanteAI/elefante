@@ -35,6 +35,7 @@ from src.utils.validators import validate_memory_content, validate_uuid
 from src.models.metadata import StandardizedMetadata, CoreMetadata, ContextMetadata, SystemMetadata, MemoryType as StdMemoryType
 from src.core.metadata_store import get_metadata_store
 from src.core.etl import ProcessingStatus  # Only need status, classification is agent-driven
+from src.models.task import Task, TaskStatus
 
 logger = get_logger(__name__)
 
@@ -1882,6 +1883,145 @@ class MemoryOrchestrator:
             self.logger.error(f"Failed to list all memories: {e}", exc_info=True)
             raise
     
+    # --------------------------------------------------------------------------
+    # Task Orchestration (v1.7.0)
+    # --------------------------------------------------------------------------
+
+    async def create_task(
+        self,
+        description: str,
+        parent_id: Optional[str] = None,
+        priority: int = 1,
+        status: TaskStatus = TaskStatus.PENDING,
+        assigned_agent: Optional[str] = None
+    ) -> str:
+        """Create a new task, optionally linked to a parent."""
+        task_id = str(uuid4())
+        now = datetime.utcnow()
+        
+        # 1. Create Task Node
+        cypher = """
+            CREATE (t:Task {
+                id: $id,
+                description: $description,
+                status: $status,
+                created_at: $created_at,
+                updated_at: $updated_at,
+                priority: $priority,
+                assigned_agent: $assigned_agent
+            })
+            RETURN t.id
+        """
+        params = {
+            "id": task_id,
+            "description": description,
+            "status": status.value,
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat(),
+            "priority": priority,
+            "assigned_agent": assigned_agent or "unassigned"
+        }
+        
+        await self.graph_store.execute_query(cypher, params)
+        
+        # 2. Link to Parent if provided
+        if parent_id:
+            rel_cypher = """
+                MATCH (child:Task), (parent:Task)
+                WHERE child.id = $child_id AND parent.id = $parent_id
+                CREATE (child)-[:TASK_PARENT]->(parent)
+            """
+            await self.graph_store.execute_query(rel_cypher, {"child_id": task_id, "parent_id": parent_id})
+            
+        return task_id
+
+    async def decompose_task(self, parent_task_id: str, subtasks: List[Dict[str, Any]]) -> List[str]:
+        """
+        Break a task into subtasks.
+        subtasks list expects dicts with: description, priority (optional), assigned_agent (optional)
+        """
+        created_ids = []
+        for st in subtasks:
+            # Inherit priority if not set? Or default to 1.
+            # Create subtask linked to parent
+            tid = await self.create_task(
+                description=st["description"],
+                parent_id=parent_task_id,
+                priority=st.get("priority", 1),
+                assigned_agent=st.get("assigned_agent")
+            )
+            created_ids.append(tid)
+        return created_ids
+
+    async def update_task(self, task_id: str, status: Optional[str] = None, output: Optional[str] = None) -> bool:
+        """Update task status and output."""
+        set_clauses = ["t.updated_at = $updated_at"]
+        params = {"id": task_id, "updated_at": datetime.utcnow().isoformat()}
+        
+        if status:
+            set_clauses.append("t.status = $status")
+            params["status"] = status
+        if output:
+            set_clauses.append("t.output = $output")
+            params["output"] = output
+            
+        cypher = f"""
+            MATCH (t:Task)
+            WHERE t.id = $id
+            SET {", ".join(set_clauses)}
+            RETURN t.id
+        """
+        results = await self.graph_store.execute_query(cypher, params)
+        return len(results) > 0
+
+    async def get_task_graph(self, task_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get task hierarchy.
+        If task_id is None, returns all root tasks (no parents).
+        If task_id provided, returns that task and its children (recursively? or just direct).
+        For now, let's return direct children and parent.
+        """
+        if task_id:
+            # Get specific task + relationships
+            cypher = """
+                MATCH (t:Task)
+                WHERE t.id = $id
+                OPTIONAL MATCH (t)-[:TASK_PARENT]->(parent:Task)
+                OPTIONAL MATCH (child:Task)-[:TASK_PARENT]->(t)
+                RETURN t, parent.id, collect(child)
+            """
+            pass # Implementation requires parsing flexible Kuzu return
+            
+            # Simplified approach: Get task details
+            task_details = await self.graph_store.execute_query(
+                "MATCH (t:Task) WHERE t.id = $id RETURN t.id, t.description, t.status, t.output", 
+                {"id": task_id}
+            )
+            if not task_details:
+                return None
+                
+            # Get children
+            children = await self.graph_store.execute_query(
+                "MATCH (child:Task)-[:TASK_PARENT]->(parent:Task) WHERE parent.id = $id RETURN child.id, child.description, child.status",
+                 {"id": task_id}
+            )
+            
+            return {
+                "task": task_details[0],
+                "subtasks": children
+            }
+        else:
+            # Get root tasks (tasks with no outgoing TASK_PARENT edge)
+            # Efficient query for roots
+            cypher = """
+                MATCH (t:Task)
+                WHERE NOT (t)-[:TASK_PARENT]->(:Task)
+                RETURN t.id, t.description, t.status, t.priority
+                ORDER BY t.created_at DESC
+                LIMIT 50
+            """
+            return await self.graph_store.execute_query(cypher)
+
     async def get_stats(self) -> Dict[str, Any]:
         """
         Get statistics from both databases
