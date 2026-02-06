@@ -1,0 +1,12 @@
+services:
+  elefante:
+    build: .
+    container_name: elefante
+    environment:
+      ELEFANTE_DATA_DIR: /data
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./elefante_data:/data
+    restart: unless-stopped

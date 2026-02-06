@@ -47,7 +47,7 @@ class VectorStoreConfig(BaseModel):
 class GraphStoreConfig(BaseModel):
     """Graph store (Kuzu) configuration"""
     type: str = "kuzu"
-    database_path: str = str(Path.home() / ".elefante" / "data" / "kuzu_db")
+    database_path: str = str(DATA_DIR / "kuzu_db")
     buffer_pool_size: str = "512MB"
     max_num_threads: int = 4
 
@@ -243,9 +243,52 @@ class Config:
         
         # Apply environment variable overrides
         config_dict = self._apply_env_overrides(config_dict)
+
+        # Normalize derived storage paths (so data_dir drives defaults)
+        config_dict = self._normalize_storage_paths(config_dict)
         
         # Validate and create configuration object
         self._config = ElefanteConfig(**config_dict)
+
+        # Ensure runtime directories exist for the active configuration
+        self._ensure_runtime_directories()
+
+    def _normalize_storage_paths(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """Derive vector/graph storage paths from elefante.data_dir when unset.
+
+        This keeps `ELEFANTE_DATA_DIR` and/or `config.yaml` consistent with
+        ChromaDB and Kuzu default locations.
+        """
+        data_dir = config_dict.get('data_dir')
+        if not data_dir:
+            return config_dict
+
+        data_dir_path = Path(str(data_dir))
+
+        vector_store = config_dict.get('vector_store') or {}
+        if 'persist_directory' not in vector_store:
+            vector_store['persist_directory'] = str(data_dir_path / 'chroma')
+        config_dict['vector_store'] = vector_store
+
+        graph_store = config_dict.get('graph_store') or {}
+        if 'database_path' not in graph_store:
+            graph_store['database_path'] = str(data_dir_path / 'kuzu_db')
+        config_dict['graph_store'] = graph_store
+
+        return config_dict
+
+    def _ensure_runtime_directories(self) -> None:
+        """Create configured directories that should exist at runtime."""
+        if self._config is None:
+            return
+
+        # Data dir and Chroma dir are safe to create. Kuzu DB directory should
+        # not be pre-created (Kuzu manages the DB directory itself).
+        data_dir = Path(self._config.data_dir)
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        chroma_dir = Path(self._config.vector_store.persist_directory)
+        chroma_dir.mkdir(parents=True, exist_ok=True)
     
     def _apply_env_overrides(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
         """

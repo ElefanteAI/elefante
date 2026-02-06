@@ -4,13 +4,14 @@ import os
 import json
 import re
 from datetime import datetime
+from pathlib import Path
 import chromadb
 
 # Add src to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.core.graph_store import GraphStore
-from src.utils.config import get_config, DATA_DIR
+from src.utils.config import get_config
 
 
 _SECRET_PATTERNS: list[re.Pattern] = [
@@ -868,7 +869,7 @@ async def main():
         "edges": edges
     }
     
-    output_path = str(DATA_DIR / "dashboard_snapshot.json")
+    output_path = str(Path(config.elefante.data_dir) / "dashboard_snapshot.json")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     class DateTimeEncoder(json.JSONEncoder):

@@ -48,10 +48,10 @@ async def get_graph(limit: int = 1000, space: Optional[str] = None):
     """
     import json
     from pathlib import Path
-    from src.utils.config import DATA_DIR
     
     try:
-        snapshot_path = DATA_DIR / "dashboard_snapshot.json"
+        cfg = get_config()
+        snapshot_path = Path(cfg.elefante.data_dir) / "dashboard_snapshot.json"
         
         if not snapshot_path.exists():
             logger.warning("Snapshot not found, returning empty graph")
@@ -157,11 +157,10 @@ async def get_stats():
     """Get system statistics from snapshot (LAW #1: No direct DB access)"""
     import json
     from pathlib import Path
-    from src.utils.config import DATA_DIR
-    from src.utils.config import get_config
     
     try:
-        snapshot_path = DATA_DIR / "dashboard_snapshot.json"
+        cfg = get_config()
+        snapshot_path = Path(cfg.elefante.data_dir) / "dashboard_snapshot.json"
         
         if not snapshot_path.exists():
             return {"error": "Snapshot not found. Run update_dashboard_data.py first."}
@@ -182,7 +181,7 @@ async def get_stats():
             "elefante": {
                 "package_version": pkg_version,
                 "config_version": getattr(cfg.elefante, "version", None),
-                "data_dir": str(DATA_DIR),
+                "data_dir": str(cfg.elefante.data_dir),
             },
             "vector_store": {
                 "total_memories": snapshot_stat.get("memories", 0),

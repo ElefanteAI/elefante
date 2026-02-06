@@ -51,7 +51,7 @@
 
 | File | Purpose |
 |------|---------|
-| [`developer-etiquette.md`](developer-etiquette.md) | Agent rules: context-first, spec-driven, no fabrication |
+| [`second-brain-protocols.md`](second-brain-protocols.md) | Hierarchical agent protocols for cognitive continuity |
 
 ### Memory Intelligence
 

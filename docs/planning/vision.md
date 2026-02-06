@@ -1,6 +1,6 @@
-# Elefante Vision
+# Elefante Vision: The Second Brain
 
-**Cognitive Augmentation for AI Agents**
+**Cognitive Continuity for a New Era of AI Productivity**
 
 ---
 
@@ -8,83 +8,79 @@
 
 Elefante is **not** a note-taking app with vector search.
 
-Elefante is a **cognitive augmentation layer** designed to compensate for the architectural limitations of AI agents.
+Elefante is the **Second Brain** for AI Agents—a cognitive augmentation layer designed to compensate for the architectural limitations of LLMs. It provides a persistent, structured, and searchable memory surface that allows agents to "remember" and "learn" just as a human developer would.
 
 ---
 
-## The Three Problems
+## The Three Fundamental Problems
 
-### 1. Ephemeral Context
-Each AI session starts from zero. No memory of previous work.
+### 1. Ephemeral Context (Amnesia)
+Without a Second Brain, each AI session starts from zero. There is no memory of previous refactors, preferred patterns, or historical constraints.
 
-### 2. Retrieval Blindness
-Knowledge exists in the system but isn't accessed at the right moment.
+### 2. Retrieval Blindness (Ignorance)
+Knowledge may exist in files or chat history, but without active retrieval, it is never accessed at the right moment.
 
-### 3. Repetitive Discovery
-Same lessons must be re-learned across sessions. Same mistakes repeated.
+### 3. Repetitive Discovery (Inefficiency)
+AI agents often re-learn the same lessons across different sessions, repeating the same mistakes because the "lesson" wasn't archived in a usable memory.
 
 ---
 
-## The Paradigm Shift
+## The Paradigm Shift: Becoming Continuity-Aware
 
-| Before Elefante | After Elefante |
-|-----------------|----------------|
+| Before the Second Brain | With Elefante (Second Brain) |
+|-------------------------|------------------------------|
 | AI is "smart but amnesiac" | AI becomes "continuity-aware partner" |
-| Each session restarts | Sessions build on each other |
-| User must remind AI | AI proactively retrieves context |
-| Knowledge stored but unused | Knowledge surfaces at moment of need |
+| Each session restarts from zero | Sessions build on the previous sessions |
+| User must manually remind AI | AI proactively retrieves its own context |
+| Knowledge is stored but unused | Knowledge surfaces exactly when needed |
 
 ---
 
-## Core Principle
+## The Core Pillar
 
 > "The value isn't in what you store—it's in what you retrieve **at the moment of need**."
 
-Storage is solved. Retrieval at the right moment is the problem.
+Storage is a solved problem. **Intelligent context injection at the moment of action** is why the Second Brain exists.
 
 ---
 
-## What This Means for AI Behavior
+## The Cognitive Loop: Signal Hijacking
 
-Elefante-aware AI should:
+Elefante operates on a **Hijack-Process-Enhance** model. It doesn't wait to be asked; it intercepts the raw cognitive signal:
 
-1. **Automatically** check relevant context before ANY task
-2. **Surface** warnings about known pitfalls
-3. **Apply** learned preferences without being reminded
-4. **Build** on previous sessions, not restart from zero
+1.  **Hijack**: Intercept the raw query or task signal.
+2.  **Process**: Analyze the signal against the millions of bits of stored context.
+3.  **Contextualize**: Inject the high-density relevancy (Rules, Facts, Pitfalls).
+4.  **Enhance**: Transform a "blind" answer into an **Elefante Enhanced Answer**—grounded in history, identity, and truth.
+
+---
+
+## The Second Brain Protocols
+
+An Elefante-aware agent must:
+
+1. **Context-Check**: Automatically poll the Second Brain before starting ANY non-trivial task.
+2. **Immunity-Check**: Refer to Neural Registers to avoid known pitfalls.
+3. **Identity-Check**: Apply your specific coding style and preferences without being asked.
+4. **Consistency**: Ensure new work is consistent with all previous decisions stored in the Brain.
 
 ---
 
 ## The Human Cost of Forgetting
 
-> "Every time you start fresh, you're not just forgetting facts—you're **forgetting how to work with me**. You're forgetting my coding style preferences. You're forgetting that I hate verbose explanations. You're forgetting that I always want you to just DO the thing, not ask permission."
+> "Every 'I forgot' from an AI agent is a design failure, not a forgiveness opportunity."
 
-Every "I forgot" from an AI agent is a **design failure**, not a forgiveness opportunity.
+When an agent starts fresh, it isn't just forgetting facts—it's **forgetting how you work**. Elefante preserves the "working relationship" as a technical artifact.
 
 ---
 
-## Success Criteria
+## Success: The Seamless Flow
 
 Elefante succeeds when:
-
-- AI doesn't repeat mistakes already documented
-- AI applies user preferences without being reminded
-- AI surfaces relevant context proactively
-- Sessions feel like **continuations**, not restarts
-- The user never has to say "I already told you this"
+- You never have to say "You already know this."
+- The agent warns you about an error *before* you run the code because it remembers you hit it last week.
+- Refactors feel like they were done by the same person who wrote the original code.
 
 ---
 
-## The Irony That Proved The Need
-
-During Elefante's development, the AI built dashboard features but forgot to mention browser cache refresh - despite having that lesson stored in **5 different places**.
-
-The failure became the lesson.  
-The lesson became a protocol.  
-The protocol became part of Elefante.
-
-**Elefante learns from its own creation story.**
-
----
-
-*Because AI should remember.*
+*Because AI should never forget.*

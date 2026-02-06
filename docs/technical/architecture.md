@@ -1,10 +1,10 @@
-# Elefante Architecture
+# Elefante Architecture: The Second Brain
 
-**Version:** 1.6.2 | **Status:** Production Ready
+**Version:** 1.6.4 | **Status:** Production Ready
 
 ## 1. System Overview
 
-Elefante solves the "stateless agent" problem by bridging the gap between fuzzy semantic search and structured knowledge graphs.
+Elefante is the **Second Brain** for AI agents. It solves the "stateless agent" problem by bridging the gap between fuzzy semantic search and structured knowledge graphs, providing a persistent cognitive layer that persists across sessions.
 
 ### The Triple-Layer Brain
 
@@ -49,3 +49,14 @@ Instead of a static RAG formula, Elefante analyzes the query to shift importance
     - **Vector:** Content embedded and stored in ChromaDB.
     - **Graph:** A `Memory` node is created in Kuzu.
 3.  **Link:** The memory is linked to the current `Session` node for temporal grounding.
+
+---
+
+## 3. The Enhanced Signal Flow (The "Hijack")
+
+Elefante is designed for **Cognitive Interception**. Instead of a passive database lookup, it follows a four-stage signal processing loop:
+
+1.  **Signal Interception**: The system (or agent orchestrator, eg. Agent Zero) "hijacks" the raw user input before it reaches the reasoning layer.
+2.  **Contextual Decanting**: The orchestrator decants the query using **Adaptive Weighting** (Semantic + Graph + Context).
+3.  **Signal Processing**: The raw signal is fused with the retrieved context (Laws, Preferences, Pitfalls).
+4.  **Enhanced Output**: The agent generates an "Enhanced Answer" that is technically grounded and historically consistent.

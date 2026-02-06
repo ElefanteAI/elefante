@@ -115,19 +115,7 @@ python scripts/health_check.py
 ### Method 3: List Available Tools
 
 ```bash
-python -c "
-import asyncio
-from src.mcp.server import ElefanteMCPServer
-
-async def list_tools():
-    server = ElefanteMCPServer()
-    tools = await server.list_tools()
-    print(f'Available MCP Tools: {len(tools)}')
-    for tool in tools:
-        print(f'  - {tool.name}')
-
-asyncio.run(list_tools())
-"
+./.venv/bin/python scripts/list_mcp_tools.py
 ```
 
 **Expected Output**:

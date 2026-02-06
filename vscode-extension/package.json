@@ -6,7 +6,7 @@
   "publisher": "elefante",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jsubiabreIBM/Elefante"
+    "url": "https://github.com/ElefanteAI/elefante"
   },
   "engines": {
     "vscode": "^1.85.0"

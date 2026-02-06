@@ -1,16 +1,28 @@
-# Elefante v1.6.3
+# Elefante v1.6.4: The Second Brain for AI Agents
 
-Local-first, privacy-first memory for AI agents.
+**Exponential Productivity through Cognitive Continuity.**
 
-Elefante runs on your machine and gives your agent durable memory across sessions using:
+> [!IMPORTANT]
+> **[READ THE CORE MANIFESTO](docs/THE_CORE.md)** - The unchangeable truths and laws of the Elefante System.
 
-- Semantic search (ChromaDB)
-- A knowledge graph (Kuzu)
-- Conversation/session context
+Elefante is not just a database; it is a **Second Brain** designed to solve the "stateless agent" problem. By providing durable, persistent memory across sessions, it transforms AI tools from "smart but amnesiac" assistants into **continuity-aware partners** that build on every interaction.
 
-It is MCP-native: your IDE launches the server and the agent calls tools.
+## Core Pillars
 
-> **Current release:** v1.6.3 (Neural Web Visualization)
+1. **Continuity over Restart**: Every session is a continuation of the last. Your agent never has to re-learn your coding style, your project's nuances, or your previous decisions.
+2. **Retrieval-at-Need**: The value isn't in storage, but in surfacing the exact knowledge required at the moment of action.
+3. **Factual Grounding**: Elefante acts as the "source of truth," eliminating hallucinations by anchoring agent responses in verified project history and documentation.
+4. **Agentic Optimization**: Specifically architected for the MCP (Model Context Protocol), providing 18+ tools designed for agents to maintain their own cognitive workspace.
+
+---
+
+Elefante runs locally and privately, using:
+
+- **Semantic Search** (ChromaDB) for fuzzy conceptual retrieval.
+- **Knowledge Graph** (Kuzu) for structured relationship mapping.
+- **Neural Registers** for immunity-based learning from failures.
+
+> **Current release:** v1.6.4 (The Second Brain Evolution)
 
 ---
 
@@ -50,6 +62,15 @@ Installer details and safeguards: [`docs/technical/installation.md`](docs/techni
 
 ---
 
+## Docker (dashboard)
+
+If you want a clean, reproducible environment, run the snapshot-driven dashboard in Docker.
+
+- Guide: [`docs/technical/docker.md`](docs/technical/docker.md)
+- Note: MCP is an IDE-started stdio server; running MCP inside Docker is an advanced setup.
+
+---
+
 ## Connect your IDE (MCP)
 
 Elefante is an MCP stdio server.
@@ -78,7 +99,7 @@ Elefante is driven by your AI agent via MCP tools. There are **four main capabil
 Save a memory with full classification. The agent must always provide:
 
 | Field | Purpose |
-|-------|--------|
+| ------- | -------- |
 | `content` | The actual text to remember |
 | `layer` | Who/what/do: `self`, `world`, or `intent` |
 | `sublayer` | Fine classification (see table below) |
@@ -92,7 +113,7 @@ Save a memory with full classification. The agent must always provide:
 **Layer/sublayer quick reference**:
 
 | Layer | Sublayers | When to use |
-|-------|-----------|-------------|
+| ------- | ----------- | ------------- |
 | `self` | identity, preference, constraint | About the user: who they are, what they like, limits |
 | `world` | fact, failure, method | Objective knowledge: truths, errors encountered, how-tos |
 | `intent` | rule, goal, anti-pattern | Directives: what to do, what to avoid |
@@ -202,7 +223,7 @@ Guide: [`docs/technical/dashboard.md`](docs/technical/dashboard.md)
 
 ## Safety & troubleshooting
 
-- Start with the canonical operating rules: [`docs/technical/developer-etiquette.md`](docs/technical/developer-etiquette.md)
+- Canonical Second Brain Protocols: [`docs/technical/second-brain-protocols.md`](docs/technical/second-brain-protocols.md)
 - Lock behavior and troubleshooting: [`docs/technical/kuzu-lock-monitoring.md`](docs/technical/kuzu-lock-monitoring.md)
 - Debug “laws” (read before debugging): [`docs/debug/README.md`](docs/debug/README.md)
 
@@ -218,7 +239,7 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Links
 
-- Repository: https://github.com/jsubiabreIBM/Elefante
+- Repository: <https://github.com/ElefanteAI/elefante>
 - Changelog: [`CHANGELOG.md`](CHANGELOG.md)
 - Docs index: [`docs/README.md`](docs/README.md)
 

@@ -2,7 +2,10 @@
 
 ## Overview
 
-Complete documentation index for Elefante AI Memory System v1.6.2.
+Complete documentation index for Elefante AI Memory System v1.6.4.
+
+> [!CAUTION]
+> **[THE CORE MANIFESTO](THE_CORE.md)**: Fundamental laws that every agent MUST obey.
 
 ---
 
@@ -16,7 +19,7 @@ Complete documentation index for Elefante AI Memory System v1.6.2.
 | Understand the system | [`technical/architecture.md`](technical/architecture.md) |
 | Use the MCP tools | [`technical/usage.md`](technical/usage.md) |
 | Open the dashboard | [`technical/dashboard.md`](technical/dashboard.md) |
-| Follow agent/developer rules | [`technical/developer-etiquette.md`](technical/developer-etiquette.md) |
+| Follow the Second Brain protocols | [`technical/second-brain-protocols.md`](technical/second-brain-protocols.md) |
 | Learn from failures | [`debug/`](debug/) - **Neural Registers** |
 | See what's next | [`planning/roadmap.md`](planning/roadmap.md) |
 
@@ -148,6 +151,7 @@ These are MCP **prompts** (not tools):
 2. Follow [`technical/installation.md`](technical/installation.md) - Install
 3. Explore [`technical/dashboard.md`](technical/dashboard.md) - Visual interface
 4. Review [`technical/usage.md`](technical/usage.md) - Complete API reference
+5. Understand the [`technical/second-brain-protocols.md`](technical/second-brain-protocols.md) - Master Framework
 
 ### "I want to use the API"
 

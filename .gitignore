@@ -24,6 +24,7 @@ env/
 # Elefante specific
 elefante.db
 elefante_vector_store/
+elefante_data/
 logs/
 temp_benchmark_data/
 *.log
@@ -53,6 +54,9 @@ src/dashboard/ui/node_modules/
 # Temporary files
 temp_*
 *.tmp
+
+# Local packaging output
+dist/
 
 # Cleanup and planning artifacts
 CLEANUP_PLAN.md

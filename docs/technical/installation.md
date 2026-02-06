@@ -77,6 +77,36 @@ chmod +x install.sh
 
 ---
 
+## Golden Path (macOS + VS Code)
+
+1. Run the installer from the repo root:
+
+```bash
+chmod +x install.sh
+./install.sh
+```
+
+2. Restart VS Code.
+
+3. Verify MCP server is configured in User scope (`mcp.json`).
+
+4. Verify tool registration:
+
+```bash
+./.venv/bin/python scripts/list_mcp_tools.py
+```
+
+5. Dashboard (snapshot + server):
+
+```bash
+./.venv/bin/python scripts/update_dashboard_data.py
+./.venv/bin/python -m src.dashboard.server
+```
+
+Open: http://127.0.0.1:8000
+
+---
+
 ## 2. Manual Installation
 
 If automated installation fails or you prefer manual control:
@@ -207,6 +237,21 @@ Expected output:
  MCP Server: Running
  All systems operational
 ```
+
+### List MCP Tools
+
+```bash
+./.venv/bin/python scripts/list_mcp_tools.py
+```
+
+### Dashboard Smoke Check
+
+```bash
+./.venv/bin/python scripts/update_dashboard_data.py
+./.venv/bin/python -m src.dashboard.server
+```
+
+Open: http://127.0.0.1:8000
 
 ### 6. System Verification (Automated)
 
