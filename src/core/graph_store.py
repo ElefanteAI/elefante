@@ -300,6 +300,7 @@ class GraphStore:
                     updated_at TIMESTAMP,
                     assigned_agent STRING,
                     priority INT64,
+                    output STRING,
                     PRIMARY KEY(id)
                 )
                 """,
@@ -323,6 +324,12 @@ class GraphStore:
                     error_msg = str(table_error).lower()
                     if "already exists" not in error_msg and "duplicate" not in error_msg:
                         logger.warning("table_creation_warning", error=str(table_error))
+            
+            # v1.7.0: Migrate Task table - add 'output' column if missing
+            try:
+                self._conn.execute("ALTER TABLE Task ADD output STRING DEFAULT ''")
+            except Exception:
+                pass  # Column already exists or table doesn't exist yet
             
             self._schema_initialized = True
             logger.info("kuzu_schema_initialized")

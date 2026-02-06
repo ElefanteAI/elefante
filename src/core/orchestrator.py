@@ -1916,8 +1916,8 @@ class MemoryOrchestrator:
             "id": task_id,
             "description": description,
             "status": status.value,
-            "created_at": now.isoformat(),
-            "updated_at": now.isoformat(),
+            "created_at": now,
+            "updated_at": now,
             "priority": priority,
             "assigned_agent": assigned_agent or "unassigned"
         }
@@ -1956,7 +1956,7 @@ class MemoryOrchestrator:
     async def update_task(self, task_id: str, status: Optional[str] = None, output: Optional[str] = None) -> bool:
         """Update task status and output."""
         set_clauses = ["t.updated_at = $updated_at"]
-        params = {"id": task_id, "updated_at": datetime.utcnow().isoformat()}
+        params = {"id": task_id, "updated_at": datetime.utcnow()}
         
         if status:
             set_clauses.append("t.status = $status")
