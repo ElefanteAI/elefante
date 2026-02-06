@@ -665,6 +665,11 @@ This will gracefully close connections and clear all locks.""",
                             "assigned_agent": {
                                 "type": "string",
                                 "description": "Which agent or role handles this task"
+                            },
+                            "blocked_by": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "List of task IDs that must complete before this task can start"
                             }
                         },
                         "required": ["description"]
@@ -2002,77 +2007,100 @@ You have access to a persistent memory system called **Elefante** - the user's s
 
     async def _handle_task_create(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Handle elefanteTaskCreate - Create a new task node"""
-        with write_lock() as lock:
-            if not lock.acquired:
-                return {"success": False, "error": "Could not acquire write lock", "retry": True}
-            
-            orchestrator = await self._get_orchestrator()
-            task_id = await orchestrator.create_task(
-                description=args["description"],
-                parent_id=args.get("parent_id"),
-                priority=args.get("priority", 1),
-                assigned_agent=args.get("assigned_agent")
-            )
-            
-            return {
-                "success": True,
-                "task_id": task_id,
-                "description": args["description"],
-                "status": "pending",
-                "message": f"Task created: {task_id}"
-            }
+        try:
+            with write_lock() as lock:
+                if not lock.acquired:
+                    return {"success": False, "error": "Could not acquire write lock", "retry": True}
+                
+                orchestrator = await self._get_orchestrator()
+                task_id = await orchestrator.create_task(
+                    description=args["description"],
+                    parent_id=args.get("parent_id"),
+                    blocked_by=args.get("blocked_by"),
+                    priority=args.get("priority", 1),
+                    assigned_agent=args.get("assigned_agent")
+                )
+                
+                return {
+                    "success": True,
+                    "task_id": task_id,
+                    "description": args["description"],
+                    "status": "pending",
+                    "message": f"Task created: {task_id}"
+                }
+        except ValueError as e:
+            return {"success": False, "error": str(e), "tool": "elefanteTaskCreate"}
+        except Exception as e:
+            self.logger.error(f"Task create failed: {e}", exc_info=True)
+            return {"success": False, "error": str(e), "tool": "elefanteTaskCreate"}
 
     async def _handle_task_decompose(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Handle elefanteTaskDecompose - Break a task into subtasks"""
-        with write_lock() as lock:
-            if not lock.acquired:
-                return {"success": False, "error": "Could not acquire write lock", "retry": True}
-            
+        try:
+            with write_lock() as lock:
+                if not lock.acquired:
+                    return {"success": False, "error": "Could not acquire write lock", "retry": True}
+                
+                orchestrator = await self._get_orchestrator()
+                subtask_ids = await orchestrator.decompose_task(
+                    parent_task_id=args["parent_task_id"],
+                    subtasks=args["subtasks"]
+                )
+                
+                return {
+                    "success": True,
+                    "parent_task_id": args["parent_task_id"],
+                    "subtask_ids": subtask_ids,
+                    "count": len(subtask_ids),
+                    "message": f"Created {len(subtask_ids)} subtasks under {args['parent_task_id']}"
+                }
+        except ValueError as e:
+            return {"success": False, "error": str(e), "tool": "elefanteTaskDecompose"}
+        except Exception as e:
+            self.logger.error(f"Task decompose failed: {e}", exc_info=True)
+            return {"success": False, "error": str(e), "tool": "elefanteTaskDecompose"}
+
+    async def _handle_task_update(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle elefanteTaskUpdate - Update task status/output"""
+        try:
+            with write_lock() as lock:
+                if not lock.acquired:
+                    return {"success": False, "error": "Could not acquire write lock", "retry": True}
+                
+                orchestrator = await self._get_orchestrator()
+                success = await orchestrator.update_task(
+                    task_id=args["task_id"],
+                    status=args.get("status"),
+                    output=args.get("output")
+                )
+                
+                return {
+                    "success": success,
+                    "task_id": args["task_id"],
+                    "updated_status": args.get("status"),
+                    "message": f"Task {args['task_id']} updated" if success else f"Task {args['task_id']} not found"
+                }
+        except ValueError as e:
+            return {"success": False, "error": str(e), "tool": "elefanteTaskUpdate"}
+        except Exception as e:
+            self.logger.error(f"Task update failed: {e}", exc_info=True)
+            return {"success": False, "error": str(e), "tool": "elefanteTaskUpdate"}
+
+    async def _handle_task_graph(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle elefanteTaskGraph - Get task hierarchy"""
+        try:
             orchestrator = await self._get_orchestrator()
-            subtask_ids = await orchestrator.decompose_task(
-                parent_task_id=args["parent_task_id"],
-                subtasks=args["subtasks"]
+            result = await orchestrator.get_task_graph(
+                task_id=args.get("task_id")
             )
             
             return {
                 "success": True,
-                "parent_task_id": args["parent_task_id"],
-                "subtask_ids": subtask_ids,
-                "count": len(subtask_ids),
-                "message": f"Created {len(subtask_ids)} subtasks under {args['parent_task_id']}"
+                "data": result
             }
-
-    async def _handle_task_update(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteTaskUpdate - Update task status/output"""
-        with write_lock() as lock:
-            if not lock.acquired:
-                return {"success": False, "error": "Could not acquire write lock", "retry": True}
-            
-            orchestrator = await self._get_orchestrator()
-            success = await orchestrator.update_task(
-                task_id=args["task_id"],
-                status=args.get("status"),
-                output=args.get("output")
-            )
-            
-            return {
-                "success": success,
-                "task_id": args["task_id"],
-                "updated_status": args.get("status"),
-                "message": f"Task {args['task_id']} updated" if success else f"Task {args['task_id']} not found"
-            }
-
-    async def _handle_task_graph(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteTaskGraph - Get task hierarchy"""
-        orchestrator = await self._get_orchestrator()
-        result = await orchestrator.get_task_graph(
-            task_id=args.get("task_id")
-        )
-        
-        return {
-            "success": True,
-            "data": result
-        }
+        except Exception as e:
+            self.logger.error(f"Task graph query failed: {e}", exc_info=True)
+            return {"success": False, "error": str(e), "tool": "elefanteTaskGraph"}
 
 
     

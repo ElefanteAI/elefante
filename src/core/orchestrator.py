@@ -1891,15 +1891,22 @@ class MemoryOrchestrator:
         self,
         description: str,
         parent_id: Optional[str] = None,
+        blocked_by: Optional[List[str]] = None,
         priority: int = 1,
         status: TaskStatus = TaskStatus.PENDING,
         assigned_agent: Optional[str] = None
     ) -> str:
-        """Create a new task, optionally linked to a parent."""
+        """Create a new task, optionally linked to a parent and/or blocked by other tasks."""
+        # Input validation
+        if not description or not description.strip():
+            raise ValueError("Task description cannot be empty")
+        priority = max(1, min(10, priority))  # Clamp to 1-10
+        if not isinstance(status, TaskStatus):
+            raise ValueError(f"Invalid status: {status}. Must be a TaskStatus enum value.")
+
         task_id = str(uuid4())
         now = datetime.utcnow()
         
-        # 1. Create Task Node
         cypher = """
             CREATE (t:Task {
                 id: $id,
@@ -1914,7 +1921,7 @@ class MemoryOrchestrator:
         """
         params = {
             "id": task_id,
-            "description": description,
+            "description": description.strip(),
             "status": status.value,
             "created_at": now,
             "updated_at": now,
@@ -1924,7 +1931,7 @@ class MemoryOrchestrator:
         
         await self.graph_store.execute_query(cypher, params)
         
-        # 2. Link to Parent if provided
+        # Link to parent if provided
         if parent_id:
             rel_cypher = """
                 MATCH (child:Task), (parent:Task)
@@ -1932,7 +1939,17 @@ class MemoryOrchestrator:
                 CREATE (child)-[:TASK_PARENT]->(parent)
             """
             await self.graph_store.execute_query(rel_cypher, {"child_id": task_id, "parent_id": parent_id})
-            
+
+        # Create TASK_BLOCKED_BY edges
+        if blocked_by:
+            for blocker_id in blocked_by:
+                block_cypher = """
+                    MATCH (blocked:Task), (blocker:Task)
+                    WHERE blocked.id = $blocked_id AND blocker.id = $blocker_id
+                    CREATE (blocked)-[:TASK_BLOCKED_BY]->(blocker)
+                """
+                await self.graph_store.execute_query(block_cypher, {"blocked_id": task_id, "blocker_id": blocker_id})
+
         return task_id
 
     async def decompose_task(self, parent_task_id: str, subtasks: List[Dict[str, Any]]) -> List[str]:
@@ -1955,13 +1972,18 @@ class MemoryOrchestrator:
 
     async def update_task(self, task_id: str, status: Optional[str] = None, output: Optional[str] = None) -> bool:
         """Update task status and output."""
+        # Validate status against enum if provided
+        valid_statuses = {s.value for s in TaskStatus}
+        if status and status not in valid_statuses:
+            raise ValueError(f"Invalid status '{status}'. Must be one of: {', '.join(sorted(valid_statuses))}")
+
         set_clauses = ["t.updated_at = $updated_at"]
         params = {"id": task_id, "updated_at": datetime.utcnow()}
         
         if status:
             set_clauses.append("t.status = $status")
             params["status"] = status
-        if output:
+        if output is not None:
             set_clauses.append("t.output = $output")
             params["output"] = output
             
@@ -1978,41 +2000,35 @@ class MemoryOrchestrator:
         """
         Get task hierarchy.
         If task_id is None, returns all root tasks (no parents).
-        If task_id provided, returns that task and its children (recursively? or just direct).
-        For now, let's return direct children and parent.
+        If task_id provided, returns that task, its children, and blockers.
         """
         if task_id:
-            # Get specific task + relationships
-            cypher = """
-                MATCH (t:Task)
-                WHERE t.id = $id
-                OPTIONAL MATCH (t)-[:TASK_PARENT]->(parent:Task)
-                OPTIONAL MATCH (child:Task)-[:TASK_PARENT]->(t)
-                RETURN t, parent.id, collect(child)
-            """
-            pass # Implementation requires parsing flexible Kuzu return
-            
-            # Simplified approach: Get task details
+            # Get task details
             task_details = await self.graph_store.execute_query(
-                "MATCH (t:Task) WHERE t.id = $id RETURN t.id, t.description, t.status, t.output", 
+                "MATCH (t:Task) WHERE t.id = $id RETURN t.id, t.description, t.status, t.output, t.priority, t.assigned_agent",
                 {"id": task_id}
             )
             if not task_details:
                 return None
-                
+
             # Get children
             children = await self.graph_store.execute_query(
-                "MATCH (child:Task)-[:TASK_PARENT]->(parent:Task) WHERE parent.id = $id RETURN child.id, child.description, child.status",
-                 {"id": task_id}
+                "MATCH (child:Task)-[:TASK_PARENT]->(parent:Task) WHERE parent.id = $id RETURN child.id, child.description, child.status, child.priority",
+                {"id": task_id}
             )
-            
+
+            # Get blockers
+            blockers = await self.graph_store.execute_query(
+                "MATCH (t:Task)-[:TASK_BLOCKED_BY]->(blocker:Task) WHERE t.id = $id RETURN blocker.id, blocker.description, blocker.status",
+                {"id": task_id}
+            )
+
             return {
                 "task": task_details[0],
-                "subtasks": children
+                "subtasks": children,
+                "blocked_by": blockers
             }
         else:
-            # Get root tasks (tasks with no outgoing TASK_PARENT edge)
-            # Efficient query for roots
             cypher = """
                 MATCH (t:Task)
                 WHERE NOT (t)-[:TASK_PARENT]->(:Task)
@@ -2021,6 +2037,10 @@ class MemoryOrchestrator:
                 LIMIT 50
             """
             return await self.graph_store.execute_query(cypher)
+
+    async def delete_task(self, task_id: str) -> bool:
+        """Delete a task and its edges. Children are NOT deleted — they become orphans (roots)."""
+        return await self.graph_store.delete_task(task_id)
 
     async def get_stats(self) -> Dict[str, Any]:
         """

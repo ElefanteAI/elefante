@@ -843,6 +843,21 @@ class GraphStore:
         except Exception as e:
             logger.error("failed_to_delete_entity", entity_id=str(entity_id), error=str(e))
             return False
+
+    async def delete_task(self, task_id: str) -> bool:
+        """Delete a task node and its relationship edges."""
+        self._initialize_connection()
+        try:
+            await asyncio.to_thread(
+                self._conn.execute,
+                "MATCH (t:Task) WHERE t.id = $id DETACH DELETE t",
+                {"id": task_id}
+            )
+            logger.info("task_deleted", task_id=task_id)
+            return True
+        except Exception as e:
+            logger.error("failed_to_delete_task", task_id=task_id, error=str(e))
+            return False
     async def search_memories(
         self,
         query: str,
