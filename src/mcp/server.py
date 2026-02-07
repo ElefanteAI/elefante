@@ -82,7 +82,87 @@ class ElefanteMCPServer:
         # Register tool handlers
         self._register_handlers()
         
-        self.logger.info("Elefante MCP Server initialized (v1.7.0 - Task Orchestration)")
+        self.logger.info("Elefante MCP Server initialized (v1.8.0 - Automatic Context Injection)")
+
+    # Tools that should NOT get automatic context injection
+    # (they already return memory data, or are system/admin tools)
+    _CONTEXT_SKIP_TOOLS = {
+        "elefanteMemorySearch", "elefanteMemoryAdd", "elefanteMemoryListAll",
+        "elefanteContextGet", "elefanteMemoryConsolidate", "elefanteMemoryMigrateToV3",
+        "elefanteSystemEnable", "elefanteSystemDisable", "elefanteSystemStatusGet",
+        "elefanteDashboardOpen", "elefanteSessionsList",
+        "elefanteETLProcess", "elefanteETLClassify", "elefanteETLStatus",
+    }
+
+    def _extract_search_signal(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
+        """Extract a meaningful search string from tool arguments for context injection."""
+        # Prioritize description/content fields, fall back to concatenating string values
+        for key in ("description", "content", "query", "cypher_query", "search"):
+            if key in arguments and isinstance(arguments[key], str) and len(arguments[key].strip()) > 5:
+                return arguments[key].strip()[:200]
+
+        # For task decompose, join subtask descriptions
+        if tool_name == "elefanteTaskDecompose" and "subtasks" in arguments:
+            descs = [s.get("description", "") for s in arguments.get("subtasks", []) if isinstance(s, dict)]
+            combined = "; ".join(d for d in descs if d)
+            if combined:
+                return combined[:200]
+
+        # Generic: concatenate short string values
+        parts = [str(v) for v in arguments.values() if isinstance(v, str) and len(v) > 5]
+        if parts:
+            return " ".join(parts)[:200]
+        return None
+
+    async def _inject_context(self, result: Dict[str, Any], tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        AUTOMATIC CONTEXT INJECTION (v1.8.0):
+        On every tool call, surfaces the top 3 most relevant memories from ChromaDB
+        and appends them to the response. The agent gets context for free — no
+        explicit elefanteMemorySearch call required.
+
+        Skips tools that already return memory data (search, list, ETL, system).
+        Budget: max 3 memories, high similarity threshold (0.5), summary only.
+        """
+        if tool_name in self._CONTEXT_SKIP_TOOLS:
+            return result
+
+        signal = self._extract_search_signal(tool_name, arguments)
+        if not signal:
+            return result
+
+        try:
+            orchestrator = await self._get_orchestrator()
+            search_results = await orchestrator.vector_store.search(
+                query=signal,
+                limit=3,
+                min_similarity=0.5,
+                apply_temporal_decay=False
+            )
+
+            if not search_results:
+                return result
+
+            context_items = []
+            for sr in search_results:
+                # SearchResult has .memory.content and .score
+                content = sr.memory.content if hasattr(sr, 'memory') and hasattr(sr.memory, 'content') else str(sr)
+                # Truncate each memory to ~150 chars for token budget
+                snippet = content[:150].strip()
+                if len(content) > 150:
+                    snippet += "..."
+                score = f"{sr.score:.2f}" if hasattr(sr, 'score') else "?"
+                context_items.append(f"[{score}] {snippet}")
+
+            result["RELEVANT_CONTEXT"] = {
+                "note": "Auto-surfaced memories relevant to this operation. No search tool call was needed.",
+                "memories": context_items
+            }
+        except Exception as e:
+            # Never let context injection break a tool call
+            self.logger.debug(f"Context injection skipped: {e}")
+
+        return result
 
     def _inject_pitfalls(self, result: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
         """
@@ -1001,9 +1081,9 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 else:
                     raise ValueError(f"Unknown tool: {name}")
                 
-                # INJECT PITFALLS (v1.0.1)
-                # Ensure the agent sees the protocols by embedding them in the response
+                # INJECT CONTEXT + PITFALLS
                 if isinstance(result, dict):
+                    result = await self._inject_context(result, name, arguments)
                     result = self._inject_pitfalls(result, name)
 
                 return [TextContent(
