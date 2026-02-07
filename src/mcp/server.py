@@ -1361,10 +1361,11 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 }
             
             orchestrator = await self._get_orchestrator()
+            normalized_type = self._normalize_relationship_type(args["relationship_type"])
             relationship = await orchestrator.create_relationship(
                 from_entity_id=UUID(args["from_entity_id"]),
                 to_entity_id=UUID(args["to_entity_id"]),
-                relationship_type=args["relationship_type"],
+                relationship_type=normalized_type,
                 properties=args.get("properties")
             )
             
