@@ -2,7 +2,7 @@
 
 Persistent memory system for AI coding agents. Runs locally via [MCP](https://modelcontextprotocol.io/) (Model Context Protocol), stores knowledge in a vector database (ChromaDB) and a graph database (Kuzu). Your agent remembers decisions, preferences, facts, and project context across sessions.
 
-> **Current version:** v1.8.0
+> **Current version:** v1.9.1
 
 ---
 
@@ -72,25 +72,23 @@ Setup guides for VS Code, Cursor, and other MCP-compatible IDEs: [`docs/technica
 
 ## MCP Tools
 
-Elefante exposes **22 tools** and **2 prompts** via MCP.
+Elefante exposes **17 tools** and **2 prompts** via MCP.
 
 ### Memory
 
 | Tool | Purpose |
 |------|---------|
 | `elefanteMemoryAdd` | Store a memory with layer/sublayer classification, importance, tags, and entity links |
-| `elefanteMemorySearch` | Search memories — semantic, structured (graph), or hybrid mode |
-| `elefanteMemoryListAll` | Retrieve all memories without filtering (for inspection or export) |
+| `elefanteMemorySearch` | Search memories — semantic, structured (graph), or hybrid mode. Use `list_all=true` to dump all memories without filtering |
+| `elefanteMemoryUpdate` | Amend a memory: correct content, adjust importance, deprecate, archive, set supersession chains |
+| `elefanteMemoryDelete` | Permanently delete a memory with audit trail (requires prior search) |
 | `elefanteMemoryConsolidate` | Cleanup: deduplicate, canonicalize keys, quarantine test data |
-| `elefanteMemoryMigrateToV3` | Admin: migrate memories to V3 schema |
 
 ### Knowledge Graph
 
 | Tool | Purpose |
 |------|---------|
-| `elefanteGraphEntityCreate` | Create an entity node (person, project, concept, technology, etc.) |
-| `elefanteGraphRelationshipCreate` | Create a directed edge between two entities |
-| `elefanteGraphConnect` | Batch upsert: create multiple entities and relationships in one call |
+| `elefanteGraphConnect` | Batch upsert: create entities and relationships in one call |
 | `elefanteGraphQuery` | Execute raw Cypher queries for advanced traversals |
 
 ### Context & Sessions
@@ -104,8 +102,7 @@ Elefante exposes **22 tools** and **2 prompts** via MCP.
 
 | Tool | Purpose |
 |------|---------|
-| `elefanteTaskCreate` | Create a task with priority, agent assignment, and dependencies |
-| `elefanteTaskDecompose` | Break a task into subtasks |
+| `elefanteTaskCreate` | Create a task with priority, agent assignment, dependencies, and optional inline subtasks |
 | `elefanteTaskUpdate` | Update task status and attach output |
 | `elefanteTaskGraph` | View task hierarchy |
 
@@ -113,16 +110,14 @@ Elefante exposes **22 tools** and **2 prompts** via MCP.
 
 | Tool | Purpose |
 |------|---------|
-| `elefanteETLProcess` | Get unclassified memories for agent review |
+| `elefanteETLProcess` | Get unclassified memories for agent review. Use `include_stats=true` for processing statistics |
 | `elefanteETLClassify` | Submit classification for a memory |
-| `elefanteETLStatus` | Get processing statistics |
 
 ### System
 
 | Tool | Purpose |
 |------|---------|
-| `elefanteSystemEnable` | Activate Elefante and acquire database locks (required first step) |
-| `elefanteSystemDisable` | Release locks for multi-IDE safety |
+| `elefanteSystem` | Enable or disable Elefante Mode (`action="enable"` / `action="disable"`) |
 | `elefanteSystemStatusGet` | Check system health, lock state, and database stats |
 | `elefanteDashboardOpen` | Open the knowledge graph dashboard |
 
@@ -159,7 +154,7 @@ Every tool call (except search/system tools) automatically gets the top 3 most r
 
 Tools that skip injection (because they already return memory data or are system operations):
 
-`elefanteMemorySearch`, `elefanteMemoryAdd`, `elefanteMemoryListAll`, `elefanteContextGet`, `elefanteMemoryConsolidate`, `elefanteMemoryMigrateToV3`, `elefanteSystemEnable`, `elefanteSystemDisable`, `elefanteSystemStatusGet`, `elefanteDashboardOpen`, `elefanteSessionsList`, `elefanteETLProcess`, `elefanteETLClassify`, `elefanteETLStatus`
+`elefanteMemorySearch`, `elefanteMemoryAdd`, `elefanteMemoryUpdate`, `elefanteMemoryDelete`, `elefanteContextGet`, `elefanteMemoryConsolidate`, `elefanteSystem`, `elefanteSystemStatusGet`, `elefanteDashboardOpen`, `elefanteSessionsList`, `elefanteETLProcess`, `elefanteETLClassify`
 
 ---
 
@@ -168,8 +163,8 @@ Tools that skip injection (because they already return memory data or are system
 These tools are blocked until the agent has called `elefanteMemorySearch` at least once in the session:
 
 - `elefanteMemoryAdd`
-- `elefanteGraphEntityCreate`
-- `elefanteGraphRelationshipCreate`
+- `elefanteMemoryUpdate`
+- `elefanteMemoryDelete`
 - `elefanteGraphConnect`
 
 This prevents agents from writing memories without first checking what already exists.

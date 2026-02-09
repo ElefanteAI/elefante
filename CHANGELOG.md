@@ -7,6 +7,86 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.9.1] - 2026-02-09
+
+### Summary
+
+Tool Consolidation — 24 tools reduced to 17 with zero feature loss. Every tool earns its seat.
+
+### The Problem Solved
+
+24 MCP tools caused decision fatigue for LLMs (~6,000 tokens of schema per message), maintenance burden (each tool = registration + dispatch + handler + docs), and redundancy (3 graph tools did what 1 already did).
+
+### The Solution
+
+**KILLED (3 tools → 0):**
+- `elefanteGraphEntityCreate` — redundant, `GraphConnect` already creates entities
+- `elefanteGraphRelationshipCreate` — redundant, `GraphConnect` already creates relationships  
+- `elefanteMemoryMigrateToV3` — one-time admin job, moved to scripts/
+
+**MERGED (5 tools → 2):**
+- `elefanteSystemEnable` + `elefanteSystemDisable` → **`elefanteSystem`** with `action: "enable" | "disable"`
+- `elefanteMemoryListAll` → absorbed into **`elefanteMemorySearch`** with `list_all: true`
+- `elefanteTaskDecompose` → absorbed into **`elefanteTaskCreate`** with optional `subtasks: [...]`
+- `elefanteETLStatus` → absorbed into **`elefanteETLProcess`** with `include_stats: true`
+
+### Changes
+
+- **MODIFIED**: `src/mcp/server.py`
+  - Removed 3 tool registrations, removed 3 dispatch branches
+  - Merged 5 tools into 2 via new parameters
+  - Updated `_CONTEXT_SKIP_TOOLS`, `GATED_TOOLS`, pitfall injection
+  - `_handle_task_create` now handles inline subtask creation
+  - `_handle_etl_process` now returns stats when requested
+  - `_handle_search_memories` delegates to `_handle_list_all_memories` when `list_all=true`
+  - Version bumped to v1.9.1
+- **MODIFIED**: `README.md` — tool table consolidated, version bumped
+- **UNCHANGED**: All handler implementations preserved (no backend changes)
+
+### Impact
+
+- **Context window**: ~2,000 fewer tokens per message (7 fewer tool schemas)
+- **LLM decision quality**: Fewer choices = better picks
+- **Backward compatibility**: Old tool names removed — MCP clients must update
+
+---
+
+## [1.9.0] - 2026-02-09
+
+### Summary
+
+Custodial Memory Tools — Elefante gains the ability to amend and forget memories, closing the gap between stored schema fields and runtime operations.
+
+### The Problem Solved
+
+Elefante stored `deprecated`, `archived`, `supersedes_id`, and `superseded_by_id` fields in its schema, but had **zero runtime tools** to use them. The vector store backend (`update_memory`, `delete_memory`) existed but was not exposed as MCP tools. Agents could only create memories — never correct, deprecate, or delete them. This violated the "Amendment" and "Forgetting" custodial duties described in Weaviate's "Limit in the Loop" framework.
+
+### The Solution
+
+1. **`elefanteMemoryUpdate`** — Amend any memory's content (triggers re-embedding), importance, tags, deprecated/archived status, or supersession chain. When `supersedes_id` is set, the old memory automatically gets `superseded_by_id` back-linked.
+2. **`elefanteMemoryDelete`** — Permanently remove a memory with a reason (audit trail). Requires prior `elefanteMemorySearch` (compliance gated).
+3. **Search-time filtering** — `elefanteMemorySearch` now excludes `deprecated=true` and `archived=true` memories from results, reporting the excluded count separately.
+
+### Changes
+
+- **MODIFIED**: `src/mcp/server.py`
+  - Added `elefanteMemoryUpdate` + `elefanteMemoryDelete` tool registrations with full inputSchema
+  - Added both to `GATED_TOOLS` compliance gate set (24 → 26 total tool registrations)
+  - Added dispatch routing for both tools
+  - Added `_handle_update_memory()` and `_handle_delete_memory()` async handlers
+  - Modified search handler to filter deprecated/archived memories with `excluded_deprecated` count in response
+- **UNCHANGED**: `src/core/vector_store.py` — backend methods already existed, now surfaced via MCP
+
+### Project Cleanup (same release)
+
+- Removed 5 identical duplicate scripts from `scripts/archive/historical/`
+- Archived 2 old memory exports, 3 stale data files, and `install.log` to `data/archive/`
+- Moved misplaced `test_end_to_end.py` from `scripts/` to `tests/`
+- Archived completed `compliance_gate_plan.md` from `planning/` to `docs/archive/historical/`
+- Removed empty `planning/` directory
+
+---
+
 ## [1.6.3] - 2025-12-30
 
 ### Summary
