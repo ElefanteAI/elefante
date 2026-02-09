@@ -1,25 +1,28 @@
 # Elefante
 
-Persistent memory system for AI coding agents. Runs locally via [MCP](https://modelcontextprotocol.io/) (Model Context Protocol), stores knowledge in a vector database (ChromaDB) and a graph database (Kuzu). Your agent remembers decisions, preferences, facts, and project context across sessions.
+Persistent memory for AI coding agents. Elefante runs locally on your machine via [MCP](https://modelcontextprotocol.io/) (Model Context Protocol), storing knowledge in a vector database and a knowledge graph. Your agent remembers what you care about, forgets what you don't, and scores every memory based on how you actually use it — not how important you *said* it was.
 
-> **Current version:** v1.9.1
+> **Current version:** v1.10.0
 
 ---
 
-## Why
+## The Problem
 
-AI agents are stateless. Every new session starts from zero — no memory of your coding style, past decisions, project conventions, or what failed last time. Elefante gives agents persistent memory so they stop repeating mistakes and start building on prior work.
+AI agents are stateless. Every new session starts from zero. The agent doesn't remember your coding style, the architecture decision you made last week, what failed yesterday, or that you hate semicolons. You repeat yourself. The agent repeats its mistakes. Context is lost at the worst possible moment.
 
-## What it does
+## What Elefante Does
 
-- **Stores** facts, preferences, decisions, code patterns, and tasks with structured classification
-- **Searches** memories using hybrid retrieval (semantic vectors + knowledge graph + session context)
-- **Injects context** automatically — every tool call gets the top relevant memories appended to the response (v1.8.0)
-- **Builds a knowledge graph** of entities and relationships (people, projects, concepts, dependencies)
-- **Enforces quality** via a compliance gate: agents must search before writing, preventing duplicate or contradictory memories
-- **Visualizes** the knowledge graph through a snapshot-driven dashboard
+Elefante gives your agent a second brain — one that learns what matters from your behavior, not from labels you assign.
 
-## How it works
+- **Stores** facts, preferences, decisions, code patterns, and tasks
+- **Searches** using hybrid retrieval: semantic similarity (vectors) + knowledge graph traversal + session context
+- **Scores** every memory automatically based on recency, how often you access it, and when you last used it — no manual importance ratings
+- **Injects context** on every tool call — the agent gets the most relevant memories without asking
+- **Builds a knowledge graph** of entities and relationships (people, projects, technologies, dependencies)
+- **Enforces quality** via a compliance gate: the agent must search before writing, preventing duplicates
+- **Visualizes** knowledge through a snapshot-driven dashboard
+
+## How It Works
 
 ```
 IDE (VS Code, Cursor, etc.)
@@ -31,7 +34,61 @@ IDE (VS Code, Cursor, etc.)
               └── Compliance Gate (search-before-write)
 ```
 
-Everything runs locally. No cloud. No telemetry.
+Everything runs locally. No cloud. No telemetry. Your data never leaves your machine.
+
+---
+
+## Behavioral Relevance (v1.10.0)
+
+This is the core idea behind v1.10.0: **nobody assigns importance. Importance emerges from behavior.**
+
+Traditional systems ask you to rate memories on a scale (1–10). That approach has two problems:
+
+1. **Bias.** Users rate everything as "important" (8+).
+2. **Rot.** An architecture decision from 6 months ago sits at importance=9 forever, even if the project moved on.
+
+Elefante replaces human-assigned importance with a **system-computed score (0–100)** that changes over time based on three behavioral signals:
+
+| Signal | What it measures | Effect |
+|--------|-----------------|--------|
+| **Recency** | Days since creation | Memories decay exponentially. Rate depends on type — a rule decays ~20x slower than a conversation. |
+| **Freshness** | Days since last access | Recently retrieved memories get a boost. Stale ones fade. |
+| **Reinforcement** | Number of times accessed | Frequently used memories grow stronger (logarithmic, so spamming won't game it). |
+
+### The Formula
+
+```
+relevance = 0.5 * recency * freshness * reinforcement
+```
+
+Where:
+- `recency = exp(-decay_rate * days_since_created)` — decay_rate varies by memory type
+- `freshness = exp(-0.02 * days_since_accessed)`
+- `reinforcement = 1 + 0.25 * ln(access_count + 1)`
+
+Every memory starts at score **50**. It earns its way up through use, and loses ground through neglect. The raw formula produces 0.0–1.0, stored as an integer 0–100.
+
+### Decay Rates by Memory Type
+
+The decay rate (λ) controls how quickly a memory loses relevance if it's never accessed. Each type has a half-life — the number of days until a memory drops to half its initial score:
+
+| Memory Type | Decay Rate (λ) | Half-Life | Why |
+|-------------|----------------|-----------|-----|
+| `rule` | 0.002 | ~347 days | Rules persist, but die if never enforced |
+| `preference` | 0.002 | ~347 days | Preferences are stable but not eternal |
+| `decision` | 0.005 | ~139 days | Decisions get revisited |
+| `fact` | 0.005 | ~139 days | Facts change |
+| `answer` | 0.005 | ~139 days | Answers may become outdated |
+| `insight` | 0.008 | ~87 days | Insights are validated or forgotten |
+| `code` | 0.008 | ~87 days | Code evolves constantly |
+| `hypothesis` | 0.01 | ~69 days | Hypotheses get tested |
+| `question` | 0.015 | ~46 days | Questions get answered |
+| `note` | 0.015 | ~46 days | Notes are transient |
+| `observation` | 0.015 | ~46 days | Observations are contextual |
+| `task` | 0.02 | ~35 days | Tasks complete or go stale |
+| `conversation` | 0.025 | ~28 days | Conversations are ephemeral |
+
+A rule you set 6 months ago and still use? Score stays high. An architecture decision from a year ago that you never reference? It fades. Naturally.
 
 ---
 
@@ -56,7 +113,7 @@ The installer creates a virtual environment, installs dependencies, and initiali
 
 ---
 
-## Connect to your IDE
+## Connect to Your IDE
 
 Elefante is an MCP stdio server. Add it to your IDE's MCP configuration:
 
@@ -72,102 +129,104 @@ Setup guides for VS Code, Cursor, and other MCP-compatible IDEs: [`docs/technica
 
 ## MCP Tools
 
-Elefante exposes **17 tools** and **2 prompts** via MCP.
+Elefante exposes **17 tools** and **2 prompts** via MCP. All tool names follow the `elefante-PascalCase` convention.
 
 ### Memory
 
 | Tool | Purpose |
 |------|---------|
-| `elefanteMemoryAdd` | Store a memory with layer/sublayer classification, importance, tags, and entity links |
-| `elefanteMemorySearch` | Search memories — semantic, structured (graph), or hybrid mode. Use `list_all=true` to dump all memories without filtering |
-| `elefanteMemoryUpdate` | Amend a memory: correct content, adjust importance, deprecate, archive, set supersession chains |
-| `elefanteMemoryDelete` | Permanently delete a memory with audit trail (requires prior search) |
-| `elefanteMemoryConsolidate` | Cleanup: deduplicate, canonicalize keys, quarantine test data |
+| `elefante-MemoryAdd` | Store a memory. Classify it by `memory_type` (fact, decision, preference, etc.) and let the system handle scoring. |
+| `elefante-MemorySearch` | Search memories — semantic, structured (graph), or hybrid mode. Use `list_all=true` to dump everything. |
+| `elefante-MemoryUpdate` | Amend a memory: correct content, deprecate, archive, or set supersession chains. |
+| `elefante-MemoryDelete` | Permanently delete a memory with audit trail. Requires prior search. |
+| `elefante-MemoryConsolidate` | Cleanup: deduplicate, canonicalize keys, quarantine test data. Dry-run by default. |
 
 ### Knowledge Graph
 
 | Tool | Purpose |
 |------|---------|
-| `elefanteGraphConnect` | Batch upsert: create entities and relationships in one call |
-| `elefanteGraphQuery` | Execute raw Cypher queries for advanced traversals |
+| `elefante-GraphConnect` | Batch upsert: create entities and relationships in one call. |
+| `elefante-GraphQuery` | Execute raw Cypher queries for advanced traversals. |
 
 ### Context & Sessions
 
 | Tool | Purpose |
 |------|---------|
-| `elefanteContextGet` | Get full context: related memories + graph connections for current work |
-| `elefanteSessionsList` | List past sessions with summaries |
+| `elefante-ContextGet` | Get full context: related memories + graph connections for current work. |
+| `elefante-SessionsList` | List past sessions with summaries. |
 
 ### Tasks
 
 | Tool | Purpose |
 |------|---------|
-| `elefanteTaskCreate` | Create a task with priority, agent assignment, dependencies, and optional inline subtasks |
-| `elefanteTaskUpdate` | Update task status and attach output |
-| `elefanteTaskGraph` | View task hierarchy |
+| `elefante-TaskCreate` | Create a task with priority, agent assignment, dependencies, and optional inline subtasks. |
+| `elefante-TaskUpdate` | Update task status and attach output. |
+| `elefante-TaskGraph` | View task hierarchy. |
 
-### ETL (Batch Classification)
+### ETL (Batch Processing)
 
 | Tool | Purpose |
 |------|---------|
-| `elefanteETLProcess` | Get unclassified memories for agent review. Use `include_stats=true` for processing statistics |
-| `elefanteETLClassify` | Submit classification for a memory |
+| `elefante-ETLProcess` | Get unprocessed memories for agent review. Use `include_stats=true` for processing statistics. |
+| `elefante-ETLClassify` | Submit classification for a memory. |
 
 ### System
 
 | Tool | Purpose |
 |------|---------|
-| `elefanteSystem` | Enable or disable Elefante Mode (`action="enable"` / `action="disable"`) |
-| `elefanteSystemStatusGet` | Check system health, lock state, and database stats |
-| `elefanteDashboardOpen` | Open the knowledge graph dashboard |
+| `elefante-System` | Enable or disable Elefante Mode (`action="enable"` / `action="disable"`). |
+| `elefante-SystemStatusGet` | Check system health, lock state, and database stats. |
+| `elefante-DashboardOpen` | Open the knowledge graph dashboard. |
 
 ### Prompts
 
 | Prompt | Purpose |
 |--------|---------|
-| `elefante-grounding` | Injects memory-aware behavior into the agent's system prompt |
-| `elefante-context` | Searches memories for a topic and returns results as context |
+| `elefante-grounding` | Injects memory-aware behavior into the agent's system prompt. |
+| `elefante-context` | Searches memories for a topic and returns results as context. |
 
 Full parameter schemas: [`docs/technical/usage.md`](docs/technical/usage.md)
 
 ---
 
-## Memory Classification
+## How Memories Are Classified
 
-Every memory is classified on two axes:
+When you store a memory, the agent provides two things:
 
-**Layer** (who / what / do):
+1. **`memory_type`** — What kind of knowledge this is. This determines the decay rate (see table above). Choose accurately: a `preference` will last ~347 days without use, while a `conversation` fragment fades in ~28 days.
 
-| Layer | Sublayers | Use for |
-|-------|-----------|---------|
-| `self` | identity, preference, constraint | User info: who they are, what they like, their limits |
-| `world` | fact, failure, method | Objective knowledge: truths, errors, how-tos |
-| `intent` | rule, goal, anti-pattern | Directives: what to do, what to avoid |
+2. **`domain`** — High-level context: `work`, `personal`, `learning`, `project`, `reference`, or `system`.
 
-**Importance** (1–10): Use 8+ for critical preferences, decisions, and architectural facts.
+That's it. No importance scale. No layer/sublayer taxonomy. The score takes care of itself.
+
+### What the Agent Does NOT Set
+
+- **Score** — Starts at 50 for every memory. Changes only through behavior (access, time decay).
+- **Decay rate** — Derived automatically from `memory_type`.
+- **Authority score** — Computed from score, access count, and freshness during retrieval.
 
 ---
 
-## Automatic Context Injection (v1.8.0)
+## Automatic Context Injection
 
-Every tool call (except search/system tools) automatically gets the top 3 most relevant memories appended to its response. The agent doesn't need to manually search — context surfaces on its own.
+Every tool call (except search and system tools) automatically gets the top 3 most relevant memories appended to its response. The agent doesn't need to manually search — context surfaces on its own.
 
-Tools that skip injection (because they already return memory data or are system operations):
+Tools that skip injection (they already return memory data or are system operations):
 
-`elefanteMemorySearch`, `elefanteMemoryAdd`, `elefanteMemoryUpdate`, `elefanteMemoryDelete`, `elefanteContextGet`, `elefanteMemoryConsolidate`, `elefanteSystem`, `elefanteSystemStatusGet`, `elefanteDashboardOpen`, `elefanteSessionsList`, `elefanteETLProcess`, `elefanteETLClassify`
+`elefante-MemorySearch`, `elefante-MemoryAdd`, `elefante-MemoryUpdate`, `elefante-MemoryDelete`, `elefante-ContextGet`, `elefante-MemoryConsolidate`, `elefante-System`, `elefante-SystemStatusGet`, `elefante-DashboardOpen`, `elefante-SessionsList`, `elefante-ETLProcess`, `elefante-ETLClassify`
 
 ---
 
 ## Compliance Gate
 
-These tools are blocked until the agent has called `elefanteMemorySearch` at least once in the session:
+These tools are blocked until the agent has called `elefante-MemorySearch` at least once in the session:
 
-- `elefanteMemoryAdd`
-- `elefanteMemoryUpdate`
-- `elefanteMemoryDelete`
-- `elefanteGraphConnect`
+- `elefante-MemoryAdd`
+- `elefante-MemoryUpdate`
+- `elefante-MemoryDelete`
+- `elefante-GraphConnect`
 
-This prevents agents from writing memories without first checking what already exists.
+This prevents agents from writing memories without first checking what already exists. Search once, then write freely for the rest of the session.
 
 ---
 
@@ -177,7 +236,7 @@ The dashboard is a read-only graph visualization. It reads from a snapshot file,
 
 ```bash
 # Via MCP tool (recommended)
-elefanteDashboardOpen(refresh=true)
+elefante-DashboardOpen(refresh=true)
 
 # Manual
 python scripts/update_dashboard_data.py   # refresh snapshot
@@ -219,11 +278,13 @@ The MCP server itself runs as a stdio process started by your IDE. Running MCP i
 ```
 src/
   mcp/          Server, tool handlers, context injection, compliance gate
-  core/         Orchestrator, ChromaDB store, Kuzu store, config
-  models/       Data models (Memory, Entity, Relationship)
+  core/         Orchestrator, ChromaDB store, Kuzu store, retrieval, config
+  models/       Data models (Memory, Entity, Relationship, Query filters)
   dashboard/    FastAPI server + React UI
     ui/         TypeScript SPA (Vite + Tailwind)
-  etl/          Batch memory classification pipeline
+  etl/          Batch memory processing pipeline
+  distiller/    Memory ingestion and export
+  utils/        Validators, curation, helpers
 scripts/        Maintenance (snapshot refresh, migrations)
 data/           Runtime data (databases, snapshots)
 docs/           Documentation

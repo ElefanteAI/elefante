@@ -7,6 +7,45 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.10.0] - 2026-02-09
+
+### Summary
+
+Behavioral Relevance & Simplified Naming — Importance scores are now system-computed based on usage, not user assignment. All tools renamed to `elefante-PascalCase` for consistency.
+
+### The Problem Solved
+
+1. **Importance Rot**: Users rated everything as "important" (8-10), and old decisions stayed "critical" forever even as they became obsolete.
+2. **Cognitive Load**: "Layer/Sublayer" taxonomy was jargon-heavy and confusing.
+3. **Naming Inconsistency**: Tool names like `elefanteMemoryAdd` were hard to read and inconsistent with standard MCP practices.
+
+### The Solution
+
+1. **Behavioral Relevance Model**: Removed all user-assigned importance. The system now computes a score (0-100) automatically based on:
+   - **Recency**: Exponential decay based on memory type (Rules decay slowly, conversations quickly).
+   - **Freshness**: Recently accessed memories get a boost.
+   - **Reinforcement**: Frequently accessed memories grow stronger.
+2. **Simplified Classification**: Removed `Layer` (self/world/intent) and `Sublayer`. Now using only `MemoryType` (fact, decision, etc.) and `Domain`.
+3. **New Naming Convention**: All 17 tools now follow the `elefante-ToolName` format (e.g., `elefante-MemorySearch`, `elefante-GraphConnect`).
+
+### Changes
+
+- **MODIFIED**: `src/models/memory.py`
+  - Removed `importance`, `layer`, `sublayer` fields from `MemoryMetadata`.
+  - Added `score` (system-computed) and `TYPE_DECAY_RATES`.
+  - Implemented `calculate_relevance_score()` using the new formula.
+- **MODIFIED**: `src/mcp/server.py`
+  - Renamed ALL 17 tools to `elefante-X` convention.
+  - Updated dispatch logic and handlers for the new naming.
+  - Removed `importance`/`layer`/`sublayer` from `elefante-MemoryAdd` schema.
+- **MODIFIED**: `README.md`
+  - Complete rewrite to explain Behavioral Relevance and document new tool names.
+- **IMPACT**:
+  - **Breaking Change**: Old tool names (`elefanteMemoryAdd`) will no longer work. Client configuration must be updated.
+  - **Data Compatibility**: v1.10.0 starts fresh (or requires migration of old importance values to score).
+
+---
+
 ## [1.9.1] - 2026-02-09
 
 ### Summary
