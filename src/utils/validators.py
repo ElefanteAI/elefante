@@ -44,22 +44,22 @@ def validate_memory_content(content: str, min_length: int = 1, max_length: int =
 
 def validate_importance(importance: int) -> int:
     """
-    Validate importance level
+    Validate score level
     
     Args:
-        importance: Importance level (1-10)
+        importance: Score level (0-100)
         
     Returns:
-        Validated importance
+        Validated score
         
     Raises:
         ValidationError: If validation fails
     """
     if not isinstance(importance, int):
-        raise ValidationError("Importance must be an integer")
+        raise ValidationError("Score must be an integer")
     
-    if importance < 1 or importance > 10:
-        raise ValidationError("Importance must be between 1 and 10")
+    if importance < 0 or importance > 100:
+        raise ValidationError("Score must be between 0 and 100")
     
     return importance
 

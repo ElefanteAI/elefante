@@ -20,14 +20,13 @@ from datetime import datetime
 
 from src.models.memory import (
     Memory, MemoryType, MemoryMetadata, MemoryStatus,
-    DomainType, IntentType, SourceType
+    DomainType, IntentType, SourceType, TYPE_DECAY_RATES
 )
 from src.models.entity import Entity, EntityType, Relationship, RelationshipType
 from src.models.query import QueryMode, QueryPlan, SearchResult, SearchFilters
 from src.core.vector_store import VectorStore, get_vector_store
 from src.core.graph_store import GraphStore, get_graph_store
 from src.core.embeddings import EmbeddingService, get_embedding_service
-from src.core.classifier import classify_memory_full
 from src.core.retrieval import CognitiveRetriever, MemoryCandidate, QueryAnalysis
 from src.utils.logger import get_logger
 from src.utils.config import get_config
@@ -108,18 +107,13 @@ class MemoryOrchestrator:
         tags: List[str] = None,
         entities: List[Dict[str, str]] = None,
         metadata: Dict[str, Any] = None,
-        importance: int = 1,
         force_new: bool = False
     ) -> Optional[Memory]:
         """
-        Add a new memory via the Authoritative 5-Step Pipeline.
+        Add a new memory via the 5-Step Pipeline (v1.10.0).
         
-        Pipeline:
-        1. PARSE & CLASSIFY: Validate input and extract Layer/Sublayer from metadata.
-        2. INTEGRITY: Check for duplicates (REDUNDANT) and contradictions (CONTRADICTORY).
-        3. WRITE: Construct Memory object with V2 metadata (Layers).
-        4. REINFORCE: Initialize plasticity (access_count=1) and decay signals.
-        5. GRAPH: Create Entity nodes and Relationships.
+        Score is system-computed (starts at 50, earned through usage).
+        Decay rate is set automatically from memory_type.
         """
         await self._ensure_metadata_initialized()
 
@@ -201,27 +195,10 @@ class MemoryOrchestrator:
             # Guardrail: require at least a few shared keywords.
             return len(overlap) >= 3
             
-        # Extract Authoritative Classification (Layer/Sublayer)
-        # We prefer the classification provided by the Agent (via metadata)
-        layer = metadata.get("layer")
-        sublayer = metadata.get("sublayer")
-        
-        # If Agent failed to classify, fall back to deterministic rules (NO LLM calls).
-        if not layer or not sublayer:
-            self.logger.warning("Memory missing explicit Layer/Sublayer classification. Using deterministic classifier.")
-            detected_layer, detected_sublayer, detected_importance = classify_memory_full(content)
-            if not layer:
-                layer = detected_layer
-                metadata["layer"] = layer
-            if not sublayer:
-                sublayer = detected_sublayer
-                metadata["sublayer"] = sublayer
-            # Only fill importance if caller left it at default/low.
-            if importance <= 1:
-                importance = max(importance, detected_importance)
+        # v1.10.0: Decay rate from memory type (behavioral relevance)
+        decay_rate = TYPE_DECAY_RATES.get(memory_type, 0.01)
 
         # Agent-driven enrichment (Elefante never calls an LLM).
-        # The calling agent may provide these fields in metadata.
         action = metadata.get("action")
         if isinstance(action, str) and action.strip().upper() == "IGNORE":
             self.logger.info(f"Memory ignored by agent instruction: {content[:50]}...")
@@ -231,10 +208,8 @@ class MemoryOrchestrator:
         if isinstance(provided_title, str) and provided_title.strip():
             title = provided_title.strip()
         else:
-            # Deterministic title generation: stable, cheap, and offline.
             from src.utils.curation import generate_title
-
-            title = generate_title(content=content, layer=str(layer), sublayer=str(sublayer), max_len=120)
+            title = generate_title(content=content, layer=memory_type, sublayer="general", max_len=120)
             metadata["title"] = title
 
         # ==================================================================================
@@ -264,26 +239,17 @@ class MemoryOrchestrator:
             metadata["title"] = title
 
         # ==================================================================================
-        # STEP 1.75: PREFERENCE RE-ASSERTION MERGE (Graceful Redundancy Handling)
+        # STEP 1.75: PREFERENCE RE-ASSERTION MERGE
         # ==================================================================================
-        # For self-level preferences/constraints, semantic similarity may be < 0.65 while still
-        # representing the same intent. In that case, we prefer updating/reinforcing the existing
-        # preference instead of creating a new redundant record.
-        is_self = isinstance(layer, str) and layer.strip().lower() == "self"
-        prefish_sublayer = isinstance(sublayer, str) and sublayer.strip().lower() in {"preference", "constraint"}
-        is_preference_like = (
-            str(memory_type).lower() == MemoryType.PREFERENCE.value
-            or (is_self and prefish_sublayer)
-        )
+        is_preference_like = str(memory_type).lower() == MemoryType.PREFERENCE.value
 
         if is_preference_like and not force_new:
-            # Only consider existing self-level preference memories.
             preference_candidates = await self.vector_store.search(
                 query=content,
                 limit=5,
                 min_similarity=0.30,
                 apply_temporal_decay=False,
-                where_override={"layer": "self"},
+                where_override={"memory_type": "preference"},
             )
 
             if preference_candidates:
@@ -292,10 +258,7 @@ class MemoryOrchestrator:
                 pref_like = [
                     r
                     for r in preference_candidates
-                    if (
-                        str(r.memory.metadata.memory_type).lower() == MemoryType.PREFERENCE.value
-                        or str(r.memory.metadata.sublayer).strip().lower() in {"preference", "constraint"}
-                    )
+                    if str(r.memory.metadata.memory_type).lower() == MemoryType.PREFERENCE.value
                 ]
 
                 if not pref_like:
@@ -317,7 +280,7 @@ class MemoryOrchestrator:
                                 seen.add(tt)
                                 merged_tags.append(tt)
 
-                    merged_importance = max(int(existing.metadata.importance or 1), int(importance or 1))
+                    merged_importance = max(int(existing.metadata.score or 50), 50)
 
                     merged_content = existing.content
                     if not _is_near_duplicate(content, existing.content):
@@ -347,7 +310,7 @@ class MemoryOrchestrator:
                         {
                             "content": merged_content,
                             "tags": merged_tags,
-                            "importance": merged_importance,
+                            "score": merged_importance,
                             "last_accessed": now,
                             "last_modified": now,
                             "access_count": int(existing.metadata.access_count or 1) + 1,
@@ -463,8 +426,8 @@ class MemoryOrchestrator:
             
             # Compute initial authority score
             authority_score = compute_authority_score(
-                importance=importance,
-                access_count=1,  # New memory
+                importance=5,  # v1.10.0: neutral start, system-computed
+                access_count=1,
                 days_since_created=0,
                 days_since_accessed=0,
             )
@@ -472,7 +435,7 @@ class MemoryOrchestrator:
             
             custom_metadata = {
                 k: v for k, v in metadata.items()
-                if k not in ["domain", "category", "intent", "confidence", "source", "layer", "sublayer"]
+                if k not in ["domain", "category", "intent", "confidence", "source"]
             }
             
             # ==================================================================================
@@ -496,17 +459,14 @@ class MemoryOrchestrator:
             custom_metadata["surfaces_when"] = surfaces_when
             custom_metadata["authority_score"] = authority_score
             
-            # Create V2 Metadata
+            # Create v1.10.0 Metadata (Behavioral Relevance)
             memory_metadata = MemoryMetadata(
                 memory_type=MemoryType(memory_type),
-                importance=importance,
+                score=50,  # Everyone starts equal
                 status=status,
                 tags=tags or [],
                 domain=DomainType(domain) if domain else DomainType.REFERENCE,
                 category=category,
-                # Enforce Layer/Sublayer
-                layer=layer,
-                sublayer=sublayer,
                 intent=intent_enum,
                 confidence=confidence,
                 source=SourceType(source),
@@ -521,7 +481,7 @@ class MemoryOrchestrator:
                 # ==================================================================================
                 access_count=1,          # Initialize 'used once' (creation counts as use)
                 last_accessed=datetime.utcnow(),
-                decay_rate=0.01          # Standard Plasticity
+                decay_rate=decay_rate    # From TYPE_DECAY_RATES
             )
             
             memory = Memory(
@@ -547,9 +507,8 @@ class MemoryOrchestrator:
                 description=summary_text,
                 properties={
                     "content": content[:200],
-                    "layer": layer,
-                    "sublayer": sublayer,
-                    "importance": importance,
+                    "memory_type": memory_type,
+                    "score": 50,
                     "status": status.value,
                     "timestamp": memory.metadata.created_at,
                     # V5 Topology - populated during ETL Phase 2
@@ -646,7 +605,7 @@ class MemoryOrchestrator:
                 except Exception as e:
                     self.logger.warning(f"Failed to update Session entity: {e}") 
 
-            self.logger.info(f"Memory stored successfully: {memory.id} [{layer}/{sublayer}]")
+            self.logger.info(f"Memory stored successfully: {memory.id} [{memory_type}]")
             return memory
             
         except Exception as e:
@@ -852,7 +811,7 @@ class MemoryOrchestrator:
                 summary=metadata.summary if hasattr(metadata, 'summary') else memory.content[:100],
                 concepts=metadata.concepts if hasattr(metadata, 'concepts') and metadata.concepts else [],
                 domain=metadata.domain.value if hasattr(metadata, 'domain') and metadata.domain and hasattr(metadata.domain, 'value') else (metadata.domain if hasattr(metadata, 'domain') and isinstance(metadata.domain, str) else "general"),
-                importance=metadata.importance if hasattr(metadata, 'importance') else 5,
+                importance=metadata.score if hasattr(metadata, 'score') else 50,
                 access_count=metadata.access_count if hasattr(metadata, 'access_count') else 1,
                 created_at=metadata.created_at if hasattr(metadata, 'created_at') and metadata.created_at else datetime.utcnow(),
                 last_accessed=metadata.last_accessed if hasattr(metadata, 'last_accessed') and metadata.last_accessed else datetime.utcnow(),
@@ -909,22 +868,13 @@ class MemoryOrchestrator:
         if plan.tags:
             metadata_filter["tags"] = {"$in": plan.tags}
         if plan.min_importance:
-            metadata_filter["importance"] = {"$gte": plan.min_importance}
+            metadata_filter["score"] = {"$gte": plan.min_importance}
 
-        # Federated search: anchors (core/domain) + general, then deterministic interleaved merge.
-        anchor_fetch = max(3, int(plan.limit * 0.7))
+        # Standard search (no federated anchor split — behavioral relevance
+        # handles ranking via temporal decay + reinforcement).
         general_fetch = max(plan.limit * 3, 10)
 
-        anchors = await self.vector_store.search(
-            query=query,
-            limit=anchor_fetch,
-            filters=filters,
-            where_override={"ring": {"$in": ["core", "domain"]}},
-            min_similarity=plan.min_similarity,
-            apply_temporal_decay=apply_temporal_decay,
-        )
-
-        general = await self.vector_store.search(
+        results = await self.vector_store.search(
             query=query,
             limit=general_fetch,
             filters=filters,
@@ -932,49 +882,7 @@ class MemoryOrchestrator:
             apply_temporal_decay=apply_temporal_decay,
         )
 
-        # Remove duplicates from general bucket
-        anchor_ids = {r.memory.id for r in anchors}
-        general = [r for r in general if r.memory.id not in anchor_ids]
-
-        merged: List[SearchResult] = []
-        seen: set[UUID] = set()
-
-        # Deterministic interleave pattern: 1 anchor, then 2 general
-        ai = 0
-        gi = 0
-        while len(merged) < plan.limit and (ai < len(anchors) or gi < len(general)):
-            if ai < len(anchors):
-                candidate = anchors[ai]
-                ai += 1
-                if candidate.memory.id not in seen:
-                    merged.append(candidate)
-                    seen.add(candidate.memory.id)
-                if len(merged) >= plan.limit:
-                    break
-
-            for _ in range(2):
-                if gi >= len(general) or len(merged) >= plan.limit:
-                    break
-                candidate = general[gi]
-                gi += 1
-                if candidate.memory.id not in seen:
-                    merged.append(candidate)
-                    seen.add(candidate.memory.id)
-
-        # Backfill if one side exhausted early
-        while len(merged) < plan.limit and ai < len(anchors):
-            candidate = anchors[ai]
-            ai += 1
-            if candidate.memory.id not in seen:
-                merged.append(candidate)
-                seen.add(candidate.memory.id)
-
-        while len(merged) < plan.limit and gi < len(general):
-            candidate = general[gi]
-            gi += 1
-            if candidate.memory.id not in seen:
-                merged.append(candidate)
-                seen.add(candidate.memory.id)
+        merged = results[:plan.limit]
 
         # Update access counts for retrieved memories
         if apply_temporal_decay:
@@ -997,7 +905,7 @@ class MemoryOrchestrator:
         if plan.memory_types:
             where_clauses.append(f"m.memory_type IN {plan.memory_types}")
         if plan.min_importance:
-            where_clauses.append(f"m.importance >= {plan.min_importance}")
+            where_clauses.append(f"m.score >= {plan.min_importance}")
         
         if where_clauses:
             cypher_parts.append("WHERE " + " AND ".join(where_clauses))
@@ -1050,15 +958,17 @@ class MemoryOrchestrator:
                 memory = await self.vector_store.get_memory(memory_id)
                 vector_backed = memory is not None
 
-            importance = extra.get("importance")
+            importance = extra.get("score")
             if importance is None:
-                importance = entity_props.get("importance")
+                importance = extra.get("importance")  # Backward compat
+            if importance is None:
+                importance = entity_props.get("score") or entity_props.get("importance")
             try:
-                importance_int = int(importance) if importance is not None else 5
+                importance_int = int(importance) if importance is not None else 50
             except Exception:
-                importance_int = 5
+                importance_int = 50
 
-            score = max(0.0, min(1.0, importance_int / 10.0))
+            score = max(0.0, min(1.0, importance_int / 100.0))
 
             if memory is None:
                 # Fallback: construct a minimal Memory object from graph metadata.
@@ -1070,7 +980,7 @@ class MemoryOrchestrator:
 
                 memory_metadata = MemoryMetadata(
                     memory_type=mem_type,
-                    importance=importance_int,
+                    score=importance_int,
                 )
 
                 memory = Memory(
@@ -1392,7 +1302,7 @@ class MemoryOrchestrator:
                             "content": content,
                             "metadata": {
                                 "memory_type": std_meta.core.memory_type.value,
-                                "importance": std_meta.core.importance,
+                                "score": getattr(std_meta.core, 'importance', 50),
                                 "timestamp": std_meta.system.created_at.isoformat(),
                                 "tags": std_meta.core.tags,
                                 **std_meta.custom
@@ -1412,7 +1322,7 @@ class MemoryOrchestrator:
                             "properties": {
                                 "content": content[:200],
                                 "memory_type": std_meta.core.memory_type.value,
-                                "importance": std_meta.core.importance,
+                                "score": getattr(std_meta.core, 'importance', 50),
                                 "timestamp": std_meta.system.created_at.isoformat()
                             }
                         })

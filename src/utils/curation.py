@@ -351,8 +351,8 @@ def compute_authority_score(
     """
     import math
     
-    # Normalize importance (1-10 → 0.1-1.0)
-    importance_factor = importance / 10.0
+    # Normalize score (0-100 → 0.0-1.0)
+    importance_factor = importance / 100.0
     
     # Access factor (logarithmic, saturates around 50 accesses)
     access_factor = min(1.0, math.log(access_count + 1) / math.log(50))

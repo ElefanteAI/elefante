@@ -97,7 +97,6 @@ class MemoryIngester:
         return self._run_async(self._store(
             content=content,
             memory_type="conversation",
-            importance=1,
             tags=["chat_session", "raw_archive", session.workspace_name or "unknown"],
             metadata=metadata,
         ))
@@ -140,7 +139,6 @@ class MemoryIngester:
             mem_id = self._run_async(self._store(
                 content=insight.content,
                 memory_type=memory_type,
-                importance=insight.importance,
                 tags=tags,
                 metadata=metadata,
             ))
@@ -149,7 +147,7 @@ class MemoryIngester:
                 stored_ids.append(mem_id)
                 logger.info(
                     f"Stored insight: [{insight.insight_type.value}] "
-                    f"importance={insight.importance} → {mem_id}"
+                    f"score=50 (default) → {mem_id}"
                 )
 
         return stored_ids
@@ -158,7 +156,6 @@ class MemoryIngester:
         self,
         content: str,
         memory_type: str,
-        importance: int,
         tags: List[str],
         metadata: dict,
     ) -> Optional[str]:
@@ -168,7 +165,6 @@ class MemoryIngester:
             memory = await orch.add_memory(
                 content=content,
                 memory_type=memory_type,
-                importance=importance,
                 tags=tags,
                 metadata=metadata,
             )

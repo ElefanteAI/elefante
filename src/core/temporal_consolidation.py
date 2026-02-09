@@ -50,8 +50,8 @@ class TemporalConsolidator:
         days_since_access = (now - memory.metadata.last_accessed).days
         access_boost = max(0.5, 1.0 - (days_since_access * temporal_config.default_decay_rate))
         
-        # Final strength calculation
-        strength = memory.metadata.importance * recency * reinforcement * access_boost
+        # Final strength calculation (score is 0-100, normalize to 0-1)
+        strength = (memory.metadata.score / 100.0) * recency * reinforcement * access_boost
         
         return strength
     

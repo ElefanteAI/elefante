@@ -43,10 +43,9 @@ logger = get_logger(__name__)
 # Tools that do NOT require Elefante Mode to be enabled
 # These are safe to call even when databases are locked by another IDE
 SAFE_TOOLS = {
-    "elefanteSystemEnable",
-    "elefanteSystemDisable",
-    "elefanteSystemStatusGet",
-    "elefanteDashboardOpen",
+    "elefante-System",
+    "elefante-SystemStatusGet",
+    "elefante-DashboardOpen",
 }
 
 
@@ -55,13 +54,12 @@ class ElefanteMCPServer:
     MCP Server for Elefante Memory System
     
     Exposes memory operations as MCP tools:
-    - elefanteMemoryAdd: Store new memories
-    - elefanteMemorySearch: Search with semantic/structured/hybrid modes
-    - elefanteGraphQuery: Execute Cypher queries on knowledge graph
-    - elefanteContextGet: Retrieve session context
-    - elefanteGraphEntityCreate: Create entities in knowledge graph
-    - elefanteGraphRelationshipCreate: Link entities with relationships
-    - elefanteSystemStatusGet: Get system status and statistics
+    - elefante-MemoryAdd: Store new memories
+    - elefante-MemorySearch: Search with semantic/structured/hybrid modes
+    - elefante-GraphQuery: Execute Cypher queries on knowledge graph
+    - elefante-ContextGet: Retrieve session context
+    - elefante-GraphConnect: Batch upsert entities and relationships
+    - elefante-SystemStatusGet: Get system status and statistics
     """
     
     def __init__(self):
@@ -82,17 +80,17 @@ class ElefanteMCPServer:
         # Register tool handlers
         self._register_handlers()
         
-        self.logger.info("Elefante MCP Server initialized (v1.9.1 - Tool Consolidation)")
+        self.logger.info("Elefante MCP Server initialized (v1.10.0 - Behavioral Relevance)")
 
     # Tools that should NOT get automatic context injection
     # (they already return memory data, or are system/admin tools)
     _CONTEXT_SKIP_TOOLS = {
-        "elefanteMemorySearch", "elefanteMemoryAdd",
-        "elefanteContextGet", "elefanteMemoryConsolidate",
-        "elefanteSystem", "elefanteSystemStatusGet",
-        "elefanteDashboardOpen", "elefanteSessionsList",
-        "elefanteETLProcess", "elefanteETLClassify",
-        "elefanteMemoryUpdate", "elefanteMemoryDelete",
+        "elefante-MemorySearch", "elefante-MemoryAdd",
+        "elefante-ContextGet", "elefante-MemoryConsolidate",
+        "elefante-System", "elefante-SystemStatusGet",
+        "elefante-DashboardOpen", "elefante-SessionsList",
+        "elefante-ETLProcess", "elefante-ETLClassify",
+        "elefante-MemoryUpdate", "elefante-MemoryDelete",
     }
 
     def _extract_search_signal(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
@@ -103,7 +101,7 @@ class ElefanteMCPServer:
                 return arguments[key].strip()[:200]
 
         # For task create with subtasks, join subtask descriptions
-        if tool_name == "elefanteTaskCreate" and "subtasks" in arguments:
+        if tool_name == "elefante-TaskCreate" and "subtasks" in arguments:
             descs = [s.get("description", "") for s in arguments.get("subtasks", []) if isinstance(s, dict)]
             combined = "; ".join(d for d in descs if d)
             if combined:
@@ -120,7 +118,7 @@ class ElefanteMCPServer:
         AUTOMATIC CONTEXT INJECTION (v1.8.0):
         On every tool call, surfaces the top 3 most relevant memories from ChromaDB
         and appends them to the response. The agent gets context for free — no
-        explicit elefanteMemorySearch call required.
+        explicit elefante-MemorySearch call required.
 
         Skips tools that already return memory data (search, list, ETL, system).
         Budget: max 3 memories, high similarity threshold (0.5), summary only.
@@ -178,23 +176,23 @@ class ElefanteMCPServer:
         ]
         
         # Context-specific injections
-        if tool_name == "elefanteMemoryAdd":
-            pitfalls.append("WARNING - MEMORY INTEGRITY: Ensure 'layer' and 'sublayer' are correctly classified. Do not default to 'world/fact' if unsure.")
+        if tool_name == "elefante-MemoryAdd":
+            pitfalls.append("WARNING - MEMORY INTEGRITY: Score is system-computed. Classify memory_type accurately — it determines the decay rate.")
         
-        if tool_name == "elefanteMemorySearch":
+        if tool_name == "elefante-MemorySearch":
              pitfalls.append("WARNING - SEARCH BIAS: If results are empty, try broader terms. Do not assume non-existence without a semantic search.")
              pitfalls.append("WARNING - CONTRADICTIONS: If you find contradictory memories, prioritize the most recent one but note the conflict.")
 
         if tool_name in [
-            "elefanteGraphQuery",
-            "elefanteGraphConnect",
+            "elefante-GraphQuery",
+            "elefante-GraphConnect",
         ]:
             pitfalls.append("WARNING - GRAPH CONSISTENCY: Ensure entity types match the allowed enum values. Do not invent new types without updating the schema.")
 
-        if tool_name == "elefanteGraphConnect":
+        if tool_name == "elefante-GraphConnect":
             pitfalls.append("WARNING - WORKFLOW: Prefer stable entity names/types and reuse existing entities. Avoid creating near-duplicates that only differ by punctuation or casing.")
 
-        if tool_name == "elefanteDashboardOpen":
+        if tool_name == "elefante-DashboardOpen":
             pitfalls.append("WARNING - DASHBOARD: If refresh=true, this reads from databases and requires Elefante Mode to be enabled.")
 
         # Add to result with a key that demands attention
@@ -210,14 +208,14 @@ class ElefanteMCPServer:
         v1.6.0 Compliance Gate: Enforce search-before-write rule.
         
         Returns None if gate passes, or an error dict if gate blocks.
-        Write operations are blocked until elefanteMemorySearch has been called.
+        Write operations are blocked until elefante-MemorySearch has been called.
         """
         # Tools that require prior search (write operations)
         GATED_TOOLS = {
-            "elefanteMemoryAdd",
-            "elefanteMemoryUpdate",
-            "elefanteMemoryDelete",
-            "elefanteGraphConnect",
+            "elefante-MemoryAdd",
+            "elefante-MemoryUpdate",
+            "elefante-MemoryDelete",
+            "elefante-GraphConnect",
         }
         
         if tool_name not in GATED_TOOLS:
@@ -232,10 +230,10 @@ class ElefanteMCPServer:
             "success": False,
             "error": " COMPLIANCE GATE: Search required before write operations.",
             "gate_status": "BLOCKED",
-            "action_required": "Call elefanteMemorySearch first to check for existing/related memories.",
+            "action_required": "Call elefante-MemorySearch first to check for existing/related memories.",
             "reason": "This prevents duplicate memories and ensures you have full context before adding new knowledge.",
             "blocked_tool": tool_name,
-            "hint": f"Try: elefanteMemorySearch with a query related to what you want to store."
+            "hint": f"Try: elefante-MemorySearch with a query related to what you want to store."
         }
     
     def _reset_compliance_gate(self):
@@ -265,20 +263,12 @@ class ElefanteMCPServer:
             self.logger.info("=== list_tools() handler called by MCP client ===")
             tools = [
                 types.Tool(
-                    name="elefanteMemoryAdd",
+                    name="elefante-MemoryAdd",
                     description="""Store a new memory in Elefante's dual-database system.
 
-**YOU ARE ELEFANTE'S BRAIN** - You must classify the memory as you store it:
-- **layer**: self (who), world (what), intent (do)
-- **sublayer**: 
-  - SELF: identity, preference, constraint
-  - WORLD: fact, failure, method
-  - INTENT: rule, goal, anti-pattern
-- **importance**: How critical? 1-10 (8+ for preferences, decisions, critical facts)
+Score is system-computed (0-100) based on behavioral signals: recency, freshness, and reinforcement. You do NOT assign importance — it emerges from how the memory is used over time.
 
-ALWAYS provide layer and sublayer. You understand the content - classify it.
-
-INTELLIGENT INGESTION: The system automatically detects duplicates (REDUNDANT), related memories (RELATED), or contradictions (CONTRADICTORY) and links to existing knowledge.""",
+Classify the memory by providing memory_type, domain, and category. The system handles the rest: duplicate detection (REDUNDANT), relation detection (RELATED), and contradiction detection (CONTRADICTORY).""",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -286,36 +276,20 @@ INTELLIGENT INGESTION: The system automatically detects duplicates (REDUNDANT), 
                                 "type": "string",
                                 "description": "The memory content to store"
                             },
-                            "layer": {
-                                "type": "string",
-                                "enum": ["self", "world", "intent"],
-                                "description": "Memory layer (self/world/intent)"
-                            },
-                            "sublayer": {
-                                "type": "string",
-                                "description": "Memory sublayer (e.g. identity, fact, rule)"
-                            },
                             "memory_type": {
                                 "type": "string",
                                 "enum": ["conversation", "fact", "insight", "code", "decision", "task", "note", "preference"],
                                 "default": "conversation",
-                                "description": "Type of memory - YOU MUST CLASSIFY THIS"
+                                "description": "Type of memory — determines decay rate. Preferences/rules decay slowest, conversations fastest."
                             },
                             "domain": {
                                 "type": "string",
                                 "enum": ["work", "personal", "learning", "project", "reference", "system"],
-                                "description": "High-level context - YOU MUST CLASSIFY THIS"
+                                "description": "High-level context"
                             },
                             "category": {
                                 "type": "string",
-                                "description": "Topic grouping (e.g., 'elefante', 'python', 'user-preferences') - YOU MUST CLASSIFY THIS"
-                            },
-                            "importance": {
-                                "type": "integer",
-                                "minimum": 1,
-                                "maximum": 10,
-                                "default": 5,
-                                "description": "Importance level (1-10). Use 8+ for preferences, decisions, critical facts"
+                                "description": "Topic grouping (e.g., 'elefante', 'python', 'user-preferences')"
                             },
                             "tags": {
                                 "type": "array",
@@ -348,7 +322,7 @@ INTELLIGENT INGESTION: The system automatically detects duplicates (REDUNDANT), 
                     }
                 ),
                 types.Tool(
-                    name="elefanteMemorySearch",
+                    name="elefante-MemorySearch",
                     description="""**CRITICAL: USE THIS TOOL FOR ALL MEMORY QUERIES** - Search Elefante's memory system when user asks about their preferences, past conversations, or anything they want you to remember. DO NOT search workspace files for memory queries.
 
 **QUERY REWRITING REQUIREMENT:** Before calling this tool, you MUST rewrite the user's query to be standalone and specific. Replace ALL pronouns (it, that, this, he, she, they) and vague references with the actual entities from conversation context.
@@ -397,7 +371,7 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
                                     "memory_type": {"type": "string"},
                                     "domain": {"type": "string", "enum": ["work", "personal", "learning", "project", "reference", "system"]},
                                     "category": {"type": "string"},
-                                    "min_importance": {"type": "integer", "minimum": 1, "maximum": 10},
+                                    "min_score": {"type": "integer", "minimum": 0, "maximum": 100, "description": "Minimum behavioral score (0-100)"},
                                     "tags": {"type": "array", "items": {"type": "string"}},
                                     "start_date": {"type": "string", "format": "date-time"},
                                     "end_date": {"type": "string", "format": "date-time"}
@@ -441,7 +415,7 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
                     }
                 ),
                 types.Tool(
-                    name="elefanteGraphQuery",
+                    name="elefante-GraphQuery",
                     description="Execute Cypher queries directly on Elefante's Kuzu knowledge graph for advanced structured data retrieval. Use this for complex relationship traversals, pattern matching, and graph analytics. Ideal for queries like 'Find all entities connected to X', 'Show the path between A and B', or 'List all relationships of type Y'.",
                     inputSchema={
                         "type": "object",
@@ -459,7 +433,7 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
                     }
                 ),
                 types.Tool(
-                    name="elefanteContextGet",
+                    name="elefante-ContextGet",
                     description="**CONTEXTUAL GROUNDING**: Retrieve comprehensive context from Elefante's memory system for a specific session or task. Returns related memories from ChromaDB, connected entities and relationships from Kuzu graph, with configurable traversal depth. Use this to gather full context before making decisions or generating responses.",
                     inputSchema={
                         "type": "object",
@@ -485,10 +459,10 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
                         }
                     }
                 ),
-                # v1.9.1: elefanteGraphEntityCreate and elefanteGraphRelationshipCreate REMOVED
-                # Use elefanteGraphConnect instead (batch upsert covers both use cases)
+                # v1.9.1: elefante-GraphEntityCreate and elefante-GraphRelationshipCreate REMOVED
+                # Use elefante-GraphConnect instead (batch upsert covers both use cases)
                 types.Tool(
-                    name="elefanteSessionsList",
+                    name="elefante-SessionsList",
                     description="Retrieve a list of recent sessions (episodes) with summaries. Use this to browse past interactions and understand the timeline of work. Each episode represents a distinct session of activity.",
                     inputSchema={
                         "type": "object",
@@ -507,7 +481,7 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
                     }
                 ),
                 types.Tool(
-                    name="elefanteSystemStatusGet",
+                    name="elefante-SystemStatusGet",
                     description="Get combined system status and statistics for Elefante. Includes Elefante Mode state (enabled/disabled), lock status, and when enabled, database health/usage statistics from the orchestrator.",
                     inputSchema={
                         "type": "object",
@@ -515,7 +489,7 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
                     }
                 ),
                 types.Tool(
-                    name="elefanteMemoryConsolidate",
+                    name="elefante-MemoryConsolidate",
                     description="**MEMORY MAINTENANCE**: Deterministic, LLM-free memory cleanup. Use this to canonicalize memories (set stable keys), quarantine test data, and mark duplicates as redundant/superseded so exports and search stay clean. Default is dry-run (`force=false`); set `force=true` to apply changes.",
                     inputSchema={
                         "type": "object",
@@ -528,20 +502,19 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
                         }
                     }
                 ),
-                # v1.9.1: elefanteMemoryListAll REMOVED — use elefanteMemorySearch with list_all=true
-                # v1.9.1: elefanteMemoryMigrateToV3 REMOVED (one-time admin, moved to scripts/)
+                # v1.9.1: elefante-MemoryListAll REMOVED — use elefante-MemorySearch with list_all=true
+                # v1.9.1: elefante-MemoryMigrateToV3 REMOVED (one-time admin, moved to scripts/)
                 # v1.9.0: Memory Custodial Tools (Amendment + Forgetting)
                 types.Tool(
-                    name="elefanteMemoryUpdate",
-                    description="""**MEMORY AMENDMENT**: Update an existing memory's content or metadata in-place. Use this to correct wrong facts, mark memories as deprecated/archived, set supersession chains, or adjust importance. This is the Amendment duty — correct the record rather than burying it under new entries.
+                    name="elefante-MemoryUpdate",
+                    description="""**MEMORY AMENDMENT**: Update an existing memory's content or metadata in-place. Use this to correct wrong facts, mark memories as deprecated/archived, or set supersession chains. This is the Amendment duty — correct the record rather than burying it under new entries.
 
 When to use:
 - A stored fact is wrong or outdated → update content
 - A decision has been superseded → set deprecated=true and/or supersedes_id
-- Importance needs adjustment after review
 - Tags need correction
 
-Requires prior elefanteMemorySearch (Compliance Gate).""",
+Requires prior elefante-MemorySearch (Compliance Gate).""",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -552,12 +525,6 @@ Requires prior elefanteMemorySearch (Compliance Gate).""",
                             "content": {
                                 "type": "string",
                                 "description": "New content to replace the existing content (triggers re-embedding)"
-                            },
-                            "importance": {
-                                "type": "integer",
-                                "minimum": 1,
-                                "maximum": 10,
-                                "description": "Updated importance level"
                             },
                             "deprecated": {
                                 "type": "boolean",
@@ -581,12 +548,12 @@ Requires prior elefanteMemorySearch (Compliance Gate).""",
                     }
                 ),
                 types.Tool(
-                    name="elefanteMemoryDelete",
+                    name="elefante-MemoryDelete",
                     description="""**PURPOSEFUL FORGETTING**: Permanently delete a memory from the vector store. Use this for: removing incorrect/harmful facts, cleaning up test data, pruning transient context that should not persist. Requires a reason for audit trail.
 
 This is the Forgetting duty — some information must be actively removed, not just deprioritized.
 
-Requires prior elefanteMemorySearch (Compliance Gate).""",
+Requires prior elefante-MemorySearch (Compliance Gate).""",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -603,7 +570,7 @@ Requires prior elefanteMemorySearch (Compliance Gate).""",
                     }
                 ),
                 types.Tool(
-                    name="elefanteDashboardOpen",
+                    name="elefante-DashboardOpen",
                     description="Launch and open the Elefante Knowledge Garden Dashboard in the user's browser. Optionally refresh the dashboard snapshot data first.",
                     inputSchema={
                         "type": "object",
@@ -617,7 +584,7 @@ Requires prior elefanteMemorySearch (Compliance Gate).""",
                     }
                 ),
                 types.Tool(
-                    name="elefanteGraphConnect",
+                    name="elefante-GraphConnect",
                     description="Create a small, idempotent graph workflow in one call: upsert entities (by name+type) and create relationships between them. Designed to reduce tool-chaining and keep graph operations consistent.",
                     inputSchema={
                         "type": "object",
@@ -658,14 +625,14 @@ Requires prior elefanteMemorySearch (Compliance Gate).""",
                             "include_system_status": {
                                 "type": "boolean",
                                 "default": False,
-                                "description": "If true, include elefanteSystemStatusGet output in the response."
+                                "description": "If true, include elefante-SystemStatusGet output in the response."
                             }
                         },
                         "additionalProperties": False
                     }
                 ),
                 types.Tool(
-                    name="elefanteSystem",
+                    name="elefante-System",
                     description="""Enable or disable Elefante Mode. Controls the memory system's on/off state and database locks.
 
 action="enable" (default): Acquires exclusive locks on ChromaDB and Kuzu databases, activates memory operations. Required first step.
@@ -693,7 +660,7 @@ If another IDE is using Elefante, enable will fail gracefully with lock informat
                 # TASK ORCHESTRATION TOOLS (v1.7.0 - Agentic Decomposition)
                 # =====================================================================
                 types.Tool(
-                    name="elefanteTaskCreate",
+                    name="elefante-TaskCreate",
                     description="""Create a new task in Elefante's orchestration graph. Tasks are stored as Kuzu nodes and can form hierarchies (parent/child) and dependency chains (blocked_by). Use this to register a unit of work that agents will execute.""",
                     inputSchema={
                         "type": "object",
@@ -733,15 +700,15 @@ If another IDE is using Elefante, enable will fail gracefully with lock informat
                                     },
                                     "required": ["description"]
                                 },
-                                "description": "Optional: create subtasks under this task in one call (absorbs former elefanteTaskDecompose)"
+                                "description": "Optional: create subtasks under this task in one call (absorbs former elefante-TaskDecompose)"
                             }
                         },
                         "required": ["description"]
                     }
                 ),
-                # v1.9.1: elefanteTaskDecompose REMOVED — use elefanteTaskCreate with subtasks array
+                # v1.9.1: elefante-TaskDecompose REMOVED — use elefante-TaskCreate with subtasks array
                 types.Tool(
-                    name="elefanteTaskUpdate",
+                    name="elefante-TaskUpdate",
                     description="""Update a task's status or output. Use this to mark tasks as in_progress, completed, failed, or blocked. Optionally attach output text (result summary, error message, etc.).""",
                     inputSchema={
                         "type": "object",
@@ -764,7 +731,7 @@ If another IDE is using Elefante, enable will fail gracefully with lock informat
                     }
                 ),
                 types.Tool(
-                    name="elefanteTaskGraph",
+                    name="elefante-TaskGraph",
                     description="""Get the task hierarchy. Without a task_id, returns all root tasks (top-level goals). With a task_id, returns that task and its direct subtasks. Use this to see what's planned, in progress, and completed.""",
                     inputSchema={
                         "type": "object",
@@ -780,10 +747,10 @@ If another IDE is using Elefante, enable will fail gracefully with lock informat
                 # ETL TOOLS (Agent-Brain Classification)
                 # =====================================================================
                 types.Tool(
-                    name="elefanteETLProcess",
+                    name="elefante-ETLProcess",
                     description="""**PHASE 2 ETL**: Get unclassified memories for YOU (the agent) to classify.
 
-This returns raw memories that need V5 topology classification. YOU must analyze each one and call elefanteETLClassify with your classification.
+This returns raw memories that need V5 topology classification. YOU must analyze each one and call elefante-ETLClassify with your classification.
 
 V5 Topology Schema:
 - **ring**: core (immutable truths) | domain (preferences, identity) | topic (project-specific) | leaf (ephemeral)
@@ -792,9 +759,9 @@ V5 Topology Schema:
 - **summary**: One-line description
 
 Flow:
-1. Call elefanteETLProcess(limit=5) → Get raw memories
+1. Call elefante-ETLProcess(limit=5) → Get raw memories
 2. Analyze each memory using your LLM brain
-3. Call elefanteETLClassify for each with your classification""",
+3. Call elefante-ETLClassify for each with your classification""",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -814,13 +781,13 @@ Flow:
                     }
                 ),
                 types.Tool(
-                    name="elefanteETLClassify",
+                    name="elefante-ETLClassify",
                     description="""**PHASE 2 ETL**: Submit YOUR classification for a memory.
 
-After analyzing a memory from elefanteETLProcess, call this to store your V5 classification.
+After analyzing a memory from elefante-ETLProcess, call this to store your V5 classification.
 
 Required fields:
-- memory_id: From elefanteETLProcess
+- memory_id: From elefante-ETLProcess
 - ring: core | domain | topic | leaf
 - knowledge_type: law | principle | method | decision | insight | preference | fact
 - topic: coding-standards | communication | workflow | agent-behavior | tools-environment | collaboration | general
@@ -830,7 +797,7 @@ Required fields:
                         "properties": {
                             "memory_id": {
                                 "type": "string",
-                                "description": "Memory UUID from elefanteETLProcess"
+                                "description": "Memory UUID from elefante-ETLProcess"
                             },
                             "ring": {
                                 "type": "string",
@@ -855,7 +822,7 @@ Required fields:
                         "required": ["memory_id", "ring", "knowledge_type", "topic", "summary"]
                     }
                 )
-                # v1.9.1: elefanteETLStatus REMOVED — use elefanteETLProcess with include_stats=true
+                # v1.9.1: elefante-ETLStatus REMOVED — use elefante-ETLProcess with include_stats=true
             ]
             self.logger.info(f"=== Returning {len(tools)} tools to MCP client ===")
             return tools
@@ -914,7 +881,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
 - Project-specific knowledge ("how we do X")
 - "The usual way" or "like we discussed"
 
-**YOU MUST first call `elefanteMemorySearch`** with a specific query.
+**YOU MUST first call `elefante-MemorySearch`** with a specific query.
 
 ## RULE: When in doubt, SEARCH.
 - Memory search is FAST (< 100ms)
@@ -980,52 +947,52 @@ You have access to a persistent memory system called **Elefante** - the user's s
             
             try:
                 # Handle mode management + safe tools FIRST (always available)
-                if name == "elefanteSystem":
+                if name == "elefante-System":
                     action = arguments.get("action", "enable")
                     if action == "disable":
                         result = await self._handle_disable_elefante(arguments)
                     else:
                         result = await self._handle_enable_elefante(arguments)
                     return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
-                elif name == "elefanteSystemStatusGet":
+                elif name == "elefante-SystemStatusGet":
                     result = await self._handle_get_system_status(arguments)
                     return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
-                elif name == "elefanteDashboardOpen":
+                elif name == "elefante-DashboardOpen":
                     result = await self._handle_get_elefante_dashboard(arguments)
                     return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
                 
                 # v1.9.1: Mode check removed - operations auto-acquire/release locks
                 # Write operations use write_lock() context manager internally
                 
-                if name == "elefanteMemoryAdd":
+                if name == "elefante-MemoryAdd":
                     result = await self._handle_add_memory(arguments)
-                elif name == "elefanteMemorySearch":
+                elif name == "elefante-MemorySearch":
                     result = await self._handle_search_memories(arguments)
-                elif name == "elefanteGraphQuery":
+                elif name == "elefante-GraphQuery":
                     result = await self._handle_query_graph(arguments)
-                elif name == "elefanteContextGet":
+                elif name == "elefante-ContextGet":
                     result = await self._handle_get_context(arguments)
-                elif name == "elefanteSessionsList":
+                elif name == "elefante-SessionsList":
                     result = await self._handle_get_episodes(arguments)
-                elif name == "elefanteMemoryConsolidate":
+                elif name == "elefante-MemoryConsolidate":
                     result = await self._handle_consolidate_memories(arguments)
-                elif name == "elefanteMemoryUpdate":
+                elif name == "elefante-MemoryUpdate":
                     result = await self._handle_update_memory(arguments)
-                elif name == "elefanteMemoryDelete":
+                elif name == "elefante-MemoryDelete":
                     result = await self._handle_delete_memory(arguments)
-                elif name == "elefanteGraphConnect":
+                elif name == "elefante-GraphConnect":
                     result = await self._handle_set_elefante_connection(arguments)
                 # ETL Tools (Agent-Brain Classification)
-                elif name == "elefanteETLProcess":
+                elif name == "elefante-ETLProcess":
                     result = await self._handle_etl_process(arguments)
-                elif name == "elefanteETLClassify":
+                elif name == "elefante-ETLClassify":
                     result = await self._handle_etl_classify(arguments)
                 # Task Orchestration Tools (v1.7.0, consolidated v1.9.1)
-                elif name == "elefanteTaskCreate":
+                elif name == "elefante-TaskCreate":
                     result = await self._handle_task_create(arguments)
-                elif name == "elefanteTaskUpdate":
+                elif name == "elefante-TaskUpdate":
                     result = await self._handle_task_update(arguments)
-                elif name == "elefanteTaskGraph":
+                elif name == "elefante-TaskGraph":
                     result = await self._handle_task_graph(arguments)
                 else:
                     raise ValueError(f"Unknown tool: {name}")
@@ -1087,7 +1054,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
 
         if not self.mode_manager.is_enabled:
             status["stats"] = None
-            status["message"] = "Elefante Mode is DISABLED - call elefanteSystem(action='enable') to activate"
+            status["message"] = "Elefante Mode is DISABLED - call elefante-System(action='enable') to activate"
             return status
 
         orchestrator = await self._get_orchestrator()
@@ -1099,7 +1066,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
     async def _handle_add_memory(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Handle elefanteMemoryAdd tool call - Authoritative Pipeline (v1.6.0: Compliance Gate)"""
         # v1.6.0 Compliance Gate Check
-        gate_result = self._check_compliance_gate("elefanteMemoryAdd")
+        gate_result = self._check_compliance_gate("elefante-MemoryAdd")
         if gate_result is not None:
             return gate_result
         
@@ -1120,20 +1087,10 @@ You have access to a persistent memory system called **Elefante** - the user's s
             metadata["domain"] = args["domain"]
         if args.get("category"):
             metadata["category"] = args["category"]
-            
-        # Add layer/sublayer to metadata - AUTHORITATIVE
-        if args.get("layer"):
-            metadata["layer"] = args["layer"]
-        if args.get("sublayer"):
-            metadata["sublayer"] = args["sublayer"]
-            
-        # Note: We removed the local classifier fallback. 
-        # The Orchestrator's 5-Step Pipeline handles validation and defaults.
         
         memory = await orchestrator.add_memory(
             content=args["content"],
             memory_type=args.get("memory_type", "conversation"),
-            importance=args.get("importance", 5),
             tags=args.get("tags"),
             entities=args.get("entities"),
             metadata=metadata if metadata else None,
@@ -1166,9 +1123,8 @@ You have access to a persistent memory system called **Elefante** - the user's s
             "relationship_count": entity_count,  # 1 relationship per entity
             "embedding_id": str(memory.id),
             "graph_ids": [str(memory.id)],  # Memory node ID
-            "layer": memory.metadata.layer,
-            "sublayer": memory.metadata.sublayer,
-            "importance": memory.metadata.importance,
+            "score": memory.metadata.score,
+            "memory_type": memory.metadata.memory_type.value if hasattr(memory.metadata.memory_type, 'value') else str(memory.metadata.memory_type),
             "memory_id": str(memory.id)
         }
     
@@ -1190,7 +1146,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 memory_type=filter_data.get("memory_type"),
                 domain=filter_data.get("domain"),
                 category=filter_data.get("category"),
-                min_importance=filter_data.get("min_importance"),
+                min_importance=filter_data.get("min_score"),
                 max_importance=filter_data.get("max_importance"),
                 tags=filter_data.get("tags"),
                 start_date=datetime.fromisoformat(filter_data["start_date"]) if "start_date" in filter_data else None,
@@ -1371,7 +1327,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 memory_type=filter_data.get("memory_type"),
                 domain=filter_data.get("domain"),
                 category=filter_data.get("category"),
-                min_importance=filter_data.get("min_importance"),
+                min_importance=filter_data.get("min_score"),
                 max_importance=filter_data.get("max_importance"),
                 tags=filter_data.get("tags")
             )
@@ -1395,7 +1351,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
     
     async def _handle_update_memory(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Handle elefanteMemoryUpdate tool call — amend memories in-place."""
-        gate_result = self._check_compliance_gate("elefanteMemoryUpdate")
+        gate_result = self._check_compliance_gate("elefante-MemoryUpdate")
         if gate_result is not None:
             return gate_result
         
@@ -1412,7 +1368,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
             
             # Build updates dict from provided args
             updates = {}
-            for key in ("content", "importance", "deprecated", "archived", "tags", "supersedes_id"):
+            for key in ("content", "deprecated", "archived", "tags", "supersedes_id"):
                 if key in args:
                     val = args[key]
                     if key == "supersedes_id" and val:
@@ -1420,7 +1376,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                     updates[key] = val
             
             if not updates:
-                return {"success": False, "error": "No fields to update. Provide at least one of: content, importance, deprecated, archived, supersedes_id, tags"}
+                return {"success": False, "error": "No fields to update. Provide at least one of: content, deprecated, archived, supersedes_id, tags"}
             
             orchestrator = await self._get_orchestrator()
             vs = orchestrator.vector_store
@@ -1444,7 +1400,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
     
     async def _handle_delete_memory(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Handle elefanteMemoryDelete tool call — purposeful forgetting."""
-        gate_result = self._check_compliance_gate("elefanteMemoryDelete")
+        gate_result = self._check_compliance_gate("elefante-MemoryDelete")
         if gate_result is not None:
             return gate_result
         
@@ -1618,9 +1574,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 "properties": {
                     "content": mem.content,
                     "memory_type": mem.metadata.memory_type.value if hasattr(mem.metadata.memory_type, "value") else str(mem.metadata.memory_type),
-                    "importance": mem.metadata.importance,
-                    "layer": getattr(mem.metadata, "layer", "world"),
-                    "sublayer": getattr(mem.metadata, "sublayer", "fact"),
+                    "score": mem.metadata.score,
                     "tags": ",".join(mem.metadata.tags) if mem.metadata.tags else "",
                     "status": status_value,
                     "relationship_type": rel_type_value,
@@ -1847,7 +1801,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         refresh_result = None
         if refresh:
             if not self.mode_manager.is_enabled:
-                return self.mode_manager.get_disabled_response("elefanteDashboardOpen")
+                return self.mode_manager.get_disabled_response("elefante-DashboardOpen")
             refresh_result = await self._refresh_dashboard_snapshot()
 
         open_result = await self._start_dashboard_and_open()
@@ -1861,7 +1815,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
     async def _handle_set_elefante_connection(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Handle elefanteGraphConnect tool call (v1.6.0: Compliance Gate)"""
         # v1.6.0 Compliance Gate Check
-        gate_result = self._check_compliance_gate("elefanteGraphConnect")
+        gate_result = self._check_compliance_gate("elefante-GraphConnect")
         if gate_result is not None:
             return gate_result
         
@@ -1983,8 +1937,6 @@ You have access to a persistent memory system called **Elefante** - the user's s
             offset = 0
             total_migrated = 0
             errors = 0
-            
-            from src.core.classifier import classify_memory
         
         # Helper for JSON serialization
         def json_serializer(obj):
@@ -2008,13 +1960,9 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 
             for mem in memories:
                 try:
-                    # Classify
+                    # v1.10.0: Legacy migration handler — layer/sublayer removed.
+                    # This handler is not exposed as a tool anymore.
                     content = mem.content
-                    layer, sublayer = classify_memory(content)
-                    
-                    # Update Metadata
-                    mem.metadata.layer = layer
-                    mem.metadata.sublayer = sublayer
                     
                     # Update Vector Store (Delete + Add)
                     await orchestrator.vector_store.delete_memory(mem.id)
@@ -2025,10 +1973,8 @@ You have access to a persistent memory system called **Elefante** - the user's s
                         "content": content[:200],
                         "full_content": content,
                         "title": mem.metadata.custom_metadata.get("title", f"Memory {mem.id}"),
-                        "layer": layer,
-                        "sublayer": sublayer,
                         "memory_type": mem.metadata.memory_type.value if hasattr(mem.metadata.memory_type, "value") else str(mem.metadata.memory_type),
-                        "importance": mem.metadata.importance,
+                        "score": mem.metadata.score,
                         "status": mem.metadata.status.value if hasattr(mem.metadata.status, "value") else str(mem.metadata.status),
                         "timestamp": mem.metadata.created_at.isoformat() if isinstance(mem.metadata.created_at, datetime) else mem.metadata.created_at,
                         "entity_subtype": "memory"
@@ -2082,7 +2028,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 "success": True,
                 "count": len(raw_memories),
                 "memories": raw_memories,
-                "instructions": "Analyze each memory and call elefanteETLClassify with your classification. Use V5 schema: ring (core/domain/topic/leaf), knowledge_type (law/principle/method/decision/insight/preference/fact), topic (coding-standards/communication/workflow/agent-behavior/tools-environment/collaboration/general), summary (one-line)."
+                "instructions": "Analyze each memory and call elefante-ETLClassify with your classification. Use V5 schema: ring (core/domain/topic/leaf), knowledge_type (law/principle/method/decision/insight/preference/fact), topic (coding-standards/communication/workflow/agent-behavior/tools-environment/collaboration/general), summary (one-line)."
             }
         
         # v1.9.1: include_stats (absorbs former elefanteETLStatus)

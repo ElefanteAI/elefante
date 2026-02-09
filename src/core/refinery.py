@@ -181,7 +181,7 @@ def _select_winner(memories: List[Memory]) -> Memory:
         return (
             1 if active else 0,
             ps_rank,
-            int(m.metadata.importance or 0),
+            int(m.metadata.score or 0),
             int(m.metadata.access_count or 0),
             created_ts,
             str(m.id),

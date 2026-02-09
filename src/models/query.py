@@ -101,8 +101,8 @@ class SearchFilters(BaseModel):
     memory_type: Optional[str] = None
     domain: Optional[str] = None
     category: Optional[str] = None
-    min_importance: Optional[int] = Field(None, ge=1, le=10)
-    max_importance: Optional[int] = Field(None, ge=1, le=10)
+    min_importance: Optional[int] = Field(None, ge=0, le=100)
+    max_importance: Optional[int] = Field(None, ge=0, le=100)
     tags: Optional[List[str]] = None
     source: Optional[str] = None
     

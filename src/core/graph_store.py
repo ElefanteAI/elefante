@@ -892,8 +892,8 @@ class GraphStore:
         cypher = """
             MATCH (m:Memory)
             WHERE m.content CONTAINS $query
-            RETURN m.id, m.content, m.timestamp, m.memory_type, m.importance
-            ORDER BY m.importance DESC
+            RETURN m.id, m.content, m.timestamp, m.memory_type, m.score
+            ORDER BY m.score DESC
             LIMIT $limit
         """
         
@@ -930,8 +930,8 @@ class GraphStore:
                     # Update access tracking
                     memory.record_access()
                 else:
-                    # Use importance as relevance score
-                    memory.relevance_score = memory.metadata.importance / 10.0
+                    # Use score as relevance score (0-100 → 0-1)
+                    memory.relevance_score = memory.metadata.score / 100.0
                 
                 memories.append(memory)
             

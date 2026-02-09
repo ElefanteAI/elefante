@@ -25,7 +25,7 @@ class MemoryCandidate:
     summary: str
     concepts: list[str]
     domain: str
-    importance: int
+    importance: int  # v1.10.0: maps to metadata.score (0-100)
     access_count: int
     created_at: datetime
     last_accessed: datetime
@@ -241,8 +241,8 @@ class CognitiveRetriever:
         return 0.6 * access_score + 0.4 * freshness_score
     
     def compute_authority(self, importance: int, access_count: int) -> float:
-        """Authority from importance and usage."""
-        importance_factor = importance / 10.0
+        """Authority from score (0-100) and usage."""
+        importance_factor = importance / 100.0
         access_factor = min(1.0, math.log(access_count + 1) / math.log(50))
         
         return 0.6 * importance_factor + 0.4 * access_factor
@@ -283,7 +283,7 @@ class CognitiveRetriever:
         
         # Authority
         candidate.authority_score = self.compute_authority(
-            candidate.importance,
+            candidate.importance,  # maps to score in v1.10.0
             candidate.access_count,
         )
         
@@ -334,12 +334,12 @@ class CognitiveRetriever:
         temporal_reason = f"Accessed {days_since_access} days ago" if days_since_access > 0 else "Recently accessed"
         
         # Build authority reason
-        if candidate.importance >= 8:
-            authority_reason = "High importance, frequently used"
-        elif candidate.importance >= 5:
-            authority_reason = "Medium importance"
+        if candidate.importance >= 80:
+            authority_reason = "High score, frequently used"
+        elif candidate.importance >= 50:
+            authority_reason = "Medium score"
         else:
-            authority_reason = "Lower importance"
+            authority_reason = "Lower score"
         
         # Build domain reason
         if candidate.domain_score >= 1.0:
@@ -388,7 +388,7 @@ class CognitiveRetriever:
                 "weight": self.WEIGHTS["authority"],
                 "weighted": candidate.authority_score * self.WEIGHTS["authority"],
                 "reason": authority_reason,
-                "details": {"importance": candidate.importance, "access_count": candidate.access_count}
+                "details": {"score": candidate.importance, "access_count": candidate.access_count}
             },
             {
                 "name": "temporal",

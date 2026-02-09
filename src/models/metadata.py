@@ -32,7 +32,7 @@ class CoreMetadata(BaseModel):
     """Core identity and classification metadata"""
     memory_type: MemoryType = Field(default=MemoryType.CONVERSATION, description="The fundamental type of the memory")
     source: MemorySource = Field(default=MemorySource.USER, description="Origin of the memory")
-    importance: int = Field(default=5, ge=1, le=10, description="Relevance score (1-10)")
+    importance: int = Field(default=50, ge=0, le=100, description="Behavioral relevance score (0-100)")
     tags: List[str] = Field(default_factory=list, description="Taxonomic tags")
 
 class ContextMetadata(BaseModel):

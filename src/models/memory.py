@@ -5,7 +5,7 @@ Enhanced with 3-level taxonomy, relationship tracking, and temporal intelligence
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Dict, Any, Literal
+from typing import List, Optional, Dict, Any
 from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -123,28 +123,48 @@ SOURCE_RELIABILITY_SCORES = {
 
 
 # ============================================================================
+# DECAY RATES BY MEMORY TYPE
+# Controls how fast a memory loses relevance without access.
+# Half-life = ln(2) / decay_rate  (in days)
+# ============================================================================
+
+TYPE_DECAY_RATES: Dict[str, float] = {
+    "rule": 0.002,          # ~347 days  — rules persist but die if never used
+    "preference": 0.002,    # ~347 days  — preferences are stable
+    "decision": 0.005,      # ~139 days  — decisions get revisited
+    "fact": 0.005,          # ~139 days  — facts change
+    "answer": 0.005,        # ~139 days  — answers may become outdated
+    "insight": 0.008,       # ~87 days   — insights are validated or forgotten
+    "code": 0.008,          # ~87 days   — code evolves
+    "question": 0.015,      # ~46 days   — questions get answered
+    "note": 0.015,          # ~46 days   — notes are transient
+    "observation": 0.015,   # ~46 days   — observations are contextual
+    "hypothesis": 0.01,     # ~69 days   — hypotheses are tested
+    "task": 0.02,           # ~35 days   — tasks complete or stale
+    "conversation": 0.025,  # ~28 days   — conversations are ephemeral
+}
+
+
+# ============================================================================
 # METADATA MODEL
 # ============================================================================
 
 class MemoryMetadata(BaseModel):
-    """Enhanced metadata for V2.0 schema"""
+    """Enhanced metadata — v1.10.0 Schema (Behavioral Relevance)"""
     
-    # Layer 1: Core Identity
+    # Identity
     created_at: datetime = Field(default_factory=datetime.utcnow)
     created_by: str = "user"
     
-    # Layer 2: Classification (3-level taxonomy)
-    layer: Literal["self", "world", "intent"] = "world"
-    sublayer: str = "fact"
+    # Classification (agent provides these)
     domain: DomainType = DomainType.REFERENCE
     category: str = "general"
     memory_type: MemoryType = MemoryType.CONVERSATION
     subcategory: Optional[str] = None
     
-    # Layer 3: Semantic Metadata
+    # Relevance (system-computed — do NOT set manually)
+    score: int = Field(default=50, ge=0, le=100, description="System-computed relevance. Starts at 50, earned through usage, lost through neglect.")
     intent: IntentType = IntentType.REFERENCE
-    importance: int = Field(default=5, ge=1, le=10)
-    urgency: int = Field(default=5, ge=1, le=10)
     confidence: float = Field(default=0.7, ge=0.0, le=1.0)
     tags: List[str] = Field(default_factory=list)
     keywords: List[str] = Field(default_factory=list)
@@ -185,12 +205,12 @@ class MemoryMetadata(BaseModel):
     url: Optional[str] = None
     location: Optional[str] = None
     
-    # Layer 7: Temporal Intelligence
+    # Temporal Intelligence
     last_accessed: datetime = Field(default_factory=datetime.utcnow)
     last_modified: datetime = Field(default_factory=datetime.utcnow)
     access_count: int = 0
-    decay_rate: float = 0.01  # Slow decay by default
-    reinforcement_factor: float = 0.1
+    decay_rate: float = 0.01  # Set from TYPE_DECAY_RATES at creation
+    reinforcement_factor: float = 0.25
     
     # Layer 8: Quality & Lifecycle
     version: int = 1
@@ -266,38 +286,45 @@ class Memory(BaseModel):
     
     def calculate_relevance_score(self, current_time: Optional[datetime] = None) -> float:
         """
-        Calculate temporal relevance score
-        Combines base importance with temporal factors
+        System-computed relevance (v1.10.0).
+        
+        Nobody assigns importance. Importance emerges from behavior:
+        - Recency: newer memories score higher, old ones decay exponentially
+        - Freshness: recently-retrieved memories get boosted
+        - Reinforcement: frequently-accessed memories grow stronger
+        
+        Formula: relevance = 0.5 * recency * freshness * reinforcement
+        Returns float 0.0–1.0 for search ranking.
         """
         import math
         
         if current_time is None:
             current_time = datetime.utcnow()
         
-        # Base score from importance
-        base = self.metadata.importance / 10.0
+        # Days since events (fractional for precision)
+        days_since_created = max(0, (current_time - self.metadata.created_at).total_seconds() / 86400)
+        days_since_access = max(0, (current_time - self.metadata.last_accessed).total_seconds() / 86400)
+        access_count = max(0, self.metadata.access_count)
         
-        # Recency factor (exponential decay)
-        days_since_created = (current_time - self.metadata.created_at).days
+        # Recency: exponential decay based on memory type
         recency = math.exp(-self.metadata.decay_rate * days_since_created)
         
-        # Access reinforcement (logarithmic growth)
-        if self.metadata.access_count > 0:
-            reinforcement = 1 + (self.metadata.reinforcement_factor * math.log(self.metadata.access_count + 1))
-        else:
-            reinforcement = 1.0
+        # Freshness: decays if not recently retrieved
+        freshness = math.exp(-0.02 * days_since_access)
         
-        # Last access boost
-        days_since_access = (current_time - self.metadata.last_accessed).days
-        access_boost = math.exp(-0.1 * days_since_access)
+        # Reinforcement: grows with repeated access (logarithmic)
+        reinforcement = 1.0 + (self.metadata.reinforcement_factor * math.log(access_count + 1))
         
-        # Combined score
-        return base * recency * reinforcement * access_boost
+        # Base = 0.5 (everyone starts equal)
+        raw = 0.5 * recency * freshness * reinforcement
+        return min(1.0, max(0.0, raw))
     
     def record_access(self):
-        """Record that this memory was accessed"""
+        """Record access and recompute stored score."""
         self.metadata.last_accessed = datetime.utcnow()
         self.metadata.access_count += 1
+        # Recompute stored score from behavioral signals
+        self.metadata.score = min(100, max(0, round(self.calculate_relevance_score() * 100)))
     
     def __str__(self) -> str:
         return f"Memory(id={self.id}, type={self.metadata.memory_type}, domain={self.metadata.domain}, content='{self.content[:50]}...')"
@@ -322,19 +349,16 @@ def create_v1_compatible_memory(
     **kwargs
 ) -> Memory:
     """
-    Create a V2 memory from V1-style parameters
-    Provides backward compatibility for existing code
+    Create a memory from V1-style parameters.
+    Maps old importance (1-10) to new score (0-100).
     """
-    # Map V1 source to V2 SourceType
     source_mapping = {
         "user": SourceType.USER_INPUT,
         "agent": SourceType.AGENT_GENERATED,
         "system": SourceType.SYSTEM_INFERRED,
     }
-    
     source_type = source_mapping.get(source, SourceType.USER_INPUT)
     
-    # Infer domain from project/tags
     domain = DomainType.REFERENCE
     if project:
         domain = DomainType.PROJECT
@@ -343,14 +367,22 @@ def create_v1_compatible_memory(
     elif tags and any(tag in ["learning", "education"] for tag in tags):
         domain = DomainType.LEARNING
     
-    # Infer category from tags
     category = "general"
     if tags and len(tags) > 0:
-        category = tags[0]  # Use first tag as category
+        category = tags[0]
+    
+    # Remove deprecated fields from kwargs before passing to MemoryMetadata
+    kwargs.pop("layer", None)
+    kwargs.pop("sublayer", None)
+    kwargs.pop("importance", None)
+    
+    # Set decay rate from memory type
+    decay_rate = TYPE_DECAY_RATES.get(memory_type, 0.01)
     
     metadata = MemoryMetadata(
         memory_type=MemoryType(memory_type) if isinstance(memory_type, str) else memory_type,
-        importance=importance,
+        score=50,  # Everyone starts equal
+        decay_rate=decay_rate,
         tags=tags or [],
         source=source_type,
         session_id=session_id,

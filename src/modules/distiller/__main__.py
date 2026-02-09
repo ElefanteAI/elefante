@@ -238,7 +238,7 @@ def _distill_one(
                     icon = {"decision": "D", "root_cause": "R", "preference": "P",
                             "architecture_rule": "A", "fact": "F", "code_snippet": "C",
                             "error_fix": "E", "workflow": "W"}.get(ins.insight_type.value, "?")
-                    print(f"    [{icon}] imp={ins.importance} | {ins.content[:90]}")
+                    print(f"    [{icon}] {ins.content[:90]}")
             else:
                 print(f"  No insights (session was all noise)")
 

@@ -122,9 +122,7 @@ class VectorStore:
             "created_at": memory.metadata.created_at.isoformat(),
             "created_by": memory.metadata.created_by,
             
-            # Layer 2: Classification (3-level taxonomy)
-            "layer": memory.metadata.layer,  # V3 Schema
-            "sublayer": memory.metadata.sublayer,  # V3 Schema
+            # Layer 2: Classification
             "domain": memory.metadata.domain.value if hasattr(memory.metadata.domain, 'value') else str(memory.metadata.domain),
             "category": memory.metadata.category,
             "memory_type": memory.metadata.memory_type.value if hasattr(memory.metadata.memory_type, 'value') else str(memory.metadata.memory_type),
@@ -132,7 +130,7 @@ class VectorStore:
             
             # Layer 3: Semantic Metadata
             "intent": memory.metadata.intent.value if hasattr(memory.metadata.intent, 'value') else str(memory.metadata.intent),
-            "importance": memory.metadata.importance,
+            "score": memory.metadata.score,
             "urgency": memory.metadata.urgency,
             "confidence": memory.metadata.confidence,
             "tags": ",".join(memory.metadata.tags) if memory.metadata.tags else "",
@@ -733,8 +731,8 @@ class VectorStore:
                 # Regenerate embedding
                 memory.embedding = await self._embedding_service.generate_embedding(memory.content)
             
-            if "importance" in updates:
-                memory.metadata.importance = updates["importance"]
+            if "score" in updates:
+                memory.metadata.score = updates["score"]
             
             if "tags" in updates:
                 memory.metadata.tags = updates["tags"]
