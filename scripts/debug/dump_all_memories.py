@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+"""Dump all 28 memories from ChromaDB — raw inspection."""
+import chromadb
+
+client = chromadb.PersistentClient(path="/Users/jay/.elefante/data/chroma")
+col = client.get_collection("memories")
+results = col.get(include=["documents", "metadatas"])
+
+total = len(results["ids"])
+print(f"TOTAL MEMORIES: {total}")
+print("=" * 80)
+
+for i in range(total):
+    mid = results["ids"][i]
+    doc = results["documents"][i]
+    meta = results["metadatas"][i]
+    
+    print(f"\n--- MEMORY {i+1}/{total} ---")
+    print(f"ID: {mid}")
+    print(f"CONTENT: {doc[:300]}")
+    
+    score = meta.get("score", "N/A")
+    importance = meta.get("importance", "N/A")
+    memory_type = meta.get("memory_type", "N/A")
+    domain = meta.get("domain", "N/A")
+    category = meta.get("category", "N/A")
+    layer = meta.get("layer", "N/A")
+    sublayer = meta.get("sublayer", "N/A")
+    created = meta.get("created_at", "N/A")
+    status = meta.get("processing_status", "N/A")
+    tags = meta.get("tags", "N/A")
+    access_count = meta.get("access_count", "N/A")
+    deprecated = meta.get("deprecated", "N/A")
+    
+    print(f"  score={score} | importance={importance} | type={memory_type} | domain={domain}")
+    print(f"  category={category} | layer={layer} | sublayer={sublayer}")
+    print(f"  created={created} | status={status} | access_count={access_count}")
+    print(f"  tags={tags} | deprecated={deprecated}")

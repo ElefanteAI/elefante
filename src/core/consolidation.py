@@ -33,46 +33,11 @@ class MemoryConsolidator:
         
     async def consolidate_recent(self, hours: int = 24, force: bool = False) -> List[Memory]:
         """
-        Analyze memories from the last N hours and consolidate them.
+        Consolidation is agent-driven by design (Elefante is LLM-free).
+        External agents should fetch memories, run their own LLM, then
+        write synthesized results via the normal add_memory pipeline.
         """
-        self.logger.info(f"Starting memory consolidation (last {hours}h)")
-
-        # Agent-driven consolidation: this built-in consolidator is intentionally disabled.
-        # External callers should implement consolidation outside Elefante and then write
-        # the synthesized memories via the normal add_memory pipeline.
-        self.logger.warning("consolidation_disabled_agent_managed")
+        self.logger.info(f"consolidation_agent_managed (last {hours}h)")
         return []
-        
-        # 1. Fetch recent memories
-        # We'll use the graph store to find memories by timestamp as it's more reliable for time queries
-        cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
-        
-        cypher = f"""
-        MATCH (m:Entity {{type: 'memory'}})
-        WHERE m.timestamp >= '{cutoff}' AND m.status <> 'consolidated'
-        RETURN m
-        ORDER BY m.timestamp DESC
-        LIMIT 100
-        """
-        
-        results = await self.graph_store.execute_query(cypher)
-        
-        memories_to_process = []
-        for row in results:
-            entity = row.get("m")
-            if entity:
-                memories_to_process.append({
-                    "id": str(entity.id),
-                    "content": entity.properties.get("content", ""),
-                    "timestamp": entity.properties.get("timestamp")
-                })
-        
-        if not memories_to_process:
-            self.logger.info("No recent memories to consolidate")
-            return []
-            
-        if len(memories_to_process) < 5 and not force:
-            self.logger.info(f"Not enough memories to consolidate ({len(memories_to_process)} < 5)")
-            return []
 
 
