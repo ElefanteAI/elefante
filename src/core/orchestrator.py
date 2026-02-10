@@ -19,7 +19,7 @@ from uuid import UUID, uuid4
 from datetime import datetime
 
 from src.models.memory import (
-    Memory, MemoryType, MemoryMetadata, MemoryStatus,
+    Memory, MemoryType, MemoryClass, MemoryMetadata, MemoryStatus,
     DomainType, IntentType, SourceType, TYPE_DECAY_RATES
 )
 from src.models.entity import Entity, EntityType, Relationship, RelationshipType
@@ -346,8 +346,15 @@ class MemoryOrchestrator:
         related_id = None
         contradiction_details = None
         
+        # Resolve memory_class for conflict branching
+        new_class = metadata.get("memory_class", "fact") if metadata else "fact"
+        
         if similar_memories:
             best_match = similar_memories[0]
+            existing_class = getattr(best_match.memory.metadata, "memory_class", None)
+            if hasattr(existing_class, "value"):
+                existing_class = existing_class.value
+            existing_class = existing_class or "fact"
             
             # Check for redundancy
             if best_match.score >= 0.95:
@@ -363,14 +370,23 @@ class MemoryOrchestrator:
             elif best_match.score >= 0.75:
                 is_contradiction = self._detect_contradiction(content, best_match.memory.content)
                 if is_contradiction:
-                    status = MemoryStatus.CONTRADICTORY
-                    related_id = best_match.memory.id
-                    contradiction_details = {
-                        "conflicting_memory_id": str(best_match.memory.id),
-                        "conflicting_content": best_match.memory.content[:200],
-                        "similarity": best_match.score
-                    }
-                    self.logger.warning(f"CONTRADICTORY memory detected vs {best_match.memory.id}")
+                    # Branch on memory_class:
+                    # - fact vs fact: CONTRADICTORY (old must be superseded)
+                    # - directive/state: RELATED (coexist, resolved at retrieval)
+                    if new_class == "fact" and existing_class == "fact":
+                        status = MemoryStatus.CONTRADICTORY
+                        related_id = best_match.memory.id
+                        contradiction_details = {
+                            "conflicting_memory_id": str(best_match.memory.id),
+                            "conflicting_content": best_match.memory.content[:200],
+                            "similarity": best_match.score
+                        }
+                        self.logger.warning(f"CONTRADICTORY fact detected vs {best_match.memory.id}")
+                    else:
+                        # Directives and states coexist — not a contradiction
+                        status = MemoryStatus.RELATED
+                        related_id = best_match.memory.id
+                        self.logger.info(f"Coexisting {new_class} vs {existing_class}: {best_match.memory.id}")
                 else:
                     status = MemoryStatus.RELATED
                     related_id = best_match.memory.id
@@ -460,8 +476,15 @@ class MemoryOrchestrator:
             custom_metadata["authority_score"] = authority_score
             
             # Create v1.10.0 Metadata (Behavioral Relevance)
+            # Resolve memory_class
+            try:
+                memory_class_enum = MemoryClass(metadata.get("memory_class", "fact"))
+            except (ValueError, KeyError):
+                memory_class_enum = MemoryClass.FACT
+            
             memory_metadata = MemoryMetadata(
                 memory_type=MemoryType(memory_type),
+                memory_class=memory_class_enum,
                 score=50,  # Everyone starts equal
                 status=status,
                 tags=tags or [],

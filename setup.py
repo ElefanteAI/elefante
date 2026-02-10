@@ -12,8 +12,8 @@ long_description = readme_file.read_text(encoding="utf-8") if readme_file.exists
 
 setup(
     name="elefante",
-    version="1.8.0",
-    author="Your Name",
+    version="1.10.0",
+    author="Elefante Contributors",
     author_email="your.email@example.com",
     description="Local AI Memory System with Vector and Graph Storage",
     long_description=long_description,
@@ -26,7 +26,7 @@ setup(
         "Intended Audience :: Developers",
         "Topic :: Software Development :: Libraries :: Python Modules",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
-        "License :: OSI Approved :: MIT License",
+        "License :: Other/Proprietary License",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",

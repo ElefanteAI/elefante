@@ -126,6 +126,7 @@ class VectorStore:
             "domain": memory.metadata.domain.value if hasattr(memory.metadata.domain, 'value') else str(memory.metadata.domain),
             "category": memory.metadata.category,
             "memory_type": memory.metadata.memory_type.value if hasattr(memory.metadata.memory_type, 'value') else str(memory.metadata.memory_type),
+            "memory_class": memory.metadata.memory_class.value if hasattr(memory.metadata.memory_class, 'value') else str(getattr(memory.metadata, 'memory_class', 'fact')),
             "subcategory": memory.metadata.subcategory or "",
             
             # Layer 3: Semantic Metadata

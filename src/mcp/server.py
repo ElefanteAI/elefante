@@ -282,6 +282,12 @@ Classify the memory by providing memory_type, domain, and category. The system h
                                 "default": "conversation",
                                 "description": "Type of memory — determines decay rate. Preferences/rules decay slowest, conversations fastest."
                             },
+                            "memory_class": {
+                                "type": "string",
+                                "enum": ["fact", "directive", "state"],
+                                "default": "fact",
+                                "description": "Contradiction behavior. fact: newer supersedes older. directive: coexists, resolved by recency. state: ephemeral (mood/energy), most recent wins. Default to directive on ambiguity."
+                            },
                             "domain": {
                                 "type": "string",
                                 "enum": ["work", "personal", "learning", "project", "reference", "system"],
@@ -1087,6 +1093,8 @@ You have access to a persistent memory system called **Elefante** - the user's s
             metadata["domain"] = args["domain"]
         if args.get("category"):
             metadata["category"] = args["category"]
+        if args.get("memory_class"):
+            metadata["memory_class"] = args["memory_class"]
         
         memory = await orchestrator.add_memory(
             content=args["content"],

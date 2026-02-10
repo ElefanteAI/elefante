@@ -316,7 +316,7 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE).
+This project is licensed under the [Business Source License 1.1](LICENSE). You may use it freely for any non-competitive purpose. It converts to Apache 2.0 on 2029-02-10.
 
 ---
 

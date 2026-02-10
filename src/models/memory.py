@@ -52,6 +52,18 @@ class IntentType(str, Enum):
     TEMPLATE = "template"
 
 
+class MemoryClass(str, Enum):
+    """How a memory behaves under contradiction.
+    
+    fact: Objective truth. Newer fact supersedes older on conflict.
+    directive: User preference/instruction. Coexists; resolved by recency at retrieval.
+    state: Ephemeral condition (mood, energy). Coexists; most recent wins by default.
+    """
+    FACT = "fact"
+    DIRECTIVE = "directive"
+    STATE = "state"
+
+
 class MemoryStatus(str, Enum):
     """Status of a memory relative to existing knowledge"""
     NEW = "new"
@@ -160,6 +172,7 @@ class MemoryMetadata(BaseModel):
     domain: DomainType = DomainType.REFERENCE
     category: str = "general"
     memory_type: MemoryType = MemoryType.CONVERSATION
+    memory_class: MemoryClass = MemoryClass.FACT
     subcategory: Optional[str] = None
     
     # Relevance (system-computed — do NOT set manually)
