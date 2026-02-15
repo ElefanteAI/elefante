@@ -1,357 +1,323 @@
-# Elefante Documentation
+# Elefante
 
-## Overview
+Persistent memory for AI coding agents. Elefante runs locally on your machine via [MCP](https://modelcontextprotocol.io/) (Model Context Protocol), storing knowledge in a vector database and a knowledge graph. Your agent remembers what you care about, forgets what you don't, and scores every memory based on how you actually use it — not how important you *said* it was.
 
-Complete documentation index for Elefante AI Memory System v1.6.4.
-
-> [!CAUTION]
-> **[THE CORE MANIFESTO](THE_CORE.md)**: Fundamental laws that every agent MUST obey.
+> **Current version:** v1.10.0
 
 ---
 
-## Quick Navigation
+## The Problem
 
+AI agents are stateless. Every new session starts from zero. The agent doesn't remember your coding style, the architecture decision you made last week, what failed yesterday, or that you hate semicolons. You repeat yourself. The agent repeats its mistakes. Context is lost at the worst possible moment.
 
-| I want to... | Go to... |
-|--------------|----------|
-| Install Elefante | [`technical/installation.md`](technical/installation.md) |
-| Configure MCP in my IDE | [`technical/ide-mcp-configuration.md`](technical/ide-mcp-configuration.md) |
-| Understand the system | [`technical/architecture.md`](technical/architecture.md) |
-| Use the MCP tools | [`technical/usage.md`](technical/usage.md) |
-| Open the dashboard | [`technical/dashboard.md`](technical/dashboard.md) |
-| Follow the Second Brain protocols | [`technical/second-brain-protocols.md`](technical/second-brain-protocols.md) |
-| Learn from failures | [`debug/`](debug/) - **Neural Registers** |
-| See what's next | [`planning/roadmap.md`](planning/roadmap.md) |
+## What Elefante Does
 
----
+Elefante gives your agent a second brain — one that learns what matters from your behavior, not from labels you assign.
 
-## Documentation Structure
+- **Stores** facts, preferences, decisions, code patterns, and tasks
+- **Searches** using hybrid retrieval: semantic similarity (vectors) + knowledge graph traversal + session context
+- **Scores** every memory automatically based on recency, how often you access it, and when you last used it — no manual importance ratings
+- **Injects context** on every tool call — the agent gets the most relevant memories without asking
+- **Builds a knowledge graph** of entities and relationships (people, projects, technologies, dependencies)
+- **Enforces quality** via a compliance gate: the agent must search before writing, preventing duplicates
+- **Visualizes** knowledge through a snapshot-driven dashboard
 
-### [`technical/`](technical/) - Production Documentation
+## How It Works
 
-**"How Things Work Now"** - Complete technical reference for using Elefante
+```
+IDE (VS Code, Cursor, etc.)
+  └── MCP stdio connection
+        └── Elefante Server (Python)
+              ├── ChromaDB (semantic vector search)
+              ├── Kuzu (knowledge graph, Cypher queries)
+              ├── Context Injector (auto-surfaces relevant memories)
+              └── Compliance Gate (search-before-write)
+```
 
-**Core Documentation**:
-
-- [`architecture.md`](technical/architecture.md) - System design & triple-layer architecture
-- [`cognitive-memory-model.md`](technical/cognitive-memory-model.md) - AI memory model
-- [`installation.md`](technical/installation.md) - Installation guide
-- [`usage.md`](technical/usage.md) - **Complete API reference (18 MCP tools + 2 prompts)**
-- [`dashboard.md`](technical/dashboard.md) - Visual knowledge graph guide
-
-**Advanced Documentation**:
-
-- [`installation-safeguards.md`](technical/installation-safeguards.md) - Automated safeguards
-- [`kuzu-best-practices.md`](technical/kuzu-best-practices.md) - Database best practices
-- [`memory-schema-v3.md`](technical/memory-schema-v3.md) - Current memory schema
-- [`memory-schema-v4.md`](technical/memory-schema-v4.md) - Proposed: canonical keys, versioning, test isolation
-- [`memory-schema-v5-topology.md`](technical/memory-schema-v5-topology.md) - Rings/topics/types topology
-- [`temporal-memory-decay.md`](technical/temporal-memory-decay.md) - Memory decay algorithm
-
-**See**: [`technical/README.md`](technical/README.md) for complete index
+Everything runs locally. No cloud. No telemetry. Your data never leaves your machine.
 
 ---
 
-### [`debug/`](debug/) - Neural Registers (System Immunity)
+## Behavioral Relevance (v1.10.0)
 
-**"Lessons from Failures"** - Immutable laws extracted from debugging sessions
+This is the core idea behind v1.10.0: **nobody assigns importance. Importance emerges from behavior.**
 
-**Master Neural Registers** (5 registers):
+Traditional systems ask you to rate memories on a scale (1–10). That approach has two problems:
 
-- [`installation-neural-register.md`](debug/installation-neural-register.md) - Installation failure laws
-- [`database-neural-register.md`](debug/database-neural-register.md) - Database failure laws
-- [`dashboard-neural-register.md`](debug/dashboard-neural-register.md) - Dashboard failure laws
-- [`mcp-code-neural-register.md`](debug/mcp-code-neural-register.md) - MCP protocol failure laws
-- [`memory-neural-register.md`](debug/memory-neural-register.md) - Memory system failure laws
+1. **Bias.** Users rate everything as "important" (8+).
+2. **Rot.** An architecture decision from 6 months ago sits at importance=9 forever, even if the project moved on.
 
-**Source Documents by Topic**:
+Elefante replaces human-assigned importance with a **system-computed score (0–100)** that changes over time based on three behavioral signals:
 
-- **[`installation/`](debug/installation/)** (1 file) - Installation troubleshooting
-- **[`dashboard/`](debug/dashboard/)** (1 file) - Dashboard debugging
-- **[`database/`](debug/database/)** (1 file) - Database issues
-- **[`memory/`](debug/memory/)** (1 file) - Memory system debugging
-- **[`general/`](debug/general/)** (1 file) - Cross-cutting concerns
+| Signal | What it measures | Effect |
+|--------|-----------------|--------|
+| **Recency** | Days since creation | Memories decay exponentially. Rate depends on type — a rule decays ~20x slower than a conversation. |
+| **Freshness** | Days since last access | Recently retrieved memories get a boost. Stale ones fade. |
+| **Reinforcement** | Number of times accessed | Frequently used memories grow stronger (logarithmic, so spamming won't game it). |
 
-**See**: [`debug/README.md`](debug/README.md) for complete index
+### The Formula
+
+```
+relevance = 0.5 * recency * freshness * reinforcement
+```
+
+Where:
+- `recency = exp(-decay_rate * days_since_created)` — decay_rate varies by memory type
+- `freshness = exp(-0.02 * days_since_accessed)`
+- `reinforcement = 1 + 0.25 * ln(access_count + 1)`
+
+Every memory starts at score **50**. It earns its way up through use, and loses ground through neglect. The raw formula produces 0.0–1.0, stored as an integer 0–100.
+
+### Decay Rates by Memory Type
+
+The decay rate (λ) controls how quickly a memory loses relevance if it's never accessed. Each type has a half-life — the number of days until a memory drops to half its initial score:
+
+| Memory Type | Decay Rate (λ) | Half-Life | Why |
+|-------------|----------------|-----------|-----|
+| `rule` | 0.002 | ~347 days | Rules persist, but die if never enforced |
+| `preference` | 0.002 | ~347 days | Preferences are stable but not eternal |
+| `decision` | 0.005 | ~139 days | Decisions get revisited |
+| `fact` | 0.005 | ~139 days | Facts change |
+| `answer` | 0.005 | ~139 days | Answers may become outdated |
+| `insight` | 0.008 | ~87 days | Insights are validated or forgotten |
+| `code` | 0.008 | ~87 days | Code evolves constantly |
+| `hypothesis` | 0.01 | ~69 days | Hypotheses get tested |
+| `question` | 0.015 | ~46 days | Questions get answered |
+| `note` | 0.015 | ~46 days | Notes are transient |
+| `observation` | 0.015 | ~46 days | Observations are contextual |
+| `task` | 0.02 | ~35 days | Tasks complete or go stale |
+| `conversation` | 0.025 | ~28 days | Conversations are ephemeral |
+
+A rule you set 6 months ago and still use? Score stays high. An architecture decision from a year ago that you never reference? It fades. Naturally.
 
 ---
 
-### [`planning/`](planning/) - Strategic Roadmaps
+## Install
 
-**"What We Will Build"** - Future plans and strategic direction
+**Requirements:** Python 3.11, ~5 GB disk space.
 
-**Active Roadmaps**:
+macOS / Linux:
 
-- [`roadmap.md`](planning/roadmap.md) - Main development roadmap
-- [`dashboard-improvement-roadmap.md`](planning/dashboard-improvement-roadmap.md) - Dashboard enhancements
-- [`sprint2-knowledge-topology-plan.md`](planning/sprint2-knowledge-topology-plan.md) - Knowledge graph design
+```bash
+chmod +x install.sh
+./install.sh
+```
 
-**See**: [`planning/README.md`](planning/README.md) for complete index
+Windows:
 
----
+```bash
+install.bat
+```
 
-### [`archive/`](archive/) - Historical Documentation
-
-**"What Happened"** - Preserved historical documents and session logs
-
-**Structure**:
-
-- `historical/` - Session logs, completed task lists
-- `releases/` - Version changelog notes
-- `raw_logs/` - Raw installation logs
-
-**See**: [`archive/README.md`](archive/README.md) for complete index
+The installer creates a virtual environment, installs dependencies, and initializes the databases. See [`docs/technical/installation.md`](docs/technical/installation.md) for details.
 
 ---
 
-## MCP Tools Reference
+## Connect to Your IDE
 
-Elefante provides **18 MCP tools** for AI agents:
+Elefante is an MCP stdio server. Add it to your IDE's MCP configuration:
 
+- **Command:** `<repo>/.venv/bin/python`
+- **Args:** `-m src.mcp.server`
+- **Env:**
+  - `PYTHONPATH=/absolute/path/to/Elefante`
+  - `ELEFANTE_CONFIG_PATH=/absolute/path/to/Elefante/config.yaml`
+
+Setup guides for VS Code, Cursor, and other MCP-compatible IDEs: [`docs/technical/ide-mcp-configuration.md`](docs/technical/ide-mcp-configuration.md)
+
+---
+
+## MCP Tools
+
+Elefante exposes **17 tools** and **2 prompts** via MCP. All tool names follow the `elefante-PascalCase` convention.
+
+### Memory
 
 | Tool | Purpose |
 |------|---------|
-| `elefanteMemoryAdd` | Store with intelligent ingestion (NEW/REDUNDANT/RELATED/CONTRADICTORY) |
-| `elefanteMemorySearch` | Hybrid search (semantic + structured + context) |
-| `elefanteGraphQuery` | Execute Cypher queries on knowledge graph |
-| `elefanteContextGet` | Get comprehensive session context |
-| `elefanteGraphEntityCreate` | Create nodes in knowledge graph |
-| `elefanteGraphRelationshipCreate` | Link entities with relationships |
-| `elefanteSessionsList` | Browse past sessions with summaries |
-| `elefanteSystemStatusGet` | System status + lock info + database health |
-| `elefanteMemoryConsolidate` | Deterministic cleanup (canonicalize, quarantine tests, mark duplicates) |
-| `elefanteMemoryListAll` | Export/inspect all memories (no filtering) |
-| `elefanteDashboardOpen` | Open dashboard (optionally refresh snapshot) |
-| `elefanteGraphConnect` | Upsert entities + create relationships in one call |
-| `elefanteMemoryMigrateToV3` | Admin schema migration to V3 |
-| `elefanteSystemEnable` | *(v1.1.0+: optional)* Initialize mode manager / (force) clear stale locks |
-| `elefanteSystemDisable` | Clear resources (release DB handles) for safe IDE switching |
-| `elefanteETLProcess` | Get raw memories for agent topology classification |
-| `elefanteETLClassify` | Store the agent's classification (V5 topology fields) |
-| `elefanteETLStatus` | ETL processing statistics (raw/processing/processed/failed) |
+| `elefante-MemoryAdd` | Store a memory. Classify it by `memory_type` (fact, decision, preference, etc.) and let the system handle scoring. |
+| `elefante-MemorySearch` | Search memories — semantic, structured (graph), or hybrid mode. Use `list_all=true` to dump everything. |
+| `elefante-MemoryUpdate` | Amend a memory: correct content, deprecate, archive, or set supersession chains. |
+| `elefante-MemoryDelete` | Permanently delete a memory with audit trail. Requires prior search. |
+| `elefante-MemoryConsolidate` | Cleanup: deduplicate, canonicalize keys, quarantine test data. Dry-run by default. |
 
-## MCP Prompts (2)
+### Knowledge Graph
 
-These are MCP **prompts** (not tools):
+| Tool | Purpose |
+|------|---------|
+| `elefante-GraphConnect` | Batch upsert: create entities and relationships in one call. |
+| `elefante-GraphQuery` | Execute raw Cypher queries for advanced traversals. |
+
+### Context & Sessions
+
+| Tool | Purpose |
+|------|---------|
+| `elefante-ContextGet` | Get full context: related memories + graph connections for current work. |
+| `elefante-SessionsList` | List past sessions with summaries. |
+
+### Tasks
+
+| Tool | Purpose |
+|------|---------|
+| `elefante-TaskCreate` | Create a task with priority, agent assignment, dependencies, and optional inline subtasks. |
+| `elefante-TaskUpdate` | Update task status and attach output. |
+| `elefante-TaskGraph` | View task hierarchy. |
+
+### ETL (Batch Processing)
+
+| Tool | Purpose |
+|------|---------|
+| `elefante-ETLProcess` | Get unprocessed memories for agent review. Use `include_stats=true` for processing statistics. |
+| `elefante-ETLClassify` | Submit classification for a memory. |
+
+### System
+
+| Tool | Purpose |
+|------|---------|
+| `elefante-System` | Enable or disable Elefante Mode (`action="enable"` / `action="disable"`). |
+| `elefante-SystemStatusGet` | Check system health, lock state, and database stats. |
+| `elefante-DashboardOpen` | Open the knowledge graph dashboard. |
+
+### Prompts
 
 | Prompt | Purpose |
-|------|---------|
-| `elefante-grounding` | Memory-aware grounding prompt |
-| `elefante-context` | Context-before-answering prompt template |
+|--------|---------|
+| `elefante-grounding` | Injects memory-aware behavior into the agent's system prompt. |
+| `elefante-context` | Searches memories for a topic and returns results as context. |
 
-**Complete API reference**: [`technical/usage.md`](technical/usage.md)
-
----
-
-## Documentation by Use Case
-
-### "I'm new to Elefante"
-
-1. Read [`../README.md`](../README.md) - High-level overview
-2. Follow [`technical/installation.md`](technical/installation.md) - Install
-3. Explore [`technical/dashboard.md`](technical/dashboard.md) - Visual interface
-4. Review [`technical/usage.md`](technical/usage.md) - Complete API reference
-5. Understand the [`technical/second-brain-protocols.md`](technical/second-brain-protocols.md) - Master Framework
-
-### "I want to use the API"
-
-1. Start with [`technical/usage.md`](technical/usage.md) - Complete API reference
-2. Review [`technical/architecture.md`](technical/architecture.md) - Understand the system
-3. Check [`technical/cognitive-memory-model.md`](technical/cognitive-memory-model.md) - Memory intelligence
-
-### "I'm having problems"
-
-1. Check **Neural Registers** in [`debug/`](debug/) - Learn from past failures
-2. Review [`debug/installation/never-again-guide.md`](debug/installation/never-again-guide.md) - Installation help
-3. Search [`debug/`](debug/) by topic (installation, dashboard, database, memory)
-
-### "I want to contribute"
-
-1. Read [`../CONTRIBUTING.md`](../CONTRIBUTING.md) - Guidelines
-2. Check [`planning/roadmap.md`](planning/roadmap.md) - Development roadmap
+Full parameter schemas: [`docs/technical/usage.md`](docs/technical/usage.md)
 
 ---
 
-## Current Development Status
+## How Memories Are Classified
 
-**Version**: v1.6.2 (Production)  
-**Next**: TBD (see roadmap)
+When you store a memory, the agent provides two things:
 
-**v1.6.2 Features** (see [CHANGELOG.md](../CHANGELOG.md)):
+1. **`memory_type`** — What kind of knowledge this is. This determines the decay rate (see table above). Choose accurately: a `preference` will last ~347 days without use, while a `conversation` fragment fades in ~28 days.
 
-- Compliance Gate: Server-side search-before-write enforcement
-- Blocks write operations until `elefanteMemorySearch` is called
-- `.github/copilot-instructions.md` for layered defense
+2. **`domain`** — High-level context: `work`, `personal`, `learning`, `project`, `reference`, or `system`.
 
-**v1.1.0 Features**:
+That's it. No importance scale. No layer/sublayer taxonomy. The score takes care of itself.
 
-- Transaction-scoped locking (multi-IDE safety without deadlocks)
-- Auto-expiry of stale locks (no more 12-day orphan locks!)
-- Backward compatible `enable()`/`disable()` shims
+### What the Agent Does NOT Set
 
-
-**Active Roadmap**: [`planning/roadmap.md`](planning/roadmap.md)
+- **Score** — Starts at 50 for every memory. Changes only through behavior (access, time decay).
+- **Decay rate** — Derived automatically from `memory_type`.
+- **Authority score** — Computed from score, access count, and freshness during retrieval.
 
 ---
 
-## Neural Register Architecture
+## Automatic Context Injection
 
-**What are Neural Registers?**  
-Immutable "Laws" extracted from debugging sessions - the system's immune memory.
+Every tool call (except search and system tools) automatically gets the top 3 most relevant memories appended to its response. The agent doesn't need to manually search — context surfaces on its own.
 
-**The 5 Master Registers**:
+Tools that skip injection (they already return memory data or are system operations):
 
-1. **Installation** - Pre-flight checks, configuration hierarchy, version migration
-2. **Database** - Reserved words, single-writer locks, schema validation
-3. **Dashboard** - Data path separation, semantic zoom, force-directed physics
-4. **MCP Code** - Type signatures, action verification, error enrichment
-5. **Memory** - Export bypass, semantic filtering, temporal decay
-
-
-**Format**: Laws -> Failure Patterns -> Safeguards -> Metrics -> Source Documents
-
-**Purpose**: Prevent recurring failures by encoding lessons as enforceable rules.
+`elefante-MemorySearch`, `elefante-MemoryAdd`, `elefante-MemoryUpdate`, `elefante-MemoryDelete`, `elefante-ContextGet`, `elefante-MemoryConsolidate`, `elefante-System`, `elefante-SystemStatusGet`, `elefante-DashboardOpen`, `elefante-SessionsList`, `elefante-ETLProcess`, `elefante-ETLClassify`
 
 ---
 
-## Documentation Statistics
+## Compliance Gate
 
-- **Technical Docs**: 10 production documents
-- **Neural Registers**: 5 master registers (12+ Laws)
-- **Debug Source Docs**: 5 compendium folders
-- **Planning Docs**: 3 roadmap documents
-- **Archive**: Historical/releases folders
-- **MCP Tools**: 18 fully documented (+ 2 prompts)
+These tools are blocked until the agent has called `elefante-MemorySearch` at least once in the session:
 
----
+- `elefante-MemoryAdd`
+- `elefante-MemoryUpdate`
+- `elefante-MemoryDelete`
+- `elefante-GraphConnect`
 
-## Search Tips
-
-**Looking for specific topics**:
-
-- Installation -> `technical/installation.md` or `debug/installation-neural-register.md`
-- API/Tools -> `technical/usage.md` (all 18 tools + 2 prompts)
-- Architecture -> `technical/architecture.md`
-- Dashboard -> `technical/dashboard.md` or `debug/dashboard-neural-register.md`
-- Database -> `technical/kuzu-best-practices.md` or `debug/database-neural-register.md`
-- Troubleshooting -> `debug/` Neural Registers
-- Roadmap -> `planning/roadmap.md`
-
-
-**File naming convention**: All files use kebab-case (lowercase-with-hyphens)
+This prevents agents from writing memories without first checking what already exists. Search once, then write freely for the rest of the session.
 
 ---
 
-## Documentation Etiquette (LLM Instructions)
+## Dashboard
 
-> **Purpose:** Prevent LLM amnesia and déjà vu errors when maintaining documentation.
+The dashboard is a read-only graph visualization. It reads from a snapshot file, not directly from the databases, to avoid lock conflicts with the MCP server.
 
-### Before Adding Documentation
+```bash
+# Via MCP tool (recommended)
+elefante-DashboardOpen(refresh=true)
 
-```text
-1. READ FIRST, THEN WRITE
-   - List the target folder contents
-   - Read existing files' headers/structure
-   - Search for related content with grep
-   
-2. NEVER DUPLICATE
-   - If topic exists -> AUGMENT the existing file
-   - If file is outdated -> UPDATE in place
-   - Only create new files for genuinely NEW topics
-
-3. KNOW YOUR FOLDERS
-   docs/
-   ├── technical/     # HOW things work NOW (production docs)
-   ├── debug/         # WHAT WENT WRONG (Neural Registers + sources)
-   ├── planning/      # WHAT WE WILL BUILD (roadmaps)
-   └── archive/       # HISTORICAL (superseded, outdated)
+# Manual
+python scripts/update_dashboard_data.py   # refresh snapshot
+python -m src.dashboard.server            # start on port 8000
 ```
 
-### When to Archive vs Delete vs Update
-
-| Scenario | Action |
-|----------|--------|
-| Doc is outdated but has historical value | Move to `archive/` with date suffix |
-| Doc is superseded by Neural Register | Move to `archive/`, update Register |
-| Doc has wrong info | UPDATE in place, don't create new |
-| Point-in-time status (e.g., "current-status-2025-11-27") | Archive after issue resolved |
-| Protocol evolved (v1 -> v2 -> v3 -> FINAL) | Keep FINAL, archive versions |
-
-### Documentation Update Checklist
-
-```text
-[ ] 1. Searched for existing docs on this topic
-[ ] 2. Read relevant Neural Register (if debug-related)
-[ ] 3. Checked archive to avoid resurrecting old content
-[ ] 4. Updated ONE file (not created duplicate)
-[ ] 5. Updated README index if structure changed
-[ ] 6. Verified links still work
-```
-
-### Neural Register Update Process
-
-When a significant failure occurs:
-
-1. **Document immediately** in appropriate `debug/{topic}/` file
-2. **Extract laws** into the corresponding `*_NEURAL_REGISTER.md`
-3. **Link source** in the Neural Register's "Source Documents" section
-4. **Archive** point-in-time status docs after resolution
-
-### File Naming Convention
-
-```text
-# Technical docs: descriptive-name.md
-technical/installation.md
-technical/kuzu-best-practices.md
-
-# Debug docs: specific-issue-YYYY-MM-DD.md (if date-specific)
-debug/dashboard/dashboard-postmortem.md
-debug/database/kuzu-reserved-words-issue.md
-
-# Archive: original-name-YYYY-MM-DD.md (preserve origin date)
-archive/debug-current-status-2025-11-27.md
-archive/protocol-enforcement-v2.md
-```
-
-### Anti-Patterns (DON'T DO THIS)
-
-- Creating `new-fix-v2.md` when `fix.md` exists
-- Writing the same info in multiple places
-- Leaving point-in-time status docs in active folders
-- Creating docs without checking Neural Registers first
-- Archiving without updating indexes
+Guide: [`docs/technical/dashboard.md`](docs/technical/dashboard.md)
 
 ---
 
-## Maintenance
+## Docker
 
-**Last Updated**: 2025-12-28  
-**Documentation Version**: v1.6.2  
-**Status**: Complete and up-to-date
+Run the dashboard in Docker for a reproducible environment:
 
-**Changes in v1.1.0**:
+```bash
+docker-compose up
+```
 
-- Transaction-scoped locking (replaces session-based locks)
-- Auto-expiry of stale locks (30 second timeout)
-- Multi-IDE safety without deadlocks
-- `elefanteSystemEnable`/`elefanteSystemDisable` become no-ops (backward compatible)
-
-**Changes in v1.0.1**:
-
-- Added ELEFANTE_MODE (3 new tools for multi-IDE safety)
-- Added Auto-Inject Pitfalls (protocol enforcement)
-- Updated tool count to 15
-- LAW 5 file hygiene audit completed
-
-**Changes in v1.0.0**:
-
-- Reorganized into technical/debug/planning/archive taxonomy
-- Introduced Neural Register architecture
-- Standardized kebab-case naming
-- Moved historical logs to archive/
-
-**Maintainers**: Elefante Core Team
+The MCP server itself runs as a stdio process started by your IDE. Running MCP inside Docker requires additional configuration. See [`docs/technical/docker.md`](docs/technical/docker.md).
 
 ---
 
-**For the main project overview, see [`../README.md`](../README.md)**
+## Tech Stack
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| Vector store | ChromaDB 1.3.5 | Semantic search via embeddings |
+| Graph store | Kuzu 0.11.3 | Knowledge graph, Cypher queries |
+| Embeddings | sentence-transformers (gte-base) | 768-dim vectors for similarity |
+| Protocol | MCP 1.23.1 | IDE–server communication |
+| Dashboard | React + TypeScript + Vite | Graph visualization (Canvas 2D) |
+| API server | FastAPI + Uvicorn | Dashboard backend |
+| Runtime | Python 3.11 | All server-side code |
+
+---
+
+## Project Structure
+
+```
+src/
+  mcp/          Server, tool handlers, context injection, compliance gate
+  core/         Orchestrator, ChromaDB store, Kuzu store, retrieval, config
+  models/       Data models (Memory, Entity, Relationship, Query filters)
+  dashboard/    FastAPI server + React UI
+    ui/         TypeScript SPA (Vite + Tailwind)
+  etl/          Batch memory processing pipeline
+  distiller/    Memory ingestion and export
+  utils/        Validators, curation, helpers
+scripts/        Maintenance (snapshot refresh, migrations)
+data/           Runtime data (databases, snapshots)
+docs/           Documentation
+tests/          Test suite
+```
+
+---
+
+## Documentation
+
+| Doc | Content |
+|-----|---------|
+| [`docs/technical/usage.md`](docs/technical/usage.md) | Complete tool reference with parameter schemas |
+| [`docs/technical/installation.md`](docs/technical/installation.md) | Installation details |
+| [`docs/technical/ide-mcp-configuration.md`](docs/technical/ide-mcp-configuration.md) | IDE setup (VS Code, Cursor, etc.) |
+| [`docs/technical/mcp-server-startup.md`](docs/technical/mcp-server-startup.md) | Manual startup and handshake verification |
+| [`docs/technical/dashboard.md`](docs/technical/dashboard.md) | Dashboard usage |
+| [`docs/technical/docker.md`](docs/technical/docker.md) | Docker setup |
+| [`docs/technical/second-brain-protocols.md`](docs/technical/second-brain-protocols.md) | Safety protocols |
+| [`docs/technical/kuzu-lock-monitoring.md`](docs/technical/kuzu-lock-monitoring.md) | Lock behavior and troubleshooting |
+| [`docs/technical/rollback.md`](docs/technical/rollback.md) | Backup and rollback |
+| [`docs/debug/README.md`](docs/debug/README.md) | Debugging guide |
+
+---
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+## License
+
+This project is licensed under the [Business Source License 1.1](LICENSE). You may use it freely for any non-competitive purpose. It converts to Apache 2.0 on 2029-02-10.
+
+---
+
+[Changelog](CHANGELOG.md) · [GitHub](https://github.com/ElefanteAI/elefante)
