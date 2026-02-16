@@ -97,9 +97,9 @@ Example:
 }
 ```
 
-## Roo-Cline (VS Code extension)
+## Roo Code (formerly Roo-Cline)
 
-Roo-Cline config lives in VS Code `settings.json`.
+Roo Code config lives in VS Code `settings.json`. The settings key may still appear as `roo-cline.mcpServers` in some installations.
 
 ```json
 {

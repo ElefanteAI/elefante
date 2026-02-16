@@ -4,7 +4,7 @@
 
 **Purpose**: Permanent record of memory retrieval failures and cognitive architecture principles  
 **Status**: Active Neural Register  
-**Last Updated**: 2025-12-26
+**Last Updated**: 2026-02-16
 
 ---
 
@@ -12,7 +12,7 @@
 
 | # | Flaw | Impact | Status |
 |---|------|--------|--------|
-| 1 | **Response Bloat**: `elefanteMemorySearch` returns 500+ tokens per memory (90% nulls) | Context window waste |  OPEN |
+| 1 | **Response Bloat**: `elefante-MemorySearch` returns 500+ tokens per memory (90% nulls) | Context window waste |  OPEN |
 | 2 | **Low Similarity**: Exact topic matches score 0.37-0.39 (should be 0.7+) | Poor retrieval |  OPEN |
 | 3 | **No Action Guidance**: Raw JSON dump, no summary or suggested actions | Integration fail |  OPEN |
 
@@ -59,31 +59,31 @@ all_data = collection._collection.get(
 
 ### LAW #2: Semantic Filter Awareness
 
-**Statement**: `elefanteMemorySearch` tool applies semantic relevance filtering. Use `elefanteMemoryListAll` for unfiltered access.
+**Statement**: `elefante-MemorySearch` tool applies semantic relevance filtering. Use `elefante-MemorySearch (list_all=true)` for unfiltered access.
 
 **The Cognitive Trade-off**: Semantic search prioritizes relevance over completeness.
 
 **Tool Comparison**:
 | Tool | Method | Use Case | Returns |
 |------|--------|----------|---------|
-| `elefanteMemorySearch` | `collection.query()` | Find relevant memories | Top N by similarity |
-| `elefanteMemoryListAll` | `collection._collection.get()` | Browse all memories | Complete dataset |
+| `elefante-MemorySearch` | `collection.query()` | Find relevant memories | Top N by similarity |
+| `elefante-MemorySearch (list_all=true)` | `collection._collection.get()` | Browse all memories | Complete dataset |
 
 **User Confusion Pattern**:
 
 ```
 User: "Show me all my memories about Python"
-AI uses: elefanteMemorySearch(query="Python")
+AI uses: elefante-MemorySearch(query="Python")
 Result: Top 10 most relevant memories
 User expectation: ALL memories mentioning Python
 ```
 
-**Resolution**: Clarify in tool descriptions that `elefanteMemorySearch` filters by relevance.
+**Resolution**: Clarify in tool descriptions that `elefante-MemorySearch` filters by relevance.
 
 **Best Practice**:
 
-- Use `elefanteMemorySearch` for "find the most relevant..."
-- Use `elefanteMemoryListAll` + client-side filtering for "show me everything about..."
+- Use `elefante-MemorySearch` for "find the most relevant..."
+- Use `elefante-MemorySearch (list_all=true)` + client-side filtering for "show me everything about..."
 
 ---
 
@@ -96,8 +96,8 @@ User expectation: ALL memories mentioning Python
 **Decay Formula**:
 
 ```python
-def calculate_decayed_importance(
-    original_importance: int,
+def calculate_decayed_relevance(
+    relevance_score: int,       # System-computed 0-100
     days_since_creation: int,
     retrieval_count: int
 ) -> float:
@@ -107,14 +107,14 @@ def calculate_decayed_importance(
     # Reinforcement: +5% per retrieval (max 2x)
     reinforcement = min(1.0 + (retrieval_count * 0.05), 2.0)
 
-    return original_importance * decay_factor * reinforcement
+    return relevance_score * decay_factor * reinforcement
 ```
 
 **Implementation Status**: Deployed (v1.1.0) - Active in `_search_structured` and `_search_semantic`
 
 **Rationale**: Prevent memory bloat, prioritize recent/frequently-accessed information
 
-**Safeguard**: Consolidation process can "rescue" decayed memories by merging into higher-importance summaries
+**Safeguard**: Consolidation process can "rescue" decayed memories by merging into higher-relevance summaries
 
 ---
 
@@ -139,7 +139,7 @@ Persistent Memory (ChromaDB + Kuzu):
 **Search Behavior**:
 
 ```python
-# elefanteMemorySearch with include_conversation=True
+# elefante-MemorySearch with include_conversation=True
 results = {
     "conversation": [...],  # From session buffer
     "stored": [...]         # From ChromaDB/Kuzu
@@ -149,7 +149,7 @@ results = {
 **User Confusion**: "Why doesn't the AI remember what I just said?"  
 **Answer**: Session buffer not yet persisted to database (happens on session end or manual save)
 
-**Best Practice**: Explicitly save important conversation turns using `elefanteMemoryAdd` tool
+**Best Practice**: Explicitly save important conversation turns using `elefante-MemoryAdd` tool
 
 ---
 
@@ -198,9 +198,9 @@ results = {
 
 **Trigger**: User asks "show all memories about X"  
 **Symptom**: Only top 10 results returned  
-**Root Cause**: `elefanteMemorySearch` prioritizes relevance over completeness  
+**Root Cause**: `elefante-MemorySearch` prioritizes relevance over completeness  
 **Impact**: User believes memories are missing  
-**Resolution**: Add `elefanteMemoryListAll` tool for unfiltered access  
+**Resolution**: Add `elefante-MemorySearch (list_all=true)` tool for unfiltered access  
 **Prevention**: Clarify tool descriptions, educate users
 
 ### Pattern #3: Session Context Loss (2025-12-02)
@@ -319,8 +319,8 @@ results = {
 
 - `docs/debug/memory-compendium.md` (export blockade discovery)
 - `docs/technical/temporal-memory-decay.md` (decay algorithm design)
-- `docs/technical/cognitive-memory-model.md` (architecture principles)
-- `docs/technical/memory-schema-v3.md` (current memory schema)
+- `docs/technical/memory-schema-v4-cognitive.md` (cognitive architecture)
+- `docs/technical/memory-schema-v4.md` (current memory schema)
 - `src/core/deduplication.py` (implementation)
 - `src/core/temporal_consolidation.py` (implementation)
 

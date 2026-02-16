@@ -90,11 +90,11 @@ async def run_integration_test():
         process.stdin.write(msg.encode())
         await process.stdin.drain()
 
-        # 3. Call Tool: elefanteMemorySearch (to trigger injection)
-        print("\nCalling 'tools/call' (elefanteMemorySearch)...")
+        # 3. Call Tool: elefante-MemorySearch (to trigger injection)
+        print("\nCalling 'tools/call' (elefante-MemorySearch)...")
         # Note: MCP protocol for tool call
         tool_call_response = await send_request("tools/call", {
-            "name": "elefanteMemorySearch",
+            "name": "elefante-MemorySearch",
             "arguments": {
                 "query": "DEVELOPER ETIQUETTE",
                 "mode": "semantic" # Force semantic to avoid graph errors if empty

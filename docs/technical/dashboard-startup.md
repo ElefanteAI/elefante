@@ -196,7 +196,7 @@ async def add_test():
     orch = MemoryOrchestrator()
     await orch.add_memory(
         content='Test memory for dashboard',
-        importance=5
+        memory_type='note'
     )
     print(' Test memory added')
 

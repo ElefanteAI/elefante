@@ -14,11 +14,11 @@ setup(
     name="elefante",
     version="1.10.0",
     author="Elefante Contributors",
-    author_email="your.email@example.com",
+    author_email="elefante@proton.me",
     description="Local AI Memory System with Vector and Graph Storage",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/elefante",
+    url="https://github.com/ElefanteAI/elefante",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     classifiers=[

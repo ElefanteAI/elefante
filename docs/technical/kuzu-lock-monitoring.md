@@ -26,7 +26,7 @@ Both IDEs can interleave operations!
 - Locks held for milliseconds, not hours
 - Stale locks auto-expire after 30 seconds
 - Dead process detection clears orphaned locks
-- No more `elefanteSystemEnable`/`elefanteSystemDisable` ceremony needed
+- No more `elefante-System` enable/disable ceremony needed
 
 ### Elefante Lock Files (v1.1.0)
 
@@ -127,7 +127,7 @@ ls -la ~/.elefante/data/kuzu_db/.lock
 # Attempt to open Kuzu
 python -c "
 import kuzu
-db = kuzu.Database('/Users/jay/.elefante/data/kuzu_db')
+db = kuzu.Database('data/kuzu_db')  # Use your project's data path
 print(' Database unlocked and accessible')
 "
 
@@ -155,7 +155,7 @@ lsof ~/.elefante/data/kuzu_db/
 # Output shows which PID has the lock
 # Example:
 # COMMAND    PID    USER   FD   TYPE       FILE
-# python   1234    jay    9    DIR        /Users/jay/.elefante/data/kuzu_db
+# python   1234    user    9    DIR        /path/to/data/kuzu_db
 ```
 
 ---

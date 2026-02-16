@@ -1,7 +1,7 @@
 # Memory System Debug Compendium
 
 > **Domain:** Memory Retrieval, Storage & Reinforcement  
-> **Last Updated:** 2025-12-10  
+> **Last Updated:** 2026-02-16  
 > **Total Issues Documented:** 9  
 > **Status:** Production Reference - 3 OPEN Design Flaws  
 > **Maintainer:** Add new issues following Issue #N template at bottom
@@ -14,12 +14,12 @@
 | --- | -------------------------------------------------------------------------- | ----------------- |
 | 1   | Use `min_similarity=0` to get ALL memories                                 | Partial exports   |
 | 2   | ChromaDB stores memories, Kuzu stores entities - DIFFERENT                 | Data confusion    |
-| 3   | Use `collection.get()` for complete export, not `elefanteMemorySearch`       | Missing data      |
+| 3   | Use `collection.get()` for complete export, not `elefante-MemorySearch`       | Missing data      |
 | 4   | Search Elefante BEFORE implementing, not after                             | Repeated mistakes |
 | 5   | Verify code works BEFORE claiming completion                               | User frustration  |
 | 6   | Memory metadata has 40+ fields - don't assume structure                    | Silent data loss  |
 | 7   | V3 Schema: layer/sublayer must be saved in BOTH add_memory AND reconstruct | 8 hours           |
-| 8   | **elefanteMemorySearch returns BLOATED JSON - 90% null fields waste tokens** | Context window  |
+| 8   | **elefante-MemorySearch returns BLOATED JSON - 90% null fields waste tokens** | Context window  |
 | 9   | **Similarity scores 0.3-0.4 for exact matches = embedding quality issue**  | Poor retrieval    |
 | 10  | **MCP response lacks actionable summary - agent must parse raw JSON**      | Integration fail  |
 
@@ -33,7 +33,7 @@
 - [Issue #4: Temporal Decay Implementation Failure](#issue-4-temporal-decay-implementation-failure)
 - [Issue #5: Memory Schema Mismatch](#issue-5-memory-schema-mismatch)
 - [Issue #6: V3 Layer Metadata Not Persisting](#issue-6-v3-layer-metadata-not-persisting)
-- [Issue #7: elefanteMemorySearch Response Bloat](#issue-7-elefantememorysearch-response-bloat-token-waste)  OPEN
+- [Issue #7: elefante-MemorySearch Response Bloat](#issue-7-elefantememorysearch-response-bloat-token-waste)  OPEN
 - [Issue #8: Low Similarity Scores](#issue-8-low-similarity-scores-for-exact-matches)  OPEN
 - [Issue #9: No Actionable Integration](#issue-9-no-actionable-integration-in-search-results)  OPEN
 - [Memory Export Guide](#memory-export-guide)
@@ -58,13 +58,13 @@ Attempts to export "all memories" return only a subset (3-10 instead of 71).
 
 ```python
 # User expects 71 memories
-result = elefanteMemorySearch("all memories", limit=1000)
+result = elefante-MemorySearch("all memories", limit=1000)
 # Returns only 3-10 memories
 ```
 
 ### Root Cause
 
-`elefanteMemorySearch` uses **semantic similarity filtering**:
+`elefante-MemorySearch` uses **semantic similarity filtering**:
 
 - Default `min_similarity=0.3`
 - Query "all memories" only matches memories semantically similar to that phrase
@@ -74,7 +74,7 @@ result = elefanteMemorySearch("all memories", limit=1000)
 
 ```python
 #  CORRECT: Use min_similarity=0 to disable filtering
-result = await mcp_client.call_tool("elefanteMemorySearch", {
+result = await mcp_client.call_tool("elefante-MemorySearch", {
     "query": "*",
     "limit": 1000,
     "min_similarity": 0.0  # CRITICAL: Disable filtering!
@@ -87,7 +87,7 @@ results = collection.get(include=["metadatas", "documents"])
 
 ### Why This Keeps Happening
 
-- `elefanteMemorySearch` name implies "find memories" not "filter memories"
+- `elefante-MemorySearch` name implies "find memories" not "filter memories"
 - Default min_similarity not obvious
 - API designed for relevance, not completeness
 
@@ -183,25 +183,25 @@ Correct: Task -> Search Elefante -> Implement with context -> Update
 
 ```
 Phase 1: PRE-TASK SEARCH (MANDATORY)
-├── elefanteMemorySearch("verification checklist for {task}")
-├── elefanteMemorySearch("common mistakes when {task}")
-├── elefanteMemorySearch("user preferences for {task}")
-└── elefanteMemorySearch("lessons learned from {similar task}")
+├── elefante-MemorySearch("verification checklist for {task}")
+├── elefante-MemorySearch("common mistakes when {task}")
+├── elefante-MemorySearch("user preferences for {task}")
+└── elefante-MemorySearch("lessons learned from {similar task}")
 
 Phase 2: DURING IMPLEMENTATION
-├── elefanteMemorySearch("how to implement {feature}")
-├── elefanteMemorySearch("known issues with {technology}")
+├── elefante-MemorySearch("how to implement {feature}")
+├── elefante-MemorySearch("known issues with {technology}")
 └── Periodically re-check relevant memories
 
 Phase 3: PRE-COMPLETION SEARCH (MANDATORY)
-├── elefanteMemorySearch("verification steps for {task}")
-├── elefanteMemorySearch("testing requirements")
-└── elefanteMemorySearch("definition of done")
+├── elefante-MemorySearch("verification steps for {task}")
+├── elefante-MemorySearch("testing requirements")
+└── elefante-MemorySearch("definition of done")
 
 Phase 4: POST-COMPLETION DOCUMENTATION
-├── elefanteMemoryAdd("What worked: {approach}")
-├── elefanteMemoryAdd("Challenges overcome: {problems}")
-└── elefanteMemoryAdd("Lessons learned: {insights}")
+├── elefante-MemoryAdd("What worked: {approach}")
+├── elefante-MemoryAdd("Challenges overcome: {problems}")
+└── elefante-MemoryAdd("Lessons learned: {insights}")
 
 Phase 5: REINFORCEMENT
 └── Update importance of memories that prevented mistakes
@@ -362,7 +362,7 @@ importance = memory.importance
 | ------------------ | ----------------------------------------------------------------------------- |
 | **Core**           | id, content, created_at, created_by                                           |
 | **Classification** | domain, category, memory_type, subcategory, intent                            |
-| **Importance**     | importance (1-10), urgency, confidence                                        |
+| **Importance**     | relevance_score (0-100, system-computed), urgency, confidence                                        |
 | **Relationship**   | relationship_type, parent_id, related_memory_ids, conflict_ids, supersedes_id |
 | **Temporal**       | last_accessed, last_modified, access_count, decay_rate, reinforcement_factor  |
 | **Source**         | source, source_detail, source_reliability, verified, verified_by              |
@@ -488,7 +488,7 @@ print(f"Exported {len(memories)} memories")  # Should be 71
 
 ```python
 # Method 2: MCP with min_similarity=0
-result = await mcp_client.call_tool("elefanteMemorySearch", {
+result = await mcp_client.call_tool("elefante-MemorySearch", {
     "query": "*",
     "limit": 1000,
     "min_similarity": 0.0  # CRITICAL!
@@ -498,8 +498,8 @@ result = await mcp_client.call_tool("elefanteMemorySearch", {
 ###  DON'T: Common Export Mistakes
 
 ```python
-#  Using elefanteMemorySearch with default min_similarity
-elefanteMemorySearch("all memories")  # Returns ~3-10, not 71
+#  Using elefante-MemorySearch with default min_similarity
+elefante-MemorySearch("all memories")  # Returns ~3-10, not 71
 
 #  Querying Kuzu instead of ChromaDB
 "MATCH (e:Entity) RETURN e"  # Returns 17 entities, not 71 memories
@@ -524,7 +524,7 @@ queries = [
 ]
 
 for q in queries:
-  results = elefanteMemorySearch(q, min_similarity=0.2)
+  results = elefante-MemorySearch(q, min_similarity=0.2)
     if results:
         print(f"Found guidance: {results}")
 ```
@@ -534,8 +534,8 @@ for q in queries:
 ```python
 # Periodic checks:
 if stuck_for_more_than_5_minutes:
-  elefanteMemorySearch(f"troubleshooting {current_error}")
-  elefanteMemorySearch(f"workarounds for {technology}")
+  elefante-MemorySearch(f"troubleshooting {current_error}")
+  elefante-MemorySearch(f"workarounds for {technology}")
 ```
 
 ### Before Claiming Done
@@ -549,7 +549,7 @@ verification_queries = [
 ]
 
 for q in verification_queries:
-  guidance = elefanteMemorySearch(q)
+  guidance = elefante-MemorySearch(q)
     # FOLLOW the guidance
 ```
 
@@ -585,7 +585,7 @@ assert count > 0, 'No memories found!'
 
 ---
 
-## Issue #7: elefanteMemorySearch Response Bloat (Token Waste)
+## Issue #7: elefante-MemorySearch Response Bloat (Token Waste)
 
 **Date:** 2025-12-10  
 **Duration:** Observed in production testing  
@@ -594,7 +594,7 @@ assert count > 0, 'No memories found!'
 
 ### Problem
 
-elefanteMemorySearch returns ~500 tokens of metadata per memory, 90% of which is null/default values.
+elefante-MemorySearch returns ~500 tokens of metadata per memory, 90% of which is null/default values.
 
 ### Symptom
 
@@ -637,14 +637,14 @@ elefanteMemorySearch returns ~500 tokens of metadata per memory, 90% of which is
 
 **Option 1: Filter nulls in MCP response**
 ```python
-# In src/mcp/server.py elefanteMemorySearch handler
+# In src/mcp/server.py elefante-MemorySearch handler
 def filter_null_metadata(metadata: dict) -> dict:
     return {k: v for k, v in metadata.items() if v is not None}
 ```
 
 **Option 2: Add slim_response parameter**
 ```python
-elefanteMemorySearch(query="...", slim_response=True)
+elefante-MemorySearch(query="...", slim_response=True)
 # Returns only: id, content, score, importance, layer, sublayer
 ```
 
@@ -750,7 +750,7 @@ embedding_model = "BAAI/bge-base-en-v1.5"  # Better for retrieval
 
 ### Problem
 
-elefanteMemorySearch returns raw JSON that agent must parse and interpret. No guidance on WHAT TO DO with results.
+elefante-MemorySearch returns raw JSON that agent must parse and interpret. No guidance on WHAT TO DO with results.
 
 ### Symptom
 

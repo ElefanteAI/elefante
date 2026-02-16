@@ -3,14 +3,14 @@ Elefante ETL Pipeline - Agent-Brain Architecture
 
 Two-phase memory ingestion where PHASE 2 uses the AGENT's LLM brain:
 
-1. INGEST (elefanteMemoryAdd): 
+1. INGEST (elefante-MemoryAdd): 
    - Fast, non-blocking raw storage
    - Returns immediately with processing_status="raw"
    
-2. PROCESS (elefanteETLProcess + elefanteETLClassify):
-   - elefanteETLProcess: Returns raw memories TO THE AGENT
+2. PROCESS (elefante-ETLProcess + elefante-ETLClassify):
+   - elefante-ETLProcess: Returns raw memories TO THE AGENT
    - Agent's LLM classifies (ring, knowledge_type, topic, summary)
-   - elefanteETLClassify: Agent sends classification back, system updates memory
+   - elefante-ETLClassify: Agent sends classification back, system updates memory
 
 This architecture keeps Elefante LLM-FREE while leveraging agent intelligence.
 """

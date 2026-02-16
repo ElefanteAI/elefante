@@ -16,12 +16,12 @@ Every memory ingestion (`add_memory`) MUST pass through these five stages:
     - **Goal**: Distill raw text into pure intent.
     - **Action**: Remove conversational fluff ("I think...", "Maybe...").
 
-2.  **CLASSIFY (V3 Schema)**
+2.  **CLASSIFY**
 
-    - **Goal**: Assign absolute truth coordinates.
+    - **Goal**: Assign structured metadata coordinates.
     - **Input**: Content.
-    - **Output**: `Layer` (Self/World/Intent) & `Sublayer` (Fact, Rule, etc.).
-    - **Rule**: Never guess. If unsure, default to `World.Fact`.
+    - **Output**: `memory_type`, `domain`, and topology fields (`ring`, `topic`, `knowledge_type`) via agent ETL classification.
+    - **Rule**: Never guess. If unsure, default to `memory_type=fact`, `domain=reference`.
 
 3.  **INTEGRITY (Logic-Level Deduplication)**
 

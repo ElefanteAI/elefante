@@ -1,6 +1,6 @@
 # Elefante Memory Schema V5: Knowledge Topology
 
-**Status**: DRAFT (Specification)
+**Status**: PRODUCTION
 
 V5 adds a queryable knowledge topology over memories so the dashboard can present a higher-level map (rings, topics, and types) without writing speculative or marketing-only metadata.
 

@@ -1,6 +1,6 @@
 # Technical Documentation Index
 
-**Status**:  Production (v1.6.2)  
+**Status**:  Production (v1.10.0)  
 **Purpose**: Complete technical reference for Elefante AI Memory System
 
 ---
@@ -37,7 +37,7 @@
 
 | File | Purpose |
 |------|---------|
-| [`rollback.md`](rollback.md) | Roll back to the v1.6.0 baseline (code + data) |
+| [`rollback.md`](rollback.md) | Backup and rollback procedures |
 
 ### Core System
 
@@ -57,12 +57,10 @@
 
 | File | Purpose | Status |
 |------|---------|--------|
-| [`cognitive-memory-model.md`](cognitive-memory-model.md) | Agent-managed enrichment contract (no internal LLM calls) |  Implemented |
 | [`temporal-memory-decay.md`](temporal-memory-decay.md) | Access-based reinforcement, decay over time |  Implemented |
-| [`memory-schema-v3.md`](memory-schema-v3.md) | Layer/sublayer taxonomy |  Production |
-| [`memory-schema-v4.md`](memory-schema-v4.md) | Canonical keys, versioning, namespaces (prod/test), TTL |  Proposed |
-| [`memory-schema-v4-cognitive.md`](memory-schema-v4-cognitive.md) | **V4 Cognitive Retrieval: concepts, surfaces_when, authority_score** |  **Implemented** |
-| [`memory-schema-v5-topology.md`](memory-schema-v5-topology.md) | Rings/topics/types topology fields for dashboard |  Draft |
+| [`memory-schema-v4.md`](memory-schema-v4.md) | Canonical keys, versioning, namespaces (prod/test), TTL |  Production |
+| [`memory-schema-v4-cognitive.md`](memory-schema-v4-cognitive.md) | V4 Cognitive Retrieval: concepts, surfaces_when, authority_score |  Production |
+| [`memory-schema-v5-topology.md`](memory-schema-v5-topology.md) | Rings/topics/types topology fields for dashboard |  Production |
 
 ### Database
 
@@ -78,8 +76,8 @@
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Dual Storage (ChromaDB + Kuzu) |  | Production |
-| MCP Server (18 tools) |  | Production |
-| MCP Prompts (2) |  | Production |
+| MCP Server (17 tools + 2 prompts) |  | Production |
+| [`copilot-instructions`](../../.github/copilot-instructions.md) | Agent behavior configuration for GitHub Copilot |  Production |
 | Transaction-Scoped Locking |  | v1.1.0 (replaced session-based locks) |
 | **Compliance Gate** |  | **v1.6.0 (search-before-write enforcement)** |
 | Auto-Inject Pitfalls |  | v1.0.1 |
@@ -100,5 +98,5 @@
 
 ---
 
-**Version**: 1.6.2  
-**Last Updated**: 2025-12-28
+**Version**: 1.10.0  
+**Last Updated**: 2026-02-16

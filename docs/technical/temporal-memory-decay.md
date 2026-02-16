@@ -1,8 +1,8 @@
 # Temporal Memory Decay & Reinforcement
 
-**Feature Version**: 1.0.0  
-**Status**: Production Ready  
-**Date**: 2025-12-04
+**Feature Version**: 1.10.0  
+**Status**: Production  
+**Date**: 2026-02-16
 
 ---
 
@@ -23,13 +23,13 @@ This creates a dynamic memory system where frequently accessed, important memori
 ### Memory Strength Formula
 
 ```python
-strength = importance × recency × reinforcement × access_recency
+strength = relevance_score × recency × reinforcement × access_recency
 
 where:
-  importance = user-defined (1-10)
-  recency = 1.0 - (days_old × decay_rate)
-  reinforcement = 1.0 + (access_count × reinforcement_factor)
-  access_recency = 1.0 - (days_since_access × decay_rate)
+  relevance_score = system-computed Behavioral Relevance (0-100)
+  recency = exp(-decay_rate × days_since_created)
+  reinforcement = 1.0 + 0.25 × ln(access_count + 1)
+  access_recency = exp(-0.02 × days_since_accessed)
 ```
 
 ### Default Parameters
@@ -60,12 +60,12 @@ consolidation_threshold = 0.3  # Archive below 30% strength
 **Example**:
 ```python
 # Memory A: Created 100 days ago, accessed 5 times, last access 2 days ago
-strength_A = 8 × 0.0 × 1.5 × 0.98 = 0.0  # Too old, decayed completely
+strength_A = 50 × 0.0 × 1.5 × 0.98 = 0.0  # Too old, decayed completely
 
 # Memory B: Created 10 days ago, accessed 3 times, last access 1 day ago  
-strength_B = 8 × 0.9 × 1.3 × 0.99 = 9.25  # Strong and recent
+strength_B = 50 × 0.9 × 1.3 × 0.99 = 57.9  # Strong and recent
 
-# Memory B ranks higher despite same importance
+# Memory B ranks higher — its behavioral relevance earns better placement
 ```
 
 ### Phase 2: Background Consolidation (Planned)
@@ -172,7 +172,7 @@ Memories can have custom decay/reinforcement rates:
 memory = Memory(
     content="Important project decision",
     metadata=MemoryMetadata(
-        importance=10,
+        importance=90,  # Behavioral relevance (0-100)
         decay_rate=0.001,  # Slower decay (0.1% per day)
         reinforcement_factor=0.2  # Stronger reinforcement
     )
@@ -187,8 +187,8 @@ memory = Memory(
 
 ```python
 # Store two memories
-memory1 = orchestrator.add_memory("Python is great", importance=8)
-memory2 = orchestrator.add_memory("JavaScript is useful", importance=8)
+memory1 = orchestrator.add_memory("Python is great", memory_type="fact")
+memory2 = orchestrator.add_memory("JavaScript is useful", memory_type="fact")
 
 # Access memory1 multiple times
 for _ in range(5):
@@ -207,27 +207,27 @@ results = orchestrator.search_memories("programming languages")
 ### Example 2: Importance vs Recency
 
 ```python
-# Old but important memory
+# Old but durable memory
 old_memory = Memory(
     content="Critical system architecture decision",
     metadata=MemoryMetadata(
-        importance=10,
+        memory_type="decision",
         created_at=datetime.now() - timedelta(days=365)
     )
 )
 
-# Recent but less important memory
+# Recent but ephemeral memory
 new_memory = Memory(
     content="Minor code style preference",
     metadata=MemoryMetadata(
-        importance=5,
+        memory_type="note",
         created_at=datetime.now() - timedelta(days=1)
     )
 )
 
 # Search results balance both factors
-# old_memory: 10 × 0.0 × 1.0 × 1.0 = 0.0 (decayed completely)
-# new_memory: 5 × 0.99 × 1.0 × 1.0 = 4.95 (recent wins)
+# old_memory: 50 × 0.0 × 1.0 × 1.0 = 0.0 (decayed completely)
+# new_memory: 50 × 0.99 × 1.0 × 1.0 = 49.5 (recent wins)
 
 # But if old_memory is accessed frequently:
 # old_memory: 10 × 0.0 × 2.0 × 0.99 = 0.0 (still decayed, but reinforcement helps)
@@ -382,11 +382,11 @@ temporal_decay:
 ## Related Documentation
 
 - [`architecture.md`](architecture.md) - System architecture
-- [`memory-schema-v3.md`](memory-schema-v3.md) - Memory data model
+- [`memory-schema-v4.md`](memory-schema-v4.md) - Memory data model
 - [`usage.md`](usage.md) - API reference
 
 ---
 
-**Version**: 1.6.2  
-**Last Updated**: 2025-12-28  
+**Version**: 1.10.0  
+**Last Updated**: 2026-02-16  
 **Status**: Production Ready (Phase 1), Planned (Phase 2)

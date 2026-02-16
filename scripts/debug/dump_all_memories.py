@@ -1,8 +1,28 @@
 #!/usr/bin/env python3
-"""Dump all 28 memories from ChromaDB — raw inspection."""
+"""Dump all memories from ChromaDB — raw inspection."""
+import os
+import sys
 import chromadb
+import yaml
 
-client = chromadb.PersistentClient(path="/Users/jay/.elefante/data/chroma")
+# Resolve config path
+config_path = os.environ.get(
+    "ELEFANTE_CONFIG_PATH",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config.yaml")
+)
+
+with open(config_path) as f:
+    config = yaml.safe_load(f)
+
+# Resolve ChromaDB path from config (mirrors config.py resolution)
+data_dir = os.path.join(os.path.dirname(config_path), "data")
+chroma_path = os.path.join(data_dir, "chroma")
+
+if not os.path.isdir(chroma_path):
+    print(f"ChromaDB directory not found: {chroma_path}")
+    sys.exit(1)
+
+client = chromadb.PersistentClient(path=chroma_path)
 col = client.get_collection("memories")
 results = col.get(include=["documents", "metadatas"])
 

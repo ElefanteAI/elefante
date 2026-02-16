@@ -1025,7 +1025,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 )]
     
     async def _handle_enable_elefante(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteSystemEnable tool call - Activate Elefante Mode"""
+        """Handle elefante-System tool call (action=enable) - Activate Elefante Mode"""
         force = args.get("force", False)
         result = self.mode_manager.enable(force=force)
         
@@ -1040,7 +1040,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         return result
     
     async def _handle_disable_elefante(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteSystemDisable tool call - Deactivate Elefante Mode"""
+        """Handle elefante-System tool call (action=disable) - Deactivate Elefante Mode"""
         result = self.mode_manager.disable()
         
         # Clear orchestrator reference
@@ -1050,7 +1050,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         return result
 
     async def _handle_get_system_status(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteSystemStatusGet tool call - Combined mode + stats"""
+        """Handle elefante-SystemStatusGet tool call - Combined mode + stats"""
         status: Dict[str, Any] = {
             "success": True,
             "mode": "enabled" if self.mode_manager.is_enabled else "disabled",
@@ -1070,7 +1070,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         return status
 
     async def _handle_add_memory(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteMemoryAdd tool call - Authoritative Pipeline (v1.6.0: Compliance Gate)"""
+        """Handle elefante-MemoryAdd tool call - Authoritative Pipeline (v1.6.0: Compliance Gate)"""
         # v1.6.0 Compliance Gate Check
         gate_result = self._check_compliance_gate("elefante-MemoryAdd")
         if gate_result is not None:
@@ -1137,8 +1137,8 @@ You have access to a persistent memory system called **Elefante** - the user's s
         }
     
     async def _handle_search_memories(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteMemorySearch tool call"""
-        # v1.9.1: list_all mode (absorbs former elefanteMemoryListAll)
+        """Handle elefante-MemorySearch tool call"""
+        # v1.9.1: list_all mode (absorbs former elefante-MemoryListAll)
         if args.get("list_all", False):
             return await self._handle_list_all_memories(args)
         
@@ -1217,7 +1217,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         return response
     
     async def _handle_query_graph(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteGraphQuery tool call"""
+        """Handle elefante-GraphQuery tool call"""
         from src.core.graph_store import get_graph_store
         
         graph_store = get_graph_store()
@@ -1231,7 +1231,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         }
     
     async def _handle_get_context(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteContextGet tool call"""
+        """Handle elefante-ContextGet tool call"""
         session_id = None
         if "session_id" in args:
             session_id = UUID(args["session_id"])
@@ -1262,7 +1262,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         return candidate_upper
     
     async def _handle_list_all_memories(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteMemoryListAll tool call"""
+        """Handle elefante-MemorySearch tool call with list_all=true"""
         orchestrator = await self._get_orchestrator()
         
         # Parse filters if provided
@@ -1296,7 +1296,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
     # =========================================================================
     
     async def _handle_update_memory(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteMemoryUpdate tool call — amend memories in-place."""
+        """Handle elefante-MemoryUpdate tool call — amend memories in-place."""
         gate_result = self._check_compliance_gate("elefante-MemoryUpdate")
         if gate_result is not None:
             return gate_result
@@ -1345,7 +1345,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 return {"success": False, "error": f"Memory {memory_id} not found or update failed"}
     
     async def _handle_delete_memory(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteMemoryDelete tool call — purposeful forgetting."""
+        """Handle elefante-MemoryDelete tool call — purposeful forgetting."""
         gate_result = self._check_compliance_gate("elefante-MemoryDelete")
         if gate_result is not None:
             return gate_result
@@ -1378,7 +1378,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 return {"success": False, "error": f"Memory {memory_id} not found or deletion failed"}
 
     async def _handle_consolidate_memories(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteMemoryConsolidate tool call (v1.9.1: transaction-scoped)"""
+        """Handle elefante-MemoryConsolidate tool call (v1.9.1: transaction-scoped)"""
         with write_lock() as lock:
             if not lock.acquired:
                 return {
@@ -1394,7 +1394,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
             return result
     
     async def _handle_get_episodes(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteSessionsList tool call"""
+        """Handle elefante-SessionsList tool call"""
         limit = args.get("limit", 10)
         offset = args.get("offset", 0)
         
@@ -1741,7 +1741,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         }
 
     async def _handle_get_elefante_dashboard(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteDashboardOpen tool call"""
+        """Handle elefante-DashboardOpen tool call"""
         refresh = bool(args.get("refresh", False))
 
         refresh_result = None
@@ -1759,7 +1759,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         return result
 
     async def _handle_set_elefante_connection(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteGraphConnect tool call (v1.6.0: Compliance Gate)"""
+        """Handle elefante-GraphConnect tool call (v1.6.0: Compliance Gate)"""
         # v1.6.0 Compliance Gate Check
         gate_result = self._check_compliance_gate("elefante-GraphConnect")
         if gate_result is not None:
@@ -1870,7 +1870,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
     # ==========================================================================
     
     async def _handle_etl_process(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteETLProcess - Get raw memories for agent classification"""
+        """Handle elefante-ETLProcess - Get raw memories for agent classification"""
         from src.core.etl import get_etl_processor
         
         etl = get_etl_processor()
@@ -1894,7 +1894,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 "instructions": "Analyze each memory and call elefante-ETLClassify with your classification. Use V5 schema: ring (core/domain/topic/leaf), knowledge_type (law/principle/method/decision/insight/preference/fact), topic (coding-standards/communication/workflow/agent-behavior/tools-environment/collaboration/general), summary (one-line)."
             }
         
-        # v1.9.1: include_stats (absorbs former elefanteETLStatus)
+        # v1.9.1: include_stats (absorbs former elefante-ETLProcess (include_stats=true))
         if args.get("include_stats", False):
             stats = await etl.get_stats()
             result["stats"] = stats
@@ -1903,7 +1903,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         return result
     
     async def _handle_etl_classify(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteETLClassify - Apply agent's classification (v1.9.1: transaction-scoped)"""
+        """Handle elefante-ETLClassify - Apply agent's classification (v1.9.1: transaction-scoped)"""
         from src.core.etl import get_etl_processor
         
         # Validate required fields first (before acquiring lock)
@@ -1939,7 +1939,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
             return result
     
     async def _handle_etl_status(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteETLStatus - Get processing stats"""
+        """Handle elefante-ETLProcess (include_stats=true) - Get processing stats"""
         from src.core.etl import get_etl_processor
         
         etl = get_etl_processor()
@@ -1958,7 +1958,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
     # =========================================================================
 
     async def _handle_task_create(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteTaskCreate - Create a new task node (v1.9.1: absorbs decompose via subtasks param)"""
+        """Handle elefante-TaskCreate - Create a new task node (v1.9.1: absorbs decompose via subtasks param)"""
         try:
             with write_lock() as lock:
                 if not lock.acquired:
@@ -1981,7 +1981,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                     "message": f"Task created: {task_id}"
                 }
                 
-                # v1.9.1: Inline subtask creation (absorbs former elefanteTaskDecompose)
+                # v1.9.1: Inline subtask creation (absorbs former elefante-TaskCreate (subtasks))
                 if "subtasks" in args and args["subtasks"]:
                     subtask_ids = await orchestrator.decompose_task(
                         parent_task_id=task_id,
@@ -1993,13 +1993,13 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 
                 return result
         except ValueError as e:
-            return {"success": False, "error": str(e), "tool": "elefanteTaskCreate"}
+            return {"success": False, "error": str(e), "tool": "elefante-TaskCreate"}
         except Exception as e:
             self.logger.error(f"Task create failed: {e}", exc_info=True)
-            return {"success": False, "error": str(e), "tool": "elefanteTaskCreate"}
+            return {"success": False, "error": str(e), "tool": "elefante-TaskCreate"}
 
     async def _handle_task_decompose(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteTaskDecompose - Break a task into subtasks"""
+        """Handle elefante-TaskCreate (subtasks) - Break a task into subtasks"""
         try:
             with write_lock() as lock:
                 if not lock.acquired:
@@ -2019,13 +2019,13 @@ You have access to a persistent memory system called **Elefante** - the user's s
                     "message": f"Created {len(subtask_ids)} subtasks under {args['parent_task_id']}"
                 }
         except ValueError as e:
-            return {"success": False, "error": str(e), "tool": "elefanteTaskDecompose"}
+            return {"success": False, "error": str(e), "tool": "elefante-TaskCreate (subtasks)"}
         except Exception as e:
             self.logger.error(f"Task decompose failed: {e}", exc_info=True)
-            return {"success": False, "error": str(e), "tool": "elefanteTaskDecompose"}
+            return {"success": False, "error": str(e), "tool": "elefante-TaskCreate (subtasks)"}
 
     async def _handle_task_update(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteTaskUpdate - Update task status/output"""
+        """Handle elefante-TaskUpdate - Update task status/output"""
         try:
             with write_lock() as lock:
                 if not lock.acquired:
@@ -2045,13 +2045,13 @@ You have access to a persistent memory system called **Elefante** - the user's s
                     "message": f"Task {args['task_id']} updated" if success else f"Task {args['task_id']} not found"
                 }
         except ValueError as e:
-            return {"success": False, "error": str(e), "tool": "elefanteTaskUpdate"}
+            return {"success": False, "error": str(e), "tool": "elefante-TaskUpdate"}
         except Exception as e:
             self.logger.error(f"Task update failed: {e}", exc_info=True)
-            return {"success": False, "error": str(e), "tool": "elefanteTaskUpdate"}
+            return {"success": False, "error": str(e), "tool": "elefante-TaskUpdate"}
 
     async def _handle_task_graph(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefanteTaskGraph - Get task hierarchy"""
+        """Handle elefante-TaskGraph - Get task hierarchy"""
         try:
             orchestrator = await self._get_orchestrator()
             result = await orchestrator.get_task_graph(
@@ -2064,7 +2064,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
             }
         except Exception as e:
             self.logger.error(f"Task graph query failed: {e}", exc_info=True)
-            return {"success": False, "error": str(e), "tool": "elefanteTaskGraph"}
+            return {"success": False, "error": str(e), "tool": "elefante-TaskGraph"}
 
 
     

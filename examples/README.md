@@ -7,7 +7,7 @@
 When Elefante MCP is installed, run the tutorial:
 
 ```
-Call: elefanteSystemEnable
+Call: elefante-System with action="enable"
 Then follow: examples/AGENT_TUTORIAL.md
 ```
 
@@ -21,11 +21,11 @@ Then follow: examples/AGENT_TUTORIAL.md
 
 ### Core Tools (in order of use)
 
-1. `elefanteSystemEnable` - Enable before any operation
-2. `elefanteMemoryAdd` - Store a memory
-3. `elefanteMemorySearch` - Retrieve memories
-4. `elefanteContextGet` - Get session context
-5. `elefanteSystemDisable` - Release locks when done
+1. `elefante-System` (action="enable") - Enable before any operation
+2. `elefante-MemoryAdd` - Store a memory
+3. `elefante-MemorySearch` - Retrieve memories
+4. `elefante-ContextGet` - Get session context
+5. `elefante-System` (action="disable") - Release locks when done
 
 ---
 

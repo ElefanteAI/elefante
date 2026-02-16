@@ -37,7 +37,7 @@ elefante:
   # MCP Server Configuration
   mcp_server:
     name: "elefante"
-    version: "1.6.2"
+    version: "1.10.0"
     description: "Local AI Memory System with Vector and Graph Storage"
     # Optional HTTP endpoint (leave commented for stdio only)
     # port: 3000
@@ -73,7 +73,7 @@ elefante:
   memory:
     auto_consolidate: false # Automatic memory consolidation (future feature)
     consolidation_threshold: 1000 # Number of memories before consolidation
-    importance_decay: false # Decay importance over time (future feature)
+    importance_decay: false # Deprecated: behavioral relevance (temporal_decay) handles this
     max_age_days: 365 # Maximum age before archival (0 = never)
   
   # Temporal Memory Decay & Reinforcement (v1.2.0)
@@ -113,7 +113,7 @@ elefante:
 
   # User Profile Configuration
   user_profile:
-    user_name: "EnterpriseUser"
-    user_id: "enterprise_user_001"
+    user_name: "User"
+    user_id: "default_user"
     auto_link_first_person: true
     detect_code_blocks: true

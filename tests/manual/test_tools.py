@@ -41,21 +41,23 @@ async def _run_tool_registration():
         print(f"  {i}. {name}")
     
     expected_tools = [
-        'elefanteMemoryAdd',
-        'elefanteMemorySearch',
-        'elefanteGraphQuery',
-        'elefanteContextGet',
-        'elefanteGraphEntityCreate',
-        'elefanteGraphRelationshipCreate',
-        'elefanteSessionsList',
-        'elefanteSystemStatusGet',
-        'elefanteDashboardOpen',
-        'elefanteGraphConnect',
-        'elefanteMemoryConsolidate',
-        'elefanteMemoryListAll',
-        'elefanteMemoryMigrateToV3',
-        'elefanteSystemEnable',
-        'elefanteSystemDisable',
+        'elefante-MemoryAdd',
+        'elefante-MemorySearch',
+        'elefante-MemoryUpdate',
+        'elefante-MemoryDelete',
+        'elefante-MemoryConsolidate',
+        'elefante-GraphConnect',
+        'elefante-GraphQuery',
+        'elefante-ContextGet',
+        'elefante-SessionsList',
+        'elefante-SystemStatusGet',
+        'elefante-DashboardOpen',
+        'elefante-System',
+        'elefante-TaskCreate',
+        'elefante-TaskUpdate',
+        'elefante-TaskGraph',
+        'elefante-ETLProcess',
+        'elefante-ETLClassify',
     ]
     
     missing = [t for t in expected_tools if t not in tool_names]

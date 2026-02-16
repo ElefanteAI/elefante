@@ -1,6 +1,6 @@
 # Elefante Architecture: The Second Brain
 
-**Version:** 1.6.4 | **Status:** Production Ready
+**Version:** 1.10.0 | **Status:** Production Ready
 
 ## 1. System Overview
 
@@ -20,7 +20,7 @@ Elefante is the **Second Brain** for AI agents. It solves the "stateless agent" 
 ### Agent-Brain Classification (ETL)
 
 In v1.1.0, Elefante shifts classification responsibility to the Agent (the "Brain").
-- **ETL Pipeline**: Raw memories are ingested and then processed by the agent via `elefanteETLProcess` and `elefanteETLClassify`.
+- **ETL Pipeline**: Raw memories are ingested and then processed by the agent via `elefante-ETLProcess` and `elefante-ETLClassify`.
 - **V5 Topology**: Memories are classified into Rings (Core, Domain, Topic, Leaf) and Knowledge Types (Law, Principle, Fact, etc.).
 
 ## 2. The Orchestrator Logic
@@ -32,7 +32,7 @@ The `Memory Orchestrator` (`src/core/orchestrator.py`) is the central decision e
 To support multi-IDE usage without deadlocks:
 - **Per-Operation Locks**: Locks are acquired only for the duration of a write operation (milliseconds).
 - **Auto-Expiry**: Stale locks (>30s) are automatically cleared.
-- **No Manual Toggle**: `elefanteSystemEnable` is now a no-op; the system is always ready.
+- **No Manual Toggle**: `elefante-System` with `action="enable"` is now a no-op; the system is always ready.
 
 ### Adaptive Weighting
 
@@ -44,7 +44,7 @@ Instead of a static RAG formula, Elefante analyzes the query to shift importance
 
 ### Data Flow: Storing a Memory
 
-1.  **Ingest:** Text received via `elefanteMemoryAdd`.
+1.  **Ingest:** Text received via `elefante-MemoryAdd`.
 2.  **Dual-Write:**
     - **Vector:** Content embedded and stored in ChromaDB.
     - **Graph:** A `Memory` node is created in Kuzu.

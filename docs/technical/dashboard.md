@@ -1,23 +1,30 @@
 # Elefante Dashboard Usage Guide
 
+**Version**: v1.10.0  
+**Last Updated**: 2026-02-16
+
 See also:
-- [Dashboard Overhaul SPEC](dashboard-overhaul-spec.md)
+- [Dashboard Startup Guide](dashboard-startup.md) — Starting, verifying, and troubleshooting
 - [Dashboard Snapshot Contract](dashboard-snapshot-contract.md)
+
+---
 
 ## Quick Start
 
 ### Starting the Dashboard
 
 **Option 1: Via MCP Tool (Recommended)**
-Use the `elefanteDashboardOpen` tool:
 ```
 "Open the dashboard"
 ```
-This will start the server and open your browser automatically.
+This calls `elefante-DashboardOpen`, starts the server, and opens your browser.
 
 **Option 2: Manual Start**
 ```bash
-# From project root
+# Refresh snapshot first
+python scripts/update_dashboard_data.py
+
+# Start dashboard server
 python -m src.dashboard.server
 ```
 
@@ -31,40 +38,42 @@ Press `Ctrl+C` in the terminal running the server.
 
 ## Dashboard Features
 
-### 1. **Memory Visualization**
+### 1. Memory Visualization
 
-- **Interactive Graph**: Each green dot represents a memory
-- **Node Labels**: Truncated descriptions (first 3 words) shown below each node
-- **Hover Tooltips**: Curated-first (title + summary + explainable link counts)
-- **Zoom Controls**: Use mouse wheel or zoom buttons (bottom right)
+- **Neural Web Graph**: Memories rendered as an organic, physics-driven network
+- **Node Labels**: Truncated descriptions shown below each node
+- **Hover Tooltips**: Title, summary, and connection counts
+- **Zoom Controls**: Mouse wheel or zoom buttons (bottom right)
 - **Pan**: Click and drag to move around the graph
 
-### 2. **Statistics Panel** (Top Left)
+### 2. Statistics Panel (Top Left)
 
 - **Total Memories**: Current count in the system
 - **Total Episodes**: Number of conversation sessions
 
-## 4. **Visual Physics Engine (V30 Only)** 
+### 3. Visual Physics Engine
 
-- **Power Law Sizing**: Node size = `8 + (Importance² * 0.4)`.
-  - Landmark Memories (Imp 10) are massive (48px) anchors.
-  - Detail Memories (Imp 1) are small (8px) particles.
-- **Oort Cloud Protocol**: Orphan nodes (no links) are physically locked into a deep-space orbital band (400-600px) to prevent cluttering the "Neural Web" center.
-- **Electric Edges**: Relationships pulse with a gradient animation, flowing towards the target.
+- **Linear Node Sizing**: Balanced sizes (max 25px) based on behavioral relevance score
+- **Neural Physics**: Nodes float organically, no rigid ring locks
+- **Recency Pulse**: White ring for very recent memories
+- **Status Borders**: Green = processed, amber = pending ETL classification
+- **Signal Hubs**: Topic, ring, and knowledge_type hub nodes connect related memories
 
 ---
 
 ## Adding Memories
 
-### Method 1: Via MCP Tools (Recommended)
+### Via MCP Tools (Recommended)
 
-When using Roo-Cline, memories are automatically added during conversations. You can also explicitly use:
+Use the `elefante-MemoryAdd` tool from your IDE:
 
 ```
-Use the elefanteMemoryAdd MCP tool to store this information
+Store this in Elefante: "Always use absolute paths in configuration files"
 ```
 
-### Method 2: Via Python Script
+The agent provides `content`, `memory_type`, and `domain`. The system computes behavioral relevance automatically.
+
+### Via Python Script
 
 ```python
 import asyncio
@@ -76,9 +85,8 @@ async def add_memory():
     result = await orchestrator.add_memory(
         content="Your memory content here",
         metadata={
-            "layer": "world", # V3 Schema
-            "sublayer": "fact",
-            "importance": 5
+            "memory_type": "fact",
+            "domain": "work"
         }
     )
 
@@ -87,54 +95,34 @@ async def add_memory():
 asyncio.run(add_memory())
 ```
 
-### Method 3: Via Dashboard API
-
-```bash
-curl -X POST http://localhost:8000/api/memories \
-  -H "Content-Type: application/json" \
-  -d '{
-    "content": "Your memory content",
-    "layer": "world",
-    "sublayer": "fact",
-    "importance": 5
-  }'
-```
-
 ---
 
 ## Snapshot Refresh
 
-**IMPORTANT**: The dashboard is snapshot-driven. If new memories are added, you must regenerate the snapshot and then refresh the browser.
+The dashboard is **snapshot-driven**. It reads from a static JSON file, not directly from the databases. This prevents lock conflicts with the MCP server.
 
-### How It Works:
+### Workflow:
 
-1. **Add a memory** using MCP or scripts
-2. **Regenerate the dashboard snapshot**: 
-   - **Via Tool**: `elefanteDashboardOpen(refresh=True)`
+1. **Add memories** using MCP tools or scripts
+2. **Regenerate the snapshot**: 
+   - **Via Tool**: `elefante-DashboardOpen(refresh=True)`
    - **Via Script**: `python scripts/update_dashboard_data.py`
 3. **Refresh your browser** (Cmd+R / F5)
 
 ### What Gets Updated:
 
--  Memory count in statistics panel
--  New nodes in the graph visualization
--  Relationships between memories
--  All filters and search results
+- Memory count in statistics panel
+- New nodes in the graph visualization
+- Relationships and signal hub connections
+- ETL classification status indicators
 
-### Notes
+### Architecture:
 
-- Snapshot generation is the only step allowed to touch databases.
-- Dashboard runtime reads `DATA_DIR/dashboard_snapshot.json` and must remain read-only.
+```
+MCP Server (write) -> databases -> Export Script -> snapshot.json -> Dashboard (read-only)
+```
 
----
-
-## Memory Types (V3 Schema)
-
-| Layer      | Sublayer                    | Color          | Meaning                    |
-| :--------- | :-------------------------- | :------------- | :------------------------- |
-| **SELF**   | `identity`, `preference`    |  Red/Orange  | User Persona & Constraints |
-| **WORLD**  | `fact`, `failure`, `method` |  Blue/Purple | Objective Knowledge        |
-| **INTENT** | `rule`, `goal`              |  White/Green | Directives & Plans         |
+Snapshot generation is the **only** step that touches databases. The dashboard runtime reads `dashboard_snapshot.json` and remains read-only.
 
 ---
 
@@ -143,78 +131,44 @@ curl -X POST http://localhost:8000/api/memories \
 ### Dashboard Shows 0 Memories
 
 1. **Hard refresh browser**: Cmd+Shift+R (clears cache)
-2. **Check database**: Run `python -c "from src.core.orchestrator import get_orchestrator; import asyncio; print(asyncio.run(get_orchestrator().get_stats()))"`
-3. **Check server logs**: Look for errors in the terminal
+2. **Regenerate snapshot**: `python scripts/update_dashboard_data.py`
+3. **Check database**: `python scripts/health_check.py`
 
 ### Graph Not Loading (Blank Screen)
 
-1. **Check Binding**: Server MUST bind to `0.0.0.0`, not `127.0.0.1`.
-2. **Check API**: Visit http://localhost:8000/api/stats and ensure it returns a flat JSON object (no `{"success": true}` wrapper).
-3. **Verify Static Files**: Ensure `ui/dist/index.html` exists.
+1. **Check Binding**: Server MUST bind to `0.0.0.0`, not `127.0.0.1`
+2. **Check API**: Visit http://localhost:8000/api/stats
+3. **Verify Static Files**: Ensure `src/dashboard/ui/dist/index.html` exists
 
 ### Memory Not Appearing After Adding
 
-1. **Refresh browser**: Press F5
-2. **Check if memory was added**: Visit http://localhost:8000/api/stats
-3. **Verify no database lock**: Only one process can access Kuzu database at a time
+1. **Regenerate snapshot**: `python scripts/update_dashboard_data.py`
+2. **Refresh browser**: Press F5
+3. **Verify no database lock**: Only one process can access Kuzu at a time
 
 ---
 
 ## Database Locations
 
-- **ChromaDB**: `~/.elefante/data/chroma` (or project specific)
-- **Kuzu**: `~/.elefante/data/kuzu_db`
-- **Logs**: `logs/`
+| Store | Default Path |
+|-------|-------------|
+| ChromaDB | `data/chroma_db/` |
+| Kuzu | `data/kuzu_db` |
+| Snapshot | `data/dashboard_snapshot.json` |
+| Logs | `logs/` |
 
----
-
-## Advanced Usage
-
-### Querying the Knowledge Graph
-
-```python
-from src.core.orchestrator import get_orchestrator
-import asyncio
-
-async def query_graph():
-    orchestrator = get_orchestrator()
-
-    # Cypher query example
-    results = await orchestrator.graph_store.execute_query(
-        "MATCH (n:Entity) RETURN n.name LIMIT 10"
-    )
-
-    for result in results:
-        print(result)
-
-asyncio.run(query_graph())
-```
-
-### Searching Memories
-
-```python
-results = await orchestrator.search_memories(
-    query="Python decorators",
-    mode="hybrid",  # semantic, structured, or hybrid
-    limit=10
-)
-```
+Paths are configured in `config.yaml`.
 
 ---
 
 ## Performance Notes
 
-- **Memory Limit**: System can handle 10,000+ memories efficiently
+- **Memory Limit**: System handles 10,000+ memories efficiently
 - **Graph Rendering**: Limited to 500 nodes by default (configurable)
 - **Search Speed**: Semantic search typically <100ms
-- **Auto-Refresh**: Instant (just browser refresh needed)
 
 ---
 
 ## Support
 
-For issues or questions:
-
-1. Check logs in `~/.elefante/logs/` (or your configured logs directory)
-2. Review [`docs/debug/dashboard-compendium.md`](../debug/dashboard-compendium.md) for common issues
-3. Ensure only one process accesses the database at a time
+For common issues, see [`docs/debug/dashboard-compendium.md`](../debug/dashboard-compendium.md)

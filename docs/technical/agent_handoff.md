@@ -13,7 +13,7 @@ This document is written for an autonomous agent that will receive this reposito
 - **Python 3.11** is the supported baseline. (If the container only has 3.13, try to create a venv and install; if databases fail to compile, you may need a 3.11 image).
 - **No emojis** in any output.
 - **Compliance Gate (search-before-write)** is enforced:
-  - You MUST call `elefanteMemorySearch` before any write tool.
+  - You MUST call `elefante-MemorySearch` before any write tool.
 - **STDOUT PURITY**: The MCP server MUST NOT print anything to `stdout` except JSON-RPC. All logs go to `stderr`. `ModuleNotFoundError` on startup will kill the connection.
 
 ## Environment Setup (Critical First Step)
@@ -149,7 +149,7 @@ python scripts/verify_mcp_handshake.py
 ## Common failure modes
 
 - Dashboard shows empty/old data: rerun `python scripts/update_dashboard_data.py` (or Docker equivalent) to regenerate the snapshot.
-- Writes blocked: you forgot to call `elefanteMemorySearch` first.
+- Writes blocked: you forgot to call `elefante-MemorySearch` first.
 - Path problems in Docker: ensure `ELEFANTE_DATA_DIR=/data` is set and volume is mounted (see `docker-compose.yml`).
 
 ## The "Installation Challenge" (Verify your setup)
@@ -161,11 +161,11 @@ As an autonomous agent, you must prove you can use this system effectively. Comp
 **Required result:** You must find a reference to "LAW 13" and list at least 3 files that MUST be updated during a version change.
 
 ### Challenge 2: The Compliance Gate Test
-**Command:** Attempt to call `elefanteMemoryAdd` with a new "dummy" memory BEFORE you have performed a search in this session.
+**Command:** Attempt to call `elefante-MemoryAdd` with a new "dummy" memory BEFORE you have performed a search in this session.
 **Required result:** The server MUST return a `BLOCKED` status or a "Compliance Gate" error. Paste the error message as proof.
 
 ### Challenge 3: The Integrated Loop
 **Command:** 
-1. Call `elefanteMemorySearch` for "Jaime's output preferences".
-2. Based on the result, perform a `health_check.py` and save a new memory using `elefanteMemoryAdd` that summarizes the health status while following the output preferences.
+1. Call `elefante-MemorySearch` for "Jaime's output preferences".
+2. Based on the result, perform a `health_check.py` and save a new memory using `elefante-MemoryAdd` that summarizes the health status while following the output preferences.
 **Required result:** A successful memory addition following the "No Emojis" and "BLUF" rules.

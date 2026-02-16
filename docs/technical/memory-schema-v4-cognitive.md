@@ -1,7 +1,7 @@
 # V4 Cognitive Retrieval Schema
 
-**Status**: IMPLEMENTED  
-**Date**: 2025-12-27  
+**Status**: PRODUCTION  
+**Date**: 2026-02-16  
 **Supersedes**: V3 taxonomy (layer/sublayer still valid, this adds retrieval intelligence)
 
 ---
@@ -77,7 +77,7 @@ Composite score for retrieval ranking:
 
 ```python
 authority = (
-    0.35 × (importance / 10) +        # User-assigned importance
+    0.35 × (relevance_score / 100) +     # System-computed behavioral relevance
     0.25 × log(access_count) / log(50) +  # Usage frequency
     0.20 × exp(-0.007 × days_since_created) +  # Creation freshness
     0.20 × exp(-0.05 × days_since_accessed)    # Access recency
@@ -174,8 +174,7 @@ python scripts/migrate_v4_cognitive.py
 # Adding a memory
 await orchestrator.add_memory(
     content="When debugging path errors, use absolute paths",
-    memory_type="decision",
-    importance=8
+    memory_type="decision"
 )
 
 # Result:

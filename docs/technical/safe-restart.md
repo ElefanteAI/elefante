@@ -1,6 +1,6 @@
 # Elefante Safe Restart
 
-**Version**: 1.6.2  
+**Version**: 1.10.0  
 **Script**: `scripts/restart_elefante.py`  
 **Purpose**: Safely restart MCP server to pick up code changes
 
@@ -259,10 +259,10 @@ Errors logged with context:
 
 ### Future Enhancement
 
-Could add an MCP tool `elefanteSystemRestart`:
+Could add an MCP tool `elefante-SystemRestart`:
 
 ```json
-Tool: elefanteSystemRestart
+Tool: elefante-SystemRestart
 Arguments: {
   "force": false,
   "verify": true
@@ -298,6 +298,6 @@ Arguments: {
 
 ---
 
-**Version**: 1.6.2
-**Last Updated**: 2025-12-29
+**Version**: 1.10.0
+**Last Updated**: 2026-02-16
 **Status**: Production Ready

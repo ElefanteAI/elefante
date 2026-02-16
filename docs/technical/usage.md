@@ -30,6 +30,7 @@ The MCP server exposes 17 tools to your AI agent. All tool names follow the `ele
 |-----------|---------|--------|
 | `content` | The actual text to remember | Free text |
 | `memory_type` | Kind of knowledge (determines decay rate) | `preference`, `fact`, `decision`, `task`, `insight`, `code`, `note`, `conversation`, `rule`, `question`, `hypothesis`, `observation`, `answer` |
+| `memory_class` | Contradiction behavior | `fact` (newer supersedes older), `directive` (coexists, resolved by recency), `state` (ephemeral, most recent wins). Default: `fact`. Use `directive` when ambiguous. |
 | `domain` | High-level context | `work`, `personal`, `project`, `learning`, `reference`, `system` |
 | `category` | Topic grouping | e.g. `elefante`, `python` |
 | `tags` | Keywords for filtering | Array of strings |

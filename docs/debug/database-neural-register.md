@@ -206,7 +206,7 @@ class GraphStore:
 **Prevention**: Proper error handling, atomic operations
 
 ### Pattern #4: Session-Based Lock Deadlock (2025-12-26) - RESOLVED in v1.1.0
-**Trigger**: IDE crashes or closes without calling `elefanteSystemDisable`  
+**Trigger**: IDE crashes or closes without calling `elefante-System` with action="disable"  
 **Symptom**: New IDE instances blocked with "Elefante Mode is DISABLED" or "Could not acquire lock"  
 **Root Cause**: v1.0.1 used session-based locks that held indefinitely until explicit release  
 **Impact**: Complete lockout - stale lock from Dec 14 blocking all access on Dec 26 (12 days!)  

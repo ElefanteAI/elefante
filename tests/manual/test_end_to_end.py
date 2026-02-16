@@ -4,9 +4,9 @@ Elefante End-to-End Test Script
 Simulates a full MCP client session:
 1. Starts the server
 2. Initializes connection
-3. Calls 'elefanteSystemEnable' to enable Elefante Mode
-4. Calls 'elefanteMemoryAdd' to store a test fact
-5. Calls 'elefanteMemorySearch' to retrieve it
+3. Calls 'elefante-System' with action="enable" to enable Elefante Mode
+4. Calls 'elefante-MemoryAdd' to store a test fact
+5. Calls 'elefante-MemorySearch' to retrieve it
 5. Verifies the result
 """
 
@@ -105,13 +105,13 @@ def test_end_to_end():
         # 3. Enable Elefante Mode (required before memory operations)
         log("   Enabling Elefante Mode...")
         send_request(process, "tools/call", {
-            "name": "elefanteSystemEnable",
-            "arguments": {}
+            "name": "elefante-System",
+            "arguments": {"action": "enable"}
         }, req_id=2)
 
         resp = read_json_rpc(process, timeout=10)
         if not resp or "result" not in resp:
-            log("   elefanteSystemEnable failed or timed out.")
+            log("   elefante-System enable failed or timed out.")
             return False
         
         # 4. Add Memory
@@ -120,13 +120,12 @@ def test_end_to_end():
         log(f"   Adding memory: '{test_content}'...")
         
         send_request(process, "tools/call", {
-            "name": "elefanteMemoryAdd",
+            "name": "elefante-MemoryAdd",
             "arguments": {
                 "content": test_content,
-                "importance": 10,
+                "memory_type": "fact",
+                "memory_class": "fact",
                 "tags": ["test", "e2e"],
-                "layer": "world",
-                "sublayer": "fact",
                 "metadata": {
                     "title": f"E2E-Test-{unique_id}"
                 }
@@ -135,7 +134,7 @@ def test_end_to_end():
         
         resp = read_json_rpc(process, timeout=15) # Give it time to embed
         if not resp or "result" not in resp:
-            log("   elefanteMemoryAdd failed or timed out.")
+            log("   elefante-MemoryAdd failed or timed out.")
             return False
             
         # Parse inner tool result
@@ -149,13 +148,13 @@ def test_end_to_end():
             if status in {"stored", "reinforced"} or success or inner_data.get("memory_id"):
                 log(f"   Memory stored successfully. status={status}")
             else:
-                log(f"   elefanteMemoryAdd reported failure: {inner_data}")
+                log(f"   elefante-MemoryAdd reported failure: {inner_data}")
                 return False
         
         # 5. Search Memory
         log(f"   Searching for memory with query: '{test_content}'...")
         send_request(process, "tools/call", {
-            "name": "elefanteMemorySearch",
+            "name": "elefante-MemorySearch",
             "arguments": {
                 "query": test_content, # Use exact content for better match
                 "limit": 5
@@ -164,7 +163,7 @@ def test_end_to_end():
         
         resp = read_json_rpc(process, timeout=10)
         if not resp or "result" not in resp:
-            log("   elefanteMemorySearch failed.")
+            log("   elefante-MemorySearch failed.")
             return False
             
         tool_result = resp["result"]

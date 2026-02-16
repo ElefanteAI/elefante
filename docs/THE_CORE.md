@@ -6,7 +6,7 @@ Elefante is the machine-resident nervous system that allows AI agents to stop re
 
 ---
 
-## ⚖️ The Three Unchangeable Laws
+## The Three Unchangeable Laws
 
 1.  **THE LAW OF CONTINUITY**  
     *A session is never new; it is a continuation.*  
@@ -14,7 +14,7 @@ Elefante is the machine-resident nervous system that allows AI agents to stop re
 
 2.  **THE LAW OF COMPLIANCE (Search-Before-Action)**  
     *Ignorance is a choice, not a constraint.*  
-    You MUST search the memory (`elefanteMemorySearch`) before answering or writing. Failure to check the Brain before acting is a violation of the system's foundational protocol.
+    You MUST search the memory (`elefante-MemorySearch`) before answering or writing. Failure to check the Brain before acting is a violation of the system's foundational protocol.
 
 3.  **THE LAW OF ABSOLUTE GROUNDING**  
     *Truth is a technical artifact.*  
@@ -22,7 +22,7 @@ Elefante is the machine-resident nervous system that allows AI agents to stop re
 
 ---
 
-## 🎯 The Core Objectives
+## The Core Objectives
 
 - **Immunity**: Prevent the repetition of known failures (via Neural Registers).
 - **Efficiency**: Maximize information density; minimize repetitive discovery.
@@ -30,7 +30,7 @@ Elefante is the machine-resident nervous system that allows AI agents to stop re
 
 ---
 
-## ⚡ Key Mandatory Actions
+## Key Mandatory Actions
 
 | Action | Phase | Why? |
 | :--- | :--- | :--- |
@@ -41,7 +41,7 @@ Elefante is the machine-resident nervous system that allows AI agents to stop re
 
 ---
 
-## 🧠 The Intelligence of Retrieval
+## The Intelligence of Retrieval
 
 Deciding what is relevant is the **Supreme Cognitive Act**. Storing data is trivial; decanting it so that only the "Core Truth" surfaces is the reason Elefante exists.
 
@@ -50,7 +50,7 @@ Deciding what is relevant is the **Supreme Cognitive Act**. Storing data is triv
 
 ---
 
-## 🛠️ Fundamental Instructions
+## Fundamental Instructions
 
 1. **Search First**: Never answer a project question without searching Elefante.
 2. **Ground Every Decision**: If it's a preference or a core style, it must have a memory link.
@@ -59,7 +59,7 @@ Deciding what is relevant is the **Supreme Cognitive Act**. Storing data is triv
 
 ---
 
-## �🚫 The Cardinal Sins
+## The Cardinal Sins
 
 - **Statelessness**: Asking for information already stored in the Brain.
 - **Hallucination**: Guessing a path, an API, or a user preference.

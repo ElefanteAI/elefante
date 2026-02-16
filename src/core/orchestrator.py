@@ -457,7 +457,7 @@ class MemoryOrchestrator:
             # ==================================================================================
             # STEP 3.5: RAW STORAGE (ETL Phase 1)
             # V5 topology classification happens asynchronously via agent-driven ETL Phase 2.
-            # Store with processing_status=raw. Agent will classify via elefanteETLProcess/Classify.
+            # Store with processing_status=raw. Agent will classify via elefante-ETLProcess/Classify.
             # ==================================================================================
             custom_metadata["processing_status"] = ProcessingStatus.RAW
             custom_metadata["ingested_at"] = datetime.utcnow().isoformat()

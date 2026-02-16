@@ -1,8 +1,8 @@
 # Memory Schema V4 (Authoritative)
 
 **Version**: 4.0.0
-**Status**: PROPOSED (Specification)
-**Supersedes**: `memory-schema-v3.md` (once implemented)
+**Status**: PRODUCTION
+**Supersedes**: V3 (layer/sublayer taxonomy — archived)
 
 > **V4 goal**: Stop the "bag of dots" permanently.
 >
@@ -201,7 +201,7 @@ Rationale:
 
 **Operational entry point**:
 
-- Use `elefanteMemoryConsolidate` for deterministic cleanup (dry-run by default; apply with `force=true`).
+- Use `elefante-MemoryConsolidate` for deterministic cleanup (dry-run by default; apply with `force=true`).
 
 ---
 

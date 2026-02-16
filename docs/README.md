@@ -297,6 +297,7 @@ tests/          Test suite
 
 | Doc | Content |
 |-----|---------|
+| [`.github/copilot-instructions.md`](.github/copilot-instructions.md) | Agent behavior configuration (search-before-answer protocol) |
 | [`docs/technical/usage.md`](docs/technical/usage.md) | Complete tool reference with parameter schemas |
 | [`docs/technical/installation.md`](docs/technical/installation.md) | Installation details |
 | [`docs/technical/ide-mcp-configuration.md`](docs/technical/ide-mcp-configuration.md) | IDE setup (VS Code, Cursor, etc.) |

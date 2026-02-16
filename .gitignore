@@ -42,6 +42,7 @@ install_verify_antigravity.log
 .pytest_cache/
 .coverage
 htmlcov/
+.hypothesis/
 
 # Dashboard
 src/dashboard/ui/dist/

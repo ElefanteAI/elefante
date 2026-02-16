@@ -4,7 +4,7 @@
 
 **Purpose**: Permanent record of dashboard architecture failures and visual design principles  
 **Status**: Active Neural Register  
-**Last Updated**: 2025-12-07
+**Last Updated**: 2026-02-16
 
 ---
 
@@ -54,7 +54,7 @@ Zoom Level 3 (Near):  Show full subgraph with relationships (500+ nodes)
 
 **Implementation Requirements**:
 
-- Node filtering by importance score (1-10)
+- Node filtering by behavioral relevance score (0-100)
 - Edge filtering by relationship strength
 - Dynamic label rendering (hide at distance)
 - Cluster aggregation for dense regions
@@ -236,7 +236,7 @@ uvicorn.run(app, host="0.0.0.0", port=8000)
 ### Pattern #6: Relative Path Read-Only Trap (2025-12-09)
 
 **Trigger**: MCP Server attempting to write snapshot to `data/` (relative path)
-**Symptom**: `[Errno 30] Read-only file system` during `elefanteDashboardOpen(refresh=true)`
+**Symptom**: `[Errno 30] Read-only file system` during `elefante-DashboardOpen(refresh=true)`
 **Root Cause**: Execution environment CWD was read-only; code relied on CWD
 **Impact**: Dashboard data refresh failed completely
 **Resolution**: Switch to centralized user data directory (`~/.elefante/data`) using `pathlib.Path.home()`

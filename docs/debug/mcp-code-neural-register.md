@@ -4,7 +4,7 @@
 
 **Purpose**: Permanent record of MCP protocol violations and enforcement strategies  
 **Status**: Active Neural Register  
-**Last Updated**: 2025-12-28 (v1.6.0 Compliance Gate)
+**Last Updated**: 2026-02-16
 
 ---
 
@@ -178,7 +178,7 @@ async def call_tool(name: str, arguments: dict):
 
 ```python
 types.Tool(
-    name="elefanteMemoryAdd",
+    name="elefante-MemoryAdd",
     description="Add memory",
     inputSchema={
         "type": "object",
@@ -193,7 +193,7 @@ types.Tool(
 
 ```python
 types.Tool(
-    name="elefanteMemoryAdd",
+    name="elefante-MemoryAdd",
     description="Store a new memory in Elefante's dual-database system. "
                 "INTELLIGENT INGESTION: Automatically analyzes against existing "
                 "knowledge and flags as NEW/REDUNDANT/RELATED/CONTRADICTORY.",
@@ -208,14 +208,7 @@ types.Tool(
                 "type": "string",
                 "enum": ["conversation", "fact", "insight", "code", "decision"],
                 "default": "conversation",
-                "description": "Type of memory for categorization"
-            },
-            "importance": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 10,
-                "default": 5,
-                "description": "Importance level (1-10)"
+                "description": "Type of memory for categorization and decay rate"
             }
         },
         "required": ["content"]
@@ -357,7 +350,7 @@ print("Initializing...", file=sys.stderr)
 
 **Statement**: Write operations MUST be blocked until a search has been performed in the current session.
 
-**The Agent Drift Problem**: Agents using Elefante tools often skip `elefanteMemorySearch` entirely, leading to:
+**The Agent Drift Problem**: Agents using Elefante tools often skip `elefante-MemorySearch` entirely, leading to:
 - Duplicate memories (same info stored multiple times)
 - Lost context (agent doesn't know what's already stored)
 - Instruction drift (agents ignore "search first" prompts to save tokens)
@@ -365,8 +358,8 @@ print("Initializing...", file=sys.stderr)
 **Instructions-Only** (Anti-Pattern):
 ```
 # .github/copilot-instructions.md
-"You MUST call elefanteMemorySearch before elefanteMemoryAdd"
-# Agent: "Understood!" *proceeds to call elefanteMemoryAdd directly*
+"You MUST call elefante-MemorySearch before elefante-MemoryAdd"
+# Agent: "Understood!" *proceeds to call elefante-MemoryAdd directly*
 ```
 
 **Compliance Gate** (v1.6.0 Correct Pattern):
@@ -375,13 +368,13 @@ print("Initializing...", file=sys.stderr)
 _compliance_state = {"search_performed": False, ...}
 
 def _check_compliance_gate(self, tool_name):
-    GATED_TOOLS = {"elefanteMemoryAdd", "elefanteGraphEntityCreate", ...}
+    GATED_TOOLS = {"elefante-MemoryAdd", "elefante-GraphConnect", ...}
     if tool_name in GATED_TOOLS and not self._compliance_state["search_performed"]:
         return {
             "success": False,
             "error": "COMPLIANCE GATE: Search required before write",
             "gate_status": "BLOCKED",
-            "action_required": "Call elefanteMemorySearch first"
+            "action_required": "Call elefante-MemorySearch first"
         }
     return None  # Gate passes
 
@@ -393,13 +386,13 @@ async def _handle_search_memories(self, args):
     return response
 ```
 
-**Gated Tools**: `elefanteMemoryAdd`, `elefanteGraphEntityCreate`, `elefanteGraphRelationshipCreate`, `elefanteGraphConnect`  
-**Gate Unlocker**: `elefanteMemorySearch`  
+**Gated Tools**: `elefante-MemoryAdd`, `elefante-GraphConnect`, `elefante-GraphConnect`, `elefante-GraphConnect`  
+**Gate Unlocker**: `elefante-MemorySearch`  
 **Layered Defense**: `.github/copilot-instructions.md` provides instructions; gate provides enforcement
 
 **Failure Symptom**: Agent receives `gate_status: BLOCKED` when trying to write  
 **Root Cause**: Agent skipped search step  
-**Resolution**: Agent must call `elefanteMemorySearch` first, then retry write  
+**Resolution**: Agent must call `elefante-MemorySearch` first, then retry write  
 **Prevention**: Gate is mechanical - cannot be bypassed by reasoning
 
 ---
@@ -472,14 +465,14 @@ _compliance_state = {
 
 # Gate check before write
 def _check_compliance_gate(tool_name):
-    GATED_TOOLS = {"elefanteMemoryAdd", "elefanteGraphEntityCreate", ...}
+    GATED_TOOLS = {"elefante-MemoryAdd", "elefante-GraphConnect", ...}
     if tool_name in GATED_TOOLS and not _compliance_state["search_performed"]:
         return {"success": False, "gate_status": "BLOCKED", ...}
     return None  # Gate passes
 ```
 
-**Gated Tools**: `elefanteMemoryAdd`, `elefanteGraphEntityCreate`, `elefanteGraphRelationshipCreate`, `elefanteGraphConnect`
-**Gate Unlocker**: `elefanteMemorySearch` (sets `search_performed=True`)
+**Gated Tools**: `elefante-MemoryAdd`, `elefante-GraphConnect`, `elefante-GraphConnect`, `elefante-GraphConnect`
+**Gate Unlocker**: `elefante-MemorySearch` (sets `search_performed=True`)
 
 ---
 

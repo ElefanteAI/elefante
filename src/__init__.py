@@ -5,8 +5,8 @@ A dual-database memory system combining semantic search (ChromaDB)
 with structured knowledge graphs (Kuzu) for comprehensive AI memory.
 """
 
-__version__ = "1.8.0"
-__author__ = "Your Name"
+__version__ = "1.10.0"
+__author__ = "Elefante Contributors"
 
 # LAW #1 ENFORCEMENT: Do NOT import orchestrator at package level
 # This causes Kuzu initialization and database locking

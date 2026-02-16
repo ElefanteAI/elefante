@@ -37,7 +37,7 @@ Memories were stored as raw text. Search only matched words. No understanding of
 # Added to MemoryMetadata in src/models/memory.py
 concepts: List[str]           # 3-5 key terms extracted from content
 surfaces_when: List[str]      # Query patterns that trigger this memory
-authority_score: float        # importance × usage × freshness (0-1)
+authority_score: float        # relevance × usage × freshness (0-1)
 co_activated_with: List[UUID] # Memories often retrieved together
 contradicts: List[UUID]       # Memories with opposing info
 supports: List[UUID]          # Memories that reinforce this one
@@ -56,7 +56,7 @@ supports: List[UUID]          # Memories that reinforce this one
 
 ### A.5 V4 Debt: CognitiveRetriever Not Wired
 
-**Issue**: `CognitiveRetriever` class exists but `elefanteMemorySearch` still uses raw ChromaDB.
+**Issue**: `CognitiveRetriever` class exists but `elefante-MemorySearch` still uses raw ChromaDB.
 
 **Impact**: Multi-signal scoring (concept overlap, authority, co-activation) not applied to search results.
 
@@ -73,7 +73,7 @@ supports: List[UUID]          # Memories that reinforce this one
 **Impact**: Critical
 
 #### Requirement
-The `CognitiveRetriever` engine must be connected to `elefanteMemorySearch`.
+The `CognitiveRetriever` engine must be connected to `elefante-MemorySearch`.
 
 #### Current State
 - `CognitiveRetriever` exists in `src/core/retrieval.py`
@@ -112,7 +112,7 @@ Every search result must include WHY it was retrieved.
     "vector_similarity": {"score": 0.30, "reason": "Semantic match"},
     "concept_overlap": {"score": 0.20, "matched": ["paths", "elefante"]},
     "domain_match": {"score": 0.15, "reason": "Same project"},
-    "authority": {"score": 0.12, "reason": "High importance, frequently used"},
+    "authority": {"score": 0.12, "reason": "High relevance, frequently used"},
     "temporal": {"score": 0.10, "reason": "Accessed 2 days ago"}
   }
 }
@@ -268,7 +268,7 @@ async def get_proactive_suggestions(
 #### MCP Tool
 ```json
 {
-  "name": "elefanteProactiveSuggestions",
+  "name": "elefante-ProactiveSuggestions",
   "description": "Get memory suggestions based on current context",
   "parameters": {
     "file_path": "string (optional)",

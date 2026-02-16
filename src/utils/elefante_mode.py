@@ -412,7 +412,7 @@ class ElefanteModeManager:
             "help": [
                 "1. Wait a few seconds and retry (locks are short-lived)",
                 "2. If persistent, another IDE may have crashed - restart it",
-                "3. Check lock status with elefanteSystemStatusGet"
+                "3. Check lock status with elefante-SystemStatusGet"
             ]
         }
 

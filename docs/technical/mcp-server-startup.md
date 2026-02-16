@@ -42,7 +42,7 @@ The MCP Server:
 
 1. Starts and waits for connections on **stdin/stdout** (stdio protocol)
 2. Receives JSON-RPC requests from the IDE (VS Code, Cursor, Bob)
-3. Exposes 18 MCP tools for memory operations
+3. Exposes 17 MCP tools for memory operations
 4. Returns JSON-RPC responses
 
 ### What It Does NOT Do
@@ -121,25 +121,24 @@ python scripts/health_check.py
 **Expected Output**:
 
 ```text
-Available MCP Tools: 18
-  - elefanteMemoryAdd
-  - elefanteMemorySearch
-  - elefanteGraphQuery
-  - elefanteContextGet
-  - elefanteGraphEntityCreate
-  - elefanteGraphRelationshipCreate
-  - elefanteSessionsList
-  - elefanteSystemStatusGet
-  - elefanteMemoryConsolidate
-  - elefanteMemoryListAll
-  - elefanteMemoryMigrateToV3
-  - elefanteDashboardOpen
-  - elefanteGraphConnect
-  - elefanteSystemEnable
-  - elefanteSystemDisable
-  - elefanteETLProcess
-  - elefanteETLClassify
-  - elefanteETLStatus
+Available MCP Tools: 17
+  - elefante-MemoryAdd
+  - elefante-MemorySearch
+  - elefante-MemoryUpdate
+  - elefante-MemoryDelete
+  - elefante-MemoryConsolidate
+  - elefante-GraphConnect
+  - elefante-GraphQuery
+  - elefante-ContextGet
+  - elefante-SessionsList
+  - elefante-SystemStatusGet
+  - elefante-DashboardOpen
+  - elefante-System
+  - elefante-TaskCreate
+  - elefante-TaskUpdate
+  - elefante-TaskGraph
+  - elefante-ETLProcess
+  - elefante-ETLClassify
 ```
 
 ---
@@ -360,7 +359,7 @@ Once configured properly, your IDE will:
 
 Once server is running, test tools:
 
-### Test elefanteMemoryAdd
+### Test elefante-MemoryAdd
 
 ```python
 import subprocess
@@ -374,13 +373,13 @@ proc = subprocess.Popen(
     text=True
 )
 
-# Send elefanteMemoryAdd request
+# Send elefante-MemoryAdd request
 request = {
     "jsonrpc": "2.0",
     "id": 1,
     "method": "tools/call",
     "params": {
-        "name": "elefanteMemoryAdd",
+        "name": "elefante-MemoryAdd",
         "arguments": {
             "content": "Test memory",
             "importance": 5
@@ -444,7 +443,7 @@ Before claiming "MCP Server is working":
 - [ ] Health check passes: `python scripts/health_check.py`
 - [ ] IDE config points to venv Python (absolute path)
 - [ ] IDE shows "MCP Connected" status
-- [ ] Can use memory tools in IDE (elefanteMemoryAdd, elefanteMemorySearch, etc.)
+- [ ] Can use memory tools in IDE (elefante-MemoryAdd, elefante-MemorySearch, etc.)
 - [ ] No Kuzu lock conflicts (if dashboard running separately)
 
 ---

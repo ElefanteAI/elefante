@@ -6,9 +6,10 @@ This directory contains roadmaps and future plans for Project Elefante.
 
 | File | Purpose |
 |------|---------|
-| [`roadmap.md`](roadmap.md) | Main development roadmap (priorities, tasks, timeline) |
-| [`dashboard-improvement-roadmap.md`](dashboard-improvement-roadmap.md) | Dashboard UX improvement plan |
-| [`sprint2-knowledge-topology-plan.md`](sprint2-knowledge-topology-plan.md) | Knowledge graph visualization design |
+| [`roadmap.md`](roadmap.md) | Main development roadmap (shipped features, planned work) |
+| [`vision.md`](vision.md) | Long-term project vision |
+| [`v5-cognitive-retrieval-requirements.md`](v5-cognitive-retrieval-requirements.md) | V5 cognitive retrieval feature requirements |
+| [`specs/`](specs/) | Detailed feature specifications (session distiller, etc.) |
 
 ## Purpose
 
@@ -25,4 +26,4 @@ Planning documents define **future work**. They are:
 
 ---
 
-**Last Updated**: 2025-12-06
+**Last Updated**: 2026-02-16

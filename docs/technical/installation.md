@@ -114,8 +114,8 @@ If automated installation fails or you prefer manual control:
 ### Step 1: Clone Repository
 
 ```bash
-git clone https://github.com/yourusername/Elefante.git
-cd Elefante
+git clone https://github.com/ElefanteAI/elefante.git
+cd elefante
 ```
 
 ### Step 2: Create Virtual Environment
@@ -311,10 +311,22 @@ This should return the Elefante Agentic Optimization Protocol.
 
 After successful installation:
 
-1. **Read the Walkthrough**: [`walkthrough.md`](walkthrough.md)
+1. **Configure agent behavior**: Copy `.github/copilot-instructions.md` to your repo (see section 6.1)
 2. **Explore the API**: [`usage.md`](usage.md)
 3. **Try the Dashboard**: [`dashboard.md`](dashboard.md)
 4. **Understand Architecture**: [`architecture.md`](architecture.md)
+
+### 6.1 Agent Behavior Configuration (copilot-instructions.md)
+
+The file `.github/copilot-instructions.md` is automatically injected into every GitHub Copilot request for this repository. It instructs the agent to:
+
+- **Search Elefante before answering** questions about user preferences, past decisions, or project conventions
+- **Include a compliance stamp** in responses confirming the search was performed
+- **Never assume** project knowledge without checking memory first
+
+This file is critical for the memory system to be effective. Without it, the agent will not proactively search Elefante and you lose the benefit of persistent context.
+
+**Location**: `.github/copilot-instructions.md` (already included in the repository)
 
 ---
 
@@ -337,6 +349,6 @@ rm -rf ~/.elefante/
 
 ---
 
-**Version**: 1.6.2
-**Last Updated**: 2025-12-28
+**Version**: 1.10.0
+**Last Updated**: 2026-02-16
 **Status**: Production Ready

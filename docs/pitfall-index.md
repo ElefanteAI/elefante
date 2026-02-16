@@ -71,8 +71,8 @@ Before completing ANY task, MUST:
 ### pitfall: installation python version
 
 **Trigger:** Installing dependencies, cryptic errors  
-**Action:** Verify Python 3.8+  
-**Why:** Type hints and async features require 3.8+  
+**Action:** Verify Python 3.11  
+**Why:** Type hints, async features, and dependency compatibility require 3.11  
 **Source:** technical/installation-safeguards.md
 
 ---
@@ -135,8 +135,8 @@ Before completing ANY task, MUST:
 ### pitfall: memory search vs list all
 
 **Trigger:** User says "show all memories about X"  
-**Action:** Use `elefanteMemoryListAll` + filter, not `elefanteMemorySearch`  
-**Why:** `elefanteMemorySearch` returns top-N by relevance  
+**Action:** Use `elefante-MemorySearch (list_all=true)` + filter, not `elefante-MemorySearch`  
+**Why:** `elefante-MemorySearch` returns top-N by relevance  
 **Source:** debug/memory-neural-register.md Law #2
 
 ---

@@ -26,7 +26,7 @@ No existing tool bridges the gap between "ephemeral chat history" and "persisten
 
 ### Prior Art (Internal)
 - **Session Extraction Research (Feb 8, 2026)**: Proved that VS Code stores chat sessions in `~/Library/Application Support/Code/User/workspaceStorage/[UUID]/chatSessions/` as `.json` (snapshots) and `.jsonl` (streaming logs). Both formats can be parsed.
-- **Elefante MCP Server**: Already provides `elefanteMemoryAdd` with intelligent dedup (REDUNDANT/CONTRADICTORY detection), `elefanteMemorySearch` for retrieval, and `elefanteGraphConnect` for structural relationships.
+- **Elefante MCP Server**: Already provides `elefante-MemoryAdd` with intelligent dedup (REDUNDANT/CONTRADICTORY detection), `elefante-MemorySearch` for retrieval, and `elefante-GraphConnect` for structural relationships.
 - **ZLCTP Handoff Protocol**: Manual proof-of-concept that structured context packages enable seamless agent handoffs.
 
 ---
@@ -48,8 +48,8 @@ No existing tool bridges the gap between "ephemeral chat history" and "persisten
 | Role | Need |
 |------|------|
 | **Solo Developer (Primary)** | Persistent context across sessions without manual work. "I shouldn't have to re-explain my project every time." |
-| **Future Agent (Consumer)** | Receives curated, high-importance memories via `elefanteMemorySearch` at session start. |
-| **Elefante System (Internal)** | Receives properly classified, deduplicated memories with full V2 metadata (layer, sublayer, importance, tags, entities). |
+| **Future Agent (Consumer)** | Receives curated, high-importance memories via `elefante-MemorySearch` at session start. |
+| **Elefante System (Internal)** | Receives properly classified, deduplicated memories with full metadata (memory_type, domain, tags, entities). Behavioral relevance is computed automatically. |
 
 ---
 
@@ -59,9 +59,9 @@ No existing tool bridges the gap between "ephemeral chat history" and "persisten
 |----|-------------|
 | F1 | **Session Discovery**: Scan all VS Code workspace storage folders, identify chat session files (`.json` and `.jsonl`), and map them to their parent workspace via `workspace.json`. |
 | F2 | **Session Parsing**: Parse both JSON (snapshot) and JSONL (streaming/incremental) formats into a normalized list of `{user_message, agent_response}` pairs. |
-| F3 | **Distillation**: Pass the normalized transcript through an LLM with a structured extraction prompt that outputs only: Decisions, Root Causes, Preferences, Architecture Rules, New Facts. Each output item must include a suggested `importance` (1-10) and `memory_type`. |
-| F4 | **Dedup-Aware Ingestion**: Store distilled insights via `elefanteMemoryAdd`, leveraging Elefante's existing REDUNDANT/CONTRADICTORY detection. Do not create duplicate memories for the same decision across sessions. |
-| F5 | **Raw Archive (Optional)**: Store a file reference to the raw transcript (not the full text) as a low-importance (`importance=1`) memory with high `decay_rate`, for forensic retrieval only. |
+| F3 | **Distillation**: Pass the normalized transcript through an LLM with a structured extraction prompt that outputs only: Decisions, Root Causes, Preferences, Architecture Rules, New Facts. Each output item must include a suggested `memory_type`. The system computes behavioral relevance automatically. |
+| F4 | **Dedup-Aware Ingestion**: Store distilled insights via `elefante-MemoryAdd`, leveraging Elefante's existing REDUNDANT/CONTRADICTORY detection. Do not create duplicate memories for the same decision across sessions. |
+| F5 | **Raw Archive (Optional)**: Store a file reference to the raw transcript (not the full text) as a low-relevance memory with `memory_type=note` (high decay rate), for forensic retrieval only. |
 | F6 | **Session Tracking**: Maintain a lightweight index (`processed_sessions.json`) that records which session UUIDs have already been ingested, to avoid reprocessing. |
 | F7 | **CLI Interface**: Provide a command-line tool: `python -m elefante.distiller [--workspace PATH] [--all] [--dry-run]`. |
 | F8 | **Distiller Prompt Engineering**: The extraction prompt must be tunable — stored as a separate `.md` or `.txt` file, not hardcoded. |

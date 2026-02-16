@@ -302,7 +302,7 @@ ChromaDB stores:
     "id": "uuid",
     "document": "content text",
     "metadata": {  # All 40+ fields flattened here
-        "importance": 8,
+        "importance": 75,
         "domain": "technical",
         "created_at": "2025-12-04T...",
         # ... everything else

@@ -7,6 +7,32 @@ For full detail, see [CHANGELOG.md](CHANGELOG.md).
 
 ## Current Baseline (recommended)
 
+- **v1.10.0 (2026-01-18)**
+  - Behavioral Relevance: system-computed scores (0–100) replace human-assigned importance
+  - Tool renaming: `elefanteCamelCase` → `elefante-PascalCase` across all 17 tools + 2 prompts
+  - `memory_class` field (fact/directive/state) for contradiction detection
+  - Tool consolidation: GraphEntityCreate + GraphRelationshipCreate → GraphConnect, MemoryListAll → MemorySearch (list_all=true), TaskDecompose → TaskCreate (subtasks), ETLStatus → ETLProcess (include_stats=true)
+  - Compliance Gate v2: enforced via server, blocks writes until search
+  - Automatic context injection on every non-skip tool call
+  - Full documentation rewrite for production readiness
+
+---
+
+## Release Index
+
+- **v1.9.1 (2026-01-15)**
+  - Tool consolidation: removed redundant tools, absorbed into existing ones
+  - GraphConnect batch upsert with ref-based linking
+
+- **v1.8.0 (2026-01-10)**
+  - Automatic context injection: top-3 relevant memories appended to tool responses
+  - Pitfall injection system
+
+- **v1.7.0 (2026-01-05)**
+  - Behavioral Relevance engine: recency × freshness × reinforcement scoring
+  - Per-type decay rates with configurable half-lives
+  - Removed `importance` as user-settable parameter
+
 - **v1.6.0 (2025-12-28)**
   - Compliance Gate: enforced search-before-write for all write tools
   - Layered defense via `.github/copilot-instructions.md`

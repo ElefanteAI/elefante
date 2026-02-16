@@ -155,7 +155,7 @@ System Python too old for some dependencies.
 
 ### Symptom
 ```
-ERROR: Package 'kuzu' requires a different Python: 3.8.10 not in '>=3.9'
+ERROR: Package 'kuzu' requires a different Python: 3.9.7 not in '>=3.11'
 ```
 
 Or cryptic syntax errors:
@@ -165,24 +165,24 @@ SyntaxError: invalid syntax
 ```
 
 ### Root Cause
-Elefante requires Python 3.9+ for:
+Elefante requires Python 3.11 for:
 - Type hints with `|` union syntax
 - Walrus operator `:=`
 - Modern async features
-- Kuzu package compatibility
+- Kuzu and ChromaDB package compatibility
 
 ### Solution
 ```bash
 # Check current version
 python --version
 
-# If < 3.9, install newer Python
+# If < 3.11, install Python 3.11
 # Windows: Download from python.org
-# Linux: sudo apt install python3.10
-# Mac: brew install python@3.10
+# Linux: sudo apt install python3.11
+# Mac: brew install python@3.11
 
 # Create venv with correct version
-python3.10 -m venv .venv
+python3.11 -m venv .venv
 .venv\Scripts\activate  # Windows
 source .venv/bin/activate  # Linux/Mac
 ```
@@ -278,7 +278,7 @@ def ensure_data_dirs():
 
 ```bash
 # 1. Verify Python version
-python --version  # Must be 3.9+
+python --version  # Must be 3.11
 
 # 2. Check no existing data directory issues
 ls data/kuzu_db  # Should not exist or should be directory structure
@@ -451,7 +451,7 @@ See `docs/archive/historical/install-escape-2025-12-11/` for the 6 scripts that 
 
 ---
 
-*Last verified: 2025-12-05 | Tested on: Windows 11, Python 3.10, Kuzu 0.11.x*
+*Last verified: 2026-02-16 | Tested on: macOS, Python 3.11, Kuzu 0.11.3*
 
 ---
 

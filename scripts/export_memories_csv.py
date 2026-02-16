@@ -19,7 +19,7 @@ async def export_memories():
     
     print("Fetching all memories from Elefante...")
     
-    # Use elefanteMemoryListAll to get everything without semantic filtering
+    # Use elefante-MemorySearch (list_all=true) to get everything without semantic filtering
     # Use the orchestrator's vector store which is already initialized (mostly)
     # Actually Orchestrator initializes components in background task in constructor, 
     # but we need to verify initialization 

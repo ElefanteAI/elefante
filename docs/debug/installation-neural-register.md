@@ -4,7 +4,7 @@
 
 **Purpose**: Permanent record of installation failure patterns and prevention protocols  
 **Status**: Active Neural Register  
-**Last Updated**: 2025-12-05
+**Last Updated**: 2026-02-16
 
 ---
 
@@ -42,7 +42,7 @@ KUZU_DIR.mkdir(exist_ok=True)  # Pre-creates directory
 **Required Checks**:
 
 1. **Disk Space**: Minimum 2GB free (5GB recommended)
-2. **Python Version**: 3.8+ required
+2. **Python Version**: 3.11 required
 3. **Kuzu Compatibility**: No pre-existing database directories
 4. **Dependency Versions**: Check for known breaking changes
 

@@ -1,7 +1,7 @@
 # AI Behavior Debug Compendium
 
 > **Domain:** AI Protocol Failures, Self-Analysis & Methodology  
-> **Last Updated:** 2025-12-11  
+> **Last Updated:** 2026-02-16  
 > **Total Issues Documented:** 6  
 > **Status:** Production Reference  
 > **Maintainer:** Add new issues following Issue #N template at bottom
@@ -161,7 +161,9 @@ python -c "Class().method()"  # Code runs
 **Date:** 2025-12-04  
 **Duration:** 30 minutes discovery  
 **Severity:** HIGH  
-**Status:**  DOCUMENTED (Platform Limitation)
+**Status:** HISTORICAL (Platform-Specific)
+
+> **Note**: This issue was specific to Roo-Cline's mode system. When using VS Code with GitHub Copilot, MCP tools are available in all modes. Retained as a reference for multi-agent environments.
 
 ### Problem
 Code mode in Roo Cline cannot access MCP tools despite server running.
@@ -346,7 +348,7 @@ EXISTING PROTOCOL (Inception Memory, importance=10):
 "PRIME DIRECTIVE: MEMORY FIRST
 1. Check Context: Before answering, ALWAYS search memory"
 
-EXISTING TOOL DESCRIPTION (elefanteMemorySearch):
+EXISTING TOOL DESCRIPTION (elefante-MemorySearch):
 "AUTOMATIC USAGE RULES:
 1. ALWAYS call this tool when user asks open-ended questions"
 
@@ -410,7 +412,7 @@ async def clearForAction(task_type: str) -> dict:
 
 # Other tools check clearance
 @server.tool()  
-async def elefanteMemoryAdd(content: str, clearance_token: str = None):
+async def elefante-MemoryAdd(content: str, clearance_token: str = None):
     if not valid_clearance(clearance_token):
         return {"error": "Must call clearForAction first"}
 ```
