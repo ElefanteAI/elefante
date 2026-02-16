@@ -297,28 +297,28 @@ tests/          Test suite
 
 | Doc | Content |
 |-----|---------|
-| [`.github/copilot-instructions.md`](.github/copilot-instructions.md) | Agent behavior configuration (search-before-answer protocol) |
-| [`docs/technical/usage.md`](docs/technical/usage.md) | Complete tool reference with parameter schemas |
-| [`docs/technical/installation.md`](docs/technical/installation.md) | Installation details |
-| [`docs/technical/ide-mcp-configuration.md`](docs/technical/ide-mcp-configuration.md) | IDE setup (VS Code, Cursor, etc.) |
-| [`docs/technical/mcp-server-startup.md`](docs/technical/mcp-server-startup.md) | Manual startup and handshake verification |
-| [`docs/technical/dashboard.md`](docs/technical/dashboard.md) | Dashboard usage |
-| [`docs/technical/docker.md`](docs/technical/docker.md) | Docker setup |
-| [`docs/technical/second-brain-protocols.md`](docs/technical/second-brain-protocols.md) | Safety protocols |
-| [`docs/technical/kuzu-lock-monitoring.md`](docs/technical/kuzu-lock-monitoring.md) | Lock behavior and troubleshooting |
-| [`docs/technical/rollback.md`](docs/technical/rollback.md) | Backup and rollback |
-| [`docs/debug/README.md`](docs/debug/README.md) | Debugging guide |
+| [`.github/copilot-instructions.md`](../.github/copilot-instructions.md) | Agent behavior configuration (search-before-answer protocol) |
+| [`technical/usage.md`](technical/usage.md) | Complete tool reference with parameter schemas |
+| [`technical/installation.md`](technical/installation.md) | Installation details |
+| [`technical/ide-mcp-configuration.md`](technical/ide-mcp-configuration.md) | IDE setup (VS Code, Cursor, etc.) |
+| [`technical/mcp-server-startup.md`](technical/mcp-server-startup.md) | Manual startup and handshake verification |
+| [`technical/dashboard.md`](technical/dashboard.md) | Dashboard usage |
+| [`technical/docker.md`](technical/docker.md) | Docker setup |
+| [`technical/second-brain-protocols.md`](technical/second-brain-protocols.md) | Safety protocols |
+| [`technical/kuzu-lock-monitoring.md`](technical/kuzu-lock-monitoring.md) | Lock behavior and troubleshooting |
+| [`technical/rollback.md`](technical/rollback.md) | Backup and rollback |
+| [`debug/README.md`](debug/README.md) | Debugging guide |
 
 ---
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+See [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
 
 ## License
 
-This project is licensed under the [Business Source License 1.1](LICENSE). You may use it freely for any non-competitive purpose. It converts to Apache 2.0 on 2029-02-10.
+This project is licensed under the [Business Source License 1.1](../LICENSE). You may use it freely for any non-competitive purpose. It converts to Apache 2.0 on 2029-02-10.
 
 ---
 
-[Changelog](CHANGELOG.md) · [GitHub](https://github.com/ElefanteAI/elefante)
+[Changelog](../CHANGELOG.md) · [GitHub](https://github.com/ElefanteAI/elefante)
