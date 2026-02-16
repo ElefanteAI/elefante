@@ -922,13 +922,12 @@ class MemoryOrchestrator:
     ) -> List[SearchResult]:
         """Execute structured search via graph store with optional temporal decay"""
         # Build Cypher query based on filters
+        # Note: Entity node stores importance in JSON 'props', not as a direct column
         cypher_parts = ["MATCH (m:Entity {type: 'memory'})"]
         where_clauses = []
         
         if plan.memory_types:
             where_clauses.append(f"m.memory_type IN {plan.memory_types}")
-        if plan.min_importance:
-            where_clauses.append(f"m.score >= {plan.min_importance}")
         
         if where_clauses:
             cypher_parts.append("WHERE " + " AND ".join(where_clauses))

@@ -47,7 +47,7 @@ class MetadataStore:
                     session_id TEXT,
                     timestamp TEXT,
                     type TEXT,
-                    score INTEGER,
+                    importance INTEGER,
                     content TEXT,
                     json_data TEXT
                 )
@@ -57,7 +57,7 @@ class MetadataStore:
             await db.execute("CREATE INDEX IF NOT EXISTS idx_session ON metadata(session_id)")
             await db.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON metadata(timestamp)")
             await db.execute("CREATE INDEX IF NOT EXISTS idx_type ON metadata(type)")
-            await db.execute("CREATE INDEX IF NOT EXISTS idx_score ON metadata(score)")
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_importance ON metadata(importance)")
             
             await db.commit()
             logger.info(f"Metadata store initialized at {self.db_path}")
@@ -69,7 +69,7 @@ class MetadataStore:
                 await db.execute(
                     """
                     INSERT OR REPLACE INTO metadata 
-                    (memory_id, session_id, timestamp, type, score, content, json_data)
+                    (memory_id, session_id, timestamp, type, importance, content, json_data)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
                     (

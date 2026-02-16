@@ -177,6 +177,7 @@ class MemoryMetadata(BaseModel):
     
     # Relevance (system-computed — do NOT set manually)
     score: int = Field(default=50, ge=0, le=100, description="System-computed relevance. Starts at 50, earned through usage, lost through neglect.")
+    urgency: int = Field(default=5, ge=0, le=10, description="How time-sensitive this memory is. 0=archival, 10=critical-now.")
     intent: IntentType = IntentType.REFERENCE
     confidence: float = Field(default=0.7, ge=0.0, le=1.0)
     tags: List[str] = Field(default_factory=list)

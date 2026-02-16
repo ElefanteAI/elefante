@@ -889,11 +889,12 @@ class GraphStore:
         search_limit = limit * 2 if temporal_enabled else limit
         
         # Search for memories containing query text
+        # Note: Memory node table has 'importance' column (not 'score')
         cypher = """
             MATCH (m:Memory)
             WHERE m.content CONTAINS $query
-            RETURN m.id, m.content, m.timestamp, m.memory_type, m.score
-            ORDER BY m.score DESC
+            RETURN m.id, m.content, m.timestamp, m.memory_type, m.importance
+            ORDER BY m.importance DESC
             LIMIT $limit
         """
         
@@ -930,8 +931,8 @@ class GraphStore:
                     # Update access tracking
                     memory.record_access()
                 else:
-                    # Use score as relevance score (0-100 → 0-1)
-                    memory.relevance_score = memory.metadata.score / 100.0
+                    # Use importance as relevance score (0-100 → 0-1)
+                    memory.relevance_score = memory.metadata.importance / 100.0
                 
                 memories.append(memory)
             

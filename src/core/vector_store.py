@@ -567,8 +567,8 @@ class VectorStore:
             
             # Layer 3: Semantic
             intent=get_enum_value(IntentType, metadata.get("intent"), IntentType.REFERENCE),
-            importance=metadata.get("importance", 5),
-            urgency=metadata.get("urgency", 5),
+            score=int(metadata.get("score", metadata.get("importance", 50))),
+            urgency=int(metadata.get("urgency", 5)),
             confidence=metadata.get("confidence", 0.7),
             tags=metadata.get("tags", "").split(",") if metadata.get("tags") else [],
             keywords=metadata.get("keywords", "").split(",") if metadata.get("keywords") else [],
