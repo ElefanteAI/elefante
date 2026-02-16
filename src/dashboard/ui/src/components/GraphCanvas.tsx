@@ -197,6 +197,7 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
   const statusRef = useRef(status);
   const viewModeRef = useRef(viewMode);
   const timeRangeRef = useRef(timeRange);
+  const hideTestArtifactsRef = useRef(hideTestArtifacts);
 
   useEffect(() => {
     hoveredEdgeRef.current = hoveredEdge;
@@ -257,6 +258,9 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
   useEffect(() => {
     timeRangeRef.current = timeRange;
   }, [timeRange]);
+  useEffect(() => {
+    hideTestArtifactsRef.current = hideTestArtifacts;
+  }, [hideTestArtifacts]);
   const draggingNode = useRef<Node | null>(null);
   const offset = useRef({ x: 0, y: 0 }); // Pan offset
   const scale = useRef(1); // Zoom scale
@@ -447,10 +451,12 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
   // Fetch Data
   useEffect(() => {
+    const controller = new AbortController();
     const fetchData = async () => {
       try {
         // CACHE BUSTING: Force fresh network request
-        const res = await fetch(`/api/graph?limit=500&space=${space === 'all' ? '' : space}&t=${Date.now()}`);
+        const res = await fetch(`/api/graph?limit=500&space=${space === 'all' ? '' : space}&t=${Date.now()}`, { signal: controller.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         
         // Silent: API data loaded
@@ -860,12 +866,14 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
           nodesRef.current = newNodes;
           edgesRef.current = allLinks;
           setData({nodes: newNodes, edges: allLinks});
-      } catch (err) {
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return; // Expected on cleanup
         console.error("Failed to fetch graph", err);
       }
     };
     
     fetchData();
+    return () => controller.abort();
   }, [space, viewMode]);
 
   // Recompute visible graph metrics when filters/toggles change.
@@ -892,6 +900,7 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
     if (!ctx) return;
 
     const animate = () => {
+     try {
       const width = canvas.width;
       const height = canvas.height;
       
@@ -911,6 +920,7 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
       const showSemanticEdges = showSemanticEdgesRef.current;
       const storyFocusOn = storyFocusOnRef.current;
       const storyFocusNode = storyFocusNodeRef.current;
+      const hideTestArtifacts = hideTestArtifactsRef.current;
       const environment = environmentRef.current;
       const status = statusRef.current;
       const viewMode = viewModeRef.current;
@@ -1110,14 +1120,19 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
         });
       }
       
-      // Helper: Get label bounding box
+      // Helper: Get label bounding box (cached per frame for performance)
+      const labelWidthCache = new Map<string, number>();
+      ctx.font = '11px Inter, sans-serif';
       const getLabelBounds = (node: Node) => {
-        ctx.font = '11px Inter, sans-serif';
-        const metrics = ctx.measureText(node.label);
+        let w = labelWidthCache.get(node.id);
+        if (w === undefined) {
+          w = ctx.measureText(node.label || '').width;
+          labelWidthCache.set(node.id, w);
+        }
         return {
-          x: node.x - metrics.width / 2 - 4,
+          x: node.x - w / 2 - 4,
           y: node.y + node.radius + 4,
-          width: metrics.width + 8,
+          width: w + 8,
           height: 16
         };
       };
@@ -1131,8 +1146,8 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
           
           // Skip if too far apart (performance)
-          if (dist > 800) continue;
-            const force = 1000 / (dist * dist); // Stronger inverse square
+          if (dist > 500) continue;
+            const force = 400 / (dist * dist); // Balanced inverse square
             const fx = (dx / dist) * force;
             const fy = (dy / dist) * force;
             
@@ -1152,7 +1167,7 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
               boundsA.y + boundsA.height > boundsB.y) {
             
             // Apply strong separation force
-            const separationForce = 200 / (dist || 1);
+            const separationForce = 80 / (dist || 1);
             const fx = (dx / dist) * separationForce;
             const fy = (dy / dist) * separationForce;
             
@@ -1224,44 +1239,42 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
           node.vx += fx;
           node.vy += fy;
         } else {
-          // CONNECTED PHYSICS: Weak centering
+          // CONNECTED PHYSICS: Centering gravity
+          // Must be strong enough to counteract repulsion (1000/d^2)
           const dx = cx - node.x;
           const dy = cy - node.y;
-          node.vx += dx * 0.001;
-          node.vy += dy * 0.001;
+          node.vx += dx * 0.012;
+          node.vy += dy * 0.012;
         }
         
-        // V1.6.2: RING GRAVITY - Keep memories in their ring zones (V5 mode)
-        // V1.6.3: NEURAL WEB - Ring Gravity Disabled
-        // We want nodes to find their own semantic clusters, not be forced into rings.
-        /*
+        // V1.6.2 / V1.10.1: RING GRAVITY - Keep memories in their ring zones (V5 mode)
+        // Re-enabled with moderate strength to prevent nodes from scattering
         if (viewMode === 'v5' && node.type === 'memory') {
           const ringRadii: Record<string, number> = {
             core: 50, domain: 180, topic: 300, leaf: 420
           };
-          const ringZone = 60; // How far from target radius is OK
+          const ringZone = 80; // How far from target radius is OK
           const targetRadius = ringRadii[node.ring || 'leaf'] ?? 420;
           
-          const dx = node.x - cx;
-          const dy = node.y - cy;
-          const currentDist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const rdx = node.x - cx;
+          const rdy = node.y - cy;
+          const currentDist = Math.sqrt(rdx * rdx + rdy * rdy) || 1;
           
           // Only apply force if outside zone
           const distError = currentDist - targetRadius;
           if (Math.abs(distError) > ringZone) {
-            const pullStrength = 0.015; // Gentle radial force
-            const fx = -(dx / currentDist) * distError * pullStrength;
-            const fy = -(dy / currentDist) * distError * pullStrength;
-            node.vx += fx;
-            node.vy += fy;
+            const pullStrength = 0.02;
+            const rfx = -(rdx / currentDist) * distError * pullStrength;
+            const rfy = -(rdy / currentDist) * distError * pullStrength;
+            node.vx += rfx;
+            node.vy += rfy;
           }
         }
-        */
         
         // MUDDY SAND FRICTION: High viscosity, but allow some settling
-        // 0.9 = Ice, 0.1 = Concrete. 0.4 = Mud.
-        node.vx *= 0.4; 
-        node.vy *= 0.4;
+        // 0.9 = Ice, 0.1 = Concrete. 0.5 = Thick Mud.
+        node.vx *= 0.5; 
+        node.vy *= 0.5;
         
         // V3 LAYER GRAVITY: Pull memories to their Anchor (V3 only)
         if (viewMode === 'v3' && node.type === 'memory' && node.layer) {
@@ -1274,7 +1287,6 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
                  const dy = anchor.y - node.y;
                  
                  // Strong pull (gravity)
-                 // V28: TEMPORAL HEAT check? No, purely structural for now.
                  const strength = 0.02; // 2% pull per frame
                  node.vx += dx * strength;
                  node.vy += dy * strength;
@@ -1296,6 +1308,13 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
           node.vx = 0;
           node.vy = 0;
         }
+
+        // VIEWPORT BOUNDARY: Hard clamp - nodes must stay visible on canvas
+        const margin = node.radius + 20;
+        if (node.x < margin) { node.x = margin; node.vx = 0; }
+        if (node.x > width - margin) { node.x = width - margin; node.vx = 0; }
+        if (node.y < margin) { node.y = margin; node.vy = 0; }
+        if (node.y > height - margin) { node.y = height - margin; node.vy = 0; }
       });
 
       // 2. Render Step
@@ -1788,6 +1807,10 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
       });
       
       ctx.restore();
+     } catch (err) {
+      // CRITICAL: Log error but keep animation alive
+      console.error('[GraphCanvas] Animation frame error:', err);
+     }
       requestRef.current = requestAnimationFrame(animate);
     };
     
