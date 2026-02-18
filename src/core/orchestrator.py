@@ -19,7 +19,7 @@ from uuid import UUID, uuid4
 from datetime import datetime
 
 from src.models.memory import (
-    Memory, MemoryType, MemoryClass, MemoryMetadata, MemoryStatus,
+    Memory, MemoryType, MemoryMetadata, MemoryStatus,
     DomainType, IntentType, SourceType, TYPE_DECAY_RATES
 )
 from src.models.entity import Entity, EntityType, Relationship, RelationshipType
@@ -346,15 +346,8 @@ class MemoryOrchestrator:
         related_id = None
         contradiction_details = None
         
-        # Resolve memory_class for conflict branching
-        new_class = metadata.get("memory_class", "fact") if metadata else "fact"
-        
         if similar_memories:
             best_match = similar_memories[0]
-            existing_class = getattr(best_match.memory.metadata, "memory_class", None)
-            if hasattr(existing_class, "value"):
-                existing_class = existing_class.value
-            existing_class = existing_class or "fact"
             
             # Check for redundancy
             if best_match.score >= 0.95:
@@ -370,23 +363,14 @@ class MemoryOrchestrator:
             elif best_match.score >= 0.75:
                 is_contradiction = self._detect_contradiction(content, best_match.memory.content)
                 if is_contradiction:
-                    # Branch on memory_class:
-                    # - fact vs fact: CONTRADICTORY (old must be superseded)
-                    # - directive/state: RELATED (coexist, resolved at retrieval)
-                    if new_class == "fact" and existing_class == "fact":
-                        status = MemoryStatus.CONTRADICTORY
-                        related_id = best_match.memory.id
-                        contradiction_details = {
-                            "conflicting_memory_id": str(best_match.memory.id),
-                            "conflicting_content": best_match.memory.content[:200],
-                            "similarity": best_match.score
-                        }
-                        self.logger.warning(f"CONTRADICTORY fact detected vs {best_match.memory.id}")
-                    else:
-                        # Directives and states coexist — not a contradiction
-                        status = MemoryStatus.RELATED
-                        related_id = best_match.memory.id
-                        self.logger.info(f"Coexisting {new_class} vs {existing_class}: {best_match.memory.id}")
+                    status = MemoryStatus.CONTRADICTORY
+                    related_id = best_match.memory.id
+                    contradiction_details = {
+                        "conflicting_memory_id": str(best_match.memory.id),
+                        "conflicting_content": best_match.memory.content[:200],
+                        "similarity": best_match.score
+                    }
+                    self.logger.warning(f"CONTRADICTORY memory detected vs {best_match.memory.id}")
                 else:
                     status = MemoryStatus.RELATED
                     related_id = best_match.memory.id
@@ -455,17 +439,11 @@ class MemoryOrchestrator:
             }
             
             # ==================================================================================
-            # STEP 3.5: RAW STORAGE (ETL Phase 1)
-            # V5 topology classification happens asynchronously via agent-driven ETL Phase 2.
-            # Store with processing_status=raw. Agent will classify via elefante-ETLProcess/Classify.
+            # STEP 3.5: RAW STORAGE (ETL tracking)
+            # Store with processing_status=raw.
             # ==================================================================================
             custom_metadata["processing_status"] = ProcessingStatus.RAW
             custom_metadata["ingested_at"] = datetime.utcnow().isoformat()
-            # Leave V5 fields empty - agent will populate via ETL Phase 2
-            # custom_metadata["ring"] = None
-            # custom_metadata["knowledge_type"] = None  
-            # custom_metadata["topic"] = None
-            # custom_metadata["owner_id"] = None
             # Persist curated fields into custom_metadata so they become top-level Chroma fields
             # in VectorStore.add_memory (title/summary are used by dashboard + dedup).
             custom_metadata["title"] = title
@@ -475,16 +453,8 @@ class MemoryOrchestrator:
             custom_metadata["surfaces_when"] = surfaces_when
             custom_metadata["authority_score"] = authority_score
             
-            # Create v1.10.0 Metadata (Behavioral Relevance)
-            # Resolve memory_class
-            try:
-                memory_class_enum = MemoryClass(metadata.get("memory_class", "fact"))
-            except (ValueError, KeyError):
-                memory_class_enum = MemoryClass.FACT
-            
             memory_metadata = MemoryMetadata(
                 memory_type=MemoryType(memory_type),
-                memory_class=memory_class_enum,
                 score=50,  # Everyone starts equal
                 status=status,
                 tags=tags or [],
@@ -534,7 +504,6 @@ class MemoryOrchestrator:
                     "score": 50,
                     "status": status.value,
                     "timestamp": memory.metadata.created_at,
-                    # V5 Topology - populated during ETL Phase 2
                     "processing_status": ProcessingStatus.RAW,
                 }
             )

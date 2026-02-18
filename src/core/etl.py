@@ -9,8 +9,8 @@ Two-phase memory ingestion where PHASE 2 uses the AGENT's LLM brain:
    
 2. PROCESS (elefante-ETLProcess + elefante-ETLClassify):
    - elefante-ETLProcess: Returns raw memories TO THE AGENT
-   - Agent's LLM classifies (ring, knowledge_type, topic, summary)
-   - elefante-ETLClassify: Agent sends classification back, system updates memory
+   - Agent's LLM enriches (summary, concepts, surfaces_when)
+   - elefante-ETLClassify: Agent sends enrichment back, system updates memory
 
 This architecture keeps Elefante LLM-FREE while leveraging agent intelligence.
 """
@@ -110,16 +110,16 @@ class ETLProcessor:
     async def apply_classification(
         self,
         memory_id: str,
-        ring: str,
-        knowledge_type: str,
-        topic: str,
         summary: str,
-        owner_id: str = "owner-jay"
+        concepts: Optional[List[str]] = None,
+        surfaces_when: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
-        Apply agent's classification to a memory.
+        Apply agent's enrichment to a memory.
         
-        Called by agent after it classifies the memory using its LLM.
+        Called by agent after it analyzes the memory using its LLM.
+        Stores summary, concepts, surfaces_when — the fields that
+        actually drive retrieval quality.
         """
         if not self.vector_store:
             from src.core.vector_store import get_vector_store
@@ -135,16 +135,23 @@ class ETLProcessor:
                 "error": f"Memory {memory_id} not found"
             }
         
-        # Update metadata with agent's classification
+        # Update metadata with agent's enrichment
         cm = memory.metadata.custom_metadata or {}
-        cm["ring"] = ring
-        cm["knowledge_type"] = knowledge_type
-        cm["topic"] = topic
         cm["summary"] = summary
-        cm["owner_id"] = owner_id
+        if concepts:
+            cm["concepts"] = concepts
+        if surfaces_when:
+            cm["surfaces_when"] = surfaces_when
         cm["processing_status"] = ProcessingStatus.PROCESSED
         cm["processed_at"] = datetime.utcnow().isoformat()
-        cm["classified_by"] = "agent"  # Track that agent did classification
+        cm["classified_by"] = "agent"
+        
+        # Also update typed metadata fields
+        memory.metadata.summary = summary
+        if concepts:
+            memory.metadata.concepts = concepts
+        if surfaces_when:
+            memory.metadata.surfaces_when = surfaces_when
         
         memory.metadata.custom_metadata = cm
         
@@ -152,21 +159,19 @@ class ETLProcessor:
         await self.vector_store.replace_memory(memory)
         
         self.logger.info(
-            "memory_classified",
+            "memory_enriched",
             memory_id=memory_id,
-            ring=ring,
-            knowledge_type=knowledge_type,
-            topic=topic,
+            has_concepts=bool(concepts),
+            has_surfaces=bool(surfaces_when),
             classified_by="agent"
         )
         
         return {
             "success": True,
             "memory_id": memory_id,
-            "ring": ring,
-            "knowledge_type": knowledge_type,
-            "topic": topic,
             "summary": summary,
+            "concepts": concepts or [],
+            "surfaces_when": surfaces_when or [],
         }
     
     async def mark_failed(self, memory_id: str, error: str) -> Dict[str, Any]:

@@ -25,19 +25,19 @@ class DomainType(str, Enum):
 
 
 class MemoryType(str, Enum):
-    """Types of memories that can be stored"""
-    CONVERSATION = "conversation"
+    """Types of memories that can be stored.
+    
+    Simplified from 12 to 6 values based on actual usage data.
+    Industry research (Mem0, Cognee, Generative Agents) confirms:
+    static type enums add zero retrieval power. These exist for
+    human browsing and decay-rate differentiation only.
+    """
     FACT = "fact"
-    INSIGHT = "insight"
-    CODE = "code"
     DECISION = "decision"
-    TASK = "task"
-    NOTE = "note"
     PREFERENCE = "preference"
-    QUESTION = "question"
-    ANSWER = "answer"
-    HYPOTHESIS = "hypothesis"
-    OBSERVATION = "observation"
+    INSIGHT = "insight"
+    NOTE = "note"
+    CONVERSATION = "conversation"
 
 
 class IntentType(str, Enum):
@@ -52,16 +52,9 @@ class IntentType(str, Enum):
     TEMPLATE = "template"
 
 
-class MemoryClass(str, Enum):
-    """How a memory behaves under contradiction.
-    
-    fact: Objective truth. Newer fact supersedes older on conflict.
-    directive: User preference/instruction. Coexists; resolved by recency at retrieval.
-    state: Ephemeral condition (mood, energy). Coexists; most recent wins by default.
-    """
-    FACT = "fact"
-    DIRECTIVE = "directive"
-    STATE = "state"
+# MemoryClass REMOVED (v2.1.0)
+# Data analysis: 13/13 memories were "fact". Zero discrimination value.
+# Contradiction handling uses vector similarity + recency instead.
 
 
 class MemoryStatus(str, Enum):
@@ -141,18 +134,11 @@ SOURCE_RELIABILITY_SCORES = {
 # ============================================================================
 
 TYPE_DECAY_RATES: Dict[str, float] = {
-    "rule": 0.002,          # ~347 days  — rules persist but die if never used
     "preference": 0.002,    # ~347 days  — preferences are stable
     "decision": 0.005,      # ~139 days  — decisions get revisited
     "fact": 0.005,          # ~139 days  — facts change
-    "answer": 0.005,        # ~139 days  — answers may become outdated
     "insight": 0.008,       # ~87 days   — insights are validated or forgotten
-    "code": 0.008,          # ~87 days   — code evolves
-    "question": 0.015,      # ~46 days   — questions get answered
     "note": 0.015,          # ~46 days   — notes are transient
-    "observation": 0.015,   # ~46 days   — observations are contextual
-    "hypothesis": 0.01,     # ~69 days   — hypotheses are tested
-    "task": 0.02,           # ~35 days   — tasks complete or stale
     "conversation": 0.025,  # ~28 days   — conversations are ephemeral
 }
 
@@ -171,8 +157,7 @@ class MemoryMetadata(BaseModel):
     # Classification (agent provides these)
     domain: DomainType = DomainType.REFERENCE
     category: str = "general"
-    memory_type: MemoryType = MemoryType.CONVERSATION
-    memory_class: MemoryClass = MemoryClass.FACT
+    memory_type: MemoryType = MemoryType.FACT
     subcategory: Optional[str] = None
     
     # Relevance (system-computed — do NOT set manually)

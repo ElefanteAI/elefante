@@ -278,15 +278,9 @@ Classify the memory by providing memory_type, domain, and category. The system h
                             },
                             "memory_type": {
                                 "type": "string",
-                                "enum": ["conversation", "fact", "insight", "code", "decision", "task", "note", "preference"],
-                                "default": "conversation",
-                                "description": "Type of memory — determines decay rate. Preferences/rules decay slowest, conversations fastest."
-                            },
-                            "memory_class": {
-                                "type": "string",
-                                "enum": ["fact", "directive", "state"],
+                                "enum": ["fact", "decision", "preference", "insight", "note", "conversation"],
                                 "default": "fact",
-                                "description": "Contradiction behavior. fact: newer supersedes older. directive: coexists, resolved by recency. state: ephemeral (mood/energy), most recent wins. Default to directive on ambiguity."
+                                "description": "Type of memory — determines decay rate. Preferences decay slowest, conversations fastest."
                             },
                             "domain": {
                                 "type": "string",
@@ -754,20 +748,19 @@ If another IDE is using Elefante, enable will fail gracefully with lock informat
                 # =====================================================================
                 types.Tool(
                     name="elefante-ETLProcess",
-                    description="""**PHASE 2 ETL**: Get unclassified memories for YOU (the agent) to classify.
+                    description="""**PHASE 2 ETL**: Get unclassified memories for YOU (the agent) to enrich.
 
-This returns raw memories that need V5 topology classification. YOU must analyze each one and call elefante-ETLClassify with your classification.
+This returns raw memories that need agent enrichment. YOU must analyze each one and call elefante-ETLClassify with your enrichment.
 
-V5 Topology Schema:
-- **ring**: core (immutable truths) | domain (preferences, identity) | topic (project-specific) | leaf (ephemeral)
-- **knowledge_type**: law | principle | method | decision | insight | preference | fact
-- **topic**: coding-standards | communication | workflow | agent-behavior | tools-environment | collaboration | general
-- **summary**: One-line description
+Enrichment fields:
+- **summary**: One-line description of what this memory is about
+- **concepts**: 3-5 key terms for graph edges and retrieval (optional, improves search)
+- **surfaces_when**: Query patterns that should trigger this memory (optional, improves search)
 
 Flow:
 1. Call elefante-ETLProcess(limit=5) → Get raw memories
 2. Analyze each memory using your LLM brain
-3. Call elefante-ETLClassify for each with your classification""",
+3. Call elefante-ETLClassify for each with your enrichment""",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -788,16 +781,17 @@ Flow:
                 ),
                 types.Tool(
                     name="elefante-ETLClassify",
-                    description="""**PHASE 2 ETL**: Submit YOUR classification for a memory.
+                    description="""**PHASE 2 ETL**: Submit YOUR enrichment for a memory.
 
-After analyzing a memory from elefante-ETLProcess, call this to store your V5 classification.
+After analyzing a memory from elefante-ETLProcess, call this to store your enrichment.
 
 Required fields:
 - memory_id: From elefante-ETLProcess
-- ring: core | domain | topic | leaf
-- knowledge_type: law | principle | method | decision | insight | preference | fact
-- topic: coding-standards | communication | workflow | agent-behavior | tools-environment | collaboration | general
-- summary: One-line description (max 200 chars)""",
+- summary: One-line description (max 200 chars)
+
+Optional fields (improve retrieval quality):
+- concepts: 3-5 key terms for graph edges
+- surfaces_when: Query patterns that should trigger this memory""",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -805,27 +799,22 @@ Required fields:
                                 "type": "string",
                                 "description": "Memory UUID from elefante-ETLProcess"
                             },
-                            "ring": {
-                                "type": "string",
-                                "enum": ["core", "domain", "topic", "leaf"],
-                                "description": "Topology ring: core=immutable, domain=identity, topic=project, leaf=ephemeral"
-                            },
-                            "knowledge_type": {
-                                "type": "string",
-                                "enum": ["law", "principle", "method", "decision", "insight", "preference", "fact"],
-                                "description": "Type of knowledge"
-                            },
-                            "topic": {
-                                "type": "string",
-                                "enum": ["coding-standards", "communication", "workflow", "agent-behavior", "tools-environment", "collaboration", "general"],
-                                "description": "Topic cluster"
-                            },
                             "summary": {
                                 "type": "string",
                                 "description": "One-line summary (max 200 chars)"
+                            },
+                            "concepts": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "3-5 key terms for graph edges and retrieval"
+                            },
+                            "surfaces_when": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Query patterns that should trigger this memory"
                             }
                         },
-                        "required": ["memory_id", "ring", "knowledge_type", "topic", "summary"]
+                        "required": ["memory_id", "summary"]
                     }
                 )
                 # v1.9.1: elefante-ETLStatus REMOVED — use elefante-ETLProcess with include_stats=true
@@ -1093,8 +1082,6 @@ You have access to a persistent memory system called **Elefante** - the user's s
             metadata["domain"] = args["domain"]
         if args.get("category"):
             metadata["category"] = args["category"]
-        if args.get("memory_class"):
-            metadata["memory_class"] = args["memory_class"]
         
         memory = await orchestrator.add_memory(
             content=args["content"],
@@ -1505,11 +1492,8 @@ You have access to a persistent memory system called **Elefante** - the user's s
             processing_status = cm.get("processing_status")
             canonical_key = cm.get("canonical_key")
             namespace = cm.get("namespace")
-            ring = cm.get("ring")
-            knowledge_type = cm.get("knowledge_type")
             topic = cm.get("topic")
             summary = cm.get("summary")
-            owner_id = cm.get("owner_id")
 
             node = {
                 "id": str(mem.id),
@@ -1532,11 +1516,8 @@ You have access to a persistent memory system called **Elefante** - the user's s
                     "canonical_key": canonical_key,
                     "namespace": namespace,
                     "title": cm.get("title", ""),
-                    "ring": ring,
-                    "knowledge_type": knowledge_type,
                     "topic": topic,
                     "summary": summary,
-                    "owner_id": owner_id,
                     "source": "chromadb",
                 }
             }
@@ -1556,7 +1537,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                         "type": "supersession",
                     })
 
-        # Add "signal hub" nodes/edges (topic / knowledge_type / ring) so the
+        # Add "signal hub" nodes/edges (topic) so the
         # dashboard has useful connectivity even when Kuzu graph edges are empty.
         signal_index = {}
         signal_members: dict[str, set[str]] = {}
@@ -1620,14 +1601,6 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 sid = _ensure_signal_node("topic", props["topic"].strip())
                 _add_edge(mem_id, sid, "HAS_TOPIC")
 
-            if isinstance(props.get("knowledge_type"), str) and props.get("knowledge_type").strip():
-                sid = _ensure_signal_node("knowledge_type", props["knowledge_type"].strip())
-                _add_edge(mem_id, sid, "HAS_KNOWLEDGE_TYPE")
-
-            if isinstance(props.get("ring"), str) and props.get("ring").strip():
-                sid = _ensure_signal_node("ring", props["ring"].strip())
-                _add_edge(mem_id, sid, "IN_RING")
-
         # Deterministic memorymemory cohesion edges derived from shared signals.
         try:
             max_per_signal = int(os.getenv("ELEFANTE_SNAPSHOT_COHESION_MAX_PER_SIGNAL", "200"))
@@ -1654,8 +1627,6 @@ You have access to a persistent memory system called **Elefante** - the user's s
             kind = signal_kind_by_id.get(sid, "signal")
             label = {
                 "topic": "CO_TOPIC",
-                "knowledge_type": "CO_KNOWLEDGE_TYPE",
-                "ring": "CO_RING",
             }.get(kind, "CO_SIGNAL")
             for other in mem_ids[1 : 1 + max_per_signal]:
                 _add_cohesion_edge(anchor, other, label)
@@ -1891,7 +1862,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 "success": True,
                 "count": len(raw_memories),
                 "memories": raw_memories,
-                "instructions": "Analyze each memory and call elefante-ETLClassify with your classification. Use V5 schema: ring (core/domain/topic/leaf), knowledge_type (law/principle/method/decision/insight/preference/fact), topic (coding-standards/communication/workflow/agent-behavior/tools-environment/collaboration/general), summary (one-line)."
+                "instructions": "Analyze each memory and call elefante-ETLClassify with your enrichment. Required: summary (one-line). Optional: concepts (3-5 key terms), surfaces_when (query patterns)."
             }
         
         # v1.9.1: include_stats (absorbs former elefante-ETLProcess (include_stats=true))
@@ -1903,11 +1874,11 @@ You have access to a persistent memory system called **Elefante** - the user's s
         return result
     
     async def _handle_etl_classify(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefante-ETLClassify - Apply agent's classification (v1.9.1: transaction-scoped)"""
+        """Handle elefante-ETLClassify - Apply agent's enrichment (v2.1.0: simplified)"""
         from src.core.etl import get_etl_processor
         
         # Validate required fields first (before acquiring lock)
-        required = ["memory_id", "ring", "knowledge_type", "topic", "summary"]
+        required = ["memory_id", "summary"]
         missing = [f for f in required if not args.get(f)]
         if missing:
             return {
@@ -1926,14 +1897,12 @@ You have access to a persistent memory system called **Elefante** - the user's s
             etl = get_etl_processor()
             etl.vector_store = (await self._get_orchestrator()).vector_store
             
-            # Apply classification
+            # Apply enrichment
             result = await etl.apply_classification(
                 memory_id=args["memory_id"],
-                ring=args["ring"],
-                knowledge_type=args["knowledge_type"],
-                topic=args["topic"],
                 summary=args["summary"][:200],  # Enforce max length
-                owner_id=args.get("owner_id", "owner-jay")
+                concepts=args.get("concepts"),
+                surfaces_when=args.get("surfaces_when"),
             )
             
             return result

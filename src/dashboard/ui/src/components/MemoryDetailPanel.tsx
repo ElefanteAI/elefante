@@ -113,7 +113,7 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [] }: Mem
           <div className="text-xs uppercase tracking-wider text-slate-500 mb-2">Metadata</div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
             <MetaRow icon={<Layers size={12} />} label="Topic" value={p.topic || 'general'} />
-            <MetaRow icon={<Brain size={12} />} label="Knowledge Type" value={p.knowledge_type || '-'} />
+            <MetaRow icon={<Brain size={12} />} label="Type" value={p.memory_type || '-'} />
             <MetaRow icon={<Star size={12} />} label="Score" value={p.score != null ? String(p.score) : '-'} />
             <MetaRow icon={<Hash size={12} />} label="Status" value={p.processing_status || '-'} />
             <MetaRow icon={<Globe size={12} />} label="Namespace" value={p.namespace || '-'} />

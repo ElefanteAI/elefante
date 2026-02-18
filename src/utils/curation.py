@@ -305,39 +305,6 @@ def infer_surfaces_when(content: str, concepts: list[str]) -> list[str]:
     return unique_surfaces[:8]
 
 
-def classify_memory_type(content: str) -> str:
-    """
-    Classify memory as fact/rule/preference/decision.
-    
-    Simple keyword heuristics, no LLM.
-    """
-    content_lower = content.lower()
-    
-    # Rule patterns
-    if any(p in content_lower for p in [
-        "always", "never", "must", "should not", "do not", "don't",
-        "rule:", "convention:", "standard:", "policy:"
-    ]):
-        return "rule"
-    
-    # Decision patterns
-    if any(p in content_lower for p in [
-        "decided", "chose", "will use", "going with", "selected",
-        "decision:", "chose to", "opted for"
-    ]):
-        return "decision"
-    
-    # Preference patterns
-    if any(p in content_lower for p in [
-        "prefer", "like", "favorite", "i want", "i need",
-        "preference:", "rather", "instead of"
-    ]):
-        return "preference"
-    
-    # Default to fact
-    return "fact"
-
-
 def compute_authority_score(
     importance: int,
     access_count: int,

@@ -17,11 +17,8 @@ export interface MemoryNode {
     processing_status: string;
     namespace: string;
     title: string;
-    ring: string;
-    knowledge_type: string;
     topic: string;
     summary: string;
-    owner_id: string;
     source: string;
     access_count: number;
     last_accessed: string;

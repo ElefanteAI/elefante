@@ -126,7 +126,6 @@ class VectorStore:
             "domain": memory.metadata.domain.value if hasattr(memory.metadata.domain, 'value') else str(memory.metadata.domain),
             "category": memory.metadata.category,
             "memory_type": memory.metadata.memory_type.value if hasattr(memory.metadata.memory_type, 'value') else str(memory.metadata.memory_type),
-            "memory_class": memory.metadata.memory_class.value if hasattr(memory.metadata.memory_class, 'value') else str(getattr(memory.metadata, 'memory_class', 'fact')),
             "subcategory": memory.metadata.subcategory or "",
             
             # Layer 3: Semantic Metadata
@@ -167,13 +166,9 @@ class VectorStore:
             "archived": getattr(memory.metadata, "archived", False),
         }
         
-        # V5 Topology fields - extract from custom_metadata to top level
+        # Extract useful fields from custom_metadata to top level
         cm = memory.metadata.custom_metadata or {}
-        metadata["ring"] = cm.get("ring", "leaf")
-        metadata["knowledge_type"] = cm.get("knowledge_type", "fact")
-        metadata["topic"] = cm.get("topic", "general")
         metadata["summary"] = cm.get("summary", memory.content[:150])
-        metadata["owner_id"] = cm.get("owner_id", "owner-jay")
         # Also preserve title at top level
         metadata["title"] = cm.get("title", "")
 

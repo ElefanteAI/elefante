@@ -33,7 +33,7 @@ export class ContextFormatter {
 
         for (const memory of sorted) {
             // Format: • Title (type, topic): Summary
-            const typeInfo = memory.knowledge_type || memory.memory_type || 'general';
+            const typeInfo = memory.memory_type || 'general';
             const topicInfo = memory.topic || 'general';
             
             lines.push(`• ${memory.title} [${typeInfo}, topic: ${topicInfo}]`);
@@ -53,7 +53,7 @@ export class ContextFormatter {
     formatSingle(memory: MemoryResult): string {
         return [
             `**${memory.title}**`,
-            `Type: ${memory.knowledge_type || memory.memory_type}`,
+            `Type: ${memory.memory_type}`,
             `Topic: ${memory.topic}`,
             `Relevance Score: ${(memory.score * 100).toFixed(1)}%`,
             '',

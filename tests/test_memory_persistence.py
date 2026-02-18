@@ -47,7 +47,6 @@ class TestMemoryPersistence:
         memory = await orchestrator.add_memory(
             content=test_content,
             memory_type="fact",
-            importance=7,
             tags=["test", "persistence"]
         )
         
@@ -77,7 +76,6 @@ class TestMemoryPersistence:
         memory = await orchestrator.add_memory(
             content=test_content,
             memory_type="insight",
-            importance=8,
             entities=[
                 {"name": "TestEntity", "type": "concept"}
             ]
@@ -108,8 +106,7 @@ class TestMemoryPersistence:
         test_content = f"Test no scripts {uuid4()}"
         await orchestrator.add_memory(
             content=test_content,
-            memory_type="note",
-            importance=5
+            memory_type="note"
         )
         
         # List all .py files after
@@ -134,8 +131,7 @@ class TestMemoryPersistence:
         
         memory = await orchestrator.add_memory(
             content=test_content,
-            memory_type="conversation",
-            importance=6
+            memory_type="conversation"
         )
         
         memory_id = memory.id
@@ -168,7 +164,6 @@ class TestMemoryPersistence:
         memory = await orchestrator.add_memory(
             content=test_content,
             memory_type="fact",
-            importance=6,
             metadata={
                 "concepts": ["Memory", "Souvenir", "Vector DB"],
                 "surfaces_when": ["How to recall memory", "vector db retrieval"],
@@ -205,7 +200,6 @@ class TestMemoryPersistence:
         memory = await orchestrator.add_memory(
             content=test_content,
             memory_type="fact",
-            importance=7,
             entities=[
                 {"name": entity_name, "type": "concept"}
             ]
@@ -237,7 +231,6 @@ class TestMemoryPersistence:
             memory = await orchestrator.add_memory(
                 content=f"Hybrid search test memory {i}",
                 memory_type="fact",
-                importance=5 + i,
                 tags=[test_tag]
             )
             memories.append(memory)

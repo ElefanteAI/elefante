@@ -27,7 +27,6 @@ async def test_blocks_test_tag_by_default(isolated_orchestrator, monkeypatch):
     mem = await isolated_orchestrator.add_memory(
         content=f"Test memory for guard {uuid4()}",
         memory_type="note",
-        importance=5,
         tags=["test"],
     )
 
@@ -41,9 +40,7 @@ async def test_allows_test_memories_with_override(isolated_orchestrator, monkeyp
     mem = await isolated_orchestrator.add_memory(
         content=f"Test memory for guard override {uuid4()}",
         memory_type="note",
-        importance=5,
         tags=["test"],
-        metadata={"namespace": "test", "category": "test"},
     )
 
     assert mem is not None

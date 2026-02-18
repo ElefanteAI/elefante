@@ -10,7 +10,6 @@ export interface MemoryResult {
     score: number;
     memory_type: string;
     topic: string;
-    knowledge_type: string;
 }
 
 export interface SearchOptions {
@@ -30,7 +29,6 @@ export interface SearchResponse {
                 score?: number;
                 memory_type?: string;
                 topic?: string;
-                knowledge_type?: string;
                 custom_metadata?: {
                     title?: string;
                     summary?: string;

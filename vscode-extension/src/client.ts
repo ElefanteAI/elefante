@@ -103,7 +103,6 @@ export class ElefanteClient {
                     score: r.score,
                     memory_type: r.memory.metadata.memory_type || 'fact',
                     topic: r.memory.metadata.topic || 'general',
-                    knowledge_type: r.memory.metadata.knowledge_type || 'fact',
                 }));
 
             logInfo(`Found ${results.length} relevant memories`);

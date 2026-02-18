@@ -38,7 +38,7 @@ function getHealthDiagnosis(health: HealthScore) {
   // Connectivity analysis
   if (health.connectivity < 10) {
     issues.push(`${health.orphanCount} of ${health.totalMemories} memories have zero graph connections`);
-    recommendations.push('Link related memories with elefante-GraphConnect to build knowledge topology');
+    recommendations.push('Link related memories with elefante-GraphConnect to build knowledge connections');
     if (status === 'healthy') status = 'warning';
   }
 
