@@ -1012,6 +1012,15 @@ You have access to a persistent memory system called **Elefante** - the user's s
                         "success": False
                     }, indent=2)
                 )]
+            finally:
+                # Release Kuzu write lock after every tool call.
+                # This makes the lock transaction-scoped (held only during the operation)
+                # allowing multiple MCP server instances to take turns without deadlock.
+                try:
+                    from src.core.graph_store import close_graph_store
+                    close_graph_store()
+                except Exception:
+                    pass
     
     async def _handle_enable_elefante(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Handle elefante-System tool call (action=enable) - Activate Elefante Mode"""

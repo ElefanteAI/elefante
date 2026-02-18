@@ -34,7 +34,8 @@ class GraphStore:
         
         Args:
             database_path: Path to Kuzu database directory
-            read_only: If True, open in read-only mode (NOT SUPPORTED BY KUZU - kept for future)
+            read_only: If True, open in read-only mode (allows concurrent reads; multiple read-only
+                   connections can coexist; a write connection and read-only connections can coexist)
         """
         self.config = get_config()
         self.database_path = database_path or self.config.elefante.graph_store.database_path
@@ -127,7 +128,8 @@ class GraphStore:
             buffer_size_bytes = self._parse_buffer_size(self.buffer_pool_size)
             
             # Initialize database - Kuzu will use the directory as-is
-            self._db = kuzu.Database(self.database_path, buffer_pool_size=buffer_size_bytes)
+            # read_only=True allows concurrent reads without lock contention
+            self._db = kuzu.Database(str(self.database_path), buffer_pool_size=buffer_size_bytes, read_only=self.read_only)
             self._conn = kuzu.Connection(self._db)
             
             # Initialize schema
@@ -1272,4 +1274,14 @@ def reset_graph_store():
     """Reset global graph store (useful for testing)"""
     global _graph_store
     _graph_store = None
+
+
+def close_graph_store():
+    """Release Kuzu write lock by closing the global connection.
+    Call after each MCP tool invocation to make the lock transaction-scoped.
+    Safe to call even if no connection is open.
+    """
+    global _graph_store
+    if _graph_store is not None:
+        _graph_store.close()
 

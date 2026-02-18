@@ -244,8 +244,9 @@ async def main():
     # =========================================================================
     print("[*] Step 2: Fetching entities from Kuzu...", file=sys.stderr)
     
+    store = None
     try:
-        store = GraphStore(config.elefante.graph_store.database_path)
+        store = GraphStore(config.elefante.graph_store.database_path, read_only=True)
         
         # Fetch entity nodes (but skip if already in ChromaDB)
         nodes_query = "MATCH (n:Entity) RETURN n"
@@ -391,6 +392,9 @@ async def main():
     except Exception as e:
         print(f"   [!] Kuzu error (non-fatal): {e}", file=sys.stderr)
         print("   Continuing with ChromaDB data only...", file=sys.stderr)
+    finally:
+        if store is not None:
+            store.close()
     
     # =========================================================================
     # STEP 3.5: Compute Semantic Similarity Edges (memory-to-memory)
