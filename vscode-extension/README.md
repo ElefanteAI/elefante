@@ -82,7 +82,7 @@ Type `@elefante` in the chat to explicitly invoke the Elefante participant:
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ Extension: Search Elefante with query                       │
-│ → Returns: "Self-Pref-BlackFormatter: Use Black, line=100"  │
+│ → Returns: "[PREF] Python :: Black Formatter"               │
 └───────────────────────────┬─────────────────────────────────┘
                             │
                             ▼
@@ -90,7 +90,7 @@ Type `@elefante` in the chat to explicitly invoke the Elefante participant:
 │ Extension: Inject context into prompt                       │
 │                                                             │
 │ [ELEFANTE MEMORY CONTEXT]                                   │
-│ • Self-Pref-BlackFormatter [self/preference, importance: 8] │
+│ • [PREF] Python :: Black Formatter [preference, topic: dev] │
 │   Use Black for Python formatting with line-length 100      │
 │ [END ELEFANTE CONTEXT]                                      │
 │                                                             │

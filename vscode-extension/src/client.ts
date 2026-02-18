@@ -100,10 +100,10 @@ export class ElefanteClient {
                     title: r.memory.metadata.custom_metadata?.title || `Memory ${r.memory.id.substring(0, 8)}`,
                     summary: r.memory.metadata.custom_metadata?.summary || r.memory.content.substring(0, 200),
                     content: r.memory.content,
-                    importance: r.memory.metadata.importance,
-                    layer: r.memory.metadata.layer,
-                    sublayer: r.memory.metadata.sublayer,
                     score: r.score,
+                    memory_type: r.memory.metadata.memory_type || 'fact',
+                    topic: r.memory.metadata.topic || 'general',
+                    knowledge_type: r.memory.metadata.knowledge_type || 'fact',
                 }));
 
             logInfo(`Found ${results.length} relevant memories`);

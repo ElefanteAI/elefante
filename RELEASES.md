@@ -7,6 +7,13 @@ For full detail, see [CHANGELOG.md](CHANGELOG.md).
 
 ## Current Baseline (recommended)
 
+- **v2.0.0 (2026-02-18)**
+  - Memory curation: 13 high-signal memories, zero noise
+  - Dashboard v2: Health Score, Knowledge Graph, Usage Intelligence
+  - Unified versioning across all components
+
+## Previous Releases
+
 - **v1.10.0 (2026-01-18)**
   - Behavioral Relevance: system-computed scores (0–100) replace human-assigned importance
   - Tool renaming: `elefanteCamelCase` → `elefante-PascalCase` across all 17 tools + 2 prompts
@@ -20,26 +27,13 @@ For full detail, see [CHANGELOG.md](CHANGELOG.md).
 
 ## Release Index
 
-- **v1.9.1 (2026-01-15)**
-  - Tool consolidation: removed redundant tools, absorbed into existing ones
+- **v1.9.1 (2026-02-09)**
+  - Tool consolidation: 24 → 17 tools with zero feature loss
   - GraphConnect batch upsert with ref-based linking
-
-- **v1.8.0 (2026-01-10)**
-  - Automatic context injection: top-3 relevant memories appended to tool responses
-  - Pitfall injection system
-
-- **v1.7.0 (2026-01-05)**
-  - Behavioral Relevance engine: recency × freshness × reinforcement scoring
-  - Per-type decay rates with configurable half-lives
-  - Removed `importance` as user-settable parameter
 
 - **v1.6.0 (2025-12-28)**
   - Compliance Gate: enforced search-before-write for all write tools
   - Layered defense via `.github/copilot-instructions.md`
-
----
-
-## Release Index
 
 - **v1.5.0 (2025-12-28)**
   - V5 cognitive features: retrieval explanations, memory health, conflict detection, proactive surfacing

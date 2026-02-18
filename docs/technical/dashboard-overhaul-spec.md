@@ -1,6 +1,6 @@
 # Dashboard Overhaul SPEC (Snapshot-First, Curated-First)
 
-**Status**: Draft (authoritative for dashboard behavior)
+**Status**: Production (shipped in v2.0.0)
 
 ## 1) Goals
 

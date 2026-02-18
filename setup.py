@@ -12,7 +12,7 @@ long_description = readme_file.read_text(encoding="utf-8") if readme_file.exists
 
 setup(
     name="elefante",
-    version="1.10.0",
+    version="2.0.0",
     author="Elefante Contributors",
     author_email="elefante@proton.me",
     description="Local AI Memory System with Vector and Graph Storage",
@@ -28,12 +28,9 @@ setup(
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
         "License :: Other/Proprietary License",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.9",
-        "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
-        "Programming Language :: Python :: 3.12",
     ],
-    python_requires=">=3.9",
+    python_requires=">=3.11",
     install_requires=[
         "chromadb>=0.4.22",
         "kuzu>=0.1.0",
@@ -53,11 +50,6 @@ setup(
             "pytest-cov>=4.1.0",
             "black>=23.12.0",
             "mypy>=1.7.0",
-        ],
-    },
-    entry_points={
-        "console_scripts": [
-            "elefante=src.cli:main",
         ],
     },
     include_package_data=True,

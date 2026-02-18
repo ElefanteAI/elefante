@@ -52,7 +52,7 @@ print_success "Python found: $($PYTHON_CMD --version)"
 
 # Check Python version
 PYTHON_VERSION=$($PYTHON_CMD -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
-REQUIRED_VERSION="3.9"
+REQUIRED_VERSION="3.11"
 
 if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$PYTHON_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]; then
     print_error "Python $REQUIRED_VERSION or higher is required. Found: $PYTHON_VERSION"
@@ -115,7 +115,7 @@ echo "STEP 4: Running End-to-End Tests"
 echo "============================================================"
 echo ""
 
-if $PYTHON_CMD scripts/test_end_to_end.py; then
+if $PYTHON_CMD tests/test_end_to_end.py; then
     print_success "All tests passed!"
 else
     print_error "Tests failed"

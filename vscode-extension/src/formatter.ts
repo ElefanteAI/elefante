@@ -32,12 +32,11 @@ export class ContextFormatter {
         ];
 
         for (const memory of sorted) {
-            // Format: • Title (layer/sublayer, importance: N): Summary
-            const layerInfo = memory.layer && memory.sublayer 
-                ? `${memory.layer}/${memory.sublayer}` 
-                : memory.layer || 'general';
+            // Format: • Title (type, topic): Summary
+            const typeInfo = memory.knowledge_type || memory.memory_type || 'general';
+            const topicInfo = memory.topic || 'general';
             
-            lines.push(`• ${memory.title} [${layerInfo}, importance: ${memory.importance}]`);
+            lines.push(`• ${memory.title} [${typeInfo}, topic: ${topicInfo}]`);
             lines.push(`  ${memory.summary}`);
             lines.push('');
         }
@@ -54,8 +53,8 @@ export class ContextFormatter {
     formatSingle(memory: MemoryResult): string {
         return [
             `**${memory.title}**`,
-            `Layer: ${memory.layer}/${memory.sublayer}`,
-            `Importance: ${memory.importance}/10`,
+            `Type: ${memory.knowledge_type || memory.memory_type}`,
+            `Topic: ${memory.topic}`,
             `Relevance Score: ${(memory.score * 100).toFixed(1)}%`,
             '',
             memory.summary,

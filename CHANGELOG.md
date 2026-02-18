@@ -7,6 +7,94 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.0.0] - 2026-02-18
+
+### Summary
+
+Unified V2 Release — Cohesive product vision across MCP, Intelligence Engine, and Dashboard. Memory curation (19 → 13 high-signal memories), dashboard overhaul with functional Explore tab, and version consolidation eliminating the version multiverse.
+
+### The Problem Solved
+
+1. **Version Multiverse**: Components declared different versions (1.10.0, 1.11.0, 2.1.0, 2.3.0) creating confusion about what "Elefante version" meant.
+2. **Memory Noise**: 6 of 19 memories were duplicates, generic checklists, or unimplemented design concepts that diluted retrieval quality.
+3. **Broken Explore Tab**: The Nivo Network graph was non-functional — wrong data format, missing dependencies, and no useful visualization.
+4. **Dashboard as Screensaver**: The dashboard showed data but didn't help users understand their knowledge system's health or find insights.
+
+### The Solution
+
+1. **Single Version (2.0.0)**: Every file — Python package, config, server, docs, dashboard components — now declares v2.0.0. Historical references in code comments are preserved but all "current version" indicators are unified.
+2. **Memory Curation**: Deleted 6 noise memories (duplicates of Operating Laws, generic checklists, unimplemented v5 concepts, overly-niche debugging notes). 13 high-signal memories remain.
+3. **Explore Tab Rewrite**:
+   - **Topics**: Card grid showing memory distribution by topic (replaced broken Nivo Treemap).
+   - **Insights**: Score distribution, type breakdown, topic breakdown, and top memories panel (replaced non-functional calendar heatmap).
+   - **Graph**: Pure SVG hub-spoke knowledge graph grouped by topic with hover highlighting (replaced broken Nivo Network).
+4. **Dashboard as Product**: Overview tab with health score ring gauge, diagnostic panels, agent impact metrics. Memories tab with semantic search and TanStack Table. Explore tab with three functional sub-views.
+
+### Changes
+
+- **MODIFIED**: `src/__init__.py`, `setup.py`, `config.yaml`, `src/mcp/server.py` — Version 2.0.0.
+- **MODIFIED**: `src/dashboard/ui/src/components/ExploreTab.tsx` — 3 sub-views: Topics, Insights, Graph.
+- **MODIFIED**: `src/dashboard/ui/src/components/CalendarHeatmap.tsx` — Rewritten as Memory Insights panel (score distribution, type/topic breakdown, top memories).
+- **MODIFIED**: `src/dashboard/ui/src/components/KnowledgeGraph.tsx` — Rewritten as pure SVG hub-spoke graph (no Nivo dependency). ResizeObserver for responsive sizing.
+- **MODIFIED**: `src/dashboard/ui/src/components/TopicTreemap.tsx` — Rewritten as card grid layout.
+- **MODIFIED**: `src/dashboard/ui/src/components/OverviewTab.tsx` — Health gauge + diagnosis + agent impact + stat pills + metric cards.
+- **MODIFIED**: `src/dashboard/ui/src/components/HealthGauge.tsx` — SVG ring gauge with animated score.
+- **MODIFIED**: All dashboard component version comments unified to v2.0.0.
+- **MODIFIED**: All documentation files — version references updated to 2.0.0.
+- **DELETED**: 6 noise memories from ChromaDB (IDs: 9ae31791, a3db42e5, cc9ca4f3, 247d89cc, 58bdc18c, 1290ec67).
+- **IMPACT**:
+  - **Breaking Change**: Version jump from 1.11.0 to 2.0.0 reflects product maturity milestone.
+  - **Memory Quality**: Retrieval precision improved by removing noise (31% fewer memories, 100% signal).
+  - **Dashboard**: All 3 tabs and all Explore sub-views are functional with zero external visualization dependencies (no D3, no Nivo).
+
+---
+
+## [1.11.0] - 2026-02-17
+
+### Summary
+
+Dashboard Overhaul — Complete rewrite of the dashboard from a physics-based "screensaver" to a functional "knowledge workbench" with tabbed navigation, sortable memory table, and static visualizations.
+
+### The Problem Solved
+
+1. **Physics Instability**: The D3 force-directed graph was unstable, causing nodes to "fly away," flicker, or appear as visual duplicates ("two dots" artifact).
+2. **Poor Usability**: The dashboard was a visual novelty with no practical utility for memory management.
+3. **No Search**: Users could not find specific memories without visually scanning the graph.
+
+### The Solution
+
+1. **Removed Physics Engine**: Eliminated the unstable D3 force simulation entirely. All visualizations are now static.
+2. **3-Tab Architecture**:
+   - **Overview**: Health score (freshness, coverage, connectivity) + topic treemap.
+   - **Memories**: Sortable/filterable table with semantic search integration.
+   - **Explore**: Static knowledge graph using Nivo Network.
+3. **Zustand State Management**: Centralized state with derived data selectors.
+4. **TanStack Table**: Full-featured table with sorting, filtering, and expandable rows.
+
+### Changes
+
+- **NEW**: `src/dashboard/ui/src/types.ts` - TypeScript interfaces for all data structures.
+- **NEW**: `src/dashboard/ui/src/store.ts` - Zustand store with 15+ state slices.
+- **NEW**: `src/dashboard/ui/src/hooks/useVisualizationData.ts` - Data transformation hooks.
+- **NEW**: `src/dashboard/ui/src/hooks/useSearch.ts` - Semantic search hook with abort controller.
+- **NEW**: `src/dashboard/ui/src/components/TabNav.tsx` - Tab navigation component.
+- **NEW**: `src/dashboard/ui/src/components/HeaderBar.tsx` - Header with stats display.
+- **NEW**: `src/dashboard/ui/src/components/OverviewTab.tsx` - Health score + treemap.
+- **NEW**: `src/dashboard/ui/src/components/MemoriesTab.tsx` - Memory list with search.
+- **NEW**: `src/dashboard/ui/src/components/MemoryTable.tsx` - TanStack Table implementation.
+- **NEW**: `src/dashboard/ui/src/components/ExploreTab.tsx` - Knowledge graph tab.
+- **NEW**: `src/dashboard/ui/src/components/TopicTreemap.tsx` - Nivo Treemap visualization.
+- **NEW**: `src/dashboard/ui/src/components/KnowledgeGraph.tsx` - Nivo Network visualization.
+- **MODIFIED**: `src/dashboard/ui/src/App.tsx` - Complete rewrite with tabbed layout.
+- **MODIFIED**: `src/dashboard/ui/package.json` - Added dependencies (zustand, @tanstack/react-table, @nivo/*).
+- **MODIFIED**: `src/dashboard/ui/vite.config.ts` - Added @ path alias.
+- **IMPACT**:
+  - **Breaking Change**: Old GraphCanvas.tsx is no longer used (kept for reference).
+  - **Performance**: Static visualizations eliminate CPU-intensive physics calculations.
+  - **Usability**: Users can now search, sort, and filter memories efficiently.
+
+---
+
 ## [1.10.0] - 2026-02-09
 
 ### Summary
@@ -488,13 +576,7 @@ This release focused on reducing migration risk by validating candidate embeddin
 
 ## [Unreleased]
 
-### Planned
-- Auto-classification of domain/category via agent
-- Smart UPDATE (merge instead of duplicate)
-- Automatic relationship inference
-- Knowledge clustering
-- Dashboard semantic zoom
-- Improved label rendering
+_No unreleased changes._
 
 ---
 

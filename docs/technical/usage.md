@@ -1,4 +1,4 @@
-# Usage Guide & API Reference (v1.10.0)
+# Usage Guide & API Reference (v2.0.0)
 
 ## 1. Natural Language Interaction
 

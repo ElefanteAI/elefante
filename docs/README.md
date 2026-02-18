@@ -2,7 +2,7 @@
 
 Persistent memory for AI coding agents. Elefante runs locally on your machine via [MCP](https://modelcontextprotocol.io/) (Model Context Protocol), storing knowledge in a vector database and a knowledge graph. Your agent remembers what you care about, forgets what you don't, and scores every memory based on how you actually use it — not how important you *said* it was.
 
-> **Current version:** v1.10.0
+> **Current version:** v2.0.0
 
 ---
 
@@ -38,9 +38,9 @@ Everything runs locally. No cloud. No telemetry. Your data never leaves your mac
 
 ---
 
-## Behavioral Relevance (v1.10.0)
+## Behavioral Relevance (v2.0.0)
 
-This is the core idea behind v1.10.0: **nobody assigns importance. Importance emerges from behavior.**
+This is the core idea behind v2.0.0: **nobody assigns importance. Importance emerges from behavior.**
 
 Traditional systems ask you to rate memories on a scale (1–10). That approach has two problems:
 
@@ -267,7 +267,7 @@ The MCP server itself runs as a stdio process started by your IDE. Running MCP i
 | Graph store | Kuzu 0.11.3 | Knowledge graph, Cypher queries |
 | Embeddings | sentence-transformers (gte-base) | 768-dim vectors for similarity |
 | Protocol | MCP 1.23.1 | IDE–server communication |
-| Dashboard | React + TypeScript + Vite | Graph visualization (Canvas 2D) |
+| Dashboard | React + TypeScript + Vite | Graph visualization (SVG) |
 | API server | FastAPI + Uvicorn | Dashboard backend |
 | Runtime | Python 3.11 | All server-side code |
 

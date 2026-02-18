@@ -3,17 +3,12 @@
 
 set -e
 
-REPO_DIR="/a0/usr/projects/elefante/elefante-repo-files"
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 VENV_PATH="$REPO_DIR/.venv"
 
 echo "=== Starting Elefante Environment Setup ==="
 
-if [ ! -d "$REPO_DIR" ]; then
-    echo "ERROR: $REPO_DIR not found. Extracted bundle first."
-    exit 1
-fi
-
-cd "$REPO_DIR"
+cd "$REPO_DIR" || { echo "ERROR: Could not cd to $REPO_DIR"; exit 1; }
 
 echo "--- Creating virtual environment ---"
 python3 -m venv .venv

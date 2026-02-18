@@ -13,7 +13,7 @@ Before answering ANY question about:
 
 **You MUST call `elefante-MemorySearch` FIRST** with a relevant query.
 
-## Compliance Gate (v1.10.0)
+## Compliance Gate
 
 The Elefante MCP server enforces a **Compliance Gate**:
 - Write operations (`elefante-MemoryAdd`, `elefante-GraphConnect`, etc.) are **BLOCKED** until you perform a search

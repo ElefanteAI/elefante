@@ -169,7 +169,7 @@ def compute_health(memory) -> HealthStatus:
 #### Files to Modify
 - `src/utils/curation.py` - Add `compute_health()`
 - `scripts/update_dashboard_data.py` - Add health to node properties
-- `src/dashboard/ui/src/components/GraphCanvas.tsx` - Render health indicator
+- `src/dashboard/ui/src/components/` - Render health indicator
 
 #### Acceptance Criteria
 - [ ] Every memory has a health status
@@ -352,7 +352,7 @@ Signal hubs (topic, ring, knowledge_type) have rich cognitive metadata.
 
 #### Files to Modify
 - `scripts/update_dashboard_data.py` - Enrich hub properties
-- `src/dashboard/ui/src/components/GraphCanvas.tsx` - Show rich tooltips
+- `src/dashboard/ui/src/components/` - Show rich tooltips
 
 #### Acceptance Criteria
 - [ ] Every hub has cognitive_purpose and retrieval_trigger
@@ -444,5 +444,5 @@ Flag potential issues for user review rather than auto-asserting. The system sug
 ### To Modify in V5
 - `src/core/orchestrator.py` - Wire CognitiveRetriever (Phase 0)
 - `src/mcp/server.py` - Include explanation in search response
-- `src/dashboard/ui/src/components/GraphCanvas.tsx` - Health indicators, tooltips
+- `src/dashboard/ui/src/components/` - Health indicators, tooltips
 - `scripts/update_dashboard_data.py` - Hub enrichment, health, conflict edges

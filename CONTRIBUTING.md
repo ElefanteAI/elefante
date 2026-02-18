@@ -23,7 +23,7 @@ Thank you for your interest in contributing to Elefante!
 src/
   mcp/          # MCP Server & Tools
   core/         # Logic (Orchestrator, Vector/Graph stores)
-  models/       # Pydantic models (v1.10.0 schema)
+  models/       # Pydantic models (v2.0.0 schema)
   dashboard/    # React/Vite app
   etl/          # Topology processing
 scripts/        # Maintenance

@@ -1,8 +1,8 @@
 # Dashboard Startup & Troubleshooting Guide
 
 **Status**: ESSENTIAL - Visual interface for memory system  
-**Last Updated**: 2025-12-10  
-**Applies to**: v1.0.0+
+**Last Updated**: 2026-02-18  
+**Applies to**: v2.0.0+
 
 ---
 
@@ -28,8 +28,8 @@ INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 ### Accessing the Dashboard
 
 1. Open browser to: **http://127.0.0.1:8000**
-2. Should see **force-directed graph visualization**
-3. Green dots = memories, labels = descriptions
+2. Should see the **Overview tab** with health score gauge and stat pills
+3. Three tabs: Overview, Memories, Explore
 
 ### Stopping the Dashboard
 
@@ -41,12 +41,12 @@ Press `Ctrl+C` in the terminal.
 
 ### Dashboard Features
 
-The dashboard displays:
-- **Interactive Graph**: Each memory as a node (green dot)
-- **Statistics**: Total memories, episodes count
-- **Zoom**: Mouse wheel or buttons to zoom/pan
-- **Labels**: Memory descriptions shown on hover
-- **Real-time Sync**: Refreshes when you add memories (F5 refresh)
+The dashboard has three tabs:
+- **Overview**: Health score gauge, diagnostic panels, agent impact metrics
+- **Memories**: Searchable, sortable table of all memories (TanStack Table)
+- **Explore**: Topics (card grid), Insights (charts), Graph (SVG hub-spoke)
+
+All data comes from a static snapshot — no live database access.
 
 ### Data Source
 
@@ -500,7 +500,8 @@ Before claiming "Dashboard is working":
 - [ ] Terminal shows "Uvicorn running on http://127.0.0.1:8000"
 - [ ] Browser opens to http://127.0.0.1:8000 with no connection error
 - [ ] Page loads (no blank/error page)
-- [ ] Graph displays (even if empty)
+- [ ] Overview tab shows health gauge and stats
+- [ ] Memories tab shows memory table
 - [ ] API endpoints respond: `curl http://127.0.0.1:8000/api/stats`
 - [ ] Memory snapshot exists: `data/dashboard_snapshot.json`
 - [ ] No Kuzu lock conflicts (MCP not running simultaneously)
@@ -508,6 +509,6 @@ Before claiming "Dashboard is working":
 
 ---
 
-**Document Version**: 1.0  
+**Document Version**: 2.0  
 **Status**: ESSENTIAL  
-**Last Validated**: 2025-12-10
+**Last Validated**: 2026-02-18

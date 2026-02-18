@@ -1,195 +1,99 @@
-import { useState, useEffect } from 'react';
-
-import GraphCanvas from './components/GraphCanvas';
-import { LayoutDashboard, Filter, ZoomIn, ZoomOut, Maximize, Clock } from 'lucide-react';
+// Elefante Dashboard v2.0.0 - Main App
+import { useEffect, useCallback } from 'react';
+import { useDashboardStore } from '@/store';
+import { HeaderBar } from '@/components/HeaderBar';
+import { TabNav } from '@/components/TabNav';
+import { OverviewTab } from '@/components/OverviewTab';
+import { MemoriesTab } from '@/components/MemoriesTab';
+import { ExploreTab } from '@/components/ExploreTab';
+import type { Tab } from '@/types';
 
 function App() {
-  const [stats, setStats] = useState<any>(null);
-  const [graphStats, setGraphStats] = useState<{ memories: number; signalCoverage: number; avgConnections: number } | null>(null);
-  const [space, setSpace] = useState<string>('all');
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [environment, setEnvironment] = useState<'all' | 'production' | 'test'>('all');
-  const [status, setStatus] = useState<'all' | 'processed' | 'unprocessed'>('all');
-  const [hideTestArtifacts, setHideTestArtifacts] = useState<boolean>(true);
-  const [canvasCommand, setCanvasCommand] = useState<{ type: 'zoomIn' | 'zoomOut' | 'resetView'; nonce: number } | null>(null);
-  // v1.6.4: Temporal filter
-  const [timeRange, setTimeRange] = useState<'all' | '24h' | '7d' | '30d'>('all');
+  const activeTab = useDashboardStore((s) => s.activeTab);
+  const setActiveTab = useDashboardStore((s) => s.setActiveTab);
+  const fetchStats = useDashboardStore((s) => s.fetchStats);
+  const fetchSnapshot = useDashboardStore((s) => s.fetchSnapshot);
+  const isLoading = useDashboardStore((s) => s.isLoading);
+  const error = useDashboardStore((s) => s.error);
+  const setInspectedMemoryId = useDashboardStore((s) => s.setInspectedMemoryId);
+  const setSearchQuery = useDashboardStore((s) => s.setSearchQuery);
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchStats();
+    fetchSnapshot();
+  }, [fetchStats, fetchSnapshot]);
+
+  // Global keyboard shortcuts
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Skip if user is typing in an input
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+
+    const tabMap: Record<string, Tab> = { '1': 'overview', '2': 'memories', '3': 'explore' };
+    if (tabMap[e.key]) {
+      setActiveTab(tabMap[e.key]);
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      setInspectedMemoryId(null);
+      setSearchQuery('');
+    }
+  }, [setActiveTab, setInspectedMemoryId, setSearchQuery]);
 
   useEffect(() => {
-    // Fetch stats
-    fetch('/api/stats')
-      .then(res => res.json())
-      .then(data => setStats(data))
-      .catch(err => console.error("Failed to fetch stats", err));
-  }, []);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
-  const versionLabel = stats?.elefante?.package_version || stats?.elefante?.config_version || 'unknown';
+  const renderTab = () => {
+    switch (activeTab) {
+      case 'overview':
+        return <OverviewTab />;
+      case 'memories':
+        return <MemoriesTab />;
+      case 'explore':
+        return <ExploreTab />;
+      default:
+        return <OverviewTab />;
+    }
+  };
 
   return (
-    <div className="w-full h-screen bg-background text-text overflow-hidden relative">
-      <div className="absolute top-0 left-0 right-0 z-20 pointer-events-none">
-        <div className="mx-4 mt-4 p-3 bg-slate-900/85 backdrop-blur border border-slate-700/60 rounded-xl shadow-lg flex flex-wrap items-center gap-3 pointer-events-auto">
-          <div className="flex items-center gap-2 pr-3 border-r border-slate-700/60">
-            <div className="p-2 bg-slate-800/80 rounded-lg text-cyan-400"><LayoutDashboard size={18} /></div>
-            <div>
-              <div className="text-sm font-semibold text-white">Cognitive Mirror</div>
-              <div className="text-[10px] text-slate-400 uppercase tracking-wide">Snapshot view</div>
+    <div className="w-full h-screen bg-slate-950 text-slate-100 overflow-hidden flex flex-col">
+      {/* Header */}
+      <HeaderBar />
+
+      {/* Tab Navigation */}
+      <TabNav />
+
+      {/* Main Content */}
+      <main className="flex-1 overflow-hidden">
+        {error && (
+          <div className="p-4 m-4 bg-red-900/30 border border-red-500/50 rounded-lg text-red-200 text-sm">
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+        
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="w-12 h-12 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <div className="text-slate-400">Loading dashboard...</div>
             </div>
           </div>
+        ) : (
+          renderTab()
+        )}
+      </main>
 
-          <div className="flex items-center gap-2 pr-3 border-r border-slate-700/60 text-[11px]">
-            <div className="px-2 py-1 rounded-lg bg-slate-800/80 text-cyan-300 font-semibold">{stats?.vector_store?.total_memories || 0} memories</div>
-            <div className="px-2 py-1 rounded-lg bg-slate-800/80 text-emerald-300 font-semibold">{stats?.graph_store?.total_entities || 0} entities</div>
-            <div className="px-2 py-1 rounded-lg bg-slate-800/80 text-amber-300 font-semibold">{stats?.graph_store?.total_relationships || 0} links</div>
-          </div>
-
-          <div className="flex items-center gap-2 pr-3 border-r border-slate-700/60 text-[11px] flex-wrap">
-            <div className="px-2 py-1 rounded-lg bg-slate-800/80 text-slate-200 font-semibold">
-              Elefante {stats?.elefante?.package_version || stats?.elefante?.config_version || 'unknown'}
-            </div>
-            <div className="px-2 py-1 rounded-lg bg-slate-800/80 text-slate-300">
-              Snapshot: {stats?.snapshot?.generated_at || 'unknown'}
-            </div>
-            <div className="px-2 py-1 rounded-lg bg-slate-800/80 text-slate-300">
-              {stats?.snapshot?.total_nodes ?? 0} nodes / {stats?.snapshot?.edges ?? 0} edges
-            </div>
-            {graphStats && (
-              <div className="px-2 py-1 rounded-lg bg-slate-800/80 text-slate-300">
-                Coverage {graphStats.signalCoverage}% · Avg {graphStats.avgConnections}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 pr-3 border-r border-slate-700/60">
-            <input
-              type="text"
-              placeholder="Search memories"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') setSearchTerm('');
-              }}
-              className="w-48 bg-slate-800 text-white p-2 rounded-lg border border-slate-600 focus:border-cyan-500 outline-none text-sm placeholder-slate-500"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap text-sm">
-            <label className="flex items-center gap-2 text-slate-400">
-              <Filter size={12} />
-              <span className="text-[11px] uppercase tracking-wide">Space</span>
-              <select
-                className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                value={space}
-                onChange={(e) => setSpace(e.target.value)}
-              >
-                <option value="all">All</option>
-                <option value="personal">Personal</option>
-                <option value="work">Work</option>
-                <option value="learning">Learning</option>
-              </select>
-            </label>
-            <label className="flex items-center gap-2 text-slate-400">
-              <span className="text-[11px] uppercase tracking-wide">Env</span>
-              <select
-                className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                value={environment}
-                onChange={(e) => setEnvironment(e.target.value as any)}
-              >
-                <option value="all">All</option>
-                <option value="production">Production</option>
-                <option value="test">Test</option>
-              </select>
-            </label>
-
-            <button
-              type="button"
-              className={
-                "px-3 py-2 rounded-lg border text-xs uppercase tracking-wide font-semibold transition-colors " +
-                (hideTestArtifacts
-                  ? "bg-slate-800/80 border-slate-700 text-emerald-300 hover:border-emerald-400"
-                  : "bg-slate-800/80 border-slate-700 text-amber-300 hover:border-amber-400")
-              }
-              onClick={() => setHideTestArtifacts((v) => !v)}
-              title="Toggle client-side hiding of test artifacts"
-            >
-              {hideTestArtifacts ? 'Tests: Hidden' : 'Tests: Shown'}
-            </button>
-
-            {environment === 'test' && (
-              <div className="px-2 py-2 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs uppercase tracking-wide font-semibold">
-                Env: TEST
-              </div>
-            )}
-            <label className="flex items-center gap-2 text-slate-400">
-              <span className="text-[11px] uppercase tracking-wide">Status</span>
-              <select
-                className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
-              >
-                <option value="all">All</option>
-                <option value="processed">Processed</option>
-                <option value="unprocessed">Unprocessed</option>
-              </select>
-            </label>
-
-            {/* v1.6.4: Temporal Filter */}
-            <label className="flex items-center gap-2 text-slate-400">
-              <Clock size={12} />
-              <span className="text-[11px] uppercase tracking-wide">Time</span>
-              <select
-                className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                value={timeRange}
-                onChange={(e) => setTimeRange(e.target.value as any)}
-              >
-                <option value="all">All Time</option>
-                <option value="24h">Last 24h</option>
-                <option value="7d">Last Week</option>
-                <option value="30d">Last Month</option>
-              </select>
-            </label>
-          </div>
-
-          <div className="flex items-center gap-2 ml-auto">
-            <button
-              className="p-2 bg-slate-800/80 rounded-full border border-slate-700 hover:border-cyan-500 transition-colors"
-              onClick={() => setCanvasCommand({ type: 'zoomIn', nonce: Date.now() })}
-            >
-              <ZoomIn size={16} />
-            </button>
-            <button
-              className="p-2 bg-slate-800/80 rounded-full border border-slate-700 hover:border-cyan-500 transition-colors"
-              onClick={() => setCanvasCommand({ type: 'zoomOut', nonce: Date.now() })}
-            >
-              <ZoomOut size={16} />
-            </button>
-            <button
-              className="p-2 bg-slate-800/80 rounded-full border border-slate-700 hover:border-cyan-500 transition-colors"
-              onClick={() => setCanvasCommand({ type: 'resetView', nonce: Date.now() })}
-            >
-              <Maximize size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <GraphCanvas
-        space={space}
-        searchTerm={searchTerm}
-        onSearchTermChange={setSearchTerm}
-        environment={environment}
-        status={status}
-        hideTestArtifacts={hideTestArtifacts}
-        onGraphStats={setGraphStats}
-        command={canvasCommand}
-        timeRange={timeRange}
-      />
-
-      <div className="absolute bottom-0 left-0 right-0 z-30 flex justify-center pb-4 pointer-events-none">
-        <div className="pointer-events-auto px-4 py-2 rounded-full shadow-2xl border border-white/20 text-white text-sm font-semibold bg-gradient-to-r from-sky-500 via-indigo-500 to-pink-500 animate-pulse">
-          Elefante v{versionLabel}
-        </div>
-      </div>
+      {/* Footer */}
+      <footer className="px-4 py-2 bg-slate-900/50 border-t border-slate-800 text-center">
+        <span className="text-xs text-slate-500">
+          Elefante v2.0.0 &middot; Knowledge Workbench &middot; <span className="text-slate-600">1/2/3 to switch tabs</span>
+        </span>
+      </footer>
     </div>
   );
 }

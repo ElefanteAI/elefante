@@ -14,6 +14,8 @@ from src.core.vector_store import VectorStore
 from src.core.graph_store import GraphStore
 from src.utils.logger import get_logger
 
+import json
+
 logger = get_logger(__name__)
 
 
@@ -72,7 +74,7 @@ def repair_topology():
             # Link all persona memories together
             related_ids = mem_a['metadata'].get('related_memory_ids', [])
             if isinstance(related_ids, str):
-                related_ids = eval(related_ids) if related_ids else []
+                related_ids = json.loads(related_ids) if related_ids else []
             
             if mem_b['id'] not in related_ids:
                 related_ids.append(mem_b['id'])
@@ -96,7 +98,7 @@ def repair_topology():
                 for mem_b in tag_memories[i+1:]:
                     related_ids = mem_a['metadata'].get('related_memory_ids', [])
                     if isinstance(related_ids, str):
-                        related_ids = eval(related_ids) if related_ids else []
+                        related_ids = json.loads(related_ids) if related_ids else []
                     
                     if mem_b['id'] not in related_ids:
                         related_ids.append(mem_b['id'])
@@ -121,7 +123,7 @@ def repair_topology():
             if len(hub_tags & mem_tags) >= 2:
                 related_ids = hub['metadata'].get('related_memory_ids', [])
                 if isinstance(related_ids, str):
-                    related_ids = eval(related_ids) if related_ids else []
+                    related_ids = json.loads(related_ids) if related_ids else []
                 
                 if mem['id'] not in related_ids:
                     related_ids.append(mem['id'])
@@ -130,8 +132,6 @@ def repair_topology():
     
     # Update ChromaDB with new relationships
     print("\n[*] Updating database...")
-    
-    import json
     
     ids_to_update = []
     metadatas_to_update = []

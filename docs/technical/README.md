@@ -1,6 +1,6 @@
 # Technical Documentation Index
 
-**Status**:  Production (v1.10.0)  
+**Status**:  Production (v2.0.0)  
 **Purpose**: Complete technical reference for Elefante AI Memory System
 
 ---
@@ -86,7 +86,7 @@
 | Entity/Relationship Extraction |  | Agent-managed (provided entities/relationships; no internal extraction) |
 | 3-Level Taxonomy Auto-Classification |  | Schema exists; agent can supply domain/category |
 | Smart UPDATE (merge) |  | Planned for v1.2.0 |
-| Dashboard UX |  | Functional but needs work |
+| Dashboard UX |  | v2.0.0 (Overview, Memories, Explore tabs) |
 
 ---
 
@@ -98,5 +98,5 @@
 
 ---
 
-**Version**: 1.10.0  
+**Version**: 2.0.0  
 **Last Updated**: 2026-02-16

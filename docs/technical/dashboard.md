@@ -1,6 +1,6 @@
 # Elefante Dashboard Usage Guide
 
-**Version**: v1.10.0  
+**Version**: v2.0.0  
 **Last Updated**: 2026-02-16
 
 See also:
@@ -38,26 +38,24 @@ Press `Ctrl+C` in the terminal running the server.
 
 ## Dashboard Features
 
-### 1. Memory Visualization
+### 1. Overview Tab
 
-- **Neural Web Graph**: Memories rendered as an organic, physics-driven network
-- **Node Labels**: Truncated descriptions shown below each node
-- **Hover Tooltips**: Title, summary, and connection counts
-- **Zoom Controls**: Mouse wheel or zoom buttons (bottom right)
-- **Pan**: Click and drag to move around the graph
+- **Health Score**: SVG ring gauge showing system health (0–100) based on freshness, coverage, and connectivity
+- **Diagnostic Panels**: Health breakdown with per-signal detail
+- **Agent Impact Metrics**: Access patterns, reinforcement data
+- **Stat Pills**: Memory count, average score, topic coverage at a glance
 
-### 2. Statistics Panel (Top Left)
+### 2. Memories Tab
 
-- **Total Memories**: Current count in the system
-- **Total Episodes**: Number of conversation sessions
+- **TanStack Table**: Sortable, filterable table of all memories
+- **Semantic Search**: Search box with live results
+- **Expandable Rows**: Click any memory to see full content, metadata, and score breakdown
 
-### 3. Visual Physics Engine
+### 3. Explore Tab (3 Sub-Views)
 
-- **Linear Node Sizing**: Balanced sizes (max 25px) based on behavioral relevance score
-- **Neural Physics**: Nodes float organically, no rigid ring locks
-- **Recency Pulse**: White ring for very recent memories
-- **Status Borders**: Green = processed, amber = pending ETL classification
-- **Signal Hubs**: Topic, ring, and knowledge_type hub nodes connect related memories
+- **Topics**: Card grid showing memory distribution by topic
+- **Insights**: Score distribution chart, type breakdown, topic breakdown, top-scoring memories
+- **Graph**: Pure SVG hub-spoke knowledge graph grouped by topic with hover highlighting
 
 ---
 

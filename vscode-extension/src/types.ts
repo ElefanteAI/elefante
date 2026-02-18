@@ -7,10 +7,10 @@ export interface MemoryResult {
     title: string;
     summary: string;
     content: string;
-    importance: number;
-    layer: string;
-    sublayer: string;
     score: number;
+    memory_type: string;
+    topic: string;
+    knowledge_type: string;
 }
 
 export interface SearchOptions {
@@ -27,9 +27,10 @@ export interface SearchResponse {
             id: string;
             content: string;
             metadata: {
-                importance: number;
-                layer: string;
-                sublayer: string;
+                score?: number;
+                memory_type?: string;
+                topic?: string;
+                knowledge_type?: string;
                 custom_metadata?: {
                     title?: string;
                     summary?: string;

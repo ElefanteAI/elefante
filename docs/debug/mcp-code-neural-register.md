@@ -322,7 +322,7 @@ print("Initializing...", file=sys.stderr)
 
 ---
 
-### LAW #7: SINGLE REGISTRATION (The IDE Scope Merge Trap)
+### LAW #8: SINGLE REGISTRATION (The IDE Scope Merge Trap)
 
 **Statement**: A given MCP server identity (e.g., `elefante`) MUST be registered in exactly one IDE configuration scope/mechanism. If you register the same server name in multiple places, IDEs may display duplicates and operators will debug the wrong layer.
 
@@ -346,7 +346,7 @@ print("Initializing...", file=sys.stderr)
 
 ---
 
-### LAW #8: Compliance Gate - Search Before Write (v1.6.0)
+### LAW #9: Compliance Gate - Search Before Write (v1.6.0)
 
 **Statement**: Write operations MUST be blocked until a search has been performed in the current session.
 

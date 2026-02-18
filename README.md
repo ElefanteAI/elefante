@@ -1,8 +1,49 @@
 # Elefante
 
-Persistent memory for AI coding agents. Runs locally via [MCP](https://modelcontextprotocol.io/), storing knowledge in a vector database (ChromaDB) and a knowledge graph (Kuzu). Your agent remembers what matters — scored by behavior, not by labels.
+**The Second Brain for AI Agents.** Your agent stops forgetting. Every preference, every decision, every pattern — remembered, scored, and surfaced at the moment of need.
 
-> **v1.10.0** — Behavioral Relevance + tool renaming release
+> **v2.0.0** — Persistent Memory for AI Agents
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        YOUR IDE                             │
+│  (VS Code, Cursor, Windsurf — any MCP-compatible client)    │
+└────────────────────────┬────────────────────────────────────┘
+                         │ MCP stdio
+┌────────────────────────▼────────────────────────────────────┐
+│              LAYER 1: MCP PROTOCOL                          │
+│  17 tools · Compliance Gate · Context Injection             │
+│  ┌─────────┐ ┌─────────────┐ ┌───────────┐ ┌────────────┐ │
+│  │ Memory  │ │   Graph     │ │   Tasks   │ │  System    │ │
+│  │ CRUD    │ │ Connect/    │ │ Create/   │ │ Status/    │ │
+│  │ Search  │ │ Query       │ │ Decompose │ │ Dashboard  │ │
+│  └────┬────┘ └──────┬──────┘ └─────┬─────┘ └─────┬──────┘ │
+└───────┼─────────────┼──────────────┼──────────────┼────────┘
+        │             │              │              │
+┌───────▼─────────────▼──────────────▼──────────────▼────────┐
+│              LAYER 2: INTELLIGENCE ENGINE                   │
+│  Orchestrator · Adaptive Weighting · Behavioral Relevance   │
+│  ┌──────────────┐ ┌──────────────┐ ┌────────────────────┐  │
+│  │  ChromaDB    │ │    Kuzu      │ │  Cognitive         │  │
+│  │  Semantic    │ │  Knowledge   │ │  Retrieval         │  │
+│  │  Vectors     │ │  Graph       │ │  (6-signal score)  │  │
+│  │  (768-dim)   │ │  (entities)  │ │                    │  │
+│  └──────────────┘ └──────────────┘ └────────────────────┘  │
+└──────────────────────┬──────────────────────────────────────┘
+                       │ snapshot.json
+┌──────────────────────▼──────────────────────────────────────┐
+│              LAYER 3: DASHBOARD                             │
+│  Read-only window into your knowledge system                │
+│  ┌──────────┐ ┌────────────┐ ┌───────────────────────────┐ │
+│  │ Overview │ │  Memories  │ │  Explore                  │ │
+│  │ Health   │ │  Search    │ │  Topics · Insights · Graph│ │
+│  │ Score    │ │  Table     │ │                           │ │
+│  └──────────┘ └────────────┘ └───────────────────────────┘ │
+│                 http://127.0.0.1:8000                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**The product is the cohesion.** MCP tools capture knowledge. The Intelligence Engine scores and connects it. The Dashboard shows you the health of your second brain. All three layers serve one purpose: *your agent gives better answers because it remembers.*
 
 ---
 
@@ -25,6 +66,25 @@ Connect to your IDE (VS Code, Cursor, etc.) via MCP stdio:
 - **Env:** `PYTHONPATH` and `ELEFANTE_CONFIG_PATH` pointing to this repo
 
 Full setup: [docs/technical/installation.md](docs/technical/installation.md) · [IDE configuration](docs/technical/ide-mcp-configuration.md)
+
+---
+
+## How It Works
+
+### Layer 1: MCP Protocol
+The bridge between your IDE and the brain. 17 tools that let agents store, search, connect, and manage knowledge. A **Compliance Gate** forces search-before-write — no duplicates, no noise. **Context Injection** silently attaches relevant memories to every tool call so the agent gets history without asking.
+
+### Layer 2: Intelligence Engine
+The brain. Two storage backends work together:
+- **ChromaDB** (semantic vectors) finds memories by meaning — "how do we handle auth?" matches a decision about JWT tokens made three months ago.
+- **Kuzu** (knowledge graph) tracks entities and relationships — who connects to what, which decisions depend on which facts.
+- **Behavioral Relevance** scores every memory automatically. Recent, frequently-accessed, and type-appropriate memories surface first. No manual ratings.
+
+### Layer 3: Dashboard
+The window. A snapshot-driven read-only view of your knowledge system:
+- **Overview**: Health score (freshness, coverage, connectivity) with diagnostic panels.
+- **Memories**: Searchable, sortable table with semantic search integration.
+- **Explore**: Topic distribution, memory insights, and a knowledge graph.
 
 ---
 

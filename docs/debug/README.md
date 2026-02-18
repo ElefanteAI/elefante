@@ -1,6 +1,6 @@
 # Debug Documentation Index
 
-**Neural Registers & Debug Compendiums for Elefante v1.10.0**
+**Neural Registers & Debug Compendiums for Elefante v2.0.0**
 
 > **Last Updated:** 2025-12-28
 
@@ -88,4 +88,4 @@ docs/debug/
 
 ---
 
-*Last verified: 2026-02-16 | Elefante v1.10.0*
+*Last verified: 2026-02-18 | Elefante v2.0.0*

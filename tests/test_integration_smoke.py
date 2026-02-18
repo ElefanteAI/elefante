@@ -53,10 +53,7 @@ class TestScenario:
     add_content: str
     search_queries: List[str]  # Multiple queries to try
     expected_keywords: List[str]  # Keywords that should match
-    layer: str
-    sublayer: str
     category: str
-    importance: int = 7
 
 
 @dataclass 
@@ -89,10 +86,7 @@ TEST_SCENARIOS = [
             "how should I format Python code"
         ],
         expected_keywords=["indentation", "spaces", "Python", "formatting"],
-        layer="self",
-        sublayer="preference",
         category="coding-preferences",
-        importance=8
     ),
     
     # 2. Project decision
@@ -106,10 +100,7 @@ TEST_SCENARIOS = [
             "API framework choice"
         ],
         expected_keywords=["FastAPI", "REST", "decision", "Django"],
-        layer="intent",
-        sublayer="rule",
         category="architecture-decisions",
-        importance=9
     ),
     
     # 3. Error solution (debugging)
@@ -123,10 +114,7 @@ TEST_SCENARIOS = [
             "init databases fix"
         ],
         expected_keywords=["ChromaDB", "collection", "error", "init"],
-        layer="world",
-        sublayer="fact",
         category="debugging",
-        importance=8
     ),
     
     # 4. Tool preference
@@ -140,10 +128,7 @@ TEST_SCENARIOS = [
             "development environment"
         ],
         expected_keywords=["VS Code", "editor", "prefer", "Copilot"],
-        layer="self",
-        sublayer="preference",
         category="tool-preferences",
-        importance=7
     ),
     
     # 5. Naming convention
@@ -157,10 +142,7 @@ TEST_SCENARIOS = [
             "naming style preference"
         ],
         expected_keywords=["snake_case", "naming", "convention", "Python"],
-        layer="intent",
-        sublayer="rule",
         category="coding-standards",
-        importance=8
     ),
     
     # 6. Workflow rule
@@ -174,10 +156,7 @@ TEST_SCENARIOS = [
             "commit workflow"
         ],
         expected_keywords=["pytest", "commit", "testing", "mandatory"],
-        layer="intent",
-        sublayer="rule",
         category="workflow-rules",
-        importance=9
     ),
     
     # 7. API pattern
@@ -191,10 +170,7 @@ TEST_SCENARIOS = [
             "API error handling pattern"
         ],
         expected_keywords=["API", "JSON", "error", "response"],
-        layer="intent",
-        sublayer="rule",
         category="api-patterns",
-        importance=8
     ),
     
     # 8. Documentation preference
@@ -208,10 +184,7 @@ TEST_SCENARIOS = [
             "documentation format"
         ],
         expected_keywords=["docstrings", "Google", "documentation", "Args"],
-        layer="self",
-        sublayer="preference",
         category="documentation",
-        importance=7
     ),
     
     # 9. Git workflow
@@ -225,10 +198,7 @@ TEST_SCENARIOS = [
             "PR workflow"
         ],
         expected_keywords=["branch", "feature", "PR", "main"],
-        layer="intent",
-        sublayer="rule",
         category="git-workflow",
-        importance=8
     ),
     
     # 10. Performance rule
@@ -242,10 +212,7 @@ TEST_SCENARIOS = [
             "performance requirements"
         ],
         expected_keywords=["query", "100ms", "performance", "database"],
-        layer="intent",
-        sublayer="rule",
         category="performance",
-        importance=8
     ),
 ]
 
@@ -317,10 +284,6 @@ class ElefanteBatteryTest:
             
             # Create Memory object with proper metadata
             metadata = MemoryMetadata(
-                layer=scenario.layer,
-                sublayer=scenario.sublayer,
-                importance=scenario.importance,
-                category=scenario.category,
                 memory_type="preference" if "preference" in scenario.category.lower() else "fact",
                 tags=[TEST_PREFIX.strip("_"), "battery_test"],
             )

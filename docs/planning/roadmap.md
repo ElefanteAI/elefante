@@ -1,13 +1,13 @@
 # Elefante Development Roadmap
 
-**Current Version**: v1.10.0  
+**Current Version**: v2.0.0  
 **Last Updated**: 2026-02-16
 
 ---
 
-## v1.10.0 — Production Baseline (Current)
+## v2.0.0 — Production Release (Current)
 
-v1.10.0 is the definitive production release. All core infrastructure is implemented, tested, and documented.
+v2.0.0 is the definitive production release. All core infrastructure is implemented, tested, and documented.
 
 ### Shipped Features
 
@@ -17,14 +17,14 @@ v1.10.0 is the definitive production release. All core infrastructure is impleme
 | MCP server (17 tools + 2 prompts) | Production | v1.0.0 |
 | Transaction-scoped locking | Production | v1.1.0 |
 | Compliance Gate (search-before-write) | Production | v1.6.0 |
-| Behavioral Relevance scoring (0-100) | Production | v1.10.0 |
+| Behavioral Relevance scoring (0-100) | Production | v2.0.0 |
 | Temporal memory decay with type-based rates | Production | v1.0.0 |
 | Cognitive retrieval (V4: concepts, authority, surfaces_when) | Production | v1.6.3 |
 | Knowledge topology (V5: rings, topics, knowledge_type) | Production | v1.6.3 |
 | Agent ETL classification pipeline | Production | v1.6.3 |
-| Dashboard (React + Canvas 2D neural web) | Production | v1.6.3 |
+| Dashboard (React + SVG, 3-tab architecture) | Production | v2.0.0 |
 | Context injection (auto-surfaces top 3 memories) | Production | v1.0.0 |
-| Session Distiller (scan, parse, ingest from VS Code chat) | Production | v1.10.0 |
+| Session Distiller (scan, parse, ingest from VS Code chat) | Production | v2.0.0 |
 
 ### Known Design Flaws (Open)
 
@@ -64,12 +64,11 @@ Flag memories with high concept overlap and opposing patterns for user review. S
 
 ### Priority 5: Dashboard UX
 
-- Semantic zoom (hide labels at low zoom)
 - Color by memory type or domain
 - Show only high-relevance nodes by default
 - Health indicators on nodes
 
-**Files**: `src/dashboard/ui/src/components/GraphCanvas.tsx`
+**Files**: `src/dashboard/ui/src/components/`
 
 ---
 

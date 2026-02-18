@@ -80,7 +80,7 @@ class ElefanteMCPServer:
         # Register tool handlers
         self._register_handlers()
         
-        self.logger.info("Elefante MCP Server initialized (v1.10.0 - Behavioral Relevance)")
+        self.logger.info("Elefante MCP Server initialized (v2.0.0)")
 
     # Tools that should NOT get automatic context injection
     # (they already return memory data, or are system/admin tools)

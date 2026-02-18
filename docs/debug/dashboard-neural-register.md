@@ -38,7 +38,9 @@ MCP Server (Write) -> kuzu_db/ -> Export Script -> snapshot.json -> Dashboard (R
 
 ---
 
-### LAW #2: Semantic Zoom (Level of Detail)
+### LAW #2: Semantic Zoom (Level of Detail) — HISTORICAL
+
+> **Note**: This law was written for the v1.x physics-based dashboard (D3 force-directed graph). The v2.0 dashboard uses static visualizations (SVG hub-spoke graph, card grids, TanStack Table) and does not have zoom-based LOD. Retained for reference if a future physics-based view is added.
 
 **Statement**: Graph visualization MUST implement progressive disclosure based on zoom level.
 
@@ -64,7 +66,9 @@ Zoom Level 3 (Near):  Show full subgraph with relationships (500+ nodes)
 
 ---
 
-### LAW #3: Force-Directed Layout Constraints
+### LAW #3: Force-Directed Layout Constraints — HISTORICAL
+
+> **Note**: This law was written for the v1.x D3 force simulation. The v2.0 dashboard uses static SVG layouts with no physics engine. Retained for reference if physics-based rendering is re-introduced.
 
 **Statement**: Physics simulation MUST have bounded parameters to prevent chaos.
 
@@ -299,21 +303,19 @@ uvicorn.run(app, host="0.0.0.0", port=8000)
 ### Phase 1: Core Stability (COMPLETE)
 
 -  Snapshot export pattern
--  Semantic zoom implementation
 -  Dependency locking
+-  3-tab architecture (Overview, Memories, Explore)
 
 ### Phase 2: Enhanced Visualization (PLANNED)
 
-- [ ] Cluster detection (DBSCAN algorithm)
 - [ ] Temporal timeline view (memory evolution)
-- [ ] Search and highlight (find entities)
+- [ ] Search and highlight in graph view
 - [ ] Export to image (PNG/SVG)
 
 ### Phase 3: Interactive Features (FUTURE)
 
-- [ ] Node editing (update metadata)
-- [ ] Relationship creation (drag-and-drop)
-- [ ] Space management (create/delete)
+- [ ] Memory editing from dashboard
+- [ ] Relationship creation (UI)
 - [ ] Memory consolidation trigger (UI button)
 
 ---
@@ -334,4 +336,4 @@ uvicorn.run(app, host="0.0.0.0", port=8000)
 
 **Neural Register Status**:  ACTIVE  
 **Enforcement**: Architecture review, performance testing  
-**Last Validation**: 2025-12-06
+**Last Validation**: 2026-02-18

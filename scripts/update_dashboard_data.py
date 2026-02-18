@@ -190,11 +190,13 @@ async def main():
                 "canonical_key": meta.get("canonical_key"),
                 "namespace": meta.get("namespace"),
                 "access_count": _safe_int(meta.get("access_count"), 0),
+                "last_accessed": meta.get("last_accessed"),
                 "last_modified": meta.get("last_modified"),
                 # V5 topology (best-effort pass-through)
                 "ring": meta.get("ring"),
                 "knowledge_type": meta.get("knowledge_type"),
                 "topic": meta.get("topic"),
+                "score": meta.get("score"),
                 "summary": _redact_secrets(meta.get("summary", "") or ""),
                 "owner_id": meta.get("owner_id"),
                 "processing_status": meta.get("processing_status"),

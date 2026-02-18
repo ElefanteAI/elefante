@@ -78,7 +78,7 @@ echo STEP 4: Running End-to-End Tests
 echo ============================================================
 echo.
 
-python scripts\test_end_to_end.py
+python tests\test_end_to_end.py
 if errorlevel 1 (
     echo [ERROR] Tests failed
     exit /b 1
