@@ -64,7 +64,7 @@ class SearchResult(BaseModel):
     vector_score: Optional[float] = None
     graph_score: Optional[float] = None
     
-    # V5: Retrieval explanation (Req-1)
+    # Retrieval explanation
     explanation: Optional[Dict[str, Any]] = None
     
     # Context information
@@ -84,7 +84,7 @@ class SearchResult(BaseModel):
             "matched_entities": [str(e) for e in self.matched_entities],
             "relationship_path": self.relationship_path,
         }
-        # V5: Include explanation if present
+        # Include explanation if present
         if self.explanation:
             result["explanation"] = self.explanation
         return result

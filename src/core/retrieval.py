@@ -1,5 +1,5 @@
 """
-Cognitive Retrieval Engine - V4 Schema
+Cognitive Retrieval Engine
 
 Returns memory constellations, not flat lists.
 Multi-signal scoring: vector + concepts + domain + co-activation + authority.
@@ -25,7 +25,7 @@ class MemoryCandidate:
     summary: str
     concepts: list[str]
     domain: str
-    importance: int  # v1.10.0: maps to metadata.score (0-100)
+    importance: int  # maps to metadata.score (0-100)
     access_count: int
     created_at: datetime
     last_accessed: datetime
@@ -54,15 +54,14 @@ class QueryAnalysis:
 
 
 # =============================================================================
-# V5: RETRIEVAL EXPLANATION
+# RETRIEVAL EXPLANATION
 # =============================================================================
 
 @dataclass
 class RetrievalExplanation:
     """
     Complete explanation for why a memory was retrieved.
-    
-    V5 Feature: Every search result includes WHY it surfaced.
+    Every search result includes WHY it surfaced.
     """
     composite_score: float
     signals: list[dict] = field(default_factory=list)
@@ -283,7 +282,7 @@ class CognitiveRetriever:
         
         # Authority
         candidate.authority_score = self.compute_authority(
-            candidate.importance,  # maps to score in v1.10.0
+            candidate.importance,  # maps to metadata.score
             candidate.access_count,
         )
         
@@ -303,7 +302,7 @@ class CognitiveRetriever:
             self.WEIGHTS["temporal"] * temporal_score
         )
         
-        # V5: Build explanation if requested
+        # Build explanation if requested
         explanation = None
         if include_explanation:
             explanation = self._build_explanation(
@@ -320,8 +319,6 @@ class CognitiveRetriever:
     ) -> RetrievalExplanation:
         """
         Build human-readable explanation from scored candidate.
-        
-        V5 Feature: Req-1 - Retrieval Explanation
         """
         # Compute matched concepts for details
         query_set = set(query.concepts) if query.concepts else set()
@@ -483,15 +480,13 @@ class CognitiveRetriever:
 
 
 # =============================================================================
-# V5: PROACTIVE SURFACING
+# PROACTIVE SURFACING
 # =============================================================================
 
 @dataclass
 class ProactiveSuggestion:
     """
     A memory that SHOULD surface based on context triggers.
-    
-    V5 Feature: Req-4 - Proactive Surfacing
     """
     memory_id: str
     memory_title: str
@@ -507,7 +502,7 @@ class ProactiveSurfacer:
     2. Domain triggers (domain matches current conversation)
     3. Recurring concepts (same concepts appearing repeatedly)
     
-    V5 Feature: Req-4 - Proactive Surfacing (soft suggestions only)
+    Surfaces memories based on context triggers (soft suggestions only).
     """
     
     def __init__(

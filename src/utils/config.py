@@ -158,8 +158,8 @@ class FeaturesConfig(BaseModel):
 
 
 class ElefanteModeConfig(BaseModel):
-    """Elefante Mode configuration (v1.1.0) - Transaction-Scoped Locking"""
-    enabled: bool = True  # v1.1.0: Always enabled (transaction-scoped locking)
+    """Elefante Mode configuration."""
+    enabled: bool = True
     lock_timeout_seconds: int = Field(default=5, ge=1, le=30)
     cleanup_on_disable: bool = True
 

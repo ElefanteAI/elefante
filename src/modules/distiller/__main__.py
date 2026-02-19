@@ -74,7 +74,7 @@ def cmd_list(args) -> int:
         try:
             parsed = parser.parse(s.file_path)
             # Find first non-empty user message
-            # V2 ChatTurn has 'user_text', not 'role'/'content'
+            # ChatTurn uses 'user_text', not 'role'/'content'
             for turn in parsed.turns:
                 if turn.user_text and turn.user_text.strip():
                     raw = turn.user_text.strip().split('\n')[0]

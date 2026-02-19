@@ -1,5 +1,5 @@
 """
-Topology Repair Script - v27.0 Semantic Topology
+Topology Repair Script
 Injects semantic relationships between memories based on metadata analysis.
 
 This script solves the "Bag of Dots" problem by creating edges between
@@ -30,7 +30,7 @@ def repair_topology():
     4. Importance Hierarchy: High-importance memories linked to related lower-importance
     """
     
-    print("[*] TOPOLOGY REPAIR v27.0 - Starting...")
+    print("[*] TOPOLOGY REPAIR - Starting...")
     
     # Initialize stores
     vector_store = VectorStore()

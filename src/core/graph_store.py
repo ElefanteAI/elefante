@@ -239,7 +239,7 @@ class GraphStore:
                     PRIMARY KEY(id)
                 )
                 """,
-                # v1.6.4: Concept node for shared concept clustering
+                # Concept node for shared concept clustering
                 """
                 CREATE NODE TABLE Concept(
                     id STRING,
@@ -279,7 +279,7 @@ class GraphStore:
                     FROM Entity TO Entity
                 )
                 """,
-                # v1.6.4: HAS_CONCEPT edges (Memory/Entity -> Concept)
+                # HAS_CONCEPT edges (Memory/Entity -> Concept)
                 """
                 CREATE REL TABLE HAS_CONCEPT(
                     FROM Entity TO Concept,
@@ -292,7 +292,7 @@ class GraphStore:
                     created_at TIMESTAMP
                 )
                 """,
-                # v1.7.0: Task Orchestration
+                # Task Orchestration
                 """
                 CREATE NODE TABLE Task(
                     id STRING,
@@ -327,7 +327,7 @@ class GraphStore:
                     if "already exists" not in error_msg and "duplicate" not in error_msg:
                         logger.warning("table_creation_warning", error=str(table_error))
             
-            # v1.7.0: Migrate Task table - add 'output' column if missing
+            # Migrate Task table - add 'output' column if missing
             try:
                 self._conn.execute("ALTER TABLE Task ADD output STRING DEFAULT ''")
             except Exception:
@@ -995,7 +995,7 @@ class GraphStore:
             return {}
     
     # =========================================================================
-    # v1.6.4: CONCEPT GRAPH METHODS
+    # CONCEPT GRAPH METHODS
     # =========================================================================
     
     async def create_or_get_concept(self, concept_name: str) -> str:

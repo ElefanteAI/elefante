@@ -2,7 +2,7 @@
 Elefante Session Distiller — Session Scanner
 Responsibility: Find, enumerate, and map VS Code chat sessions to their workspaces.
 
-Key improvements over v1 "watcher.py":
+Features:
   - Cross-platform detection (macOS/Linux/Windows)
   - Workspace name resolution via workspace.json
   - Buffered keyword search (no full-file-into-memory for large files)

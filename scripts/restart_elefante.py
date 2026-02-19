@@ -8,7 +8,7 @@ Usage:
 
 Notes:
 - This is a promoted entrypoint (previously under scripts/archive/historical/).
-- It is safe with v1.1.0+ transaction-scoped locking.
+- It is safe with transaction-scoped locking.
 """
 
 import os

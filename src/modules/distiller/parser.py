@@ -2,7 +2,7 @@
 Elefante Session Distiller — Chat Parser
 Responsibility: Parse VS Code's JSON/JSONL chat formats into typed ChatSession objects.
 
-Key improvement over v1: Returns ChatSession (typed), not List[Dict] (raw).
+Returns ChatSession (typed), not List[Dict] (raw).
 Handles ALL known response kinds. Logs warnings instead of swallowing errors.
 """
 

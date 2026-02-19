@@ -71,7 +71,7 @@ class MemoryOrchestrator:
         self.logger = get_logger(self.__class__.__name__)
         self.metadata_store = get_metadata_store()
         
-        # V4 Cognitive Retriever - multi-signal scoring engine
+        # Cognitive Retriever - multi-signal scoring engine
         self.cognitive_retriever = CognitiveRetriever()
 
         self._metadata_init_task: Optional[asyncio.Task] = None
@@ -110,9 +110,9 @@ class MemoryOrchestrator:
         force_new: bool = False
     ) -> Optional[Memory]:
         """
-        Add a new memory via the 5-Step Pipeline (v1.10.0).
+        Add a new memory via the 5-Step Pipeline.
         
-        Score is system-computed (starts at 50, earned through usage).
+        Score is system-computed (starts at 100, decays with age).
         Decay rate is set automatically from memory_type.
         """
         await self._ensure_metadata_initialized()
@@ -195,7 +195,7 @@ class MemoryOrchestrator:
             # Guardrail: require at least a few shared keywords.
             return len(overlap) >= 3
             
-        # v1.10.0: Decay rate from memory type (behavioral relevance)
+        # Decay rate from memory type
         decay_rate = TYPE_DECAY_RATES.get(memory_type, 0.01)
 
         # Agent-driven enrichment (Elefante never calls an LLM).
@@ -426,7 +426,7 @@ class MemoryOrchestrator:
             
             # Compute initial authority score
             authority_score = compute_authority_score(
-                importance=5,  # v1.10.0: neutral start, system-computed
+                importance=5,  # neutral start, system-computed
                 access_count=1,
                 days_since_created=0,
                 days_since_accessed=0,
@@ -448,7 +448,7 @@ class MemoryOrchestrator:
             # in VectorStore.add_memory (title/summary are used by dashboard + dedup).
             custom_metadata["title"] = title
             custom_metadata["summary"] = summary_text
-            # V4 Cognitive Retrieval Fields
+            # Cognitive Retrieval Fields
             custom_metadata["concepts"] = concepts
             custom_metadata["surfaces_when"] = surfaces_when
             custom_metadata["authority_score"] = authority_score
@@ -462,7 +462,7 @@ class MemoryOrchestrator:
                 intent=intent_enum,
                 confidence=confidence,
                 source=SourceType(source),
-                # V4 cognitive retrieval (typed)
+                # Cognitive retrieval fields
                 concepts=concepts,
                 surfaces_when=surfaces_when,
                 authority_score=authority_score,
@@ -548,7 +548,7 @@ class MemoryOrchestrator:
                             relationship_type=RelationshipType.RELATES_TO
                         ))
             
-            # 5d. Link to Concepts (v1.6.4 Cognitive Hub)
+            # 5d. Link to Concepts
             # Creates shared Concept nodes for memory clustering
             if concepts and isinstance(concepts, list) and len(concepts) > 0:
                 try:
@@ -689,7 +689,7 @@ class MemoryOrchestrator:
                 results = await self._merge_and_deduplicate(results, query, session_id is not None, mode.value)
             
             # =============================================================
-            # V4 COGNITIVE SCORING - Multi-signal re-ranking
+            # COGNITIVE SCORING - Multi-signal re-ranking
             # =============================================================
             if results and include_stored:
                 results = self._apply_cognitive_scoring(query, results)
@@ -809,7 +809,7 @@ class MemoryOrchestrator:
                 vector_score=result.score,  # Original vector similarity score
             )
             
-            # V5: Score candidate and get explanation
+            # Score candidate and get explanation
             scored_candidate, explanation = self.cognitive_retriever.score_candidate(
                 candidate,
                 query_analysis,
@@ -821,7 +821,7 @@ class MemoryOrchestrator:
             result.vector_score = result.score
             result.score = scored_candidate.composite_score
             
-            # V5: Attach explanation to result
+            # Attach explanation to result
             if explanation:
                 result.explanation = explanation.to_dict()
             
@@ -1784,7 +1784,7 @@ class MemoryOrchestrator:
             raise
     
     # --------------------------------------------------------------------------
-    # Task Orchestration (v1.7.0)
+    # Task Orchestration
     # --------------------------------------------------------------------------
 
     async def create_task(

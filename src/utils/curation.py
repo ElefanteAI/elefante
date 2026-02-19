@@ -71,7 +71,7 @@ def generate_summary(*, content: str, max_len: int = 200) -> str:
 
 
 # ============================================================================
-# V4 COGNITIVE RETRIEVAL HELPERS
+# COGNITIVE RETRIEVAL HELPERS
 # ============================================================================
 
 # Common stop words to exclude from concepts
@@ -342,7 +342,7 @@ def compute_authority_score(
 
 
 # ============================================================================
-# V5 MEMORY HEALTH ANALYZER
+# MEMORY HEALTH ANALYZER
 # ============================================================================
 
 from enum import Enum
@@ -350,7 +350,7 @@ from dataclasses import dataclass
 
 
 class HealthStatus(str, Enum):
-    """Memory health status (V5 Req-2)."""
+    """Memory health status."""
     HEALTHY = "healthy"   #  Active, connected, recently used
     STALE = "stale"       #  Not accessed in 90+ days
     AT_RISK = "at_risk"   #  Superseded or has unresolved conflicts
@@ -367,7 +367,7 @@ class HealthReport:
 
 @dataclass
 class ConflictReport:
-    """Potential conflict between two memories (V5 Req-3)."""
+    """Potential conflict between two memories."""
     memory_a_id: str
     memory_b_id: str
     overlap: float
@@ -378,9 +378,6 @@ class ConflictReport:
 class MemoryHealthAnalyzer:
     """
     Analyzes memory health and detects potential conflicts.
-    
-    V5 Features: Req-2 (Health), Req-3 (Conflicts)
-    
     Used by: update_dashboard_data.py (snapshot generation)
     """
     

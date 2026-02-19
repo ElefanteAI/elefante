@@ -67,9 +67,9 @@ class ElefanteMCPServer:
         self.server = Server("elefante")
         self.orchestrator = None # Lazy loaded
         self.logger = get_logger(self.__class__.__name__)
-        self.mode_manager = get_mode_manager()  # Elefante Mode manager (v1.1.0 - transaction-scoped)
+        self.mode_manager = get_mode_manager()  # Elefante Mode manager (transaction-scoped)
         
-        # v1.6.0 Compliance Gate: Session state for search-before-write enforcement
+        # Compliance Gate: Session state for search-before-write enforcement
         self._compliance_state = {
             "search_performed": False,
             "search_count": 0,
@@ -80,7 +80,7 @@ class ElefanteMCPServer:
         # Register tool handlers
         self._register_handlers()
         
-        self.logger.info("Elefante MCP Server initialized (v2.0.0)")
+        self.logger.info("Elefante MCP Server initialized")
 
     # Tools that should NOT get automatic context injection
     # (they already return memory data, or are system/admin tools)
@@ -115,7 +115,7 @@ class ElefanteMCPServer:
 
     async def _inject_context(self, result: Dict[str, Any], tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
-        AUTOMATIC CONTEXT INJECTION (v1.8.0):
+        AUTOMATIC CONTEXT INJECTION:
         On every tool call, surfaces the top 3 most relevant memories from ChromaDB
         and appends them to the response. The agent gets context for free — no
         explicit elefante-MemorySearch call required.
@@ -165,7 +165,7 @@ class ElefanteMCPServer:
 
     def _inject_pitfalls(self, result: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
         """
-        SURGICAL INJECTION (v1.0.1): 
+        SURGICAL INJECTION: 
         Injects mandatory protocols and known pitfalls directly into the tool response.
         This ensures the agent CANNOT ignore them, as they are part of the data payload.
         """
@@ -205,7 +205,7 @@ class ElefanteMCPServer:
 
     def _check_compliance_gate(self, tool_name: str) -> Dict[str, Any] | None:
         """
-        v1.6.0 Compliance Gate: Enforce search-before-write rule.
+        Compliance Gate: Enforce search-before-write rule.
         
         Returns None if gate passes, or an error dict if gate blocks.
         Write operations are blocked until elefante-MemorySearch has been called.
@@ -459,7 +459,7 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
                         }
                     }
                 ),
-                # v1.9.1: elefante-GraphEntityCreate and elefante-GraphRelationshipCreate REMOVED
+                # elefante-GraphEntityCreate and elefante-GraphRelationshipCreate REMOVED
                 # Use elefante-GraphConnect instead (batch upsert covers both use cases)
                 types.Tool(
                     name="elefante-SessionsList",
@@ -502,9 +502,9 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
                         }
                     }
                 ),
-                # v1.9.1: elefante-MemoryListAll REMOVED — use elefante-MemorySearch with list_all=true
-                # v1.9.1: elefante-MemoryMigrateToV3 REMOVED (one-time admin, moved to scripts/)
-                # v1.9.0: Memory Custodial Tools (Amendment + Forgetting)
+                # elefante-MemoryListAll REMOVED — use elefante-MemorySearch with list_all=true
+                # elefante-MemoryMigrateToV3 REMOVED (one-time admin, moved to scripts/)
+                # Memory Custodial Tools (Amendment + Forgetting)
                 types.Tool(
                     name="elefante-MemoryUpdate",
                     description="""**MEMORY AMENDMENT**: Update an existing memory's content or metadata in-place. Use this to correct wrong facts, mark memories as deprecated/archived, or set supersession chains. This is the Amendment duty — correct the record rather than burying it under new entries.
@@ -657,7 +657,7 @@ If another IDE is using Elefante, enable will fail gracefully with lock informat
                     }
                 ),
                 # =====================================================================
-                # TASK ORCHESTRATION TOOLS (v1.7.0 - Agentic Decomposition)
+                # TASK ORCHESTRATION TOOLS
                 # =====================================================================
                 types.Tool(
                     name="elefante-TaskCreate",
@@ -706,7 +706,7 @@ If another IDE is using Elefante, enable will fail gracefully with lock informat
                         "required": ["description"]
                     }
                 ),
-                # v1.9.1: elefante-TaskDecompose REMOVED — use elefante-TaskCreate with subtasks array
+                # elefante-TaskDecompose REMOVED — use elefante-TaskCreate with subtasks array
                 types.Tool(
                     name="elefante-TaskUpdate",
                     description="""Update a task's status or output. Use this to mark tasks as in_progress, completed, failed, or blocked. Optionally attach output text (result summary, error message, etc.).""",
@@ -817,7 +817,7 @@ Optional fields (improve retrieval quality):
                         "required": ["memory_id", "summary"]
                     }
                 )
-                # v1.9.1: elefante-ETLStatus REMOVED — use elefante-ETLProcess with include_stats=true
+                # elefante-ETLStatus REMOVED — use elefante-ETLProcess with include_stats=true
             ]
             self.logger.info(f"=== Returning {len(tools)} tools to MCP client ===")
             return tools
@@ -956,7 +956,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                     result = await self._handle_get_elefante_dashboard(arguments)
                     return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
                 
-                # v1.9.1: Mode check removed - operations auto-acquire/release locks
+                # Mode check removed - operations auto-acquire/release locks
                 # Write operations use write_lock() context manager internally
                 
                 if name == "elefante-MemoryAdd":
@@ -982,7 +982,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                     result = await self._handle_etl_process(arguments)
                 elif name == "elefante-ETLClassify":
                     result = await self._handle_etl_classify(arguments)
-                # Task Orchestration Tools (v1.7.0, consolidated v1.9.1)
+                # Task Orchestration Tools
                 elif name == "elefante-TaskCreate":
                     result = await self._handle_task_create(arguments)
                 elif name == "elefante-TaskUpdate":
@@ -1068,8 +1068,8 @@ You have access to a persistent memory system called **Elefante** - the user's s
         return status
 
     async def _handle_add_memory(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefante-MemoryAdd tool call - Authoritative Pipeline (v1.6.0: Compliance Gate)"""
-        # v1.6.0 Compliance Gate Check
+        """Handle elefante-MemoryAdd tool call - Authoritative Pipeline (Compliance Gate)"""
+        # Compliance Gate Check
         gate_result = self._check_compliance_gate("elefante-MemoryAdd")
         if gate_result is not None:
             return gate_result
@@ -1134,7 +1134,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
     
     async def _handle_search_memories(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Handle elefante-MemorySearch tool call"""
-        # v1.9.1: list_all mode (absorbs former elefante-MemoryListAll)
+        # list_all mode (absorbs former elefante-MemoryListAll)
         if args.get("list_all", False):
             return await self._handle_list_all_memories(args)
         
@@ -1175,7 +1175,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
             session_id=session_id
         )
         
-        # v1.9.0: Filter out deprecated/archived memories from results
+        # Filter out deprecated/archived memories from results
         filtered_results = []
         excluded_count = 0
         for result in results:
@@ -1196,7 +1196,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         if excluded_count > 0:
             response["excluded_deprecated"] = excluded_count
         
-        # v1.6.0 Compliance Gate: Mark search as performed
+        # Compliance Gate: Mark search as performed
         self._compliance_state["search_performed"] = True
         self._compliance_state["search_count"] = len(results)
         self._compliance_state["search_timestamp"] = datetime.utcnow()
@@ -1288,7 +1288,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         }
     
     # =========================================================================
-    # v1.9.0: CUSTODIAL TOOLS — Amendment & Forgetting
+    # CUSTODIAL TOOLS — Amendment & Forgetting
     # =========================================================================
     
     async def _handle_update_memory(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -1374,7 +1374,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 return {"success": False, "error": f"Memory {memory_id} not found or deletion failed"}
 
     async def _handle_consolidate_memories(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefante-MemoryConsolidate tool call (v1.9.1: transaction-scoped)"""
+        """Handle elefante-MemoryConsolidate tool call (transaction-scoped)"""
         with write_lock() as lock:
             if not lock.acquired:
                 return {
@@ -1566,7 +1566,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                     "id": sid,
                     "name": f"{kind}: {value}",
                     "type": "entity",
-                    "description": f"V5 signal hub ({kind})",
+                    "description": f"signal hub ({kind})",
                     "created_at": datetime.utcnow().isoformat(),
                     "properties": {
                         "source": "snapshot",
@@ -1739,8 +1739,8 @@ You have access to a persistent memory system called **Elefante** - the user's s
         return result
 
     async def _handle_set_elefante_connection(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefante-GraphConnect tool call (v1.6.0: Compliance Gate)"""
-        # v1.6.0 Compliance Gate Check
+        """Handle elefante-GraphConnect tool call (Compliance Gate)"""
+        # Compliance Gate Check
         gate_result = self._check_compliance_gate("elefante-GraphConnect")
         if gate_result is not None:
             return gate_result
@@ -1874,7 +1874,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 "instructions": "Analyze each memory and call elefante-ETLClassify with your enrichment. Required: summary (one-line). Optional: concepts (3-5 key terms), surfaces_when (query patterns)."
             }
         
-        # v1.9.1: include_stats (absorbs former elefante-ETLProcess (include_stats=true))
+        # include_stats (absorbs former elefante-ETLProcess (include_stats=true))
         if args.get("include_stats", False):
             stats = await etl.get_stats()
             result["stats"] = stats
@@ -1932,11 +1932,11 @@ You have access to a persistent memory system called **Elefante** - the user's s
         }
 
     # =========================================================================
-    # TASK ORCHESTRATION HANDLERS (v1.7.0)
+    # TASK ORCHESTRATION HANDLERS
     # =========================================================================
 
     async def _handle_task_create(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefante-TaskCreate - Create a new task node (v1.9.1: absorbs decompose via subtasks param)"""
+        """Handle elefante-TaskCreate — create a new task node."""
         try:
             with write_lock() as lock:
                 if not lock.acquired:
@@ -1959,7 +1959,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                     "message": f"Task created: {task_id}"
                 }
                 
-                # v1.9.1: Inline subtask creation (absorbs former elefante-TaskCreate (subtasks))
+                # Inline subtask creation (absorbs former elefante-TaskCreate (subtasks))
                 if "subtasks" in args and args["subtasks"]:
                     subtask_ids = await orchestrator.decompose_task(
                         parent_task_id=task_id,

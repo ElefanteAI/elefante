@@ -116,19 +116,19 @@ class VectorStore:
             logger.debug("generating_embedding", memory_id=str(memory.id))
             memory.embedding = await self._embedding_service.generate_embedding(memory.content)
         
-        # Prepare metadata for ChromaDB (V2.0 Schema)
+        # Prepare metadata for ChromaDB
         metadata = {
-            # Layer 1: Core Identity
+            # Core Identity
             "created_at": memory.metadata.created_at.isoformat(),
             "created_by": memory.metadata.created_by,
             
-            # Layer 2: Classification
+            # Classification
             "domain": memory.metadata.domain.value if hasattr(memory.metadata.domain, 'value') else str(memory.metadata.domain),
             "category": memory.metadata.category,
             "memory_type": memory.metadata.memory_type.value if hasattr(memory.metadata.memory_type, 'value') else str(memory.metadata.memory_type),
             "subcategory": memory.metadata.subcategory or "",
             
-            # Layer 3: Semantic Metadata
+            # Semantic Metadata
             "intent": memory.metadata.intent.value if hasattr(memory.metadata.intent, 'value') else str(memory.metadata.intent),
             "score": memory.metadata.score,
             "urgency": memory.metadata.urgency,
@@ -136,7 +136,7 @@ class VectorStore:
             "tags": ",".join(memory.metadata.tags) if memory.metadata.tags else "",
             "keywords": ",".join(memory.metadata.keywords) if memory.metadata.keywords else "",
             
-            # Layer 4: Relationships (IDs only, graph stores full relationships)
+            # Relationships (IDs only, graph stores full relationships)
             "status": memory.metadata.status.value if hasattr(memory.metadata.status, 'value') else str(memory.metadata.status),
             "relationship_type": memory.metadata.relationship_type.value if getattr(memory.metadata, "relationship_type", None) else "",
             "parent_id": str(memory.metadata.parent_id) if memory.metadata.parent_id else "",
@@ -145,22 +145,22 @@ class VectorStore:
             "supersedes_id": str(memory.metadata.supersedes_id) if memory.metadata.supersedes_id else "",
             "superseded_by_id": str(memory.metadata.superseded_by_id) if memory.metadata.superseded_by_id else "",
             
-            # Layer 5: Source Attribution
+            # Source Attribution
             "source": memory.metadata.source.value if hasattr(memory.metadata.source, 'value') else str(memory.metadata.source),
             "source_reliability": memory.metadata.source_reliability,
             "verified": memory.metadata.verified,
             
-            # Layer 6: Context Anchoring
+            # Context Anchoring
             "project": memory.metadata.project or "",
             "file_path": memory.metadata.file_path or "",
             "session_id": str(memory.metadata.session_id) if memory.metadata.session_id else "",
             
-            # Layer 7: Temporal Intelligence
+            # Temporal Intelligence
             "last_accessed": memory.metadata.last_accessed.isoformat(),
             "last_modified": memory.metadata.last_modified.isoformat() if getattr(memory.metadata, "last_modified", None) else datetime.utcnow().isoformat(),
             "access_count": memory.metadata.access_count,
             
-            # Layer 8: Quality & Lifecycle
+            # Quality & Lifecycle
             "version": memory.metadata.version,
             "deprecated": memory.metadata.deprecated,
             "archived": getattr(memory.metadata, "archived", False),
@@ -172,7 +172,7 @@ class VectorStore:
         # Also preserve title at top level
         metadata["title"] = cm.get("title", "")
 
-        # V4 Cognitive Retrieval fields (Chroma metadata values must be primitives).
+        # Cognitive Retrieval fields (Chroma metadata values must be primitives).
         # Store list fields as JSON strings and reconstruct on read.
         concepts = memory.metadata.concepts or cm.get("concepts")
         if isinstance(concepts, list):
@@ -418,7 +418,7 @@ class VectorStore:
         return where if where else None
     
     def _reconstruct_memory(self, memory_id: str, content: str, metadata: Dict[str, Any]) -> Memory:
-        """Reconstruct Memory object from ChromaDB data (V2.0 Schema)"""
+        """Reconstruct Memory object from ChromaDB data."""
         from src.models.memory import (
             DomainType,
             IntentType,
@@ -445,7 +445,7 @@ class VectorStore:
             "relationship_type", "related_memory_ids", "conflict_ids", "supersedes_id", "superseded_by_id",
             "source", "source_reliability", "verified", "project", "file_path", 
             "session_id", "last_accessed", "last_modified", "access_count", "version", "deprecated", "archived",
-            # V4 Cognitive Retrieval
+            # Cognitive Retrieval
             "concepts", "surfaces_when", "authority_score",
         }
         custom_metadata = {k: v for k, v in metadata.items() if k not in known_keys}
@@ -515,7 +515,7 @@ class VectorStore:
                 return [s]
             return []
 
-        # V4 cognitive fields (prefer top-level; fall back to custom_metadata)
+        # Cognitive fields (prefer top-level; fall back to custom_metadata)
         raw_concepts = metadata.get("concepts")
         if raw_concepts is None:
             raw_concepts = custom_metadata.get("concepts")
@@ -546,21 +546,21 @@ class VectorStore:
         except Exception:
             pass
 
-        # Parse V2 metadata with backward compatibility for V1
+        # Parse metadata with backward compatibility
         memory_metadata = MemoryMetadata(
-            # Layer 1: Core Identity
+            # Core Identity
             created_at=datetime.fromisoformat(metadata.get("created_at", metadata.get("timestamp", datetime.utcnow().isoformat()))),
             created_by=metadata.get("created_by", "user"),
             
-            # Layer 2: Classification
-            layer=metadata.get("layer", "world"),  # V3 Schema
-            sublayer=metadata.get("sublayer", "fact"),  # V3 Schema
+            # Classification
+            layer=metadata.get("layer", "world"),
+            sublayer=metadata.get("sublayer", "fact"),
             domain=get_enum_value(DomainType, metadata.get("domain"), DomainType.REFERENCE),
             category=metadata.get("category", "general"),
             memory_type=get_enum_value(MemoryType, metadata.get("memory_type"), MemoryType.CONVERSATION),
             subcategory=metadata.get("subcategory") or None,
             
-            # Layer 3: Semantic
+            # Semantic
             intent=get_enum_value(IntentType, metadata.get("intent"), IntentType.REFERENCE),
             score=int(metadata.get("score", metadata.get("importance", 100))),
             urgency=int(metadata.get("urgency", 5)),
@@ -568,12 +568,12 @@ class VectorStore:
             tags=metadata.get("tags", "").split(",") if metadata.get("tags") else [],
             keywords=metadata.get("keywords", "").split(",") if metadata.get("keywords") else [],
 
-            # Layer 3b: Cognitive Retrieval (V4 Schema)
+            # Cognitive Retrieval
             concepts=concepts,
             surfaces_when=surfaces_when,
             authority_score=authority_score,
             
-            # Layer 4: Relationships
+            # Relationships
             status=get_enum_value(MemoryStatus, metadata.get("status"), MemoryStatus.NEW),
             relationship_type=get_enum_value(
                 RelationshipType,
@@ -586,22 +586,22 @@ class VectorStore:
             supersedes_id=UUID(metadata["supersedes_id"]) if metadata.get("supersedes_id") else None,
             superseded_by_id=UUID(metadata["superseded_by_id"]) if metadata.get("superseded_by_id") else None,
             
-            # Layer 5: Source
+            # Source
             source=get_enum_value(SourceType, metadata.get("source"), SourceType.USER_INPUT),
             source_reliability=metadata.get("source_reliability", 0.9),
             verified=metadata.get("verified", False),
             
-            # Layer 6: Context
+            # Context
             project=metadata.get("project") or None,
             file_path=metadata.get("file_path") or None,
             session_id=UUID(metadata["session_id"]) if metadata.get("session_id") else None,
             
-            # Layer 7: Temporal
+            # Temporal
             last_accessed=datetime.fromisoformat(metadata.get("last_accessed", datetime.utcnow().isoformat())),
             last_modified=datetime.fromisoformat(metadata.get("last_modified", datetime.utcnow().isoformat())),
             access_count=metadata.get("access_count", 0),
             
-            # Layer 8: Quality
+            # Quality
             version=metadata.get("version", 1),
             deprecated=metadata.get("deprecated", False),
             archived=metadata.get("archived", False),

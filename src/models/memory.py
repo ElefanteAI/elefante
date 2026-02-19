@@ -1,6 +1,5 @@
 """
-Memory data models for Elefante - V2.0 Schema
-Enhanced with 3-level taxonomy, relationship tracking, and temporal intelligence
+Memory data models for Elefante.
 """
 
 from datetime import datetime
@@ -52,8 +51,7 @@ class IntentType(str, Enum):
     TEMPLATE = "template"
 
 
-# MemoryClass REMOVED (v2.1.0)
-# Data analysis: 13/13 memories were "fact". Zero discrimination value.
+# MemoryClass removed — zero discrimination value in practice.
 # Contradiction handling uses vector similarity + recency instead.
 
 
@@ -148,7 +146,7 @@ TYPE_DECAY_RATES: Dict[str, float] = {
 # ============================================================================
 
 class MemoryMetadata(BaseModel):
-    """Enhanced metadata — v1.10.0 Schema (Behavioral Relevance)"""
+    """Memory metadata."""
     
     # Identity
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -169,7 +167,7 @@ class MemoryMetadata(BaseModel):
     keywords: List[str] = Field(default_factory=list)
     entities: List[str] = Field(default_factory=list)
     
-    # Layer 3b: Cognitive Retrieval (V4 Schema)
+    # Cognitive Retrieval
     concepts: List[str] = Field(default_factory=list, description="3-5 key terms for graph edges")
     surfaces_when: List[str] = Field(default_factory=list, description="Query patterns that trigger this memory")
     co_activated_with: List[UUID] = Field(default_factory=list, description="Memories often retrieved together")
@@ -177,7 +175,7 @@ class MemoryMetadata(BaseModel):
     contradicts: List[UUID] = Field(default_factory=list, description="Memories with opposing info")
     supports: List[UUID] = Field(default_factory=list, description="Memories that reinforce this one")
     
-    # Layer 4: Relationship Tracking
+    # Relationship Tracking
     status: MemoryStatus = MemoryStatus.NEW
     relationship_type: Optional[RelationshipType] = None
     parent_id: Optional[UUID] = None
@@ -186,7 +184,7 @@ class MemoryMetadata(BaseModel):
     supersedes_id: Optional[UUID] = None
     superseded_by_id: Optional[UUID] = None
     
-    # Layer 5: Source Attribution
+    # Source Attribution
     source: SourceType = SourceType.USER_INPUT
     source_detail: str = "direct_input"
     source_reliability: float = Field(default=0.9, ge=0.0, le=1.0)
@@ -196,7 +194,7 @@ class MemoryMetadata(BaseModel):
     session_id: Optional[UUID] = None
     author: str = "user"
     
-    # Layer 6: Context Anchoring
+    # Context Anchoring
     project: Optional[str] = None
     workspace: Optional[str] = None
     file_path: Optional[str] = None
@@ -211,7 +209,7 @@ class MemoryMetadata(BaseModel):
     decay_rate: float = 0.01  # Set from TYPE_DECAY_RATES at creation
     reinforcement_factor: float = 0.25
     
-    # Layer 8: Quality & Lifecycle
+    # Quality & Lifecycle
     version: int = 1
     deprecated: bool = False
     archived: bool = False
@@ -219,7 +217,7 @@ class MemoryMetadata(BaseModel):
     sentiment: Optional[float] = Field(default=None, ge=-1.0, le=1.0)
     quality_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     
-    # Layer 9: Extensibility
+    # Extensibility
     custom_metadata: Dict[str, Any] = Field(default_factory=dict)
     system_metadata: Dict[str, Any] = Field(default_factory=dict)
     
@@ -238,7 +236,7 @@ class MemoryMetadata(BaseModel):
 # ============================================================================
 
 class Memory(BaseModel):
-    """Core memory object with V2.0 schema"""
+    """Core memory object."""
     
     # Core identity
     id: UUID = Field(default_factory=uuid4)
@@ -285,7 +283,7 @@ class Memory(BaseModel):
     
     def calculate_relevance_score(self, current_time: Optional[datetime] = None) -> float:
         """
-        Behavioral vitality (v2.0.0).
+        Behavioral vitality.
 
         Nobody assigns importance. Vitality emerges from behavior:
         - Recency: older memories decay based on their type's half-life

@@ -78,7 +78,7 @@ def _compute_live_score(meta: dict) -> int:
     Avoids using the stale `score` persisted in ChromaDB, which may have been
     set under the old formula (0.5 base, freshness punishing never-retrieved memories).
 
-    Rules (v2.0.0 formula):
+    Rules:
       vitality = recency × freshness × reinforcement
       - recency:       exp(-decay_rate × days_since_created)  — type-specific half-life
       - freshness:     exp(-0.02 × days_since_access)  **only if access_count > 0**
@@ -266,7 +266,7 @@ async def main():
                 "access_count": _safe_int(meta.get("access_count"), 0),
                 "last_accessed": meta.get("last_accessed"),
                 "last_modified": meta.get("last_modified"),
-                # V5 topology (best-effort pass-through)
+                # Topology fields (best-effort pass-through)
                 "ring": meta.get("ring"),
                 "knowledge_type": meta.get("knowledge_type"),
                 "topic": _derive_topic(str(title) if title is not None else "", meta.get("topic")),
@@ -274,7 +274,7 @@ async def main():
                 "summary": _redact_secrets(meta.get("summary", "") or ""),
                 "owner_id": meta.get("owner_id"),
                 "processing_status": meta.get("processing_status"),
-                # V4 cognitive retrieval fields (v1.6.1)
+                # Cognitive retrieval fields
                 "concepts": meta.get("concepts"),
                 "surfaces_when": meta.get("surfaces_when"),
                 "authority_score": meta.get("authority_score"),
@@ -401,7 +401,7 @@ async def main():
         print(f"   Found {len(edges)} relationships", file=sys.stderr)
         
         # =========================================================================
-        # STEP 3.25: Fetch Concept nodes from Kuzu (v1.6.4 Cognitive Hub)
+        # STEP 3.25: Fetch Concept nodes from Kuzu
         # =========================================================================
         print("[*] Step 3.25: Fetching Concept nodes from Kuzu...", file=sys.stderr)
         
@@ -777,9 +777,9 @@ async def main():
         print(f"   [!] Similarity computation error: {e}", file=sys.stderr)
 
     # =========================================================================
-    # STEP 3.6: Build V5 Signal Hubs (topic / knowledge_type / ring)
+    # STEP 3.6: Build signal hubs (topic / knowledge_type / ring)
     # =========================================================================
-    print("[*] Step 3.6: Building V5 signal hubs...", file=sys.stderr)
+    print("[*] Step 3.6: Building signal hubs...", file=sys.stderr)
 
     try:
         def _env_bool(name: str, default: bool) -> bool:
@@ -823,7 +823,7 @@ async def main():
                     "id": sid,
                     "name": f"{kind}: {value}",
                     "type": "entity",
-                    "description": f"V5 signal hub ({kind})",
+                    "description": f"signal hub ({kind})",
                     "created_at": datetime.utcnow().isoformat(),
                     "properties": {
                         "source": "snapshot",

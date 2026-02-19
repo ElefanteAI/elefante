@@ -1,22 +1,15 @@
 """
-Elefante Mode Manager (v1.1.0) - Transaction-Scoped Locking
+Elefante Mode Manager — Transaction-Scoped Locking
 
-EVOLUTION from v1.0.1:
-- Locks are now PER-OPERATION, not per-session
-- No more "enable/disable" ceremony - operations auto-acquire/release
-- Multiple IDEs can interleave operations safely
-- Stale locks auto-expire after configurable timeout
-
-Versioning:
-- v1.0.0: Initial release (session-based locking)
-- v1.0.1: Multi-IDE safety with enable/disable ceremony
-- v1.1.0: Transaction-scoped locking (this version)
+Locks are per-operation: acquire → work → release (milliseconds, not sessions).
+Multiple IDEs can interleave operations safely.
+Stale locks auto-expire after configurable timeout.
 
 Design Principles:
 1. SHORT TRANSACTIONS: Acquire → Work → Release (milliseconds, not hours)
 2. AUTO-EXPIRY: Locks older than LOCK_TIMEOUT_SECONDS are considered stale
 3. READ vs WRITE: Reads can proceed without locks; writes need brief exclusive lock
-4. GRACEFUL DEGRADATION: If lock fails, return helpful error (don't crash)
+4. GRACEFUL DEGRADATION: If lock fails, return helpful error (don’t crash)
 """
 
 import os
@@ -206,13 +199,11 @@ class TransactionLock:
 
 class ElefanteModeManager:
     """
-    Transaction-scoped lock manager for Elefante (v2.0.0).
-    
-    Key changes from v1.x:
-    - No persistent "enabled/disabled" state
-    - Operations acquire locks on-demand and release immediately
-    - `is_enabled` always returns True (mode concept deprecated)
-    - `enable()`/`disable()` are no-ops for backward compatibility
+    Transaction-scoped lock manager for Elefante.
+
+    Operations acquire locks on-demand and release immediately.
+    `is_enabled` always returns True (mode concept deprecated).
+    `enable()`/`disable()` are no-ops for backward compatibility.
     """
     
     _instance: Optional['ElefanteModeManager'] = None
@@ -245,15 +236,15 @@ class ElefanteModeManager:
             self._lock_timeout = DEFAULT_LOCK_TIMEOUT
         
         logger.info(
-            "ElefanteModeManager v1.1.0 initialized (transaction-scoped locking)",
+            "ElefanteModeManager initialized (transaction-scoped locking)",
             startup_time=self._startup_time.isoformat()
         )
     
     @property
     def is_enabled(self) -> bool:
         """
-        Always returns True in v2.0.0.
-        
+        Always returns True.
+
         The "enabled/disabled" concept is deprecated. Operations now
         acquire locks on-demand and release immediately.
         """
@@ -263,7 +254,7 @@ class ElefanteModeManager:
     def status(self) -> Dict[str, Any]:
         """Get current status."""
         return {
-            "enabled": True,  # Always enabled in v1.1.0
+            "enabled": True,
             "version": PACKAGE_VERSION,
             "mode": "transaction-scoped",
             "startup_time": self._startup_time.isoformat(),
@@ -343,11 +334,11 @@ class ElefanteModeManager:
     
     def enable(self, force: bool = False) -> Dict[str, Any]:
         """
-        DEPRECATED in v1.1.0 - kept for backward compatibility.
+        DEPRECATED — kept for backward compatibility.
         
         Always returns success. Operations now auto-acquire locks.
         """
-        logger.info("enable() called - no-op in v1.1.0 (transaction-scoped mode)")
+        logger.info("enable() called - no-op (transaction-scoped mode)")
         
         if force:
             # Force flag = clear any stale locks
@@ -355,17 +346,17 @@ class ElefanteModeManager:
         
         return {
             "success": True,
-            "message": "Elefante v1.1.0: Transaction-scoped locking active. No enable needed.",
+            "message": "Transaction-scoped locking active. No enable needed.",
             "status": self.status
         }
     
     def disable(self) -> Dict[str, Any]:
         """
-        DEPRECATED in v1.1.0 - kept for backward compatibility.
+        DEPRECATED — kept for backward compatibility.
         
         Clears any locks this process might hold and resets orchestrator ref.
         """
-        logger.info("disable() called - clearing resources in v1.1.0")
+        logger.info("disable() called - clearing resources")
         
         # Best-effort cleanup of orchestrator
         if self._orchestrator_ref is not None:
@@ -399,7 +390,7 @@ class ElefanteModeManager:
     
     def get_disabled_response(self, tool_name: str) -> Dict[str, Any]:
         """
-        DEPRECATED in v1.1.0 - operations should not be blocked.
+        DEPRECATED — operations should not be blocked.
         
         Kept for backward compatibility but should rarely be called.
         """
@@ -430,13 +421,13 @@ def get_mode_manager() -> ElefanteModeManager:
 
 
 def is_elefante_enabled() -> bool:
-    """Always returns True in v1.1.0 - operations auto-acquire locks."""
+    """Always returns True — operations auto-acquire locks."""
     return True
 
 
 def require_elefante_mode(func):
     """
-    DEPRECATED decorator in v1.1.0.
+    DEPRECATED decorator.
     
     Kept for backward compatibility - just passes through to function.
     Operations should use write_transaction() context manager instead.
