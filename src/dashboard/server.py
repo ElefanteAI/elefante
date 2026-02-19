@@ -60,6 +60,9 @@ async def get_graph(limit: int = 1000, space: Optional[str] = None):
                 "label": n.get("name", "")[:50] + ("..." if len(n.get("name", "")) > 50 else ""),
                 "type": node_type,
                 "entityType": node_type,
+                "created_at": n.get("created_at", ""),
+                "name": n.get("name", ""),
+                "description": n.get("description", ""),
                 "properties": {
                     "description": n.get("description", ""),
                     "created_at": n.get("created_at", ""),
