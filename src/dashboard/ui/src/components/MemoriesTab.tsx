@@ -162,6 +162,10 @@ export function MemoriesTab() {
                 setSelectedId(null);
                 setInspectedMemoryId(null);
               }}
+              onNavigateToMemory={(id) => {
+                setSelectedId(id);
+                setInspectedMemoryId(id);
+              }}
             />
           );
         })()}

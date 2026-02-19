@@ -123,6 +123,8 @@ function buildLayout(
 // ── component ──────────────────────────────────────────────────────
 export function KnowledgeGraph() {
   const getMemoryNodes  = useDashboardStore((s) => s.getMemoryNodes);
+  const setInspectedMemoryId = useDashboardStore((s) => s.setInspectedMemoryId);
+  const setActiveTab    = useDashboardStore((s) => s.setActiveTab);
   const memories        = getMemoryNodes();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -203,7 +205,13 @@ export function KnowledgeGraph() {
               key={n.id}
               onMouseEnter={() => setHovered(n.id)}
               onMouseLeave={() => setHovered(null)}
-              style={{ cursor: 'pointer' }}
+              onClick={() => {
+                if (n.kind === 'memory') {
+                  setInspectedMemoryId(n.id);
+                  setActiveTab('memories');
+                }
+              }}
+              style={{ cursor: n.kind === 'memory' ? 'pointer' : 'default' }}
             >
               {/* Hit target */}
               <circle cx={n.x} cy={n.y} r={n.r + 8} fill="transparent" />
@@ -306,7 +314,7 @@ export function KnowledgeGraph() {
           <div className="w-2 h-2 rounded-full bg-slate-400 opacity-75" />
           <span>Memory</span>
         </div>
-        <span className="text-slate-600">hover to highlight</span>
+        <span className="text-slate-600">hover to highlight · click to open</span>
       </div>
     </div>
   );

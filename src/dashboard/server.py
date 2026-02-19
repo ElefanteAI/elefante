@@ -152,6 +152,39 @@ async def health_check():
     return {"status": "ok", "service": "elefante-dashboard"}
 
 
+@app.post("/api/refresh")
+async def refresh_snapshot():
+    """
+    Regenerate the dashboard snapshot by running update_dashboard_data.py.
+    Runs as a subprocess to avoid lock contention with the MCP server.
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    script = Path(__file__).parent.parent.parent / "scripts" / "update_dashboard_data.py"
+    if not script.exists():
+        raise HTTPException(status_code=500, detail="Snapshot script not found")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, str(script)],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode != 0:
+            logger.error(f"Snapshot refresh failed: {result.stderr}")
+            raise HTTPException(status_code=500, detail=f"Refresh failed: {result.stderr[-500:]}")
+        logger.info("Snapshot refresh complete")
+        return {"success": True, "message": "Snapshot refreshed"}
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Snapshot refresh timed out (>120s)")
+    except Exception as e:
+        logger.error(f"Refresh error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/stats")
 async def get_stats():
     """Get system statistics from snapshot (LAW #1: No direct DB access)"""

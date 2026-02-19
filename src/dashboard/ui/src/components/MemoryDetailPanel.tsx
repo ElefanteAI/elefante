@@ -36,9 +36,10 @@ interface MemoryDetailPanelProps {
   memory: MemoryNode;
   onClose: () => void;
   relatedMemories?: MemoryNode[];
+  onNavigateToMemory?: (id: string) => void;
 }
 
-export function MemoryDetailPanel({ memory, onClose, relatedMemories = [] }: MemoryDetailPanelProps) {
+export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNavigateToMemory }: MemoryDetailPanelProps) {
   // Escape to close
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') onClose();
@@ -152,10 +153,8 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [] }: Mem
               {relatedMemories.slice(0, 8).map((rm) => (
                 <div
                   key={rm.id}
-                  className="px-3 py-2 bg-slate-800/40 rounded-lg border border-slate-700/40 hover:border-slate-600 transition-colors cursor-pointer"
-                  onClick={() => {
-                    // Could navigate to this memory - for now just log
-                  }}
+                  className="px-3 py-2 bg-slate-800/40 rounded-lg border border-slate-700/40 hover:border-cyan-500/40 hover:bg-slate-800/70 transition-colors cursor-pointer"
+                  onClick={() => onNavigateToMemory?.(rm.id)}
                 >
                   <div className="text-xs text-slate-200 truncate">
                     {rm.properties.title || rm.properties.summary || rm.name}

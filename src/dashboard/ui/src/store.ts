@@ -42,6 +42,8 @@ interface DashboardStore {
   // Actions
   fetchSnapshot: () => Promise<void>;
   fetchStats: () => Promise<void>;
+  refreshSnapshot: () => Promise<void>;
+  isRefreshing: boolean;
 
   // Derived (computed helpers)
   getMemoryNodes: () => MemoryNode[];
@@ -58,6 +60,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   snapshot: null,
   stats: null,
   isLoading: false,
+  isRefreshing: false,
   error: null,
 
   // Selection
@@ -124,6 +127,24 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       set({ stats: data });
     } catch (e: any) {
       console.error('Failed to fetch stats:', e);
+    }
+  },
+
+  refreshSnapshot: async () => {
+    set({ isRefreshing: true, error: null });
+    try {
+      const res = await fetch('/api/refresh', { method: 'POST' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `HTTP ${res.status}`);
+      }
+      // Re-fetch both after refresh
+      await get().fetchStats();
+      await get().fetchSnapshot();
+    } catch (e: any) {
+      set({ error: `Refresh failed: ${e.message}` });
+    } finally {
+      set({ isRefreshing: false });
     }
   },
 
