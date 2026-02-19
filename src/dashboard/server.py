@@ -94,10 +94,12 @@ async def get_graph(limit: int = 1000, space: Optional[str] = None):
         return {
             "nodes": nodes,
             "edges": edges,
-            "stats": {
-                "node_count": len(nodes),
-                "edge_count": len(edges),
-            }
+            "stats": data.get("stats", {
+                "total_nodes": len(nodes),
+                "memories": sum(1 for n in nodes if n.get("type") == "memory"),
+                "entities": sum(1 for n in nodes if n.get("type") != "memory"),
+                "edges": len(edges),
+            }),
         }
         
     except Exception as e:

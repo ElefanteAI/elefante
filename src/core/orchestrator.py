@@ -22,11 +22,6 @@ from src.models.memory import (
     Memory, MemoryType, MemoryMetadata, MemoryStatus,
     DomainType, IntentType, SourceType, TYPE_DECAY_RATES
 )
-
-# Only reinforce memories that were genuinely relevant to the query.
-# Below this threshold the hit is a keyword drag, not a true match.
-# (Theoretical composite max without coactivation signal is ~0.65-0.70.)
-REINFORCEMENT_THRESHOLD = 0.55
 from src.models.entity import Entity, EntityType, Relationship, RelationshipType
 from src.models.query import QueryMode, QueryPlan, SearchResult, SearchFilters
 from src.core.vector_store import VectorStore, get_vector_store
@@ -42,6 +37,11 @@ from src.core.etl import ProcessingStatus  # Only need status, classification is
 from src.models.task import Task, TaskStatus
 
 logger = get_logger(__name__)
+
+# Only reinforce memories that were genuinely relevant to the query.
+# Below this threshold the hit is a keyword drag, not a true match.
+# (Theoretical composite max without coactivation signal is ~0.65-0.70.)
+REINFORCEMENT_THRESHOLD = 0.55
 
 
 class MemoryOrchestrator:
