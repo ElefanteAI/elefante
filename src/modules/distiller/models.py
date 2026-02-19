@@ -201,7 +201,6 @@ class DistilledInsight(BaseModel):
     """A single piece of knowledge extracted by the LLM Distiller."""
     insight_type: InsightType
     content: str
-    importance: int = Field(ge=1, le=10)
     suggested_tags: List[str] = Field(default_factory=list)
     source_turn: Optional[int] = None
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)

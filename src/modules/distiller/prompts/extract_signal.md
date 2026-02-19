@@ -18,7 +18,6 @@ You are a knowledge extraction engine. Your job is to read a raw developer chat 
 
 4. **Each insight MUST be self-contained.** Someone reading it in 6 months with ZERO context should understand it completely.
 5. **Include the WHY.** "Use wb mode" is useless. "Use wb mode for PDF streams because text mode corrupts binary data on Windows" is valuable.
-6. **Assign importance honestly.** 1-3 = trivial fact. 4-6 = useful reference. 7-8 = important decision. 9-10 = critical rule that prevents data loss or security issues.
 
 ## Output Format
 
@@ -29,7 +28,6 @@ Respond with ONLY a JSON array. No preamble, no explanation, no markdown fences.
   {
     "type": "decision|root_cause|preference|architecture_rule|fact|code_snippet|error_fix|workflow",
     "content": "Complete, self-contained insight text.",
-    "importance": 1-10,
     "tags": ["tag1", "tag2"],
     "source_turn": null or turn number,
     "confidence": 0.0-1.0

@@ -283,7 +283,6 @@ class DistillerEngine:
                 if not content:
                     continue
 
-                importance = max(1, min(10, int(item.get("importance", 5))))
                 confidence = max(0.0, min(1.0, float(item.get("confidence", 0.7))))
                 tags = item.get("tags", [])
                 if not isinstance(tags, list):
@@ -300,7 +299,6 @@ class DistillerEngine:
                 insights.append(DistilledInsight(
                     insight_type=insight_type,
                     content=content,
-                    importance=importance,
                     suggested_tags=tags,
                     source_turn=source_turn,
                     confidence=confidence,

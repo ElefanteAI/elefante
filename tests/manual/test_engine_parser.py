@@ -14,7 +14,6 @@ fake_response = '''```json
   {
     "type": "decision",
     "content": "Use Astro with React islands for the landing page to minimize JS bundle size while keeping interactive components.",
-    "importance": 8,
     "tags": ["architecture", "frontend", "astro"],
     "source_turn": 3,
     "confidence": 0.9
@@ -22,7 +21,6 @@ fake_response = '''```json
   {
     "type": "error_fix",
     "content": "When PDF streams fail on Windows, use wb (binary write) mode instead of w (text) mode to prevent encoding corruption.",
-    "importance": 9,
     "tags": ["python", "pdf", "windows"],
     "source_turn": 7,
     "confidence": 0.95
@@ -30,7 +28,6 @@ fake_response = '''```json
   {
     "type": "preference",
     "content": "The user prefers maximum brevity in responses. No emojis unless requested.",
-    "importance": 7,
     "tags": ["communication"],
     "source_turn": null,
     "confidence": 0.85
@@ -38,7 +35,6 @@ fake_response = '''```json
   {
     "type": "unknown_type_test",
     "content": "This has an unknown type and should default to fact.",
-    "importance": 3,
     "tags": [],
     "confidence": 0.5
   }
@@ -49,12 +45,11 @@ insights = engine._parse_response(fake_response, 'test-session-123')
 
 print(f"Parsed {len(insights)} insights:")
 for i in insights:
-    print(f"  [{i.insight_type.value:20s}] imp={i.importance} conf={i.confidence} turn={i.source_turn} tags={i.suggested_tags}")
+    print(f"  [{i.insight_type.value:20s}] conf={i.confidence} turn={i.source_turn} tags={i.suggested_tags}")
     print(f"    {i.content[:90]}")
 
 assert len(insights) == 4, f"Expected 4 insights, got {len(insights)}"
 assert insights[0].insight_type.value == "decision"
-assert insights[1].importance == 9
 assert insights[2].source_turn is None
 assert insights[3].insight_type.value == "fact"  # Unknown type → default
 
