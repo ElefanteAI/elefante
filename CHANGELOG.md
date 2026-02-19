@@ -276,12 +276,12 @@ Updated `src/dashboard/ui/src/components/GraphCanvas.tsx` to display:
 
 When clicking a memory node in the dashboard, the sidebar now shows:
 ```
-🧬 Cognitive Fields                           v1.6.2
-  🎯 Concepts: [elefante] [mcp] [law] [protocol]
-  ⚡ Surfaces When:
+Cognitive Fields                              v1.6.2
+  Concepts: [elefante] [mcp] [law] [protocol]
+  Surfaces When:
     • "when user asks about development rules"
     • "on etiquette or protocol questions"
-  📊 Authority Score: [=====-----] 0.850
+  Authority Score: [=====-----] 0.850
 ```
 
 ---

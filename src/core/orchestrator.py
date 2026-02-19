@@ -209,7 +209,7 @@ class MemoryOrchestrator:
             title = provided_title.strip()
         else:
             from src.utils.curation import generate_title
-            title = generate_title(content=content, layer=memory_type, sublayer="general", max_len=120)
+            title = generate_title(content=content, max_len=120)
             metadata["title"] = title
 
         # ==================================================================================
@@ -813,7 +813,7 @@ class MemoryOrchestrator:
             scored_candidate, explanation = self.cognitive_retriever.score_candidate(
                 candidate,
                 query_analysis,
-                recent_memory_ids=[],  # TODO: Track recent retrievals for co-activation
+                recent_memory_ids=[],  # co-activation tracking not yet implemented
                 include_explanation=True
             )
             
@@ -1125,8 +1125,7 @@ class MemoryOrchestrator:
                 
                 memory_metadata = MemoryMetadata(
                     memory_type=MemoryType.CONVERSATION,
-                    importance=5,
-                    source=candidate.metadata.get("role", "user"),
+                    source=SourceType.CONVERSATION,
                     session_id=session_id
                 )
                 

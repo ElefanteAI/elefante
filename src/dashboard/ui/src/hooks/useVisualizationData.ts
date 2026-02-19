@@ -43,41 +43,6 @@ export function useCalendarData(): CalendarDatum[] {
   }, [memories]);
 }
 
-// ── Network (static) ─────────────────────────────────────
-export interface NetworkData {
-  nodes: { id: string; label: string; size: number; color: string }[];
-  links: { source: string; target: string; distance: number }[];
-}
-
-export function useNetworkData(): NetworkData {
-  const snapshot = useDashboardStore((s) => s.snapshot);
-  return useMemo(() => {
-    if (!snapshot) return { nodes: [], links: [] };
-
-    // Only include memory nodes
-    const memoryNodes = snapshot.nodes.filter((n) => n.type === 'memory');
-    const memoryIds = new Set(memoryNodes.map((n) => n.id));
-
-    const nodes = memoryNodes.map((n) => ({
-      id: n.id,
-      label: (n as MemoryNode).properties?.summary || n.name || n.id,
-      size: Math.max(4, Math.min(16, ((n as MemoryNode).properties?.score || 5) * 1.5)),
-      color: typeColor((n as MemoryNode).properties?.memory_type),
-    }));
-
-    const links = snapshot.edges
-      .filter((e) => memoryIds.has(e.source) && memoryIds.has(e.target))
-      .slice(0, 200) // cap edges for performance
-      .map((e) => ({
-        source: e.source,
-        target: e.target,
-        distance: 50,
-      }));
-
-    return { nodes, links };
-  }, [snapshot]);
-}
-
 // ── Health Score ──────────────────────────────────────────
 export interface HealthScore {
   overall: number;           // 0-100
@@ -245,15 +210,4 @@ export function useUsageData(): UsageData {
 
     return { neverRetrieved, mostRetrieved, avgAccessCount, retrievalRate };
   }, [snapshot]);
-}
-
-// ── Helpers ──────────────────────────────────────────────
-function typeColor(type?: string): string {
-  switch (type) {
-    case 'fact': return '#3b82f6';       // blue
-    case 'decision': return '#f59e0b';   // amber
-    case 'preference': return '#8b5cf6'; // violet
-    case 'insight': return '#10b981';    // emerald
-    default: return '#64748b';           // slate
-  }
 }

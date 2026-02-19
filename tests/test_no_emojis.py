@@ -17,6 +17,7 @@ EXCLUDED_DIR_NAMES = {
     ".pytest_cache",
     "dist",
     "build",
+    "archive",  # historical docs, not production
 }
 
 ALLOWED_EXTENSIONS = {

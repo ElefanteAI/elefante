@@ -2,7 +2,6 @@ import os
 import threading
 import traceback
 import uvicorn
-import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -15,18 +14,6 @@ from src.utils.logger import get_logger
 from src.utils.config import get_config
 
 logger = get_logger(__name__)
-
-async def compute_semantic_edges(memory_nodes: List[Dict], top_k: int = 5, min_threshold: float = 0.1) -> List[Dict]:
-    """
-    Compute semantic similarity edges between memory nodes using embeddings.
-    
-    LAW #1 ENFORCEMENT: This function is DISABLED at runtime to prevent
-    database locks. Semantic edges should be pre-computed in the snapshot
-    generation script (scripts/update_dashboard_data.py) instead.
-    """
-    # DISABLED: Runtime embedding computation causes lock contention
-    # TODO: Move semantic edge computation to snapshot generation script
-    return []
 
 app = FastAPI(title="Elefante Knowledge Garden")
 
@@ -99,11 +86,6 @@ async def get_graph(limit: int = 1000, space: Optional[str] = None):
                     "properties": {}
                 })
         
-        # Compute semantic similarity edges for better visualization
-        memory_nodes = [n for n in nodes if n["type"] == "memory"]
-        semantic_edges = await compute_semantic_edges(memory_nodes, top_k=3, min_threshold=0.3)
-        edges.extend(semantic_edges)
-        
         logger.info(f"Loaded {len(nodes)} nodes, {len(edges)} edges from snapshot")
         
         return {
@@ -112,7 +94,6 @@ async def get_graph(limit: int = 1000, space: Optional[str] = None):
             "stats": {
                 "node_count": len(nodes),
                 "edge_count": len(edges),
-                "semantic_edge_count": len(semantic_edges)
             }
         }
         
@@ -125,9 +106,7 @@ async def search_memories(query: str, limit: int = 5, min_similarity: float = 0.
     """
     Search memories using semantic search.
     This endpoint is designed for the VS Code extension grounding feature.
-    
-    Note: This breaks LAW #1 during search but is acceptable for quick reads.
-    The connection is released immediately after the search.
+    Opens the orchestrator only for the duration of the call; released immediately after.
     """
     from src.core.vector_store import get_vector_store
     

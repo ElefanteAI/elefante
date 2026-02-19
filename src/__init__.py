@@ -11,8 +11,6 @@ __author__ = "Elefante Contributors"
 # LAW #1 ENFORCEMENT: Do NOT import orchestrator at package level
 # This causes Kuzu initialization and database locking
 # Use lazy imports instead
-
-# from src.core.orchestrator import MemoryOrchestrator  # DISABLED - causes lock
 from src.models.memory import Memory, MemoryType
 from src.models.entity import Entity, Relationship
 

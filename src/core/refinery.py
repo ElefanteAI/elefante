@@ -98,18 +98,9 @@ def infer_canonical_key(memory: Memory) -> str:
 
     def _is_preference_like(m: Memory) -> bool:
         try:
-            mem_type = str(m.metadata.memory_type)
+            return str(m.metadata.memory_type).lower() == "preference"
         except Exception:
-            mem_type = ""
-        layer = str(getattr(m.metadata, "layer", "") or "").strip().lower()
-        sublayer = str(getattr(m.metadata, "sublayer", "") or "").strip().lower()
-        return (
-            layer == "self"
-            and (
-                mem_type.lower() == "preference"
-                or sublayer in {"preference", "constraint"}
-            )
-        )
+            return False
 
     def _matches_simple_concise_preference(text: str) -> bool:
         if not _is_preference_like(memory):

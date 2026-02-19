@@ -99,7 +99,7 @@ intent/rule, intent/goal, intent/anti-pattern
 ```
 Also: `calculate_importance(content, layer, sublayer) → int 1-10`
 
-**Status: ZOMBIE** ⚠️
+**Status: ZOMBIE** [WARNING]
 
 The functions (`classify_memory()`, `calculate_importance()`, `classify_memory_full()`) are defined in `classifier.py` but **never called from the main pipeline** (`orchestrator.py` does not import or invoke them). The module is dead code performing no function.
 
@@ -122,7 +122,7 @@ authority_score: float       # importance × access × freshness blended score
 co_activated_with: List[UUID] # Memories retrieved together (co-activation matrix)
 ```
 
-**Status: PARTIAL ✅⚠️**
+**Status: PARTIAL [OK][WARNING]**
 
 **What's live**: `concepts` and `surfaces_when` are auto-extracted at ingestion (STEP 3.25 in `orchestrator.add_memory()`). `CognitiveRetriever.score_candidate()` IS called from `orchestrator._apply_cognitive_scoring()` and uses `concept_score` (Jaccard overlap between query concepts and memory concepts). This IS running on every search.
 
@@ -148,7 +148,7 @@ topic:          coding-standards | communication | workflow | agent-behavior |
 1. **Phase 1** (automatic at ingestion): memory stored with `processing_status = "raw"`
 2. **Phase 2** (manual, agent-driven): agent calls `elefante-ETLProcess` → gets raw memories → classifies with LLM → calls `elefante-ETLClassify` → V5 fields written to `custom_metadata`
 
-**Status: PHANTOM** ⚠️⚠️
+**Status: PHANTOM** [WARNING][WARNING]
 
 V5 fields are stored in `custom_metadata` dict (not typed `MemoryMetadata` fields). This means:
 - They are **not accessible via search filters** (e.g., `filters.ring = "core"` does not exist in `SearchFilters`)
@@ -182,7 +182,7 @@ summary:         str (in custom_metadata)
 decay_rate:      float — from TYPE_DECAY_RATES[memory_type]
 ```
 
-**Status: LIVE ✅** — This is the foundation everything else must extend.
+**Status: LIVE [OK]** — This is the foundation everything else must extend.
 
 ---
 
@@ -202,7 +202,7 @@ This model diverged from `MemoryMetadata` in `memory.py`:
 - Used exclusively by `metadata_store.py` (SQLite fast path)
 - The `get_session_metadata()` fast path returns `StandardizedMetadata` objects, not real `Memory` objects
 
-**Status: PARALLEL BUG ⚠️** — The fast path and the full path return different data structures. The `get_context()` method attempts to merge them but produces inconsistent `score` values (SQLite returns `importance` where callers expect `score`).
+**Status: PARALLEL BUG [WARNING]** — The fast path and the full path return different data structures. The `get_context()` method attempts to merge them but produces inconsistent `score` values (SQLite returns `importance` where callers expect `score`).
 
 ---
 
@@ -229,12 +229,12 @@ orchestrator.search_memories()
             ├── analyze_query(query) → extracts concepts, infers domain/intent
             │
             └── score_candidate() per result:
-                    vector_score     × 0.30  ← FROM ChromaDB ✅
-                    concept_score    × 0.20  ← Jaccard(query_concepts, memory_concepts) ✅
-                    domain_score     × 0.15  ← USUALLY 0.5 (neutral, no domain inferred) ⚠️
-                    coactivation     × 0.15  ← ALWAYS 0.0 (matrix never populated) ❌
-                    authority_score  × 0.10  ← From score + access_count ✅
-                    temporal_score   × 0.10  ← Recency/freshness decay ✅
+                    vector_score     × 0.30  ← FROM ChromaDB [OK]
+                    concept_score    × 0.20  ← Jaccard(query_concepts, memory_concepts) [OK]
+                    domain_score     × 0.15  ← USUALLY 0.5 (neutral, no domain inferred) [WARNING]
+                    coactivation     × 0.15  ← ALWAYS 0.0 (matrix never populated) [ERROR]
+                    authority_score  × 0.10  ← From score + access_count [OK]
+                    temporal_score   × 0.10  ← Recency/freshness decay [OK]
 ```
 
 **Net effect**: The CognitiveRetriever operates at ~70% capacity. The `coactivation` signal (15% weight) is permanently 0. The `domain_match` signal usually contributes only 0.5×0.15 = 0.075 net. The actual discriminating signals are **vector + concept + temporal + authority** (combined weight = 0.70).
@@ -247,26 +247,26 @@ orchestrator.search_memories()
 
 | Tool | Purpose | Status |
 |------|---------|--------|
-| `elefante-System` | Enable/disable mode, acquire DB locks | ✅ Live |
-| `elefante-SystemStatusGet` | Stats from both DBs | ✅ Live |
-| `elefante-MemoryAdd` | Store new memory | ✅ Live |
-| `elefante-MemorySearch` | Semantic/structured/hybrid search | ✅ Live |
-| `elefante-MemoryUpdate` | Amend existing memory | ✅ Live |
-| `elefante-MemoryDelete` | Delete with audit reason | ✅ Live |
-| `elefante-MemoryConsolidate` | Deterministic dedup cleanup | ✅ Live |
-| `elefante-ContextGet` | Session context with graph traversal | ✅ Live |
-| `elefante-GraphQuery` | Raw Cypher on Kuzu | ✅ Live |
-| `elefante-GraphConnect` | Batch entity/relationship upsert | ✅ Live |
-| `elefante-SessionsList` | Recent session summaries | ✅ Live |
-| `elefante-DashboardOpen` | Launch dashboard browser | ✅ Live |
-| `elefante-TaskCreate` | Create task with optional subtasks | ✅ Live |
-| `elefante-TaskUpdate` | Update task status/output | ✅ Live |
-| `elefante-TaskGraph` | View task hierarchy | ✅ Live |
-| `elefante-ETLProcess` | Get unclassified memories for agent | ✅ Live (rarely invoked) |
-| `elefante-ETLClassify` | Submit V5 classification | ✅ Live (rarely invoked) |
-| `_inject_context` | Auto context injection on every tool call | ✅ Live (internal) |
-| `_inject_pitfalls` | Protocol enforcement injection | ✅ Live (internal) |
-| `_compliance_gate` | Search-before-write enforcement | ✅ Live |
+| `elefante-System` | Enable/disable mode, acquire DB locks | [OK] Live |
+| `elefante-SystemStatusGet` | Stats from both DBs | [OK] Live |
+| `elefante-MemoryAdd` | Store new memory | [OK] Live |
+| `elefante-MemorySearch` | Semantic/structured/hybrid search | [OK] Live |
+| `elefante-MemoryUpdate` | Amend existing memory | [OK] Live |
+| `elefante-MemoryDelete` | Delete with audit reason | [OK] Live |
+| `elefante-MemoryConsolidate` | Deterministic dedup cleanup | [OK] Live |
+| `elefante-ContextGet` | Session context with graph traversal | [OK] Live |
+| `elefante-GraphQuery` | Raw Cypher on Kuzu | [OK] Live |
+| `elefante-GraphConnect` | Batch entity/relationship upsert | [OK] Live |
+| `elefante-SessionsList` | Recent session summaries | [OK] Live |
+| `elefante-DashboardOpen` | Launch dashboard browser | [OK] Live |
+| `elefante-TaskCreate` | Create task with optional subtasks | [OK] Live |
+| `elefante-TaskUpdate` | Update task status/output | [OK] Live |
+| `elefante-TaskGraph` | View task hierarchy | [OK] Live |
+| `elefante-ETLProcess` | Get unclassified memories for agent | [OK] Live (rarely invoked) |
+| `elefante-ETLClassify` | Submit V5 classification | [OK] Live (rarely invoked) |
+| `_inject_context` | Auto context injection on every tool call | [OK] Live (internal) |
+| `_inject_pitfalls` | Protocol enforcement injection | [OK] Live (internal) |
+| `_compliance_gate` | Search-before-write enforcement | [OK] Live |
 
 **Note**: The response format for `elefante-MemorySearch` currently returns a **flat list of memory objects** with the full metadata JSON. Known issue: ~500 tokens per memory result (90% null fields). No structured grouping into constellation (primary/supporting/contradicting/context).
 
@@ -325,27 +325,27 @@ Code that is defined, takes up cognitive space, and produces zero user value:
 
 | Vision Feature | Built | Wired | Working | Gap |
 |---------------|-------|-------|---------|-----|
-| Behavioral scoring (score 0-100) | ✅ | ✅ | ✅ | None |
-| Semantic search via ChromaDB | ✅ | ✅ | ✅ | None |
-| Graph search via Kuzu | ✅ | ✅ | ✅ | None |
-| Temporal decay by memory type | ✅ | ✅ | ✅ | None |
-| Compliance Gate | ✅ | ✅ | ✅ | None |
-| Auto context injection | ✅ | ✅ | ✅ | None |
-| Concept extraction (V4) | ✅ | ✅ | ✅ | None |
-| Concept-overlap scoring (V4) | ✅ | ✅ | ✅ | None |
-| Co-activation scoring (V4) | ✅ | ✅ | ❌ | Matrix never populated |
-| Proactive memory surfacing (V4) | ✅ | ❌ | ❌ | ProactiveSurfacer unconnected |
-| Memory constellation (V4) | ✅ | ❌ | ❌ | build_constellation never called |
-| V5 topology (ring/type/topic) | ✅ | ⚠️ | ⚠️ | Stored in custom_metadata, mostly empty |
-| V5 auto-classification | ✅ code | ❌ | ❌ | topology.py isolated from pipeline |
-| V5 topology as search filter | ❌ | ❌ | ❌ | SearchFilters has no ring/topic fields |
-| Memory health indicators | ✅ | ⚠️ | ⚠️ | MemoryHealthAnalyzer in dashboard only |
-| Conflict detection | ✅ | ⚠️ | ⚠️ | Dashboard only, not surfaced in search |
-| Retrieval explanation (V5 Req-1) | ✅ | ✅ | ✅ | Works, included in result.explanation |
-| Flat list search response | ✅ | ✅ | ✅ | Works but verbose (500 tokens/memory) |
-| Constellation search response | ✅ | ❌ | ❌ | MCP still returns flat list |
-| Distiller LLM integration | ✅ | ✅ | ✅ | Standalone, runs on demand |
-| Distiller → V5 topology | ❌ | ❌ | ❌ | Distiller uses own InsightType vocabulary |
+| Behavioral scoring (score 0-100) | [OK] | [OK] | [OK] | None |
+| Semantic search via ChromaDB | [OK] | [OK] | [OK] | None |
+| Graph search via Kuzu | [OK] | [OK] | [OK] | None |
+| Temporal decay by memory type | [OK] | [OK] | [OK] | None |
+| Compliance Gate | [OK] | [OK] | [OK] | None |
+| Auto context injection | [OK] | [OK] | [OK] | None |
+| Concept extraction (V4) | [OK] | [OK] | [OK] | None |
+| Concept-overlap scoring (V4) | [OK] | [OK] | [OK] | None |
+| Co-activation scoring (V4) | [OK] | [OK] | [ERROR] | Matrix never populated |
+| Proactive memory surfacing (V4) | [OK] | [ERROR] | [ERROR] | ProactiveSurfacer unconnected |
+| Memory constellation (V4) | [OK] | [ERROR] | [ERROR] | build_constellation never called |
+| V5 topology (ring/type/topic) | [OK] | [WARNING] | [WARNING] | Stored in custom_metadata, mostly empty |
+| V5 auto-classification | [OK] code | [ERROR] | [ERROR] | topology.py isolated from pipeline |
+| V5 topology as search filter | [ERROR] | [ERROR] | [ERROR] | SearchFilters has no ring/topic fields |
+| Memory health indicators | [OK] | [WARNING] | [WARNING] | MemoryHealthAnalyzer in dashboard only |
+| Conflict detection | [OK] | [WARNING] | [WARNING] | Dashboard only, not surfaced in search |
+| Retrieval explanation (V5 Req-1) | [OK] | [OK] | [OK] | Works, included in result.explanation |
+| Flat list search response | [OK] | [OK] | [OK] | Works but verbose (500 tokens/memory) |
+| Constellation search response | [OK] | [ERROR] | [ERROR] | MCP still returns flat list |
+| Distiller LLM integration | [OK] | [OK] | [OK] | Standalone, runs on demand |
+| Distiller → V5 topology | [ERROR] | [ERROR] | [ERROR] | Distiller uses own InsightType vocabulary |
 
 ---
 

@@ -26,7 +26,7 @@ The Elefante codebase contains **FOUR overlapping classification systems** accum
 | `sublayer` | identity, preference, constraint, rule, goal, anti-pattern, failure, method, fact | Regex patterns |
 | `importance` | 1-10 | Content heuristics |
 
-**Status**: ⚠️ PARTIALLY DEPRECATED
+**Status**: [WARNING] PARTIALLY DEPRECATED
 - Used for title generation (`generate_title()`)
 - Used in refinery for namespace detection
 - NOT stored in memory metadata
@@ -47,7 +47,7 @@ The Elefante codebase contains **FOUR overlapping classification systems** accum
 | `authority_score` | 0.0-1.0 | `compute_authority_score()` - formula |
 | `score` | 0-100 | Behavioral relevance (system-computed) |
 
-**Status**: ✅ PRODUCTION
+**Status**: [OK] PRODUCTION
 - Core schema fields
 - Used in retrieval scoring
 - Used in MCP tool schemas
@@ -65,7 +65,7 @@ The Elefante codebase contains **FOUR overlapping classification systems** accum
 | `summary` | one-line essence | Agent LLM via ETL |
 | `processing_status` | raw, processing, processed, failed | ETL lifecycle |
 
-**Status**: ⚠️ OPTIONAL LAYER
+**Status**: [WARNING] OPTIONAL LAYER
 - Stored in `custom_metadata` (not core schema)
 - Requires agent to call ETL tools
 - Not enforced at ingestion
@@ -85,7 +85,7 @@ TYPE_DECAY_RATES = {
 }
 ```
 
-**Status**: ✅ PRODUCTION
+**Status**: [OK] PRODUCTION
 - Maps `memory_type` to decay rate
 - Core to Behavioral Relevance Model
 

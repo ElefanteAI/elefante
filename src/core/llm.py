@@ -41,10 +41,9 @@ class LLMService:
             "action": "ADD",
         }
 
-    async def generate_semantic_title(self, content: str, layer: str, sublayer: str) -> str:
+    async def generate_semantic_title(self, content: str) -> str:
         cleaned = re.sub(r"\s+", " ", (content or "").strip())
-        snippet = cleaned[:80] + ("..." if len(cleaned) > 80 else "")
-        return f"{layer}.{sublayer}: {snippet}"
+        return cleaned[:80] + ("..." if len(cleaned) > 80 else "")
 
 
 _llm_service: Optional[LLMService] = None

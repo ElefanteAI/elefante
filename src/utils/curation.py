@@ -44,8 +44,6 @@ def truncate(text: str, max_len: int) -> str:
 def generate_title(
     *,
     content: str,
-    layer: Optional[str],
-    sublayer: Optional[str],
     max_len: int = 90,
 ) -> str:
     cleaned = strip_codeblocks(content or "")
@@ -53,13 +51,7 @@ def generate_title(
 
     words = cleaned.split()
     core = " ".join(words[:10]) if words else "Memory"
-    core = truncate(core, 70)
-
-    l = (layer or "world").strip() or "world"
-    s = (sublayer or "fact").strip() or "fact"
-
-    title = f"{l}.{s}: {core}" if core else f"{l}.{s}: Memory"
-    return truncate(title, max_len) or "Memory"
+    return truncate(core, max_len) or "Memory"
 
 
 def generate_summary(*, content: str, max_len: int = 200) -> str:

@@ -6,8 +6,7 @@ locally using Sentence Transformers.
 """
 
 import asyncio
-from typing import List, Optional, Dict, Any
-from functools import lru_cache
+from typing import List, Optional
 import numpy as np
 
 from src.utils.config import get_config
@@ -164,33 +163,6 @@ class EmbeddingService:
         if self._dimension is None:
             self._load_model()
         return self._dimension
-    
-    @lru_cache(maxsize=1000)
-    def _cached_embedding(self, text: str) -> tuple:
-        """
-        Cached embedding generation (synchronous)
-        
-        Note: Returns tuple for hashability in lru_cache
-        """
-        # This is a synchronous wrapper for caching
-        # In practice, use async version for new embeddings
-        embeddings = asyncio.run(self.generate_embedding(text))
-        return tuple(embeddings)
-    
-    def clear_cache(self):
-        """Clear the embedding cache"""
-        self._cached_embedding.cache_clear()
-        logger.info("embedding_cache_cleared")
-    
-    def get_cache_info(self) -> Dict[str, Any]:
-        """Get cache statistics"""
-        info = self._cached_embedding.cache_info()
-        return {
-            "hits": info.hits,
-            "misses": info.misses,
-            "size": info.currsize,
-            "max_size": info.maxsize
-        }
     
     async def compute_similarity(
         self, embedding1: List[float], embedding2: List[float]

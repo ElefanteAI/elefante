@@ -8,29 +8,20 @@ an external agent can fetch recent memories, run any LLM it wants, then call
 Elefante tools to store the consolidated insights.
 """
 
-import asyncio
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
-from uuid import uuid4, UUID
+from typing import List
 
-from src.models.memory import Memory, MemoryType, MemoryStatus
-from src.models.entity import EntityType, RelationshipType
-from src.core.vector_store import get_vector_store
-from src.core.graph_store import get_graph_store
+from src.models.memory import Memory
 from src.utils.logger import get_logger
 
-logger = get_logger(__name__)
 
 class MemoryConsolidator:
     """
     Consolidates raw memories into refined insights.
     """
-    
+
     def __init__(self):
-        self.vector_store = get_vector_store()
-        self.graph_store = get_graph_store()
         self.logger = get_logger(self.__class__.__name__)
-        
+
     async def consolidate_recent(self, hours: int = 24, force: bool = False) -> List[Memory]:
         """
         Consolidation is agent-driven by design (Elefante is LLM-free).
@@ -39,5 +30,3 @@ class MemoryConsolidator:
         """
         self.logger.info(f"consolidation_agent_managed (last {hours}h)")
         return []
-
-

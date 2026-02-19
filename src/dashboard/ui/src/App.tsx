@@ -17,6 +17,7 @@ function App() {
   const error = useDashboardStore((s) => s.error);
   const setInspectedMemoryId = useDashboardStore((s) => s.setInspectedMemoryId);
   const setSearchQuery = useDashboardStore((s) => s.setSearchQuery);
+  const version = useDashboardStore((s) => s.stats?.elefante?.package_version ?? '...');
 
   // Initial data fetch
   useEffect(() => {
@@ -91,7 +92,7 @@ function App() {
       {/* Footer */}
       <footer className="px-4 py-2 bg-slate-900/50 border-t border-slate-800 text-center">
         <span className="text-xs text-slate-500">
-          Elefante v2.0.0 &middot; Knowledge Workbench &middot; <span className="text-slate-600">1/2/3 to switch tabs</span>
+          Elefante v{version} &middot; Knowledge Workbench &middot; <span className="text-slate-600">1/2/3 to switch tabs</span>
         </span>
       </footer>
     </div>

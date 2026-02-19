@@ -105,16 +105,13 @@ class GraphExecutor:
         Find existing entity by name or create new one.
         Note: This is a poor man's MERGE until Kuzu supports it fully via Cypher in Python API.
         """
-        # 1. Try to find existing entity by name
-        # We need a way to search by name. GraphStore doesn't have get_entity_by_name exposed yet.
-        # We'll use execute_query.
-        
+        # 1. Try to find existing entity by name using execute_query (MERGE not yet available via Python API)
         query = f"MATCH (e:Entity {{name: '{name}'}}) RETURN e"
         results = await self.graph_store.execute_query(query)
         
         if results:
             # Found existing
-            entity = results[0].get("m") or results[0].get("e")
+            entity = results[0].get("e")
             if entity:
                 # Ideally we update description if new one is better, but skip for now
                 return entity.id if hasattr(entity, 'id') else UUID(entity.get('id'))
@@ -142,9 +139,7 @@ class GraphExecutor:
         rel_type: RelationshipType,
         properties: Dict[str, Any]
     ) -> None:
-        """Create relationship if it doesn't exist"""
-        # Check existence? Kuzu might allow duplicates. 
-        # For now, we just create. A true MERGE would be better.
+        """Create a relationship between two entities."""
         
         rel = Relationship(
             from_entity_id=source_id,
