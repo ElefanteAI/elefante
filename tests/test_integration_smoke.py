@@ -19,21 +19,21 @@ SUCCESS CRITERIA:
 """
 
 import pytest
+import atexit
 import asyncio
+import shutil
+import tempfile
 import time
 import os
 from datetime import datetime
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 import sys
-
-# Enable test memories
-os.environ["ELEFANTE_ALLOW_TEST_MEMORIES"] = "true"
 
 # Ensure src is in path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.core.vector_store import get_vector_store
+from src.core.vector_store import VectorStore
 from src.models.memory import Memory, MemoryMetadata, MemoryType, MemoryStatus
 
 # =============================================================================
@@ -225,12 +225,29 @@ class ElefanteBatteryTest:
     """Test harness for Elefante battery tests"""
     
     def __init__(self):
-        self.vector_store = None
+        self.vector_store: Optional[VectorStore] = None
         self.added_memory_ids: List[str] = []
         self.results: List[TestResult] = []
+        self._test_dir: Optional[str] = None
+        self._atexit_registered: bool = False
+        
+    def _emergency_cleanup(self):
+        """Synchronous cleanup registered with atexit.
+        
+        Called on process exit, including after KeyboardInterrupt kills the
+        asyncio event loop.  shutil.rmtree is synchronous and does not need
+        a running event loop, so it is guaranteed to run.
+        """
+        if self._test_dir:
+            shutil.rmtree(self._test_dir, ignore_errors=True)
+            self._test_dir = None
         
     async def setup(self):
-        """Initialize test environment"""
+        """Initialize isolated test environment.
+        
+        Creates a throw-away ChromaDB directory so the battery test NEVER
+        touches the production database at ~/.elefante/data/.
+        """
         print("\n" + "="*70)
         print("ELEFANTE 10X BATTERY TEST")
         print("="*70)
@@ -239,27 +256,36 @@ class ElefanteBatteryTest:
         print(f"Min similarity: {MIN_SIMILARITY}")
         print(f"Cleanup enabled: {CLEANUP_ENABLED}")
         print("="*70 + "\n")
-        
-        self.vector_store = get_vector_store()
+
+        # Isolated temp database — never touches production
+        self._test_dir = tempfile.mkdtemp(prefix="elefante_battery_")
+        os.environ["ELEFANTE_ALLOW_TEST_MEMORIES"] = "true"
+
+        # Register synchronous atexit handler — survives Ctrl+C killing the loop
+        if not self._atexit_registered:
+            atexit.register(self._emergency_cleanup)
+            self._atexit_registered = True
+
+        # Direct VectorStore with isolated path — independent of global singleton
+        self.vector_store = VectorStore(persist_directory=self._test_dir)
+        print(f"  Isolated DB: {self._test_dir}\n")
         
     async def cleanup(self):
-        """Remove all test data"""
+        """Remove isolated test database directory."""
         if not CLEANUP_ENABLED:
             print("\n  CLEANUP DISABLED - Test data preserved for inspection")
+            print(f"  DB path: {self._test_dir}")
             return
             
         print("\n" + "-"*50)
-        print("CLEANUP: Removing test data...")
-        
-        deleted_count = 0
-        for memory_id in self.added_memory_ids:
-            try:
-                await self.vector_store.delete_memory(memory_id)
-                deleted_count += 1
-            except Exception as e:
-                print(f"    Failed to delete {memory_id}: {e}")
-                
-        print(f"  ✓ Deleted {deleted_count}/{len(self.added_memory_ids)} test memories")
+        print("CLEANUP: Removing isolated test database...")
+
+        os.environ.pop("ELEFANTE_ALLOW_TEST_MEMORIES", None)
+        if self._test_dir:
+            shutil.rmtree(self._test_dir, ignore_errors=True)
+            self._test_dir = None
+
+        print("  Deleted isolated test database")
         print("-"*50)
         
     async def run_single_scenario(self, scenario: TestScenario) -> TestResult:

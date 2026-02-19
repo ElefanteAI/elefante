@@ -122,6 +122,14 @@ def _is_test_artifact(*, content: str, title: str) -> bool:
     if t.startswith("e2e-test") or "hybrid_test_" in t:
         return True
 
+    # Battery test artifacts — content starts with [BATTERY_TEST] marker
+    if c.startswith("[battery_test]"):
+        return True
+
+    # Battery test artifacts — title/tags contain test prefix
+    if "battery_test" in t or "test_battery_" in t:
+        return True
+
     return False
 
 async def main():
