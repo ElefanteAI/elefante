@@ -22,6 +22,11 @@ from src.models.memory import (
     Memory, MemoryType, MemoryMetadata, MemoryStatus,
     DomainType, IntentType, SourceType, TYPE_DECAY_RATES
 )
+
+# Only reinforce memories that were genuinely relevant to the query.
+# Below this threshold the hit is a keyword drag, not a true match.
+# (Theoretical composite max without coactivation signal is ~0.65-0.70.)
+REINFORCEMENT_THRESHOLD = 0.55
 from src.models.entity import Entity, EntityType, Relationship, RelationshipType
 from src.models.query import QueryMode, QueryPlan, SearchResult, SearchFilters
 from src.core.vector_store import VectorStore, get_vector_store
@@ -875,10 +880,14 @@ class MemoryOrchestrator:
 
         merged = results[:plan.limit]
 
-        # Update access counts for retrieved memories
+        # Reinforce only memories that were genuinely relevant to this query.
+        # Marginal keyword-drag hits (score < REINFORCEMENT_THRESHOLD) must not
+        # accumulate access_count, or broad-concept memories inflate to the top.
         if apply_temporal_decay:
             for result in merged:
-                await self.vector_store.update_memory_access(result.memory)
+                if result.score >= REINFORCEMENT_THRESHOLD:
+                    result.memory.record_access()
+                    await self.vector_store.update_memory_access(result.memory)
 
         return merged
     
@@ -1012,11 +1021,11 @@ class MemoryOrchestrator:
                 result.score = (semantic_weight * result.score) + (temporal_weight * temporal_score)
                 result.score = max(0.0, min(1.0, result.score))
                 
-                # REINFORCEMENT: Update access stats in Vector Store
-                # This ensures graph-found memories also get "stronger"
-                # Only persist access stats when this is a real vector-store backed memory.
-                # (Fallback graph-only results may not exist in ChromaDB.)
-                if getattr(result.memory.metadata, "custom_metadata", {}).get("_vector_backed"):
+                # REINFORCEMENT: Only reinforce graph-found memories that were
+                # genuinely relevant (composite score clears threshold).
+                if (result.score >= REINFORCEMENT_THRESHOLD
+                        and getattr(result.memory.metadata, "custom_metadata", {}).get("_vector_backed")):
+                    result.memory.record_access()
                     await self.vector_store.update_memory_access(result.memory)
                 
             # Re-sort after decay application

@@ -358,9 +358,9 @@ class VectorStore:
                         # Clamp final score to the SearchResult contract.
                         final_score = max(0.0, min(1.0, final_score))
                         
-                        # Update access tracking
-                        memory.record_access()
-                        # Note: Access count update will be persisted by orchestrator
+                        # Reinforcement (record_access + persist) is gated by composite
+                        # score in the orchestrator. Do NOT increment here — the score
+                        # is not yet known at this layer.
                     
                     # Create search result
                     result = SearchResult(
