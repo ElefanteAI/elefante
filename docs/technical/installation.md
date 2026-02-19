@@ -1,7 +1,7 @@
 # Installation & Configuration
 
 **Quick Start**: Run `install.bat` (Windows) or `install.sh` (Mac/Linux)
-**Troubleshooting**: See [`installation-safeguards.md`](installation-safeguards.md) for automated protection against common failures
+**Troubleshooting**: See [`pitfall-index.md`](../pitfall-index.md) for automated protection against common failures
 
 ---
 
@@ -47,7 +47,7 @@ chmod +x install.sh
    - Disk space verification (5GB+ required)
    - Dependency version compatibility
    - Kuzu database path validation
-   - See [`installation-safeguards.md`](installation-safeguards.md) for details
+   - See [`pitfall-index.md`](../pitfall-index.md) for details
 
 2. **Environment Setup**
 
@@ -68,7 +68,13 @@ chmod +x install.sh
    - Configures MCP (Model Context Protocol)
    - Sets up server connection
 
-5. **Health Check**
+5. **Agent Behavior Bootstrap**
+
+   - Verifies `.github/copilot-instructions.md` exists
+   - This file is the **entry point** that makes AI agents proactively use Elefante
+   - Without it, agents can use Elefante tools but won't do so automatically
+
+6. **Health Check**
    - Verifies all components working
    - Tests database connections
    - Validates MCP server
@@ -283,7 +289,7 @@ This should return the Elefante Agentic Optimization Protocol.
 ### Common Issues
 
 **Issue**: `Database path cannot be a directory`
-**Solution**: See [`installation-safeguards.md`](installation-safeguards.md) - automated fix included
+**Solution**: See [`pitfall-index.md`](../pitfall-index.md) — search `pitfall: installation kuzu`
 
 **Issue**: `ModuleNotFoundError: No module named 'src'`
 **Solution**: Ensure PYTHONPATH is set correctly in MCP config
@@ -300,7 +306,7 @@ This should return the Elefante Agentic Optimization Protocol.
 
 ### Getting Help
 
-1. Check [`installation-safeguards.md`](installation-safeguards.md) for automated protections
+1. Check [`pitfall-index.md`](../pitfall-index.md) for common installation pitfalls
 2. Review `install.log` for detailed error messages
 3. See [`../debug/README.md`](../debug/README.md) for debugging guides
 4. Check GitHub Issues for known problems
@@ -311,22 +317,130 @@ This should return the Elefante Agentic Optimization Protocol.
 
 After successful installation:
 
-1. **Configure agent behavior**: Copy `.github/copilot-instructions.md` to your repo (see section 6.1)
-2. **Explore the API**: [`usage.md`](usage.md)
-3. **Try the Dashboard**: [`dashboard.md`](dashboard.md)
-4. **Understand Architecture**: [`architecture.md`](architecture.md)
+1. **Explore the API**: [`usage.md`](usage.md)
+2. **Try the Dashboard**: [`dashboard-startup.md`](dashboard-startup.md)
+3. **Understand Architecture**: [`architecture.md`](architecture.md)
 
-### 6.1 Agent Behavior Configuration (copilot-instructions.md)
+---
 
-The file `.github/copilot-instructions.md` is automatically injected into every GitHub Copilot request for this repository. It instructs the agent to:
+## Behavioral Instruction Architecture
 
-- **Search Elefante before answering** questions about user preferences, past decisions, or project conventions
-- **Include a compliance stamp** in responses confirming the search was performed
-- **Never assume** project knowledge without checking memory first
+Elefante uses a **three-layer architecture** to ensure AI agents behave correctly. Understanding this architecture is critical — each layer serves a distinct purpose and failure of any layer degrades agent behavior.
 
-This file is critical for the memory system to be effective. Without it, the agent will not proactively search Elefante and you lose the benefit of persistent context.
+### Layer 1: Bootstrap — `copilot-instructions.md`
 
-**Location**: `.github/copilot-instructions.md` (already included in the repository)
+**File**: `.github/copilot-instructions.md`
+**Mechanism**: VS Code / GitHub Copilot automatically reads this file from the workspace root and injects its contents into the system prompt for every conversation.
+**Scope**: Per-workspace (only active when the workspace containing the file is open).
+
+This is the **entry point** of the entire behavioral chain. It tells the agent three things:
+
+1. **Elefante exists** — call `elefante-MemorySearch` before answering questions about preferences, decisions, or conventions
+2. **Compliance stamp** — include `[ELEFANTE] Searched:` in every response to confirm the search happened
+3. **Tool Response Contract** — every MCP tool response contains three injected sections that MUST be read and acted on
+
+Without this file, the agent has no reason to call Elefante proactively. The MCP tools are registered (via `mcp.json`), but the agent won't use them unless instructed.
+
+**How it gets there**: This file is committed to the repository. When a user clones Elefante and opens the workspace, VS Code loads it automatically. The installer validates its existence in Step 4a.
+
+**For external workspaces**: If using Elefante as a global MCP server in other workspaces, copy this file to those workspaces' `.github/` directories. Without it, only the tool response contract (Layers 2 and 3) is active.
+
+### Tool Response Contract (Three Injected Sections)
+
+Every MCP tool response from Elefante contains up to three injected sections. These are appended to every tool result automatically by the server (`src/mcp/server.py`). The agent reads them as part of the tool's data payload — at the decision boundary, right before it decides its next action.
+
+#### `MANDATORY_PROTOCOLS_READ_THIS_FIRST`
+
+**Source**: `_inject_pitfalls()` in `src/mcp/server.py`
+**Present on**: Every tool response, always.
+
+Critical protocols and known pitfalls. These are non-negotiable rules:
+
+- Check for existing memories before creating new ones (prevent duplication)
+- Read the relevant Neural Register in `docs/debug/` before debugging
+- Do not rely on internal knowledge for project specifics — use the memory system
+- Developer Etiquette v1.2 enforcement reminder
+
+Context-specific warnings are added per tool:
+- `elefante-MemoryAdd`: Score is system-computed; classify `memory_type` accurately
+- `elefante-MemorySearch`: Search bias warnings; contradiction resolution rules
+- `elefante-GraphQuery` / `elefante-GraphConnect`: Graph consistency warnings
+- `elefante-DashboardOpen`: Refresh requires Elefante Mode enabled
+
+#### `DIRECTIVES`
+
+**Source**: `_inject_directives()` in `src/mcp/server.py`, reading from `DirectiveStore`
+**Storage**: `~/.elefante/data/directives.json` (simple JSON file, not in ChromaDB)
+**Present on**: Every tool response where active directives exist.
+
+User-managed, persistent behavioral constraints. These are unconditional rules set by the user (e.g., "never claim success without user confirmation"). They are:
+
+- **Not suggestions** — they are law. Read and follow them on every turn.
+- **Not dependent on search** — unlike memories, they don't need keyword or semantic matching
+- **Not in competition** — they cannot be outcompeted by similarity scores
+- **User-managed** — added/removed via `elefante-DirectiveAdd` and `elefante-DirectiveRemove`
+
+Directives solve the fundamental problem of behavioral rules that MUST be followed regardless of context: you cannot rely on retrieval to surface rules that should never be forgotten.
+
+#### `RELEVANT_CONTEXT`
+
+**Source**: `_inject_context()` in `src/mcp/server.py`, querying ChromaDB
+**Present on**: Tool responses where applicable (skipped for search, system, admin, and ETL tools).
+
+Auto-surfaced memories relevant to the current operation. The server extracts a search signal from the tool arguments (description, content, query fields), runs a fast ChromaDB search (top 3, min similarity 0.5), and appends matching memories with similarity scores.
+
+This gives the agent ambient context without requiring an explicit `elefante-MemorySearch` call. It's supplementary — the agent should still call `elefante-MemorySearch` for deliberate queries, but `RELEVANT_CONTEXT` ensures relevant knowledge surfaces even on non-search operations.
+
+### Layer 2: Directives — Always-Active Behavioral Rules
+
+Directives are the `DIRECTIVES` section described above. See **Tool Response Contract** for full details.
+
+### Layer 3: Memories — Contextual Knowledge
+
+**Mechanism**: Stored in ChromaDB (vector) + Kuzu (graph). Retrieved by semantic similarity search.
+**Scope**: Global (accessible from any workspace via MCP).
+
+Memories are contextual knowledge: project facts, user preferences, past decisions, technical notes. They are retrieved in two ways:
+
+1. **Explicitly** — via `elefante-MemorySearch` (agent calls it proactively, triggered by Layer 1 instructions)
+2. **Automatically** — via `RELEVANT_CONTEXT` injection (server auto-surfaces top 3 relevant memories on every non-search tool call)
+
+The **Inception Memory** (ingested during installation by `scripts/ingest_inception.py`) provides system-level knowledge about how to use Elefante tools.
+
+### How the Three Layers Interact
+
+```
+User opens workspace
+       |
+       v
+[Layer 1] VS Code loads .github/copilot-instructions.md
+       |  Agent now knows: "search Elefante first, respect Tool Response Contract"
+       |
+       v
+Agent calls elefante-MemorySearch (or any Elefante tool)
+       |
+       v
+[Tool Response] Three sections injected:
+       |  MANDATORY_PROTOCOLS_READ_THIS_FIRST — pitfalls & protocols
+       |  DIRECTIVES — user behavioral constraints ("never claim success", etc.)
+       |  RELEVANT_CONTEXT — auto-surfaced memories (when applicable)
+       |
+       v
+Agent responds — following protocols + directives, informed by memories
+```
+
+### Installation Ensures All Layers
+
+| Step | What happens |
+|------|-------------|
+| Step 4  | IDE MCP configuration (tools registered → response contract active) |
+| Step 4a | Validates `copilot-instructions.md` exists (Layer 1 bootstrap) |
+| Step 5b | Ingests Inception Memory (Layer 3 seed knowledge) |
+| Runtime | `MANDATORY_PROTOCOLS` injected by server on every call |
+| Runtime | `DIRECTIVES` injected by server from `directives.json` |
+| Runtime | `RELEVANT_CONTEXT` injected by server from ChromaDB |
+
+The Directive store (`~/.elefante/data/directives.json`) is created on first use — no installation step needed.
 
 ---
 

@@ -386,7 +386,7 @@ async def _handle_search_memories(self, args):
     return response
 ```
 
-**Gated Tools**: `elefante-MemoryAdd`, `elefante-GraphConnect`, `elefante-GraphConnect`, `elefante-GraphConnect`  
+**Gated Tools**: `elefante-MemoryAdd`, `elefante-MemoryUpdate`, `elefante-MemoryDelete`, `elefante-GraphConnect`  
 **Gate Unlocker**: `elefante-MemorySearch`  
 **Layered Defense**: `.github/copilot-instructions.md` provides instructions; gate provides enforcement
 
@@ -471,7 +471,7 @@ def _check_compliance_gate(tool_name):
     return None  # Gate passes
 ```
 
-**Gated Tools**: `elefante-MemoryAdd`, `elefante-GraphConnect`, `elefante-GraphConnect`, `elefante-GraphConnect`
+**Gated Tools**: `elefante-MemoryAdd`, `elefante-MemoryUpdate`, `elefante-MemoryDelete`, `elefante-GraphConnect`
 **Gate Unlocker**: `elefante-MemorySearch` (sets `search_performed=True`)
 
 ---

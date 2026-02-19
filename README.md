@@ -2,7 +2,7 @@
 
 **The Second Brain for AI Agents.** Your agent stops forgetting. Every preference, every decision, every pattern — remembered, scored, and surfaced at the moment of need.
 
-> **v2.0.0** — Persistent Memory for AI Agents
+> **v2.1.0** — Persistent Memory for AI Agents
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -12,7 +12,7 @@
                          │ MCP stdio
 ┌────────────────────────▼────────────────────────────────────┐
 │              LAYER 1: MCP PROTOCOL                          │
-│  17 tools · Compliance Gate · Context Injection             │
+│  20 tools · Compliance Gate · Context Injection             │
 │  ┌─────────┐ ┌─────────────┐ ┌───────────┐ ┌────────────┐ │
 │  │ Memory  │ │   Graph     │ │   Tasks   │ │  System    │ │
 │  │ CRUD    │ │ Connect/    │ │ Create/   │ │ Status/    │ │
@@ -72,7 +72,7 @@ Full setup: [docs/technical/installation.md](docs/technical/installation.md) · 
 ## How It Works
 
 ### Layer 1: MCP Protocol
-The bridge between your IDE and the brain. 17 tools that let agents store, search, connect, and manage knowledge. A **Compliance Gate** forces search-before-write — no duplicates, no noise. **Context Injection** silently attaches relevant memories to every tool call so the agent gets history without asking.
+The bridge between your IDE and the brain. 20 tools that let agents store, search, connect, and manage knowledge. A **Compliance Gate** forces search-before-write — no duplicates, no noise. **Context Injection** silently attaches relevant memories to every tool call so the agent gets history without asking. **Directives** keep unconditional behavioral rules always present in every tool response — never dependent on search.
 
 ### Layer 2: Intelligence Engine
 The brain. Two storage backends work together:
@@ -104,7 +104,7 @@ Everything runs locally. No cloud. No telemetry. Your data stays on your machine
 
 ## MCP Tools
 
-17 tools + 2 prompts. All names follow `elefante-PascalCase` convention.
+20 tools + 2 prompts. All names follow `elefante-PascalCase` convention.
 
 | Category | Key Tools |
 |----------|-----------|
@@ -113,6 +113,7 @@ Everything runs locally. No cloud. No telemetry. Your data stays on your machine
 | Context | `elefante-ContextGet`, `elefante-SessionsList` |
 | Tasks | `elefante-TaskCreate`, `elefante-TaskUpdate`, `elefante-TaskGraph` |
 | ETL | `elefante-ETLProcess`, `elefante-ETLClassify` |
+| Directives | `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove` |
 | System | `elefante-System`, `elefante-SystemStatusGet`, `elefante-DashboardOpen` |
 
 Full reference with parameter schemas: [docs/technical/usage.md](docs/technical/usage.md)

@@ -1,8 +1,8 @@
 # Debug Documentation Index
 
-**Neural Registers & Debug Compendiums for Elefante v2.0.0**
+**Compendiums and pitfall reference for Elefante v2.1.0**
 
-> **Last Updated:** 2025-12-28
+> **Last Updated:** 2026-02-19
 
 ---
 
@@ -10,33 +10,19 @@
 
 ```
 docs/debug/
-├── README.md                        <- You are here (index)
-├── *-neural-register.md             <- LAWS (start here when debugging)
-└── *-compendium.md                  <- SOURCE (detailed issue tracking)
+├── README.md                   <- You are here (index)
+└── *-compendium.md             <- Detailed post-mortems by domain
 ```
 
-**All files at root level. No subfolders.**
+Operational quick-reference (pitfalls, LAWs) lives in **[`docs/pitfall-index.md`](../pitfall-index.md)**.  
+Archived neural registers are in `docs/archive/deprecated-registers/`.
 
 ---
 
-## Neural Registers (System Immunity)
-
-Immutable "Laws" extracted from debugging sessions - prevents recurring failures.
-
-| Register | Purpose |
-|----------|---------|
-| [installation-neural-register.md](installation-neural-register.md) | Installation failure prevention |
-| [database-neural-register.md](database-neural-register.md) | Database failure prevention |
-| [dashboard-neural-register.md](dashboard-neural-register.md) | Dashboard failure prevention |
-| [mcp-code-neural-register.md](mcp-code-neural-register.md) | MCP protocol enforcement |
-| [memory-neural-register.md](memory-neural-register.md) | Memory system reliability |
-
----
-
-## Domain Compendiums (Detailed Issues)
+## Domain Compendiums (Detailed Post-Mortems)
 
 Each compendium follows the **Unified Post-Mortem Structure**:
-- Problem -> Symptom -> Root Cause -> Solution -> Lesson
+Problem → Symptom → Root Cause → Solution → Lesson
 
 | Domain | Compendium |
 |--------|-----------|
@@ -48,21 +34,13 @@ Each compendium follows the **Unified Post-Mortem Structure**:
 
 ---
 
-## Additional Reference
-
-| File | Purpose |
-|------|---------|
-| [kuzu-reserved-words-issue.md](kuzu-reserved-words-issue.md) | Kuzu property naming conflicts |
-
----
-
 ## How to Use
 
 | Task | Action |
 |------|--------|
-| **Debugging** | Check Neural Register first -> Search compendium |
-| **New issue** | Add to relevant compendium using template |
-| **New pattern** | Extract law to Neural Register |
+| **Quick debug** | Search [`docs/pitfall-index.md`](../pitfall-index.md) for `pitfall: [domain]` |
+| **Deep dive** | Open the relevant `*-compendium.md` for full post-mortems |
+| **New issue** | Add to relevant compendium using the template at the bottom of that file |
 
 ---
 
@@ -73,19 +51,13 @@ docs/debug/
 ├── README.md
 ├── ai-behavior-compendium.md
 ├── dashboard-compendium.md
-├── dashboard-neural-register.md
 ├── database-compendium.md
-├── database-neural-register.md
 ├── installation-compendium.md
-├── installation-neural-register.md
-├── kuzu-reserved-words-issue.md
-├── mcp-code-neural-register.md
-├── memory-compendium.md
-└── memory-neural-register.md
+└── memory-compendium.md
 ```
 
-**Total: 12 files (flat structure)**
+**Total: 6 files (flat structure)**
 
 ---
 
-*Last verified: 2026-02-18 | Elefante v2.0.0*
+*Last verified: 2026-02-19 | Elefante v2.1.0*

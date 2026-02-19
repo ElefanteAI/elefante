@@ -243,7 +243,7 @@ python scripts/update_dashboard_data.py   # refresh snapshot
 python -m src.dashboard.server            # start on port 8000
 ```
 
-Guide: [`docs/technical/dashboard.md`](docs/technical/dashboard.md)
+Guide: [`docs/technical/dashboard-startup.md`](docs/technical/dashboard-startup.md)
 
 ---
 
@@ -297,12 +297,12 @@ tests/          Test suite
 
 | Doc | Content |
 |-----|---------|
-| [`.github/copilot-instructions.md`](../.github/copilot-instructions.md) | Agent behavior configuration (search-before-answer protocol) |
+| [`.github/copilot-instructions.md`](../.github/copilot-instructions.md) | Agent behavior bootstrap: search-before-answer protocol + Tool Response Contract (`MANDATORY_PROTOCOLS_READ_THIS_FIRST`, `DIRECTIVES`, `RELEVANT_CONTEXT`) |
 | [`technical/usage.md`](technical/usage.md) | Complete tool reference with parameter schemas |
 | [`technical/installation.md`](technical/installation.md) | Installation details |
 | [`technical/ide-mcp-configuration.md`](technical/ide-mcp-configuration.md) | IDE setup (VS Code, Cursor, etc.) |
 | [`technical/mcp-server-startup.md`](technical/mcp-server-startup.md) | Manual startup and handshake verification |
-| [`technical/dashboard.md`](technical/dashboard.md) | Dashboard usage |
+| [`technical/dashboard-startup.md`](technical/dashboard-startup.md) | Dashboard startup and verification |
 | [`technical/docker.md`](technical/docker.md) | Docker setup |
 | [`technical/second-brain-protocols.md`](technical/second-brain-protocols.md) | Safety protocols |
 | [`technical/kuzu-lock-monitoring.md`](technical/kuzu-lock-monitoring.md) | Lock behavior and troubleshooting |

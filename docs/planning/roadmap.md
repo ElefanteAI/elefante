@@ -1,7 +1,7 @@
 # Elefante Development Roadmap
 
-**Current Version**: v2.0.0  
-**Last Updated**: 2026-02-16
+**Current Version**: v2.1.0  
+**Last Updated**: 2026-02-19
 
 ---
 
@@ -14,7 +14,7 @@ v2.0.0 is the definitive production release. All core infrastructure is implemen
 | Feature | Status | Since |
 |---------|--------|-------|
 | Dual storage (ChromaDB + Kuzu) | Production | v1.0.0 |
-| MCP server (17 tools + 2 prompts) | Production | v1.0.0 |
+| MCP server (20 tools + 2 prompts) | Production | v2.1.0 |
 | Transaction-scoped locking | Production | v1.1.0 |
 | Compliance Gate (search-before-write) | Production | v1.6.0 |
 | Behavioral Relevance scoring (0-100) | Production | v2.0.0 |

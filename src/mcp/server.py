@@ -32,6 +32,7 @@ from src.dashboard.server import serve_dashboard_in_thread
 DASHBOARD_STARTED = False
 
 from src.core.orchestrator import get_orchestrator
+from src.core.directive_store import get_directive_store
 from src.models.query import QueryMode, SearchFilters
 from src.models.entity import EntityType, RelationshipType
 from src.utils.logger import get_logger
@@ -46,6 +47,9 @@ SAFE_TOOLS = {
     "elefante-System",
     "elefante-SystemStatusGet",
     "elefante-DashboardOpen",
+    "elefante-DirectiveAdd",
+    "elefante-DirectiveList",
+    "elefante-DirectiveRemove",
 }
 
 
@@ -68,6 +72,7 @@ class ElefanteMCPServer:
         self.orchestrator = None # Lazy loaded
         self.logger = get_logger(self.__class__.__name__)
         self.mode_manager = get_mode_manager()  # Elefante Mode manager (transaction-scoped)
+        self.directive_store = get_directive_store()  # Always-on behavioral constraints
         
         # Compliance Gate: Session state for search-before-write enforcement
         self._compliance_state = {
@@ -91,6 +96,8 @@ class ElefanteMCPServer:
         "elefante-DashboardOpen", "elefante-SessionsList",
         "elefante-ETLProcess", "elefante-ETLClassify",
         "elefante-MemoryUpdate", "elefante-MemoryDelete",
+        "elefante-DirectiveAdd", "elefante-DirectiveList",
+        "elefante-DirectiveRemove",
     }
 
     def _extract_search_signal(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
@@ -816,7 +823,53 @@ Optional fields (improve retrieval quality):
                         },
                         "required": ["memory_id", "summary"]
                     }
-                )
+                ),
+                # =====================================================================
+                # DIRECTIVE TOOLS (Always-On Behavioral Constraints)
+                # =====================================================================
+                types.Tool(
+                    name="elefante-DirectiveAdd",
+                    description="""Add a persistent behavioral directive. Directives are NOT memories — they are unconditional constraints injected into EVERY MCP tool response, ensuring the agent sees them at the decision boundary.
+
+Use this for rules that must always be active regardless of context:
+- "Never claim success without user confirmation"
+- "Always verify a server is alive before opening it"
+- "Do not use emojis in code comments"
+
+Directives are stored separately from the memory system (not in ChromaDB, not in Kuzu). They cannot be outcompeted by similarity scores.""",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "content": {
+                                "type": "string",
+                                "description": "The directive text — a clear, actionable behavioral constraint"
+                            }
+                        },
+                        "required": ["content"]
+                    }
+                ),
+                types.Tool(
+                    name="elefante-DirectiveList",
+                    description="List all active directives. These are the unconditional behavioral constraints injected into every tool response.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {}
+                    }
+                ),
+                types.Tool(
+                    name="elefante-DirectiveRemove",
+                    description="Remove a directive by its ID. The directive will no longer be injected into tool responses.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "directive_id": {
+                                "type": "string",
+                                "description": "The ID of the directive to remove (from elefante-DirectiveList)"
+                            }
+                        },
+                        "required": ["directive_id"]
+                    }
+                ),
                 # elefante-ETLStatus REMOVED — use elefante-ETLProcess with include_stats=true
             ]
             self.logger.info(f"=== Returning {len(tools)} tools to MCP client ===")
@@ -955,6 +1008,16 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 elif name == "elefante-DashboardOpen":
                     result = await self._handle_get_elefante_dashboard(arguments)
                     return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
+                # Directive tools — safe, no DB locks needed
+                elif name == "elefante-DirectiveAdd":
+                    result = self._handle_directive_add(arguments)
+                    return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
+                elif name == "elefante-DirectiveList":
+                    result = self._handle_directive_list(arguments)
+                    return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
+                elif name == "elefante-DirectiveRemove":
+                    result = self._handle_directive_remove(arguments)
+                    return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
                 
                 # Mode check removed - operations auto-acquire/release locks
                 # Write operations use write_lock() context manager internally
@@ -992,10 +1055,11 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 else:
                     raise ValueError(f"Unknown tool: {name}")
                 
-                # INJECT CONTEXT + PITFALLS
+                # INJECT CONTEXT + PITFALLS + DIRECTIVES
                 if isinstance(result, dict):
                     result = await self._inject_context(result, name, arguments)
                     result = self._inject_pitfalls(result, name)
+                    result = self._inject_directives(result)
 
                 return [TextContent(
                     type="text",
@@ -1930,6 +1994,66 @@ You have access to a persistent memory system called **Elefante** - the user's s
             **stats,
             "message": f"Total: {stats['total']}, Raw: {stats['raw']}, Processed: {stats['processed']}, Failed: {stats['failed']}"
         }
+
+    # =========================================================================
+    # DIRECTIVE HANDLERS (Always-On Behavioral Constraints)
+    # =========================================================================
+
+    def _handle_directive_add(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle elefante-DirectiveAdd — add a persistent behavioral constraint."""
+        content = args.get("content", "").strip()
+        if not content:
+            return {"success": False, "error": "Directive content cannot be empty"}
+
+        directive = self.directive_store.add(content)
+        return {
+            "success": True,
+            "directive": directive.to_dict(),
+            "total_directives": self.directive_store.count(),
+            "message": "Directive stored. It will be injected into every future tool response."
+        }
+
+    def _handle_directive_list(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle elefante-DirectiveList — list all directives."""
+        directives = self.directive_store.list_all()
+        return {
+            "success": True,
+            "count": len(directives),
+            "directives": directives
+        }
+
+    def _handle_directive_remove(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle elefante-DirectiveRemove — remove a directive by ID."""
+        directive_id = args.get("directive_id", "").strip()
+        if not directive_id:
+            return {"success": False, "error": "directive_id is required"}
+
+        removed = self.directive_store.remove(directive_id)
+        if removed:
+            return {
+                "success": True,
+                "directive_id": directive_id,
+                "total_directives": self.directive_store.count(),
+                "message": "Directive removed. It will no longer appear in tool responses."
+            }
+        return {
+            "success": False,
+            "error": f"Directive '{directive_id}' not found"
+        }
+
+    def _inject_directives(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Inject active directives into the tool response.
+
+        This is the core mechanism: directives appear in the data payload
+        the agent reads right before deciding its next action.
+        Not retrieved by similarity. Not competing with memories.
+        Always present. Unconditional.
+        """
+        active = self.directive_store.get_active_texts()
+        if active:
+            result["DIRECTIVES"] = active
+        return result
 
     # =========================================================================
     # TASK ORCHESTRATION HANDLERS

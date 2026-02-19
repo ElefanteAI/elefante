@@ -1,204 +1,297 @@
-# PITFALL INDEX - Quick Search Reference
+# Pitfall Index
 
-> **Purpose:** Searchable index of all documented pitfalls  
-> **Usage:** Search this file BEFORE completing any task  
-> **Format:** Each entry is a searchable trigger-action pair
-
----
-
-## PRE-ACTION CHECKPOINT PROTOCOL
-
-Before completing ANY task, MUST:
-
-1. IDENTIFY task category (dashboard, install, memory, database)
-2. SEARCH this file for `pitfall: [category]`
-3. CHECK relevant Neural Register in `docs/debug/`
-4. APPLY any found warnings
-5. THEN complete the task
-
-| Category | Primary Pitfall | Quick Fix |
-|----------|-----------------|-----------|
-| Dashboard | Browser cache | `Ctrl+Shift+R` |
-| Installation | Kuzu pre-existing dir | Do not mkdir before Kuzu init |
-| MCP | Type signature | `list[types.Tool]` not `List[Tool]` |
-| Database | Reserved words | `props` not `properties` |
-| Memory | API vs raw access | `_collection.get()` for export |
-| **Documentation** | **Archive without index update** | **Update ALL READMEs that link to moved files** |
+**Purpose**: Canonical operational reference. Search this file BEFORE completing any task.  
+**Structure**: Domain sections → quick-fix entries → source links for depth.  
+**Depth**: Full post-mortems live in `docs/debug/*-compendium.md`.
 
 ---
 
-## DASHBOARD PITFALLS
+## Pre-Action Checkpoint
+
+Before completing ANY task:
+
+1. Identify task category: `dashboard` / `installation` / `database` / `mcp` / `memory` / `documentation`
+2. Search this file for `pitfall: [category]`
+3. Apply any found warnings
+4. Then complete the task
+
+| Category | Most Common Pitfall | Jump To |
+|----------|---------------------|---------|
+| Dashboard | Stale snapshot / browser cache | [Dashboard Pitfalls](#dashboard-pitfalls) |
+| Installation | Pre-existing kuzu dir / wrong Python path | [Installation Pitfalls](#installation-pitfalls) |
+| Database | Reserved word `properties` / stale lock | [Database Pitfalls](#database-pitfalls) |
+| MCP | Wrong type signature / stdout pollution | [MCP Pitfalls](#mcp-pitfalls) |
+| Memory | Export truncated / search vs browse | [Memory Pitfalls](#memory-pitfalls) |
+| Docs | Ghost links after archive | [Documentation Pitfalls](#documentation-pitfalls) |
+
+---
+
+## Dashboard Pitfalls
 
 ### pitfall: dashboard build browser cache refresh
 
 **Trigger:** After `npm run build` or any frontend changes  
 **Action:** Tell user to press `Ctrl+Shift+R` (hard refresh)  
 **Why:** Browser caches old JS/CSS, shows stale version  
-**Source:** debug/dashboard/dashboard-compendium.md, debug/dashboard-neural-register.md
+**Source:** `docs/debug/dashboard-compendium.md`
 
 ### pitfall: dashboard data snapshot stale
 
 **Trigger:** After adding/changing memories via MCP  
 **Action:** Run `python scripts/update_dashboard_data.py`  
-**Why:** Dashboard reads from snapshot file, not live database  
-**Source:** debug/dashboard/dashboard-compendium.md Law #1
+**Why:** Dashboard reads from `snapshot.json`, not live database. Direct Kuzu access from the dashboard triggers lock conflicts.  
+**Source:** `docs/debug/dashboard-compendium.md` Issue #1
 
 ### pitfall: dashboard kuzu lock conflict
 
 **Trigger:** Dashboard won't start, "cannot acquire lock"  
-**Action:** Kill Python processes, remove `kuzu_db/.lock`  
-**Why:** Kuzu single-writer architecture  
-**Source:** debug/database-neural-register.md Law #2
+**Action:** Kill Python processes, remove `~/.elefante/locks/write.lock`  
+**Why:** Kuzu single-writer architecture; v1.1.0+ uses transaction-scoped locks (auto-expire 30s) but a crashed process can leave a stale lock  
+**Source:** `docs/debug/database-compendium.md` Issue #2
 
 ### pitfall: dashboard empty relative path
 
-**Trigger**: Dashboard works but is empty (0 nodes)
-**Action**: Check `server.py` uses `src.utils.config.DATA_DIR`
-**Why**: Relative paths (`./data`) depend on CWD. Use absolute `~/.elefante/data`.
-**Source**: debug/dashboard-neural-register.md Pattern #7
+**Trigger:** Dashboard opens but shows 0 nodes  
+**Action:** Ensure `server.py` imports `DATA_DIR` from `src.utils.config` — never use `./data`  
+**Why:** Relative paths depend on CWD. MCP server writes to `~/.elefante/data`; if the dashboard reads from `./data` they never see the same files.  
+**Source:** `docs/debug/dashboard-compendium.md` (Pattern "Ghost Data")
+
+### pitfall: dashboard server binding localhost ipv6
+
+**Trigger:** `curl localhost:8000` works but browser shows blank screen  
+**Action:** Bind uvicorn to `host="0.0.0.0"`, not `127.0.0.1` or `localhost`  
+**Why:** Modern browsers default to IPv6 `[::1]`; Python uvicorn defaults to IPv4 `127.0.0.1`. They never meet.  
+**Source:** `docs/debug/dashboard-compendium.md` (LAW #6)
+
+### pitfall: dashboard api response envelope
+
+**Trigger:** Frontend shows `undefined` for stats despite API returning 200  
+**Action:** Return the data object directly from FastAPI — no `{"success": True, "data": ...}` wrapper  
+**Why:** Frontend reads `response.memories` directly. Envelope shifts the shape.  
+**Source:** `docs/debug/dashboard-compendium.md` (LAW #7)
+
+### pitfall: dashboard npm dependency unlocked
+
+**Trigger:** Fresh `npm install` breaks the build  
+**Action:** Pin exact versions (`"react": "18.2.0"` not `"^18.2.0"`); commit `package-lock.json`  
+**Why:** Unlocked minor versions introduce silent breaking changes  
+**Source:** `docs/debug/dashboard-compendium.md` Issue #3
 
 ---
 
-## INSTALLATION PITFALLS
+## Installation Pitfalls
 
-### pitfall: kuzu database directory pre-exists
+### pitfall: installation kuzu directory pre-exists
 
-**Trigger:** Installing Elefante, "path cannot be a directory"  
-**Action:** Do NOT pre-create kuzu_db directory (System now auto-heals empty dirs)  
-**Why:** Kuzu 0.11+ creates its own structure. Empty dir blocks it.  
-**Source:** debug/installation-neural-register.md Law #1 & Law #7
+**Trigger:** Installing Elefante — `Runtime exception: Database path cannot be a directory`  
+**Action:** Do NOT pre-create `kuzu_db/`. The app auto-heals empty dirs via `GraphStore.__init__`. If blocked: remove/rename the directory.  
+**Why:** Kuzu 0.11+ requires path to be non-existent or a valid DB. Empty dirs crash it.  
+**Source:** `docs/debug/installation-compendium.md` Issue #1
 
-### pitfall: installation python version
+### pitfall: installation python version wrong
 
-**Trigger:** Installing dependencies, cryptic errors  
-**Action:** Verify Python 3.11  
-**Why:** Type hints, async features, and dependency compatibility require 3.11  
-**Source:** technical/installation-safeguards.md
+**Trigger:** Cryptic dependency errors, type hint failures  
+**Action:** Verify Python 3.11 exactly. Check `python --version` and ensure venv uses the right interpreter.  
+**Why:** Type hints, async features, and dependency compatibility all require 3.11.  
+**Source:** `docs/technical/python-version-requirements.md`
+
+### pitfall: installation python executable path ambiguous
+
+**Trigger:** MCP server works manually but not in IDE; `ImportError` or wrong library version  
+**Action:** Use `sys.executable` (absolute path) in ALL MCP/script configurations — never `"command": "python"`  
+**Why:** `"python"` resolves to the system Python or a different venv. `sys.executable` is deterministic.  
+**Source:** `docs/debug/installation-compendium.md` Issue #4 (LAW #6, LAW #8)
+
+### pitfall: installation stale bytecode ghost errors
+
+**Trigger:** Fixed the code but error persists  
+**Action:** Delete all `__pycache__/` and `.pyc` files before restarting  
+**Why:** Python may load stale bytecode metadata even after source changes  
+**Source:** `docs/debug/installation-compendium.md` Issue #4 (LAW #9)
+
+### pitfall: installation mcp handshake not verified
+
+**Trigger:** Install reports success but IDE shows "Connection Refused"  
+**Action:** Run `scripts/verify_mcp_handshake.py` — checks actual JSON-RPC `initialize` handshake, not just process PID  
+**Why:** "Process running" ≠ "Server working". Port-open checks miss protocol failures.  
+**Source:** `docs/debug/installation-compendium.md` Issue #4 (LAW #10)
+
+### pitfall: installation inception data garbage
+
+**Trigger:** Fresh install; database contains test/placeholder data  
+**Action:** Run `scripts/ingest_inception.py` — injects identity + protocol as Memory #1  
+**Why:** Initializing with `"This is a test"` pollutes the knowledge graph. Prime Directive must be first.  
+**Source:** `docs/debug/installation-compendium.md` (LAW #11)
+
+### pitfall: installation broken venv trap
+
+**Trigger:** Any `python scripts/install.py` call fails with ImportError or module errors inside VS Code/Copilot  
+**Action:** Escape via system Python with absolute path: `/opt/homebrew/bin/python3.11 -m venv .venv && .venv/bin/pip install -r requirements.txt`  
+**Why:** VS Code runs Python from workspace `.venv`. When that venv is corrupted, the agent cannot fix itself from within.  
+**Source:** `docs/debug/installation-compendium.md` Issue #5
 
 ---
 
-## DATABASE PITFALLS
+## Database Pitfalls
 
 ### pitfall: kuzu reserved word properties
 
-**Trigger:** Entity creation fails, "Cannot find property"  
-**Action:** Use `props` not `properties`  
-**Why:** `properties` is reserved in Cypher but valid in SQL DDL  
-**Source:** debug/database-neural-register.md Law #1, technical/kuzu-best-practices.md
+**Trigger:** Entity creation fails — `Binder exception: Cannot find property properties for e`  
+**Action:** Use `props` not `properties`; use `entity_type` not `type`; use `entity_label` not `label`  
+**Why:** Kuzu uses SQL for schema (DDL) but Cypher for operations (DML). Names must be valid in both. `properties` passes DDL, fails DML.  
+**Source:** `docs/technical/kuzu-best-practices.md`, `docs/debug/database-compendium.md` Issue #1
 
-### pitfall: kuzu reserved word type label
+### pitfall: kuzu schema operation validation gap
 
-**Trigger:** Schema works but CREATE fails  
-**Action:** Use `entity_type`, `entity_label` instead  
-**Why:** Reserved words valid in schema, invalid in DML  
-**Source:** technical/kuzu-best-practices.md
+**Trigger:** New property added and schema applies cleanly, but CREATE operations fail  
+**Action:** Test BOTH `CREATE NODE TABLE (...)` AND a `CREATE (entity {...})` statement in the same test  
+**Why:** SQL-valid names can be Cypher-invalid. Schema creation and data operations use different parsers.  
+**Source:** `docs/debug/database-compendium.md` Issue #1 (LAW #3)
 
-### pitfall: kuzu schema operation validation
+### pitfall: kuzu stale lock blocking access
 
-**Trigger:** New property added to schema  
-**Action:** Test BOTH schema creation AND Cypher CREATE  
-**Why:** SQL-valid names can be Cypher-invalid  
-**Source:** debug/database-neural-register.md Law #3
+**Trigger:** "Elefante Mode is DISABLED" despite prior `enable()`, or "Could not acquire lock"  
+**Action:** Check `~/.elefante/locks/write.lock`; if PID is dead or timestamp > 30s, delete it. v1.1.0+ auto-clears on next operation.  
+**Why:** v1.0.1 used session-scoped locks held indefinitely. A crashed IDE leaves an orphaned lock. v1.1.0 uses transaction-scoped locks (auto-expire 30s).  
+**Source:** `docs/debug/database-compendium.md` Issue #2, `docs/technical/kuzu-lock-monitoring.md`
+
+### pitfall: kuzu database corrupted single file
+
+**Trigger:** `kuzu_db` exists as a single file (not a directory); `Cannot open file` errors  
+**Action:** Backup, delete `kuzu_db`, reinitialize. ChromaDB is unaffected.  
+**Why:** Interrupted database creation or permissions issue produces a file instead of a directory structure.  
+**Source:** `docs/debug/database-compendium.md` Issue #3
 
 ---
 
-## MCP / MEMORY PITFALLS
+## MCP Pitfalls
 
 ### pitfall: mcp type signature list types tool
 
 **Trigger:** Tools not showing in IDE  
-**Action:** Use `list[types.Tool]` not `List[Tool]`  
-**Why:** MCP SDK uses strict runtime type checking  
-**Source:** debug/mcp-code-neural-register.md Law #1
+**Action:** Return `list[types.Tool]` — not `List[Tool]`, not `list[Tool]`, not unannotated  
+**Why:** MCP SDK uses strict runtime type checking; mismatches cause silent failure  
+**Source:** `docs/debug/ai-behavior-compendium.md` (MCP LAW #1)
+
+### pitfall: mcp action verification missing
+
+**Trigger:** Tool returns "success" but user reports no change  
+**Action:** After every write, read back the written record and fail explicitly if not found  
+**Why:** ChromaDB and Kuzu can fail silently (disk full, permissions). Unverified success = silent data loss.  
+**Source:** `docs/debug/ai-behavior-compendium.md` (Layer 5 Protocol)
+
+### pitfall: mcp error missing context
+
+**Trigger:** MCP tool throws but error message is just `"Error: str(e)"`  
+**Action:** Include tool name, arguments, `type(e).__name__`, traceback, and timestamp in error response  
+**Why:** Without context, debugging MCP errors requires re-running under special conditions  
+**Source:** `docs/debug/ai-behavior-compendium.md` (MCP LAW #3)
+
+### pitfall: mcp async blocking database call
+
+**Trigger:** Server hangs or times out on database operations  
+**Action:** Wrap synchronous Kuzu/ChromaDB calls in `asyncio.get_event_loop().run_in_executor(None, fn, ...)`  
+**Why:** Kuzu and ChromaDB are synchronous. Calling them directly inside `async def` blocks the event loop.  
+**Source:** `docs/debug/ai-behavior-compendium.md` (MCP LAW #4)
+
+### pitfall: mcp stdout pollution json-rpc corrupt
+
+**Trigger:** `invalid character 'I' looking for beginning of value` on connection  
+**Action:** Route ALL logging to `sys.stderr`. `print()` to stdout breaks MCP. Check uvicorn `log_config`.  
+**Why:** MCP communicates over stdin/stdout JSON-RPC. Any `INFO:` line on stdout instantly corrupts the stream.  
+**Source:** `docs/debug/ai-behavior-compendium.md` (MCP LAW #6)
 
 ### pitfall: mcp vscode duplicate server scopes
 
 **Trigger:** VS Code shows two identical `elefante` MCP servers  
-**Action:** Keep `elefante` only in User `mcp.json`; ensure `.vscode/mcp.json` does not define `servers.elefante`; remove `chat.mcp.servers.elefante` / `roo-cline.mcpServers.elefante` if present; reload window  
-**Why:** VS Code merges User + Workspace MCP servers; multiple mechanisms/scopes can register the same server name  
-**Source:** debug/mcp-code-neural-register.md Law #7, technical/ide-mcp-configuration.md
+**Action:** Keep `elefante` only in User `mcp.json`; ensure `.vscode/mcp.json` does NOT define `servers.elefante`; remove `chat.mcp.servers.elefante` / `roo-cline.mcpServers.elefante` if present; reload window  
+**Why:** VS Code merges User + Workspace MCP configs; multiple scopes can register the same server name  
+**Source:** `docs/technical/ide-mcp-configuration.md` (MCP LAW #8)
 
-### pitfall: mcp connection crash uvicorn
+### pitfall: mcp write blocked compliance gate
 
-**Trigger**: `invalid character 'I'` when launching dashboard
-**Action**: Redirect Uvicorn logs to `sys.stderr`
-**Why**: `INFO` logs on stdout corrupt MCP JSON-RPC protocol
-**Source**: debug/mcp-code-neural-register.md Pattern #5
-
-### pitfall: memory export chromadb api
-
-**Trigger:** Export returns only 10 memories instead of all  
-**Action:** Use `collection._collection.get()` not `query()`  
-**Why:** API filters by semantic relevance  
-**Source:** debug/memory-neural-register.md Law #1
-
-### pitfall: memory search vs list all
-
-**Trigger:** User says "show all memories about X"  
-**Action:** Use `elefante-MemorySearch (list_all=true)` + filter, not `elefante-MemorySearch`  
-**Why:** `elefante-MemorySearch` returns top-N by relevance  
-**Source:** debug/memory-neural-register.md Law #2
+**Trigger:** Write tool returns `gate_status: BLOCKED`  
+**Action:** Call `elefante-MemorySearch` first (any query), then retry the write  
+**Why:** Compliance gate (v1.6.0) mechanically blocks `MemoryAdd`, `MemoryUpdate`, `MemoryDelete`, `GraphConnect` until a search has been performed in the current session  
+**Source:** `docs/debug/ai-behavior-compendium.md` (MCP LAW #9)
 
 ---
 
-## DOCUMENTATION PITFALLS
+## Memory Pitfalls
+
+### pitfall: memory export chromadb api truncated
+
+**Trigger:** Export returns 10 memories instead of all  
+**Action:** Use `collection._collection.get(include=["documents","metadatas","embeddings"])` not `collection.query()`  
+**Why:** `query()` applies semantic relevance filtering even with high `n_results`  
+**Source:** `docs/debug/memory-compendium.md` Issue #1 (LAW #1)
+
+### pitfall: memory search vs browse all
+
+**Trigger:** User says "show me ALL my memories about X" — only top 10 returned  
+**Action:** Use `elefante-MemorySearch(list_all=true)` + client-side filtering, not `elefante-MemorySearch` alone  
+**Why:** `elefante-MemorySearch` returns top-N by semantic relevance, not completeness  
+**Source:** `docs/debug/memory-compendium.md` Issue #2 (LAW #2)
+
+### pitfall: memory temporal decay not active
+
+**Trigger:** Memory importance scores not reflecting age  
+**Action:** Verify `temporal_consolidation.py` is running; decay is active in `_search_structured` and `_search_semantic`  
+**Why:** Memory importance must decay over time (Ebbinghaus model) unless reinforced by retrieval  
+**Source:** `docs/technical/temporal-memory-decay.md`
+
+### pitfall: memory session vs persistent confusion
+
+**Trigger:** User restarts IDE, AI has no memory of recent conversation  
+**Action:** Explicitly save important turns with `elefante-MemoryAdd`; session buffer is NOT auto-persisted  
+**Why:** Session buffer (RAM) and persistent memory (ChromaDB + Kuzu) are separate systems. Buffer clears on restart.  
+**Source:** `docs/debug/memory-compendium.md` Issue #4 (LAW #4)
+
+### pitfall: memory schema field roundtrip missing
+
+**Trigger:** Memory stored with extra fields (layer, sublayer, etc.) but retrieved with defaults  
+**Action:** When adding a field to the schema, update BOTH `add_memory()` write path AND `_reconstruct_memory()` read path  
+**Why:** Field must be mapped in both directions. Missing from read = always shows default.  
+**Source:** `docs/debug/memory-compendium.md` Issue #7 (Pattern #4)
+
+---
+
+## Documentation Pitfalls
 
 ### pitfall: documentation archive without index update CRITICAL
 
-**Trigger:** Moving/archiving ANY file that is linked from an index (README.md, technical/README.md, etc.)  
-**Action:** BEFORE archiving, grep for all references: `grep -r "filename" docs/`; update ALL indexes that link to the file  
-**Why:** Archiving files without updating indexes creates ghost links. Documentation becomes obsolete. Future agents/users hit 404s.  
-**Source:** 2025-12-27 incident: v2 schema files archived Dec 11, but docs/README.md and docs/technical/README.md still linked to them for 16 days.
+**Trigger:** Moving or archiving ANY file that is linked from an index  
+**Action:** Before archiving: `grep -r "filename" docs/` — then update ALL index files that link to it  
+**Why:** Ghost links remain for weeks. Future agents hit 404s. This happened Dec 11 → Dec 27 with schema files.  
+**Source:** Developer practice — see also `pitfall: documentation partial refactor`
 
 ### pitfall: documentation partial refactor
 
 **Trigger:** Renaming, moving, or deleting documentation files  
-**Action:** Complete the full chain: (1) Move file → (2) Update ALL inbound links → (3) Update ALL index files → (4) Verify with `grep -r "oldname" docs/`  
-**Why:** Partial refactors leave broken links and confusion. One file can be referenced from 5+ places.  
-**Source:** Developer Etiquette LAW 6 (File and Artifact Hygiene)
+**Action:** Complete the full chain: (1) Move file → (2) Update ALL inbound links → (3) Update ALL index READMEs → (4) `grep -r "oldname" docs/` to verify clean  
+**Why:** One file can be referenced from 5+ places. Partial refactors leave broken links silently.
 
 ---
 
-## VERIFICATION PITFALLS
+## Quick Reference
 
-### pitfall: verification layer 5 action
-
-**Trigger:** Tool says "success" but user sees nothing  
-**Action:** Verify state change before returning success  
-**Why:** Operation may silently fail  
-**Source:** debug/mcp-code-neural-register.md Law #2
-
-### pitfall: verification browser cache
-
-**Trigger:** Code changed but nothing looks different  
-**Action:** Hard refresh (`Ctrl+Shift+R`)  
-**Why:** Browser serves cached version  
-**Source:** debug/dashboard/dashboard-compendium.md Law #5
-
----
-
-## HOW TO USE THIS INDEX
-
-### Before Completing a Task:
-
-```
-1. Identify your task category: [dashboard/install/database/mcp/memory]
-2. Search this file for: "pitfall: [category]"
-3. Read matching entries
-4. Apply any relevant actions
-5. THEN complete task
-```
-
-### Search Examples:
-
-- Building dashboard? Search: `pitfall: dashboard build`
-- Changing Kuzu schema? Search: `pitfall: kuzu`
-- Memory export failing? Search: `pitfall: memory export`
-- Tools not showing? Search: `pitfall: mcp type`
+| Category | Most Common Pitfall | Quick Fix |
+|----------|---------------------|-----------|
+| Dashboard | Stale snapshot | `python scripts/update_dashboard_data.py` |
+| Dashboard | Browser cache | `Ctrl+Shift+R` |
+| Installation | Kuzu pre-existing dir | Do not mkdir; let `GraphStore.__init__` handle it |
+| Installation | Wrong Python path | Use `sys.executable` not `"python"` |
+| Database | Reserved word `properties` | Use `props` |
+| Database | Stale lock | Check `~/.elefante/locks/write.lock`, delete if stale |
+| MCP | Tools not showing | `list[types.Tool]` not `List[Tool]` |
+| MCP | stdout pollution | All logs → `sys.stderr` |
+| MCP | Write gate blocked | Call `elefante-MemorySearch` first |
+| Memory | Export truncated | `collection._collection.get()` not `query()` |
+| Docs | Ghost links after archive | `grep -r "filename" docs/` before moving any file |
 
 ---
 
-## ADDING NEW PITFALLS
+## Adding New Pitfalls
 
 When you encounter a new repeated mistake:
 
@@ -208,9 +301,11 @@ When you encounter a new repeated mistake:
 **Trigger:** [what action causes this]  
 **Action:** [what to do]  
 **Why:** [root cause]  
-**Source:** [document reference]
+**Source:** [compendium file and issue number]
 ```
+
+Full post-mortems belong in the relevant `docs/debug/*-compendium.md` file.
 
 ---
 
-**Search this file. Don't repeat history.**
+*Last updated: 2026-02-19 | Elefante v2.1.0*

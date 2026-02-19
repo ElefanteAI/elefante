@@ -261,7 +261,7 @@ python -m src.dashboard.server  # Will block or fail
 
 ### Best Practice #2: Dashboard Uses Snapshot
 
-From [dashboard.md](dashboard.md):
+From [dashboard-startup.md](dashboard-startup.md):
 
 Dashboard reads from **static snapshot**, not live database:
 
@@ -401,11 +401,11 @@ If timestamp is very old, lock is likely stale.
 
 ---
 
-## Neural Register Law (From Documentation)
+## From Pitfall Index
 
-From [database-neural-register.md](../debug/database-neural-register.md):
+See [`docs/pitfall-index.md`](../pitfall-index.md) — search `pitfall: kuzu stale lock`:
 
-**LAW #2: Single-Writer Lock Architecture**
+**LAW #2: Transaction-Scoped Locking (v1.1.0+)**
 
 > "Kuzu uses file-based locking. Only ONE process can access database at a time."
 

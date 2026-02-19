@@ -1,6 +1,6 @@
 # Technical Documentation Index
 
-**Status**:  Production (v2.0.0)  
+**Status**: Production (v2.1.0)  
 **Purpose**: Complete technical reference for Elefante AI Memory System
 
 ---
@@ -10,7 +10,7 @@
 1. **New Users**: Start with [`installation.md`](installation.md)
 2. **Understanding the System**: Read [`architecture.md`](architecture.md)
 3. **Using the API**: See [`usage.md`](usage.md)
-4. **Visual Dashboard**: Check [`dashboard.md`](dashboard.md)
+4. **Visual Dashboard**: Check [`dashboard-startup.md`](dashboard-startup.md)
 
 ---
 
@@ -23,7 +23,6 @@
 | [`python-version-requirements.md`](python-version-requirements.md) | **MANDATORY: Python 3.11 locking** |
 | [`installation.md`](installation.md) | Full installation guide |
 | [`ide-mcp-configuration.md`](ide-mcp-configuration.md) | **Authoritative: MCP config for VS Code / Cursor / Bob / Antigravity** |
-| [`installation-safeguards.md`](installation-safeguards.md) | Pre-flight checks & Kuzu compatibility |
 
 ### Running Elefante
 
@@ -45,7 +44,6 @@
 |------|---------|
 | [`architecture.md`](architecture.md) | System design, triple-layer brain |
 | [`usage.md`](usage.md) | API reference, MCP tools |
-| [`dashboard.md`](dashboard.md) | Legacy dashboard guide (see dashboard-startup.md) |
 
 ### Development Process
 
@@ -67,7 +65,6 @@
 | File | Purpose |
 |------|---------|
 | [`kuzu-best-practices.md`](kuzu-best-practices.md) | Reserved words, safe property names |
-| [`installation-safeguards.md`](installation-safeguards.md) | Pre-flight checks, Kuzu 0.11.x fixes |
 
 ---
 
@@ -76,8 +73,9 @@
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Dual Storage (ChromaDB + Kuzu) |  | Production |
-| MCP Server (17 tools + 2 prompts) |  | Production |
-| [`copilot-instructions`](../../.github/copilot-instructions.md) | Agent behavior configuration for GitHub Copilot |  Production |
+| MCP Server (20 tools + 2 prompts) |  | Production |
+| [`copilot-instructions`](../../.github/copilot-instructions.md) | Agent behavior bootstrap + Tool Response Contract (`MANDATORY_PROTOCOLS_READ_THIS_FIRST`, `DIRECTIVES`, `RELEVANT_CONTEXT`) |  Production |
+| Directive System (`src/core/directive_store.py`) | Always-injected behavioral constraints, independent of memory retrieval |  v2.1.0 |
 | Transaction-Scoped Locking |  | v1.1.0 (replaced session-based locks) |
 | **Compliance Gate** |  | **v1.6.0 (search-before-write enforcement)** |
 | Auto-Inject Pitfalls |  | v1.0.1 |
@@ -98,5 +96,5 @@
 
 ---
 
-**Version**: 2.0.0  
-**Last Updated**: 2026-02-16
+**Version**: 2.1.0  
+**Last Updated**: 2026-02-19

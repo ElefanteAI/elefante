@@ -7,12 +7,18 @@ For full detail, see [CHANGELOG.md](CHANGELOG.md).
 
 ## Current Baseline (recommended)
 
+- **v2.1.0 (2026-02-19)**
+  - Directive System: behavioral constraints separated from memories, always injected into every tool response
+  - Tool Response Contract: `MANDATORY_PROTOCOLS_READ_THIS_FIRST`, `DIRECTIVES`, `RELEVANT_CONTEXT` documented as first-class architecture
+  - Installation bootstrap: Step 4a validates `copilot-instructions.md` exists
+  - Tool count: 17 → 20 (added `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove`)
+
+## Previous Releases
+
 - **v2.0.0 (2026-02-18)**
   - Memory curation: 13 high-signal memories, zero noise
   - Dashboard v2: Health Score, Knowledge Graph, Usage Intelligence
   - Unified versioning across all components
-
-## Previous Releases
 
 - **v1.10.0 (2026-01-18)**
   - Behavioral Relevance: system-computed scores (0–100) replace human-assigned importance

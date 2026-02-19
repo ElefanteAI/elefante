@@ -1,72 +1,26 @@
-# Elefante Memory System - Copilot Instructions
+# Elefante Memory System
 
-This repository uses **Elefante**, a persistent memory system that stores user preferences, decisions, and project knowledge.
+This repository uses **Elefante**, a persistent memory and behavioral system via MCP.
 
-## MANDATORY PROTOCOL
+## One Rule
 
-Before answering ANY question about:
-- User preferences (coding style, tools, formatting)
-- Past decisions or discussions  
-- Project-specific knowledge ("how we do X")
-- "The usual way" or "like we discussed"
-- Existing implementations or patterns
+Before answering questions about user preferences, past decisions, or project conventions: **call `elefante-MemorySearch` first**. Queries must be explicit and standalone (no pronouns).
 
-**You MUST call `elefante-MemorySearch` FIRST** with a relevant query.
+## Compliance Stamp
 
-## Compliance Gate
+After searching, include one stamp in your response:
+- `[ELEFANTE] Searched: Found {N} relevant memories`
+- `[ELEFANTE] Searched: No relevant memories found`
 
-The Elefante MCP server enforces a **Compliance Gate**:
-- Write operations (`elefante-MemoryAdd`, `elefante-GraphConnect`, etc.) are **BLOCKED** until you perform a search
-- This prevents duplicate memories and ensures you have full context
+## Tool Response Contract
 
-## Required Compliance Stamp
+Every Elefante MCP tool response contains up to three injected sections. You MUST read and act on all of them:
 
-After searching, include ONE of these stamps in your response:
+### `MANDATORY_PROTOCOLS_READ_THIS_FIRST`
+Critical protocols and known pitfalls injected into every response. These are non-negotiable rules: check for duplicates before creating memories, read Neural Registers before debugging, do not rely on internal knowledge for project specifics. Context-specific warnings appear for specific tools (e.g., search bias warnings on MemorySearch, graph consistency on GraphConnect).
 
-**If memories were found:**
-```
-[ELEFANTE] Searched: Found {N} relevant memories
-```
+### `DIRECTIVES`
+User-managed, persistent behavioral constraints. These are unconditional rules set by the user (e.g., "never claim success without user confirmation"). They are not suggestions — read and follow them on every turn. Stored separately from memories. Cannot be outcompeted by similarity scores.
 
-**If no memories were found:**
-```
-[ELEFANTE] Searched: No relevant memories found
-```
-
-## Trigger Patterns
-
-ALWAYS search when the user mentions:
-- "remember", "recall", "what did I say"
-- "preference", "decision", "how do I like"
-- "the usual", "like before", "as discussed"
-- "elefante:" prefix (explicit trigger)
-- References to past conversations or decisions
-
-## NEVER Do This
-
-- Answer from general knowledge when user asks about THEIR preferences
-- Assume you know the project conventions without checking
-- Skip the memory search to be faster
-- Store new memories without first searching for existing ones
-
-## Query Guidelines
-
-When calling `elefante-MemorySearch`:
-- Use **explicit, standalone queries** (no pronouns)
-- Be specific about what you're looking for
-- Example: "user preferences for Python code formatting" NOT "how do they like it"
-
-## Workflow Example
-
-```
-User: "Create a new component using our usual pattern"
-
-1. Call elefante-MemorySearch("component patterns and conventions")
-2. Review results
-3. Include stamp: "[ELEFANTE] Searched: Found 3 relevant memories"
-4. Apply the patterns found in the memories
-5. Generate the component
-```
-
----
-*This file is read by GitHub Copilot and injected into every request for this repository.*
+### `RELEVANT_CONTEXT`
+Auto-surfaced memories relevant to the current operation. Appears when applicable (not on search/system tools). Contains the top 3 most similar memories with similarity scores. This gives you ambient context without requiring an explicit `elefante-MemorySearch` call.

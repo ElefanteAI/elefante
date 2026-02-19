@@ -7,6 +7,41 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.1.0] - 2026-02-19
+
+### Summary
+
+Directive System + Behavioral Bootstrap — Always-active behavioral constraints separated from memories, `copilot-instructions.md` formally integrated into the installation process, and the three-key Tool Response Contract documented as first-class architecture.
+
+### The Problem Solved
+
+1. **Behavioral Rules Depended on Retrieval**: Critical rules like "never claim success without user approval" were stored as memories with `surfaces_when` triggers. Keyword-based retrieval is fragile — you cannot enumerate every possible phrasing of a rule that should never be forgotten.
+2. **`copilot-instructions.md` Was an Afterthought**: The installer never validated or referenced it. Section 6.1 of installation docs listed it as a "Next Step" rather than a core installation component.
+3. **Tool Response Contract Was Undocumented**: The three injected keys (`MANDATORY_PROTOCOLS_READ_THIS_FIRST`, `DIRECTIVES`, `RELEVANT_CONTEXT`) existed in the server code but were only mentioned in internal planning docs — not in any agent-facing or user-facing documentation.
+
+### The Solution
+
+1. **Directive System**: A new `DirectiveStore` class (`src/core/directive_store.py`) stores behavioral constraints in `~/.elefante/data/directives.json`. Directives are injected into every MCP tool response unconditionally — no search, no similarity scores, no keyword matching. They cannot be outcompeted by memories.
+2. **Three Directive Tools**: `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove`.
+3. **Installation Bootstrap Validation**: `scripts/install.py` Step 4a now validates `copilot-instructions.md` exists. The installer warns with an explicit error if it is missing, explaining the behavioral consequence.
+4. **Tool Response Contract Documented**: Both `copilot-instructions.md` and `docs/technical/installation.md` now formally document all three injected keys as a first-class agent-facing contract.
+
+### Changes
+
+- **NEW**: `src/core/directive_store.py` — `DirectiveStore` + `Directive` classes. JSON-backed persistent storage at `~/.elefante/data/directives.json`. Module-level singleton `get_directive_store()`.
+- **MODIFIED**: `src/mcp/server.py` — Added `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove` tools. Added `_inject_directives()` and `_handle_directive_*` methods. Updated `_CONTEXT_SKIP_TOOLS`.
+- **MODIFIED**: `scripts/install.py` — Added `verify_copilot_instructions()` function and Step 4a to installer flow.
+- **MODIFIED**: `.github/copilot-instructions.md` — Added "Tool Response Contract" section documenting all three injected response keys with their sources, scope, and behavioral rules.
+- **MODIFIED**: `docs/technical/installation.md` — Replaced "Next Steps / Section 6.1" with "Behavioral Instruction Architecture": Layer 1 (Bootstrap), Tool Response Contract (three keys), Layer 2 (Directives), Layer 3 (Memories), and installation-to-runtime mapping table.
+- **MODIFIED**: `docs/technical/usage.md` — Added `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove` documentation under new "Directives" section.
+- **IMPACT**:
+  - **Tool count**: 17 → 20.
+  - `copilot-instructions.md` is now validated by the installer (Step 4a) — missing file produces a clear warning.
+  - Behavioral rules that must never be forgotten are separated from the memory system entirely.
+  - Three-key Tool Response Contract is documented in both the bootstrap file and the installation guide.
+
+---
+
 ## [2.0.0] - 2026-02-18
 
 ### Summary

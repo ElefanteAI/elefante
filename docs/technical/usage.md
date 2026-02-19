@@ -12,9 +12,9 @@ Once connected to your IDE, use natural language to interact with Elefante. The 
 
 ---
 
-## 2. MCP Tools (17 Total)
+## 2. MCP Tools (20 Total)
 
-The MCP server exposes 17 tools to your AI agent. All tool names follow the `elefante-PascalCase` convention.
+The MCP server exposes 20 tools to your AI agent. All tool names follow the `elefante-PascalCase` convention.
 
 ### Core Memory Operations
 
@@ -190,6 +190,34 @@ elefante-MemorySearch(query="preferences for Python development")
 #### `elefante-DashboardOpen`
 **Purpose**: Open dashboard in browser.
 **Parameters**: `refresh` (bool) to update snapshot first.
+
+---
+
+### Directives (Always-Active Behavioral Constraints)
+
+Directives are unconditional behavioral rules injected into **every** MCP tool response under the `DIRECTIVES` key. They are stored separately from memories (not in ChromaDB, not in Kuzu) and cannot be outcompeted by similarity scores. Use directives for rules that must be followed regardless of context — things that should never depend on whether a search happens to surface them.
+
+#### `elefante-DirectiveAdd`
+**Purpose**: Add a persistent behavioral constraint.
+
+**Parameters**:
+- `content` (required): The directive text — a clear, actionable rule (e.g., "Never claim success without user confirmation")
+
+**Example**:
+```json
+{"content": "Always verify the MCP server is alive before opening the dashboard"}
+```
+
+#### `elefante-DirectiveList`
+**Purpose**: List all active directives (with their IDs for removal).
+
+#### `elefante-DirectiveRemove`
+**Purpose**: Remove a directive so it stops being injected.
+
+**Parameters**:
+- `directive_id` (required): The ID from `elefante-DirectiveList`
+
+**Storage**: `~/.elefante/data/directives.json` — created on first use, no installation step needed.
 
 ---
 

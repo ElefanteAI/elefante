@@ -363,6 +363,21 @@ def run_health_check(root_dir, python_cmd):
         logger.log("ERROR: Health check failed")
         return False
 
+def verify_copilot_instructions(root_dir):
+    """Verify .github/copilot-instructions.md exists — the bootstrap layer for agent behavior"""
+    logger.log("Verifying agent behavior bootstrap...")
+    instructions_path = root_dir / ".github" / "copilot-instructions.md"
+    if instructions_path.exists():
+        logger.log(f"OK: copilot-instructions.md found at {instructions_path}")
+        return True
+    else:
+        logger.log("ERROR: .github/copilot-instructions.md is MISSING")
+        logger.log("   This file is the bootstrap layer that tells AI agents how to use Elefante.")
+        logger.log("   Without it, agents will NOT proactively search memory.")
+        logger.log("   Expected at: " + str(instructions_path))
+        return False
+
+
 def generate_proof(root_dir, success):
     """Generate installation proof block"""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -448,6 +463,14 @@ def main():
         except Exception as e:
             logger.log(f"ERROR: Error configuring MCP: {e}")
             
+    if success:
+        # 4a. Agent Behavior Bootstrap
+        logger.log("")
+        logger.log("[Step 4a] Agent Behavior Bootstrap...")
+        if not verify_copilot_instructions(root_dir):
+            logger.log("WARN: Agent behavior bootstrap missing. Agents will not proactively use Elefante.")
+            logger.log("   See docs/technical/installation.md Section 4a for details.")
+    
     if success:
         # 5. Verification
         print_step(5, "System Verification")

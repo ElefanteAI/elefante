@@ -924,7 +924,7 @@ class RelationshipType(str, Enum):
 
 | File | Purpose |
 |------|---------|
-| `docs/THE_CORE.md` | The Three Unchangeable Laws |
+| `docs/the-core.md` | The Three Laws |
 | `docs/README.md` | Main documentation |
 | `docs/pitfall-index.md` | Quick reference for known issues |
 | `docs/technical/usage.md` | Complete tool reference |
@@ -964,7 +964,7 @@ class RelationshipType(str, Enum):
 
 ### For New Agents
 
-1. **Start with the Three Laws** - Read `docs/THE_CORE.md` first. These are non-negotiable.
+1. **Start with the Three Laws** - Read `docs/the-core.md` first. These are non-negotiable.
 
 2. **Understand Behavioral Relevance** - The score is system-computed. Never let users assign importance.
 

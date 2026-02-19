@@ -42,7 +42,7 @@ The MCP Server:
 
 1. Starts and waits for connections on **stdin/stdout** (stdio protocol)
 2. Receives JSON-RPC requests from the IDE (VS Code, Cursor, Bob)
-3. Exposes 17 MCP tools for memory operations
+3. Exposes 20 MCP tools for memory operations
 4. Returns JSON-RPC responses
 
 ### What It Does NOT Do
