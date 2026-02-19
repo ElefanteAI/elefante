@@ -1,12 +1,107 @@
 """
-Unit tests for scoring normalization
+Unit tests for scoring normalization and behavioral vitality.
 
-Tests the ScoreNormalizer class and adaptive weight calculation.
+Tests the ScoreNormalizer class, adaptive weight calculation, and the
+calculate_relevance_score formula to prevent regressions.
 """
 
+import math
+from datetime import datetime, timedelta
+from uuid import uuid4
+
 import pytest
+
+from src.models.memory import Memory, MemoryMetadata, MemoryType, TYPE_DECAY_RATES
 from src.core.scoring import ScoreNormalizer
 from src.models.conversation import SearchCandidate
+
+
+# ============================================================================
+# Behavioral Vitality Tests
+# ============================================================================
+
+def _make_memory(
+    memory_type: str = "decision",
+    age_days: float = 0,
+    access_count: int = 0,
+    days_since_access: float = 0,
+) -> Memory:
+    now = datetime.utcnow()
+    created = now - timedelta(days=age_days)
+    last_accessed = now - timedelta(days=days_since_access) if access_count > 0 else created
+    decay_rate = TYPE_DECAY_RATES.get(memory_type, 0.01)
+    return Memory(
+        id=uuid4(),
+        content="test",
+        metadata=MemoryMetadata(
+            memory_type=memory_type,
+            created_at=created,
+            last_accessed=last_accessed,
+            access_count=access_count,
+            decay_rate=decay_rate,
+        ),
+    )
+
+
+def test_new_memory_scores_100():
+    """A brand-new memory (age=0, never retrieved) must start at 100."""
+    m = _make_memory(age_days=0, access_count=0)
+    score = round(m.calculate_relevance_score() * 100)
+    assert score == 100, f"Expected 100, got {score}"
+
+
+def test_score_always_bounded_0_to_100():
+    """Score must never exceed 100, even for heavily-used fresh memories."""
+    for ac in [0, 1, 5, 10, 50, 71, 200]:
+        m = _make_memory(age_days=0, access_count=ac, days_since_access=0)
+        raw = m.calculate_relevance_score()
+        assert 0.0 <= raw <= 1.0, f"Out of bounds for ac={ac}: {raw}"
+
+
+def test_higher_access_count_produces_higher_score():
+    """A memory accessed 71 times should score higher than one accessed 5 times
+    for the same age — reinforcement slows decay."""
+    low = _make_memory(age_days=60, access_count=5, days_since_access=1, memory_type="decision")
+    high = _make_memory(age_days=60, access_count=71, days_since_access=1, memory_type="decision")
+    assert high.calculate_relevance_score() > low.calculate_relevance_score(), (
+        "Higher access_count should yield higher score for same-age memory"
+    )
+
+
+def test_older_memory_decays_vs_newer():
+    """A 70-day-old memory should score lower than a 5-day-old memory of the same type."""
+    old = _make_memory(age_days=70, access_count=0, memory_type="decision")
+    new = _make_memory(age_days=5, access_count=0, memory_type="decision")
+    assert new.calculate_relevance_score() > old.calculate_relevance_score()
+
+
+def test_preference_decays_slower_than_decision():
+    """Preferences (dr=0.002) should score higher than decisions (dr=0.005)
+    for equal age and access count."""
+    pref = _make_memory(age_days=60, access_count=0, memory_type="preference")
+    dec = _make_memory(age_days=60, access_count=0, memory_type="decision")
+    assert pref.calculate_relevance_score() > dec.calculate_relevance_score(), (
+        "Preferences have a smaller decay_rate and should decay slower"
+    )
+
+
+def test_no_flat_100_wall_for_high_access():
+    """The score for a 60-day-old heavily-used decision memory should be well below 100.
+    This guards against the regression where reinforcement * recency > 1.0."""
+    m = _make_memory(age_days=60, access_count=71, days_since_access=1, memory_type="decision")
+    score = round(m.calculate_relevance_score() * 100)
+    assert score < 100, f"60-day-old memory with 71 accesses should not be 100, got {score}"
+    assert score >= 70, f"60-day-old memory with 71 accesses should not be too low, got {score}"
+
+
+def test_correct_decay_rates_are_defined():
+    """TYPE_DECAY_RATES must define at least the key memory types with sensible values."""
+    assert TYPE_DECAY_RATES["preference"] < TYPE_DECAY_RATES["decision"]
+    assert TYPE_DECAY_RATES["decision"] < TYPE_DECAY_RATES["conversation"]
+    assert TYPE_DECAY_RATES["preference"] > 0
+
+
+
 
 
 class TestScoreNormalizer:

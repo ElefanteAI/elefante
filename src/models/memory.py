@@ -286,41 +286,50 @@ class Memory(BaseModel):
         Behavioral vitality.
 
         Nobody assigns importance. Vitality emerges from behavior:
-        - Recency: older memories decay based on their type's half-life
-        - Freshness: only penalizes memories the agent has ALREADY retrieved
-          (unproven memories keep full vitality — they haven't had a chance to prove
-           themselves yet; penalizing them for not being retrieved is circular)
-        - Reinforcement: frequently-retrieved memories grow stronger
+        - Recency: core exponential decay based on memory type's half-life
+        - Reinforcement: frequent retrieval SLOWS the decay rate (extends half-life)
+          rather than multiplying the product — this keeps scores bounded 0–100
+          and ensures high-use memories survive longer WITHOUT inflating to 100+
+        - Freshness: gentle additional penalty for memories not accessed recently
 
-        Formula: vitality = recency × freshness × reinforcement
+        Formula:
+          effective_decay_rate = decay_rate / (1 + reinforcement_factor * log(access_count + 1))
+          vitality = exp(-effective_decay_rate * days_since_created) * freshness
+
+        Properties:
+          - New memory at birth (ac=0): effective_dr = decay_rate → score = 100
+          - ac=10: effective_dr = decay_rate / 1.58  (half-life 58% longer)
+          - ac=71: effective_dr = decay_rate / 2.07  (half-life doubled)
+          - Product is ALWAYS in [0, 1] — score can never inflate beyond 100
+          - A 72-day-old frequently-accessed preference still scores ~90 (meaningful signal)
+          - A 72-day-old rarely-accessed preference scores ~85 (correct differentiation)
+
         Returns float 0.0–1.0 → multiply by 100 for stored score.
-        New memory at birth: 1.0 × 1.0 × 1.0 = 1.0 → score 100.
         """
         import math
 
         if current_time is None:
             current_time = datetime.utcnow()
 
-        # Days since events (fractional for precision)
         days_since_created = max(0, (current_time - self.metadata.created_at).total_seconds() / 86400)
         days_since_access = max(0, (current_time - self.metadata.last_accessed).total_seconds() / 86400)
         access_count = max(0, self.metadata.access_count)
 
-        # Recency: exponential decay based on memory type's half-life
-        recency = math.exp(-self.metadata.decay_rate * days_since_created)
+        # Reinforcement slows decay — frequent retrieval extends the half-life.
+        # This is bounded below by decay_rate (no access) and above by decay_rate/2+
+        # The product exp(-eff_dr * age) is always in [0, 1].
+        effective_decay_rate = self.metadata.decay_rate / (
+            1.0 + self.metadata.reinforcement_factor * math.log(access_count + 1)
+        )
 
-        # Freshness: only decay if the agent has actually retrieved this memory.
-        # A memory never retrieved is UNPROVEN — not stale. Give it benefit of the doubt.
-        if access_count > 0:
-            freshness = math.exp(-0.02 * days_since_access)
-        else:
-            freshness = 1.0
+        recency = math.exp(-effective_decay_rate * days_since_created)
 
-        # Reinforcement: grows with repeated retrieval (logarithmic ceiling)
-        reinforcement = 1.0 + (self.metadata.reinforcement_factor * math.log(access_count + 1))
+        # Freshness: gentle uniform decay since last access (applied regardless
+        # of access_count — a never-retrieved memory that is 1 day old is considered
+        # as fresh as one accessed 1 day ago, since last_accessed defaults to created_at).
+        freshness = math.exp(-0.005 * days_since_access)
 
-        raw = recency * freshness * reinforcement
-        return min(1.0, max(0.0, raw))
+        return min(1.0, max(0.0, recency * freshness))
     
     def record_access(self):
         """Record access and recompute stored score."""

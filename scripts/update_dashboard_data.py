@@ -75,16 +75,13 @@ def _compute_live_score(meta: dict) -> int:
     """
     Recompute behavioral vitality from stored ChromaDB metadata fields.
 
-    Avoids using the stale `score` persisted in ChromaDB, which may have been
-    set under the old formula (0.5 base, freshness punishing never-retrieved memories).
+    Formula (matches src/models/memory.py calculate_relevance_score):
+      effective_decay_rate = decay_rate / (1 + reinforcement_factor * log(access_count + 1))
+      vitality = exp(-effective_decay_rate * days_since_created) * freshness
 
-    Rules:
-      vitality = recency × freshness × reinforcement
-      - recency:       exp(-decay_rate × days_since_created)  — type-specific half-life
-      - freshness:     exp(-0.02 × days_since_access)  **only if access_count > 0**
-                       (unproven memories are NOT penalised for low retrieval; they
-                        haven't had a chance to prove themselves yet)
-      - reinforcement: 1.0 + 0.25 × log(access_count + 1)  — grows with use
+    Reinforcement slows the decay rate rather than multiplying the product,
+    so the score is always in [0, 100] and high-access memories show real
+    differentiated values (not a flat 100 wall).
     """
     import math
 
@@ -103,12 +100,11 @@ def _compute_live_score(meta: dict) -> int:
         days_since_created = max(0.0, (now - created).total_seconds() / 86400)
         days_since_access = max(0.0, (now - last_accessed).total_seconds() / 86400)
 
-        recency = math.exp(-decay_rate * days_since_created)
-        freshness = math.exp(-0.02 * days_since_access) if access_count > 0 else 1.0
-        reinforcement = 1.0 + (0.25 * math.log(access_count + 1))
+        effective_decay_rate = decay_rate / (1.0 + 0.25 * math.log(access_count + 1))
+        recency = math.exp(-effective_decay_rate * days_since_created)
+        freshness = math.exp(-0.005 * days_since_access)
 
-        raw = recency * freshness * reinforcement
-        return min(100, max(0, round(raw * 100)))
+        return min(100, max(0, round(recency * freshness * 100)))
     except Exception:
         return int(meta.get("score") or 100)
 

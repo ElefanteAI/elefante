@@ -12,7 +12,7 @@ from uuid import UUID
 from datetime import datetime
 from pathlib import Path
 
-from src.models.memory import Memory, MemoryMetadata
+from src.models.memory import Memory, MemoryMetadata, TYPE_DECAY_RATES
 from src.models.query import SearchResult, SearchFilters
 from src.core.embeddings import get_embedding_service
 from src.utils.config import get_config
@@ -607,14 +607,20 @@ class VectorStore:
             archived=metadata.get("archived", False),
             custom_metadata=custom_metadata,
         )
-        
+
+        # Derive decay_rate from memory_type (not stored in ChromaDB — always
+        # recompute so old memories get correct half-life on reconstruction).
+        raw_mem_type = metadata.get("memory_type", "conversation")
+        type_key = str(raw_mem_type).split(".")[-1].lower()
+        memory_metadata.decay_rate = TYPE_DECAY_RATES.get(type_key, 0.01)
+
         # Create memory object
         memory = Memory(
             id=UUID(memory_id),
             content=content,
             metadata=memory_metadata
         )
-        
+
         return memory
     
     async def find_by_title(self, title: str) -> Optional[Memory]:
@@ -791,19 +797,18 @@ class VectorStore:
     
     async def update_memory_access(self, memory: Memory) -> bool:
         """
-        Update memory access tracking (lightweight update for temporal decay)
-        
-        Args:
-            memory: Memory object with updated access metadata
-            
-        Returns:
-            True if successful, False otherwise
+        Update memory access tracking (lightweight update for temporal decay).
+        Persists last_accessed, access_count AND the recomputed behavioral score
+        so the stored score stays in sync with actual vitality.
         """
+        # Recompute score before persisting so it reflects current vitality.
+        memory.metadata.score = min(100, max(0, round(memory.calculate_relevance_score() * 100)))
         return await self.update_memory(
             memory.id,
             {
                 "last_accessed": memory.metadata.last_accessed,
-                "access_count": memory.metadata.access_count
+                "access_count": memory.metadata.access_count,
+                "score": memory.metadata.score,
             }
         )
     
