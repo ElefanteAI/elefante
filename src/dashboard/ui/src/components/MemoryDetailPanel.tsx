@@ -114,7 +114,11 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [] }: Mem
           <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
             <MetaRow icon={<Layers size={12} />} label="Topic" value={p.topic || 'general'} />
             <MetaRow icon={<Brain size={12} />} label="Type" value={p.memory_type || '-'} />
-            <MetaRow icon={<Star size={12} />} label="Score" value={p.score != null ? String(p.score) : '-'} />
+            <MetaRow icon={<Star size={12} />} label="Vitality" value={p.score != null ? (() => {
+              const n = Number(p.score);
+              const label = n >= 80 ? 'Fresh' : n >= 60 ? 'Healthy' : n >= 40 ? 'Aging' : n >= 20 ? 'Fading' : 'Dormant';
+              return `${Math.round(n)} / 100 — ${label}`;
+            })() : '-'} />
             <MetaRow icon={<Hash size={12} />} label="Status" value={p.processing_status || '-'} />
             <MetaRow icon={<Globe size={12} />} label="Namespace" value={p.namespace || '-'} />
             <MetaRow icon={<User size={12} />} label="Source" value={p.source || '-'} />

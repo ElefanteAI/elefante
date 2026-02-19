@@ -39,6 +39,80 @@ def _redact_secrets(text: str) -> str:
     return redacted
 
 
+def _derive_topic(title: str, meta_topic: str | None) -> str:
+    """Derive a topic from the memory title when meta.topic is missing.
+
+    Two formats seen in the wild:
+      "Category | Rest of title..."  -> returns "Category"
+      "type.category: content..."    -> returns "Category" (title-cased)
+    Falls back to "General" if neither pattern matches.
+    """
+    if meta_topic and str(meta_topic).strip():
+        return meta_topic.strip()
+    if not title:
+        return "General"
+    # Format 1: "Category | ..." — the dominant pattern
+    if " | " in title:
+        return title.split(" | ")[0].strip()
+    # Format 2: "type.category: ..." e.g. "decision.general:" or "preference.general:"
+    if "." in title and ":" in title:
+        try:
+            category = title.split(".")[1].split(":")[0].strip()
+            if category:
+                return category.title()
+        except IndexError:
+            pass
+    return "General"
+
+
+_TYPE_DECAY_RATES = {
+    "preference": 0.002, "decision": 0.005, "fact": 0.005,
+    "insight": 0.008, "note": 0.015, "conversation": 0.025,
+}
+
+
+def _compute_live_score(meta: dict) -> int:
+    """
+    Recompute behavioral vitality from stored ChromaDB metadata fields.
+
+    Avoids using the stale `score` persisted in ChromaDB, which may have been
+    set under the old formula (0.5 base, freshness punishing never-retrieved memories).
+
+    Rules (v2.0.0 formula):
+      vitality = recency × freshness × reinforcement
+      - recency:       exp(-decay_rate × days_since_created)  — type-specific half-life
+      - freshness:     exp(-0.02 × days_since_access)  **only if access_count > 0**
+                       (unproven memories are NOT penalised for low retrieval; they
+                        haven't had a chance to prove themselves yet)
+      - reinforcement: 1.0 + 0.25 × log(access_count + 1)  — grows with use
+    """
+    import math
+
+    try:
+        memory_type = meta.get("memory_type", "fact")
+        decay_rate = _TYPE_DECAY_RATES.get(str(memory_type), 0.01)
+
+        now = datetime.utcnow()
+        created_str = meta.get("created_at") or ""
+        accessed_str = meta.get("last_accessed") or ""
+        access_count = int(meta.get("access_count") or 0)
+
+        created = datetime.fromisoformat(created_str.replace("Z", "")) if created_str else now
+        last_accessed = datetime.fromisoformat(accessed_str.replace("Z", "")) if accessed_str else created
+
+        days_since_created = max(0.0, (now - created).total_seconds() / 86400)
+        days_since_access = max(0.0, (now - last_accessed).total_seconds() / 86400)
+
+        recency = math.exp(-decay_rate * days_since_created)
+        freshness = math.exp(-0.02 * days_since_access) if access_count > 0 else 1.0
+        reinforcement = 1.0 + (0.25 * math.log(access_count + 1))
+
+        raw = recency * freshness * reinforcement
+        return min(100, max(0, round(raw * 100)))
+    except Exception:
+        return int(meta.get("score") or 100)
+
+
 def _is_test_artifact(*, content: str, title: str) -> bool:
     c = (content or "").strip().lower()
     t = (title or "").strip().lower()
@@ -195,8 +269,8 @@ async def main():
                 # V5 topology (best-effort pass-through)
                 "ring": meta.get("ring"),
                 "knowledge_type": meta.get("knowledge_type"),
-                "topic": meta.get("topic"),
-                "score": meta.get("score"),
+                "topic": _derive_topic(str(title) if title is not None else "", meta.get("topic")),
+                "score": _compute_live_score(meta),
                 "summary": _redact_secrets(meta.get("summary", "") or ""),
                 "owner_id": meta.get("owner_id"),
                 "processing_status": meta.get("processing_status"),

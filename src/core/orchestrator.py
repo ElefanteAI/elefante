@@ -280,7 +280,7 @@ class MemoryOrchestrator:
                                 seen.add(tt)
                                 merged_tags.append(tt)
 
-                    merged_importance = max(int(existing.metadata.score or 50), 50)
+                    merged_importance = int(existing.metadata.score or 100)
 
                     merged_content = existing.content
                     if not _is_near_duplicate(content, existing.content):
@@ -455,7 +455,6 @@ class MemoryOrchestrator:
             
             memory_metadata = MemoryMetadata(
                 memory_type=MemoryType(memory_type),
-                score=50,  # Everyone starts equal
                 status=status,
                 tags=tags or [],
                 domain=DomainType(domain) if domain else DomainType.REFERENCE,
@@ -501,7 +500,7 @@ class MemoryOrchestrator:
                 properties={
                     "content": content[:200],
                     "memory_type": memory_type,
-                    "score": 50,
+                    "score": memory.metadata.score,
                     "status": status.value,
                     "timestamp": memory.metadata.created_at,
                     "processing_status": ProcessingStatus.RAW,
@@ -803,7 +802,7 @@ class MemoryOrchestrator:
                 summary=metadata.summary if hasattr(metadata, 'summary') else memory.content[:100],
                 concepts=metadata.concepts if hasattr(metadata, 'concepts') and metadata.concepts else [],
                 domain=metadata.domain.value if hasattr(metadata, 'domain') and metadata.domain and hasattr(metadata.domain, 'value') else (metadata.domain if hasattr(metadata, 'domain') and isinstance(metadata.domain, str) else "general"),
-                importance=metadata.score if hasattr(metadata, 'score') else 50,
+                importance=metadata.score if hasattr(metadata, 'score') else 100,
                 access_count=metadata.access_count if hasattr(metadata, 'access_count') else 1,
                 created_at=metadata.created_at if hasattr(metadata, 'created_at') and metadata.created_at else datetime.utcnow(),
                 last_accessed=metadata.last_accessed if hasattr(metadata, 'last_accessed') and metadata.last_accessed else datetime.utcnow(),
@@ -955,9 +954,9 @@ class MemoryOrchestrator:
             if importance is None:
                 importance = entity_props.get("score") or entity_props.get("importance")
             try:
-                importance_int = int(importance) if importance is not None else 50
+                importance_int = int(importance) if importance is not None else 100
             except Exception:
-                importance_int = 50
+                importance_int = 100
 
             score = max(0.0, min(1.0, importance_int / 100.0))
 

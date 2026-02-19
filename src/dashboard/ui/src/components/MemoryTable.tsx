@@ -96,17 +96,24 @@ export function MemoryTable({ memories, onSelectMemory, selectedId }: MemoryTabl
       size: 100,
     }),
     columnHelper.accessor('properties.score', {
-      header: 'Score',
+      header: 'Vitality',
       cell: (info) => {
         const score = info.getValue();
         if (score === undefined || score === null) return null;
+        const n = typeof score === 'number' ? score : Number(score);
+        const [label, cls] =
+          n >= 80 ? ['Fresh',   'bg-emerald-500/20 text-emerald-300'] :
+          n >= 60 ? ['Healthy', 'bg-teal-500/20 text-teal-300'] :
+          n >= 40 ? ['Aging',   'bg-amber-500/20 text-amber-300'] :
+          n >= 20 ? ['Fading',  'bg-orange-500/20 text-orange-300'] :
+                    ['Dormant', 'bg-red-500/20 text-red-400'];
         return (
-          <span className="text-xs text-slate-400">
-            {typeof score === 'number' ? score.toFixed(2) : score}
+          <span className={`px-2 py-0.5 rounded text-xs ${cls}`}>
+            {label}
           </span>
         );
       },
-      size: 60,
+      size: 72,
     }),
     columnHelper.accessor('properties.access_count', {
       header: 'Uses',

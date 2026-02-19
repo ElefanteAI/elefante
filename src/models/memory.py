@@ -161,7 +161,7 @@ class MemoryMetadata(BaseModel):
     subcategory: Optional[str] = None
     
     # Relevance (system-computed — do NOT set manually)
-    score: int = Field(default=50, ge=0, le=100, description="System-computed relevance. Starts at 50, earned through usage, lost through neglect.")
+    score: int = Field(default=100, ge=0, le=100, description="Behavioral vitality (0-100). Born at 100 — decays slowly with age, grows with retrieval. Unproven memories keep full vitality until the agent actually uses them.")
     urgency: int = Field(default=5, ge=0, le=10, description="How time-sensitive this memory is. 0=archival, 10=critical-now.")
     intent: IntentType = IntentType.REFERENCE
     confidence: float = Field(default=0.7, ge=0.0, le=1.0)
@@ -285,37 +285,43 @@ class Memory(BaseModel):
     
     def calculate_relevance_score(self, current_time: Optional[datetime] = None) -> float:
         """
-        System-computed relevance (v1.10.0).
-        
-        Nobody assigns importance. Importance emerges from behavior:
-        - Recency: newer memories score higher, old ones decay exponentially
-        - Freshness: recently-retrieved memories get boosted
-        - Reinforcement: frequently-accessed memories grow stronger
-        
-        Formula: relevance = 0.5 * recency * freshness * reinforcement
-        Returns float 0.0–1.0 for search ranking.
+        Behavioral vitality (v2.0.0).
+
+        Nobody assigns importance. Vitality emerges from behavior:
+        - Recency: older memories decay based on their type's half-life
+        - Freshness: only penalizes memories the agent has ALREADY retrieved
+          (unproven memories keep full vitality — they haven't had a chance to prove
+           themselves yet; penalizing them for not being retrieved is circular)
+        - Reinforcement: frequently-retrieved memories grow stronger
+
+        Formula: vitality = recency × freshness × reinforcement
+        Returns float 0.0–1.0 → multiply by 100 for stored score.
+        New memory at birth: 1.0 × 1.0 × 1.0 = 1.0 → score 100.
         """
         import math
-        
+
         if current_time is None:
             current_time = datetime.utcnow()
-        
+
         # Days since events (fractional for precision)
         days_since_created = max(0, (current_time - self.metadata.created_at).total_seconds() / 86400)
         days_since_access = max(0, (current_time - self.metadata.last_accessed).total_seconds() / 86400)
         access_count = max(0, self.metadata.access_count)
-        
-        # Recency: exponential decay based on memory type
+
+        # Recency: exponential decay based on memory type's half-life
         recency = math.exp(-self.metadata.decay_rate * days_since_created)
-        
-        # Freshness: decays if not recently retrieved
-        freshness = math.exp(-0.02 * days_since_access)
-        
-        # Reinforcement: grows with repeated access (logarithmic)
+
+        # Freshness: only decay if the agent has actually retrieved this memory.
+        # A memory never retrieved is UNPROVEN — not stale. Give it benefit of the doubt.
+        if access_count > 0:
+            freshness = math.exp(-0.02 * days_since_access)
+        else:
+            freshness = 1.0
+
+        # Reinforcement: grows with repeated retrieval (logarithmic ceiling)
         reinforcement = 1.0 + (self.metadata.reinforcement_factor * math.log(access_count + 1))
-        
-        # Base = 0.5 (everyone starts equal)
-        raw = 0.5 * recency * freshness * reinforcement
+
+        raw = recency * freshness * reinforcement
         return min(1.0, max(0.0, raw))
     
     def record_access(self):
@@ -380,7 +386,6 @@ def create_v1_compatible_memory(
     
     metadata = MemoryMetadata(
         memory_type=MemoryType(memory_type) if isinstance(memory_type, str) else memory_type,
-        score=50,  # Everyone starts equal
         decay_rate=decay_rate,
         tags=tags or [],
         source=source_type,
