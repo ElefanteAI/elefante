@@ -3,7 +3,7 @@
 > **Purpose:** This document captures the cohesive larger vision of Elefante for a new agent to implement without requiring clarification. Every file, function, variable, and architectural decision is documented here.
 >
 > **Generated:** 2026-02-18
-> **Version:** v2.0.0
+> **Version:** v2.1.1
 
 ---
 
@@ -204,18 +204,11 @@ The decay rate (lambda) controls how quickly a memory loses relevance if never a
 
 | Memory Type | Decay Rate | Half-Life | Why |
 |-------------|------------|-----------|-----|
-| `rule` | 0.002 | ~347 days | Rules persist, but die if never enforced |
-| `preference` | 0.002 | ~347 days | Preferences are stable but not eternal |
+| `preference` | 0.002 | ~347 days | Preferences are stable |
 | `decision` | 0.005 | ~139 days | Decisions get revisited |
 | `fact` | 0.005 | ~139 days | Facts change |
-| `answer` | 0.005 | ~139 days | Answers may become outdated |
 | `insight` | 0.008 | ~87 days | Insights are validated or forgotten |
-| `code` | 0.008 | ~87 days | Code evolves constantly |
-| `hypothesis` | 0.01 | ~69 days | Hypotheses get tested |
-| `question` | 0.015 | ~46 days | Questions get answered |
 | `note` | 0.015 | ~46 days | Notes are transient |
-| `observation` | 0.015 | ~46 days | Observations are contextual |
-| `task` | 0.02 | ~35 days | Tasks complete or go stale |
 | `conversation` | 0.025 | ~28 days | Conversations are ephemeral |
 
 **Implementation:** `src/models/memory.py` - `TYPE_DECAY_RATES` dictionary
@@ -279,9 +272,9 @@ STEP 2: INTEGRITY (Duplicate & Contradiction Check)
 |     |-- score >= 0.75 + contradiction -> CONTRADICTORY (fact vs fact)
 |     |-- score >= 0.75 + no contradiction -> RELATED
 |     |-- else -> NEW
-|-- Branch on memory_class:
+|-- Resolve contradictions by memory_type:
 |     |-- fact vs fact: CONTRADICTORY (old must be superseded)
-|     |-- directive/state: RELATED (coexist, resolved at retrieval)
+|     |-- preference/decision: RELATED (coexist, resolved at retrieval)
 
 STEP 3: WRITE (Construct Memory Object)
 ==============================================
@@ -317,13 +310,13 @@ REDUNDANT -> DEPRECATED (via refinery cleanup)
 CONTRADICTORY -> DEPRECATED (old fact superseded by new)
 ```
 
-### Memory Class Behavior
+### Contradiction Resolution
 
-| Class | Behavior Under Contradiction |
+| Type | Behavior Under Contradiction |
 |-------|------------------------------|
-| `fact` | Newer supersedes older. Objective truth. |
-| `directive` | Coexists. User preference/instruction. Resolved by recency at retrieval. |
-| `state` | Coexists. Ephemeral condition (mood, energy). Most recent wins. |
+| Fact | Newer supersedes older. Objective truth. |
+| Preference | Coexists. User preference/instruction. Resolved by recency at retrieval. |
+| Conversation | Ephemeral. Most recent wins. |
 
 ### Preference Re-Assertion Merge
 
@@ -348,7 +341,7 @@ All tool names follow `elefante-PascalCase` convention.
 
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
-| `elefante-MemoryAdd` | Store a new memory | `content`, `memory_type`, `memory_class`, `domain`, `category`, `tags`, `entities`, `force_new` |
+| `elefante-MemoryAdd` | Store a new memory | `content`, `memory_type`, `domain`, `category`, `tags`, `entities`, `force_new` |
 | `elefante-MemorySearch` | Search memories | `query`, `mode` (semantic/structured/hybrid), `limit`, `filters`, `list_all` |
 | `elefante-MemoryUpdate` | Amend a memory in-place | `memory_id`, `content`, `deprecated`, `archived`, `supersedes_id`, `tags` |
 | `elefante-MemoryDelete` | Permanently delete with audit trail | `memory_id`, `reason` |
@@ -408,13 +401,8 @@ All tool names follow `elefante-PascalCase` convention.
     "content": { "type": "string", "description": "The memory content to store" },
     "memory_type": {
       "type": "string",
-      "enum": ["conversation", "fact", "insight", "code", "decision", "task", "note", "preference"],
+      "enum": ["conversation", "fact", "insight", "decision", "note", "preference"],
       "default": "conversation"
-    },
-    "memory_class": {
-      "type": "string",
-      "enum": ["fact", "directive", "state"],
-      "default": "fact"
     },
     "domain": {
       "type": "string",
@@ -512,7 +500,7 @@ class MemoryCandidate:
     summary: str
     concepts: list[str]
     domain: str
-    importance: int  # maps to metadata.score (0-100)
+    score: int  # 0-100 behavioral vitality score
     access_count: int
     created_at: datetime
     last_accessed: datetime
@@ -526,17 +514,7 @@ class MemoryCandidate:
     authority_score: float = 0.0
     composite_score: float = 0.0
     
-    # Role in constellation
     role: str = "candidate"  # primary, supporting, contradicting, context
-
-@dataclass
-class MemoryConstellation:
-    """Structured retrieval result - not a flat list."""
-    primary: Optional[MemoryCandidate] = None
-    supporting: list[MemoryCandidate] = field(default_factory=list)
-    contradicting: list[MemoryCandidate] = field(default_factory=list)
-    context: list[MemoryCandidate] = field(default_factory=list)
-    synthesis: str = ""
 
 @dataclass
 class RetrievalExplanation:
@@ -779,23 +757,16 @@ class MemoryMetadata(BaseModel):
     # Classification
     domain: DomainType = DomainType.REFERENCE
     category: str = "general"
-    memory_type: MemoryType = MemoryType.CONVERSATION
-    memory_class: MemoryClass = MemoryClass.FACT
+    memory_type: MemoryType = MemoryType.FACT
     
     # Relevance (system-computed)
     score: int = Field(default=50, ge=0, le=100)
-    urgency: int = Field(default=5, ge=0, le=10)
-    intent: IntentType = IntentType.REFERENCE
-    confidence: float = Field(default=0.7)
     tags: List[str] = Field(default_factory=list)
     
     # V4 Cognitive Retrieval
     concepts: List[str] = Field(default_factory=list)
     surfaces_when: List[str] = Field(default_factory=list)
-    co_activated_with: List[UUID] = Field(default_factory=list)
     authority_score: float = Field(default=0.5)
-    contradicts: List[UUID] = Field(default_factory=list)
-    supports: List[UUID] = Field(default_factory=list)
     
     # Relationship Tracking
     status: MemoryStatus = MemoryStatus.NEW
@@ -893,7 +864,7 @@ class RelationshipType(str, Enum):
 | `src/core/orchestrator.py` | Central intelligence layer | `MemoryOrchestrator`, `add_memory()`, `search_memories()` |
 | `src/core/vector_store.py` | ChromaDB integration | `VectorStore`, `search()`, `add_memory()` |
 | `src/core/graph_store.py` | Kuzu integration | `GraphStore`, `create_or_get_entity()`, `execute_query()` |
-| `src/core/retrieval.py` | Cognitive retrieval | `CognitiveRetriever`, `MemoryCandidate`, `MemoryConstellation` |
+| `src/core/retrieval.py` | Cognitive retrieval | `CognitiveRetriever`, `MemoryCandidate`, `RetrievalExplanation` |
 | `src/core/embeddings.py` | Local embeddings | `EmbeddingService`, `generate_embedding()` |
 | `src/core/etl.py` | Agent-driven ETL | `ETLProcessor`, `get_raw_memories()`, `apply_classification()` |
 | `src/core/refinery.py` | Memory cleanup | `MemoryRefinery`, `build_refinery_plan()` |

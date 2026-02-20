@@ -2,7 +2,7 @@
 
 Persistent memory for AI coding agents. Elefante runs locally on your machine via [MCP](https://modelcontextprotocol.io/) (Model Context Protocol), storing knowledge in a vector database and a knowledge graph. Your agent remembers what you care about, forgets what you don't, and scores every memory based on how you actually use it — not how important you *said* it was.
 
-> **Current version:** v2.0.0
+> **Current version:** v2.1.1
 
 ---
 
@@ -129,7 +129,7 @@ Setup guides for VS Code, Cursor, and other MCP-compatible IDEs: [`docs/technica
 
 ## MCP Tools
 
-Elefante exposes **17 tools** and **2 prompts** via MCP. All tool names follow the `elefante-PascalCase` convention.
+Elefante exposes **20 tools** and **2 prompts** via MCP. All tool names follow the `elefante-PascalCase` convention.
 
 ### Memory
 
@@ -177,6 +177,14 @@ Elefante exposes **17 tools** and **2 prompts** via MCP. All tool names follow t
 | `elefante-System` | Enable or disable Elefante Mode (`action="enable"` / `action="disable"`). |
 | `elefante-SystemStatusGet` | Check system health, lock state, and database stats. |
 | `elefante-DashboardOpen` | Open the knowledge graph dashboard. |
+
+### Directives
+
+| Tool | Purpose |
+|------|---------|
+| `elefante-DirectiveAdd` | Add a persistent behavioral directive — unconditional rules injected into every tool response. |
+| `elefante-DirectiveList` | List all active directives. |
+| `elefante-DirectiveRemove` | Remove a directive by ID. |
 
 ### Prompts
 

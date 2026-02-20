@@ -32,6 +32,8 @@ Two field name mismatches between ChromaDB storage and dashboard presentation ca
 - **FIX**: `src/mcp/server.py` `_refresh_dashboard_snapshot()` — Read `mem.metadata.category` instead of `cm.get("topic")` for live refresh topic assignment.
 - **FIX**: `src/dashboard/server.py` `get_graph()` — Added usage hydration fallback that populates `access_count`, `last_accessed`, `last_modified` from live vector store when snapshot properties lack them.
 - **REMOVED**: Deprecated `importance`, `layer`, `sublayer` fields from snapshot builder (removed in schema v4).
+- **FIX**: Version unification — bumped all 15 files (`setup.py`, `src/__init__.py`, `config.yaml`, `package.json`, `package-lock.json`, `README.md`, `RELEASES.md`, and 8 docs) from stale 2.0.0/2.1.0 to 2.1.1. Dashboard now reports the correct version.
+- **CLEANED**: Removed dead `llm`, `memory`, `consolidation`, `auto_tagging` placeholder sections from `config.yaml`.
 
 ---
 

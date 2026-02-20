@@ -7,13 +7,17 @@ For full detail, see [CHANGELOG.md](CHANGELOG.md).
 
 ## Current Baseline (recommended)
 
-- **v2.1.0 (2026-02-19)**
+- **v2.1.1 (2026-02-19)**
+  - Dashboard field mapping fix: categories and usage counts now display correctly
   - Directive System: behavioral constraints separated from memories, always injected into every tool response
   - Tool Response Contract: `MANDATORY_PROTOCOLS_READ_THIS_FIRST`, `DIRECTIVES`, `RELEVANT_CONTEXT` documented as first-class architecture
   - Installation bootstrap: Step 4a validates `copilot-instructions.md` exists
   - Tool count: 17 → 20 (added `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove`)
 
 ## Previous Releases
+
+- **v2.1.0 (2026-02-19)**
+  - Directive System, Tool Response Contract, installation bootstrap (superseded by v2.1.1)
 
 - **v2.0.0 (2026-02-18)**
   - Memory curation: 13 high-signal memories, zero noise

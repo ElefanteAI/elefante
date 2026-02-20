@@ -1,4 +1,4 @@
-# Usage Guide & API Reference (v2.0.0)
+# Usage Guide & API Reference (v2.1.1)
 
 ## 1. Natural Language Interaction
 
@@ -29,8 +29,7 @@ The MCP server exposes 20 tools to your AI agent. All tool names follow the `ele
 | Parameter | Purpose | Values |
 |-----------|---------|--------|
 | `content` | The actual text to remember | Free text |
-| `memory_type` | Kind of knowledge (determines decay rate) | `preference`, `fact`, `decision`, `task`, `insight`, `code`, `note`, `conversation`, `rule`, `question`, `hypothesis`, `observation`, `answer` |
-| `memory_class` | Contradiction behavior | `fact` (newer supersedes older), `directive` (coexists, resolved by recency), `state` (ephemeral, most recent wins). Default: `fact`. Use `directive` when ambiguous. |
+| `memory_type` | Kind of knowledge (determines decay rate) | `preference`, `fact`, `decision`, `insight`, `note`, `conversation` |
 | `domain` | High-level context | `work`, `personal`, `project`, `learning`, `reference`, `system` |
 | `category` | Topic grouping | e.g. `elefante`, `python` |
 | `tags` | Keywords for filtering | Array of strings |
@@ -63,7 +62,7 @@ The MCP server exposes 20 tools to your AI agent. All tool names follow the `ele
 - `query` (required): Search query
 - `mode` (optional): `semantic` (vectors), `structured` (graph), or `hybrid` (both). Default: `hybrid`
 - `limit` (optional): Max results (default: 10)
-- `filters` (optional): Filter by `memory_type`, `min_importance` (score 0-100), `tags`
+- `filters` (optional): Filter by `memory_type`, `min_score` (score 0-100), `tags`
 - `list_all` (optional): If true, returns ALL memories (paginated) without semantic search. Use for dumps/exports.
 
 **Example**:

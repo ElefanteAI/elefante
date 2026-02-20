@@ -1,12 +1,12 @@
 # Elefante Memory System Configuration
-# Version: 2.0.0
+# Version: 2.1.1
 #
 # NOTE: Paths are now automatically resolved to absolute paths by config.py
 # to prevent database "amnesia" when starting from different directories.
 # You can override these with environment variables if needed.
 
 elefante:
-  version: "2.0.0"
+  version: "2.1.1"
   # data_dir is auto-set to absolute path in config.py
   anonymized_telemetry: false
 
@@ -37,7 +37,7 @@ elefante:
   # MCP Server Configuration
   mcp_server:
     name: "elefante"
-    version: "2.0.0"
+    version: "2.1.1"
     description: "Local AI Memory System with Vector and Graph Storage"
     # Optional HTTP endpoint (leave commented for stdio only)
     # port: 3000
@@ -51,15 +51,6 @@ elefante:
     batch_size: 32
     normalize: true
 
-  # LLM Configuration
-  # Elefante does NOT connect to an LLM. Any LLM usage must be handled by the calling agent.
-  # (Kept as a placeholder for legacy configs; currently ignored by runtime.)
-  llm:
-    provider: "agent-managed"
-    model: ""
-    temperature: 0.0
-    max_tokens: 0
-
   # Logging Configuration
   logging:
     level: "INFO" # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
@@ -69,12 +60,6 @@ elefante:
     backup_count: 5
     console: true
 
-  # Memory Management
-  memory:
-    auto_consolidate: false # Automatic memory consolidation (future feature)
-    consolidation_threshold: 1000 # Number of memories before consolidation
-    max_age_days: 365 # Maximum age before archival (0 = never)
-  
   # Temporal Memory Decay & Reinforcement (v1.2.0)
   temporal_decay:
     enabled: true # Enable adaptive memory strength
@@ -82,11 +67,6 @@ elefante:
     default_reinforcement_factor: 0.1 # 10% boost per access (0.0-1.0)
     semantic_weight: 0.7 # Weight for semantic similarity (0.0-1.0)
     temporal_weight: 0.3 # Weight for temporal strength (0.0-1.0)
-    consolidation:
-      enabled: false # Background archival of low-strength memories
-      interval_hours: 24 # Run every 24 hours
-      strength_threshold: 0.1 # Archive memories below this strength (0.0-1.0)
-      archive_threshold_days: 180 # Only archive memories older than this
 
   # Performance Tuning
   performance:
@@ -99,7 +79,6 @@ elefante:
   features:
     enable_graph_store: true
     enable_vector_store: true
-    enable_auto_tagging: false # AI-powered auto-tagging (future)
     enable_deduplication: true
 
   # Elefante Mode (v1.1.0) - Transaction-Scoped Locking

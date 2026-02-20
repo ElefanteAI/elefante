@@ -1,6 +1,6 @@
 # Debug Documentation Index
 
-**Compendiums and pitfall reference for Elefante v2.1.0**
+**Compendiums and pitfall reference for Elefante v2.1.1**
 
 > **Last Updated:** 2026-02-19
 
@@ -60,4 +60,4 @@ docs/debug/
 
 ---
 
-*Last verified: 2026-02-19 | Elefante v2.1.0*
+*Last verified: 2026-02-19 | Elefante v2.1.1*

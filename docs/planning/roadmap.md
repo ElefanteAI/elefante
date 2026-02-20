@@ -1,6 +1,6 @@
 # Elefante Development Roadmap
 
-**Current Version**: v2.1.0  
+**Current Version**: v2.1.1  
 **Last Updated**: 2026-02-19
 
 ---
@@ -20,8 +20,7 @@ v2.0.0 is the definitive production release. All core infrastructure is implemen
 | Behavioral Relevance scoring (0-100) | Production | v2.0.0 |
 | Temporal memory decay with type-based rates | Production | v1.0.0 |
 | Cognitive retrieval (V4: concepts, authority, surfaces_when) | Production | v1.6.3 |
-| Knowledge topology (V5: rings, topics, knowledge_type) | Production | v1.6.3 |
-| Agent ETL classification pipeline | Production | v1.6.3 |
+| Agent ETL classification pipeline (ring, topic, knowledge_type) | Production | v1.6.3 |
 | Dashboard (React + SVG, 3-tab architecture) | Production | v2.0.0 |
 | Context injection (auto-surfaces top 3 memories) | Production | v1.0.0 |
 | Session Distiller (scan, parse, ingest from VS Code chat) | Production | v2.0.0 |
@@ -38,11 +37,11 @@ v2.0.0 is the definitive production release. All core infrastructure is implemen
 
 ## Next Phase (Planned)
 
-### Priority 1: Wire CognitiveRetriever (P0)
+### Priority 1: Response Bloat Fix (P0)
 
-The `CognitiveRetriever` class exists in `src/core/retrieval.py` but `elefante-MemorySearch` still uses raw ChromaDB results. Multi-signal scoring (concept overlap, authority, co-activation) needs to be connected.
+Search returns ~500 tokens per memory (90% nulls). Needs compact response format.
 
-**Files**: `src/core/orchestrator.py`
+**Files**: `src/mcp/server.py`, `src/models/query.py`
 
 ### Priority 2: Retrieval Explanation
 
@@ -79,6 +78,9 @@ Merge new info with existing memories instead of duplicating. Track version hist
 
 ### Proactive Memory Surfacing
 System suggests relevant memories without user searching, based on file context, error patterns, and conversation keywords.
+
+### Co-Activation Tracking
+Track which memories are frequently retrieved together to improve scoring (currently 15% weight returns 0).
 
 ### Multi-Modal
 Image memory support. Audio transcription integration.

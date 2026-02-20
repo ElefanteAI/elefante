@@ -1,6 +1,6 @@
 # Elefante Agent Tutorial
 
-> **Version:** 2.0.0  
+> **Version:** 2.1.1  
 > **Audience:** AI Agents using MCP tools  
 > **Tool naming:** All tools use `elefante-PascalCase` convention
 
@@ -88,7 +88,6 @@ Tool: elefante-MemoryAdd
 Arguments: {
   "content": "The user prefers concise communication without fluff.",
   "memory_type": "preference",
-  "memory_class": "directive",
   "domain": "personal",
   "category": "communication",
   "tags": ["preference", "communication"]
@@ -99,8 +98,7 @@ Arguments: {
 - `content` — What to remember (string)
 
 **Recommended fields (YOU classify these):**
-- `memory_type` — `conversation` | `fact` | `insight` | `code` | `decision` | `task` | `note` | `preference` | `rule` | `observation` | `hypothesis` | `question` | `answer` (default: `conversation`)
-- `memory_class` — `fact` | `directive` | `state` (default: `fact`). Controls contradiction detection behavior.
+- `memory_type` — `fact` | `decision` | `preference` | `insight` | `note` | `conversation` (default: `fact`). Determines decay rate.
 - `domain` — `work` | `personal` | `learning` | `project` | `reference` | `system`
 - `category` — Topic grouping (e.g., "elefante", "python")
 - `tags` — Array of keywords
@@ -278,12 +276,11 @@ A preference you set 6 months ago and still use? Score stays high. An architectu
 
 | Type | Half-Life | Why |
 |------|-----------|-----|
-| `rule`, `preference` | ~347 days | Stable but not eternal |
-| `decision`, `fact`, `answer` | ~139 days | Get revisited over time |
-| `insight`, `code` | ~87 days | Validated or forgotten |
-| `hypothesis` | ~69 days | Tested quickly |
-| `question`, `note`, `observation` | ~46 days | Contextual, transient |
-| `task` | ~35 days | Complete or go stale |
+| `preference` | ~347 days | Stable personal choices |
+| `decision` | ~139 days | Get revisited over time |
+| `fact` | ~139 days | Objective truths evolve |
+| `insight` | ~87 days | Validated or forgotten |
+| `note` | ~46 days | Contextual, transient |
 | `conversation` | ~28 days | Ephemeral |
 
 ---
@@ -292,29 +289,12 @@ A preference you set 6 months ago and still use? Score stays high. An architectu
 
 | Type | Use For |
 |------|---------|
-| `conversation` | Chat history, discussions |
 | `fact` | Objective truths, configurations |
-| `insight` | Patterns, learned behaviors |
-| `code` | Code snippets, implementations |
 | `decision` | Architecture choices, rationale |
-| `task` | TODOs, action items |
-| `note` | General notes, documentation |
-| `preference` | User preferences, style choices |
-| `rule` | Laws, constraints, behavioral rules |
-| `observation` | Contextual observations |
-| `hypothesis` | Theories to be tested |
-| `question` | Open questions |
-| `answer` | Resolved answers |
-
----
-
-## Memory Class Guide
-
-| Class | Behavior |
-|-------|----------|
-| `fact` | Standard memory. Multiple facts on the same topic can coexist. |
-| `directive` | Behavioral instruction. If a newer directive contradicts an older one, the older is superseded. |
-| `state` | Current state. New state replaces old state for the same entity. |
+| `preference` | User preferences, style choices, rules |
+| `insight` | Patterns, learned behaviors |
+| `note` | General notes, documentation, code snippets |
+| `conversation` | Chat history, discussions |
 
 ---
 
@@ -338,7 +318,6 @@ A preference you set 6 months ago and still use? Score stays high. An architectu
 {
   "content": "User prefers dark mode in all IDEs.",
   "memory_type": "preference",
-  "memory_class": "directive",
   "domain": "personal",
   "category": "ui",
   "tags": ["preference", "ui", "ide"]
@@ -349,8 +328,7 @@ A preference you set 6 months ago and still use? Score stays high. An architectu
 ```json
 {
   "content": "NEVER commit directly to main branch.",
-  "memory_type": "rule",
-  "memory_class": "directive",
+  "memory_type": "preference",
   "domain": "work",
   "category": "git",
   "tags": ["rule", "git", "workflow"]
@@ -362,7 +340,6 @@ A preference you set 6 months ago and still use? Score stays high. An architectu
 {
   "content": "Using PostgreSQL for persistence, Redis for caching.",
   "memory_type": "decision",
-  "memory_class": "fact",
   "domain": "project",
   "category": "architecture",
   "tags": ["architecture", "database"]
@@ -374,7 +351,6 @@ A preference you set 6 months ago and still use? Score stays high. An architectu
 {
   "content": "Current sprint: migrating auth to OAuth2.",
   "memory_type": "fact",
-  "memory_class": "state",
   "domain": "project",
   "category": "sprint",
   "tags": ["sprint", "auth"]
@@ -408,7 +384,6 @@ A preference you set 6 months ago and still use? Score stays high. An architectu
 - [ ] Called `elefante-System` with `action: "enable"` first
 - [ ] Called `elefante-MemorySearch` before any write operations
 - [ ] Used correct `memory_type` (determines decay rate)
-- [ ] Set `memory_class` when appropriate (`directive` for rules/preferences, `state` for current state)
 - [ ] Used meaningful `tags` for filtering
 - [ ] Called `elefante-System` with `action: "disable"` when switching IDEs
 

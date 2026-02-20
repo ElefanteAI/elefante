@@ -1,6 +1,6 @@
 # Technical Documentation Index
 
-**Status**: Production (v2.1.0)  
+**Status**: Production (v2.1.1)  
 **Purpose**: Complete technical reference for Elefante AI Memory System
 
 ---
@@ -56,7 +56,7 @@
 | File | Purpose | Status |
 |------|---------|--------|
 | [`temporal-memory-decay.md`](temporal-memory-decay.md) | Access-based reinforcement, decay over time |  Implemented |
-| [`memory-schema-v4.md`](memory-schema-v4.md) | Canonical keys, versioning, namespaces (prod/test), TTL |  Production |
+| `memory-schema-v4.md` | Canonical keys, versioning, namespaces (prod/test), TTL | Archived (`docs/archive/technical/`) |
 | [`memory-schema-v4-cognitive.md`](memory-schema-v4-cognitive.md) | V4 Cognitive Retrieval: concepts, surfaces_when, authority_score |  Production |
 | [`memory-schema-v5-topology.md`](memory-schema-v5-topology.md) | Rings/topics/types topology fields for dashboard |  Production |
 

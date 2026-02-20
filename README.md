@@ -2,7 +2,7 @@
 
 **The Second Brain for AI Agents.** Your agent stops forgetting. Every preference, every decision, every pattern — remembered, scored, and surfaced at the moment of need.
 
-> **v2.1.0** — Persistent Memory for AI Agents
+> **v2.1.1** — Persistent Memory for AI Agents
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
