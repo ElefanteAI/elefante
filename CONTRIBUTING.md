@@ -22,10 +22,11 @@ Thank you for your interest in contributing to Elefante!
 ```
 src/
   mcp/          # MCP Server & Tools
-  core/         # Logic (Orchestrator, Vector/Graph stores)
+  core/         # Logic (Orchestrator, Vector/Graph stores, ETL, Retrieval)
   models/       # Pydantic models (v2.0.0 schema)
+  modules/      # Session Distiller
   dashboard/    # React/Vite app
-  etl/          # Topology processing
+  utils/        # Config, curation, logging
 scripts/        # Maintenance
 docs/           # Documentation
 tests/          # Pytest suite
@@ -37,3 +38,21 @@ tests/          # Pytest suite
 2. **Context**: Explain *why*, not just what.
 3. **Tests**: Must pass locally.
 4. **Docs**: Update `docs/technical/usage.md` if you change tool signatures.
+
+## Versioning
+
+**Single source of truth**: `src/__init__.py` → propagated by script.
+
+```bash
+# Bump version in all 16 files at once
+python scripts/bump_version.py 2.2.0
+
+# Verify no file has drifted (exit code 1 = drift detected)
+python scripts/bump_version.py --check
+```
+
+**Rules:**
+- NEVER edit version strings by hand in individual files.
+- Run `bump_version.py` once, it updates everything: `setup.py`, `config.yaml`, `package.json`, `package-lock.json`, `README.md`, `RELEASES.md`, and all docs.
+- Run `--check` before committing to catch drift.
+- CHANGELOG.md is the only file where you write version entries manually (it's a historical log, not a current-version declaration).
