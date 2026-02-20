@@ -37,6 +37,7 @@ TARGETS = [
     ("docs/planning/ELEFANTE_VISION_BRIEF.md", r'(\*\*Version:\*\*\s*v)\S+',                     r'\g<1>{v}'),
     ("examples/AGENT_TUTORIAL.md",             r'(\*\*Version:\*\*\s*)\S+',                       r'\g<1>{v}'),
     ("tests/README.md",                        r'(\*\*Version:\*\*\s*)\S+',                       r'\g<1>{v}'),
+    ("CONTRIBUTING.md",                        r'(Pydantic models \(v)\d+\.\d+\.\d+( schema\))',   r'\g<1>{v}\2'),
 ]
 
 

@@ -38,9 +38,9 @@ Everything runs locally. No cloud. No telemetry. Your data never leaves your mac
 
 ---
 
-## Behavioral Relevance (v2.0.0)
+## Behavioral Relevance
 
-This is the core idea behind v2.0.0: **nobody assigns importance. Importance emerges from behavior.**
+Introduced in v2.0.0, this is the core idea: **nobody assigns importance. Importance emerges from behavior.**
 
 Traditional systems ask you to rate memories on a scale (1–10). That approach has two problems:
 

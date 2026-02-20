@@ -5,9 +5,9 @@
 
 ---
 
-## v2.0.0 — Production Release (Current)
+## v2.0.0 — Production Release
 
-v2.0.0 is the definitive production release. All core infrastructure is implemented, tested, and documented.
+v2.0.0 established the production baseline. All core infrastructure is implemented, tested, and documented.
 
 ### Shipped Features
 
