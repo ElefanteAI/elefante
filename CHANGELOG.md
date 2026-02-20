@@ -9,11 +9,35 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [2.1.1] - 2026-02-19
 
-### Summary
+### Part 3: Schema Simplification & Archive Cleanup
 
-Dashboard field mapping fix — Categories no longer show as "General" and usage counts no longer show as "Never".
+A major cleanup pass removing dead model abstractions and historical archive content that was adding noise without value.
 
-### The Problem Solved
+**Dead code removed from `src/`** (−1,397 lines):
+- `src/core/metadata_store.py` — `StandardizedMetadata` layer; unused since v4 schema.
+- `src/core/consolidation.py` — background consolidation task; never activated.
+- `src/core/llm.py` — LLM client stub; Elefante doesn't connect to LLMs.
+- `src/core/graph_executor.py` — delegated graph executor; inlined and unused.
+- `src/models/cognitive.py` — v5 cognitive topology models; superseded.
+- `src/models/metadata.py` — `StandardizedMetadata` model; superseded by `MemoryMetadata`.
+- `src/models/memory.py` — removed `IntentType` enum (8 values, zero usage); removed lingering `RelationshipType` duplicate.
+- `src/core/retrieval.py` — removed `MemoryConstellation` dataclass; renamed `importance` → `score` in `MemoryCandidate`.
+- `scripts/ingest_inception.py`, `scripts/ingest_protocol.py` — one-time ingest scripts.
+- `scripts/utils/repair_graph_topology.py` — one-time migration script.
+
+**Archive cleanup** (−62 docs + deprecated registers, −44 scripts, −12 tests):
+- `docs/archive/historical/` — 40+ historical implementation logs, dashboards plans, schema archives.
+- `docs/archive/deprecated-registers/` — 7 old neural registers.
+- `docs/archive/releases/` — 3 old release notes.
+- `docs/archive/technical/` — `memory-schema-v4.md` moved here from `docs/technical/`.
+- `scripts/archive/historical/` — 44 one-time migration/debug scripts.
+- `tests/archive/` — 12 deprecated test files.
+
+**Renamed**: `importance` → `score` everywhere (vscode-extension `formatter.ts`, retrieval internals) — aligns with behavioral scoring terminology.
+
+---
+
+### Part 2: Dashboard Field Mapping Fixes
 
 Two field name mismatches between ChromaDB storage and dashboard presentation caused all memories to display with wrong metadata:
 

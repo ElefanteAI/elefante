@@ -382,7 +382,7 @@ request = {
         "name": "elefante-MemoryAdd",
         "arguments": {
             "content": "Test memory",
-            "importance": 5
+            "memory_type": "note"
         }
     }
 }

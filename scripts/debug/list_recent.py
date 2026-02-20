@@ -20,7 +20,7 @@ async def list_recent():
     # We'll print the last 10.
     recent = memories[-10:]
     for mem in recent:
-        print(f"[{mem.metadata.layer}.{mem.metadata.sublayer}] ({mem.id})")
+        print(f"[{mem.metadata.memory_type}.{mem.metadata.domain}] ({mem.id})")
         print(f"   {mem.content[:150]}...")
         print("-" * 40)
 

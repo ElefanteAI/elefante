@@ -59,8 +59,8 @@ async def main():
             print(f"\n  Memory {i}:")
             print(f"    Content: {result.memory.content[:100]}...")
             print(f"    Type: {result.memory.metadata.memory_type}")
-            print(f"    Importance: {result.memory.metadata.importance}")
-            print(f"    Timestamp: {result.memory.metadata.timestamp}")
+            print(f"    Score: {result.memory.metadata.score}")
+            print(f"    Created: {result.memory.metadata.created_at}")
             print(f"    Score: {result.score}")
             if result.memory.metadata.tags:
                 print(f"    Tags: {', '.join(result.memory.metadata.tags)}")
@@ -78,7 +78,6 @@ async def main():
         memory = await orch.add_memory(
             content="TEST: This is a persistence test memory added at session startup.",
             memory_type=MemoryType.NOTE,
-            importance=5,
             tags=["test", "persistence_check"],
             metadata={"namespace": "test", "category": "test"},
         )

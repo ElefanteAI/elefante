@@ -342,7 +342,7 @@ class GraphStore:
     
     async def create_entity(self, entity: Entity) -> UUID:
         """
-        Create an entity in the graph (DEPRECATED - use create_or_get_entity for deduplication)
+        Create an entity in the graph.
         
         Args:
             entity: Entity object to create
@@ -891,7 +891,7 @@ class GraphStore:
         search_limit = limit * 2 if temporal_enabled else limit
         
         # Search for memories containing query text
-        # Note: Memory node table has 'importance' column (not 'score')
+        # Note: Kuzu column is named 'importance' (legacy); maps to score (0-100)
         cypher = """
             MATCH (m:Memory)
             WHERE m.content CONTAINS $query
@@ -915,7 +915,7 @@ class GraphStore:
                 memory_metadata = MemoryMetadata(
                     created_at=row[2] if isinstance(row[2], datetime) else datetime.fromisoformat(row[2]),
                     memory_type=MemoryType(row[3]) if row[3] else MemoryType.CONVERSATION,
-                    importance=row[4] if row[4] else 5
+                    score=row[4] if row[4] else 50
                 )
                 
                 memory = Memory(
@@ -933,8 +933,8 @@ class GraphStore:
                     # Update access tracking
                     memory.record_access()
                 else:
-                    # Use importance as relevance score (0-100 → 0-1)
-                    memory.relevance_score = memory.metadata.importance / 100.0
+                    # Use score as relevance (0-100 → 0-1)
+                    memory.relevance_score = memory.metadata.score / 100.0
                 
                 memories.append(memory)
             

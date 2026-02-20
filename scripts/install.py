@@ -488,16 +488,6 @@ def main():
                  logger.log("ERROR: MCP handshake failed. Server is not responding to protocol.")
                  success = False
 
-        if success:
-             # 5b. Inception Memory (Agentic Optimization)
-             logger.log("\nLocating inception memory...")
-             inception_script = root_dir / "scripts" / "ingest_inception.py"
-             if run_command([python_cmd, str(inception_script)], cwd=root_dir):
-                 logger.log("OK: Inception memory ingested")
-             else:
-                 logger.log("ERROR: Inception memory ingest failed")
-                 success = False
-    
     # Generate Proof
     generate_proof(root_dir, success)
     

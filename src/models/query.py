@@ -31,7 +31,7 @@ class QueryPlan(BaseModel):
     # Filters
     memory_types: Optional[List[str]] = None
     tags: Optional[List[str]] = None
-    min_importance: Optional[int] = None
+    min_score: Optional[int] = None
     date_range: Optional[Dict[str, datetime]] = None
     
     # Graph-specific
@@ -101,8 +101,8 @@ class SearchFilters(BaseModel):
     memory_type: Optional[str] = None
     domain: Optional[str] = None
     category: Optional[str] = None
-    min_importance: Optional[int] = Field(None, ge=0, le=100)
-    max_importance: Optional[int] = Field(None, ge=0, le=100)
+    min_score: Optional[int] = Field(None, ge=0, le=100)
+    max_score: Optional[int] = Field(None, ge=0, le=100)
     tags: Optional[List[str]] = None
     source: Optional[str] = None
     
@@ -135,10 +135,10 @@ class SearchFilters(BaseModel):
             filters["domain"] = self.domain
         if self.category:
             filters["category"] = self.category
-        if self.min_importance is not None:
-            filters["min_importance"] = self.min_importance
-        if self.max_importance is not None:
-            filters["max_importance"] = self.max_importance
+        if self.min_score is not None:
+            filters["min_score"] = self.min_score
+        if self.max_score is not None:
+            filters["max_score"] = self.max_score
         if self.tags:
             filters["tags"] = self.tags
         if self.source:

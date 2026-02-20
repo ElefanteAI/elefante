@@ -115,16 +115,6 @@ ACTIONABLE_MARKERS = re.compile(
     re.IGNORECASE,
 )
 
-KNOWLEDGE_TYPE_SCORES = {
-    "law": 2.0,
-    "principle": 2.0,
-    "method": 1.5,
-    "insight": 1.5,
-    "decision": 1.0,
-    "fact": 1.0,
-    "none": 0.0,
-}
-
 MEMORY_TYPE_SCORES = {
     "decision": 2.0,
     "insight": 2.0,
@@ -135,36 +125,32 @@ MEMORY_TYPE_SCORES = {
 
 def calculate_score(meta: dict, has_specific_topic: bool) -> int:
     """
-    Calculate a meaningful 1-10 score based on metadata quality.
+    Calculate a meaningful 0-100 score based on metadata quality.
 
     Formula:
-      has_specific_topic:   0 or 3
-      knowledge_type:       0-2
-      memory_type:          0-2
-      is_actionable:        0 or 1
-      freshness:            0-2
-    Max = 10
+      has_specific_topic:   0 or 30
+      memory_type:          0-20
+      is_actionable:        0 or 10
+      freshness:            0-20
+      access_count:         0-20
+    Max = 100
     """
     score = 0.0
 
-    # Topic specificity (0 or 3)
+    # Topic specificity (0 or 30)
     if has_specific_topic:
-        score += 3.0
+        score += 30.0
 
-    # Knowledge type (0-2)
-    kt = (meta.get("knowledge_type") or "none").lower()
-    score += KNOWLEDGE_TYPE_SCORES.get(kt, 0.0)
-
-    # Memory type (0-2)
+    # Memory type (0-20)
     mt = (meta.get("memory_type") or "fact").lower()
-    score += MEMORY_TYPE_SCORES.get(mt, 0.5)
+    score += MEMORY_TYPE_SCORES.get(mt, 0.5) * 10.0
 
-    # Actionable language (0 or 1)
+    # Actionable language (0 or 10)
     content = meta.get("_content") or ""
     if ACTIONABLE_MARKERS.search(content):
-        score += 1.0
+        score += 10.0
 
-    # Freshness (0-2)
+    # Freshness (0-20)
     created_str = meta.get("created_at") or ""
     if created_str:
         try:
@@ -173,13 +159,20 @@ def calculate_score(meta: dict, has_specific_topic: bool) -> int:
                 created = created.replace(tzinfo=timezone.utc)
             age_days = (datetime.now(timezone.utc) - created).days
             if age_days < 30:
-                score += 2.0
+                score += 20.0
             elif age_days < 90:
-                score += 1.0
+                score += 10.0
         except (ValueError, TypeError):
             pass
 
-    return max(1, min(10, round(score)))
+    # Access count (0-20)
+    access_count = int(meta.get("access_count") or 0)
+    if access_count >= 10:
+        score += 20.0
+    elif access_count >= 3:
+        score += 10.0
+
+    return max(0, min(100, round(score)))
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────

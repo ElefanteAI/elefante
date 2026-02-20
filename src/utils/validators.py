@@ -42,12 +42,12 @@ def validate_memory_content(content: str, min_length: int = 1, max_length: int =
     return content
 
 
-def validate_importance(importance: int) -> int:
+def validate_score(score: int) -> int:
     """
     Validate score level
     
     Args:
-        importance: Score level (0-100)
+        score: Score level (0-100)
         
     Returns:
         Validated score
@@ -55,13 +55,13 @@ def validate_importance(importance: int) -> int:
     Raises:
         ValidationError: If validation fails
     """
-    if not isinstance(importance, int):
+    if not isinstance(score, int):
         raise ValidationError("Score must be an integer")
     
-    if importance < 0 or importance > 100:
+    if score < 0 or score > 100:
         raise ValidationError("Score must be between 0 and 100")
     
-    return importance
+    return score
 
 
 def validate_tags(tags: List[str], max_tags: int = 20, max_tag_length: int = 50) -> List[str]:

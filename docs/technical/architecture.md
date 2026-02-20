@@ -21,7 +21,7 @@ Elefante is the **Second Brain** for AI agents. It solves the "stateless agent" 
 
 In v1.1.0, Elefante shifts classification responsibility to the Agent (the "Brain").
 - **ETL Pipeline**: Raw memories are ingested and then processed by the agent via `elefante-ETLProcess` and `elefante-ETLClassify`.
-- **V5 Topology**: Memories are classified into Rings (Core, Domain, Topic, Leaf) and Knowledge Types (Law, Principle, Fact, etc.).
+- **V5 Fields**: Memories can be classified with Ring (Core, Domain, Topic, Leaf), Knowledge Type (Law, Principle, Fact, etc.), and Topic via agent ETL.
 
 ## 2. The Orchestrator Logic
 
@@ -36,7 +36,7 @@ To support multi-IDE usage without deadlocks:
 
 ### Adaptive Weighting
 
-Instead of a static RAG formula, Elefante analyzes the query to shift importance:
+Instead of a static RAG formula, Elefante analyzes the query to adjust signal weights:
 
 - **Pronouns found (`it`, `she`):** Boosts Conversation Context weight.
 - **Specific IDs (`uuid`, `id`):** Boosts Graph weight.

@@ -124,7 +124,6 @@ def test_end_to_end():
             "arguments": {
                 "content": test_content,
                 "memory_type": "fact",
-                "memory_class": "fact",
                 "tags": ["test", "e2e"],
                 "metadata": {
                     "title": f"E2E-Test-{unique_id}"

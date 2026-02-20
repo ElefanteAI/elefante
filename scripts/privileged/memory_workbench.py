@@ -150,7 +150,7 @@ async def _review_one(memory_id: UUID, *, k: int, min_similarity: float) -> None
     category = mem.metadata.category or ""
 
     print(f"== {memory_id} ==")
-    print(f"ns={ns}  importance={mem.metadata.importance}  access={mem.metadata.access_count}  archived={getattr(mem.metadata, 'archived', False)}")
+    print(f"ns={ns}  score={mem.metadata.score}  access={mem.metadata.access_count}  archived={getattr(mem.metadata, 'archived', False)}")
     print(f"category={category}  tags={','.join(tags[:8])}{',...' if len(tags) > 8 else ''}")
     print(f"temporal_score={temporal:.3f}")
     print(f"preview: {_safe_preview(mem.content, limit=240)}")

@@ -5,6 +5,8 @@
 > **Total Issues Documented:** 9  
 > **Status:** Production Reference - 3 OPEN Design Flaws  
 > **Maintainer:** Add new issues following Issue #N template at bottom
+>
+> **HISTORICAL NOTE:** Some issues below reference V3 concepts (layer, sublayer, classifier.py, IntentType, importance 1-10) that have since been removed. These entries document the debugging process and lessons learned; the referenced code/fields no longer exist.
 
 ---
 

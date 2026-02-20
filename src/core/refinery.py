@@ -20,7 +20,8 @@ import re
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 from uuid import UUID
 
-from src.models.memory import Memory, MemoryStatus, RelationshipType
+from src.models.memory import Memory, MemoryStatus
+from src.models.entity import RelationshipType
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -149,7 +150,7 @@ def infer_canonical_key(memory: Memory) -> str:
 
 def _select_winner(memories: List[Memory]) -> Memory:
     """Pick a canonical winner deterministically."""
-    # Prefer active (not archived/deprecated/redundant), then processed, then higher importance,
+    # Prefer active (not archived/deprecated/redundant), then processed, then higher score,
     # then higher access_count, then newer created_at.
     def sort_key(m: Memory) -> Tuple[int, int, int, int, float, str]:
         created_at = m.metadata.created_at

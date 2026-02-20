@@ -302,7 +302,7 @@ ChromaDB stores:
     "id": "uuid",
     "document": "content text",
     "metadata": {  # All 40+ fields flattened here
-        "importance": 75,
+        "score": 75,
         "domain": "technical",
         "created_at": "2025-12-04T...",
         # ... everything else
@@ -315,7 +315,7 @@ ChromaDB stores:
 class Memory:
     id: str
     content: str
-    importance: int  # Direct attribute
+    score: int  # Direct attribute
     domain: str      # Direct attribute
     # ... typed fields
 ```
@@ -324,7 +324,7 @@ class Memory:
 Use `MemoryModel.from_chromadb_result()` helper that handles translation:
 ```python
 # Don't do this:
-memory.importance = result["metadata"]["importance"]
+memory.score = result["metadata"]["score"]
 
 # Do this:
 memory = MemoryModel.from_chromadb_result(result)

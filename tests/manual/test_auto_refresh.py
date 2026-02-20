@@ -37,7 +37,6 @@ async def _run_auto_refresh():
             "This memory should appear in the dashboard without server restart."
         ),
         memory_type="note",
-        importance=5,
         tags=["test", "auto-refresh", "verification"],
         metadata={"namespace": "test", "category": "test"},
     )

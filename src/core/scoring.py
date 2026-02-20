@@ -20,7 +20,7 @@ class ScoreNormalizer:
     Handles the challenge of comparing scores from different systems:
     - Conversation: recency + keyword overlap (0-1)
     - Semantic (ChromaDB): cosine similarity (0-1)
-    - Graph (Kuzu): importance/10 (0-1)
+    - Graph (Kuzu): score/100 (0-1)
     """
     
     @staticmethod

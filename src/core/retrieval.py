@@ -1,7 +1,7 @@
 """
 Cognitive Retrieval Engine
 
-Returns memory constellations, not flat lists.
+Returns ranked memory results with multi-signal scoring.
 Multi-signal scoring: vector + concepts + domain + co-activation + authority.
 """
 
@@ -25,7 +25,7 @@ class MemoryCandidate:
     summary: str
     concepts: list[str]
     domain: str
-    importance: int  # maps to metadata.score (0-100)
+    score: int  # 0-100 behavioral vitality score
     access_count: int
     created_at: datetime
     last_accessed: datetime
@@ -39,7 +39,6 @@ class MemoryCandidate:
     authority_score: float = 0.0
     composite_score: float = 0.0
     
-    # Role in constellation
     role: str = "candidate"  # primary, supporting, contradicting, context
 
 
@@ -83,35 +82,6 @@ class RetrievalExplanation:
             ]
         }
 
-
-@dataclass
-class MemoryConstellation:
-    """Structured retrieval result - not a flat list."""
-    primary: Optional[MemoryCandidate] = None
-    supporting: list[MemoryCandidate] = field(default_factory=list)
-    contradicting: list[MemoryCandidate] = field(default_factory=list)
-    context: list[MemoryCandidate] = field(default_factory=list)
-    synthesis: str = ""
-    
-    def to_dict(self) -> dict:
-        def mem_to_dict(m: MemoryCandidate) -> dict:
-            return {
-                "id": m.id,
-                "title": m.title,
-                "summary": m.summary,
-                "score": round(m.composite_score, 3),
-                "role": m.role,
-                "concepts": m.concepts,
-            }
-        
-        return {
-            "primary": mem_to_dict(self.primary) if self.primary else None,
-            "supporting": [mem_to_dict(m) for m in self.supporting],
-            "contradicting": [mem_to_dict(m) for m in self.contradicting],
-            "context": [mem_to_dict(m) for m in self.context],
-            "synthesis": self.synthesis,
-            "total_memories": 1 + len(self.supporting) + len(self.contradicting) + len(self.context) if self.primary else 0,
-        }
 
 
 class CognitiveRetriever:
@@ -239,12 +209,12 @@ class CognitiveRetriever:
         
         return 0.6 * access_score + 0.4 * freshness_score
     
-    def compute_authority(self, importance: int, access_count: int) -> float:
+    def compute_authority(self, score: int, access_count: int) -> float:
         """Authority from score (0-100) and usage."""
-        importance_factor = importance / 100.0
+        score_factor = score / 100.0
         access_factor = min(1.0, math.log(access_count + 1) / math.log(50))
         
-        return 0.6 * importance_factor + 0.4 * access_factor
+        return 0.6 * score_factor + 0.4 * access_factor
     
     def score_candidate(
         self,
@@ -282,7 +252,7 @@ class CognitiveRetriever:
         
         # Authority
         candidate.authority_score = self.compute_authority(
-            candidate.importance,  # maps to metadata.score
+            candidate.score,
             candidate.access_count,
         )
         
@@ -331,9 +301,9 @@ class CognitiveRetriever:
         temporal_reason = f"Accessed {days_since_access} days ago" if days_since_access > 0 else "Recently accessed"
         
         # Build authority reason
-        if candidate.importance >= 80:
+        if candidate.score >= 80:
             authority_reason = "High score, frequently used"
-        elif candidate.importance >= 50:
+        elif candidate.score >= 50:
             authority_reason = "Medium score"
         else:
             authority_reason = "Lower score"
@@ -385,7 +355,7 @@ class CognitiveRetriever:
                 "weight": self.WEIGHTS["authority"],
                 "weighted": candidate.authority_score * self.WEIGHTS["authority"],
                 "reason": authority_reason,
-                "details": {"score": candidate.importance, "access_count": candidate.access_count}
+                "details": {"score": candidate.score, "access_count": candidate.access_count}
             },
             {
                 "name": "temporal",
@@ -402,300 +372,3 @@ class CognitiveRetriever:
             signals=signals
         )
     
-    def build_constellation(
-        self,
-        candidates: list[MemoryCandidate],
-        query: QueryAnalysis,
-        contradictions: Optional[dict[str, list[str]]] = None,
-        supports: Optional[dict[str, list[str]]] = None,
-    ) -> MemoryConstellation:
-        """
-        Build structured constellation from scored candidates.
-        
-        Args:
-            candidates: Scored candidates, sorted by composite_score descending
-            contradictions: {memory_id: [contradicting_ids]}
-            supports: {memory_id: [supporting_ids]}
-        """
-        if not candidates:
-            return MemoryConstellation(synthesis="No relevant memories found.")
-        
-        contradictions = contradictions or {}
-        supports = supports or {}
-        
-        # Primary = highest score
-        primary = candidates[0]
-        primary.role = "primary"
-        
-        constellation = MemoryConstellation(primary=primary)
-        
-        # Categorize remaining candidates
-        primary_contradicts = set(contradictions.get(primary.id, []))
-        primary_supports = set(supports.get(primary.id, []))
-        
-        for candidate in candidates[1:10]:  # Limit to top 10
-            if candidate.id in primary_contradicts:
-                candidate.role = "contradicting"
-                constellation.contradicting.append(candidate)
-            elif candidate.id in primary_supports:
-                candidate.role = "supporting"
-                constellation.supporting.append(candidate)
-            elif candidate.concept_score > 0.3:  # Shares concepts
-                candidate.role = "context"
-                constellation.context.append(candidate)
-            elif candidate.composite_score > 0.5:  # High enough to include
-                candidate.role = "supporting"
-                constellation.supporting.append(candidate)
-        
-        # Limit each category
-        constellation.supporting = constellation.supporting[:3]
-        constellation.contradicting = constellation.contradicting[:2]
-        constellation.context = constellation.context[:2]
-        
-        # Generate synthesis
-        constellation.synthesis = self._generate_synthesis(constellation, query)
-        
-        return constellation
-    
-    def _generate_synthesis(self, constellation: MemoryConstellation, query: QueryAnalysis) -> str:
-        """Generate human-readable synthesis."""
-        parts = []
-        
-        if constellation.primary:
-            parts.append(f"Primary: {constellation.primary.title} (confidence: {constellation.primary.composite_score:.2f})")
-        
-        if constellation.supporting:
-            support_titles = [m.title for m in constellation.supporting[:2]]
-            parts.append(f"Supported by: {', '.join(support_titles)}")
-        
-        if constellation.contradicting:
-            contra_titles = [m.title for m in constellation.contradicting[:2]]
-            parts.append(f"Note: Conflicting info in: {', '.join(contra_titles)}")
-        
-        if constellation.context:
-            context_titles = [m.title for m in constellation.context[:2]]
-            parts.append(f"Related: {', '.join(context_titles)}")
-        
-        return " | ".join(parts) if parts else "No synthesis available."
-
-
-# =============================================================================
-# PROACTIVE SURFACING
-# =============================================================================
-
-@dataclass
-class ProactiveSuggestion:
-    """
-    A memory that SHOULD surface based on context triggers.
-    """
-    memory_id: str
-    memory_title: str
-    trigger: str       # "temporal" | "domain" | "recurring_concept"
-    confidence: float  # 0.0 - 1.0
-    reason: str        # Human-readable explanation
-
-
-class ProactiveSurfacer:
-    """
-    Suggests memories that SHOULD surface based on:
-    1. Temporal triggers (surfaces_when matches current time/context)
-    2. Domain triggers (domain matches current conversation)
-    3. Recurring concepts (same concepts appearing repeatedly)
-    
-    Surfaces memories based on context triggers (soft suggestions only).
-    """
-    
-    def __init__(
-        self,
-        temporal_confidence: float = 0.7,
-        domain_confidence: float = 0.6,
-        concept_confidence: float = 0.5,
-    ):
-        """
-        Configurable confidence thresholds.
-        
-        Args:
-            temporal_confidence: Base confidence for time-based triggers
-            domain_confidence: Base confidence for domain matches
-            concept_confidence: Base confidence for recurring concepts
-        """
-        self.temporal_confidence = temporal_confidence
-        self.domain_confidence = domain_confidence
-        self.concept_confidence = concept_confidence
-    
-    def check_temporal_trigger(
-        self,
-        memory_id: str,
-        memory_title: str,
-        surfaces_when: Optional[str],
-        current_context: str,
-    ) -> Optional[ProactiveSuggestion]:
-        """
-        Check if memory's surfaces_when matches current context.
-        
-        Examples of surfaces_when values:
-        - "at standup meetings"
-        - "when discussing Python projects"
-        - "during code reviews"
-        """
-        if not surfaces_when:
-            return None
-        
-        # Normalize for comparison
-        surfaces_lower = surfaces_when.lower()
-        context_lower = current_context.lower()
-        
-        # Extract key phrases from surfaces_when
-        trigger_phrases = []
-        
-        # Common temporal patterns
-        if "standup" in surfaces_lower:
-            trigger_phrases.extend(["standup", "daily", "morning meeting"])
-        if "code review" in surfaces_lower:
-            trigger_phrases.extend(["review", "pr", "pull request"])
-        if "debug" in surfaces_lower:
-            trigger_phrases.extend(["debug", "error", "bug", "fix"])
-        if "planning" in surfaces_lower:
-            trigger_phrases.extend(["plan", "sprint", "roadmap"])
-        
-        # Also use raw words from surfaces_when
-        raw_words = [w.strip() for w in surfaces_lower.replace(",", " ").split() if len(w) > 3]
-        trigger_phrases.extend(raw_words)
-        
-        # Check for matches
-        matches = [p for p in trigger_phrases if p in context_lower]
-        
-        if not matches:
-            return None
-        
-        return ProactiveSuggestion(
-            memory_id=memory_id,
-            memory_title=memory_title,
-            trigger="temporal",
-            confidence=self.temporal_confidence,
-            reason=f"Scheduled to surface: '{surfaces_when}' matches current context"
-        )
-    
-    def check_domain_trigger(
-        self,
-        memory_id: str,
-        memory_title: str,
-        memory_domain: str,
-        conversation_domain: Optional[str],
-    ) -> Optional[ProactiveSuggestion]:
-        """
-        Check if memory's domain matches current conversation domain.
-        """
-        if not conversation_domain:
-            return None
-        
-        if memory_domain == conversation_domain:
-            return ProactiveSuggestion(
-                memory_id=memory_id,
-                memory_title=memory_title,
-                trigger="domain",
-                confidence=self.domain_confidence,
-                reason=f"Relevant to current domain: {memory_domain}"
-            )
-        
-        return None
-    
-    def check_concept_trigger(
-        self,
-        memory_id: str,
-        memory_title: str,
-        memory_concepts: list[str],
-        recent_concepts: list[str],
-        min_overlap: int = 2,
-    ) -> Optional[ProactiveSuggestion]:
-        """
-        Check if memory shares multiple concepts with recent conversation.
-        """
-        if not memory_concepts or not recent_concepts:
-            return None
-        
-        shared = set(memory_concepts) & set(recent_concepts)
-        
-        if len(shared) >= min_overlap:
-            return ProactiveSuggestion(
-                memory_id=memory_id,
-                memory_title=memory_title,
-                trigger="recurring_concept",
-                confidence=self.concept_confidence,
-                reason=f"Shares concepts: {', '.join(list(shared)[:3])}"
-            )
-        
-        return None
-    
-    def get_proactive_surfaces(
-        self,
-        memories: list[dict],
-        current_context: str,
-        conversation_domain: Optional[str] = None,
-        recent_concepts: Optional[list[str]] = None,
-    ) -> list[ProactiveSuggestion]:
-        """
-        Scan memories for proactive surfacing candidates.
-        
-        Args:
-            memories: List of dicts with keys:
-                - id: str
-                - title: str
-                - domain: str
-                - concepts: list[str]
-                - surfaces_when: Optional[str]
-            current_context: Current conversation/query context
-            conversation_domain: Inferred domain of conversation
-            recent_concepts: Concepts from recent conversation
-        
-        Returns:
-            List of ProactiveSuggestion, sorted by confidence descending
-        """
-        recent_concepts = recent_concepts or []
-        suggestions: list[ProactiveSuggestion] = []
-        seen_ids: set[str] = set()  # Dedupe
-        
-        for mem in memories:
-            mem_id = mem["id"]
-            mem_title = mem.get("title", "Untitled")
-            
-            # Skip if already suggested
-            if mem_id in seen_ids:
-                continue
-            
-            # Check temporal trigger (highest priority)
-            temporal = self.check_temporal_trigger(
-                mem_id, mem_title,
-                mem.get("surfaces_when"),
-                current_context
-            )
-            if temporal:
-                suggestions.append(temporal)
-                seen_ids.add(mem_id)
-                continue
-            
-            # Check domain trigger
-            domain_sug = self.check_domain_trigger(
-                mem_id, mem_title,
-                mem.get("domain", "general"),
-                conversation_domain
-            )
-            if domain_sug:
-                suggestions.append(domain_sug)
-                seen_ids.add(mem_id)
-                continue
-            
-            # Check concept trigger
-            concept_sug = self.check_concept_trigger(
-                mem_id, mem_title,
-                mem.get("concepts", []),
-                recent_concepts
-            )
-            if concept_sug:
-                suggestions.append(concept_sug)
-                seen_ids.add(mem_id)
-        
-        # Sort by confidence descending
-        suggestions.sort(key=lambda s: s.confidence, reverse=True)
-        
-        return suggestions[:5]  # Limit to top 5

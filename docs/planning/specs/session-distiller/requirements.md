@@ -15,7 +15,7 @@
 ### The Amnesia Tax
 Every new LLM session starts from zero. Developers spend ~20% of each session re-explaining context. Chat sessions contain critical decisions and learnings, but they vanish when the session ends. VS Code stores them in SQLite/JSON files, but in a raw, unstructured format that is:
 - **Not searchable** semantically.
-- **Not classified** by importance.
+- **Not classified** by relevance.
 - **Not connected** to the knowledge graph.
 
 ### The Garbage-In Problem
@@ -48,7 +48,7 @@ No existing tool bridges the gap between "ephemeral chat history" and "persisten
 | Role | Need |
 |------|------|
 | **Solo Developer (Primary)** | Persistent context across sessions without manual work. "I shouldn't have to re-explain my project every time." |
-| **Future Agent (Consumer)** | Receives curated, high-importance memories via `elefante-MemorySearch` at session start. |
+| **Future Agent (Consumer)** | Receives curated, high-score memories via `elefante-MemorySearch` at session start. |
 | **Elefante System (Internal)** | Receives properly classified, deduplicated memories with full metadata (memory_type, domain, tags, entities). Behavioral relevance is computed automatically. |
 
 ---

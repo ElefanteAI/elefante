@@ -7,6 +7,7 @@ from enum import Enum
 from typing import List, Optional, Dict, Any
 from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from src.models.entity import RelationshipType  # noqa: F401 — re-exported for MemoryMetadata
 
 
 # ============================================================================
@@ -39,22 +40,6 @@ class MemoryType(str, Enum):
     CONVERSATION = "conversation"
 
 
-class IntentType(str, Enum):
-    """Why the memory was stored"""
-    REFERENCE = "reference"
-    REMINDER = "reminder"
-    LEARNING = "learning"
-    DECISION_LOG = "decision_log"
-    CONTEXT = "context"
-    ACTION = "action"
-    ARCHIVE = "archive"
-    TEMPLATE = "template"
-
-
-# MemoryClass removed — zero discrimination value in practice.
-# Contradiction handling uses vector similarity + recency instead.
-
-
 class MemoryStatus(str, Enum):
     """Status of a memory relative to existing knowledge"""
     NEW = "new"
@@ -66,35 +51,6 @@ class MemoryStatus(str, Enum):
     VERIFIED = "verified"
     DEPRECATED = "deprecated"
     ARCHIVED = "archived"
-
-
-class RelationshipType(str, Enum):
-    """How memories relate to each other"""
-    # Additive
-    EXTENDS = "extends"
-    SUPPORTS = "supports"
-    IMPLEMENTS = "implements"
-    EXEMPLIFIES = "exemplifies"
-    
-    # Transformative
-    REFINES = "refines"
-    SUPERSEDES = "supersedes"
-    CONSOLIDATES = "consolidates"
-    
-    # Conflictual
-    CONTRADICTS = "contradicts"
-    CHALLENGES = "challenges"
-    
-    # Structural
-    DEPENDS_ON = "depends_on"
-    PART_OF = "part_of"
-    REFERENCES = "references"
-    RELATES_TO = "relates_to"
-    
-    # Temporal
-    FOLLOWS = "follows"
-    PRECEDES = "precedes"
-    UPDATES = "updates"
 
 
 class SourceType(str, Enum):
@@ -156,12 +112,9 @@ class MemoryMetadata(BaseModel):
     domain: DomainType = DomainType.REFERENCE
     category: str = "general"
     memory_type: MemoryType = MemoryType.FACT
-    subcategory: Optional[str] = None
-    
+
     # Relevance (system-computed — do NOT set manually)
     score: int = Field(default=100, ge=0, le=100, description="Behavioral vitality (0-100). Born at 100 — decays slowly with age, grows with retrieval. Unproven memories keep full vitality until the agent actually uses them.")
-    urgency: int = Field(default=5, ge=0, le=10, description="How time-sensitive this memory is. 0=archival, 10=critical-now.")
-    intent: IntentType = IntentType.REFERENCE
     confidence: float = Field(default=0.7, ge=0.0, le=1.0)
     tags: List[str] = Field(default_factory=list)
     keywords: List[str] = Field(default_factory=list)
@@ -170,10 +123,7 @@ class MemoryMetadata(BaseModel):
     # Cognitive Retrieval
     concepts: List[str] = Field(default_factory=list, description="3-5 key terms for graph edges")
     surfaces_when: List[str] = Field(default_factory=list, description="Query patterns that trigger this memory")
-    co_activated_with: List[UUID] = Field(default_factory=list, description="Memories often retrieved together")
-    authority_score: float = Field(default=0.5, ge=0.0, le=1.0, description="importance × access × freshness")
-    contradicts: List[UUID] = Field(default_factory=list, description="Memories with opposing info")
-    supports: List[UUID] = Field(default_factory=list, description="Memories that reinforce this one")
+    authority_score: float = Field(default=0.5, ge=0.0, le=1.0, description="score x access x freshness")
     
     # Relationship Tracking
     status: MemoryStatus = MemoryStatus.NEW
@@ -189,8 +139,6 @@ class MemoryMetadata(BaseModel):
     source_detail: str = "direct_input"
     source_reliability: float = Field(default=0.9, ge=0.0, le=1.0)
     verified: bool = False
-    verified_by: Optional[str] = None
-    verified_at: Optional[datetime] = None
     session_id: Optional[UUID] = None
     author: str = "user"
     
@@ -214,9 +162,7 @@ class MemoryMetadata(BaseModel):
     deprecated: bool = False
     archived: bool = False
     summary: Optional[str] = None
-    sentiment: Optional[float] = Field(default=None, ge=-1.0, le=1.0)
-    quality_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    
+
     # Extensibility
     custom_metadata: Dict[str, Any] = Field(default_factory=dict)
     system_metadata: Dict[str, Any] = Field(default_factory=dict)
@@ -345,65 +291,5 @@ class Memory(BaseModel):
         return self.__str__()
 
 
-# ============================================================================
-# BACKWARD COMPATIBILITY HELPERS
-# ============================================================================
-
-def create_v1_compatible_memory(
-    content: str,
-    memory_type: str = "conversation",
-    importance: int = 5,
-    tags: Optional[List[str]] = None,
-    source: str = "user",
-    session_id: Optional[UUID] = None,
-    project: Optional[str] = None,
-    file_path: Optional[str] = None,
-    **kwargs
-) -> Memory:
-    """
-    Create a memory from V1-style parameters.
-    Maps old importance (1-10) to new score (0-100).
-    """
-    source_mapping = {
-        "user": SourceType.USER_INPUT,
-        "agent": SourceType.AGENT_GENERATED,
-        "system": SourceType.SYSTEM_INFERRED,
-    }
-    source_type = source_mapping.get(source, SourceType.USER_INPUT)
-    
-    domain = DomainType.REFERENCE
-    if project:
-        domain = DomainType.PROJECT
-    elif tags and any(tag in ["work", "professional"] for tag in tags):
-        domain = DomainType.WORK
-    elif tags and any(tag in ["learning", "education"] for tag in tags):
-        domain = DomainType.LEARNING
-    
-    category = "general"
-    if tags and len(tags) > 0:
-        category = tags[0]
-    
-    # Remove deprecated fields from kwargs before passing to MemoryMetadata
-    kwargs.pop("layer", None)
-    kwargs.pop("sublayer", None)
-    kwargs.pop("importance", None)
-    
-    # Set decay rate from memory type
-    decay_rate = TYPE_DECAY_RATES.get(memory_type, 0.01)
-    
-    metadata = MemoryMetadata(
-        memory_type=MemoryType(memory_type) if isinstance(memory_type, str) else memory_type,
-        decay_rate=decay_rate,
-        tags=tags or [],
-        source=source_type,
-        session_id=session_id,
-        project=project,
-        file_path=file_path,
-        domain=domain,
-        category=category,
-        **kwargs
-    )
-    
-    return Memory(content=content, metadata=metadata)
 
 

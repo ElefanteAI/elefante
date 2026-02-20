@@ -13,7 +13,7 @@ export class ContextFormatter {
      * 
      * Design decisions:
      * - Use clear delimiters so the AI knows where context starts/ends
-     * - Include title, importance, and summary (not full content to save tokens)
+     * - Include title, score, and summary (not full content to save tokens)
      * - Order by score (most relevant first)
      * - Keep it concise but informative
      */

@@ -20,7 +20,7 @@ from datetime import datetime
 
 from src.models.memory import (
     Memory, MemoryType, MemoryMetadata, MemoryStatus,
-    DomainType, IntentType, SourceType, TYPE_DECAY_RATES
+    DomainType, SourceType, TYPE_DECAY_RATES
 )
 from src.models.entity import Entity, EntityType, Relationship, RelationshipType
 from src.models.query import QueryMode, QueryPlan, SearchResult, SearchFilters
@@ -31,8 +31,6 @@ from src.core.retrieval import CognitiveRetriever, MemoryCandidate, QueryAnalysi
 from src.utils.logger import get_logger
 from src.utils.config import get_config
 from src.utils.validators import validate_memory_content, validate_uuid
-from src.models.metadata import StandardizedMetadata, CoreMetadata, ContextMetadata, SystemMetadata, MemoryType as StdMemoryType
-from src.core.metadata_store import get_metadata_store
 from src.core.etl import ProcessingStatus  # Only need status, classification is agent-driven
 from src.models.task import Task, TaskStatus
 
@@ -74,36 +72,11 @@ class MemoryOrchestrator:
         self.embedding_service = embedding_service or get_embedding_service()
         self.config = get_config()
         self.logger = get_logger(self.__class__.__name__)
-        self.metadata_store = get_metadata_store()
-        
+
         # Cognitive Retriever - multi-signal scoring engine
         self.cognitive_retriever = CognitiveRetriever()
 
-        self._metadata_init_task: Optional[asyncio.Task] = None
-        self._metadata_initialized: bool = False
-
-        # Initialize metadata store if we're already inside a running event loop.
-        # In synchronous contexts (e.g., pytest fixtures), defer initialization until first use.
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = None
-
-        if loop is not None and loop.is_running():
-            self._metadata_init_task = loop.create_task(self.metadata_store.initialize())
-        
         self.logger.info("Memory orchestrator initialized")
-
-    async def _ensure_metadata_initialized(self) -> None:
-        if self._metadata_initialized:
-            return
-
-        if self._metadata_init_task is not None:
-            await self._metadata_init_task
-        else:
-            await self.metadata_store.initialize()
-
-        self._metadata_initialized = True
     
     async def add_memory(
         self,
@@ -120,11 +93,7 @@ class MemoryOrchestrator:
         Score is system-computed (starts at 100, decays with age).
         Decay rate is set automatically from memory_type.
         """
-        await self._ensure_metadata_initialized()
 
-        from src.core.graph_executor import GraphExecutor
-        if not hasattr(self, 'graph_executor'):
-            self.graph_executor = GraphExecutor(self.graph_store)
 
         # ==================================================================================
         # STEP 1: PARSE & CLASSIFY
@@ -285,7 +254,7 @@ class MemoryOrchestrator:
                                 seen.add(tt)
                                 merged_tags.append(tt)
 
-                    merged_importance = int(existing.metadata.score or 100)
+                    merged_score = int(existing.metadata.score or 100)
 
                     merged_content = existing.content
                     if not _is_near_duplicate(content, existing.content):
@@ -315,7 +284,7 @@ class MemoryOrchestrator:
                         {
                             "content": merged_content,
                             "tags": merged_tags,
-                            "score": merged_importance,
+                            "score": merged_score,
                             "last_accessed": now,
                             "last_modified": now,
                             "access_count": int(existing.metadata.access_count or 1) + 1,
@@ -390,12 +359,6 @@ class MemoryOrchestrator:
             confidence = metadata.get("confidence", 0.7)
             source = metadata.get("source", "user_input")
 
-            intent_value = metadata.get("intent")
-            try:
-                intent_enum = IntentType(intent_value) if intent_value else IntentType.REFERENCE
-            except Exception:
-                intent_enum = IntentType.REFERENCE
-
             summary_text = metadata.get("summary")
             if not isinstance(summary_text, str) or not summary_text.strip():
                 from src.utils.curation import generate_summary
@@ -431,7 +394,7 @@ class MemoryOrchestrator:
             
             # Compute initial authority score
             authority_score = compute_authority_score(
-                importance=5,  # neutral start, system-computed
+                score=5,  # neutral start, system-computed
                 access_count=1,
                 days_since_created=0,
                 days_since_accessed=0,
@@ -440,7 +403,7 @@ class MemoryOrchestrator:
             
             custom_metadata = {
                 k: v for k, v in metadata.items()
-                if k not in ["domain", "category", "intent", "confidence", "source"]
+                if k not in ["domain", "category", "confidence", "source"]
             }
             
             # ==================================================================================
@@ -464,7 +427,6 @@ class MemoryOrchestrator:
                 tags=tags or [],
                 domain=DomainType(domain) if domain else DomainType.REFERENCE,
                 category=category,
-                intent=intent_enum,
                 confidence=confidence,
                 source=SourceType(source),
                 # Cognitive retrieval fields
@@ -649,8 +611,6 @@ class MemoryOrchestrator:
         """
         validate_memory_content(query, min_length=1, max_length=1000)
 
-        await self._ensure_metadata_initialized()
-        
         # Extract conversation settings from filters if provided
         if filters:
             include_conversation = filters.include_conversation if filters.include_conversation is not None else include_conversation
@@ -754,7 +714,7 @@ class MemoryOrchestrator:
             min_similarity=min_similarity,
             memory_types=[filters.memory_type] if filters and filters.memory_type else None,
             tags=filters.tags if filters else None,
-            min_importance=filters.min_importance if filters else None,
+            min_score=filters.min_score if filters else None,
             date_range={
                 "start": filters.start_date if filters.start_date else datetime.min,
                 "end": filters.end_date if filters.end_date else datetime.max
@@ -776,7 +736,7 @@ class MemoryOrchestrator:
         - concept_overlap (0.20): Jaccard overlap with query concepts
         - domain_match (0.15): Domain alignment
         - co_activation (0.15): Retrieved-together history
-        - authority (0.10): Importance + access patterns
+        - authority (0.10): Score + access patterns
         - temporal (0.10): Recency and freshness
         """
         if not results:
@@ -807,7 +767,7 @@ class MemoryOrchestrator:
                 summary=metadata.summary if hasattr(metadata, 'summary') else memory.content[:100],
                 concepts=metadata.concepts if hasattr(metadata, 'concepts') and metadata.concepts else [],
                 domain=metadata.domain.value if hasattr(metadata, 'domain') and metadata.domain and hasattr(metadata.domain, 'value') else (metadata.domain if hasattr(metadata, 'domain') and isinstance(metadata.domain, str) else "general"),
-                importance=metadata.score if hasattr(metadata, 'score') else 100,
+                score=metadata.score if hasattr(metadata, 'score') else 100,
                 access_count=metadata.access_count if hasattr(metadata, 'access_count') else 1,
                 created_at=metadata.created_at if hasattr(metadata, 'created_at') and metadata.created_at else datetime.utcnow(),
                 last_accessed=metadata.last_accessed if hasattr(metadata, 'last_accessed') and metadata.last_accessed else datetime.utcnow(),
@@ -850,7 +810,8 @@ class MemoryOrchestrator:
         query: str,
         plan: QueryPlan,
         filters: Optional[SearchFilters] = None,
-        apply_temporal_decay: bool = True
+        apply_temporal_decay: bool = True,
+        reinforce_access: bool = True,
     ) -> List[SearchResult]:
         """Execute semantic search via vector store with optional temporal decay.
 
@@ -863,8 +824,8 @@ class MemoryOrchestrator:
             metadata_filter["memory_type"] = plan.memory_types
         if plan.tags:
             metadata_filter["tags"] = {"$in": plan.tags}
-        if plan.min_importance:
-            metadata_filter["score"] = {"$gte": plan.min_importance}
+        if plan.min_score:
+            metadata_filter["score"] = {"$gte": plan.min_score}
 
         # Standard search (no federated anchor split — behavioral relevance
         # handles ranking via temporal decay + reinforcement).
@@ -880,14 +841,10 @@ class MemoryOrchestrator:
 
         merged = results[:plan.limit]
 
-        # Reinforce only memories that were genuinely relevant to this query.
-        # Marginal keyword-drag hits (score < REINFORCEMENT_THRESHOLD) must not
-        # accumulate access_count, or broad-concept memories inflate to the top.
-        if apply_temporal_decay:
+        if apply_temporal_decay and reinforce_access:
             for result in merged:
-                if result.score >= REINFORCEMENT_THRESHOLD:
-                    result.memory.record_access()
-                    await self.vector_store.update_memory_access(result.memory)
+                result.memory.record_access()
+                await self.vector_store.update_memory_access(result.memory)
 
         return merged
     
@@ -895,11 +852,12 @@ class MemoryOrchestrator:
         self,
         query: str,
         plan: QueryPlan,
-        apply_temporal_decay: bool = True
+        apply_temporal_decay: bool = True,
+        reinforce_access: bool = True,
     ) -> List[SearchResult]:
         """Execute structured search via graph store with optional temporal decay"""
         # Build Cypher query based on filters
-        # Note: Entity node stores importance in JSON 'props', not as a direct column
+        # Note: Entity node stores score in JSON 'props', not as a direct column
         cypher_parts = ["MATCH (m:Entity {type: 'memory'})"]
         where_clauses = []
         
@@ -916,7 +874,7 @@ class MemoryOrchestrator:
         graph_results = await self.graph_store.execute_query(cypher_query)
         
         # Convert to SearchResult objects
-        # Note: Graph results don't have similarity scores, so we use importance as a proxy.
+        # Note: Graph results don't have similarity scores, so we use score as a proxy.
         import json
 
         results: List[SearchResult] = []
@@ -957,17 +915,17 @@ class MemoryOrchestrator:
                 memory = await self.vector_store.get_memory(memory_id)
                 vector_backed = memory is not None
 
-            importance = extra.get("score")
-            if importance is None:
-                importance = extra.get("importance")  # Backward compat
-            if importance is None:
-                importance = entity_props.get("score") or entity_props.get("importance")
+            score_val = extra.get("score")
+            if score_val is None:
+                score_val = extra.get("importance")  # Backward compat
+            if score_val is None:
+                score_val = entity_props.get("score") or entity_props.get("importance")
             try:
-                importance_int = int(importance) if importance is not None else 100
+                score_int = int(score_val) if score_val is not None else 100
             except Exception:
-                importance_int = 100
+                score_int = 100
 
-            score = max(0.0, min(1.0, importance_int / 100.0))
+            score = max(0.0, min(1.0, score_int / 100.0))
 
             if memory is None:
                 # Fallback: construct a minimal Memory object from graph metadata.
@@ -979,7 +937,7 @@ class MemoryOrchestrator:
 
                 memory_metadata = MemoryMetadata(
                     memory_type=mem_type,
-                    score=importance_int,
+                    score=score_int,
                 )
 
                 memory = Memory(
@@ -1011,9 +969,9 @@ class MemoryOrchestrator:
                 current_time = datetime.utcnow()
                 temporal_score = result.memory.calculate_relevance_score(current_time)
                 
-                # Blend with graph score (importance-based)
+                # Blend with graph score
                 # Config defaults: semantic=0.7, temporal=0.3
-                # For graph, we treat importance as the "semantic" signal
+                # For graph, we treat score as the "semantic" signal
                 semantic_weight = 0.7 
                 temporal_weight = 0.3
                 
@@ -1021,10 +979,7 @@ class MemoryOrchestrator:
                 result.score = (semantic_weight * result.score) + (temporal_weight * temporal_score)
                 result.score = max(0.0, min(1.0, result.score))
                 
-                # REINFORCEMENT: Only reinforce graph-found memories that were
-                # genuinely relevant (composite score clears threshold).
-                if (result.score >= REINFORCEMENT_THRESHOLD
-                        and getattr(result.memory.metadata, "custom_metadata", {}).get("_vector_backed")):
+                if reinforce_access and getattr(result.memory.metadata, "custom_metadata", {}).get("_vector_backed"):
                     result.memory.record_access()
                     await self.vector_store.update_memory_access(result.memory)
                 
@@ -1049,9 +1004,21 @@ class MemoryOrchestrator:
         3. Calculate weighted scores (including temporal strength)
         4. Deduplicate and rank
         """
-        # Execute both searches in parallel with temporal decay
-        semantic_task = self._search_semantic(query, plan, filters, apply_temporal_decay)
-        structured_task = self._search_structured(query, plan, apply_temporal_decay)
+        # Execute both searches in parallel with temporal decay.
+        # Reinforcement is deferred until after merge to avoid double increments.
+        semantic_task = self._search_semantic(
+            query,
+            plan,
+            filters,
+            apply_temporal_decay,
+            reinforce_access=False,
+        )
+        structured_task = self._search_structured(
+            query,
+            plan,
+            apply_temporal_decay,
+            reinforce_access=False,
+        )
         
         semantic_results, structured_results = await asyncio.gather(
             semantic_task,
@@ -1100,7 +1067,19 @@ class MemoryOrchestrator:
                 result.source = "hybrid"
                 merged[memory_id] = result
         
-        return list(merged.values())
+        merged_results = list(merged.values())
+
+        if apply_temporal_decay:
+            for result in merged_results:
+                is_vector_backed_graph = (
+                    result.source == "graph"
+                    and getattr(result.memory.metadata, "custom_metadata", {}).get("_vector_backed")
+                )
+                if result.source in {"semantic", "hybrid"} or is_vector_backed_graph:
+                    result.memory.record_access()
+                    await self.vector_store.update_memory_access(result.memory)
+
+        return merged_results
     
     async def _search_conversation(
         self,
@@ -1289,48 +1268,6 @@ class MemoryOrchestrator:
             memory_ids = []
             if session_id:
                 validate_uuid(str(session_id))
-                # [FAST PATH] Get recent session memories from SQLite
-                try:
-                    fast_memories = await self.metadata_store.get_session_metadata(session_id, limit)
-                    
-                    for mem_id, std_meta, content in fast_memories:
-                        # 1. Add to memories list
-                        mem_dict = {
-                            "id": mem_id,
-                            "content": content,
-                            "metadata": {
-                                "memory_type": std_meta.core.memory_type.value,
-                                "score": getattr(std_meta.core, 'importance', 50),
-                                "timestamp": std_meta.system.created_at.isoformat(),
-                                "tags": std_meta.core.tags,
-                                **std_meta.custom
-                            },
-                            "embedding": None, 
-                            "related_entities": [],
-                            "similarity_score": None,
-                            "relevance_score": None
-                        }
-                        context["memories"].append(mem_dict)
-                        
-                        # 2. Add to entities list (as memory nodes)
-                        context["entities"].append({
-                            "id": mem_id,
-                            "name": f"memory_{mem_id}",
-                            "type": "memory",
-                            "properties": {
-                                "content": content[:200],
-                                "memory_type": std_meta.core.memory_type.value,
-                                "score": getattr(std_meta.core, 'importance', 50),
-                                "timestamp": std_meta.system.created_at.isoformat()
-                            }
-                        })
-                        memory_ids.append(UUID(mem_id))
-                        
-                    self.logger.debug(f"Retrieved {len(fast_memories)} memories from Fast Store")
-                    
-                except Exception as e:
-                    self.logger.warning(f"Fast memory retrieval failed: {e}")
-                    # Fallback to graph query if needed, but for now we proceed
                     
             else:
                 # AUTHORITATIVE: Use recursive traversal based on depth
@@ -1749,7 +1686,7 @@ class MemoryOrchestrator:
         Args:
             limit: Maximum number of memories to return (default: 100)
             offset: Number of memories to skip for pagination (default: 0)
-            filters: Optional filters (memory_type, importance, etc.)
+            filters: Optional filters (memory_type, score, etc.)
             
         Returns:
             List[Memory]: List of memory objects

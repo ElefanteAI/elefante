@@ -11,21 +11,17 @@ def _mem(
     title: str | None = None,
     category: str = "general",
     tags: list[str] | None = None,
-    importance: int = 5,
+    score: int = 100,
     access_count: int = 0,
     created_at: datetime | None = None,
-    layer: str = "world",
-    sublayer: str = "fact",
     memory_type: str = "conversation",
 ):
     md = MemoryMetadata(
         category=category,
         tags=tags or [],
-        importance=importance,
+        score=score,
         access_count=access_count,
         created_at=created_at or datetime.utcnow(),
-        layer=layer,
-        sublayer=sublayer,
         memory_type=memory_type,
     )
     if title:
@@ -34,8 +30,8 @@ def _mem(
 
 
 def test_refinery_marks_duplicates_redundant():
-    m1 = _mem("LAW 11 - NO EMOJIS", title="Self-Limit-Emojis", importance=10, access_count=1)
-    m2 = _mem("CRITICAL CONSTRAINT: Do NOT use emojis", title="Self-Limit-Emojis", importance=9, access_count=20)
+    m1 = _mem("LAW 11 - NO EMOJIS", title="Self-Limit-Emojis", score=100, access_count=1)
+    m2 = _mem("CRITICAL CONSTRAINT: Do NOT use emojis", title="Self-Limit-Emojis", score=90, access_count=20)
 
     plan = build_refinery_plan([m1, m2])
 
@@ -68,17 +64,13 @@ def test_refinery_routes_test_namespace():
 def test_refinery_canonicalizes_simple_concise_preference():
     m1 = _mem(
         "Preference: Agents should communicate in simple terms and be concise.",
-        layer="self",
-        sublayer="preference",
         memory_type="preference",
-        importance=7,
+        score=70,
     )
     m2 = _mem(
         "ALWAYS avoid jargon. Keep it concise. No fluff.",
-        layer="self",
-        sublayer="constraint",
         memory_type="preference",
-        importance=10,
+        score=100,
     )
 
     plan = build_refinery_plan([m1, m2])

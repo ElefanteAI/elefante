@@ -25,10 +25,9 @@ Memories were stored as raw text. Search only matched words. No understanding of
 | Concept extraction | `src/utils/curation.py` |  Verified |
 | Query pattern inference | `src/utils/curation.py` |  Verified |
 | Authority scoring | `src/utils/curation.py` |  Verified |
-| Cognitive retriever | `src/core/retrieval.py` |  Built (not wired to MCP) |
+| Cognitive retriever | `src/core/retrieval.py` |  Wired (orchestrator.py) |
 | Auto-populate on add | `src/core/orchestrator.py` |  Verified |
 | SHARES_CONCEPT edges | `scripts/update_dashboard_data.py` |  Verified (24 edges) |
-| Migration script | `scripts/migrate_v4_cognitive.py` |  Done |
 | Documentation | `docs/technical/memory-schema-v4-cognitive.md` |  Done |
 
 ### A.3 New Metadata Fields
@@ -38,9 +37,6 @@ Memories were stored as raw text. Search only matched words. No understanding of
 concepts: List[str]           # 3-5 key terms extracted from content
 surfaces_when: List[str]      # Query patterns that trigger this memory
 authority_score: float        # relevance × usage × freshness (0-1)
-co_activated_with: List[UUID] # Memories often retrieved together
-contradicts: List[UUID]       # Memories with opposing info
-supports: List[UUID]          # Memories that reinforce this one
 ```
 
 ### A.4 Verified Results (2025-12-27)
@@ -54,43 +50,21 @@ supports: List[UUID]          # Memories that reinforce this one
 | SHARES_CONCEPT edges | 24 |
 | Total edges | 189 |
 
-### A.5 V4 Debt: CognitiveRetriever Not Wired
+### A.5 V4 Debt: CognitiveRetriever — RESOLVED
 
-**Issue**: `CognitiveRetriever` class exists but `elefante-MemorySearch` still uses raw ChromaDB.
+**Status**: DONE — WIRED in `orchestrator.search_memories()` via `_apply_cognitive_scoring()` (lines 30, 77, 660 of orchestrator.py).
 
-**Impact**: Multi-signal scoring (concept overlap, authority, co-activation) not applied to search results.
-
-**Fix**: Wire `CognitiveRetriever` to `orchestrator.search_memories()` in Phase 0.
+Multi-signal scoring (concept overlap, authority, domain, temporal) is applied to all search results.
 
 ---
 
 ## Part B: V5 Features (TO BE DEVELOPED)
 
-### B.0 Feature 0: Wire CognitiveRetriever (V4 DEBT)
+### B.0 Feature 0: Wire CognitiveRetriever (V4 DEBT) — DONE
 
-**Priority**: P0 (BLOCKING)  
-**Complexity**: Low  
-**Impact**: Critical
+**Status**: COMPLETED
 
-#### Requirement
-The `CognitiveRetriever` engine must be connected to `elefante-MemorySearch`.
-
-#### Current State
-- `CognitiveRetriever` exists in `src/core/retrieval.py`
-- `orchestrator.search_memories()` uses raw ChromaDB results
-- Multi-signal scoring is computed but not applied
-
-#### Target State
-- Search uses `CognitiveRetriever.score_candidate()` for all results
-- Results include composite scores from all signals
-- Foundation ready for retrieval explanation
-
-#### Files to Modify
-- `src/core/orchestrator.py` - Integrate `CognitiveRetriever` into `_search_semantic()`
-
-#### Acceptance Criteria
-- [ ] Search results scored by CognitiveRetriever
-- [ ] Composite score reflects concept/domain/authority/temporal signals
+The `CognitiveRetriever` is wired into `orchestrator.search_memories()`. All search results are scored by `CognitiveRetriever.score_candidate()` with concept, domain, authority, and temporal signals.
 
 ---
 
@@ -149,7 +123,7 @@ class HealthStatus(Enum):
 def compute_health(memory) -> HealthStatus:
     if memory.superseded_by_id:
         return AT_RISK
-    if memory.contradicts and not resolved:
+    if memory.conflict_ids and not resolved:
         return AT_RISK
     if days_since_access > 90:
         return STALE
@@ -217,10 +191,10 @@ POTENTIAL_OPPOSING_PATTERNS = [
 
 #### Resolution Flow
 1. System detects potential conflict
-2. Adds to `potential_conflicts` field (not `contradicts`)
+2. Adds to `potential_conflicts` field (not `conflict_ids`)
 3. Dashboard shows " Review conflict?" badge
 4. User reviews and resolves: 
-   - **Confirm conflict** → move to `contradicts`
+   - **Confirm conflict** → move to `conflict_ids`
    - **Dismiss** → remove flag
    - **Mark exception** → both valid in different contexts
 
@@ -263,19 +237,6 @@ async def get_proactive_suggestions(
     Analyze context and return most relevant memories.
     Uses surfaces_when field for matching.
     """
-```
-
-#### MCP Tool
-```json
-{
-  "name": "elefante-ProactiveSuggestions",
-  "description": "Get memory suggestions based on current context",
-  "parameters": {
-    "file_path": "string (optional)",
-    "error_message": "string (optional)", 
-    "conversation_snippet": "string (optional)"
-  }
-}
 ```
 
 #### Files to Modify
@@ -394,8 +355,8 @@ Flag potential issues for user review rather than auto-asserting. The system sug
 
 ## Part D: Implementation Plan
 
-### Phase 0: V4 Debt (Before V5)
-1. **B.0 Wire CognitiveRetriever** — Foundation for all V5 features
+### Phase 0: V4 Debt (DONE)
+1. **B.0 Wire CognitiveRetriever** — Completed
 
 ### Phase 1: Low Complexity
 2. B.1 Retrieval Explanation — Trivial once CognitiveRetriever wired
@@ -404,7 +365,7 @@ Flag potential issues for user review rather than auto-asserting. The system sug
 
 ### Phase 2: Medium Complexity  
 5. B.3 Potential Conflict Detection — Soft detection, user confirmation
-6. B.4 Proactive Memory Surfacing — Highest risk of unused, last
+6. B.4 Proactive Memory Surfacing — Highest impact, needs careful design
 
 ---
 
@@ -414,7 +375,7 @@ Flag potential issues for user review rather than auto-asserting. The system sug
 |--------|---------|--------|-------|
 | V4 fields populated | 100% | 100% |  Achieved |
 | SHARES_CONCEPT edges | 24 | - |  Achieved |
-| Search uses multi-signal scoring | No | Yes | Phase 0 |
+| Search uses multi-signal scoring | Yes | Yes | Done |
 | Search includes explanation | No | Yes | Phase 1 |
 | Potential conflicts flagged | 0 | All detected | Phase 2 |
 
@@ -435,10 +396,9 @@ Flag potential issues for user review rather than auto-asserting. The system sug
 ### V4 (Verified Working)
 - `src/models/memory.py` - V4 fields in MemoryMetadata
 - `src/utils/curation.py` - extract_concepts, infer_surfaces_when, compute_authority_score
-- `src/core/retrieval.py` - CognitiveRetriever (built, NOT wired)
-- `src/core/orchestrator.py` - Auto-populate V4 fields on add
+- `src/core/retrieval.py` - CognitiveRetriever (wired to orchestrator)
+- `src/core/orchestrator.py` - Auto-populate V4 fields on add; CognitiveRetriever scoring on search
 - `scripts/update_dashboard_data.py` - SHARES_CONCEPT edges
-- `scripts/migrate_v4_cognitive.py` - Migration script
 - `docs/technical/memory-schema-v4-cognitive.md` - Documentation
 
 ### To Modify in V5

@@ -147,8 +147,8 @@ class ConversationSearcher:
             # Create filters for conversation type only
             filters = SearchFilters(
                 memory_type="conversation",
-                min_importance=None,
-                max_importance=None
+                min_score=None,
+                max_score=None
             )
             
             # Search with generic query to get conversation memories

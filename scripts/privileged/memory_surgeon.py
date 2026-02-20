@@ -10,7 +10,7 @@ This tool is DANGEROUS.
 What it does:
 - Select candidate memories (by ids, query, or built-in rules).
 - Computes an "impact report" for each candidate:
-  - Temporal relevance score (importance + recency + access reinforcement)
+  - Temporal relevance score (score + recency + access reinforcement)
   - Graph degree / neighbor list (how many connections will be removed)
   - Safety classification (low/medium/high risk)
 - Writes a JSON backup of every candidate before deletion.
@@ -72,7 +72,7 @@ class Impact:
     namespace: str
     category: str
     tags: List[str]
-    importance: int
+    score: int
     access_count: int
     archived: bool
     deprecated: bool
@@ -114,7 +114,7 @@ def _risk_classification(
     degree: int,
     semantic_degree: int,
     semantic_max_similarity: float,
-    importance: int,
+    score: int,
     namespace: str,
     archived: bool,
 ) -> Tuple[str, str]:
@@ -129,8 +129,8 @@ def _risk_classification(
     if degree < 0:
         return "high", "graph connectivity unknown (graph store locked/unavailable)"
 
-    # Hard safety bias: do not auto-delete important+connected prod memories.
-    if namespace != "test" and (importance >= 8 or temporal_score >= 0.6) and degree >= 6:
+    # Hard safety bias: do not auto-delete high-scoring+connected prod memories.
+    if namespace != "test" and (score >= 80 or temporal_score >= 0.6) and degree >= 6:
         return "high", "high-value and highly connected"
 
     # Strong semantic connectivity affects dashboard similarity edges.
@@ -148,13 +148,13 @@ def _risk_classification(
             return "low", "archived + low connectivity"
         return "medium", "archived but connected or temporally relevant"
 
-    if temporal_score >= 0.65 or importance >= 9:
-        return "high", "high temporal score or importance"
+    if temporal_score >= 0.65 or score >= 90:
+        return "high", "high temporal score or high behavioral score"
 
     if degree >= 10:
         return "high", "high degree"
 
-    if temporal_score < 0.2 and degree <= 2 and importance <= 5:
+    if temporal_score < 0.2 and degree <= 2 and score <= 50:
         return "low", "low temporal score + low degree"
 
     return "medium", "default"
@@ -315,7 +315,7 @@ async def _build_impact(memory_id: UUID) -> Optional[Impact]:
     namespace = infer_namespace(mem)
     category = str(mem.metadata.category or "")
     tags = [t for t in (mem.metadata.tags or []) if isinstance(t, str)]
-    importance = int(mem.metadata.importance or 0)
+    score = int(mem.metadata.score or 0)
     access_count = int(mem.metadata.access_count or 0)
     archived = bool(getattr(mem.metadata, "archived", False))
     deprecated = bool(getattr(mem.metadata, "deprecated", False))
@@ -335,7 +335,7 @@ async def _build_impact(memory_id: UUID) -> Optional[Impact]:
         degree=degree,
         semantic_degree=semantic_degree,
         semantic_max_similarity=semantic_max_similarity,
-        importance=importance,
+        score=score,
         namespace=namespace,
         archived=archived,
     )
@@ -345,7 +345,7 @@ async def _build_impact(memory_id: UUID) -> Optional[Impact]:
         namespace=namespace,
         category=category,
         tags=tags,
-        importance=importance,
+        score=score,
         access_count=access_count,
         archived=archived,
         deprecated=deprecated,
@@ -401,7 +401,7 @@ async def _delete_memory(memory_id: UUID) -> Dict[str, Any]:
 
 def _print_report(impacts: Sequence[Impact], *, limit: int = 200) -> None:
     print(f"Candidates: {len(impacts)}")
-    header = "id  ns  risk  deg  sdeg  smax  temporal  imp  access  archived  category  tags  preview"
+    header = "id  ns  risk  deg  sdeg  smax  temporal  score  access  archived  category  tags  preview"
     print(header)
     print("-" * len(header))
 
@@ -413,7 +413,7 @@ def _print_report(impacts: Sequence[Impact], *, limit: int = 200) -> None:
         print(
             f"{str(i.memory_id)[:8]}  {i.namespace:<4}  {i.risk:<6}  {i.degree:<3}  "
             f"{i.semantic_degree:<4}  {i.semantic_max_similarity:>4.2f}  "
-            f"{i.temporal_score:>7.3f}  {i.importance:<3}  {i.access_count:<6}  "
+            f"{i.temporal_score:>7.3f}  {i.score:<5}  {i.access_count:<6}  "
             f"{str(i.archived):<8}  {i.category[:12]:<12}  {tags[:16]:<16}  {i.preview}"
         )
 

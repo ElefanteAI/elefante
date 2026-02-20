@@ -116,13 +116,6 @@ Before completing ANY task:
 **Why:** "Process running" ≠ "Server working". Port-open checks miss protocol failures.  
 **Source:** `docs/debug/installation-compendium.md` Issue #4 (LAW #10)
 
-### pitfall: installation inception data garbage
-
-**Trigger:** Fresh install; database contains test/placeholder data  
-**Action:** Run `scripts/ingest_inception.py` — injects identity + protocol as Memory #1  
-**Why:** Initializing with `"This is a test"` pollutes the knowledge graph. Prime Directive must be first.  
-**Source:** `docs/debug/installation-compendium.md` (LAW #11)
-
 ### pitfall: installation broken venv trap
 
 **Trigger:** Any `python scripts/install.py` call fails with ImportError or module errors inside VS Code/Copilot  
@@ -235,9 +228,9 @@ Before completing ANY task:
 
 ### pitfall: memory temporal decay not active
 
-**Trigger:** Memory importance scores not reflecting age  
-**Action:** Verify `temporal_consolidation.py` is running; decay is active in `_search_structured` and `_search_semantic`  
-**Why:** Memory importance must decay over time (Ebbinghaus model) unless reinforced by retrieval  
+**Trigger:** Memory scores not reflecting age  
+**Action:** Verify temporal decay is active in `calculate_relevance_score()` (`src/models/memory.py`); decay runs in `_search_structured` and `_search_semantic`  
+**Why:** Memory scores must decay over time (Ebbinghaus model) unless reinforced by retrieval  
 **Source:** `docs/technical/temporal-memory-decay.md`
 
 ### pitfall: memory session vs persistent confusion
@@ -249,7 +242,7 @@ Before completing ANY task:
 
 ### pitfall: memory schema field roundtrip missing
 
-**Trigger:** Memory stored with extra fields (layer, sublayer, etc.) but retrieved with defaults  
+**Trigger:** Memory stored with extra fields but retrieved with defaults  
 **Action:** When adding a field to the schema, update BOTH `add_memory()` write path AND `_reconstruct_memory()` read path  
 **Why:** Field must be mapped in both directions. Missing from read = always shows default.  
 **Source:** `docs/debug/memory-compendium.md` Issue #7 (Pattern #4)

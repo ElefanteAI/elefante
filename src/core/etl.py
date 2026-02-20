@@ -32,7 +32,7 @@ class ProcessingStatus:
     """Memory lifecycle states"""
     RAW = "raw"              # Just ingested, awaiting agent classification
     PROCESSING = "processing" # Handed to agent for classification
-    PROCESSED = "processed"   # Agent classified, fully placed in topology
+    PROCESSED = "processed"   # Agent classified with V5 fields (ring, topic, knowledge_type)
     FAILED = "failed"         # Classification failed
 
 

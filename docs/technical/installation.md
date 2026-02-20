@@ -264,7 +264,6 @@ Open: http://127.0.0.1:8000
 The installation script checks:
 
 - **MCP Liveness**: Performs a real JSON-RPC handshake (`scripts/verify_mcp_handshake.py`).
-- **Inception Memory**: Ingests the "Agentic Optimization Protocol" (`scripts/ingest_inception.py`).
 
 ### Verification Command (Manual)
 
@@ -405,7 +404,7 @@ Memories are contextual knowledge: project facts, user preferences, past decisio
 1. **Explicitly** — via `elefante-MemorySearch` (agent calls it proactively, triggered by Layer 1 instructions)
 2. **Automatically** — via `RELEVANT_CONTEXT` injection (server auto-surfaces top 3 relevant memories on every non-search tool call)
 
-The **Inception Memory** (ingested during installation by `scripts/ingest_inception.py`) provides system-level knowledge about how to use Elefante tools.
+System-level knowledge about how to use Elefante tools is provided through the `copilot-instructions.md` bootstrap and the Tool Response Contract.
 
 ### How the Three Layers Interact
 

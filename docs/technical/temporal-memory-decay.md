@@ -10,11 +10,10 @@
 
 Temporal Memory Decay is an adaptive memory strength system that mimics human cognition by:
 - **Decaying** memories over time (recency bias)
-- **Reinforcing** memories when accessed (importance through use)
-- **Consolidating** weak memories into long-term storage
-- **Archiving** unused memories automatically
+- **Reinforcing** memories when accessed (strengthened through use)
+- **Archiving** unused memories automatically (planned)
 
-This creates a dynamic memory system where frequently accessed, important memories stay strong while unused memories naturally fade.
+This creates a dynamic memory system where frequently accessed memories stay strong while unused memories naturally fade.
 
 ---
 
@@ -70,8 +69,7 @@ strength_B = 50 × 0.9 × 1.3 × 0.99 = 57.9  # Strong and recent
 
 ### Phase 2: Background Consolidation (Planned)
 
-**When**: Periodic background job  
-**Where**: `temporal_consolidation.py`
+**When**: Periodic background job (not yet implemented)  
 
 **Process**:
 1. Scan all memories
@@ -81,6 +79,8 @@ strength_B = 50 × 0.9 × 1.3 × 0.99 = 57.9  # Strong and recent
 5. Keep searchable but marked as archived
 
 **Effect**: Database stays focused on active memories while preserving history.
+
+**Status**: This phase is planned but not yet implemented. The consolidation module does not exist yet.
 
 ---
 
@@ -127,25 +127,6 @@ def search(self, query: str, limit: int = 10) -> List[Memory]:
 
 Similar temporal scoring applied to graph traversal results.
 
-### Consolidation Service
-
-**File**: `src/core/temporal_consolidation.py`
-
-**Key Methods**:
-```python
-def calculate_temporal_strength(memory: Memory) -> float:
-    """Calculate current strength based on temporal factors"""
-    
-def identify_weak_memories(threshold: float = 0.3) -> List[Memory]:
-    """Find memories below strength threshold"""
-    
-def archive_memory(memory: Memory) -> None:
-    """Move memory to archive with metadata"""
-    
-def run_consolidation() -> ConsolidationReport:
-    """Execute full consolidation cycle"""
-```
-
 ---
 
 ## Configuration
@@ -172,7 +153,7 @@ Memories can have custom decay/reinforcement rates:
 memory = Memory(
     content="Important project decision",
     metadata=MemoryMetadata(
-        importance=90,  # Behavioral relevance (0-100)
+        score=100,  # Behavioral vitality (0-100)
         decay_rate=0.001,  # Slower decay (0.1% per day)
         reinforcement_factor=0.2  # Stronger reinforcement
     )
@@ -204,7 +185,7 @@ results = orchestrator.search_memories("programming languages")
 # - Stronger reinforcement (1.5x vs 1.1x)
 ```
 
-### Example 2: Importance vs Recency
+### Example 2: Score vs Recency
 
 ```python
 # Old but durable memory
@@ -233,20 +214,23 @@ new_memory = Memory(
 # old_memory: 10 × 0.0 × 2.0 × 0.99 = 0.0 (still decayed, but reinforcement helps)
 ```
 
-### Example 3: Manual Consolidation
+### Example 3: Score vs Recency
 
 ```python
-from src.core.temporal_consolidation import TemporalConsolidation
+# A decision memory accessed 10 times in 72 days
+decision = Memory(
+    content="Use absolute paths for all imports",
+    metadata=MemoryMetadata(
+        memory_type="decision",
+        access_count=10,
+        decay_rate=0.005,  # decision type
+    )
+)
 
-consolidator = TemporalConsolidation(config)
-
-# Run consolidation
-report = consolidator.run_consolidation()
-
-print(f"Memories scanned: {report.total_scanned}")
-print(f"Weak memories found: {report.weak_count}")
-print(f"Archived: {report.archived_count}")
-print(f"Average strength: {report.average_strength}")
+# calculate_relevance_score() returns 0.0-1.0
+# High access slows decay via reinforcement factor
+vitality = decision.calculate_relevance_score()
+# => ~0.90 (still strong due to frequent access)
 ```
 
 ---
@@ -365,9 +349,9 @@ temporal_decay:
 ### Issue: Important Memories Being Archived
 
 **Solution**: 
-1. Increase importance rating (8-10)
-2. Access memories regularly to reinforce
-3. Lower consolidation threshold
+1. Access memories regularly to reinforce them (raises behavioral score)
+2. Lower consolidation threshold
+3. Memories with high access counts decay much slower
 
 ### Issue: Search Results Too Biased Toward Recent
 
@@ -382,7 +366,7 @@ temporal_decay:
 ## Related Documentation
 
 - [`architecture.md`](architecture.md) - System architecture
-- [`memory-schema-v4.md`](memory-schema-v4.md) - Memory data model
+- [`memory-schema-v4-cognitive.md`](memory-schema-v4-cognitive.md) - Memory data model
 - [`usage.md`](usage.md) - API reference
 
 ---

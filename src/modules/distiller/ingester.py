@@ -1,12 +1,10 @@
 """
 Elefante Session Distiller — Memory Ingester
-Responsibility: Bridge between the Distiller pipeline and Elefante's MemoryOrchestrator.
+Bridge between the Distiller pipeline and Elefante's MemoryOrchestrator.
 
 Two modes:
-  1. Raw Archive: Store a lightweight reference to the session (importance=1, high decay).
-  2. Insight Promotion: Store distilled insights as high-importance permanent memories.
-
-This module handles the async boundary — the CLI is sync, the orchestrator is async.
+  1. Raw Archive: Store a lightweight session reference (high decay).
+  2. Insight Promotion: Store distilled insights as permanent memories.
 """
 
 from __future__ import annotations
@@ -26,21 +24,9 @@ _INSIGHT_TYPE_MAP = {
     InsightType.PREFERENCE:         "preference",
     InsightType.ARCHITECTURE_RULE:  "fact",
     InsightType.FACT:               "fact",
-    InsightType.CODE_SNIPPET:       "code",
+    InsightType.CODE_SNIPPET:       "note",
     InsightType.ERROR_FIX:          "insight",
     InsightType.WORKFLOW:           "note",
-}
-
-# Mapping from InsightType → Elefante layer/sublayer
-_INSIGHT_LAYER_MAP = {
-    InsightType.DECISION:           ("intent", "decision"),
-    InsightType.ROOT_CAUSE:         ("world", "failure"),
-    InsightType.PREFERENCE:         ("self", "preference"),
-    InsightType.ARCHITECTURE_RULE:  ("intent", "rule"),
-    InsightType.FACT:               ("world", "fact"),
-    InsightType.CODE_SNIPPET:       ("world", "method"),
-    InsightType.ERROR_FIX:          ("world", "failure"),
-    InsightType.WORKFLOW:           ("intent", "rule"),
 }
 
 
@@ -68,7 +54,7 @@ class MemoryIngester:
     def store_raw_reference(self, session: ChatSession) -> Optional[str]:
         """
         Store a lightweight raw session reference (NOT the full transcript).
-        This is the Free Tier archival — low importance, high decay.
+        This is the Free Tier archival — low score, high decay.
         Returns the memory ID if successful.
         """
         content = (
@@ -79,8 +65,6 @@ class MemoryIngester:
         )
 
         metadata = {
-            "layer": "world",
-            "sublayer": "raw_history",
             "category": "chat_session",
             "source_detail": "session_distiller",
             "session_id": session.session_id,
@@ -103,21 +87,16 @@ class MemoryIngester:
 
     def store_insights(self, session: ChatSession, insights: List[DistilledInsight]) -> List[str]:
         """
-        Store distilled insights as high-importance, permanent memories.
+        Store distilled insights as high-value, permanent memories.
         This is the Pro Tier — the money maker.
         Returns list of memory IDs for successfully stored insights.
         """
         stored_ids = []
 
         for insight in insights:
-            layer, sublayer = _INSIGHT_LAYER_MAP.get(
-                insight.insight_type, ("world", "fact")
-            )
             memory_type = _INSIGHT_TYPE_MAP.get(insight.insight_type, "fact")
 
             metadata = {
-                "layer": layer,
-                "sublayer": sublayer,
                 "category": f"distilled_{insight.insight_type.value}",
                 "source_detail": "session_distiller",
                 "confidence": insight.confidence,

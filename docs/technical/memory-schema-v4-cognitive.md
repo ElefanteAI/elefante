@@ -1,8 +1,7 @@
 # V4 Cognitive Retrieval Schema
 
 **Status**: PRODUCTION  
-**Date**: 2026-02-16  
-**Supersedes**: V3 taxonomy (layer/sublayer still valid, this adds retrieval intelligence)
+**Date**: 2026-02-16
 
 ---
 
@@ -11,8 +10,7 @@
 V4 adds **cognitive retrieval fields** to make memories discoverable not just by content similarity, but by:
 - **Shared concepts** (keywords)
 - **Query patterns** (when should this surface?)
-- **Authority** (importance × usage × freshness)
-- **Relationships** (supports/contradicts other memories)
+- **Authority** (relevance x usage x freshness)
 
 ---
 
@@ -23,9 +21,7 @@ V4 adds **cognitive retrieval fields** to make memories discoverable not just by
 | `concepts` | `string[]` | 3-5 key terms extracted from content |  Yes |
 | `surfaces_when` | `string[]` | Query patterns that should trigger this memory |  Yes |
 | `authority_score` | `float` | Composite score (0-1) for ranking |  Yes |
-| `co_activated_with` | `uuid[]` | Memories often retrieved together |  Runtime |
-| `contradicts` | `uuid[]` | Memories with opposing information |  Runtime |
-| `supports` | `uuid[]` | Memories that reinforce this one |  Runtime |
+
 
 ---
 
@@ -103,7 +99,7 @@ V4 adds **SHARES_CONCEPT** edges to the dashboard:
 
 **File**: `src/core/retrieval.py`
 
-Multi-signal scoring for search:
+Multi-signal scoring for search (wired into `orchestrator.search_memories()`):
 
 ```python
 composite_score = (
@@ -111,22 +107,9 @@ composite_score = (
     0.20 × concept_overlap +      # Shared keywords
     0.15 × domain_match +         # Same project/context
     0.15 × co_activation +        # Often retrieved together
-    0.10 × authority_score +      # Importance/usage
+    0.10 × authority_score +      # Authority/usage
     0.10 × temporal_relevance     # Freshness
 )
-```
-
-### Memory Constellation
-
-Search returns structured results, not flat lists:
-
-```json
-{
-  "primary": {"id": "...", "score": 0.87, "role": "direct_answer"},
-  "supporting": [{"id": "...", "role": "context"}],
-  "contradicting": [{"id": "...", "role": "exception"}],
-  "synthesis": "Primary: X | Supported by: Y | Note: Conflicting info in Z"
-}
 ```
 
 ---
@@ -143,28 +126,15 @@ When `add_memory()` is called:
 
 ---
 
-## Migration
-
-**Script**: `scripts/migrate_v4_cognitive.py`
-
-Backfills existing memories with V4 fields:
-
-```bash
-python scripts/migrate_v4_cognitive.py
-```
-
----
-
 ## Files Modified
 
 | File | Changes |
 |------|---------|
 | `src/models/memory.py` | Added 6 new fields to `MemoryMetadata` |
 | `src/utils/curation.py` | Added `extract_concepts()`, `infer_surfaces_when()`, `compute_authority_score()` |
-| `src/core/retrieval.py` | New file: `CognitiveRetriever`, `MemoryConstellation` |
+| `src/core/retrieval.py` | `CognitiveRetriever` (wired in orchestrator) |
 | `src/core/orchestrator.py` | Auto-populate V4 fields on add |
 | `scripts/update_dashboard_data.py` | Added SHARES_CONCEPT edges |
-| `scripts/migrate_v4_cognitive.py` | New migration script |
 
 ---
 
@@ -178,7 +148,7 @@ await orchestrator.add_memory(
 )
 
 # Result:
-# title: "intent.rule: When debugging path errors..."
+# title: "When debugging path errors..."
 # concepts: ['debugging', 'path', 'errors', 'absolute', 'paths']
 # surfaces_when: ['debugging error', 'path error', 'debugging best practice', ...]
 # authority_score: 0.724

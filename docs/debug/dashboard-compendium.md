@@ -3,7 +3,9 @@
 > **Domain:** Dashboard & Visualization  
 > **Last Updated:** 2025-12-07  
 > **Total Issues Documented:** 6  
-> **Status:** Production Reference  
+> **Status:** Production Reference
+>
+> **HISTORICAL NOTE:** Some issues below reference V3 concepts (layer, sublayer, classifier.py, importance 1-10) that have since been removed. These entries document the debugging process and lessons learned; the referenced code/fields no longer exist.  
 > **Maintainer:** Add new issues following Issue #N template at bottom
 
 ---

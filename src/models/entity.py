@@ -100,6 +100,8 @@ class RelationshipType(str, Enum):
     WORKS_ON = "WORKS_ON"
     LOCATED_IN = "LOCATED_IN"
     CUSTOM = "CUSTOM"
+    SUPERSEDES = "SUPERSEDES"
+    CONTRADICTS = "CONTRADICTS"
 
 
 class Relationship(BaseModel):

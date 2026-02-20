@@ -126,12 +126,9 @@ class VectorStore:
             "domain": memory.metadata.domain.value if hasattr(memory.metadata.domain, 'value') else str(memory.metadata.domain),
             "category": memory.metadata.category,
             "memory_type": memory.metadata.memory_type.value if hasattr(memory.metadata.memory_type, 'value') else str(memory.metadata.memory_type),
-            "subcategory": memory.metadata.subcategory or "",
             
             # Semantic Metadata
-            "intent": memory.metadata.intent.value if hasattr(memory.metadata.intent, 'value') else str(memory.metadata.intent),
             "score": memory.metadata.score,
-            "urgency": memory.metadata.urgency,
             "confidence": memory.metadata.confidence,
             "tags": ",".join(memory.metadata.tags) if memory.metadata.tags else "",
             "keywords": ",".join(memory.metadata.keywords) if memory.metadata.keywords else "",
@@ -409,8 +406,8 @@ class VectorStore:
         if filters.project:
             where["project"] = filters.project
         
-        if filters.min_importance is not None:
-            where["importance"] = {"$gte": filters.min_importance}
+        if filters.min_score is not None:
+            where["score"] = {"$gte": filters.min_score}
         
         # Note: ChromaDB has limited filtering capabilities
         # Complex filters (tags, dates) may need post-processing
@@ -421,12 +418,11 @@ class VectorStore:
         """Reconstruct Memory object from ChromaDB data."""
         from src.models.memory import (
             DomainType,
-            IntentType,
             MemoryStatus,
             MemoryType,
-            RelationshipType,
             SourceType,
         )
+        from src.models.entity import RelationshipType
         
         # Helper to safely get enum value
         def get_enum_value(enum_class, value, default):
@@ -439,11 +435,11 @@ class VectorStore:
         
         # Identify custom metadata (unknown fields) for restoration
         known_keys = {
-            "created_at", "timestamp", "created_by", "layer", "sublayer", "domain", 
-            "category", "memory_type", "subcategory", "intent", "importance", 
-            "urgency", "confidence", "tags", "keywords", "status", "parent_id", 
+            "created_at", "timestamp", "created_by", "domain",
+            "category", "memory_type", "subcategory", "score", "importance",
+            "confidence", "tags", "keywords", "status", "parent_id",
             "relationship_type", "related_memory_ids", "conflict_ids", "supersedes_id", "superseded_by_id",
-            "source", "source_reliability", "verified", "project", "file_path", 
+            "source", "source_reliability", "verified", "project", "file_path",
             "session_id", "last_accessed", "last_modified", "access_count", "version", "deprecated", "archived",
             # Cognitive Retrieval
             "concepts", "surfaces_when", "authority_score",
@@ -553,17 +549,12 @@ class VectorStore:
             created_by=metadata.get("created_by", "user"),
             
             # Classification
-            layer=metadata.get("layer", "world"),
-            sublayer=metadata.get("sublayer", "fact"),
             domain=get_enum_value(DomainType, metadata.get("domain"), DomainType.REFERENCE),
             category=metadata.get("category", "general"),
             memory_type=get_enum_value(MemoryType, metadata.get("memory_type"), MemoryType.CONVERSATION),
-            subcategory=metadata.get("subcategory") or None,
             
             # Semantic
-            intent=get_enum_value(IntentType, metadata.get("intent"), IntentType.REFERENCE),
             score=int(metadata.get("score", metadata.get("importance", 100))),
-            urgency=int(metadata.get("urgency", 5)),
             confidence=metadata.get("confidence", 0.7),
             tags=metadata.get("tags", "").split(",") if metadata.get("tags") else [],
             keywords=metadata.get("keywords", "").split(",") if metadata.get("keywords") else [],

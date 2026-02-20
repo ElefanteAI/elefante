@@ -86,18 +86,6 @@ class EmbeddingsConfig(BaseModel):
     normalize: bool = True
 
 
-class LLMConfig(BaseModel):
-    """LLM service configuration"""
-    # NOTE: Elefante does not connect to an LLM. This section is kept for legacy
-    # config compatibility, but is not used by runtime.
-    provider: str = "agent-managed"
-    model: str = ""
-    temperature: float = 0.0
-    max_tokens: int = 0
-    api_key: Optional[str] = None
-    base_url: Optional[str] = None
-
-
 class LoggingConfig(BaseModel):
     """Logging configuration"""
     level: str = "INFO"
@@ -108,22 +96,6 @@ class LoggingConfig(BaseModel):
     console: bool = True
 
 
-class MemoryConfig(BaseModel):
-    """Memory management configuration"""
-    auto_consolidate: bool = False
-    consolidation_threshold: int = 1000
-    importance_decay: bool = False
-    max_age_days: int = Field(default=365, ge=0)
-
-
-class ConsolidationConfig(BaseModel):
-    """Consolidation job configuration"""
-    enabled: bool = False
-    interval_hours: int = Field(default=24, ge=1)
-    strength_threshold: float = Field(default=0.1, ge=0.0, le=1.0)
-    archive_threshold_days: int = Field(default=180, ge=0)
-
-
 class TemporalDecayConfig(BaseModel):
     """Temporal memory decay & reinforcement configuration"""
     enabled: bool = True
@@ -131,7 +103,6 @@ class TemporalDecayConfig(BaseModel):
     default_reinforcement_factor: float = Field(default=0.1, ge=0.0, le=1.0)
     semantic_weight: float = Field(default=0.7, ge=0.0, le=1.0)
     temporal_weight: float = Field(default=0.3, ge=0.0, le=1.0)
-    consolidation: ConsolidationConfig = Field(default_factory=ConsolidationConfig)
     
     @model_validator(mode="after")
     def validate_weights(self):
@@ -153,7 +124,6 @@ class FeaturesConfig(BaseModel):
     """Feature flags"""
     enable_graph_store: bool = True
     enable_vector_store: bool = True
-    enable_auto_tagging: bool = False
     enable_deduplication: bool = True
 
 
@@ -182,9 +152,7 @@ class ElefanteConfig(BaseModel):
     orchestrator: OrchestratorConfig = Field(default_factory=OrchestratorConfig)
     mcp_server: MCPServerConfig = Field(default_factory=MCPServerConfig)
     embeddings: EmbeddingsConfig = Field(default_factory=EmbeddingsConfig)
-    llm: LLMConfig = Field(default_factory=LLMConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
-    memory: MemoryConfig = Field(default_factory=MemoryConfig)
     performance: PerformanceConfig = Field(default_factory=PerformanceConfig)
     features: FeaturesConfig = Field(default_factory=FeaturesConfig)
     user_profile: UserProfileConfig = Field(default_factory=UserProfileConfig)

@@ -227,7 +227,7 @@ AI has knowledge in Elefante but fails to apply it when relevant.
 
 ### Symptom
 ```
-Memory stored: "NEVER delete files, move to ARCHIVE" (importance: 10)
+Memory stored: "NEVER delete files, move to ARCHIVE" (score: 100)
 
 User: "Clean up the root directory"
 
@@ -256,7 +256,7 @@ Before every response:
 
 **Example:**
 ```
-Retrieved: Memory e752a57b (importance 10): "Never delete, move to ARCHIVE"
+Retrieved: Memory e752a57b (score 100): "Never delete, move to ARCHIVE"
 Applicable: Yes - this is a file cleanup task
 Compliance: Will move files to ARCHIVE/, not delete
 Conflicts: None
@@ -344,7 +344,7 @@ Elefante has comprehensive protocols (Inception Memory, Tool Descriptions, Docum
 ### Symptom
 
 ```
-EXISTING PROTOCOL (Inception Memory, importance=10):
+EXISTING PROTOCOL (Inception Memory, score=100):
 "PRIME DIRECTIVE: MEMORY FIRST
 1. Check Context: Before answering, ALWAYS search memory"
 

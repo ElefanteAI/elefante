@@ -435,7 +435,7 @@ uvicorn.run(
 For large graphs (500+ memories):
 
 1. Filter by space/category before visualization
-2. Hide low-importance nodes
+2. Hide low-score nodes
 3. Use search to show subgraph only
 
 ---
