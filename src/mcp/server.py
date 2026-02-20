@@ -956,7 +956,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 try:
                     orchestrator = await self._get_orchestrator()
                     from src.models.query import QueryMode
-                    results = await orchestrator.search(
+                    results = await orchestrator.search_memories(
                         query=topic,
                         mode=QueryMode.HYBRID,
                         limit=5,
@@ -965,7 +965,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                     
                     if results:
                         memory_text = "\\n\\n".join([
-                            f"**Memory [{i+1}]** (score: {r.score:.2f}):\\n{r.content}"
+                            f"**Memory [{i+1}]** (score: {r.score:.2f}):\\n{r.memory.content}"
                             for i, r in enumerate(results)
                         ])
                         context_msg = f"# Relevant Memories for: {topic}\\n\\n{memory_text}\\n\\n---\\nUse this context to answer the user's question."
@@ -1214,8 +1214,8 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 memory_type=filter_data.get("memory_type"),
                 domain=filter_data.get("domain"),
                 category=filter_data.get("category"),
-                min_importance=filter_data.get("min_score"),
-                max_importance=filter_data.get("max_importance"),
+                min_score=filter_data.get("min_score"),
+                max_score=filter_data.get("max_score"),
                 tags=filter_data.get("tags"),
                 start_date=datetime.fromisoformat(filter_data["start_date"]) if "start_date" in filter_data else None,
                 end_date=datetime.fromisoformat(filter_data["end_date"]) if "end_date" in filter_data else None
@@ -1333,8 +1333,8 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 memory_type=filter_data.get("memory_type"),
                 domain=filter_data.get("domain"),
                 category=filter_data.get("category"),
-                min_importance=filter_data.get("min_score"),
-                max_importance=filter_data.get("max_importance"),
+                min_score=filter_data.get("min_score"),
+                max_score=filter_data.get("max_score"),
                 tags=filter_data.get("tags")
             )
         
@@ -1565,7 +1565,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
             processing_status = cm.get("processing_status")
             canonical_key = cm.get("canonical_key")
             namespace = cm.get("namespace")
-            topic = cm.get("topic")
+            topic = mem.metadata.category if mem.metadata.category and mem.metadata.category != "general" else cm.get("topic")
             summary = cm.get("summary")
 
             node = {
@@ -1980,20 +1980,6 @@ You have access to a persistent memory system called **Elefante** - the user's s
             
             return result
     
-    async def _handle_etl_status(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefante-ETLProcess (include_stats=true) - Get processing stats"""
-        from src.core.etl import get_etl_processor
-        
-        etl = get_etl_processor()
-        etl.vector_store = (await self._get_orchestrator()).vector_store
-        
-        stats = await etl.get_stats()
-        
-        return {
-            "success": True,
-            **stats,
-            "message": f"Total: {stats['total']}, Raw: {stats['raw']}, Processed: {stats['processed']}, Failed: {stats['failed']}"
-        }
 
     # =========================================================================
     # DIRECTIVE HANDLERS (Always-On Behavioral Constraints)
@@ -2099,32 +2085,6 @@ You have access to a persistent memory system called **Elefante** - the user's s
         except Exception as e:
             self.logger.error(f"Task create failed: {e}", exc_info=True)
             return {"success": False, "error": str(e), "tool": "elefante-TaskCreate"}
-
-    async def _handle_task_decompose(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefante-TaskCreate (subtasks) - Break a task into subtasks"""
-        try:
-            with write_lock() as lock:
-                if not lock.acquired:
-                    return {"success": False, "error": "Could not acquire write lock", "retry": True}
-                
-                orchestrator = await self._get_orchestrator()
-                subtask_ids = await orchestrator.decompose_task(
-                    parent_task_id=args["parent_task_id"],
-                    subtasks=args["subtasks"]
-                )
-                
-                return {
-                    "success": True,
-                    "parent_task_id": args["parent_task_id"],
-                    "subtask_ids": subtask_ids,
-                    "count": len(subtask_ids),
-                    "message": f"Created {len(subtask_ids)} subtasks under {args['parent_task_id']}"
-                }
-        except ValueError as e:
-            return {"success": False, "error": str(e), "tool": "elefante-TaskCreate (subtasks)"}
-        except Exception as e:
-            self.logger.error(f"Task decompose failed: {e}", exc_info=True)
-            return {"success": False, "error": str(e), "tool": "elefante-TaskCreate (subtasks)"}
 
     async def _handle_task_update(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Handle elefante-TaskUpdate - Update task status/output"""

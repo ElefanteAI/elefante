@@ -51,10 +51,49 @@ async def get_graph(limit: int = 1000, space: Optional[str] = None):
         with open(snapshot_path, "r", encoding="utf-8") as f:
             data = json.load(f)
         
+        # Fallback hydration for usage metadata if snapshot omitted it.
+        usage_by_id: Dict[str, Dict[str, Any]] = {}
+        try:
+            from src.core.vector_store import get_vector_store
+
+            vector_store = get_vector_store()
+            memories = await vector_store.get_all(limit=5000, offset=0)
+            usage_by_id = {
+                str(m.id): {
+                    "access_count": int(getattr(m.metadata, "access_count", 0) or 0),
+                    "last_accessed": (
+                        m.metadata.last_accessed.isoformat()
+                        if getattr(m.metadata, "last_accessed", None)
+                        else None
+                    ),
+                    "last_modified": (
+                        m.metadata.last_modified.isoformat()
+                        if getattr(m.metadata, "last_modified", None)
+                        else None
+                    ),
+                }
+                for m in memories
+            }
+        except Exception as hydrate_error:
+            logger.warning(f"Usage hydration skipped: {hydrate_error}")
+
         # Transform nodes to frontend format
         nodes = []
         for n in data.get("nodes", []):
             node_type = n.get("type", "memory")
+            raw_props = n.get("properties", {}) if isinstance(n.get("properties"), dict) else {}
+            memory_id = str(n.get("id") or "")
+            hydrated_usage = usage_by_id.get(memory_id, {}) if node_type == "memory" else {}
+            access_count = raw_props.get("access_count")
+            if access_count is None:
+                access_count = hydrated_usage.get("access_count", 0)
+            last_accessed = raw_props.get("last_accessed")
+            if last_accessed is None:
+                last_accessed = hydrated_usage.get("last_accessed")
+            last_modified = raw_props.get("last_modified")
+            if last_modified is None:
+                last_modified = hydrated_usage.get("last_modified")
+
             nodes.append({
                 "id": n.get("id"),
                 "label": n.get("name", "")[:50] + ("..." if len(n.get("name", "")) > 50 else ""),
@@ -66,7 +105,10 @@ async def get_graph(limit: int = 1000, space: Optional[str] = None):
                 "properties": {
                     "description": n.get("description", ""),
                     "created_at": n.get("created_at", ""),
-                    **(n.get("properties", {}) if isinstance(n.get("properties"), dict) else {})
+                    **raw_props,
+                    "access_count": access_count,
+                    "last_accessed": last_accessed,
+                    "last_modified": last_modified,
                 },
                 "full_data": n
             })

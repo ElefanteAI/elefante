@@ -195,7 +195,7 @@ async def main():
             return default
 
     def _winner_better(meta_new: dict, node_new: dict, meta_old: dict, node_old: dict) -> bool:
-        # Prefer active > processed > importance > access_count > newer created_at
+        # Prefer active > processed > score > access_count > newer created_at
         a_new = 1 if _active(meta_new) else 0
         a_old = 1 if _active(meta_old) else 0
         if a_new != a_old:
@@ -205,11 +205,6 @@ async def main():
         p_old = _ps_rank(meta_old)
         if p_new != p_old:
             return p_new > p_old
-
-        imp_new = _safe_int(meta_new.get("importance"), 5)
-        imp_old = _safe_int(meta_old.get("importance"), 5)
-        if imp_new != imp_old:
-            return imp_new > imp_old
 
         ac_new = _safe_int(meta_new.get("access_count"), 0)
         ac_old = _safe_int(meta_old.get("access_count"), 0)
@@ -237,13 +232,6 @@ async def main():
         if _is_test_artifact(content=doc, title=str(name)):
             continue
         
-        # CRITICAL: Typecast importance to INTEGER
-        importance_raw = meta.get("importance", 5)
-        try:
-            importance = int(importance_raw) if importance_raw is not None else 5
-        except (ValueError, TypeError):
-            importance = 5
-        
         node = {
             "id": memory_id,
             "name": name,
@@ -255,10 +243,7 @@ async def main():
                 # Curated-first fields (used by dashboard UI and snapshot validators)
                 "title": _redact_secrets(str(title) if title is not None else ""),
                 "memory_type": meta.get("memory_type", "unknown"),
-                "importance": importance,  # INTEGER, not string
                 "tags": meta.get("tags", ""),
-                "layer": meta.get("layer", "world"),
-                "sublayer": meta.get("sublayer", "fact"),
                 "status": meta.get("status"),
                 "relationship_type": meta.get("relationship_type"),
                 "archived": _truthy(meta.get("archived")),
@@ -273,7 +258,7 @@ async def main():
                 # Topology fields (best-effort pass-through)
                 "ring": meta.get("ring"),
                 "knowledge_type": meta.get("knowledge_type"),
-                "topic": _derive_topic(str(title) if title is not None else "", meta.get("topic")),
+                "topic": _derive_topic(str(title) if title is not None else "", meta.get("category")),
                 "score": _compute_live_score(meta),
                 "summary": _redact_secrets(meta.get("summary", "") or ""),
                 "owner_id": meta.get("owner_id"),
