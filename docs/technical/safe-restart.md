@@ -1,6 +1,6 @@
 # Elefante Safe Restart
 
-**Version**: 2.0.0  
+**Version**: 2.1.2  
 **Script**: `scripts/restart_elefante.py`  
 **Purpose**: Safely restart MCP server to pick up code changes
 
@@ -17,7 +17,7 @@ The Safe Restart utility cleanly restarts the Elefante MCP server without corrup
 
 ## Features
 
- **Graceful Shutdown**: Uses SIGTERM for clean exit  
+**Graceful Shutdown**: Uses SIGTERM for clean exit  
  **Resource Cleanup**: Clears orchestrator references  
  **Lock Management**: Removes stale locks safely  
  **Transaction Safety**: Respects v1.1.0+ transaction-scoped locking  
@@ -67,12 +67,12 @@ python scripts/restart_elefante.py --force --timeout 20 --verify
 
 ## Options
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--force` | False | Use SIGKILL if SIGTERM fails |
-| `--timeout SECONDS` | 10 | Max wait for graceful shutdown |
-| `--verify` | False | Verify process after restart |
-| `--version VERSION` | None | Expected version (future feature) |
+| Option              | Default | Description                       |
+| ------------------- | ------- | --------------------------------- |
+| `--force`           | False   | Use SIGKILL if SIGTERM fails      |
+| `--timeout SECONDS` | 10      | Max wait for graceful shutdown    |
+| `--verify`          | False   | Verify process after restart      |
+| `--version VERSION` | None    | Expected version (future feature) |
 
 ---
 
@@ -197,12 +197,12 @@ python scripts/restart_elefante.py
 
 ## Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | Failed to stop server |
-| 1 | Failed to start server |
-| 1 | Verification failed |
+| Code | Meaning                |
+| ---- | ---------------------- |
+| 0    | Success                |
+| 1    | Failed to stop server  |
+| 1    | Failed to start server |
+| 1    | Verification failed    |
 
 ---
 
@@ -281,12 +281,12 @@ Arguments: {
 
 ## Comparison: Restart vs Enable/Disable
 
-| Action | Purpose | Code Reload | Data Loss |
-|--------|---------|-------------|-----------|
-| **Disable/Enable** | Switch IDEs |  No |  No |
-| **Restart** | Load new code |  Yes |  No |
-| **Kill/Start** | Emergency |  Yes |  Risk if mid-write |
-| **Safe Restart** | Best practice |  Yes |  No |
+| Action             | Purpose       | Code Reload | Data Loss         |
+| ------------------ | ------------- | ----------- | ----------------- |
+| **Disable/Enable** | Switch IDEs   | No          | No                |
+| **Restart**        | Load new code | Yes         | No                |
+| **Kill/Start**     | Emergency     | Yes         | Risk if mid-write |
+| **Safe Restart**   | Best practice | Yes         | No                |
 
 ---
 
@@ -298,6 +298,6 @@ Arguments: {
 
 ---
 
-**Version**: 2.0.0
-**Last Updated**: 2026-02-18
+**Version**: 2.1.2
+**Last Updated**: 2026-02-25
 **Status**: Production Ready

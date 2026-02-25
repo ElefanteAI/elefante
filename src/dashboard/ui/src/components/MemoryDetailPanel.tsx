@@ -37,9 +37,14 @@ interface MemoryDetailPanelProps {
   onClose: () => void;
   relatedMemories?: MemoryNode[];
   onNavigateToMemory?: (id: string) => void;
+  health_status?: 'healthy'|'stale'|'at_risk'|'orphan';
 }
 
-export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNavigateToMemory }: MemoryDetailPanelProps) {
+const iconMap = {healthy: "✓", stale: "⏰", at_risk: "⚠", orphan: "🔗"};
+const colorMap = {healthy: "green", stale: "yellow", at_risk: "red", orphan: "gray"};
+
+const tooltipMap = {healthy: "Healthy", stale: "Stale - refresh", at_risk: "At risk - review", orphan: "Orphan - link"};
+export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNavigateToMemory , health_status }: MemoryDetailPanelProps) {
   // Escape to close
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') onClose();
@@ -80,6 +85,7 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNav
                 </span>
               )}
             </div>
+              <div className="health-status {{health_status}}" style={{color: colorMap[health_status]}} title={tooltipMap[health_status]}}>{iconMap[health_status]}</div>
           </div>
           <button
             onClick={onClose}

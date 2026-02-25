@@ -1,7 +1,7 @@
 # Dashboard Startup & Troubleshooting Guide
 
 **Status**: ESSENTIAL - Visual interface for memory system  
-**Last Updated**: 2026-02-18  
+**Last Updated**: 2026-02-25  
 **Applies to**: v2.0.0+
 
 ---
@@ -42,6 +42,7 @@ Press `Ctrl+C` in the terminal.
 ### Dashboard Features
 
 The dashboard has three tabs:
+
 - **Overview**: Health score gauge, diagnostic panels, agent impact metrics
 - **Memories**: Searchable, sortable table of all memories (TanStack Table)
 - **Explore**: Topics (card grid), Insights (charts), Graph (SVG hub-spoke)
@@ -150,6 +151,7 @@ python -m src.dashboard.server
 ### Issue #2: "Connection refused" or "Cannot reach localhost:8000"
 
 **Symptom**:
+
 - Browser shows "Connection refused"
 - Or "Unable to reach this page"
 
@@ -175,6 +177,7 @@ python -m src.dashboard.server
 ### Issue #3: "Blank page with no graph"
 
 **Symptom**:
+
 - Dashboard loads (no connection error)
 - But shows blank page or empty graph
 - No nodes visible
@@ -264,7 +267,7 @@ python -m src.dashboard.server
 **Symptom**:
 
 ```
-Access to XMLHttpRequest at 'http://127.0.0.1:8000/api/stats' 
+Access to XMLHttpRequest at 'http://127.0.0.1:8000/api/stats'
 from origin 'http://127.0.0.1:8000' has been blocked by CORS policy
 ```
 
@@ -291,6 +294,7 @@ curl -H "Content-Type: application/json" http://127.0.0.1:8000/api/stats
 ### Issue #6: "Old data showing after adding memories"
 
 **Symptom**:
+
 - Add memory via MCP
 - Refresh dashboard
 - Memory not showing
@@ -444,10 +448,10 @@ For large graphs (500+ memories):
 
 ### Tested Browsers
 
--  Chrome/Chromium 120+
--  Firefox 121+
--  Safari 17+
--  Edge 120+
+- Chrome/Chromium 120+
+- Firefox 121+
+- Safari 17+
+- Edge 120+
 
 ### Known Issues
 
@@ -509,6 +513,6 @@ Before claiming "Dashboard is working":
 
 ---
 
-**Document Version**: 2.0  
+**Document Version**: 2.1.2  
 **Status**: ESSENTIAL  
-**Last Validated**: 2026-02-18
+**Last Validated**: 2026-02-25

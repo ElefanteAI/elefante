@@ -8,6 +8,7 @@
 ## Overview
 
 V4 adds **cognitive retrieval fields** to make memories discoverable not just by content similarity, but by:
+
 - **Shared concepts** (keywords)
 - **Query patterns** (when should this surface?)
 - **Authority** (relevance x usage x freshness)
@@ -16,12 +17,11 @@ V4 adds **cognitive retrieval fields** to make memories discoverable not just by
 
 ## New Metadata Fields
 
-| Field | Type | Purpose | Auto-populated |
-|-------|------|---------|----------------|
-| `concepts` | `string[]` | 3-5 key terms extracted from content |  Yes |
-| `surfaces_when` | `string[]` | Query patterns that should trigger this memory |  Yes |
-| `authority_score` | `float` | Composite score (0-1) for ranking |  Yes |
-
+| Field             | Type       | Purpose                                        | Auto-populated |
+| ----------------- | ---------- | ---------------------------------------------- | -------------- |
+| `concepts`        | `string[]` | 3-5 key terms extracted from content           | Yes            |
+| `surfaces_when`   | `string[]` | Query patterns that should trigger this memory | Yes            |
+| `authority_score` | `float`    | Composite score (0-1) for ranking              | Yes            |
 
 ---
 
@@ -30,12 +30,14 @@ V4 adds **cognitive retrieval fields** to make memories discoverable not just by
 **File**: `src/utils/curation.py` → `extract_concepts()`
 
 Deterministic keyword extraction (no LLM):
+
 - Removes stop words
 - Boosts technical terms (python, docker, elefante, etc.)
 - Weights by position (early words score higher)
 - Returns top 5 concepts
 
 **Example**:
+
 ```python
 content = "Always use absolute paths in Elefante to avoid errors"
 concepts = extract_concepts(content)
@@ -50,14 +52,15 @@ concepts = extract_concepts(content)
 
 Generates query patterns that should surface this memory:
 
-| Content Pattern | Generated Triggers |
-|-----------------|-------------------|
-| "how to", "why" | Question patterns |
-| "error", "fix", "bug" | `{concept} error`, `{concept} problem` |
+| Content Pattern           | Generated Triggers                            |
+| ------------------------- | --------------------------------------------- |
+| "how to", "why"           | Question patterns                             |
+| "error", "fix", "bug"     | `{concept} error`, `{concept} problem`        |
 | "always", "never", "must" | `{concept} best practice`, `how to {concept}` |
-| "config", "setup" | `{concept} setup`, `{concept} configuration` |
+| "config", "setup"         | `{concept} setup`, `{concept} configuration`  |
 
 **Example**:
+
 ```python
 surfaces_when = infer_surfaces_when(content, concepts)
 # → ['elefante error', 'elefante problem', 'elefante best practice', ...]
@@ -86,12 +89,12 @@ authority = (
 
 V4 adds **SHARES_CONCEPT** edges to the dashboard:
 
-| Edge Type | Meaning |
-|-----------|---------|
-| `SHARES_CONCEPT` | Two memories share at least one concept |
-| `CO_TOPIC` | Share same topic (existing) |
-| `CO_RING` | Share same ring (existing) |
-| `CO_KNOWLEDGE_TYPE` | Share same knowledge type (existing) |
+| Edge Type           | Meaning                                 |
+| ------------------- | --------------------------------------- |
+| `SHARES_CONCEPT`    | Two memories share at least one concept |
+| `CO_TOPIC`          | Share same topic (existing)             |
+| `CO_RING`           | Share same ring (existing)              |
+| `CO_KNOWLEDGE_TYPE` | Share same knowledge type (existing)    |
 
 ---
 
@@ -110,6 +113,12 @@ composite_score = (
     0.10 × authority_score +      # Authority/usage
     0.10 × temporal_relevance     # Freshness
 )
+
+# Smoothed Vector Baseline Limit (Issue #8 Fix)
+# Prevents valid semantic matches from being mathematically suppressed by missing heuristics
+vector_baseline = vector_similarity * 0.85
+if composite_score < vector_baseline:
+    composite_score = vector_baseline
 ```
 
 ---
@@ -128,13 +137,13 @@ When `add_memory()` is called:
 
 ## Files Modified
 
-| File | Changes |
-|------|---------|
-| `src/models/memory.py` | Added 6 new fields to `MemoryMetadata` |
-| `src/utils/curation.py` | Added `extract_concepts()`, `infer_surfaces_when()`, `compute_authority_score()` |
-| `src/core/retrieval.py` | `CognitiveRetriever` (wired in orchestrator) |
-| `src/core/orchestrator.py` | Auto-populate V4 fields on add |
-| `scripts/update_dashboard_data.py` | Added SHARES_CONCEPT edges |
+| File                               | Changes                                                                          |
+| ---------------------------------- | -------------------------------------------------------------------------------- |
+| `src/models/memory.py`             | Added 6 new fields to `MemoryMetadata`                                           |
+| `src/utils/curation.py`            | Added `extract_concepts()`, `infer_surfaces_when()`, `compute_authority_score()` |
+| `src/core/retrieval.py`            | `CognitiveRetriever` (wired in orchestrator)                                     |
+| `src/core/orchestrator.py`         | Auto-populate V4 fields on add                                                   |
+| `scripts/update_dashboard_data.py` | Added SHARES_CONCEPT edges                                                       |
 
 ---
 

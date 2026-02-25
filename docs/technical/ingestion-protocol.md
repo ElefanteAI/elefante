@@ -12,27 +12,21 @@
 Every memory ingestion (`add_memory`) MUST pass through these five stages:
 
 1.  **EXTRACT (Parse)**
-
     - **Goal**: Distill raw text into pure intent.
     - **Action**: Remove conversational fluff ("I think...", "Maybe...").
 
 2.  **CLASSIFY**
-
     - **Goal**: Assign structured metadata coordinates.
     - **Input**: Content.
     - **Output**: `memory_type`, `domain`, and topology fields (`ring`, `topic`, `knowledge_type`) via agent ETL classification.
     - **Rule**: Never guess. If unsure, default to `memory_type=fact`, `domain=reference`.
 
 3.  **INTEGRITY (Logic-Level Deduplication)**
-
     - **Goal**: Prevent "Bag of Dots" (redundancy).
-        - **Method**: Deterministic `Subject-Aspect-Qualifier` (SAQ) key generation.
-        - **Check**: Does an ACTIVE memory with this **canonical key** already exist (in the same namespace)?
-                - **YES**: Trigger **Reinforcement Protocol**.
-                - **NO**: Proceed to Creation.
+      - **Method**: Deterministic `Subject-Aspect-Qualifier` (SAQ) key generation.
+      - **Check**: Does an ACTIVE memory with this **canonical key** already exist (in the same namespace)? - **YES**: Trigger **Reinforcement Protocol**. - **NO**: Proceed to Creation.
 
 4.  **WRITE (Storage)**
-
     - **Goal**: Persist to persistent storage.
     - **Vector Store**: ChromaDB (Embeddings + Metadata).
     - **Graph Store**: Kuzu (Nodes + Edges).
@@ -42,6 +36,7 @@ Every memory ingestion (`add_memory`) MUST pass through these five stages:
     - **Goal**: Strengthen active pathways.
     - **Action**: New memories start with `access_count = 1` (not 0).
     - **Action**: Re-visited memories get `access_count += 1` and `last_accessed = now()`.
+    - **Co-Activation**: Memories retrieved simultaneously within the same session organically form `CO_ACTIVATED` relationships in the Graph, mathematically boosting their co-retrieval odds in the future.
 
 ---
 
@@ -55,7 +50,7 @@ The SAQ string is the canonical key for deduplication. It must follow the **SAQ 
 
 ### Examples
 
-| Raw Content                      |  Bad Title          |  SAQ Title            |
+| Raw Content                      | Bad Title             | SAQ Title               |
 | :------------------------------- | :-------------------- | :---------------------- |
 | "I really prefer dark mode IDEs" | User-Pref-Dark        | `Self-Pref-DarkMode`    |
 | "The server listens on 0.0.0.0"  | Server-Config-Listens | `Server-Config-Binding` |

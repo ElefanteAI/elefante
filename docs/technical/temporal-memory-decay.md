@@ -1,14 +1,15 @@
 # Temporal Memory Decay & Reinforcement
 
-**Feature Version**: 2.0.0  
+**Feature Version**: 2.1.2  
 **Status**: Production  
-**Date**: 2026-02-16
+**Date**: 2026-02-25
 
 ---
 
 ## Overview
 
 Temporal Memory Decay is an adaptive memory strength system that mimics human cognition by:
+
 - **Decaying** memories over time (recency bias)
 - **Reinforcing** memories when accessed (strengthened through use)
 - **Archiving** unused memories automatically (planned)
@@ -49,6 +50,7 @@ consolidation_threshold = 0.3  # Archive below 30% strength
 **Where**: `vector_store.py` and `graph_store.py`
 
 **Process**:
+
 1. Retrieve memories from database
 2. Calculate temporal strength for each
 3. Apply strength as score multiplier
@@ -57,11 +59,12 @@ consolidation_threshold = 0.3  # Archive below 30% strength
 **Effect**: Recent and frequently accessed memories rank higher in search results.
 
 **Example**:
+
 ```python
 # Memory A: Created 100 days ago, accessed 5 times, last access 2 days ago
 strength_A = 50 × 0.0 × 1.5 × 0.98 = 0.0  # Too old, decayed completely
 
-# Memory B: Created 10 days ago, accessed 3 times, last access 1 day ago  
+# Memory B: Created 10 days ago, accessed 3 times, last access 1 day ago
 strength_B = 50 × 0.9 × 1.3 × 0.99 = 57.9  # Strong and recent
 
 # Memory B ranks higher — its behavioral relevance earns better placement
@@ -69,9 +72,10 @@ strength_B = 50 × 0.9 × 1.3 × 0.99 = 57.9  # Strong and recent
 
 ### Phase 2: Background Consolidation (Planned)
 
-**When**: Periodic background job (not yet implemented)  
+**When**: Periodic background job (not yet implemented)
 
 **Process**:
+
 1. Scan all memories
 2. Calculate temporal strength
 3. Identify weak memories (strength < 0.3)
@@ -91,6 +95,7 @@ strength_B = 50 × 0.9 × 1.3 × 0.99 = 57.9  # Strong and recent
 **File**: `src/models/memory.py`
 
 **New Fields**:
+
 ```python
 class MemoryMetadata:
     last_accessed: datetime      # Updated on every retrieval
@@ -109,12 +114,12 @@ class MemoryMetadata:
 def search(self, query: str, limit: int = 10) -> List[Memory]:
     # 1. Semantic search
     results = self.collection.query(query_texts=[query], n_results=limit*2)
-    
+
     # 2. Calculate temporal strength
     for memory in results:
         temporal_strength = self._calculate_temporal_strength(memory)
         memory.relevance_score *= temporal_strength  # Apply multiplier
-    
+
     # 3. Re-rank and return top results
     return sorted(results, key=lambda m: m.relevance_score, reverse=True)[:limit]
 ```
@@ -142,7 +147,7 @@ elefante:
     default_decay_rate: 0.01
     default_reinforcement_factor: 0.1
     consolidation_threshold: 0.3
-    consolidation_schedule: "daily"  # or "weekly", "manual"
+    consolidation_schedule: "daily" # or "weekly", "manual"
 ```
 
 ### Per-Memory Settings
@@ -238,21 +243,25 @@ vitality = decision.calculate_relevance_score()
 ## Benefits
 
 ### 1. Adaptive Memory System
+
 - Memories naturally adapt to usage patterns
 - Important memories stay accessible
 - Unused memories fade gracefully
 
 ### 2. Improved Search Relevance
+
 - Recent context prioritized
 - Frequently referenced knowledge surfaces
 - Balanced with semantic similarity
 
 ### 3. Database Efficiency
+
 - Active memories stay in hot storage
 - Archived memories reduce query overhead
 - Historical context preserved
 
 ### 4. Human-Like Cognition
+
 - Mimics human memory patterns
 - Recency bias (recent events more accessible)
 - Reinforcement through repetition
@@ -263,16 +272,19 @@ vitality = decision.calculate_relevance_score()
 ## Performance Impact
 
 ### Search Performance
+
 - **Overhead**: ~5-10ms per search (temporal calculation)
 - **Benefit**: Better relevance, fewer irrelevant results
 - **Net**: Improved user experience
 
 ### Storage Impact
+
 - **Active Memories**: No change
 - **Archived Memories**: Moved to separate collection
 - **Total Storage**: Slightly increased (metadata)
 
 ### Consolidation Performance
+
 - **Frequency**: Daily (configurable)
 - **Duration**: ~1-5 seconds per 1000 memories
 - **Impact**: Runs in background, no user impact
@@ -288,13 +300,13 @@ vitality = decision.calculate_relevance_score()
 ```python
 def test_temporal_strength_calculation():
     """Test strength formula"""
-    
+
 def test_decay_over_time():
     """Test memories decay correctly"""
-    
+
 def test_reinforcement_on_access():
     """Test access count increases strength"""
-    
+
 def test_consolidation_threshold():
     """Test weak memories identified correctly"""
 ```
@@ -306,7 +318,7 @@ def test_consolidation_threshold():
 ```python
 def test_search_with_temporal_scoring():
     """Test search results ranked by temporal strength"""
-    
+
 def test_consolidation_workflow():
     """Test full consolidation cycle"""
 ```
@@ -341,14 +353,16 @@ def test_consolidation_workflow():
 ### Issue: Memories Decaying Too Fast
 
 **Solution**: Adjust decay rate in config:
+
 ```yaml
 temporal_decay:
-  default_decay_rate: 0.005  # Slower decay (0.5% per day)
+  default_decay_rate: 0.005 # Slower decay (0.5% per day)
 ```
 
 ### Issue: Important Memories Being Archived
 
-**Solution**: 
+**Solution**:
+
 1. Access memories regularly to reinforce them (raises behavioral score)
 2. Lower consolidation threshold
 3. Memories with high access counts decay much slower
@@ -356,9 +370,10 @@ temporal_decay:
 ### Issue: Search Results Too Biased Toward Recent
 
 **Solution**: Reduce reinforcement factor:
+
 ```yaml
 temporal_decay:
-  default_reinforcement_factor: 0.05  # Less reinforcement
+  default_reinforcement_factor: 0.05 # Less reinforcement
 ```
 
 ---
@@ -371,6 +386,6 @@ temporal_decay:
 
 ---
 
-**Version**: 2.0.0  
-**Last Updated**: 2026-02-18  
+**Version**: 2.1.2  
+**Last Updated**: 2026-02-25  
 **Status**: Production Ready (Phase 1), Planned (Phase 2)

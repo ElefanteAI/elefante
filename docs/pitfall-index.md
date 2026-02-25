@@ -15,14 +15,14 @@ Before completing ANY task:
 3. Apply any found warnings
 4. Then complete the task
 
-| Category | Most Common Pitfall | Jump To |
-|----------|---------------------|---------|
-| Dashboard | Stale snapshot / browser cache | [Dashboard Pitfalls](#dashboard-pitfalls) |
-| Installation | Pre-existing kuzu dir / wrong Python path | [Installation Pitfalls](#installation-pitfalls) |
-| Database | Reserved word `properties` / stale lock | [Database Pitfalls](#database-pitfalls) |
-| MCP | Wrong type signature / stdout pollution | [MCP Pitfalls](#mcp-pitfalls) |
-| Memory | Export truncated / search vs browse | [Memory Pitfalls](#memory-pitfalls) |
-| Docs | Ghost links after archive | [Documentation Pitfalls](#documentation-pitfalls) |
+| Category     | Most Common Pitfall                       | Jump To                                           |
+| ------------ | ----------------------------------------- | ------------------------------------------------- |
+| Dashboard    | Stale snapshot / browser cache            | [Dashboard Pitfalls](#dashboard-pitfalls)         |
+| Installation | Pre-existing kuzu dir / wrong Python path | [Installation Pitfalls](#installation-pitfalls)   |
+| Database     | Reserved word `properties` / stale lock   | [Database Pitfalls](#database-pitfalls)           |
+| MCP          | Wrong type signature / stdout pollution   | [MCP Pitfalls](#mcp-pitfalls)                     |
+| Memory       | Export truncated / search vs browse       | [Memory Pitfalls](#memory-pitfalls)               |
+| Docs         | Ghost links after archive                 | [Documentation Pitfalls](#documentation-pitfalls) |
 
 ---
 
@@ -208,6 +208,20 @@ Before completing ANY task:
 **Why:** Compliance gate (v1.6.0) mechanically blocks `MemoryAdd`, `MemoryUpdate`, `MemoryDelete`, `GraphConnect` until a search has been performed in the current session  
 **Source:** `docs/debug/ai-behavior-compendium.md` (MCP LAW #9)
 
+### pitfall: mcp response bloat token waste
+
+**Trigger:** Returning massive JSON arrays with null properties.  
+**Action:** Use recursive mathematical null-stripping (`_strip_nulls`) to compress the payload.  
+**Why:** Agents have limited context windows. Passing empty arrays or null variables wastes thousands of tokens.  
+**Source:** `docs/debug/memory-compendium.md` Issue #7
+
+### pitfall: mcp actionable integration missing
+
+**Trigger:** Agent retrieves memories but completely ignores the rules they contain.  
+**Action:** Inject a hardcoded `suggested_action` header acting as a system prompt directive before the memory list.  
+**Why:** Passive semantic matches are just "facts." Agents act on directives. A directive forces compliance.  
+**Source:** `docs/debug/memory-compendium.md` Issue #9
+
 ---
 
 ## Memory Pitfalls
@@ -247,6 +261,13 @@ Before completing ANY task:
 **Why:** Field must be mapped in both directions. Missing from read = always shows default.  
 **Source:** `docs/debug/memory-compendium.md` Issue #7 (Pattern #4)
 
+### pitfall: memory scoring similarity override suppress
+
+**Trigger:** Excellent semantic matches (`sim > 0.85`) receive terrible composite scores due to heuristic penalties.  
+**Action:** Use V4/V5 Cognitive Multi-Signal Scoring with a Smoothed Vector Baseline.  
+**Why:** A pure heuristic equation can suppress highly relevant facts if they lack access count. Baseline guarantees true semantic matches floor at >=85% of their raw similarity.  
+**Source:** `docs/debug/memory-compendium.md` Issue #8
+
 ---
 
 ## Documentation Pitfalls
@@ -268,19 +289,22 @@ Before completing ANY task:
 
 ## Quick Reference
 
-| Category | Most Common Pitfall | Quick Fix |
-|----------|---------------------|-----------|
-| Dashboard | Stale snapshot | `python scripts/update_dashboard_data.py` |
-| Dashboard | Browser cache | `Ctrl+Shift+R` |
-| Installation | Kuzu pre-existing dir | Do not mkdir; let `GraphStore.__init__` handle it |
-| Installation | Wrong Python path | Use `sys.executable` not `"python"` |
-| Database | Reserved word `properties` | Use `props` |
-| Database | Stale lock | Check `~/.elefante/locks/write.lock`, delete if stale |
-| MCP | Tools not showing | `list[types.Tool]` not `List[Tool]` |
-| MCP | stdout pollution | All logs → `sys.stderr` |
-| MCP | Write gate blocked | Call `elefante-MemorySearch` first |
-| Memory | Export truncated | `collection._collection.get()` not `query()` |
-| Docs | Ghost links after archive | `grep -r "filename" docs/` before moving any file |
+| Category     | Most Common Pitfall        | Quick Fix                                             |
+| ------------ | -------------------------- | ----------------------------------------------------- |
+| Dashboard    | Stale snapshot             | `python scripts/update_dashboard_data.py`             |
+| Dashboard    | Browser cache              | `Ctrl+Shift+R`                                        |
+| Installation | Kuzu pre-existing dir      | Do not mkdir; let `GraphStore.__init__` handle it     |
+| Installation | Wrong Python path          | Use `sys.executable` not `"python"`                   |
+| Database     | Reserved word `properties` | Use `props`                                           |
+| Database     | Stale lock                 | Check `~/.elefante/locks/write.lock`, delete if stale |
+| MCP          | Tools not showing          | `list[types.Tool]` not `List[Tool]`                   |
+| MCP          | stdout pollution           | All logs → `sys.stderr`                               |
+| MCP          | Write gate blocked         | Call `elefante-MemorySearch` first                    |
+| MCP          | Response Bloat             | Recursive null-stripping payload                      |
+| MCP          | Rules Ignored              | Use `suggested_action` directive                      |
+| Memory       | Export truncated           | `collection._collection.get()` not `query()`          |
+| Memory       | High sim, low score        | Smoothed Vector Baseline                              |
+| Docs         | Ghost links after archive  | `grep -r "filename" docs/` before moving any file     |
 
 ---
 
@@ -301,4 +325,4 @@ Full post-mortems belong in the relevant `docs/debug/*-compendium.md` file.
 
 ---
 
-*Last updated: 2026-02-19 | Elefante v2.1.0*
+_Last updated: 2026-02-25 | Elefante v2.1.2_

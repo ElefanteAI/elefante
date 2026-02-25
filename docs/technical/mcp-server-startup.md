@@ -1,8 +1,8 @@
 # MCP Server Startup & Troubleshooting Guide
 
 **Status**: ESSENTIAL - Required for IDE integration  
-**Last Updated**: 2025-12-10  
-**Applies to**: v1.0.0+
+**Last Updated**: 2026-02-25  
+**Applies to**: v2.0.0+
 
 ---
 
@@ -92,7 +92,7 @@ python scripts/verify_mcp_handshake.py
 ```
 
 **What This Tests**:
- 
+
 - Server process starts
 - Server listens to stdin
 - Server responds to JSON-RPC
@@ -121,7 +121,7 @@ python scripts/health_check.py
 **Expected Output**:
 
 ```text
-Available MCP Tools: 17
+Available MCP Tools: 20
   - elefante-MemoryAdd
   - elefante-MemorySearch
   - elefante-MemoryUpdate
@@ -448,6 +448,6 @@ Before claiming "MCP Server is working":
 
 ---
 
-**Document Version**: 1.0  
+**Document Version**: 2.1.2  
 **Status**: ESSENTIAL  
-**Last Validated**: 2025-12-10
+**Last Validated**: 2026-02-25

@@ -582,7 +582,8 @@ class MemoryOrchestrator:
         include_stored: bool = True,
         session_id: Optional[UUID] = None,
         return_debug: bool = False,
-        apply_temporal_decay: bool = True
+        apply_temporal_decay: bool = True,
+        recent_memory_ids: Optional[list[str]] = None
     ) -> List[SearchResult]:
         """
         Search memories using semantic, structured, and/or conversation context with temporal decay
@@ -657,7 +658,24 @@ class MemoryOrchestrator:
             # COGNITIVE SCORING - Multi-signal re-ranking
             # =============================================================
             if results and include_stored:
-                results = self._apply_cognitive_scoring(query, results)
+                # NEW: Pre-fetch co-activation matrix to avoid N+1 queries in sync code
+                co_activation_matrix = {}
+                if recent_memory_ids:
+                    try:
+                        for rid in recent_memory_ids[-10:]:
+                            cypher = f"MATCH (a:Entity {{id: '{rid}'}})-[r:CO_ACTIVATED]-(b:Entity) RETURN b.id as target_id, r.strength as strength"
+                            edges = await self.graph_store.execute_query(cypher)
+                            for edge in edges:
+                                target_id = str(edge.get("target_id", ""))
+                                strength = float(edge.get("strength", 0.0))
+                                if target_id:
+                                    if target_id not in co_activation_matrix:
+                                        co_activation_matrix[target_id] = {}
+                                    co_activation_matrix[target_id][rid] = strength
+                    except Exception as e:
+                        self.logger.warning(f"Failed to fetch co-activation matrix: {e}")
+                        
+                results = self._apply_cognitive_scoring(query, results, recent_memory_ids=recent_memory_ids, co_activation_matrix=co_activation_matrix)
             
             # Sort by score and limit
             results.sort(key=lambda r: r.score, reverse=True)
@@ -724,7 +742,9 @@ class MemoryOrchestrator:
     def _apply_cognitive_scoring(
         self,
         query: str,
-        results: List[SearchResult]
+        results: List[SearchResult],
+        recent_memory_ids: Optional[list[str]] = None,
+        co_activation_matrix: Optional[dict] = None
     ) -> List[SearchResult]:
         """
         Apply V4 cognitive multi-signal scoring to search results.
@@ -778,8 +798,9 @@ class MemoryOrchestrator:
             scored_candidate, explanation = self.cognitive_retriever.score_candidate(
                 candidate,
                 query_analysis,
-                recent_memory_ids=[],  # co-activation tracking not yet implemented
-                include_explanation=True
+                recent_memory_ids=recent_memory_ids or [],
+                include_explanation=True,
+                co_activation_matrix=co_activation_matrix
             )
             
             # Preserve original vector_score, update score with composite
@@ -804,6 +825,36 @@ class MemoryOrchestrator:
             scored_results.append(result)
         
         return scored_results
+    
+    async def record_coactivation(self, memory_ids: list[str]) -> None:
+        """
+        Passive graph maintenance: Record co-activations of retrieved memories.
+        Maintains Hebbian learning edges in Kuzu based on MCP session usage.
+        """
+        if not memory_ids or len(memory_ids) < 2:
+            return
+            
+        try:
+            # We want to link all pairs of recently retrieved memories
+            # To avoid an N^2 query explosion, we pair them up sequentially or in combinations
+            # Kuzu Cypher doesn't easily support arbitrary array combinations in a single fast MERGE without UNWIND
+            # We will generate separate MERGE statements for unique pairs.
+            import itertools
+            pairs = list(itertools.combinations(set(memory_ids), 2))
+            
+            for m1, m2 in pairs:
+                # Merge the undirected (or bidirectional) relationship
+                cypher = f"""
+                MATCH (a:Entity {{id: '{m1}'}}), (b:Entity {{id: '{m2}'}})
+                MERGE (a)-[r:CO_ACTIVATED]->(b)
+                ON CREATE SET r.strength = 1.0, r.last_coactivated = '{datetime.utcnow().isoformat()}'
+                ON MATCH SET r.strength = r.strength + 0.1, r.last_coactivated = '{datetime.utcnow().isoformat()}'
+                """
+                await self.graph_store.execute_query(cypher)
+                
+            self.logger.debug(f"Recorded co-activations for {len(pairs)} memory pairs.")
+        except Exception as e:
+            self.logger.warning(f"Failed to record passive graph co-activations: {e}")
     
     async def _search_semantic(
         self,

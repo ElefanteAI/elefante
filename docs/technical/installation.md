@@ -8,9 +8,9 @@
 ## Prerequisites
 
 - **Python**: **3.11 ONLY** (See [`python-version-requirements.md`](python-version-requirements.md) for mandatory details)
-  - 3.9, 3.10:  Not supported
-  - **3.11**:  Required and tested
-  - 3.12+:  Not supported
+  - 3.9, 3.10: Not supported
+  - **3.11**: Required and tested
+  - 3.12+: Not supported
 - **Git**: For cloning the repository
 - **Disk Space**: Minimum 5GB free
 - **OS**: Windows, macOS, or Linux
@@ -43,33 +43,28 @@ chmod +x install.sh
 ### What Happens During Installation
 
 1. **Pre-Flight Checks** (automated safeguards)
-
    - Disk space verification (5GB+ required)
    - Dependency version compatibility
    - Kuzu database path validation
    - See [`pitfall-index.md`](../pitfall-index.md) for details
 
 2. **Environment Setup**
-
    - Creates `.venv` virtual environment
    - Installs all dependencies from `requirements.txt`
    - Configures Python path
 
 3. **Database Initialization**
-
    - Creates `~/.elefante/data/` directory
    - Initializes ChromaDB (vector store)
    - Initializes Kuzu (graph database)
    - Creates default schema
 
 4. **IDE Configuration**
-
    - Auto-detects VS Code, Cursor, or Bob IDE
    - Configures MCP (Model Context Protocol)
    - Sets up server connection
 
 5. **Agent Behavior Bootstrap**
-
    - Verifies `.github/copilot-instructions.md` exists
    - This file is the **entry point** that makes AI agents proactively use Elefante
    - Without it, agents can use Elefante tools but won't do so automatically
@@ -361,6 +356,7 @@ Critical protocols and known pitfalls. These are non-negotiable rules:
 - Developer Etiquette v1.2 enforcement reminder
 
 Context-specific warnings are added per tool:
+
 - `elefante-MemoryAdd`: Score is system-computed; classify `memory_type` accurately
 - `elefante-MemorySearch`: Search bias warnings; contradiction resolution rules
 - `elefante-GraphQuery` / `elefante-GraphConnect`: Graph consistency warnings
@@ -430,14 +426,14 @@ Agent responds — following protocols + directives, informed by memories
 
 ### Installation Ensures All Layers
 
-| Step | What happens |
-|------|-------------|
+| Step    | What happens                                                        |
+| ------- | ------------------------------------------------------------------- |
 | Step 4  | IDE MCP configuration (tools registered → response contract active) |
-| Step 4a | Validates `copilot-instructions.md` exists (Layer 1 bootstrap) |
-| Step 5b | Ingests Inception Memory (Layer 3 seed knowledge) |
-| Runtime | `MANDATORY_PROTOCOLS` injected by server on every call |
-| Runtime | `DIRECTIVES` injected by server from `directives.json` |
-| Runtime | `RELEVANT_CONTEXT` injected by server from ChromaDB |
+| Step 4a | Validates `copilot-instructions.md` exists (Layer 1 bootstrap)      |
+| Step 5b | Ingests Inception Memory (Layer 3 seed knowledge)                   |
+| Runtime | `MANDATORY_PROTOCOLS` injected by server on every call              |
+| Runtime | `DIRECTIVES` injected by server from `directives.json`              |
+| Runtime | `RELEVANT_CONTEXT` injected by server from ChromaDB                 |
 
 The Directive store (`~/.elefante/data/directives.json`) is created on first use — no installation step needed.
 
@@ -462,6 +458,6 @@ rm -rf ~/.elefante/
 
 ---
 
-**Version**: 2.0.0
-**Last Updated**: 2026-02-16
+**Version**: 2.1.2
+**Last Updated**: 2026-02-25
 **Status**: Production Ready
