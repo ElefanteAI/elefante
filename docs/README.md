@@ -1,6 +1,6 @@
 # Elefante
 
-Persistent memory for AI coding agents. Elefante runs locally on your machine via [MCP](https://modelcontextprotocol.io/) (Model Context Protocol), storing knowledge in a vector database and a knowledge graph. Your agent remembers what you care about, forgets what you don't, and scores every memory based on how you actually use it — not how important you *said* it was.
+Persistent memory for AI coding agents. Elefante runs locally on your machine via [MCP](https://modelcontextprotocol.io/) (Model Context Protocol), storing knowledge in a vector database and a knowledge graph. Your agent remembers what you care about, forgets what you don't, and scores every memory based on how you actually use it — not how important you _said_ it was.
 
 > **Current version:** v2.1.1
 
@@ -16,8 +16,9 @@ Elefante gives your agent a second brain — one that learns what matters from y
 
 - **Stores** facts, preferences, decisions, code patterns, and tasks
 - **Searches** using hybrid retrieval: semantic similarity (vectors) + knowledge graph traversal + session context
+- **Self-Organizes** by passively building `CO_ACTIVATED` graph relationships between memories used in the same session, naturally boosting their future retrieval scores without manual LLM query management.
 - **Scores** every memory automatically based on recency, how often you access it, and when you last used it — no manual importance ratings
-- **Injects context** on every tool call — the agent gets the most relevant memories without asking
+- **Injects context** on every tool call — the agent gets the most relevant memories without asking. The payload is aggressively mathematically compressed to prevent LLM token bloat.
 - **Builds a knowledge graph** of entities and relationships (people, projects, technologies, dependencies)
 - **Enforces quality** via a compliance gate: the agent must search before writing, preventing duplicates
 - **Visualizes** knowledge through a snapshot-driven dashboard
@@ -49,11 +50,11 @@ Traditional systems ask you to rate memories on a scale (1–10). That approach 
 
 Elefante replaces human-assigned importance with a **system-computed score (0–100)** that changes over time based on three behavioral signals:
 
-| Signal | What it measures | Effect |
-|--------|-----------------|--------|
-| **Recency** | Days since creation | Memories decay exponentially. Rate depends on type — a rule decays ~20x slower than a conversation. |
-| **Freshness** | Days since last access | Recently retrieved memories get a boost. Stale ones fade. |
-| **Reinforcement** | Number of times accessed | Frequently used memories grow stronger (logarithmic, so spamming won't game it). |
+| Signal            | What it measures         | Effect                                                                                              |
+| ----------------- | ------------------------ | --------------------------------------------------------------------------------------------------- |
+| **Recency**       | Days since creation      | Memories decay exponentially. Rate depends on type — a rule decays ~20x slower than a conversation. |
+| **Freshness**     | Days since last access   | Recently retrieved memories get a boost. Stale ones fade.                                           |
+| **Reinforcement** | Number of times accessed | Frequently used memories grow stronger (logarithmic, so spamming won't game it).                    |
 
 ### The Formula
 
@@ -62,6 +63,7 @@ relevance = 0.5 * recency * freshness * reinforcement
 ```
 
 Where:
+
 - `recency = exp(-decay_rate * days_since_created)` — decay_rate varies by memory type
 - `freshness = exp(-0.02 * days_since_accessed)`
 - `reinforcement = 1 + 0.25 * ln(access_count + 1)`
@@ -72,21 +74,21 @@ Every memory starts at score **50**. It earns its way up through use, and loses 
 
 The decay rate (λ) controls how quickly a memory loses relevance if it's never accessed. Each type has a half-life — the number of days until a memory drops to half its initial score:
 
-| Memory Type | Decay Rate (λ) | Half-Life | Why |
-|-------------|----------------|-----------|-----|
-| `rule` | 0.002 | ~347 days | Rules persist, but die if never enforced |
-| `preference` | 0.002 | ~347 days | Preferences are stable but not eternal |
-| `decision` | 0.005 | ~139 days | Decisions get revisited |
-| `fact` | 0.005 | ~139 days | Facts change |
-| `answer` | 0.005 | ~139 days | Answers may become outdated |
-| `insight` | 0.008 | ~87 days | Insights are validated or forgotten |
-| `code` | 0.008 | ~87 days | Code evolves constantly |
-| `hypothesis` | 0.01 | ~69 days | Hypotheses get tested |
-| `question` | 0.015 | ~46 days | Questions get answered |
-| `note` | 0.015 | ~46 days | Notes are transient |
-| `observation` | 0.015 | ~46 days | Observations are contextual |
-| `task` | 0.02 | ~35 days | Tasks complete or go stale |
-| `conversation` | 0.025 | ~28 days | Conversations are ephemeral |
+| Memory Type    | Decay Rate (λ) | Half-Life | Why                                      |
+| -------------- | -------------- | --------- | ---------------------------------------- |
+| `rule`         | 0.002          | ~347 days | Rules persist, but die if never enforced |
+| `preference`   | 0.002          | ~347 days | Preferences are stable but not eternal   |
+| `decision`     | 0.005          | ~139 days | Decisions get revisited                  |
+| `fact`         | 0.005          | ~139 days | Facts change                             |
+| `answer`       | 0.005          | ~139 days | Answers may become outdated              |
+| `insight`      | 0.008          | ~87 days  | Insights are validated or forgotten      |
+| `code`         | 0.008          | ~87 days  | Code evolves constantly                  |
+| `hypothesis`   | 0.01           | ~69 days  | Hypotheses get tested                    |
+| `question`     | 0.015          | ~46 days  | Questions get answered                   |
+| `note`         | 0.015          | ~46 days  | Notes are transient                      |
+| `observation`  | 0.015          | ~46 days  | Observations are contextual              |
+| `task`         | 0.02           | ~35 days  | Tasks complete or go stale               |
+| `conversation` | 0.025          | ~28 days  | Conversations are ephemeral              |
 
 A rule you set 6 months ago and still use? Score stays high. An architecture decision from a year ago that you never reference? It fades. Naturally.
 
@@ -133,65 +135,65 @@ Elefante exposes **20 tools** and **2 prompts** via MCP. All tool names follow t
 
 ### Memory
 
-| Tool | Purpose |
-|------|---------|
-| `elefante-MemoryAdd` | Store a memory. Classify it by `memory_type` (fact, decision, preference, etc.) and let the system handle scoring. |
-| `elefante-MemorySearch` | Search memories — semantic, structured (graph), or hybrid mode. Use `list_all=true` to dump everything. |
-| `elefante-MemoryUpdate` | Amend a memory: correct content, deprecate, archive, or set supersession chains. |
-| `elefante-MemoryDelete` | Permanently delete a memory with audit trail. Requires prior search. |
-| `elefante-MemoryConsolidate` | Cleanup: deduplicate, canonicalize keys, quarantine test data. Dry-run by default. |
+| Tool                         | Purpose                                                                                                            |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `elefante-MemoryAdd`         | Store a memory. Classify it by `memory_type` (fact, decision, preference, etc.) and let the system handle scoring. |
+| `elefante-MemorySearch`      | Search memories — semantic, structured (graph), or hybrid mode. Use `list_all=true` to dump everything.            |
+| `elefante-MemoryUpdate`      | Amend a memory: correct content, deprecate, archive, or set supersession chains.                                   |
+| `elefante-MemoryDelete`      | Permanently delete a memory with audit trail. Requires prior search.                                               |
+| `elefante-MemoryConsolidate` | Cleanup: deduplicate, canonicalize keys, quarantine test data. Dry-run by default.                                 |
 
 ### Knowledge Graph
 
-| Tool | Purpose |
-|------|---------|
+| Tool                    | Purpose                                                      |
+| ----------------------- | ------------------------------------------------------------ |
 | `elefante-GraphConnect` | Batch upsert: create entities and relationships in one call. |
-| `elefante-GraphQuery` | Execute raw Cypher queries for advanced traversals. |
+| `elefante-GraphQuery`   | Execute raw Cypher queries for advanced traversals.          |
 
 ### Context & Sessions
 
-| Tool | Purpose |
-|------|---------|
-| `elefante-ContextGet` | Get full context: related memories + graph connections for current work. |
-| `elefante-SessionsList` | List past sessions with summaries. |
+| Tool                    | Purpose                                                                  |
+| ----------------------- | ------------------------------------------------------------------------ |
+| `elefante-ContextGet`   | Get full context: related memories + graph connections for current work. |
+| `elefante-SessionsList` | List past sessions with summaries.                                       |
 
 ### Tasks
 
-| Tool | Purpose |
-|------|---------|
+| Tool                  | Purpose                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------ |
 | `elefante-TaskCreate` | Create a task with priority, agent assignment, dependencies, and optional inline subtasks. |
-| `elefante-TaskUpdate` | Update task status and attach output. |
-| `elefante-TaskGraph` | View task hierarchy. |
+| `elefante-TaskUpdate` | Update task status and attach output.                                                      |
+| `elefante-TaskGraph`  | View task hierarchy.                                                                       |
 
 ### ETL (Batch Processing)
 
-| Tool | Purpose |
-|------|---------|
-| `elefante-ETLProcess` | Get unprocessed memories for agent review. Use `include_stats=true` for processing statistics. |
-| `elefante-ETLClassify` | Submit classification for a memory. |
+| Tool                   | Purpose                                                                                        |
+| ---------------------- | ---------------------------------------------------------------------------------------------- |
+| `elefante-ETLProcess`  | Get unprocessed memories for agent review. Use `include_stats=true` for processing statistics. |
+| `elefante-ETLClassify` | Submit classification for a memory.                                                            |
 
 ### System
 
-| Tool | Purpose |
-|------|---------|
-| `elefante-System` | Enable or disable Elefante Mode (`action="enable"` / `action="disable"`). |
-| `elefante-SystemStatusGet` | Check system health, lock state, and database stats. |
-| `elefante-DashboardOpen` | Open the knowledge graph dashboard. |
+| Tool                       | Purpose                                                                   |
+| -------------------------- | ------------------------------------------------------------------------- |
+| `elefante-System`          | Enable or disable Elefante Mode (`action="enable"` / `action="disable"`). |
+| `elefante-SystemStatusGet` | Check system health, lock state, and database stats.                      |
+| `elefante-DashboardOpen`   | Open the knowledge graph dashboard.                                       |
 
 ### Directives
 
-| Tool | Purpose |
-|------|---------|
-| `elefante-DirectiveAdd` | Add a persistent behavioral directive — unconditional rules injected into every tool response. |
-| `elefante-DirectiveList` | List all active directives. |
-| `elefante-DirectiveRemove` | Remove a directive by ID. |
+| Tool                       | Purpose                                                                                        |
+| -------------------------- | ---------------------------------------------------------------------------------------------- |
+| `elefante-DirectiveAdd`    | Add a persistent behavioral directive — unconditional rules injected into every tool response. |
+| `elefante-DirectiveList`   | List all active directives.                                                                    |
+| `elefante-DirectiveRemove` | Remove a directive by ID.                                                                      |
 
 ### Prompts
 
-| Prompt | Purpose |
-|--------|---------|
+| Prompt               | Purpose                                                       |
+| -------------------- | ------------------------------------------------------------- |
 | `elefante-grounding` | Injects memory-aware behavior into the agent's system prompt. |
-| `elefante-context` | Searches memories for a topic and returns results as context. |
+| `elefante-context`   | Searches memories for a topic and returns results as context. |
 
 Full parameter schemas: [`docs/technical/usage.md`](docs/technical/usage.md)
 
@@ -269,15 +271,15 @@ The MCP server itself runs as a stdio process started by your IDE. Running MCP i
 
 ## Tech Stack
 
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| Vector store | ChromaDB 1.3.5 | Semantic search via embeddings |
-| Graph store | Kuzu 0.11.3 | Knowledge graph, Cypher queries |
-| Embeddings | sentence-transformers (gte-base) | 768-dim vectors for similarity |
-| Protocol | MCP 1.23.1 | IDE–server communication |
-| Dashboard | React + TypeScript + Vite | Graph visualization (SVG) |
-| API server | FastAPI + Uvicorn | Dashboard backend |
-| Runtime | Python 3.11 | All server-side code |
+| Component    | Technology                       | Purpose                         |
+| ------------ | -------------------------------- | ------------------------------- |
+| Vector store | ChromaDB 1.3.5                   | Semantic search via embeddings  |
+| Graph store  | Kuzu 0.11.3                      | Knowledge graph, Cypher queries |
+| Embeddings   | sentence-transformers (gte-base) | 768-dim vectors for similarity  |
+| Protocol     | MCP 1.23.1                       | IDE–server communication        |
+| Dashboard    | React + TypeScript + Vite        | Graph visualization (SVG)       |
+| API server   | FastAPI + Uvicorn                | Dashboard backend               |
+| Runtime      | Python 3.11                      | All server-side code            |
 
 ---
 
@@ -303,19 +305,19 @@ tests/          Test suite
 
 ## Documentation
 
-| Doc | Content |
-|-----|---------|
-| [`.github/copilot-instructions.md`](../.github/copilot-instructions.md) | Agent behavior bootstrap: search-before-answer protocol + Tool Response Contract (`MANDATORY_PROTOCOLS_READ_THIS_FIRST`, `DIRECTIVES`, `RELEVANT_CONTEXT`) |
-| [`technical/usage.md`](technical/usage.md) | Complete tool reference with parameter schemas |
-| [`technical/installation.md`](technical/installation.md) | Installation details |
-| [`technical/ide-mcp-configuration.md`](technical/ide-mcp-configuration.md) | IDE setup (VS Code, Cursor, etc.) |
-| [`technical/mcp-server-startup.md`](technical/mcp-server-startup.md) | Manual startup and handshake verification |
-| [`technical/dashboard-startup.md`](technical/dashboard-startup.md) | Dashboard startup and verification |
-| [`technical/docker.md`](technical/docker.md) | Docker setup |
-| [`technical/second-brain-protocols.md`](technical/second-brain-protocols.md) | Safety protocols |
-| [`technical/kuzu-lock-monitoring.md`](technical/kuzu-lock-monitoring.md) | Lock behavior and troubleshooting |
-| [`technical/rollback.md`](technical/rollback.md) | Backup and rollback |
-| [`debug/README.md`](debug/README.md) | Debugging guide |
+| Doc                                                                          | Content                                                                                                                                                    |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`.github/copilot-instructions.md`](../.github/copilot-instructions.md)      | Agent behavior bootstrap: search-before-answer protocol + Tool Response Contract (`MANDATORY_PROTOCOLS_READ_THIS_FIRST`, `DIRECTIVES`, `RELEVANT_CONTEXT`) |
+| [`technical/usage.md`](technical/usage.md)                                   | Complete tool reference with parameter schemas                                                                                                             |
+| [`technical/installation.md`](technical/installation.md)                     | Installation details                                                                                                                                       |
+| [`technical/ide-mcp-configuration.md`](technical/ide-mcp-configuration.md)   | IDE setup (VS Code, Cursor, etc.)                                                                                                                          |
+| [`technical/mcp-server-startup.md`](technical/mcp-server-startup.md)         | Manual startup and handshake verification                                                                                                                  |
+| [`technical/dashboard-startup.md`](technical/dashboard-startup.md)           | Dashboard startup and verification                                                                                                                         |
+| [`technical/docker.md`](technical/docker.md)                                 | Docker setup                                                                                                                                               |
+| [`technical/second-brain-protocols.md`](technical/second-brain-protocols.md) | Safety protocols                                                                                                                                           |
+| [`technical/kuzu-lock-monitoring.md`](technical/kuzu-lock-monitoring.md)     | Lock behavior and troubleshooting                                                                                                                          |
+| [`technical/rollback.md`](technical/rollback.md)                             | Backup and rollback                                                                                                                                        |
+| [`debug/README.md`](debug/README.md)                                         | Debugging guide                                                                                                                                            |
 
 ---
 

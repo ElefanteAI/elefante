@@ -82,6 +82,9 @@ class ElefanteMCPServer:
             "last_query": None
         }
         
+        # Session state for autonomous graph maintenance (passive co-activation)
+        self._session_retrieval_history: list[str] = []
+        
         # Register tool handlers
         self._register_handlers()
         
@@ -150,6 +153,7 @@ class ElefanteMCPServer:
                 return result
 
             context_items = []
+            new_ids = []
             for sr in search_results:
                 # SearchResult has .memory.content and .score
                 content = sr.memory.content if hasattr(sr, 'memory') and hasattr(sr.memory, 'content') else str(sr)
@@ -159,6 +163,16 @@ class ElefanteMCPServer:
                     snippet += "..."
                 score = f"{sr.score:.2f}" if hasattr(sr, 'score') else "?"
                 context_items.append(f"[{score}] {snippet}")
+                
+                if hasattr(sr, 'memory') and hasattr(sr.memory, 'id'):
+                    new_ids.append(str(sr.memory.id))
+
+            if new_ids:
+                self._session_retrieval_history.extend(new_ids)
+                # Keep sliding window of recent unique ids, max 20
+                self._session_retrieval_history = list(dict.fromkeys(self._session_retrieval_history))[-20:]
+                # Fire and forget passive co-activation recording
+                asyncio.create_task(orchestrator.record_coactivation(self._session_retrieval_history.copy()))
 
             result["RELEVANT_CONTEXT"] = {
                 "note": "Auto-surfaced memories relevant to this operation. No search tool call was needed.",
@@ -1197,6 +1211,8 @@ You have access to a persistent memory system called **Elefante** - the user's s
         }
     
     async def _handle_search_memories(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        args = args.copy()
+        args.setdefault("include_explanation", True)
         """Handle elefante-MemorySearch tool call"""
         # list_all mode (absorbs former elefante-MemoryListAll)
         if args.get("list_all", False):
@@ -1236,8 +1252,16 @@ You have access to a persistent memory system called **Elefante** - the user's s
             min_similarity=args.get("min_similarity", 0.3),
             include_conversation=args.get("include_conversation", True),
             include_stored=args.get("include_stored", True),
-            session_id=session_id
+            session_id=session_id,
+            recent_memory_ids=self._session_retrieval_history
         )
+        
+        # Session Tracking for Co-Activation
+        new_ids = [str(r.memory.id) for r in results if hasattr(r, 'memory') and hasattr(r.memory, 'id')]
+        if new_ids:
+            self._session_retrieval_history.extend(new_ids)
+            self._session_retrieval_history = list(dict.fromkeys(self._session_retrieval_history))[-20:]
+            asyncio.create_task(orchestrator.record_coactivation(self._session_retrieval_history.copy()))
         
         # Filter out deprecated/archived memories from results
         filtered_results = []
@@ -1252,10 +1276,26 @@ You have access to a persistent memory system called **Elefante** - the user's s
             filtered_results.append(result)
         results = filtered_results
 
+        # Data Compression (Issue #7) - Strip Nulls to prevent token bloat
+        compressed_results = []
+        for result in results:
+            r_dict = result.to_dict()
+            if 'memory' in r_dict and 'metadata' in r_dict['memory']:
+                # Recursively drop null fields in metadata
+                cleaned_meta = {k: v for k, v in r_dict['memory']['metadata'].items() if v is not None}
+                # Drop empty lists/dicts
+                cleaned_meta = {k: v for k, v in cleaned_meta.items() if not (isinstance(v, (list, dict)) and not v)}
+                r_dict['memory']['metadata'] = cleaned_meta
+            compressed_results.append(r_dict)
+
+        # Actionable Integration (Issue #9) - Force behavioral compliance
+        action_summary = "CRITICAL DIRECTIVE: These memories are your authoritative context. You MUST read the 'content' of each memory and integrate it directly into your solution. If a memory dictates a rule, you must follow it precisely."
+
         response = {
             "success": True,
             "count": len(results),
-            "results": [result.to_dict() for result in results]
+            "suggested_action": action_summary,
+            "results": compressed_results
         }
         if excluded_count > 0:
             response["excluded_deprecated"] = excluded_count

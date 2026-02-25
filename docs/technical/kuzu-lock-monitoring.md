@@ -1,8 +1,8 @@
 # Kuzu Database Lock Monitoring & Troubleshooting
 
-**Status**: UPDATED for v1.1.0 (Transaction-Scoped Locking)  
-**Last Updated**: 2025-12-26  
-**Applies to**: v1.1.0+ (Transaction-scoped) and v1.0.x (Session-based, legacy)
+**Status**: UPDATED for Transaction-Scoped Locking  
+**Last Updated**: 2026-02-25  
+**Applies to**: v2.0.0+
 
 ---
 
@@ -15,14 +15,15 @@ In v1.1.0, Elefante uses **transaction-scoped locking**:
 ```
 IDE 1: add_memory()
   └─ acquire write.lock (5ms) → write → release write.lock
-  
-IDE 2: add_memory()  
+
+IDE 2: add_memory()
   └─ wait briefly if needed → acquire write.lock (5ms) → write → release
-  
+
 Both IDEs can interleave operations!
 ```
 
 **Key Changes from v1.0.x**:
+
 - Locks held for milliseconds, not hours
 - Stale locks auto-expire after 30 seconds
 - Dead process detection clears orphaned locks
@@ -284,6 +285,7 @@ python -m src.dashboard.server
 For advanced users needing concurrent access, use separate databases:
 
 **NOT RECOMMENDED** for normal users. Requires:
+
 - Duplicated data (memory bloat)
 - Sync complexity
 - Maintenance burden
@@ -343,14 +345,14 @@ LOCK_FILE=~/.elefante/data/kuzu_db/.lock
 if [ -f "$LOCK_FILE" ]; then
     # Lock exists - check if process still exists
     PID=$(lsof "$LOCK_FILE" 2>/dev/null | tail -1 | awk '{print $2}')
-    
+
     if [ -z "$PID" ] || ! kill -0 "$PID" 2>/dev/null; then
         # Process doesn't exist - lock is stale
         echo "$(date): Removing stale lock"
         rm "$LOCK_FILE"
         exit 0
     fi
-    
+
     # Process exists - lock is valid
     exit 1
 fi
@@ -412,11 +414,13 @@ See [`docs/pitfall-index.md`](../pitfall-index.md) — search `pitfall: kuzu sta
 **Architectural Limitation**: Dashboard and MCP server CANNOT run simultaneously.
 
 **Lock Mechanism**:
+
 - Lock file: `kuzu_db/.lock`
 - File-based locking (not network-based)
 - Prevents all concurrent access
 
 **Resolution Protocol**:
+
 1. Kill all Python processes: `pkill -f python`
 2. Remove stale lock: `rm kuzu_db/.lock`
 3. Restart IDE to let autoStart handle server lifecycle
@@ -430,7 +434,7 @@ Before claiming "Lock is healthy":
 
 - [ ] Only one process (MCP or Dashboard) running at a time
 - [ ] Lock file doesn't exist: `ls ~/.elefante/data/kuzu_db/.lock`
-  - Returns "No such file or directory" 
+  - Returns "No such file or directory"
 - [ ] Database is accessible: `python -c "import kuzu; kuzu.Database(...)"`
 - [ ] No stale processes: `ps aux | grep python` shows expected processes only
 - [ ] Dashboard uses snapshot, not direct Kuzu access
@@ -438,6 +442,6 @@ Before claiming "Lock is healthy":
 
 ---
 
-**Document Version**: 1.0  
+**Document Version**: 2.1.2  
 **Status**: CRITICAL  
-**Last Validated**: 2025-12-10
+**Last Validated**: 2026-02-25

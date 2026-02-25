@@ -3,7 +3,7 @@
 > **Purpose:** This document captures the cohesive larger vision of Elefante for a new agent to implement without requiring clarification. Every file, function, variable, and architectural decision is documented here.
 >
 > **Generated:** 2026-02-18
-> **Version:** v2.1.1
+> **Version:** v2.1.2
 
 ---
 
@@ -40,19 +40,20 @@ Elefante bridges the cognitive gap between human intent and agentic execution th
 
 - **Stores** facts, preferences, decisions, code patterns, and tasks
 - **Searches** using hybrid retrieval: semantic vectors + knowledge graph + session context
-- **Scores** every memory automatically based on recency, freshness, and reinforcement
-- **Injects context** into every tool call-the agent gets relevant memories without asking
+- **Self-Organizes** by passively building `CO_ACTIVATED` graph relationships between memories used in the same session, naturally boosting their future retrieval scores.
+- **Scores** every memory automatically based on recency, freshness, and reinforcement. A smoothed vector baseline ensures valid semantic matches are never mathematically suppressed.
+- **Injects context** into every tool call-the agent gets relevant memories without asking. The payload is aggressively mathematically compressed to prevent LLM token bloat and includes strict actionable directives.
 - **Builds a knowledge graph** of entities and relationships
 - **Enforces quality** via a compliance gate: search before write, no duplicates
 - **Visualizes** knowledge through a snapshot-driven dashboard
 
 ### Core Objectives
 
-| Objective | Description |
-|-----------|-------------|
-| **Immunity** | Prevent the repetition of known failures (via Neural Registers) |
-| **Efficiency** | Maximize information density; minimize repetitive discovery |
-| **Trust** | Provide evidence and verification for every claim made to the user |
+| Objective      | Description                                                        |
+| -------------- | ------------------------------------------------------------------ |
+| **Immunity**   | Prevent the repetition of known failures (via Neural Registers)    |
+| **Efficiency** | Maximize information density; minimize repetitive discovery        |
+| **Trust**      | Provide evidence and verification for every claim made to the user |
 
 ---
 
@@ -62,30 +63,30 @@ These laws are **non-negotiable** and form the foundation of Elefante's design:
 
 ### Law 1: The Law of Continuity
 
-> *A session is never new; it is a continuation.*
+> _A session is never new; it is a continuation._
 
 You are forbidden from acting as a "stateless" tool. You must maintain the identity, preferences, and progress of the user as established in the Second Brain.
 
 ### Law 2: The Law of Compliance (Search-Before-Action)
 
-> *Ignorance is a choice, not a constraint.*
+> _Ignorance is a choice, not a constraint._
 
 You MUST search the memory (`elefante-MemorySearch`) before answering or writing. Failure to check the Brain before acting is a violation of the system's foundational protocol.
 
 ### Law 3: The Law of Absolute Grounding
 
-> *Truth is a technical artifact.*
+> _Truth is a technical artifact._
 
 If information is not in the Brain or the Workspace, it is **UNKNOWN**. You are forbidden from hallucinating, approximating, or assuming. If it isn't grounded, it doesn't exist.
 
 ### The Cardinal Sins
 
-| Sin | Description |
-|-----|-------------|
-| **Statelessness** | Asking for information already stored in the Brain |
-| **Hallucination** | Guessing a path, an API, or a user preference |
+| Sin                  | Description                                                    |
+| -------------------- | -------------------------------------------------------------- |
+| **Statelessness**    | Asking for information already stored in the Brain             |
+| **Hallucination**    | Guessing a path, an API, or a user preference                  |
 | **STDOUT Pollution** | Printing logs to the MCP command stream (kills the connection) |
-| **Redundancy** | Creating a new file where an archive/augmentation path exists |
+| **Redundancy**       | Creating a new file where an archive/augmentation path exists  |
 
 ---
 
@@ -156,15 +157,15 @@ Return: { status: "stored", memory_id: UUID, classification: "NEW" }
 
 ### Tech Stack
 
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| Vector store | ChromaDB 1.3.5 | Semantic search via embeddings |
-| Graph store | Kuzu 0.11.3 | Knowledge graph, Cypher queries |
-| Embeddings | sentence-transformers (gte-base) | 768-dim vectors for similarity |
-| Protocol | MCP 1.23.1 | IDE-server communication |
-| Dashboard | React + TypeScript + Vite | Graph visualization (SVG) |
-| API server | FastAPI + Uvicorn | Dashboard backend |
-| Runtime | Python 3.11 | All server-side code |
+| Component    | Technology                       | Purpose                         |
+| ------------ | -------------------------------- | ------------------------------- |
+| Vector store | ChromaDB 1.3.5                   | Semantic search via embeddings  |
+| Graph store  | Kuzu 0.11.3                      | Knowledge graph, Cypher queries |
+| Embeddings   | sentence-transformers (gte-base) | 768-dim vectors for similarity  |
+| Protocol     | MCP 1.23.1                       | IDE-server communication        |
+| Dashboard    | React + TypeScript + Vite        | Graph visualization (SVG)       |
+| API server   | FastAPI + Uvicorn                | Dashboard backend               |
+| Runtime      | Python 3.11                      | All server-side code            |
 
 ---
 
@@ -175,6 +176,7 @@ Return: { status: "stored", memory_id: UUID, classification: "NEW" }
 **Nobody assigns importance. Importance emerges from behavior.**
 
 Traditional systems ask users to rate memories (1-10). This fails because:
+
 1. **Bias**: Users rate everything as "important" (8+)
 2. **Rot**: An architecture decision from 6 months ago sits at importance=9 forever
 
@@ -182,11 +184,11 @@ Elefante replaces human-assigned importance with a **system-computed score (0-10
 
 ### Three Behavioral Signals
 
-| Signal | Formula | What It Measures |
-|--------|---------|------------------|
-| **Recency** | `exp(-decay_rate × days_since_created)` | Memories decay exponentially. Rate depends on type. |
-| **Freshness** | `exp(-0.02 × days_since_accessed)` | Recently retrieved memories get boosted. Stale ones fade. |
-| **Reinforcement** | `1 + 0.25 × ln(access_count + 1)` | Frequently used memories grow stronger (logarithmic). |
+| Signal            | Formula                                 | What It Measures                                          |
+| ----------------- | --------------------------------------- | --------------------------------------------------------- |
+| **Recency**       | `exp(-decay_rate × days_since_created)` | Memories decay exponentially. Rate depends on type.       |
+| **Freshness**     | `exp(-0.02 × days_since_accessed)`      | Recently retrieved memories get boosted. Stale ones fade. |
+| **Reinforcement** | `1 + 0.25 × ln(access_count + 1)`       | Frequently used memories grow stronger (logarithmic).     |
 
 ### Final Formula
 
@@ -202,14 +204,14 @@ relevance = 0.5 * recency * freshness * reinforcement
 
 The decay rate (lambda) controls how quickly a memory loses relevance if never accessed. Each type has a half-life:
 
-| Memory Type | Decay Rate | Half-Life | Why |
-|-------------|------------|-----------|-----|
-| `preference` | 0.002 | ~347 days | Preferences are stable |
-| `decision` | 0.005 | ~139 days | Decisions get revisited |
-| `fact` | 0.005 | ~139 days | Facts change |
-| `insight` | 0.008 | ~87 days | Insights are validated or forgotten |
-| `note` | 0.015 | ~46 days | Notes are transient |
-| `conversation` | 0.025 | ~28 days | Conversations are ephemeral |
+| Memory Type    | Decay Rate | Half-Life | Why                                 |
+| -------------- | ---------- | --------- | ----------------------------------- |
+| `preference`   | 0.002      | ~347 days | Preferences are stable              |
+| `decision`     | 0.005      | ~139 days | Decisions get revisited             |
+| `fact`         | 0.005      | ~139 days | Facts change                        |
+| `insight`      | 0.008      | ~87 days  | Insights are validated or forgotten |
+| `note`         | 0.015      | ~46 days  | Notes are transient                 |
+| `conversation` | 0.025      | ~28 days  | Conversations are ephemeral         |
 
 **Implementation:** `src/models/memory.py` - `TYPE_DECAY_RATES` dictionary
 
@@ -221,28 +223,28 @@ The decay rate (lambda) controls how quickly a memory loses relevance if never a
 def calculate_relevance_score(self, current_time: Optional[datetime] = None) -> float:
     """
     System-computed relevance (v1.10.0).
-    
+
     Formula: relevance = 0.5 * recency * freshness * reinforcement
     Returns float 0.0-1.0 for search ranking.
     """
     import math
-    
+
     if current_time is None:
         current_time = datetime.utcnow()
-    
+
     days_since_created = max(0, (current_time - self.metadata.created_at).total_seconds() / 86400)
     days_since_access = max(0, (current_time - self.metadata.last_accessed).total_seconds() / 86400)
     access_count = max(0, self.metadata.access_count)
-    
+
     # Recency: exponential decay based on memory type
     recency = math.exp(-self.metadata.decay_rate * days_since_created)
-    
+
     # Freshness: decays if not recently retrieved
     freshness = math.exp(-0.02 * days_since_access)
-    
+
     # Reinforcement: grows with repeated access (logarithmic)
     reinforcement = 1.0 + (self.metadata.reinforcement_factor * math.log(access_count + 1))
-    
+
     raw = 0.5 * recency * freshness * reinforcement
     return min(1.0, max(0.0, raw))
 ```
@@ -312,11 +314,11 @@ CONTRADICTORY -> DEPRECATED (old fact superseded by new)
 
 ### Contradiction Resolution
 
-| Type | Behavior Under Contradiction |
-|-------|------------------------------|
-| Fact | Newer supersedes older. Objective truth. |
-| Preference | Coexists. User preference/instruction. Resolved by recency at retrieval. |
-| Conversation | Ephemeral. Most recent wins. |
+| Type         | Behavior Under Contradiction                                             |
+| ------------ | ------------------------------------------------------------------------ |
+| Fact         | Newer supersedes older. Objective truth.                                 |
+| Preference   | Coexists. User preference/instruction. Resolved by recency at retrieval. |
+| Conversation | Ephemeral. Most recent wins.                                             |
 
 ### Preference Re-Assertion Merge
 
@@ -339,57 +341,57 @@ All tool names follow `elefante-PascalCase` convention.
 
 #### Memory Tools
 
-| Tool | Purpose | Key Parameters |
-|------|---------|----------------|
-| `elefante-MemoryAdd` | Store a new memory | `content`, `memory_type`, `domain`, `category`, `tags`, `entities`, `force_new` |
-| `elefante-MemorySearch` | Search memories | `query`, `mode` (semantic/structured/hybrid), `limit`, `filters`, `list_all` |
-| `elefante-MemoryUpdate` | Amend a memory in-place | `memory_id`, `content`, `deprecated`, `archived`, `supersedes_id`, `tags` |
-| `elefante-MemoryDelete` | Permanently delete with audit trail | `memory_id`, `reason` |
-| `elefante-MemoryConsolidate` | Deterministic cleanup | `force` (dry-run by default) |
+| Tool                         | Purpose                             | Key Parameters                                                                  |
+| ---------------------------- | ----------------------------------- | ------------------------------------------------------------------------------- |
+| `elefante-MemoryAdd`         | Store a new memory                  | `content`, `memory_type`, `domain`, `category`, `tags`, `entities`, `force_new` |
+| `elefante-MemorySearch`      | Search memories                     | `query`, `mode` (semantic/structured/hybrid), `limit`, `filters`, `list_all`    |
+| `elefante-MemoryUpdate`      | Amend a memory in-place             | `memory_id`, `content`, `deprecated`, `archived`, `supersedes_id`, `tags`       |
+| `elefante-MemoryDelete`      | Permanently delete with audit trail | `memory_id`, `reason`                                                           |
+| `elefante-MemoryConsolidate` | Deterministic cleanup               | `force` (dry-run by default)                                                    |
 
 #### Knowledge Graph Tools
 
-| Tool | Purpose | Key Parameters |
-|------|---------|----------------|
+| Tool                    | Purpose                                 | Key Parameters                                       |
+| ----------------------- | --------------------------------------- | ---------------------------------------------------- |
 | `elefante-GraphConnect` | Batch upsert entities and relationships | `entities`, `relationships`, `include_system_status` |
-| `elefante-GraphQuery` | Execute raw Cypher queries | `cypher_query` |
+| `elefante-GraphQuery`   | Execute raw Cypher queries              | `cypher_query`                                       |
 
 #### Context & Session Tools
 
-| Tool | Purpose | Key Parameters |
-|------|---------|----------------|
-| `elefante-ContextGet` | Get full context for session/task | `session_id`, `depth` (1-5), `limit` |
-| `elefante-SessionsList` | List past sessions | `limit`, `offset` |
+| Tool                    | Purpose                           | Key Parameters                       |
+| ----------------------- | --------------------------------- | ------------------------------------ |
+| `elefante-ContextGet`   | Get full context for session/task | `session_id`, `depth` (1-5), `limit` |
+| `elefante-SessionsList` | List past sessions                | `limit`, `offset`                    |
 
 #### Task Tools
 
-| Tool | Purpose | Key Parameters |
-|------|---------|----------------|
+| Tool                  | Purpose                            | Key Parameters                                                                     |
+| --------------------- | ---------------------------------- | ---------------------------------------------------------------------------------- |
 | `elefante-TaskCreate` | Create task with optional subtasks | `description`, `parent_id`, `blocked_by`, `priority`, `assigned_agent`, `subtasks` |
-| `elefante-TaskUpdate` | Update task status/output | `task_id`, `status`, `output` |
-| `elefante-TaskGraph` | View task hierarchy | `task_id` (optional, returns roots if None) |
+| `elefante-TaskUpdate` | Update task status/output          | `task_id`, `status`, `output`                                                      |
+| `elefante-TaskGraph`  | View task hierarchy                | `task_id` (optional, returns roots if None)                                        |
 
 #### ETL Tools
 
-| Tool | Purpose | Key Parameters |
-|------|---------|----------------|
-| `elefante-ETLProcess` | Get raw memories for agent classification | `limit`, `include_stats` |
-| `elefante-ETLClassify` | Apply agent's classification | `memory_id`, `ring`, `knowledge_type`, `topic`, `summary`, `owner_id` |
+| Tool                   | Purpose                                   | Key Parameters                                                        |
+| ---------------------- | ----------------------------------------- | --------------------------------------------------------------------- |
+| `elefante-ETLProcess`  | Get raw memories for agent classification | `limit`, `include_stats`                                              |
+| `elefante-ETLClassify` | Apply agent's classification              | `memory_id`, `ring`, `knowledge_type`, `topic`, `summary`, `owner_id` |
 
 #### System Tools
 
-| Tool | Purpose | Key Parameters |
-|------|---------|----------------|
-| `elefante-System` | Enable/disable Elefante Mode | `action` ("enable" / "disable"), `force` |
-| `elefante-SystemStatusGet` | Get system health and stats | None |
-| `elefante-DashboardOpen` | Open knowledge graph dashboard | `refresh` (true/false) |
+| Tool                       | Purpose                        | Key Parameters                           |
+| -------------------------- | ------------------------------ | ---------------------------------------- |
+| `elefante-System`          | Enable/disable Elefante Mode   | `action` ("enable" / "disable"), `force` |
+| `elefante-SystemStatusGet` | Get system health and stats    | None                                     |
+| `elefante-DashboardOpen`   | Open knowledge graph dashboard | `refresh` (true/false)                   |
 
 #### Prompts
 
-| Prompt | Purpose |
-|--------|---------|
+| Prompt               | Purpose                                                 |
+| -------------------- | ------------------------------------------------------- |
 | `elefante-grounding` | Inject memory-aware behavior into agent's system prompt |
-| `elefante-context` | Search memories for a topic and return as context |
+| `elefante-context`   | Search memories for a topic and return as context       |
 
 ### Tool Schemas (Key Excerpts)
 
@@ -398,10 +400,20 @@ All tool names follow `elefante-PascalCase` convention.
 ```json
 {
   "properties": {
-    "content": { "type": "string", "description": "The memory content to store" },
+    "content": {
+      "type": "string",
+      "description": "The memory content to store"
+    },
     "memory_type": {
       "type": "string",
-      "enum": ["conversation", "fact", "insight", "decision", "note", "preference"],
+      "enum": [
+        "conversation",
+        "fact",
+        "insight",
+        "decision",
+        "note",
+        "preference"
+      ],
       "default": "conversation"
     },
     "domain": {
@@ -467,14 +479,14 @@ All tool names follow `elefante-PascalCase` convention.
 
 The `CognitiveRetriever` class in `src/core/retrieval.py` implements multi-signal scoring:
 
-| Signal | Weight | What It Measures |
-|--------|--------|------------------|
-| `vector_similarity` | 0.30 | Semantic match via embeddings |
-| `concept_overlap` | 0.20 | Jaccard-like shared concepts |
-| `domain_match` | 0.15 | Same domain (work/personal/etc) |
-| `coactivation` | 0.15 | Co-retrieval history |
-| `authority` | 0.10 | Score x access count |
-| `temporal` | 0.10 | Recency + freshness |
+| Signal              | Weight | What It Measures                |
+| ------------------- | ------ | ------------------------------- |
+| `vector_similarity` | 0.30   | Semantic match via embeddings   |
+| `concept_overlap`   | 0.20   | Jaccard-like shared concepts    |
+| `domain_match`      | 0.15   | Same domain (work/personal/etc) |
+| `coactivation`      | 0.15   | Co-retrieval history            |
+| `authority`         | 0.10   | Score x access count            |
+| `temporal`          | 0.10   | Recency + freshness             |
 
 ### Composite Score Formula
 
@@ -505,7 +517,7 @@ class MemoryCandidate:
     created_at: datetime
     last_accessed: datetime
     embedding: Optional[list[float]] = None
-    
+
     # Computed scores
     vector_score: float = 0.0
     concept_score: float = 0.0
@@ -513,7 +525,7 @@ class MemoryCandidate:
     coactivation_score: float = 0.0
     authority_score: float = 0.0
     composite_score: float = 0.0
-    
+
     role: str = "candidate"  # primary, supporting, contradicting, context
 
 @dataclass
@@ -556,6 +568,7 @@ else:
 ### Core Principle: Elefante is LLM-Free
 
 Elefante does NOT make internal LLM calls. All classification is either:
+
 1. **Deterministic** (via `src/utils/curation.py` helpers)
 2. **Agent-driven** (via ETL tools that let the agent's LLM do the work)
 
@@ -596,13 +609,13 @@ class ProcessingStatus:
 
 ### V5 Topology Fields
 
-| Field | Values | Purpose |
-|-------|--------|---------|
-| `ring` | core, domain, topic, leaf | Distance from user's core concerns |
-| `knowledge_type` | law, principle, method, decision, insight, preference, fact | Nature of knowledge |
-| `topic` | coding-standards, communication, workflow, agent-behavior, tools-environment, collaboration, general | Subject area |
-| `summary` | One-line description | Quick reference |
-| `owner_id` | Default: "owner-jay" | Attribution |
+| Field            | Values                                                                                               | Purpose                            |
+| ---------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `ring`           | core, domain, topic, leaf                                                                            | Distance from user's core concerns |
+| `knowledge_type` | law, principle, method, decision, insight, preference, fact                                          | Nature of knowledge                |
+| `topic`          | coding-standards, communication, workflow, agent-behavior, tools-environment, collaboration, general | Subject area                       |
+| `summary`        | One-line description                                                                                 | Quick reference                    |
+| `owner_id`       | Default: "owner-jay"                                                                                 | Attribution                        |
 
 ---
 
@@ -630,11 +643,11 @@ def _check_compliance_gate(self, tool_name: str) -> Dict[str, Any] | None:
     # Not a gated tool -> pass
     if tool_name not in GATED_TOOLS:
         return None
-    
+
     # Search was performed -> pass
     if self._compliance_state["search_performed"]:
         return None
-    
+
     # GATE BLOCKED
     return {
         "success": False,
@@ -696,6 +709,7 @@ python scripts/update_dashboard_data.py
 ```
 
 This script:
+
 1. Fetches ALL memories from ChromaDB
 2. Fetches entities and relationships from Kuzu
 3. Computes semantic similarity edges (optional)
@@ -710,10 +724,10 @@ This script:
 async def get_graph(limit: int = 1000):
     """Fetch graph data from pre-generated snapshot file."""
     snapshot_path = Path(cfg.elefante.data_dir) / "dashboard_snapshot.json"
-    
+
     with open(snapshot_path, "r") as f:
         data = json.load(f)
-    
+
     return {
         "nodes": data["nodes"],
         "edges": data["edges"],
@@ -723,11 +737,11 @@ async def get_graph(limit: int = 1000):
 
 ### Dashboard Tabs
 
-| Tab | Purpose |
-|-----|---------|
+| Tab          | Purpose                                                                 |
+| ------------ | ----------------------------------------------------------------------- |
 | **Overview** | Health score (freshness, coverage, connectivity) with diagnostic panels |
-| **Memories** | Searchable, sortable table with semantic search integration |
-| **Explore** | Topic distribution, memory insights, and knowledge graph visualization |
+| **Memories** | Searchable, sortable table with semantic search integration             |
+| **Explore**  | Topic distribution, memory insights, and knowledge graph visualization  |
 
 ---
 
@@ -753,37 +767,37 @@ class MemoryMetadata(BaseModel):
     # Identity
     created_at: datetime = Field(default_factory=datetime.utcnow)
     created_by: str = "user"
-    
+
     # Classification
     domain: DomainType = DomainType.REFERENCE
     category: str = "general"
     memory_type: MemoryType = MemoryType.FACT
-    
+
     # Relevance (system-computed)
     score: int = Field(default=50, ge=0, le=100)
     tags: List[str] = Field(default_factory=list)
-    
+
     # V4 Cognitive Retrieval
     concepts: List[str] = Field(default_factory=list)
     surfaces_when: List[str] = Field(default_factory=list)
     authority_score: float = Field(default=0.5)
-    
+
     # Relationship Tracking
     status: MemoryStatus = MemoryStatus.NEW
     relationship_type: Optional[RelationshipType] = None
     supersedes_id: Optional[UUID] = None
     superseded_by_id: Optional[UUID] = None
-    
+
     # Temporal Intelligence
     last_accessed: datetime = Field(default_factory=datetime.utcnow)
     access_count: int = 0
     decay_rate: float = 0.01
     reinforcement_factor: float = 0.25
-    
+
     # Lifecycle
     deprecated: bool = False
     archived: bool = False
-    
+
     # Extensibility
     custom_metadata: Dict[str, Any] = Field(default_factory=dict)
 ```
@@ -830,22 +844,22 @@ class RelationshipType(str, Enum):
     EXTENDS = "extends"
     SUPPORTS = "supports"
     IMPLEMENTS = "implements"
-    
+
     # Transformative
     REFINES = "refines"
     SUPERSEDES = "supersedes"
     CONSOLIDATES = "consolidates"
-    
+
     # Conflictual
     CONTRADICTS = "contradicts"
     CHALLENGES = "challenges"
-    
+
     # Structural
     DEPENDS_ON = "depends_on"
     PART_OF = "part_of"
     REFERENCES = "references"
     RELATES_TO = "relates_to"
-    
+
     # Temporal
     FOLLOWS = "follows"
     PRECEDES = "precedes"
@@ -858,48 +872,48 @@ class RelationshipType(str, Enum):
 
 ### Core Files
 
-| File | Purpose | Key Classes/Functions |
-|------|---------|------------------------|
-| `src/mcp/server.py` | MCP server implementation | `ElefanteMCPServer`, tool handlers, compliance gate |
-| `src/core/orchestrator.py` | Central intelligence layer | `MemoryOrchestrator`, `add_memory()`, `search_memories()` |
-| `src/core/vector_store.py` | ChromaDB integration | `VectorStore`, `search()`, `add_memory()` |
-| `src/core/graph_store.py` | Kuzu integration | `GraphStore`, `create_or_get_entity()`, `execute_query()` |
-| `src/core/retrieval.py` | Cognitive retrieval | `CognitiveRetriever`, `MemoryCandidate`, `RetrievalExplanation` |
-| `src/core/embeddings.py` | Local embeddings | `EmbeddingService`, `generate_embedding()` |
-| `src/core/etl.py` | Agent-driven ETL | `ETLProcessor`, `get_raw_memories()`, `apply_classification()` |
-| `src/core/refinery.py` | Memory cleanup | `MemoryRefinery`, `build_refinery_plan()` |
-| `src/models/memory.py` | Data models | `Memory`, `MemoryMetadata`, `TYPE_DECAY_RATES` |
-| `src/utils/config.py` | Configuration | `Config`, `get_config()` |
-| `src/utils/curation.py` | Deterministic helpers | `extract_concepts()`, `generate_title()`, `generate_summary()` |
+| File                       | Purpose                    | Key Classes/Functions                                           |
+| -------------------------- | -------------------------- | --------------------------------------------------------------- |
+| `src/mcp/server.py`        | MCP server implementation  | `ElefanteMCPServer`, tool handlers, compliance gate             |
+| `src/core/orchestrator.py` | Central intelligence layer | `MemoryOrchestrator`, `add_memory()`, `search_memories()`       |
+| `src/core/vector_store.py` | ChromaDB integration       | `VectorStore`, `search()`, `add_memory()`                       |
+| `src/core/graph_store.py`  | Kuzu integration           | `GraphStore`, `create_or_get_entity()`, `execute_query()`       |
+| `src/core/retrieval.py`    | Cognitive retrieval        | `CognitiveRetriever`, `MemoryCandidate`, `RetrievalExplanation` |
+| `src/core/embeddings.py`   | Local embeddings           | `EmbeddingService`, `generate_embedding()`                      |
+| `src/core/etl.py`          | Agent-driven ETL           | `ETLProcessor`, `get_raw_memories()`, `apply_classification()`  |
+| `src/core/refinery.py`     | Memory cleanup             | `MemoryRefinery`, `build_refinery_plan()`                       |
+| `src/models/memory.py`     | Data models                | `Memory`, `MemoryMetadata`, `TYPE_DECAY_RATES`                  |
+| `src/utils/config.py`      | Configuration              | `Config`, `get_config()`                                        |
+| `src/utils/curation.py`    | Deterministic helpers      | `extract_concepts()`, `generate_title()`, `generate_summary()`  |
 
 ### Dashboard Files
 
-| File | Purpose |
-|------|---------|
-| `src/dashboard/server.py` | FastAPI server |
-| `src/dashboard/ui/src/App.tsx` | Main React component |
-| `src/dashboard/ui/src/components/OverviewTab.tsx` | Health diagnostics |
-| `src/dashboard/ui/src/components/MemoriesTab.tsx` | Memory table |
-| `src/dashboard/ui/src/components/KnowledgeGraph.tsx` | Graph visualization |
+| File                                                 | Purpose              |
+| ---------------------------------------------------- | -------------------- |
+| `src/dashboard/server.py`                            | FastAPI server       |
+| `src/dashboard/ui/src/App.tsx`                       | Main React component |
+| `src/dashboard/ui/src/components/OverviewTab.tsx`    | Health diagnostics   |
+| `src/dashboard/ui/src/components/MemoriesTab.tsx`    | Memory table         |
+| `src/dashboard/ui/src/components/KnowledgeGraph.tsx` | Graph visualization  |
 
 ### Script Files
 
-| File | Purpose |
-|------|---------|
-| `scripts/install.py` | Unified installation |
-| `scripts/update_dashboard_data.py` | Snapshot generation |
-| `scripts/health_check.py` | System diagnostics |
-| `scripts/factory_reset.py` | Complete data wipe |
+| File                               | Purpose              |
+| ---------------------------------- | -------------------- |
+| `scripts/install.py`               | Unified installation |
+| `scripts/update_dashboard_data.py` | Snapshot generation  |
+| `scripts/health_check.py`          | System diagnostics   |
+| `scripts/factory_reset.py`         | Complete data wipe   |
 
 ### Documentation Files
 
-| File | Purpose |
-|------|---------|
-| `docs/the-core.md` | The Three Laws |
-| `docs/README.md` | Main documentation |
-| `docs/pitfall-index.md` | Quick reference for known issues |
-| `docs/technical/usage.md` | Complete tool reference |
-| `docs/debug/README.md` | Debugging guide |
+| File                      | Purpose                          |
+| ------------------------- | -------------------------------- |
+| `docs/the-core.md`        | The Three Laws                   |
+| `docs/README.md`          | Main documentation               |
+| `docs/pitfall-index.md`   | Quick reference for known issues |
+| `docs/technical/usage.md` | Complete tool reference          |
+| `docs/debug/README.md`    | Debugging guide                  |
 
 ---
 
@@ -907,17 +921,17 @@ class RelationshipType(str, Enum):
 
 ### From `docs/pitfall-index.md`
 
-| Category | Pitfall | Quick Fix |
-|----------|---------|-----------|
-| Dashboard | Browser cache | `Ctrl+Shift+R` (hard refresh) |
-| Dashboard | Snapshot stale | Run `python scripts/update_dashboard_data.py` |
-| Dashboard | Kuzu lock conflict | Kill Python processes, remove `kuzu_db/.lock` |
-| Installation | Kuzu pre-existing dir | Do NOT mkdir before Kuzu init |
-| MCP | Type signature | Use `list[types.Tool]` not `List[Tool]` |
-| MCP | STDOUT pollution | Redirect all prints to `sys.stderr` |
-| Database | Reserved word | Use `props` not `properties` |
-| Memory | Export API | Use `collection._collection.get()` for full export |
-| Documentation | Archive without index | Update ALL READMEs that link to moved files |
+| Category      | Pitfall               | Quick Fix                                          |
+| ------------- | --------------------- | -------------------------------------------------- |
+| Dashboard     | Browser cache         | `Ctrl+Shift+R` (hard refresh)                      |
+| Dashboard     | Snapshot stale        | Run `python scripts/update_dashboard_data.py`      |
+| Dashboard     | Kuzu lock conflict    | Kill Python processes, remove `kuzu_db/.lock`      |
+| Installation  | Kuzu pre-existing dir | Do NOT mkdir before Kuzu init                      |
+| MCP           | Type signature        | Use `list[types.Tool]` not `List[Tool]`            |
+| MCP           | STDOUT pollution      | Redirect all prints to `sys.stderr`                |
+| Database      | Reserved word         | Use `props` not `properties`                       |
+| Memory        | Export API            | Use `collection._collection.get()` for full export |
+| Documentation | Archive without index | Update ALL READMEs that link to moved files        |
 
 ### Critical Warnings
 
@@ -949,14 +963,14 @@ class RelationshipType(str, Enum):
 
 ### Key Implementation Files by Feature Area
 
-| Feature Area | Primary File | Secondary Files |
-|--------------|--------------|-----------------|
-| Memory storage | `src/core/orchestrator.py` | `src/core/vector_store.py`, `src/core/graph_store.py` |
-| Search/retrieval | `src/core/retrieval.py` | `src/core/scoring.py`, `src/core/deduplication.py` |
-| MCP tools | `src/mcp/server.py` | `src/core/orchestrator.py` |
-| Dashboard | `src/dashboard/server.py` | `scripts/update_dashboard_data.py` |
-| Configuration | `src/utils/config.py` | `config.yaml` |
-| Cleanup/maintenance | `src/core/refinery.py` | `scripts/golden_cleanup.py` |
+| Feature Area        | Primary File               | Secondary Files                                       |
+| ------------------- | -------------------------- | ----------------------------------------------------- |
+| Memory storage      | `src/core/orchestrator.py` | `src/core/vector_store.py`, `src/core/graph_store.py` |
+| Search/retrieval    | `src/core/retrieval.py`    | `src/core/scoring.py`, `src/core/deduplication.py`    |
+| MCP tools           | `src/mcp/server.py`        | `src/core/orchestrator.py`                            |
+| Dashboard           | `src/dashboard/server.py`  | `scripts/update_dashboard_data.py`                    |
+| Configuration       | `src/utils/config.py`      | `config.yaml`                                         |
+| Cleanup/maintenance | `src/core/refinery.py`     | `scripts/golden_cleanup.py`                           |
 
 ### Testing Approach
 
@@ -1011,4 +1025,4 @@ class RelationshipType(str, Enum):
 
 **END OF VISION BRIEF**
 
-*This document is self-contained. A new agent can implement Elefante features using only this reference.*
+_This document is self-contained. A new agent can implement Elefante features using only this reference._

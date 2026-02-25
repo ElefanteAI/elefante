@@ -11,37 +11,39 @@ v2.0.0 established the production baseline. All core infrastructure is implement
 
 ### Shipped Features
 
-| Feature | Status | Since |
-|---------|--------|-------|
-| Dual storage (ChromaDB + Kuzu) | Production | v1.0.0 |
-| MCP server (20 tools + 2 prompts) | Production | v2.1.0 |
-| Transaction-scoped locking | Production | v1.1.0 |
-| Compliance Gate (search-before-write) | Production | v1.6.0 |
-| Behavioral Relevance scoring (0-100) | Production | v2.0.0 |
-| Temporal memory decay with type-based rates | Production | v1.0.0 |
-| Cognitive retrieval (V4: concepts, authority, surfaces_when) | Production | v1.6.3 |
+| Feature                                                         | Status     | Since  |
+| --------------------------------------------------------------- | ---------- | ------ |
+| Dual storage (ChromaDB + Kuzu)                                  | Production | v1.0.0 |
+| MCP server (20 tools + 2 prompts)                               | Production | v2.1.0 |
+| Transaction-scoped locking                                      | Production | v1.1.0 |
+| Compliance Gate (search-before-write)                           | Production | v1.6.0 |
+| Behavioral Relevance scoring (0-100)                            | Production | v2.0.0 |
+| Temporal memory decay with type-based rates                     | Production | v1.0.0 |
+| Cognitive retrieval (V4: concepts, authority, surfaces_when)    | Production | v1.6.3 |
 | Agent ETL classification pipeline (ring, topic, knowledge_type) | Production | v1.6.3 |
-| Dashboard (React + SVG, 3-tab architecture) | Production | v2.0.0 |
-| Context injection (auto-surfaces top 3 memories) | Production | v1.0.0 |
-| Session Distiller (scan, parse, ingest from VS Code chat) | Production | v2.0.0 |
+| Dashboard (React + SVG, 3-tab architecture)                     | Production | v2.0.0 |
+| Context injection (auto-surfaces top 3 memories)                | Production | v1.0.0 |
+| Session Distiller (scan, parse, ingest from VS Code chat)       | Production | v2.0.0 |
+| Actionable Integration (behavioral forcing headers)             | Production | v2.1.2 |
+| Response Compression (null stripping, token efficiency)         | Production | v2.1.2 |
+| Smoothed Vector Baseline (fixes low similarity scores)          | Production | v2.1.2 |
+| Autonomous Co-Activation (passive graph wiring)                 | Production | v2.1.2 |
 
 ### Known Design Flaws (Open)
 
-| Issue | Severity | Reference |
-|-------|----------|-----------|
+| Issue                                          | Severity | Reference                                  |
+| ---------------------------------------------- | -------- | ------------------------------------------ |
 | Response Bloat: ~500 tokens/memory (90% nulls) | CRITICAL | `docs/debug/memory-compendium.md` Issue #7 |
-| Low Similarity: exact matches score 0.37-0.39 | HIGH | `docs/debug/memory-compendium.md` Issue #8 |
-| No Action Guidance: raw JSON, no summary | HIGH | `docs/debug/memory-compendium.md` Issue #9 |
+| Low Similarity: exact matches score 0.37-0.39  | HIGH     | `docs/debug/memory-compendium.md` Issue #8 |
+| No Action Guidance: raw JSON, no summary       | HIGH     | `docs/debug/memory-compendium.md` Issue #9 |
 
 ---
 
 ## Next Phase (Planned)
 
-### Priority 1: Response Bloat Fix (P0)
+### Priority 1: Response Compression (Shipped - v2.1.2)
 
-Search returns ~500 tokens per memory (90% nulls). Needs compact response format.
-
-**Files**: `src/mcp/server.py`, `src/models/query.py`
+Fixed Issue #7 and #9. Search returns are now mathematically compressed, stripping all null/empty structures before serializing to MCP. Appends a strict behavioral directive header to ensure LLM usage.
 
 ### Priority 2: Retrieval Explanation
 
@@ -74,15 +76,19 @@ Flag memories with high concept overlap and opposing patterns for user review. S
 ## Future Phases
 
 ### Smart UPDATE (Merge)
+
 Merge new info with existing memories instead of duplicating. Track version history.
 
 ### Proactive Memory Surfacing
+
 System suggests relevant memories without user searching, based on file context, error patterns, and conversation keywords.
 
-### Co-Activation Tracking
-Track which memories are frequently retrieved together to improve scoring (currently 15% weight returns 0).
+### Co-Activation Tracking (Shipped - v2.1.2)
+
+Tracks which memories are frequently retrieved together and automatically constructs `CO_ACTIVATED` graph edges to naturally boost future semantic retrieval groupings.
 
 ### Multi-Modal
+
 Image memory support. Audio transcription integration.
 
 ---

@@ -183,12 +183,14 @@ class CognitiveRetriever:
         self,
         memory_id: str,
         recent_memory_ids: list[str],
+        co_activation_matrix: dict | None = None,
     ) -> float:
         """Score based on co-retrieval history."""
-        if not recent_memory_ids or memory_id not in self.co_activation_matrix:
+        matrix = co_activation_matrix if co_activation_matrix is not None else self.co_activation_matrix
+        if not recent_memory_ids or memory_id not in matrix:
             return 0.0
         
-        memory_coacts = self.co_activation_matrix.get(memory_id, {})
+        memory_coacts = matrix.get(memory_id, {})
         total_coact = sum(memory_coacts.get(rid, 0) for rid in recent_memory_ids)
         
         # Normalize (saturates around 10 co-activations)
@@ -222,6 +224,7 @@ class CognitiveRetriever:
         query: QueryAnalysis,
         recent_memory_ids: list[str],
         include_explanation: bool = True,
+        co_activation_matrix: dict | None = None,
     ) -> tuple[MemoryCandidate, Optional[RetrievalExplanation]]:
         """
         Compute all scores for a candidate.
@@ -248,6 +251,7 @@ class CognitiveRetriever:
         candidate.coactivation_score = self.compute_coactivation(
             candidate.id,
             recent_memory_ids,
+            co_activation_matrix
         )
         
         # Authority
@@ -262,7 +266,7 @@ class CognitiveRetriever:
             candidate.created_at,
         )
         
-        # Composite score
+        # Base composite score
         candidate.composite_score = (
             self.WEIGHTS["vector"] * candidate.vector_score +
             self.WEIGHTS["concept"] * candidate.concept_score +
@@ -271,6 +275,14 @@ class CognitiveRetriever:
             self.WEIGHTS["authority"] * candidate.authority_score +
             self.WEIGHTS["temporal"] * temporal_score
         )
+
+        # Dynamic Floor (Fixes Issue #8 Low Similarity)
+        # Vector score is the semantic ground truth. Cognitive heuristics should boost 
+        # semantic matches, not suppress them into oblivion if metadata is sparse.
+        # We enforce a smoothed vector baseline to ensure exact text matches survive.
+        vector_baseline = candidate.vector_score * 0.85
+        if candidate.composite_score < vector_baseline:
+            candidate.composite_score = vector_baseline
         
         # Build explanation if requested
         explanation = None

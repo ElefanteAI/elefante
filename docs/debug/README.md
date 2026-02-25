@@ -1,8 +1,8 @@
 # Debug Documentation Index
 
-**Compendiums and pitfall reference for Elefante v2.1.1**
+**Compendiums and pitfall reference for Elefante v2.1.2**
 
-> **Last Updated:** 2026-02-19
+> **Last Updated:** 2026-02-25
 
 ---
 
@@ -24,23 +24,23 @@ Archived neural registers are in `docs/archive/deprecated-registers/`.
 Each compendium follows the **Unified Post-Mortem Structure**:
 Problem → Symptom → Root Cause → Solution → Lesson
 
-| Domain | Compendium |
-|--------|-----------|
-| Dashboard | [dashboard-compendium.md](dashboard-compendium.md) |
-| Database | [database-compendium.md](database-compendium.md) |
+| Domain       | Compendium                                               |
+| ------------ | -------------------------------------------------------- |
+| Dashboard    | [dashboard-compendium.md](dashboard-compendium.md)       |
+| Database     | [database-compendium.md](database-compendium.md)         |
 | Installation | [installation-compendium.md](installation-compendium.md) |
-| Memory | [memory-compendium.md](memory-compendium.md) |
-| AI Behavior | [ai-behavior-compendium.md](ai-behavior-compendium.md) |
+| Memory       | [memory-compendium.md](memory-compendium.md)             |
+| AI Behavior  | [ai-behavior-compendium.md](ai-behavior-compendium.md)   |
 
 ---
 
 ## How to Use
 
-| Task | Action |
-|------|--------|
+| Task            | Action                                                                        |
+| --------------- | ----------------------------------------------------------------------------- |
 | **Quick debug** | Search [`docs/pitfall-index.md`](../pitfall-index.md) for `pitfall: [domain]` |
-| **Deep dive** | Open the relevant `*-compendium.md` for full post-mortems |
-| **New issue** | Add to relevant compendium using the template at the bottom of that file |
+| **Deep dive**   | Open the relevant `*-compendium.md` for full post-mortems                     |
+| **New issue**   | Add to relevant compendium using the template at the bottom of that file      |
 
 ---
 
@@ -60,4 +60,4 @@ docs/debug/
 
 ---
 
-*Last verified: 2026-02-19 | Elefante v2.1.1*
+_Last verified: 2026-02-25 | Elefante v2.1.2_

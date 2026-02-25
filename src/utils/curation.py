@@ -332,3 +332,23 @@ def compute_authority_score(
     
     return round(min(1.0, max(0.0, score)), 3)
 
+
+from src.models.memory import Memory, HealthStatus
+from datetime import datetime
+
+
+def compute_health(memory: Memory, connection_count: int) -> HealthStatus:
+    if memory.superseded_by_id:
+        return HealthStatus.AT_RISK
+    if len(memory.conflict_ids) > 0:
+        return HealthStatus.AT_RISK
+    try:
+        last_acc = memory.metadata.last_accessed if hasattr(memory.metadata, 'last_accessed') else datetime.utcnow()
+        days_since = (datetime.utcnow() - last_acc).days
+    except:
+        days_since = 0
+    if days_since > 90:
+        return HealthStatus.STALE
+    if connection_count == 0:
+        return HealthStatus.ORPHAN
+    return HealthStatus.HEALTHY

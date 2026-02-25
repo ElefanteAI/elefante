@@ -16,19 +16,20 @@ Transform Elefante from a **storage system** to a **cognitive retrieval system**
 ## Part A: V4 Implementation (VERIFIED )
 
 ### A.1 Problem Solved
+
 Memories were stored as raw text. Search only matched words. No understanding of meaning or connections.
 
 ### A.2 Delivered Features
 
-| Feature | File | Status |
-|---------|------|--------|
-| Concept extraction | `src/utils/curation.py` |  Verified |
-| Query pattern inference | `src/utils/curation.py` |  Verified |
-| Authority scoring | `src/utils/curation.py` |  Verified |
-| Cognitive retriever | `src/core/retrieval.py` |  Wired (orchestrator.py) |
-| Auto-populate on add | `src/core/orchestrator.py` |  Verified |
-| SHARES_CONCEPT edges | `scripts/update_dashboard_data.py` |  Verified (24 edges) |
-| Documentation | `docs/technical/memory-schema-v4-cognitive.md` |  Done |
+| Feature                 | File                                           | Status                  |
+| ----------------------- | ---------------------------------------------- | ----------------------- |
+| Concept extraction      | `src/utils/curation.py`                        | Verified                |
+| Query pattern inference | `src/utils/curation.py`                        | Verified                |
+| Authority scoring       | `src/utils/curation.py`                        | Verified                |
+| Cognitive retriever     | `src/core/retrieval.py`                        | Wired (orchestrator.py) |
+| Auto-populate on add    | `src/core/orchestrator.py`                     | Verified                |
+| SHARES_CONCEPT edges    | `scripts/update_dashboard_data.py`             | Verified (24 edges)     |
+| Documentation           | `docs/technical/memory-schema-v4-cognitive.md` | Done                    |
 
 ### A.3 New Metadata Fields
 
@@ -41,14 +42,14 @@ authority_score: float        # relevance × usage × freshness (0-1)
 
 ### A.4 Verified Results (2025-12-27)
 
-| Metric | Value |
-|--------|-------|
-| Memories | 25 |
-| With concepts | 25/25 (100%) |
-| With surfaces_when | 25/25 (100%) |
+| Metric               | Value        |
+| -------------------- | ------------ |
+| Memories             | 25           |
+| With concepts        | 25/25 (100%) |
+| With surfaces_when   | 25/25 (100%) |
 | With authority_score | 25/25 (100%) |
-| SHARES_CONCEPT edges | 24 |
-| Total edges | 189 |
+| SHARES_CONCEPT edges | 24           |
+| Total edges          | 189          |
 
 ### A.5 V4 Debt: CognitiveRetriever — RESOLVED
 
@@ -68,35 +69,37 @@ The `CognitiveRetriever` is wired into `orchestrator.search_memories()`. All sea
 
 ---
 
-### B.1 Feature 1: Retrieval Explanation
+### B.1 Feature 1: Retrieval Explanation — DONE
 
-**Priority**: P0  
-**Complexity**: Low  
-**Impact**: High
+**Status**: COMPLETED (v2.1)
 
 #### Requirement
+
 Every search result must include WHY it was retrieved.
 
 #### Specification
+
 ```json
 {
   "memory_id": "abc-123",
   "score": 0.87,
   "explanation": {
-    "vector_similarity": {"score": 0.30, "reason": "Semantic match"},
-    "concept_overlap": {"score": 0.20, "matched": ["paths", "elefante"]},
-    "domain_match": {"score": 0.15, "reason": "Same project"},
-    "authority": {"score": 0.12, "reason": "High relevance, frequently used"},
-    "temporal": {"score": 0.10, "reason": "Accessed 2 days ago"}
+    "composite_score": 0.87,
+    "signals": [
+      { "name": "vector", "score": 0.3, "reason": "Semantic match" },
+      { "name": "concept", "score": 0.2, "matched": ["paths", "elefante"] }
+    ]
   }
 }
 ```
 
-#### Files to Modify
-- `src/core/retrieval.py` - Add explanation to `MemoryCandidate`
-- `src/mcp/server.py` - Include explanation in search response
+#### Files Modified
+
+- `src/core/retrieval.py` - Added `RetrievalExplanation` data class
+- `src/mcp/server.py` - Included explanation in search responses
 
 #### Acceptance Criteria
+
 - [ ] Every search result includes breakdown of score components
 - [ ] User can see which concepts matched
 - [ ] Explanation is human-readable
@@ -110,9 +113,11 @@ Every search result must include WHY it was retrieved.
 **Impact**: High
 
 #### Requirement
+
 Every memory has a health indicator showing its current state.
 
 #### Specification
+
 ```python
 class HealthStatus(Enum):
     HEALTHY = "healthy"      # Recent, verified, frequently used
@@ -133,19 +138,22 @@ def compute_health(memory) -> HealthStatus:
 ```
 
 #### Dashboard Integration
-| Health | Icon | Color | Action |
-|--------|------|-------|--------|
-| Healthy |  | Green | None |
-| Stale |  | Yellow | "Review this memory" |
-| At Risk |  | Red | "Resolve conflict" |
-| Orphan |  | Gray | "Connect or archive" |
+
+| Health  | Icon | Color  | Action               |
+| ------- | ---- | ------ | -------------------- |
+| Healthy |      | Green  | None                 |
+| Stale   |      | Yellow | "Review this memory" |
+| At Risk |      | Red    | "Resolve conflict"   |
+| Orphan  |      | Gray   | "Connect or archive" |
 
 #### Files to Modify
+
 - `src/utils/curation.py` - Add `compute_health()`
 - `scripts/update_dashboard_data.py` - Add health to node properties
 - `src/dashboard/ui/src/components/` - Render health indicator
 
 #### Acceptance Criteria
+
 - [ ] Every memory has a health status
 - [ ] Dashboard shows health visually
 - [ ] Unhealthy memories are actionable
@@ -159,26 +167,29 @@ def compute_health(memory) -> HealthStatus:
 **Impact**: High
 
 #### Requirement
+
 Automatically detect and flag **potential** conflicting memories for user confirmation.
 
 #### Design Principle
+
 Lexical pattern matching (always/never, do/don't) is brittle. Real contradictions are semantic.  
 **Flag as "potential conflict" — let user confirm/dismiss. Never auto-assert.**
 
 #### Specification
+
 ```python
 def detect_potential_conflict(memory_a, memory_b) -> Optional[str]:
     """
     Returns conflict reason if potential conflict, None otherwise.
-    
+
     Two memories MAY conflict if:
     1. High concept overlap (>60%)
     2. Same topic/domain
     3. Either: opposing patterns OR significantly different dates
-    
+
     Returns reason string for user review, not boolean assertion.
     """
-    
+
 # Soft patterns (suggest, don't assert)
 POTENTIAL_OPPOSING_PATTERNS = [
     ("always", "never"),
@@ -190,21 +201,24 @@ POTENTIAL_OPPOSING_PATTERNS = [
 ```
 
 #### Resolution Flow
+
 1. System detects potential conflict
 2. Adds to `potential_conflicts` field (not `conflict_ids`)
 3. Dashboard shows " Review conflict?" badge
-4. User reviews and resolves: 
+4. User reviews and resolves:
    - **Confirm conflict** → move to `conflict_ids`
    - **Dismiss** → remove flag
    - **Mark exception** → both valid in different contexts
 
 #### Files to Modify
+
 - `src/utils/curation.py` - Add `detect_potential_conflict()`
 - `src/core/orchestrator.py` - Check on add, populate `potential_conflicts`
 - `scripts/update_dashboard_data.py` - Add POTENTIAL_CONFLICT edges (dashed)
 - Dashboard - Add conflict review UI
 
 #### Acceptance Criteria
+
 - [ ] High concept overlap memories flagged for review
 - [ ] POTENTIAL_CONFLICT edges visible (distinct from confirmed)
 - [ ] User can confirm, dismiss, or mark exception
@@ -218,16 +232,19 @@ POTENTIAL_OPPOSING_PATTERNS = [
 **Impact**: Very High
 
 #### Requirement
+
 System suggests relevant memories without user searching.
 
 #### Triggers
-| Context | Action |
-|---------|--------|
-| File opened | Surface memories tagged with that file/project |
-| Error in terminal | Surface memories matching error pattern |
-| Conversation keyword | Surface memories with matching concepts |
+
+| Context              | Action                                         |
+| -------------------- | ---------------------------------------------- |
+| File opened          | Surface memories tagged with that file/project |
+| Error in terminal    | Surface memories matching error pattern        |
+| Conversation keyword | Surface memories with matching concepts        |
 
 #### Specification
+
 ```python
 async def get_proactive_suggestions(
     context: dict,  # file_path, recent_errors, conversation
@@ -240,11 +257,13 @@ async def get_proactive_suggestions(
 ```
 
 #### Files to Modify
+
 - `src/core/retrieval.py` - Add `get_proactive_suggestions()`
 - `src/mcp/server.py` - Add new MCP tool
 - Agent prompt - Call tool proactively
 
 #### Acceptance Criteria
+
 - [ ] System can suggest memories without explicit search
 - [ ] Suggestions based on `surfaces_when` patterns
 - [ ] Agent receives suggestions in context
@@ -258,9 +277,11 @@ async def get_proactive_suggestions(
 **Impact**: Medium
 
 #### Requirement
+
 Signal hubs (topic, ring, knowledge_type) have rich cognitive metadata.
 
 #### Current State
+
 ```json
 {
   "name": "topic: workflow",
@@ -273,6 +294,7 @@ Signal hubs (topic, ring, knowledge_type) have rich cognitive metadata.
 ```
 
 #### Target State
+
 ```json
 {
   "name": "topic: workflow",
@@ -285,7 +307,7 @@ Signal hubs (topic, ring, knowledge_type) have rich cognitive metadata.
     "memory_count": 4,
     "authority_weight": 0.72,
     "sample_concepts": ["spec-driven", "requirements", "process"],
-    "health_summary": {"healthy": 3, "stale": 1, "at_risk": 0}
+    "health_summary": { "healthy": 3, "stale": 1, "at_risk": 0 }
   }
 }
 ```
@@ -312,10 +334,12 @@ Signal hubs (topic, ring, knowledge_type) have rich cognitive metadata.
 | `insight` | Learned wisdom | When reflecting |
 
 #### Files to Modify
+
 - `scripts/update_dashboard_data.py` - Enrich hub properties
 - `src/dashboard/ui/src/components/` - Show rich tooltips
 
 #### Acceptance Criteria
+
 - [ ] Every hub has cognitive_purpose and retrieval_trigger
 - [ ] authority_weight computed from connected memories
 - [ ] sample_concepts extracted from connected memories
@@ -331,14 +355,14 @@ Signal hubs (topic, ring, knowledge_type) have rich cognitive metadata.
 
 Different knowledge types have different durability and should be managed accordingly:
 
-| Knowledge Type | Durability | Rationale |
-|----------------|------------|-----------|
-| `law` | Most durable | Absolute rules that remain valid until explicitly superseded |
-| `fact` | Durable | Objective truths that may become outdated over time |
-| `method` | Moderate | Procedures that evolve as tools and practices change |
-| `preference` | Least durable | Personal tastes that shift frequently |
-| `decision` | Context-dependent | Past choices that may need revisiting as circumstances change |
-| `insight` | Moderate | Learned wisdom that may deepen or be refined |
+| Knowledge Type | Durability        | Rationale                                                     |
+| -------------- | ----------------- | ------------------------------------------------------------- |
+| `law`          | Most durable      | Absolute rules that remain valid until explicitly superseded  |
+| `fact`         | Durable           | Objective truths that may become outdated over time           |
+| `method`       | Moderate          | Procedures that evolve as tools and practices change          |
+| `preference`   | Least durable     | Personal tastes that shift frequently                         |
+| `decision`     | Context-dependent | Past choices that may need revisiting as circumstances change |
+| `insight`      | Moderate          | Learned wisdom that may deepen or be refined                  |
 
 This principle affects retrieval priority, health scoring, and review prompts.  
 **Implementation details (specific thresholds) to be determined in future phases.**
@@ -356,14 +380,17 @@ Flag potential issues for user review rather than auto-asserting. The system sug
 ## Part D: Implementation Plan
 
 ### Phase 0: V4 Debt (DONE)
+
 1. **B.0 Wire CognitiveRetriever** — Completed
 
 ### Phase 1: Low Complexity
+
 2. B.1 Retrieval Explanation — Trivial once CognitiveRetriever wired
 3. B.5 Signal Hub Enrichment — Build health_summary infrastructure
 4. B.2 Memory Health Score — Uses hub infrastructure
 
-### Phase 2: Medium Complexity  
+### Phase 2: Medium Complexity
+
 5. B.3 Potential Conflict Detection — Soft detection, user confirmation
 6. B.4 Proactive Memory Surfacing — Highest impact, needs careful design
 
@@ -371,13 +398,13 @@ Flag potential issues for user review rather than auto-asserting. The system sug
 
 ## Part E: Success Metrics
 
-| Metric | Current | Target | Notes |
-|--------|---------|--------|-------|
-| V4 fields populated | 100% | 100% |  Achieved |
-| SHARES_CONCEPT edges | 24 | - |  Achieved |
-| Search uses multi-signal scoring | Yes | Yes | Done |
-| Search includes explanation | No | Yes | Phase 1 |
-| Potential conflicts flagged | 0 | All detected | Phase 2 |
+| Metric                           | Current | Target       | Notes    |
+| -------------------------------- | ------- | ------------ | -------- |
+| V4 fields populated              | 100%    | 100%         | Achieved |
+| SHARES_CONCEPT edges             | 24      | -            | Achieved |
+| Search uses multi-signal scoring | Yes     | Yes          | Done     |
+| Search includes explanation      | No      | Yes          | Phase 1  |
+| Potential conflicts flagged      | 0       | All detected | Phase 2  |
 
 ---
 
@@ -394,6 +421,7 @@ Flag potential issues for user review rather than auto-asserting. The system sug
 ## Appendix: File Inventory
 
 ### V4 (Verified Working)
+
 - `src/models/memory.py` - V4 fields in MemoryMetadata
 - `src/utils/curation.py` - extract_concepts, infer_surfaces_when, compute_authority_score
 - `src/core/retrieval.py` - CognitiveRetriever (wired to orchestrator)
@@ -402,6 +430,7 @@ Flag potential issues for user review rather than auto-asserting. The system sug
 - `docs/technical/memory-schema-v4-cognitive.md` - Documentation
 
 ### To Modify in V5
+
 - `src/core/orchestrator.py` - Wire CognitiveRetriever (Phase 0)
 - `src/mcp/server.py` - Include explanation in search response
 - `src/dashboard/ui/src/components/` - Health indicators, tooltips

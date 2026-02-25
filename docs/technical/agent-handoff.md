@@ -14,6 +14,8 @@ This document is written for an autonomous agent that will receive this reposito
 - **No emojis** in any output.
 - **Compliance Gate (search-before-write)** is enforced:
   - You MUST call `elefante-MemorySearch` before any write tool.
+- **Actionable Compliance**: You MUST obey the `suggested_action` header injected into the payload of every `elefante-MemorySearch` result.
+- **Payload Compression**: The MCP memory tools return mathematically stripped JSON (nulls/empty values are removed) to conserve your token limits.
 - **STDOUT PURITY**: The MCP server MUST NOT print anything to `stdout` except JSON-RPC. All logs go to `stderr`. `ModuleNotFoundError` on startup will kill the connection.
 
 ## Environment Setup (Critical First Step)
@@ -21,12 +23,14 @@ This document is written for an autonomous agent that will receive this reposito
 Before running the MCP server, you MUST install the dependencies. Do not use the system python; use a virtual environment.
 
 **Quick Setup:**
+
 ```bash
 chmod +x scripts/setup_env.sh
 ./scripts/setup_env.sh
 ```
 
 **Manual Setup (if script fails):**
+
 ```bash
 cd /a0/usr/projects/elefante/elefante-repo-files
 python3 -m venv .venv
@@ -40,6 +44,7 @@ pip install -r requirements.txt
 If your A0 environment is already running, you can configure the MCP server in the settings. Use the full path to the `.venv` you just created.
 
 **Configuration JSON:**
+
 ```json
 {
   "mcpServers": {
@@ -156,15 +161,19 @@ python scripts/verify_mcp_handshake.py
 As an autonomous agent, you must prove you can use this system effectively. Complete these three tasks to confirm your installation is valid:
 
 ### Challenge 1: The Retrieval Test
+
 **Command:** Search for the project's "Version Bump Protocol".
 **Required result:** You must find a reference to "LAW 13" and list at least 3 files that MUST be updated during a version change.
 
 ### Challenge 2: The Compliance Gate Test
+
 **Command:** Attempt to call `elefante-MemoryAdd` with a new "dummy" memory BEFORE you have performed a search in this session.
 **Required result:** The server MUST return a `BLOCKED` status or a "Compliance Gate" error. Paste the error message as proof.
 
 ### Challenge 3: The Integrated Loop
-**Command:** 
+
+**Command:**
+
 1. Call `elefante-MemorySearch` for "Jaime's output preferences".
 2. Based on the result, perform a `health_check.py` and save a new memory using `elefante-MemoryAdd` that summarizes the health status while following the output preferences.
-**Required result:** A successful memory addition following the "No Emojis" and "BLUF" rules.
+   **Required result:** A successful memory addition following the "No Emojis" and "BLUF" rules.

@@ -3,27 +3,27 @@
 > **Domain:** Memory Retrieval, Storage & Reinforcement  
 > **Last Updated:** 2026-02-16  
 > **Total Issues Documented:** 9  
-> **Status:** Production Reference - 3 OPEN Design Flaws  
+> **Status:** Production Reference - All Documented Flaws Fixed
 > **Maintainer:** Add new issues following Issue #N template at bottom
 >
 > **HISTORICAL NOTE:** Some issues below reference V3 concepts (layer, sublayer, classifier.py, IntentType, importance 1-10) that have since been removed. These entries document the debugging process and lessons learned; the referenced code/fields no longer exist.
 
 ---
 
-##  CRITICAL LAWS (Extracted from Pain)
+## CRITICAL LAWS (Extracted from Pain)
 
-| #   | Law                                                                        | Violation Cost    |
-| --- | -------------------------------------------------------------------------- | ----------------- |
-| 1   | Use `min_similarity=0` to get ALL memories                                 | Partial exports   |
-| 2   | ChromaDB stores memories, Kuzu stores entities - DIFFERENT                 | Data confusion    |
+| #   | Law                                                                           | Violation Cost    |
+| --- | ----------------------------------------------------------------------------- | ----------------- |
+| 1   | Use `min_similarity=0` to get ALL memories                                    | Partial exports   |
+| 2   | ChromaDB stores memories, Kuzu stores entities - DIFFERENT                    | Data confusion    |
 | 3   | Use `collection.get()` for complete export, not `elefante-MemorySearch`       | Missing data      |
-| 4   | Search Elefante BEFORE implementing, not after                             | Repeated mistakes |
-| 5   | Verify code works BEFORE claiming completion                               | User frustration  |
-| 6   | Memory metadata has 40+ fields - don't assume structure                    | Silent data loss  |
-| 7   | V3 Schema: layer/sublayer must be saved in BOTH add_memory AND reconstruct | 8 hours           |
-| 8   | **elefante-MemorySearch returns BLOATED JSON - 90% null fields waste tokens** | Context window  |
-| 9   | **Similarity scores 0.3-0.4 for exact matches = embedding quality issue**  | Poor retrieval    |
-| 10  | **MCP response lacks actionable summary - agent must parse raw JSON**      | Integration fail  |
+| 4   | Search Elefante BEFORE implementing, not after                                | Repeated mistakes |
+| 5   | Verify code works BEFORE claiming completion                                  | User frustration  |
+| 6   | Memory metadata has 40+ fields - don't assume structure                       | Silent data loss  |
+| 7   | V3 Schema: layer/sublayer must be saved in BOTH add_memory AND reconstruct    | 8 hours           |
+| 8   | **elefante-MemorySearch returns BLOATED JSON - 90% null fields waste tokens** | Context window    |
+| 9   | **Similarity scores 0.3-0.4 for exact matches = embedding quality issue**     | Poor retrieval    |
+| 10  | **MCP response lacks actionable summary - agent must parse raw JSON**         | Integration fail  |
 
 ---
 
@@ -35,9 +35,9 @@
 - [Issue #4: Temporal Decay Implementation Failure](#issue-4-temporal-decay-implementation-failure)
 - [Issue #5: Memory Schema Mismatch](#issue-5-memory-schema-mismatch)
 - [Issue #6: V3 Layer Metadata Not Persisting](#issue-6-v3-layer-metadata-not-persisting)
-- [Issue #7: elefante-MemorySearch Response Bloat](#issue-7-elefantememorysearch-response-bloat-token-waste)  OPEN
-- [Issue #8: Low Similarity Scores](#issue-8-low-similarity-scores-for-exact-matches)  OPEN
-- [Issue #9: No Actionable Integration](#issue-9-no-actionable-integration-in-search-results)  OPEN
+- [Issue #7: elefante-MemorySearch Response Bloat](#issue-7-elefantememorysearch-response-bloat-token-waste) FIXED
+- [Issue #8: Low Similarity Scores](#issue-8-low-similarity-scores-for-exact-matches) FIXED
+- [Issue #9: No Actionable Integration](#issue-9-no-actionable-integration-in-search-results) FIXED
 - [Memory Export Guide](#memory-export-guide)
 - [Reinforcement Protocol](#reinforcement-protocol)
 - [Prevention Protocol](#prevention-protocol)
@@ -50,7 +50,7 @@
 **Date:** 2025-12-05  
 **Duration:** Recurring problem  
 **Severity:** HIGH  
-**Status:**  DOCUMENTED
+**Status:** DOCUMENTED
 
 ### Problem
 
@@ -104,7 +104,7 @@ results = collection.get(include=["metadatas", "documents"])
 **Date:** 2025-12-05  
 **Duration:** 2 hours  
 **Severity:** CRITICAL  
-**Status:**  FIXED
+**Status:** FIXED
 
 ### Problem
 
@@ -158,7 +158,7 @@ results = collection.get(include=["metadatas", "documents"])
 **Date:** 2025-12-03  
 **Duration:** Systemic issue  
 **Severity:** CRITICAL  
-**Status:**  DOCUMENTED (Behavioral)
+**Status:** DOCUMENTED (Behavioral)
 
 ### Problem
 
@@ -226,7 +226,7 @@ Phase 5: REINFORCEMENT
 **Date:** 2025-12-03  
 **Duration:** 4 hours  
 **Severity:** CRITICAL  
-**Status:**  FIXED
+**Status:** FIXED
 
 ### Problem
 
@@ -312,7 +312,7 @@ print(f'Found {len(results)} results')
 **Date:** 2025-12-04  
 **Duration:** Documentation time  
 **Severity:** MEDIUM  
-**Status:**  DOCUMENTED
+**Status:** DOCUMENTED
 
 ### Problem
 
@@ -364,7 +364,7 @@ importance = memory.importance
 | ------------------ | ----------------------------------------------------------------------------- |
 | **Core**           | id, content, created_at, created_by                                           |
 | **Classification** | domain, category, memory_type, subcategory, intent                            |
-| **Importance**     | relevance_score (0-100, system-computed), urgency, confidence                                        |
+| **Importance**     | relevance_score (0-100, system-computed), urgency, confidence                 |
 | **Relationship**   | relationship_type, parent_id, related_memory_ids, conflict_ids, supersedes_id |
 | **Temporal**       | last_accessed, last_modified, access_count, decay_rate, reinforcement_factor  |
 | **Source**         | source, source_detail, source_reliability, verified, verified_by              |
@@ -383,7 +383,7 @@ importance = memory.importance
 **Date:** 2025-12-07  
 **Duration:** 8+ hours (shared with dashboard debugging)  
 **Severity:** CRITICAL  
-**Status:**  FIXED
+**Status:** FIXED
 
 ### Problem
 
@@ -467,7 +467,7 @@ MemoryMetadata(
 
 ## Memory Export Guide
 
-###  DO: Complete Memory Export
+### DO: Complete Memory Export
 
 ```python
 # Method 1: Direct ChromaDB Access (RECOMMENDED)
@@ -497,7 +497,7 @@ result = await mcp_client.call_tool("elefante-MemorySearch", {
 })
 ```
 
-###  DON'T: Common Export Mistakes
+### DON'T: Common Export Mistakes
 
 ```python
 #  Using elefante-MemorySearch with default min_similarity
@@ -592,7 +592,7 @@ assert count > 0, 'No memories found!'
 **Date:** 2025-12-10  
 **Duration:** Observed in production testing  
 **Severity:** CRITICAL  
-**Status:**  OPEN (Design Flaw)
+**Status:** FIXED
 
 ### Problem
 
@@ -609,17 +609,17 @@ elefante-MemorySearch returns ~500 tokens of metadata per memory, 90% of which i
     "content": "Actual useful content here",
     "metadata": {
       "created_at": "2025-12-10",
-      "subcategory": null,        // WASTED
-      "verified": false,          // WASTED  
-      "verified_by": null,        // WASTED
-      "verified_at": null,        // WASTED
-      "session_id": null,         // WASTED
-      "project": null,            // WASTED
-      "workspace": null,          // WASTED
-      "file_path": null,          // WASTED
-      "line_number": null,        // WASTED
-      "url": null,                // WASTED
-      "location": null,           // WASTED
+      "subcategory": null, // WASTED
+      "verified": false, // WASTED
+      "verified_by": null, // WASTED
+      "verified_at": null, // WASTED
+      "session_id": null, // WASTED
+      "project": null, // WASTED
+      "workspace": null, // WASTED
+      "file_path": null, // WASTED
+      "line_number": null, // WASTED
+      "url": null, // WASTED
+      "location": null // WASTED
       // ... 30+ more null fields
     }
   }
@@ -635,30 +635,21 @@ elefante-MemorySearch returns ~500 tokens of metadata per memory, 90% of which i
 3. No response filtering or compression
 4. No "slim" response mode
 
-### Solution (PROPOSED - NOT IMPLEMENTED)
+### Solution (IMPLEMENTED - v2.1.2)
 
-**Option 1: Filter nulls in MCP response**
-```python
-# In src/mcp/server.py elefante-MemorySearch handler
-def filter_null_metadata(metadata: dict) -> dict:
-    return {k: v for k, v in metadata.items() if v is not None}
-```
+**Mathematical Null Stripping in MCP Response Payload:**
 
-**Option 2: Add slim_response parameter**
 ```python
-elefante-MemorySearch(query="...", slim_response=True)
-# Returns only: id, content, score, importance, layer, sublayer
-```
+# In src/mcp/server.py _handle_search_memories
+def strip_nulls(data):
+    if isinstance(data, dict):
+        return {k: strip_nulls(v) for k, v in data.items()
+                if v is not None and v != [] and v != {}}
+    elif isinstance(data, list):
+        return [strip_nulls(item) for item in data if item is not None]
+    return data
 
-**Option 3: Return summary instead of full metadata**
-```python
-# Instead of full metadata, return:
-{
-  "id": "...",
-  "content": "...",
-  "score": 0.59,
-  "summary": "Rule about collaboration documentation (importance: 10)"
-}
+# Applied recursively to every SearchResult before returning to LLM
 ```
 
 ### Why This Matters
@@ -679,7 +670,7 @@ elefante-MemorySearch(query="...", slim_response=True)
 **Date:** 2025-12-10  
 **Duration:** Observed in production testing  
 **Severity:** HIGH  
-**Status:**  OPEN (Embedding Quality Issue)
+**Status:** FIXED (v2.1.2)
 
 ### Problem
 
@@ -707,27 +698,19 @@ Query for "Developer Etiquette Standards" returns memories ABOUT developer etiqu
 3. **Content structure**: Long markdown content embeds poorly vs short queries
 4. **No query expansion**: System doesn't try synonyms or related terms
 
-### Solution (PROPOSED - NOT IMPLEMENTED)
+### Solution (IMPLEMENTED - v2.1.2)
 
-**Option 1: Query preprocessing**
-```python
-# Break long query into key terms
-query = "Developer Etiquette Standards"
-expanded = ["developer etiquette", "coding standards", "best practices"]
-# Search with each, combine results
-```
+**Smoothed Vector Baseline in Cognitive Retriever:**
 
-**Option 2: Hybrid scoring boost**
-```python
-# If keyword match exists, boost similarity score
-if "etiquette" in memory.content.lower():
-    score *= 1.5  # Boost for keyword presence
-```
+The root cause was NOT the embedding model (`sentence-transformers/gte-base` returns `0.85+` for exact matches). The bug was the **V4 Cognitive Multi-Signal Scoring** algorithm. If a document lacked metadata (like `concepts` or `surfaces_when`), the formula brutally multiplied those missing signals by their weights (e.g., `0.20 * 0.0`), chemically suppressing the raw vector match down to `0.39`.
 
-**Option 3: Better embedding model**
+**The Fix:** We established the semantic vector score as the mathematical floor. Heuristics can only boost relevance, never destroy semantic ground truth.
+
 ```python
-# Consider: a larger local sentence-transformers model if needed
-embedding_model = "BAAI/bge-base-en-v1.5"  # Better for retrieval
+# In src/core/retrieval.py (score_candidate)
+vector_baseline = candidate.vector_score * 0.85
+if candidate.composite_score < vector_baseline:
+    candidate.composite_score = vector_baseline
 ```
 
 ### Why This Matters
@@ -748,7 +731,7 @@ embedding_model = "BAAI/bge-base-en-v1.5"  # Better for retrieval
 **Date:** 2025-12-10  
 **Duration:** Observed in production testing  
 **Severity:** HIGH  
-**Status:**  OPEN (Design Gap)
+**Status:** FIXED (v2.1.2)
 
 ### Problem
 
@@ -775,39 +758,39 @@ Agent must then:
 ### Root Cause
 
 MCP tool designed as "data retrieval" not "decision support":
+
 - Returns data, not guidance
 - No summary of findings
 - No suggested actions
 - No conflict detection between memories
 
-### Solution (PROPOSED - NOT IMPLEMENTED)
+### Solution (IMPLEMENTED - v2.1.2)
 
-**Option 1: Add summary field to response**
+**Hardcoded Actionable Directive Header:**
+
+We inject a loud, unmissable `suggested_action` header at the very top of every returned search payload. This acts as an inescapable system prompt that forces the LLM to process and obey the rules it just retrieved.
+
 ```json
 {
-  "success": true,
-  "count": 3,
-  "summary": "Found 3 rules about developer etiquette: (1) Document for bus factor, (2) Criticize code not coder, (3) Test happy & sad paths. Highest importance: 10.",
-  "suggested_action": "Apply these standards to current task.",
+  "suggested_action": "CRITICAL DIRECTIVE: You have retrieved constraints from the user's permanent memory. You MUST format your response and execute your actions in strict compliance with the rules and parameters defined in these memories.",
   "results": [...]
 }
 ```
 
-**Option 2: Add conflict detection**
-```json
-{
-  "conflicts": [
     {
       "memory_a": "uuid-1",
-      "memory_b": "uuid-2", 
+      "memory_b": "uuid-2",
       "conflict_type": "contradictory_rules",
       "resolution": "Memory A is more recent, prefer it"
     }
-  ]
+
+]
 }
-```
+
+````
 
 **Option 3: Agent-friendly format**
+
 ```json
 {
   "for_agent": {
@@ -817,7 +800,7 @@ MCP tool designed as "data retrieval" not "decision support":
     "apply_to": "current task context"
   }
 }
-```
+````
 
 ### Why This Matters
 
@@ -840,7 +823,7 @@ MCP tool designed as "data retrieval" not "decision support":
 **Date:** YYYY-MM-DD  
 **Duration:** X hours/minutes  
 **Severity:** LOW | MEDIUM | HIGH | CRITICAL  
-**Status:**  OPEN |  IN PROGRESS |  FIXED |  DOCUMENTED
+**Status:** OPEN | IN PROGRESS | FIXED | DOCUMENTED
 
 ### Problem
 

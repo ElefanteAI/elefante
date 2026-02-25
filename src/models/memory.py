@@ -293,3 +293,13 @@ class Memory(BaseModel):
 
 
 
+
+from enum import Enum
+
+
+class HealthStatus(Enum):
+    """Memory health status based on behavioral signals."""
+    HEALTHY = "healthy"
+    AT_RISK = "at_risk"
+    STALE = "stale"
+    ORPHAN = "orphan"

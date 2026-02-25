@@ -1,13 +1,13 @@
-```markdown
+````markdown
 # Python Version Requirements & Locking
 
 **Status**: CRITICAL - Mandatory for all installations  
-**Last Updated**: 2025-12-10  
-**Applies to**: v1.0.0+
+**Last Updated**: 2026-02-25  
+**Applies to**: v2.0.0+
 
 ---
 
-##  MANDATORY: Python 3.11 ONLY
+## MANDATORY: Python 3.11 ONLY
 
 ### Why Python 3.11?
 
@@ -31,13 +31,13 @@
 
 ### Supported Versions
 
-| Python Version | Status | Notes |
-|---|---|---|
-| 3.9 |  NOT SUPPORTED | Too old, missing features |
-| 3.10 |  UNCERTAIN | May work, but not tested |
-| **3.11** |  **RECOMMENDED** | **All features tested & working** |
-| 3.12 |  UNCERTAIN | Type hint changes may cause issues |
-| 3.13 |  NOT SUPPORTED | Too new, dependency gaps |
+| Python Version | Status          | Notes                              |
+| -------------- | --------------- | ---------------------------------- |
+| 3.9            | NOT SUPPORTED   | Too old, missing features          |
+| 3.10           | UNCERTAIN       | May work, but not tested           |
+| **3.11**       | **RECOMMENDED** | **All features tested & working**  |
+| 3.12           | UNCERTAIN       | Type hint changes may cause issues |
+| 3.13           | NOT SUPPORTED   | Too new, dependency gaps           |
 
 ---
 
@@ -49,6 +49,7 @@
 python3 --version
 # Should output: Python 3.11.x
 ```
+````
 
 ### macOS
 
@@ -197,6 +198,7 @@ python scripts/health_check.py
 ### Symptom: "Python 3.12 / 3.13 is being used"
 
 **Error Signs**:
+
 ```
 TypeError: unsupported operand type(s) for +: 'NoneType' and 'str'
 ModuleNotFoundError: No module named 'async_timeout'
@@ -232,12 +234,14 @@ python scripts/health_check.py
 **Edit `install.sh`** (Mac/Linux):
 
 Change:
+
 ```bash
 if command -v python3 &> /dev/null; then
     PYTHON_CMD=python3
 ```
 
 To:
+
 ```bash
 if command -v python3.11 &> /dev/null; then
     PYTHON_CMD=python3.11
@@ -248,6 +252,7 @@ elif command -v python3 &> /dev/null; then
 **Edit `install.bat`** (Windows):
 
 Add before venv creation:
+
 ```batch
 REM Check for Python 3.11 specifically
 python3.11 --version >nul 2>&1
@@ -360,7 +365,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.11"]
-    
+
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python 3.11
@@ -446,8 +451,10 @@ If you're on a different version, follow the troubleshooting steps above to upgr
 
 ---
 
-**Document Version**: 1.0  
+**Document Version**: 2.1.2  
 **Status**: MANDATORY  
-**Last Validated**: 2025-12-10  
+**Last Validated**: 2026-02-25
+
+```
 
 ```

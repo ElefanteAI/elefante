@@ -292,6 +292,14 @@ class GraphStore:
                     created_at TIMESTAMP
                 )
                 """,
+                # Autonomous Graph Maintenance
+                """
+                CREATE REL TABLE CO_ACTIVATED(
+                    FROM Entity TO Entity,
+                    strength DOUBLE,
+                    last_coactivated STRING
+                )
+                """,
                 # Task Orchestration
                 """
                 CREATE NODE TABLE Task(
