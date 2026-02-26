@@ -20,7 +20,7 @@ USER_HOME = Path.home()
 ELEFANTE_HOME = USER_HOME / ".elefante"
 DATA_DIR = ELEFANTE_HOME / "data"
 CHROMA_DIR = DATA_DIR / "chroma"
-KUZU_DIR = DATA_DIR / "kuzu"
+KUZU_DIR = DATA_DIR / "kuzu_db"  # Actual Kuzu database path (matches GraphStoreConfig)
 LOGS_DIR = ELEFANTE_HOME / "logs"
 
 # Ensure directories exist

@@ -78,6 +78,43 @@ chmod +x install.sh
 
 ---
 
+## Golden Path (Windows + VS Code)
+
+1. Open **Command Prompt** (not PowerShell) from the repo root:
+
+```cmd
+install.bat
+```
+
+   > PowerShell alternative (if you prefer PS):
+   > ```powershell
+   > .venv\Scripts\Activate.ps1
+   > python scripts\install.py
+   > ```
+
+2. Restart VS Code.
+
+3. Verify MCP server is configured at `%APPDATA%\Code\User\mcp.json`.
+
+4. Verify tool registration:
+
+```cmd
+.venv\Scripts\python.exe scripts\list_mcp_tools.py
+```
+
+5. Dashboard (snapshot + server):
+
+```cmd
+.venv\Scripts\python.exe scripts\update_dashboard_data.py
+.venv\Scripts\python.exe -m src.dashboard.server
+```
+
+Open: http://127.0.0.1:8000
+
+> **Windows quick-reference**: Wherever this guide uses `./.venv/bin/python`, use `.venv\Scripts\python.exe` instead.
+
+---
+
 ## Golden Path (macOS + VS Code)
 
 1. Run the installer from the repo root:
@@ -226,8 +263,13 @@ After installation, verify everything works:
 
 ### Test MCP Connection
 
+Windows:
+```cmd
+.venv\Scripts\python.exe scripts\health_check.py
+```
+macOS/Linux:
 ```bash
-python scripts/health_check.py
+./.venv/bin/python scripts/health_check.py
 ```
 
 Expected output:
@@ -241,12 +283,23 @@ Expected output:
 
 ### List MCP Tools
 
+Windows:
+```cmd
+.venv\Scripts\python.exe scripts\list_mcp_tools.py
+```
+macOS/Linux:
 ```bash
 ./.venv/bin/python scripts/list_mcp_tools.py
 ```
 
 ### Dashboard Smoke Check
 
+Windows:
+```cmd
+.venv\Scripts\python.exe scripts\update_dashboard_data.py
+.venv\Scripts\python.exe -m src.dashboard.server
+```
+macOS/Linux:
 ```bash
 ./.venv/bin/python scripts/update_dashboard_data.py
 ./.venv/bin/python -m src.dashboard.server
@@ -262,14 +315,22 @@ The installation script checks:
 
 ### Verification Command (Manual)
 
-To verify the system yourself after install:
-
+Windows:
+```cmd
+.venv\Scripts\python.exe scripts\health_check.py
+```
+macOS/Linux:
 ```bash
 python scripts/health_check.py
 ```
 
 To verify the Inception Memory (The Prime Directive):
 
+Windows:
+```cmd
+.venv\Scripts\python.exe -c "import sys; sys.path.append('.'); import asyncio; from src.core.orchestrator import get_orchestrator; asyncio.run(get_orchestrator().search_memories('Agentic Protocol'))"
+```
+macOS/Linux:
 ```bash
 python -c "import sys; sys.path.append('.'); import asyncio; from src.core.orchestrator import get_orchestrator; asyncio.run(get_orchestrator().search_memories('Agentic Protocol'))"
 ```
@@ -280,7 +341,27 @@ This should return the Elefante Agentic Optimization Protocol.
 
 ## 5. Troubleshooting
 
-### Common Issues
+### Windows-Specific Issues
+
+**Issue**: `ImportError: No module named 'fcntl'`
+**Solution**: This is a known bug fixed in current code. Ensure you are running the latest version — `src/utils/elefante_mode.py` must have the `sys.platform != "win32"` guard around `import fcntl`. See `pitfall-index.md` → `pitfall: installation fcntl windows incompatibility`.
+
+**Issue**: `install.bat` reports wrong Python version (e.g. `3.` instead of `3.11`)
+**Solution**: Fixed in current `install.bat` (was a `tokens=1,2` parsing bug, now `tokens=1,2,3`). If on an older version, run `py -3.11 -m venv .venv` manually and proceed with manual install.
+
+**Issue**: `install.bat` not finding Python 3.11
+**Solution**: Install the **Windows Python Launcher** (`py.exe`) via the official Python 3.11 installer from https://python.org. The launcher allows `py -3.11` to select the correct version. Make sure "Add to PATH" and "py launcher" are checked during install.
+
+**Issue**: PowerShell execution policy blocks `.venv\Scripts\Activate.ps1`
+**Solution**: Run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` once in PowerShell, then activate normally.
+
+**Issue**: `KUZU_DIR` constant mismatch causing database not found
+**Solution**: Fixed in current `src/utils/config.py` — constant is `kuzu_db` (not `kuzu`). If you see path errors, verify `KUZU_DIR = DATA_DIR / "kuzu_db"` in that file.
+
+**Issue**: MCP server not found at `%APPDATA%\Code\User\mcp.json`
+**Solution**: Run `python scripts\configure_vscode_bob.py` from the repo root (with venv activated). The script writes the correct absolute Windows path to the venv Python.
+
+### Common Issues (All Platforms)
 
 **Issue**: `Database path cannot be a directory`
 **Solution**: See [`pitfall-index.md`](../pitfall-index.md) — search `pitfall: installation kuzu`
@@ -441,23 +522,39 @@ The Directive store (`~/.elefante/data/directives.json`) is created on first use
 
 ## 7. Uninstallation
 
-To completely remove Elefante:
+### Windows
+
+```cmd
+REM 1. Deactivate virtual environment
+deactivate
+
+REM 2. Remove installation directory (or delete the folder in Explorer)
+rmdir /s /q Elefante
+
+REM 3. Remove data directory (OPTIONAL — contains your memories)
+rmdir /s /q %USERPROFILE%\.elefante
+```
+
+### macOS / Linux
 
 ```bash
 # 1. Deactivate virtual environment
 deactivate
 
 # 2. Remove installation directory
-rm -rf Elefante/  # or delete folder on Windows
+rm -rf Elefante/
 
 # 3. Remove data directory (optional - contains your memories)
 rm -rf ~/.elefante/
 ```
 
-**Warning**: Step 3 deletes all stored memories. Backup first if needed.
+**Warning**: Step 3 deletes all stored memories. Backup first:
+
+Windows: `python scripts\backup_elefante_data.py`
+macOS/Linux: `python scripts/backup_elefante_data.py`
 
 ---
 
-**Version**: 2.1.2
-**Last Updated**: 2026-02-25
-**Status**: Production Ready
+**Version**: 2.1.3
+**Last Updated**: 2026-02-26
+**Status**: Production Ready (Windows validated)

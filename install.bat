@@ -19,19 +19,32 @@ echo.
 REM 1. Check for Python 3.11 explicitly (mandatory)
 echo [INFO] Checking for Python 3.11... >> "%LOG_FILE%"
 set PYTHON_CMD=
+
+REM Try python3.11 (common on developer machines with multiple Pythons)
 python3.11 --version >nul 2>&1 && set PYTHON_CMD=python3.11
+
+REM Try Windows Python Launcher with explicit version (most reliable on Windows)
+if not defined PYTHON_CMD (
+    py -3.11 --version >nul 2>&1 && set PYTHON_CMD=py -3.11
+)
+
+REM Fall back to generic python (verify version below)
 if not defined PYTHON_CMD (
     python --version >nul 2>&1 && set PYTHON_CMD=python
 )
+
 if not defined PYTHON_CMD (
     echo [ERROR] Python is not installed or not in PATH.
     echo [ERROR] Python is not installed or not in PATH. >> "%LOG_FILE%"
     echo Please install Python 3.11 from https://python.org
+    echo Tip: On Windows, install the Python Launcher (py.exe) for easy version management.
     pause
     exit /b 1
 )
 
-for /f "tokens=1,2 delims=. " %%a in ('%PYTHON_CMD% --version 2^>^&1') do (
+REM Parse version: "Python 3.11.9" with delimiters=dot+space gives tokens Python, 3, 11, 9
+REM tokens=1,2,3 captures %%a=Python %%b=3 %%c=11
+for /f "tokens=1,2,3 delims=. " %%a in ('%PYTHON_CMD% --version 2^>^&1') do (
     set MAJOR=%%b
     set MINOR=%%c
     goto :version_checked
@@ -40,7 +53,8 @@ for /f "tokens=1,2 delims=. " %%a in ('%PYTHON_CMD% --version 2^>^&1') do (
 if not "%MAJOR%.%MINOR%"=="3.11" (
     echo [ERROR] Python 3.11 is required but found %MAJOR%.%MINOR%.
     echo [ERROR] Python 3.11 is required but found %MAJOR%.%MINOR%. >> "%LOG_FILE%"
-    echo Install Python 3.11 and re-run: python3.11 -m venv .venv
+    echo Install Python 3.11 from https://python.org, then re-run.
+    echo Tip: Use the Windows Python Launcher: py -3.11 -m venv .venv
     pause
     exit /b 1
 )

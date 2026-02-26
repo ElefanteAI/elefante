@@ -7,6 +7,15 @@ For full detail, see [CHANGELOG.md](CHANGELOG.md).
 
 ## Current Baseline (recommended)
 
+- **v2.1.3 (2026-02-26)**
+  - Windows clean installation: `fcntl` guard, `KUZU_DIR` fix, `install.bat` version parse fix, `py -3.11` launcher support.
+  - Windows Golden Path documented in `docs/technical/installation.md`.
+  - Windows Pitfalls section added to `docs/pitfall-index.md` (6 entries).
+  - Pre-action gate promoted from memory to Directive (unconditional enforcement).
+  - All 20+ version references updated to 2.1.3 across codebase.
+
+## Previous Releases
+
 - **v2.1.2 (2026-02-25)**
   - Passive Co-Activation: Automatically generates graph connections between memories retrieved sequentially.
   - Smoothed Vector Baseline: Exponential scaling applied to cognitive context scores, fixing muted heuristic suppression.

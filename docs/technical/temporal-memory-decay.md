@@ -1,8 +1,8 @@
 # Temporal Memory Decay & Reinforcement
 
-**Feature Version**: 2.1.2  
+**Feature Version**: 2.1.3  
 **Status**: Production  
-**Date**: 2026-02-25
+**Date**: 2026-02-26
 
 ---
 
@@ -386,6 +386,6 @@ temporal_decay:
 
 ---
 
-**Version**: 2.1.2  
-**Last Updated**: 2026-02-25  
+**Version**: 2.1.3  
+**Last Updated**: 2026-02-26  
 **Status**: Production Ready (Phase 1), Planned (Phase 2)

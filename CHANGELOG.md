@@ -7,6 +7,43 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.1.3] - 2026-02-26
+
+### Summary
+
+Windows clean installation support: all platform-specific bugs fixed, full Windows documentation added, pre-action gate promoted to Directive.
+
+### The Problem Solved
+
+1. **Windows install failures**: `fcntl` (Unix-only) was imported unconditionally, crashing on Windows. `KUZU_DIR` constant was `'kuzu'` instead of `'kuzu_db'`, causing database path mismatch. `install.bat` version parse used `tokens=1,2` (MINOR was always empty). Windows Python Launcher (`py -3.11`) was never tried.
+2. **Documentation gap**: No Windows-specific installation path, no Windows command variants in verification steps, no Windows pitfall section in `pitfall-index.md`.
+3. **Enforcement gap**: Pre-action gate was a memory (score-dependent retrieval) — now a Directive (unconditional, injected into every tool response).
+
+### The Solution
+
+1. **Code fixes** (already shipped in source):
+   - `src/utils/elefante_mode.py`: `sys.platform != "win32"` guard around `import fcntl` and `fcntl.flock` calls.
+   - `src/utils/config.py`: `KUZU_DIR = DATA_DIR / "kuzu_db"` (was `"kuzu"`).
+   - `install.bat`: `tokens=1,2,3` version parse; `py -3.11` detection before `python`; improved error messages.
+
+2. **Documentation additions**:
+   - `docs/technical/installation.md`: Windows Golden Path section, Windows Troubleshooting (6 issues), Windows uninstall commands, version bumped.
+   - `docs/pitfall-index.md`: New `## Windows Pitfalls` section (6 entries), category table updated, quick reference table updated.
+   - `docs/technical/architecture.md`, `docs/technical/README.md` and 10 other docs: version bumped to 2.1.3.
+
+3. **Behavioral enforcement**:
+   - Pre-action gate promoted from memory to Directive: `"MANDATORY PRE-ACTION GATE: Before creating any file, running any install command, or making any system change — you MUST first: (1) search Elefante memory for relevant context, AND (2) read docs/pitfall-index.md for the relevant category."`
+
+### Files Changed
+
+- `src/__init__.py`, `setup.py`, `config.yaml`, `src/dashboard/ui/package.json`, `src/dashboard/ui/package-lock.json` — version bump
+- `install.bat` — Python version detection fixes
+- `docs/technical/installation.md` — Windows Golden Path + Troubleshooting + Windows uninstall
+- `docs/pitfall-index.md` — Windows Pitfalls section + quick reference + `fcntl` entry
+- 14 documentation files — version bump to 2.1.3
+
+---
+
 ## [2.1.2] - 2026-02-25
 
 ### Summary

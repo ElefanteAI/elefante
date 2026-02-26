@@ -13,9 +13,12 @@ Design Principles:
 """
 
 import os
-import fcntl
+import sys
 import time
 import atexit
+
+if sys.platform != "win32":
+    import fcntl
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
@@ -139,8 +142,9 @@ class TransactionLock:
                 # Open/create lock file
                 self._fd = os.open(str(self._lock_path), os.O_RDWR | os.O_CREAT)
                 
-                # Try non-blocking exclusive lock
-                fcntl.flock(self._fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                # Try non-blocking exclusive lock (Unix only; Windows uses PID+timestamp)
+                if sys.platform != "win32":
+                    fcntl.flock(self._fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 
                 # Write our PID and timestamp
                 os.ftruncate(self._fd, 0)
@@ -178,7 +182,8 @@ class TransactionLock:
             return
             
         try:
-            fcntl.flock(self._fd, fcntl.LOCK_UN)
+            if sys.platform != "win32":
+                fcntl.flock(self._fd, fcntl.LOCK_UN)
             os.close(self._fd)
             
             # Clear lock file content (don't delete - avoids race)

@@ -19,6 +19,7 @@ Before completing ANY task:
 | ------------ | ----------------------------------------- | ------------------------------------------------- |
 | Dashboard    | Stale snapshot / browser cache            | [Dashboard Pitfalls](#dashboard-pitfalls)         |
 | Installation | Pre-existing kuzu dir / wrong Python path | [Installation Pitfalls](#installation-pitfalls)   |
+| Windows      | fcntl import / version parse / ExecPolicy | [Windows Pitfalls](#windows-pitfalls)             |
 | Database     | Reserved word `properties` / stale lock   | [Database Pitfalls](#database-pitfalls)           |
 | MCP          | Wrong type signature / stdout pollution   | [MCP Pitfalls](#mcp-pitfalls)                     |
 | Memory       | Export truncated / search vs browse       | [Memory Pitfalls](#memory-pitfalls)               |
@@ -122,6 +123,63 @@ Before completing ANY task:
 **Action:** Escape via system Python with absolute path: `/opt/homebrew/bin/python3.11 -m venv .venv && .venv/bin/pip install -r requirements.txt`  
 **Why:** VS Code runs Python from workspace `.venv`. When that venv is corrupted, the agent cannot fix itself from within.  
 **Source:** `docs/debug/installation-compendium.md` Issue #5
+
+### pitfall: installation fcntl windows incompatibility
+
+**Trigger:** `ImportError: No module named 'fcntl'` on Windows during MCP server startup or lock operations  
+**Action:** Add a `sys.platform` guard — import `fcntl` only on non-Windows: `if sys.platform != "win32": import fcntl`  
+**Why:** `fcntl` is a Unix-only module. Any file that imports it unconditionally will crash on Windows.  
+**Affected file:** `src/utils/elefante_mode.py`  
+**Source:** Discovered during Windows first-run, February 26, 2026
+
+---
+
+## Windows Pitfalls
+
+### pitfall: windows python version check tokens
+
+**Trigger:** `install.bat` version check fails silently or reports wrong version (e.g. `3.` instead of `3.11`)  
+**Action:** Ensure `install.bat` uses `tokens=1,2,3` (not `tokens=1,2`) in the `for /f` loop that parses `python --version`. Fixed in current version.  
+**Why:** `Python 3.11.9` split by dot+space yields 4 tokens. With `tokens=1,2`, %%c (the minor version) is never defined — MINOR stays empty.  
+**Source:** Discovered February 26, 2026
+
+### pitfall: windows python launcher not tried
+
+**Trigger:** `install.bat` fails to find Python 3.11 even though it is installed  
+**Action:** Install Python via the official installer with "Python Launcher" checked. The launcher provides `py -3.11` which is the most reliable way to invoke a specific version on Windows.  
+**Why:** Windows doesn't always add `python3.11` to PATH — only `python`. `py -3.11` routes via the launcher regardless of PATH order.  
+**Source:** `install.bat` updated February 26, 2026 to try `py -3.11` before `python`
+
+### pitfall: windows powershell execution policy blocks venv
+
+**Trigger:** Activating `.venv\Scripts\Activate.ps1` in PowerShell fails: `running scripts is disabled on this system`  
+**Action:** Run once in PowerShell (as user, not admin): `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`  
+**Why:** Windows default execution policy (`Restricted`) blocks unsigned `.ps1` scripts. `RemoteSigned` allows local scripts.  
+**Note:** Use `call .venv\Scripts\activate.bat` from Command Prompt instead — no policy change needed.
+
+### pitfall: windows venv activate path difference
+
+**Trigger:** Documentation shows `.venv/bin/python` — command not found on Windows  
+**Action:** On Windows, the venv layout uses `Scripts\` not `bin\`. Use `.venv\Scripts\python.exe` everywhere `.venv/bin/python` appears in macOS/Linux docs.  
+**Why:** CPython venv uses `Scripts/` on Windows and `bin/` on Unix — deliberate platform difference.
+
+### pitfall: windows mcp json path wrong
+
+**Trigger:** MCP server configured but VS Code doesn't show Elefante tools  
+**Action:** Verify MCP config is at `%APPDATA%\Code\User\mcp.json` (not `~/.config/Code/User/mcp.json`). Run `python scripts\configure_vscode_bob.py` to write it automatically.  
+**Why:** `%APPDATA%` expands to `C:\Users\<name>\AppData\Roaming`. `~/.config` does not exist on Windows.
+
+### pitfall: windows kuzu_dir constant wrong
+
+**Trigger:** Database initialization passes but queries return empty results; `FileNotFoundError` on `kuzu_db`  
+**Action:** Verify `KUZU_DIR = DATA_DIR / "kuzu_db"` in `src/utils/config.py`. Was `"kuzu"` in early versions — fixed February 26, 2026.  
+**Why:** Constant mismatch means `GraphStore` opens a different path than `init_databases.py` creates.
+
+### pitfall: windows lock dir tilde path
+
+**Trigger:** `~/.elefante/locks/` does not exist on Windows after first run  
+**Action:** Normal — `~` on Windows expands to `C:\Users\<name>`. The lock directory is auto-created by `TransactionLock._acquire()`. If missing after enable: check `ELEFANTE_HOME` in `src/utils/config.py` resolves to `Path.home() / ".elefante"`.  
+**Why:** `Path.home()` is cross-platform. `~` in shell commands may not expand the same way on all Windows terminals.
 
 ---
 
@@ -295,6 +353,10 @@ Before completing ANY task:
 | Dashboard    | Browser cache              | `Ctrl+Shift+R`                                        |
 | Installation | Kuzu pre-existing dir      | Do not mkdir; let `GraphStore.__init__` handle it     |
 | Installation | Wrong Python path          | Use `sys.executable` not `"python"`                   |
+| Windows      | fcntl import               | `if sys.platform != "win32": import fcntl`            |
+| Windows      | Activate.ps1 blocked       | `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser` |
+| Windows      | Wrong venv path            | Use `.venv\Scripts\python.exe` not `.venv/bin/python` |
+| Windows      | MCP config not found       | `python scripts\configure_vscode_bob.py`              |
 | Database     | Reserved word `properties` | Use `props`                                           |
 | Database     | Stale lock                 | Check `~/.elefante/locks/write.lock`, delete if stale |
 | MCP          | Tools not showing          | `list[types.Tool]` not `List[Tool]`                   |
@@ -325,4 +387,4 @@ Full post-mortems belong in the relevant `docs/debug/*-compendium.md` file.
 
 ---
 
-_Last updated: 2026-02-25 | Elefante v2.1.2_
+_Last updated: 2026-02-26 | Elefante v2.1.3 | Windows validated_

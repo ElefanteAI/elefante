@@ -1,7 +1,7 @@
 # Elefante Test Suite
 
-> **Version:** 2.1.2  
-> **Last Updated:** 2026-02-16
+> **Version:** 2.1.3  
+> **Last Updated:** 2026-02-26
 
 ## Quick Reference
 
