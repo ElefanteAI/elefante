@@ -840,8 +840,7 @@ class MemoryOrchestrator:
             valid_ids = []
             for mid in set(memory_ids):
                 try:
-                    from uuid import UUID as _UUID
-                    mem = await self.vector_store.get_memory(_UUID(mid))
+                    mem = await self.vector_store.get_memory(UUID(mid))
                     if mem is not None:
                         valid_ids.append(mid)
                 except Exception:
