@@ -44,15 +44,29 @@ tests/          # Pytest suite
 **Single source of truth**: `src/__init__.py` → propagated by script.
 
 ```bash
-# Bump version in all 16 files at once
-python scripts/bump_version.py 2.2.0
+# Bump version in all 25 files at once (Windows)
+.venv\Scripts\python.exe scripts\bump_version.py 2.2.0
+
+# Bump version (macOS/Linux)
+.venv/bin/python scripts/bump_version.py 2.2.0
 
 # Verify no file has drifted (exit code 1 = drift detected)
-python scripts/bump_version.py --check
+.venv\Scripts\python.exe scripts\bump_version.py --check
 ```
 
-**Rules:**
+**Rules — MANDATORY:**
 - NEVER edit version strings by hand in individual files.
-- Run `bump_version.py` once, it updates everything: `setup.py`, `config.yaml`, `package.json`, `package-lock.json`, `README.md`, `RELEASES.md`, and all docs.
+- ALWAYS run `bump_version.py X.Y.Z` to update all 25 files atomically.
 - Run `--check` before committing to catch drift.
-- CHANGELOG.md is the only file where you write version entries manually (it's a historical log, not a current-version declaration).
+- CHANGELOG.md and RELEASES.md entries must be written manually (they are historical logs, not current-version declarations).
+- If a new doc file has a version marker, ADD IT to `scripts/bump_version.py` TARGETS before the next version bump.
+
+**Semantic versioning (x.y.z):**
+- `x` — MAJOR: breaking changes requiring user action or migration
+- `y` — MINOR: new features, backward compatible
+- `z` — PATCH: bug fixes, documentation additions, small improvements
+
+**When to bump:**
+- Bug fix or doc-only change → patch (`z`)
+- New MCP tool, new feature, new OS support → minor (`y`)
+- Breaking schema change, DB migration required → major (`x`)

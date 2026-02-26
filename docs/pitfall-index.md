@@ -180,7 +180,12 @@ Before completing ANY task:
 **Trigger:** `~/.elefante/locks/` does not exist on Windows after first run  
 **Action:** Normal — `~` on Windows expands to `C:\Users\<name>`. The lock directory is auto-created by `TransactionLock._acquire()`. If missing after enable: check `ELEFANTE_HOME` in `src/utils/config.py` resolves to `Path.home() / ".elefante"`.  
 **Why:** `Path.home()` is cross-platform. `~` in shell commands may not expand the same way on all Windows terminals.
+### pitfall: windows script read_text encoding cp1252
 
+**Trigger:** Any Python script that calls `Path.read_text()` or `Path.write_text()` crashes on Windows with `UnicodeDecodeError: 'charmap' codec can't decode byte...`  
+**Action:** Always pass `encoding='utf-8'` explicitly: `path.read_text(encoding='utf-8')` and `path.write_text(content, encoding='utf-8')`.  
+**Why:** On Windows, `Path.read_text()` defaults to `cp1252` (the Windows ANSI code page). UTF-8 text with non-ASCII characters (e.g., `ó`, emoji, curly quotes in doc files) will crash it.  
+**Affected:** `scripts/bump_version.py` — fixed February 26, 2026.
 ---
 
 ## Database Pitfalls
@@ -356,8 +361,7 @@ Before completing ANY task:
 | Windows      | fcntl import               | `if sys.platform != "win32": import fcntl`            |
 | Windows      | Activate.ps1 blocked       | `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser` |
 | Windows      | Wrong venv path            | Use `.venv\Scripts\python.exe` not `.venv/bin/python` |
-| Windows      | MCP config not found       | `python scripts\configure_vscode_bob.py`              |
-| Database     | Reserved word `properties` | Use `props`                                           |
+| Windows      | MCP config not found       | `python scripts\configure_vscode_bob.py`              || Windows      | read_text encoding crash   | Always pass `encoding='utf-8'` to `read_text/write_text` || Database     | Reserved word `properties` | Use `props`                                           |
 | Database     | Stale lock                 | Check `~/.elefante/locks/write.lock`, delete if stale |
 | MCP          | Tools not showing          | `list[types.Tool]` not `List[Tool]`                   |
 | MCP          | stdout pollution           | All logs → `sys.stderr`                               |
