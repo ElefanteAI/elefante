@@ -361,7 +361,8 @@ Before completing ANY task:
 | Windows      | fcntl import               | `if sys.platform != "win32": import fcntl`            |
 | Windows      | Activate.ps1 blocked       | `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser` |
 | Windows      | Wrong venv path            | Use `.venv\Scripts\python.exe` not `.venv/bin/python` |
-| Windows      | MCP config not found       | `python scripts\configure_vscode_bob.py`              || Windows      | read_text encoding crash   | Always pass `encoding='utf-8'` to `read_text/write_text` || Database     | Reserved word `properties` | Use `props`                                           |
+| Windows      | MCP config not found       | `python scripts\configure_vscode_bob.py`              || Windows      | read_text encoding crash   | Always pass `encoding='utf-8'` to `read_text/write_text` |
+| Versioning   | Version part out of range  | Each of x, y, z must be in `[0, 99]` — scripts enforce this || Database     | Reserved word `properties` | Use `props`                                           |
 | Database     | Stale lock                 | Check `~/.elefante/locks/write.lock`, delete if stale |
 | MCP          | Tools not showing          | `list[types.Tool]` not `List[Tool]`                   |
 | MCP          | stdout pollution           | All logs → `sys.stderr`                               |

@@ -7,6 +7,21 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- `scripts/version_counsel.py` — interactive smart version advisor. Analyses staged git diff, classifies the change as MAJOR / MINOR / PATCH, presents a recommendation with a short reason and the semantic versioning table, then asks for confirmation before calling `bump_version.py`. Supports manual override (type `x.y.z` at the prompt).
+
+### Changed
+
+- `scripts/bump_version.py` — added `[0, 99]` range validation for each version part (x, y, z). Rejects values outside this range with a clear error message.
+- `scripts/version_counsel.py` — same `[0, 99]` guard applied to manual override input at the prompt.
+- `CONTRIBUTING.md` — versioning section rewritten: recommends `version_counsel.py` as primary workflow, documents manual bump as secondary, includes example output and full rules.
+- VERSION BUMP GATE Directive updated to reference `version_counsel.py`.
+
+---
+
 ## [2.1.3] - 2026-02-26
 
 ### Summary

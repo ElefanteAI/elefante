@@ -12,7 +12,9 @@ For full detail, see [CHANGELOG.md](CHANGELOG.md).
   - Windows Golden Path documented in `docs/technical/installation.md`.
   - Windows Pitfalls section added to `docs/pitfall-index.md` (6 entries).
   - Pre-action gate promoted from memory to Directive (unconditional enforcement).
-  - All 20+ version references updated to 2.1.3 across codebase.
+  - `scripts/version_counsel.py` added: smart version advisor that analyses staged diff, classifies MAJOR/MINOR/PATCH, and asks for confirmation before bumping. `[0-99]` range validation enforced across both version scripts.
+  - `bump_version.py` expanded to cover 25 files; Windows `encoding='utf-8'` fix.
+  - All 25 version references updated to 2.1.3 across codebase.
 
 ## Previous Releases
 
