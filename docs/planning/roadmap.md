@@ -1,6 +1,6 @@
 # Elefante Development Roadmap
 
-**Current Version**: v2.1.1  
+**Current Version**: v2.1.2  
 **Last Updated**: 2026-02-19
 
 ---

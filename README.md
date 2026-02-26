@@ -2,7 +2,7 @@
 
 **The Second Brain for AI Agents.** Your agent stops forgetting. Every preference, every decision, every pattern — remembered, scored, and surfaced at the moment of need.
 
-> **v2.1.1** — Persistent Memory for AI Agents
+> **v2.1.2** — Persistent Memory for AI Agents
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -43,7 +43,7 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**The product is the cohesion.** MCP tools capture knowledge. The Intelligence Engine scores and connects it. The Dashboard shows you the health of your second brain. All three layers serve one purpose: *your agent gives better answers because it remembers.*
+**The product is the cohesion.** MCP tools capture knowledge. The Intelligence Engine scores and connects it. The Dashboard shows you the health of your second brain. All three layers serve one purpose: _your agent gives better answers because it remembers._
 
 ---
 
@@ -72,16 +72,21 @@ Full setup: [docs/technical/installation.md](docs/technical/installation.md) · 
 ## How It Works
 
 ### Layer 1: MCP Protocol
+
 The bridge between your IDE and the brain. 20 tools that let agents store, search, connect, and manage knowledge. A **Compliance Gate** forces search-before-write — no duplicates, no noise. **Context Injection** silently attaches relevant memories to every tool call so the agent gets history without asking. **Directives** keep unconditional behavioral rules always present in every tool response — never dependent on search.
 
 ### Layer 2: Intelligence Engine
+
 The brain. Two storage backends work together:
+
 - **ChromaDB** (semantic vectors) finds memories by meaning — "how do we handle auth?" matches a decision about JWT tokens made three months ago.
 - **Kuzu** (knowledge graph) tracks entities and relationships — who connects to what, which decisions depend on which facts.
 - **Behavioral Relevance** scores every memory automatically. Recent, frequently-accessed, and type-appropriate memories surface first. No manual ratings.
 
 ### Layer 3: Dashboard
+
 The window. A snapshot-driven read-only view of your knowledge system:
+
 - **Overview**: Health score (freshness, coverage, connectivity) with diagnostic panels.
 - **Memories**: Searchable, sortable table with semantic search integration.
 - **Explore**: Topic distribution, memory insights, and a knowledge graph.
@@ -106,15 +111,15 @@ Everything runs locally. No cloud. No telemetry. Your data stays on your machine
 
 20 tools + 2 prompts. All names follow `elefante-PascalCase` convention.
 
-| Category | Key Tools |
-|----------|-----------|
-| Memory | `elefante-MemoryAdd`, `elefante-MemorySearch`, `elefante-MemoryUpdate`, `elefante-MemoryDelete`, `elefante-MemoryConsolidate` |
-| Graph | `elefante-GraphConnect`, `elefante-GraphQuery` |
-| Context | `elefante-ContextGet`, `elefante-SessionsList` |
-| Tasks | `elefante-TaskCreate`, `elefante-TaskUpdate`, `elefante-TaskGraph` |
-| ETL | `elefante-ETLProcess`, `elefante-ETLClassify` |
-| Directives | `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove` |
-| System | `elefante-System`, `elefante-SystemStatusGet`, `elefante-DashboardOpen` |
+| Category   | Key Tools                                                                                                                     |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Memory     | `elefante-MemoryAdd`, `elefante-MemorySearch`, `elefante-MemoryUpdate`, `elefante-MemoryDelete`, `elefante-MemoryConsolidate` |
+| Graph      | `elefante-GraphConnect`, `elefante-GraphQuery`                                                                                |
+| Context    | `elefante-ContextGet`, `elefante-SessionsList`                                                                                |
+| Tasks      | `elefante-TaskCreate`, `elefante-TaskUpdate`, `elefante-TaskGraph`                                                            |
+| ETL        | `elefante-ETLProcess`, `elefante-ETLClassify`                                                                                 |
+| Directives | `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove`                                                 |
+| System     | `elefante-System`, `elefante-SystemStatusGet`, `elefante-DashboardOpen`                                                       |
 
 Full reference with parameter schemas: [docs/technical/usage.md](docs/technical/usage.md)
 
@@ -122,14 +127,14 @@ Full reference with parameter schemas: [docs/technical/usage.md](docs/technical/
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|------------|
-| Vector store | ChromaDB 1.3.5 |
-| Graph store | Kuzu 0.11.3 |
-| Embeddings | sentence-transformers (gte-base) |
-| Protocol | MCP 1.23.1 |
-| Dashboard | React + TypeScript + Vite |
-| Runtime | Python 3.11 |
+| Component    | Technology                       |
+| ------------ | -------------------------------- |
+| Vector store | ChromaDB 1.3.5                   |
+| Graph store  | Kuzu 0.11.3                      |
+| Embeddings   | sentence-transformers (gte-base) |
+| Protocol     | MCP 1.23.1                       |
+| Dashboard    | React + TypeScript + Vite        |
+| Runtime      | Python 3.11                      |
 
 ---
 

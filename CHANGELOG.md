@@ -7,13 +7,48 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [2.1.1] - 2026-02-19
+## [2.1.2] - 2026-02-25
 
-### Part 3: Schema Simplification & Archive Cleanup
+### Summary
+
+Passive Co-Activation (Autonomous Graph Maintenance), Smoothed Vector Baselines for precise semantic scoring, and comprehensive E2E Verification fixes ensuring Elefante operates seamlessly as a true, self-optimizing second brain without manual user curation.
+
+### The Problem Solved
+
+1. **Stale Graph Architecture**: Elefante relied on explicit agent-driven tools (`elefanteGraphConnect`) to build relationships, which agents frequently forgot to use, leaving the Kuzu graph sparse and ineffective.
+2. **Brittle Heuristic Suppression (Issue 8)**: The `sentence-transformers/gte-base` embedding model naturally compresses cosine similarities. Elefante's hardcoded threshold (0.4) was ruthlessly suppressing highly relevant semantic matches (e.g., scoring exact matches at 0.52 and suppressing 0.38 matches entirely).
+3. **Response Bloat (Issue 7) & Agent Actionability (Issue 9)**: Search results flooded the IDE with empty `null` metadata fields, wasting tokens. Furthermore, agents often retrieved context but didn't know what to do with it.
+4. **Agent Zero Stateless Bypass**: The compliance gate ("search before write") failed under certain stateless multi-agent workflows, allowing raw unregulated memory dumps.
+
+### The Solution
+
+1. **Autonomous Graph Maintenance**:
+   - Session Tracking: The MCP server now maintains a `_session_retrieval_history` sliding window.
+   - `record_coactivation`: Automatically generates and reinforces `CO_ACTIVATED` relationships in the Kuzu graph between memories retrieved sequentially within the same context window.
+   - The Cognitive Retriever now directly ingests this live graph density (the `strength` property) to boost the `coactivation_score` of related memories during future searches.
+2. **Smoothed Vector Baseline**: Implemented a proportional scaling formula (`vector_baseline = similarity * 0.85`) in the cognitive router. This creates a dynamic floor that rescues valid semantic matches from hard suppression.
+3. **Slim & Actionable Responses**:
+   - `SearchResult` dictionaries now aggressively strip all `null`/`None` metadata fields.
+   - Raw JSON payloads rendered to the LLM now include a synthesized `summary` and `suggested_action` header to immediately dictate how the context should be parsed.
+4. **Strict Protocol Enforcement**: Hardened the Compliance Gate and injected explicit `NO GUESSING / EXACTLY UNKNOWN.` behavioral rules into `MANDATORY_PROTOCOLS_READ_THIS_FIRST` to prevent agent hallucinations when search queries return empty.
+
+### Changes
+
+- **NEW**: `Autonomous Co-Activation` pipeline spanning `src/mcp/server.py`, `src/core/orchestrator.py`, and `src/core/retrieval.py` powered by a direct Kuzu `MERGE` query.
+- **NEW**: `tests/test_autonomous_coactivation.py` suite proving real-time graph edge generation influences routing weights.
+- **MODIFIED**: `_apply_cognitive_scoring` mathematically smoothed to fix Issue #8 (Muted Similarity Suppression).
+- **MODIFIED**: `src/mcp/server.py` dict rendering optimized to strip `None` values (Fixes Issue #7).
+- **MODIFIED**: Context injection headers upgraded for actionability (Fixes Issue #9).
+- **FIXED**: Multi-agent compliance gate bypass patched; Agent Zero native E2E test scripts (`e2e_agent_zero.js`) added to formally verify end-to-end frontend graphical rendering.
+
+---
+
+## [2.1.1] - 2026-02-19### Part 3: Schema Simplification & Archive Cleanup
 
 A major cleanup pass removing dead model abstractions and historical archive content that was adding noise without value.
 
 **Dead code removed from `src/`** (−1,397 lines):
+
 - `src/core/metadata_store.py` — `StandardizedMetadata` layer; unused since v4 schema.
 - `src/core/consolidation.py` — background consolidation task; never activated.
 - `src/core/llm.py` — LLM client stub; Elefante doesn't connect to LLMs.
@@ -26,6 +61,7 @@ A major cleanup pass removing dead model abstractions and historical archive con
 - `scripts/utils/repair_graph_topology.py` — one-time migration script.
 
 **Archive cleanup** (−62 docs + deprecated registers, −44 scripts, −12 tests):
+
 - `docs/archive/historical/` — 40+ historical implementation logs, dashboards plans, schema archives.
 - `docs/archive/deprecated-registers/` — 7 old neural registers.
 - `docs/archive/releases/` — 3 old release notes.
@@ -175,7 +211,7 @@ Dashboard Overhaul — Complete rewrite of the dashboard from a physics-based "s
 - **NEW**: `src/dashboard/ui/src/components/TopicTreemap.tsx` - Nivo Treemap visualization.
 - **NEW**: `src/dashboard/ui/src/components/KnowledgeGraph.tsx` - Nivo Network visualization.
 - **MODIFIED**: `src/dashboard/ui/src/App.tsx` - Complete rewrite with tabbed layout.
-- **MODIFIED**: `src/dashboard/ui/package.json` - Added dependencies (zustand, @tanstack/react-table, @nivo/*).
+- **MODIFIED**: `src/dashboard/ui/package.json` - Added dependencies (zustand, @tanstack/react-table, @nivo/\*).
 - **MODIFIED**: `src/dashboard/ui/vite.config.ts` - Added @ path alias.
 - **IMPACT**:
   - **Breaking Change**: Old GraphCanvas.tsx is no longer used (kept for reference).
@@ -236,11 +272,13 @@ Tool Consolidation — 24 tools reduced to 17 with zero feature loss. Every tool
 ### The Solution
 
 **KILLED (3 tools → 0):**
+
 - `elefanteGraphEntityCreate` — redundant, `GraphConnect` already creates entities
-- `elefanteGraphRelationshipCreate` — redundant, `GraphConnect` already creates relationships  
+- `elefanteGraphRelationshipCreate` — redundant, `GraphConnect` already creates relationships
 - `elefanteMemoryMigrateToV3` — one-time admin job, moved to scripts/
 
 **MERGED (5 tools → 2):**
+
 - `elefanteSystemEnable` + `elefanteSystemDisable` → **`elefanteSystem`** with `action: "enable" | "disable"`
 - `elefanteMemoryListAll` → absorbed into **`elefanteMemorySearch`** with `list_all: true`
 - `elefanteTaskDecompose` → absorbed into **`elefanteTaskCreate`** with optional `subtasks: [...]`
@@ -351,6 +389,7 @@ v1.6.1 ensured cognitive fields are stored and reconstructed correctly, but user
 ### The Solution
 
 Updated `src/dashboard/ui/src/components/GraphCanvas.tsx` to display:
+
 - **Concepts**: Clickable cyan chips showing extracted concepts (search on click)
 - **Surfaces When**: Purple bullet list showing when memory surfaces
 - **Authority Score**: Progress bar (0-1 scale) with color gradient
@@ -364,6 +403,7 @@ Updated `src/dashboard/ui/src/components/GraphCanvas.tsx` to display:
 ### Visual Output
 
 When clicking a memory node in the dashboard, the sidebar now shows:
+
 ```
 Cognitive Fields                              v1.6.2
   Concepts: [elefante] [mcp] [law] [protocol]
@@ -384,6 +424,7 @@ Cognitive Field Standardization - Ensured `concepts`, `surfaces_when`, and `auth
 ### The Problem Solved
 
 V4 Cognitive Retrieval uses concept overlap (0.20 weight) for scoring, but:
+
 - Concepts were sometimes stored in inconsistent formats (JSON, repr(), comma-separated)
 - Some memories had missing or malformed cognitive fields
 - Dashboard snapshot didn't include these fields
@@ -411,6 +452,7 @@ Compliance Gate - Enforced search-before-write to ensure agents retrieve context
 ### The Problem Solved
 
 Agents using Elefante MCP tools often skip memory retrieval entirely:
+
 - Memories are stored without checking for duplicates
 - Context is ignored because search is never called
 - No mechanical enforcement existed - only "instructions" which agents drift from
@@ -418,12 +460,14 @@ Agents using Elefante MCP tools often skip memory retrieval entirely:
 ### The Solution
 
 **Server-Side Compliance Gate** in `src/mcp/server.py`:
+
 - Session state tracks whether `elefanteMemorySearch` has been called
 - Write operations (`elefanteMemoryAdd`, `elefanteGraphEntityCreate`, `elefanteGraphRelationshipCreate`, `elefanteGraphConnect`) are **BLOCKED** if no prior search
 - Search handler sets `search_performed=True` and returns a compliance stamp
 - Gate resets on session end
 
 **Layered Defense** via `.github/copilot-instructions.md`:
+
 - Injected into every GitHub Copilot request in this repository
 - Documents the mandatory search-first protocol
 - Defines the compliance stamp format
@@ -443,21 +487,21 @@ Agents using Elefante MCP tools often skip memory retrieval entirely:
 - **MODIFIED**: `_handle_search_memories` - sets compliance flag and adds stamp to response
 - **MODIFIED**: `_handle_add_memory` - gate check before write
 - **MODIFIED**: `_handle_create_entity` - gate check before write
-- **MODIFIED**: `_handle_create_relationship` - gate check before write  
+- **MODIFIED**: `_handle_create_relationship` - gate check before write
 - **MODIFIED**: `_handle_set_elefante_connection` - gate check before write
 - **NEW**: `.github/copilot-instructions.md` - Copilot-injected protocol instructions
 
 ### Gated Tools
 
-| Tool | Gate Enforced |
-|------|---------------|
-| `elefanteMemoryAdd` |  Yes |
-| `elefanteGraphEntityCreate` |  Yes |
-| `elefanteGraphRelationshipCreate` |  Yes |
-| `elefanteGraphConnect` |  Yes |
-| `elefanteMemorySearch` |  No (this unlocks the gate) |
-| `elefanteContextGet` |  No (read-only) |
-| `elefanteGraphQuery` |  No (read-only) |
+| Tool                              | Gate Enforced              |
+| --------------------------------- | -------------------------- |
+| `elefanteMemoryAdd`               | Yes                        |
+| `elefanteGraphEntityCreate`       | Yes                        |
+| `elefanteGraphRelationshipCreate` | Yes                        |
+| `elefanteGraphConnect`            | Yes                        |
+| `elefanteMemorySearch`            | No (this unlocks the gate) |
+| `elefanteContextGet`              | No (read-only)             |
+| `elefanteGraphQuery`              | No (read-only)             |
 
 ### Error Response (Gate Blocked)
 
@@ -482,6 +526,7 @@ V5 Cognitive Features - Retrieval Explanation, Memory Health, Conflict Detection
 ### The Problem Solved
 
 V4 returns cognitive scores but doesn't explain WHY. Users can't audit the system:
+
 - Why did this memory rank higher than another?
 - Which memories are stale or orphaned?
 - Are any memories contradicting each other?
@@ -492,16 +537,19 @@ V4 returns cognitive scores but doesn't explain WHY. Users can't audit the syste
 4 new features via 2 consolidated components:
 
 **CognitiveRetriever Extensions** (`src/core/retrieval.py`):
+
 - `RetrievalExplanation` - Full breakdown of 6 signals with reasons
 - `ProactiveSurfacer` - Suggests memories based on temporal/domain/concept triggers
 
 **MemoryHealthAnalyzer** (`src/utils/curation.py`):
-- `compute_health()` - 4 states:  healthy,  stale,  at_risk,  orphan
+
+- `compute_health()` - 4 states: healthy, stale, at_risk, orphan
 - `detect_potential_conflict()` - Flags same-domain memories with 60%+ concept overlap
 
 ### Property-Based Testing
 
 8 properties verified with Hypothesis (700+ test iterations):
+
 - P1: Explanation completeness (6 signals always present)
 - P2: Explanation accuracy (matched concepts correct)
 - P3: Health exhaustiveness (exactly 4 states)
@@ -533,6 +581,7 @@ V4 Cognitive Retrieval Engine - 6-signal composite scoring replaces raw vector s
 ### The Problem Solved
 
 Raw vector similarity alone is naive. A memory can be semantically similar but:
+
 - Temporally stale (hasn't been accessed in months)
 - Low authority (user never reinforced it)
 - Disconnected (no graph relationships)
@@ -541,14 +590,14 @@ Raw vector similarity alone is naive. A memory can be semantically similar but:
 
 `CognitiveRetriever` in `src/core/retrieval.py` applies 6 weighted signals:
 
-| Signal | Weight | Source |
-|--------|--------|--------|
-| Vector Similarity | 0.35 | ChromaDB cosine distance |
-| Concept Match | 0.15 | Keyword/concept overlap |
-| Domain Alignment | 0.10 | Domain field match |
-| Coactivation | 0.15 | Graph relationship density |
-| Authority | 0.15 | Reinforcement history |
-| Temporal Recency | 0.10 | Decay-adjusted freshness |
+| Signal            | Weight | Source                     |
+| ----------------- | ------ | -------------------------- |
+| Vector Similarity | 0.35   | ChromaDB cosine distance   |
+| Concept Match     | 0.15   | Keyword/concept overlap    |
+| Domain Alignment  | 0.10   | Domain field match         |
+| Coactivation      | 0.15   | Graph relationship density |
+| Authority         | 0.15   | Reinforcement history      |
+| Temporal Recency  | 0.10   | Decay-adjusted freshness   |
 
 ### Verified Results
 
@@ -574,6 +623,7 @@ Embedding model upgrade to `thenlper/gte-base` (768-dim) for improved semantic s
 ### The Problem Solved
 
 The previous embedding model (`all-MiniLM-L6-v2`, 384-dim) had lower semantic precision:
+
 - Fuzzy queries often missed relevant memories
 - Similar concepts had weak similarity scores
 - Edge cases (version numbers, acronyms) performed poorly
@@ -582,13 +632,14 @@ The previous embedding model (`all-MiniLM-L6-v2`, 384-dim) had lower semantic pr
 
 Rigorous benchmarking of 10 embedding models (1485 queries) identified `thenlper/gte-base` as the optimal choice:
 
-| Model | Dimensions | MRR | Hit@5 | Latency |
-|-------|------------|-----|-------|---------|
-| **thenlper/gte-base** | 768 | **0.337** | 49.8% | ~15ms |
-| all-MiniLM-L6-v2 | 384 | 0.310 | 45.2% | ~8ms |
-| BAAI/bge-base-en-v1.5 | 768 | 0.328 | 48.1% | ~14ms |
+| Model                 | Dimensions | MRR       | Hit@5 | Latency |
+| --------------------- | ---------- | --------- | ----- | ------- |
+| **thenlper/gte-base** | 768        | **0.337** | 49.8% | ~15ms   |
+| all-MiniLM-L6-v2      | 384        | 0.310     | 45.2% | ~8ms    |
+| BAAI/bge-base-en-v1.5 | 768        | 0.328     | 48.1% | ~14ms   |
 
 Live testing (35 queries, 24 memories) confirmed:
+
 - **Global Avg Similarity: 0.803** (excellent)
 - **Hit Rate: 100%** (all queries returned relevant results)
 - **Fuzzy query handling**: "remember that thing about the database lock" → 0.845 similarity
@@ -596,29 +647,35 @@ Live testing (35 queries, 24 memories) confirmed:
 ### Changes
 
 #### Configuration Updates
+
 - **`config.yaml`**: `embedding_model: "thenlper/gte-base"`, `embedding_dimension: 768`
 - **`src/utils/config.py`**: Updated `VectorStoreConfig` and `EmbeddingsConfig` defaults
 - **`.env.example`**: Updated example value
 - **`docs/technical/architecture.md`**: Model reference updated
 
 #### Migration Script
+
 - **`scripts/migrate_embeddings_gte_base.py`**: Re-embeds all memories with new model
   - Creates timestamped backup before migration
   - Batch processing with progress indication
   - Verification of count match
 
 #### Documentation Fixes (Ghost Links)
+
 During workspace audit, discovered v2 schema files were archived Dec 11 but documentation still linked to them:
+
 - **`docs/README.md`**: v2 schema → v3/v4/v5 references
 - **`docs/technical/README.md`**: Removed dead v2 links
 - **`docs/debug/memory-neural-register.md`**: v2 → v3
 - **`docs/technical/temporal-memory-decay.md`**: v2 → v3
 
 #### Safeguards Added
+
 - **`docs/pitfall-index.md`**: Added Documentation category with "archive without index update" pitfall
 - **`docs/technical/developer-etiquette.md`**: Added LAW 6.5 (mandatory grep-before-archive rule)
 
 #### Test Tooling
+
 - **`scripts/test_embedding_battery.py`**: 35-query test battery across 8 categories
   - Identity, Preferences, Project, Technical, Decisions, Workflow, Fuzzy, Edge
 
@@ -627,16 +684,19 @@ During workspace audit, discovered v2 schema files were archived Dec 11 but docu
 **BREAKING**: Existing ChromaDB databases have 384-dim embeddings incompatible with new 768-dim model.
 
 To migrate:
+
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/migrate_embeddings_gte_base.py
 ```
 
 The script:
+
 1. Creates backup: `memories_backup_YYYYMMDD_HHMMSS`
 2. Re-embeds all memories with `gte-base`
 3. Verifies count match
 
 To delete backup after verification:
+
 ```bash
 python -c "import chromadb; c=chromadb.PersistentClient('~/.elefante/data/chroma'); c.delete_collection('memories_backup_...')"
 ```
@@ -678,6 +738,7 @@ Transaction-scoped locking for true multi-IDE safety. Fixes the fundamental lock
 ### The Problem Solved
 
 v1.0.1 used **session-based locking**:
+
 - `elefanteSystemEnable` acquired locks → held indefinitely
 - `elefanteSystemDisable` released locks only on explicit call
 - Crashed processes left stale locks forever (e.g., PID 4563 from Dec 14 blocking all access on Dec 26)
@@ -686,6 +747,7 @@ v1.0.1 used **session-based locking**:
 ### The Solution
 
 v1.1.0 uses **transaction-scoped locking**:
+
 - Each write operation acquires lock → does work → releases lock (milliseconds)
 - Read operations are lock-free
 - Stale locks auto-expire after 30 seconds
@@ -694,6 +756,7 @@ v1.1.0 uses **transaction-scoped locking**:
 ### Changes
 
 #### Transaction-Scoped Locking (`src/utils/elefante_mode.py`)
+
 - **NEW**: `TransactionLock` class - short-lived, auto-releasing locks
 - **NEW**: `write_lock()` context manager for write operations
 - **NEW**: `read_lock()` context manager (no-op - reads are lock-free)
@@ -704,6 +767,7 @@ v1.1.0 uses **transaction-scoped locking**:
 - **ADDED**: Single `write.lock` file with PID/timestamp tracking
 
 #### MCP Server Updates (`src/mcp/server.py`)
+
 - **CHANGED**: Write operations wrapped in `write_lock()`:
   - `_handle_add_memory`
   - `_handle_create_entity`
@@ -718,6 +782,7 @@ v1.1.0 uses **transaction-scoped locking**:
 ### Migration
 
 No migration needed. v1.1.0 is backward compatible:
+
 - `elefanteSystemEnable` still works (now a no-op that returns success)
 - `elefanteSystemDisable` still works (clears resources)
 - All existing tool calls work unchanged
@@ -725,11 +790,13 @@ No migration needed. v1.1.0 is backward compatible:
 ### Versioning Logic
 
 Elefante follows [Semantic Versioning](https://semver.org/):
+
 - **MAJOR** (x.0.0): Breaking changes requiring user action
 - **MINOR** (1.x.0): New features, backward compatible
 - **PATCH** (1.0.x): Bug fixes, documentation
 
 This release is **1.1.0** (minor) because:
+
 - New feature (transaction-scoped locking)
 - Backward compatible (existing tools work unchanged)
 - No user migration required
@@ -745,30 +812,36 @@ Critical update addressing protocol enforcement and multi-IDE safety.
 ### Changes
 
 #### Auto-Inject Pitfalls (Protocol Enforcement)
+
 - MCP Server now injects mandatory protocols (`MANDATORY_PROTOCOLS_READ_THIS_FIRST`) directly into every tool response
 - Context-Aware Warnings for `addMemory` (integrity), `searchMemories` (bias), and graph tools (consistency)
 - Updated `ai-behavior-compendium.md` with Issue #6 (Passive Protocol Enforcement Failure)
 
 #### ELEFANTE_MODE (Multi-IDE Safety)
+
 - **Problem**: Multiple IDEs accessing same databases caused crashes/lock conflicts
 - **Solution**: Server starts OFF by default, user must explicitly enable
 
 ##### New MCP Tools
+
 - `elefanteSystemEnable` - Acquires exclusive locks, enables memory operations
 - `elefanteSystemDisable` - Releases locks, cleans up, returns to OFF state
 - `elefanteSystemStatusGet` - Shows current mode, lock status, holder info (and stats when enabled)
 
 ##### New Files
+
 - `src/utils/elefante_mode.py` - Lock management singleton
 - `config.yaml` -> `elefante_mode:` section added
 
 ##### Behavior
+
 - When **OFF**: Memory tools return graceful "disabled" response with instructions
 - When **ON**: Full functionality with exclusive database access
 - Lock files stored in `~/.elefante/locks/` with PID/timestamp tracking
 - Safe tools (`elefanteSystemEnable`, `elefanteSystemDisable`, `elefanteSystemStatusGet`, `elefanteDashboardOpen`) always available
 
 ##### Usage
+
 ```
 User: "Enable Elefante"
 Agent calls: elefanteSystemEnable -> Acquires locks -> Memory tools now work
@@ -782,9 +855,11 @@ Agent calls: elefanteSystemDisable -> Releases locks -> Safe for other IDE
 ## [1.0.0] - 2025-12-05
 
 ### Summary
+
 First stable production release with comprehensive documentation cleanup.
 
 ### Core Features
+
 - **Triple-Layer Memory Architecture**
   - ChromaDB for semantic/vector search
   - Kuzu for knowledge graph relationships
@@ -826,12 +901,14 @@ First stable production release with comprehensive documentation cleanup.
   - IDE auto-configuration (VS Code, Cursor)
 
 ### Documentation
+
 - Neural Register architecture (5 master registers)
 - Domain compendiums for issue tracking
 - Technical reference documentation
 - Planning roadmaps
 
 ### Known Limitations
+
 - Memory Schema V2 taxonomy (domain/category) requires manual input - auto-classification planned for v1.1.0
 - Dashboard UX needs improvement - semantic zoom planned
 - Smart UPDATE (merge) not yet implemented
@@ -843,20 +920,22 @@ First stable production release with comprehensive documentation cleanup.
 Development prior to v1.0.0 used inflated version numbers during rapid iteration.
 These have been consolidated into this baseline release.
 
-| Date | Internal Label | What Happened |
-|------|----------------|---------------|
-| 2025-11-27 | "v1.1.0" | Initial repository setup |
-| 2025-12-02 | "v1.2.0" | User profile integration |
-| 2025-12-04 | "v1.2.0" | Kuzu reserved word fix (`properties` -> `props`) |
-| 2025-12-05 | "v1.3.0" | Documentation cleanup |
-| 2025-12-06 | **v1.0.0** | Official baseline release |
+| Date       | Internal Label | What Happened                                    |
+| ---------- | -------------- | ------------------------------------------------ |
+| 2025-11-27 | "v1.1.0"       | Initial repository setup                         |
+| 2025-12-02 | "v1.2.0"       | User profile integration                         |
+| 2025-12-04 | "v1.2.0"       | Kuzu reserved word fix (`properties` -> `props`) |
+| 2025-12-05 | "v1.3.0"       | Documentation cleanup                            |
+| 2025-12-06 | **v1.0.0**     | Official baseline release                        |
 
 ---
 
 ## Migration Notes
 
 ### From Pre-1.0 Development
+
 If upgrading from internal development versions:
+
 1. Database schema changed (`properties` -> `props`)
 2. Run `python scripts/init_databases.py` to reinitialize
 3. Documentation restructured into `technical/`, `debug/`, `planning/`, `archive/`

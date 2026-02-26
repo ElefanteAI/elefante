@@ -85,7 +85,11 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNav
                 </span>
               )}
             </div>
-              <div className="health-status {{health_status}}" style={{color: colorMap[health_status]}} title={tooltipMap[health_status]}}>{iconMap[health_status]}</div>
+              {health_status && (
+                <div className={`health-status ${health_status}`} style={{color: colorMap[health_status]}} title={tooltipMap[health_status]}>
+                  {iconMap[health_status]}
+                </div>
+              )}
           </div>
           <button
             onClick={onClose}

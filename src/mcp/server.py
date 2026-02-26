@@ -75,12 +75,10 @@ class ElefanteMCPServer:
         self.directive_store = get_directive_store()  # Always-on behavioral constraints
         
         # Compliance Gate: Session state for search-before-write enforcement
-        self._compliance_state = {
-            "search_performed": False,
-            "search_count": 0,
-            "search_timestamp": None,
-            "last_query": None
-        }
+        # Check for persistent compliance state or initialize clean
+        state = self._get_compliance_state()
+        if not state:
+            self._reset_compliance_gate()
         
         # Session state for autonomous graph maintenance (passive co-activation)
         self._session_retrieval_history: list[str] = []
@@ -219,10 +217,42 @@ class ElefanteMCPServer:
         # Add to result with a key that demands attention
         # Developer Etiquette V1.2 (canonical) — concise enforcement reminder.
         pitfalls.append(
-            "DEVELOPER ETIQUETTE v1.2 (docs/technical/developer-etiquette.md): Context-first; label UNKNOWN; no fabrication; reuse existing artifacts; for non-trivial work follow SPEC→DESIGN→TASKS→IMPLEMENT→VERIFY; verify before claiming done; keep outputs concise."
+            "STRICT ENFORCEMENT: 1. Keep all responses SHORT, SIMPLE, and DIRECT. "
+            "2. NO GUESSING. If the exact information is not found in memory, your final response MUST BE EXACTLY 'UNKNOWN.' with no apologies or filler. "
+            "3. Ask context questions ONLY if you are hard-blocked from proceeding."
         )
         result["MANDATORY_PROTOCOLS_READ_THIS_FIRST"] = pitfalls
         return result
+
+    def _get_compliance_file(self):
+        """Get path to persistent compliance state file"""
+        from pathlib import Path
+        state_file = Path.home() / ".elefante" / "compliance_state.json"
+        state_file.parent.mkdir(parents=True, exist_ok=True)
+        return state_file
+
+    def _get_compliance_state(self) -> Dict[str, Any]:
+        """Read compliance state from persistent storage"""
+        import json
+        state_file = self._get_compliance_file()
+        if not state_file.exists():
+            return None
+        try:
+            with open(state_file, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            self.logger.error(f"Failed to read compliance state: {e}")
+            return None
+
+    def _save_compliance_state(self, state: Dict[str, Any]):
+        """Save compliance state to persistent storage"""
+        import json
+        state_file = self._get_compliance_file()
+        try:
+            with open(state_file, 'w') as f:
+                json.dump(state, f)
+        except Exception as e:
+            self.logger.error(f"Failed to save compliance state: {e}")
 
     def _check_compliance_gate(self, tool_name: str) -> Dict[str, Any] | None:
         """
@@ -241,8 +271,13 @@ class ElefanteMCPServer:
         
         if tool_name not in GATED_TOOLS:
             return None  # Gate passes - not a gated tool
+            
+        state = self._get_compliance_state()
+        if not state:
+            self._reset_compliance_gate()
+            state = self._get_compliance_state()
         
-        if self._compliance_state["search_performed"]:
+        if state.get("search_performed", False):
             return None  # Gate passes - search was performed
         
         # GATE BLOCKED
@@ -259,12 +294,13 @@ class ElefanteMCPServer:
     
     def _reset_compliance_gate(self):
         """Reset compliance state (e.g., after session ends or on explicit reset)"""
-        self._compliance_state = {
+        state = {
             "search_performed": False,
             "search_count": 0,
             "search_timestamp": None,
             "last_query": None
         }
+        self._save_compliance_state(state)
         self.logger.info("Compliance Gate reset")
 
     async def _get_orchestrator(self):
@@ -1249,7 +1285,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
             mode=mode,
             limit=args.get("limit", 10),
             filters=filters,
-            min_similarity=args.get("min_similarity", 0.3),
+            min_similarity=args.get("min_similarity", 0.1), # Issue #8 Fix: Lowered from 0.3
             include_conversation=args.get("include_conversation", True),
             include_stored=args.get("include_stored", True),
             session_id=session_id,
@@ -1276,20 +1312,38 @@ You have access to a persistent memory system called **Elefante** - the user's s
             filtered_results.append(result)
         results = filtered_results
 
-        # Data Compression (Issue #7) - Strip Nulls to prevent token bloat
+        # Data Compression (Issue #7) - Aggressive Slim Response Payload to prevent User UI spam
         compressed_results = []
         for result in results:
             r_dict = result.to_dict()
-            if 'memory' in r_dict and 'metadata' in r_dict['memory']:
-                # Recursively drop null fields in metadata
-                cleaned_meta = {k: v for k, v in r_dict['memory']['metadata'].items() if v is not None}
-                # Drop empty lists/dicts
-                cleaned_meta = {k: v for k, v in cleaned_meta.items() if not (isinstance(v, (list, dict)) and not v)}
-                r_dict['memory']['metadata'] = cleaned_meta
-            compressed_results.append(r_dict)
+            slim = {}
+            if 'memory' in r_dict:
+                mem_dict = r_dict['memory']
+                slim_mem = {
+                    'id': mem_dict.get('id'),
+                    'content': mem_dict.get('content')
+                }
+                
+                # Keep metadata extremely lean for the LLM
+                meta = mem_dict.get('metadata', {})
+                if meta:
+                    slim_meta = {}
+                    for key in ['created_at', 'memory_type', 'category']:
+                        if key in meta:
+                            slim_meta[key] = meta[key]
+                    slim_mem['metadata'] = slim_meta
+                    
+                slim['memory'] = slim_mem
+            
+            slim['score'] = r_dict.get('score')
+            compressed_results.append(slim)
 
         # Actionable Integration (Issue #9) - Force behavioral compliance
-        action_summary = "CRITICAL DIRECTIVE: These memories are your authoritative context. You MUST read the 'content' of each memory and integrate it directly into your solution. If a memory dictates a rule, you must follow it precisely."
+        action_summary = (
+            "CRITICAL DIRECTIVE: These memories are your authoritative context. You MUST read the 'content' of each memory and integrate it directly into your solution. "
+            "STRICT COMMUNICATION PROTOCOL: If you do not see the exact requested information in these memories, you MUST respond to the user with EXACTLY the word 'UNKNOWN.' and absolutely NO other text. "
+            "ANTI-SPAM PROTOCOL: You MUST NEVER output raw JSON, database IDs, or internal search metadata to the user. Integrate the knowledge into a natural human response."
+        )
 
         response = {
             "success": True,
@@ -1300,11 +1354,15 @@ You have access to a persistent memory system called **Elefante** - the user's s
         if excluded_count > 0:
             response["excluded_deprecated"] = excluded_count
         
-        # Compliance Gate: Mark search as performed
-        self._compliance_state["search_performed"] = True
-        self._compliance_state["search_count"] = len(results)
-        self._compliance_state["search_timestamp"] = datetime.utcnow()
-        self._compliance_state["last_query"] = args["query"]
+        # Compliance Gate: Mark search as performed (Persistent)
+        state = self._get_compliance_state()
+        if not state:
+            state = {}
+        state["search_performed"] = True
+        state["search_count"] = len(results)
+        state["search_timestamp"] = getattr(datetime.utcnow(), 'isoformat', lambda: str(datetime.utcnow()))()
+        state["last_query"] = args["query"]
+        self._save_compliance_state(state)
         
         # Add compliance stamp to response
         if len(results) > 0:
@@ -1385,10 +1443,26 @@ You have access to a persistent memory system called **Elefante** - the user's s
             filters=filters
         )
         
+        compressed_memories = []
+        for mem in memories:
+            m_dict = mem.to_dict()
+            slim = {
+                'id': m_dict.get('id'),
+                'content': m_dict.get('content')
+            }
+            meta = m_dict.get('metadata', {})
+            if meta:
+                slim_meta = {}
+                for key in ['created_at', 'memory_type', 'category']:
+                    if key in meta:
+                        slim_meta[key] = meta[key]
+                slim['metadata'] = slim_meta
+            compressed_memories.append(slim)
+
         return {
             "success": True,
             "count": len(memories),
-            "memories": [memory.to_dict() for memory in memories]
+            "memories": compressed_memories
         }
     
     # =========================================================================
@@ -1537,12 +1611,36 @@ You have access to a persistent memory system called **Elefante** - the user's s
 
         if not DASHBOARD_STARTED:
             try:
-                serve_dashboard_in_thread(port=port)
+                import subprocess
+                import sys
+                
+                # Check if it's already running by trying to connect
+                import urllib.request
+                import urllib.error
+                is_running = False
+                try:
+                    req = urllib.request.Request(f"{url}/health", headers={"Accept": "application/json"})
+                    with urllib.request.urlopen(req, timeout=1) as resp:
+                        if resp.status == 200:
+                            is_running = True
+                except (urllib.error.URLError, TimeoutError):
+                    pass
+                
+                if not is_running:
+                    # Launch as an independent, detached subprocess so it survives the MCP server
+                    subprocess.Popen(
+                        [sys.executable, "-m", "src.dashboard.server"],
+                        start_new_session=True,  # Detach from parent process group
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    )
+                    self.logger.info(f"Dashboard server started via subprocess on port {port}")
+                else:
+                    self.logger.info(f"Dashboard already running on {port}")
+                
                 DASHBOARD_STARTED = True
-                self.logger.info(f"Dashboard server started on port {port}")
             except Exception as e:
-                # It might already be running (e.g. from another instance or previous run)
-                self.logger.warning(f"Failed to start dashboard server (might be running): {e}")
+                self.logger.warning(f"Failed to start dashboard server: {e}")
                 DASHBOARD_STARTED = True  # Assume it's running
 
         try:

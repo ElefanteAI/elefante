@@ -1,6 +1,6 @@
 # Elefante Test Suite
 
-> **Version:** 2.1.1  
+> **Version:** 2.1.2  
 > **Last Updated:** 2026-02-16
 
 ## Quick Reference
@@ -22,22 +22,22 @@ pytest tests/test_integration_smoke.py -v
 
 ### CRITICAL (Run on every PR)
 
-| File | What It Tests | Why Critical |
-|------|---------------|--------------|
+| File                                                     | What It Tests                                      | Why Critical                                |
+| -------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------- |
 | [test_memory_persistence.py](test_memory_persistence.py) | Memories written to ChromaDB/Kuzu actually persist | Without this, users lose all their memories |
-| [test_memory_guard.py](test_memory_guard.py) | `[test]` tagged memories blocked by default | Prevents test data polluting real memory DB |
+| [test_memory_guard.py](test_memory_guard.py)             | `[test]` tagged memories blocked by default        | Prevents test data polluting real memory DB |
 
 ### UNIT TESTS (Run during development)
 
-| File | What It Tests | When to Run |
-|------|---------------|-------------|
-| [test_scoring.py](test_scoring.py) | Score normalization math, weight calculation | When changing `src/core/scoring.py` |
+| File                                 | What It Tests                                  | When to Run                          |
+| ------------------------------------ | ---------------------------------------------- | ------------------------------------ |
+| [test_scoring.py](test_scoring.py)   | Score normalization math, weight calculation   | When changing `src/core/scoring.py`  |
 | [test_refinery.py](test_refinery.py) | Memory deduplication, canonical key assignment | When changing `src/core/refinery.py` |
 
 ### INTEGRATION (Run before release)
 
-| File | What It Tests | Prerequisites |
-|------|---------------|---------------|
+| File                                                   | What It Tests                              | Prerequisites                           |
+| ------------------------------------------------------ | ------------------------------------------ | --------------------------------------- |
 | [test_integration_smoke.py](test_integration_smoke.py) | Full ADD -> SEARCH cycle with 10 scenarios | Set `ELEFANTE_ALLOW_TEST_MEMORIES=true` |
 
 ---
@@ -79,19 +79,20 @@ tests/
 
 ## When to Run What
 
-| Scenario | Command |
-|----------|---------|
-| Before any commit | `pytest tests/test_memory_persistence.py tests/test_memory_guard.py -v` |
-| Changed scoring/retrieval logic | `pytest tests/test_scoring.py tests/test_refinery.py -v` |
-| Before release | `pytest tests/ -v` |
-| Debugging search issues | `python tests/manual/test_semantic_search.py` |
-| Verify MCP server works | `python tests/verification/test_mcp_server.py` |
+| Scenario                        | Command                                                                 |
+| ------------------------------- | ----------------------------------------------------------------------- |
+| Before any commit               | `pytest tests/test_memory_persistence.py tests/test_memory_guard.py -v` |
+| Changed scoring/retrieval logic | `pytest tests/test_scoring.py tests/test_refinery.py -v`                |
+| Before release                  | `pytest tests/ -v`                                                      |
+| Debugging search issues         | `python tests/manual/test_semantic_search.py`                           |
+| Verify MCP server works         | `python tests/verification/test_mcp_server.py`                          |
 
 ---
 
 ## Archive Policy
 
 Tests move to `archive/` when:
+
 - The feature they validate is **shipped and stable** (e.g., v5, compliance gate)
 - They were **one-time validation** tests (e.g., embedding quality)
 - They're **superseded** by a better test
@@ -102,9 +103,8 @@ Archived tests can still run: `pytest tests/archive/ -v`
 
 ## Environment Variables
 
-| Variable | Purpose | Default |
-|----------|---------|---------|
+| Variable                       | Purpose                              | Default |
+| ------------------------------ | ------------------------------------ | ------- |
 | `ELEFANTE_ALLOW_TEST_MEMORIES` | Allow `[test]` tagged memories in DB | `false` |
 
 ---
-

@@ -1,6 +1,6 @@
 # Elefante Agent Tutorial
 
-> **Version:** 2.1.1  
+> **Version:** 2.1.2  
 > **Audience:** AI Agents using MCP tools  
 > **Tool naming:** All tools use `elefante-PascalCase` convention
 
@@ -16,8 +16,9 @@ Arguments: { "action": "enable" }
 ```
 
 Expected response:
+
 ```json
-{"status": "enabled", "message": "Elefante Mode activated"}
+{ "status": "enabled", "message": "Elefante Mode activated" }
 ```
 
 If already enabled: `{"status": "already_enabled"}`
@@ -39,13 +40,16 @@ Arguments: {
 ```
 
 **CRITICAL:** Rewrite vague queries to be specific:
+
 - Bad: `"How do I install it?"`
 - Good: `"How to install Elefante memory system"`
 
 **Required fields:**
+
 - `query` — Natural language search (explicit, no pronouns)
 
 **Optional fields:**
+
 - `limit` — Max results, 1–100 (default: 10)
 - `mode` — `semantic` | `structured` | `hybrid` (default: `hybrid`)
 - `min_similarity` — 0.0–1.0 threshold (default: 0.3)
@@ -63,6 +67,7 @@ Arguments: {
   - `start_date`, `end_date` — Date range
 
 Expected response:
+
 ```json
 {
   "results": [
@@ -95,9 +100,11 @@ Arguments: {
 ```
 
 **Required fields:**
+
 - `content` — What to remember (string)
 
 **Recommended fields (YOU classify these):**
+
 - `memory_type` — `fact` | `decision` | `preference` | `insight` | `note` | `conversation` (default: `fact`). Determines decay rate.
 - `domain` — `work` | `personal` | `learning` | `project` | `reference` | `system`
 - `category` — Topic grouping (e.g., "elefante", "python")
@@ -106,6 +113,7 @@ Arguments: {
 - `force_new` — `true` to bypass deduplication check
 
 **What you do NOT set:**
+
 - **Score** — Starts at 50 for every memory. Changes through behavior (access, time decay). Not a parameter.
 - **Decay rate** — Derived automatically from `memory_type`.
 
@@ -124,6 +132,7 @@ Arguments: {
 ```
 
 **Optional fields:**
+
 - `session_id` — Session UUID
 - `depth` — Graph traversal depth, 1–5 (default: 2)
 - `limit` — Max results, 1–200 (default: 50)
@@ -164,6 +173,7 @@ Arguments: {
 ```
 
 Use `parameters` for parameterized queries:
+
 ```json
 {
   "cypher_query": "MATCH (e:Entity) WHERE e.type = $type RETURN e.name",
@@ -264,56 +274,57 @@ Arguments: { "action": "disable" }
 
 Elefante does **not** use human-assigned importance. Every memory starts at score **50** and changes over time based on three behavioral signals:
 
-| Signal | What it measures | Effect |
-|--------|-----------------|--------|
-| **Recency** | Days since creation | Memories decay exponentially. Rate depends on `memory_type`. |
-| **Freshness** | Days since last access | Recently retrieved memories get a boost. Stale ones fade. |
-| **Reinforcement** | Number of times accessed | Frequently used memories grow stronger (logarithmic). |
+| Signal            | What it measures         | Effect                                                       |
+| ----------------- | ------------------------ | ------------------------------------------------------------ |
+| **Recency**       | Days since creation      | Memories decay exponentially. Rate depends on `memory_type`. |
+| **Freshness**     | Days since last access   | Recently retrieved memories get a boost. Stale ones fade.    |
+| **Reinforcement** | Number of times accessed | Frequently used memories grow stronger (logarithmic).        |
 
 A preference you set 6 months ago and still use? Score stays high. An architecture decision from a year ago that you never reference? It fades naturally.
 
 ### Decay by Memory Type
 
-| Type | Half-Life | Why |
-|------|-----------|-----|
-| `preference` | ~347 days | Stable personal choices |
-| `decision` | ~139 days | Get revisited over time |
-| `fact` | ~139 days | Objective truths evolve |
-| `insight` | ~87 days | Validated or forgotten |
-| `note` | ~46 days | Contextual, transient |
-| `conversation` | ~28 days | Ephemeral |
+| Type           | Half-Life | Why                     |
+| -------------- | --------- | ----------------------- |
+| `preference`   | ~347 days | Stable personal choices |
+| `decision`     | ~139 days | Get revisited over time |
+| `fact`         | ~139 days | Objective truths evolve |
+| `insight`      | ~87 days  | Validated or forgotten  |
+| `note`         | ~46 days  | Contextual, transient   |
+| `conversation` | ~28 days  | Ephemeral               |
 
 ---
 
 ## Memory Type Guide
 
-| Type | Use For |
-|------|---------|
-| `fact` | Objective truths, configurations |
-| `decision` | Architecture choices, rationale |
-| `preference` | User preferences, style choices, rules |
-| `insight` | Patterns, learned behaviors |
-| `note` | General notes, documentation, code snippets |
-| `conversation` | Chat history, discussions |
+| Type           | Use For                                     |
+| -------------- | ------------------------------------------- |
+| `fact`         | Objective truths, configurations            |
+| `decision`     | Architecture choices, rationale             |
+| `preference`   | User preferences, style choices, rules      |
+| `insight`      | Patterns, learned behaviors                 |
+| `note`         | General notes, documentation, code snippets |
+| `conversation` | Chat history, discussions                   |
 
 ---
 
 ## Domain Guide
 
-| Domain | Use For |
-|--------|---------|
-| `work` | Professional context |
-| `personal` | User identity, preferences |
-| `learning` | Educational content |
-| `project` | Specific project context |
-| `reference` | Documentation, guides |
-| `system` | Elefante/system settings |
+| Domain      | Use For                    |
+| ----------- | -------------------------- |
+| `work`      | Professional context       |
+| `personal`  | User identity, preferences |
+| `learning`  | Educational content        |
+| `project`   | Specific project context   |
+| `reference` | Documentation, guides      |
+| `system`    | Elefante/system settings   |
 
 ---
 
 ## Common Patterns
 
 ### Store User Preference
+
 ```json
 {
   "content": "User prefers dark mode in all IDEs.",
@@ -325,6 +336,7 @@ A preference you set 6 months ago and still use? Score stays high. An architectu
 ```
 
 ### Store Critical Constraint
+
 ```json
 {
   "content": "NEVER commit directly to main branch.",
@@ -336,6 +348,7 @@ A preference you set 6 months ago and still use? Score stays high. An architectu
 ```
 
 ### Store Project Decision
+
 ```json
 {
   "content": "Using PostgreSQL for persistence, Redis for caching.",
@@ -347,6 +360,7 @@ A preference you set 6 months ago and still use? Score stays high. An architectu
 ```
 
 ### Store Current State
+
 ```json
 {
   "content": "Current sprint: migrating auth to OAuth2.",
@@ -358,6 +372,7 @@ A preference you set 6 months ago and still use? Score stays high. An architectu
 ```
 
 ### Search for Context
+
 ```json
 {
   "query": "PostgreSQL database architecture decisions for this project",
@@ -371,11 +386,11 @@ A preference you set 6 months ago and still use? Score stays high. An architectu
 
 ## Error Handling
 
-| Error | Cause | Fix |
-|-------|-------|-----|
-| `"Elefante Mode not enabled"` | Forgot Step 0 | Call `elefante-System` with `action: "enable"` |
-| `"Database locked"` | Another IDE has lock | Use `"force": true` or disable in other IDE first |
-| `"Compliance gate"` | Tried to write before searching | Call `elefante-MemorySearch` first |
+| Error                         | Cause                           | Fix                                               |
+| ----------------------------- | ------------------------------- | ------------------------------------------------- |
+| `"Elefante Mode not enabled"` | Forgot Step 0                   | Call `elefante-System` with `action: "enable"`    |
+| `"Database locked"`           | Another IDE has lock            | Use `"force": true` or disable in other IDE first |
+| `"Compliance gate"`           | Tried to write before searching | Call `elefante-MemorySearch` first                |
 
 ---
 
@@ -388,4 +403,3 @@ A preference you set 6 months ago and still use? Score stays high. An architectu
 - [ ] Called `elefante-System` with `action: "disable"` when switching IDEs
 
 ---
-

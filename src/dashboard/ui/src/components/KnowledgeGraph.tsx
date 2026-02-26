@@ -1,7 +1,7 @@
 // Elefante Dashboard v2.0.0 — Hub-Spoke Knowledge Graph (pure SVG)
 import { useMemo, useState, useRef, useLayoutEffect } from 'react';
 import { useDashboardStore } from '@/store';
-import type { MemoryNode } from '@/types';
+import type { MemoryNode, GraphEdge } from '@/types';
 
 // ── colour palette ─────────────────────────────────────────────────
 const TOPIC_COLORS: Record<string, string> = {
@@ -42,10 +42,15 @@ interface LayoutEdge {
   x1: number; y1: number;
   x2: number; y2: number;
   color: string;
+  isRealEdge?: boolean;
+  sourceId?: string;
+  targetId?: string;
+  label?: string;
 }
 
 function buildLayout(
   memories: MemoryNode[],
+  snapshotEdges: GraphEdge[],
   W: number,
   H: number,
 ): { nodes: LayoutNode[]; edges: LayoutEdge[] } {
@@ -117,12 +122,38 @@ function buildLayout(
     }
   }
 
+  // Real semantic/graph edges
+  const memMap = new Map(nodes.filter(n => n.kind === 'memory').map(n => [n.id, n]));
+  snapshotEdges.forEach(e => {
+    const src = memMap.get(e.source);
+    const tgt = memMap.get(e.target);
+    if (!src || !tgt) return;
+
+    // Filter out weak semantic connections to avoid hairballs
+    if (e.type === 'semantic' && (e.similarity || 0) < 0.8) return;
+
+    // Distinguish Graph vs Semantic
+    const isGraph = e.type === 'graph' || e.label === 'CO_ACTIVATED';
+    const edgeColor = isGraph ? '#a855f7' : '#10b981';
+
+    edges.push({
+      x1: src.x, y1: src.y,
+      x2: tgt.x, y2: tgt.y,
+      color: edgeColor,
+      isRealEdge: true,
+      sourceId: src.id,
+      targetId: tgt.id,
+      label: e.label || e.type
+    });
+  });
+
   return { nodes, edges };
 }
 
 // ── component ──────────────────────────────────────────────────────
 export function KnowledgeGraph() {
   const getMemoryNodes  = useDashboardStore((s) => s.getMemoryNodes);
+  const snapshotEdges   = useDashboardStore((s) => s.snapshot?.edges || []);
   const setInspectedMemoryId = useDashboardStore((s) => s.setInspectedMemoryId);
   const setActiveTab    = useDashboardStore((s) => s.setActiveTab);
   const memories        = getMemoryNodes();
@@ -145,8 +176,8 @@ export function KnowledgeGraph() {
   }, []);
 
   const { nodes, edges } = useMemo(
-    () => buildLayout(memories, size.w, size.h),
-    [memories, size.w, size.h],
+    () => buildLayout(memories, snapshotEdges, size.w, size.h),
+    [memories, snapshotEdges, size.w, size.h],
   );
 
   const nodeMap = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
@@ -160,8 +191,19 @@ export function KnowledgeGraph() {
       return new Set(nodes.filter((n) => n.topic === topic).map((n) => n.id));
     }
     const n = nodeMap.get(hovered);
-    return n ? new Set([`hub:${n.topic}`, n.id]) : new Set<string>();
-  }, [hovered, nodes, nodeMap]);
+    const connected = new Set<string>();
+    if (n) {
+      connected.add(`hub:${n.topic}`);
+      connected.add(n.id);
+      edges.forEach(e => {
+        if (e.isRealEdge) {
+          if (e.sourceId === n.id && e.targetId) connected.add(e.targetId);
+          if (e.targetId === n.id && e.sourceId) connected.add(e.sourceId);
+        }
+      });
+    }
+    return connected;
+  }, [hovered, nodes, nodeMap, edges]);
 
   if (memories.length === 0) {
     return (
@@ -182,13 +224,31 @@ export function KnowledgeGraph() {
         <g>
           {edges.map((e, i) => {
             const isHub = e.color === '#334155';
+            const isReal = !!e.isRealEdge;
+            let strokeWidth = isHub ? 0.8 : 1.2;
+            if (isReal) strokeWidth = 1.5;
+
+            let opacity = 0.35;
+            if (dimmed) {
+              if (isReal && (e.sourceId === hovered || e.targetId === hovered)) {
+                opacity = 0.9;
+                strokeWidth = 2.5;
+              } else {
+                opacity = isReal ? 0.05 : (isHub ? 0.05 : 0.08); 
+              }
+            } else if (isReal) {
+              opacity = 0.6;
+            } else if (isHub) {
+              opacity = 0.15;
+            }
+
             return (
               <line
                 key={i}
                 x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
                 stroke={e.color}
-                strokeWidth={isHub ? 0.8 : 1.2}
-                opacity={dimmed ? (isHub ? 0.05 : 0.08) : (isHub ? 0.15 : 0.35)}
+                strokeWidth={strokeWidth}
+                opacity={opacity}
               />
             );
           })}
@@ -305,7 +365,7 @@ export function KnowledgeGraph() {
       )}
 
       {/* Legend */}
-      <div className="absolute bottom-3 right-4 flex gap-3 text-[10px] text-slate-500">
+      <div className="absolute bottom-3 right-4 flex gap-4 text-[10px] text-slate-500 bg-slate-900/60 p-2 rounded-md border border-slate-700/50 backdrop-blur-sm">
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-full bg-cyan-400 opacity-90" />
           <span>Hub</span>
@@ -314,7 +374,14 @@ export function KnowledgeGraph() {
           <div className="w-2 h-2 rounded-full bg-slate-400 opacity-75" />
           <span>Memory</span>
         </div>
-        <span className="text-slate-600">hover to highlight · click to open</span>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-0.5 bg-[#a855f7] opacity-80" />
+          <span>Graph/Co-Activation Link</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-0.5 bg-[#10b981] opacity-80" />
+          <span>Semantic Link</span>
+        </div>
       </div>
     </div>
   );

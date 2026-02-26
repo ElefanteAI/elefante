@@ -7,6 +7,13 @@ For full detail, see [CHANGELOG.md](CHANGELOG.md).
 
 ## Current Baseline (recommended)
 
+- **v2.1.2 (2026-02-25)**
+  - Passive Co-Activation: Automatically generates graph connections between memories retrieved sequentially.
+  - Smoothed Vector Baseline: Exponential scaling applied to cognitive context scores, fixing muted heuristic suppression.
+  - Response Optimization: Context stripped of nulls to save tokens and prepended with actionable agent summaries.
+  - Compliance Gate Hardening: Blocked stateless multi-tool agent bypasses with strict NO GUESSING edicts.
+  - Dashboard Validation: Full headless verification of Chroma and Kuzu insight rendering.
+
 - **v2.1.1 (2026-02-19)**
   - Dashboard field mapping fix: categories and usage counts now display correctly
   - Directive System: behavioral constraints separated from memories, always injected into every tool response

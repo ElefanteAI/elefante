@@ -10,7 +10,7 @@
 
 ---
 
-##  CRITICAL LAWS (Extracted from Pain)
+## CRITICAL LAWS (Extracted from Pain)
 
 | #   | Law                                                                            | Violation Cost       |
 | --- | ------------------------------------------------------------------------------ | -------------------- |
@@ -43,7 +43,7 @@
 **Date:** 2025-11-28  
 **Duration:** 45 minutes  
 **Severity:** CRITICAL  
-**Status:**  FIXED
+**Status:** FIXED
 
 ### Problem
 
@@ -87,7 +87,7 @@ def _parse_buffer_size(self):
 **Date:** 2025-11-28  
 **Duration:** 30 minutes  
 **Severity:** HIGH  
-**Status:**  FIXED
+**Status:** FIXED
 
 ### Problem
 
@@ -113,7 +113,7 @@ Frontend reading wrong API response fields:
 stats.total_memories; //  undefined
 
 // Should read:
-stats.vector_store.total_memories; // 
+stats.vector_store.total_memories; //
 ```
 
 ### Solution
@@ -137,7 +137,7 @@ Updated `App.tsx` line 36 to read nested fields correctly.
 **Date:** 2025-11-28  
 **Duration:** 40 minutes  
 **Severity:** MEDIUM  
-**Status:**  FIXED
+**Status:** FIXED
 
 ### Problem
 
@@ -177,7 +177,7 @@ Canvas only showed labels on hover, not by default. Technical implementation wor
 **Date:** 2025-12-05  
 **Duration:** 2 hours  
 **Severity:** CRITICAL  
-**Status:**  FIXED
+**Status:** FIXED
 
 ### Problem
 
@@ -229,7 +229,7 @@ results = collection.get(include=["metadatas", "documents"])
 **Date:** 2025-12-05  
 **Duration:** 45 minutes  
 **Severity:** CRITICAL  
-**Status:**  FIXED
+**Status:** FIXED
 
 ### Problem
 
@@ -283,7 +283,7 @@ async def get_graph():
 **Date:** 2025-12-07  
 **Duration:** 8+ hours across multiple sessions  
 **Severity:** CRITICAL  
-**Status:**  FIXED
+**Status:** FIXED
 
 ### Problem
 
@@ -308,14 +308,14 @@ Despite ChromaDB containing:
 
 **6-Layer Bug Chain** - Each bug hid the next:
 
-| #   | Location                            | Issue                                               | Hidden By                     |
-| --- | ----------------------------------- | --------------------------------------------------- | ----------------------------- |
+| #   | Location                            | Issue                                                | Hidden By                     |
+| --- | ----------------------------------- | ---------------------------------------------------- | ----------------------------- |
 | 1   | `classifier.py`                     | Only 5 regex patterns -> 90% defaulted to world/fact | "Migration succeeded" message |
-| 2   | `VectorStore.add_memory()`          | Missing `layer`/`sublayer` in metadata dict         | Data never saved              |
-| 3   | `VectorStore._reconstruct_memory()` | Missing `layer`/`sublayer` in reconstruction        | Even if saved, not read back  |
+| 2   | `VectorStore.add_memory()`          | Missing `layer`/`sublayer` in metadata dict          | Data never saved              |
+| 3   | `VectorStore._reconstruct_memory()` | Missing `layer`/`sublayer` in reconstruction         | Even if saved, not read back  |
 | 4   | MCP Server (12h running)            | Cached old code -> migration used unfixed code       | Tool reported success         |
-| 5   | `GraphCanvas.tsx` colors            | Read `n.full_data.props` not `n.properties`         | Frontend path mismatch        |
-| 6   | `GraphCanvas.tsx` sidebar           | Same path mismatch in different code location       | Same bug, different place     |
+| 5   | `GraphCanvas.tsx` colors            | Read `n.full_data.props` not `n.properties`          | Frontend path mismatch        |
+| 6   | `GraphCanvas.tsx` sidebar           | Same path mismatch in different code location        | Same bug, different place     |
 
 ### Solution
 
@@ -384,10 +384,10 @@ grep -r "full_data.props" src/dashboard/ui/
 
 ### Pattern 1: Testing API Without Testing UI
 
-| What I Did                       | What I Should Do                             |
-| -------------------------------- | -------------------------------------------- |
+| What I Did                       | What I Should Do                               |
+| -------------------------------- | ---------------------------------------------- |
 | Tested API endpoint in isolation | Test complete flow: API -> Frontend -> Browser |
-| Assumed API working = UI working | Verify actual user-facing behavior           |
+| Assumed API working = UI working | Verify actual user-facing behavior             |
 
 ### Pattern 2: Fixing Wrong Files
 
@@ -462,7 +462,7 @@ Write-Host "API nodes: $($response.nodes.Count)"
 **Date:** YYYY-MM-DD  
 **Duration:** X hours/minutes  
 **Severity:** LOW | MEDIUM | HIGH | CRITICAL  
-**Status:**  OPEN |  IN PROGRESS |  FIXED |  DOCUMENTED
+**Status:** OPEN | IN PROGRESS | FIXED | DOCUMENTED
 
 ### Problem
 
@@ -489,6 +489,60 @@ Write-Host "API nodes: $($response.nodes.Count)"
 > [One-line takeaway in blockquote format]
 ```
 
+## Issue #7: The Phantom Dashboard (Blank Screen / Connection Death)
+
+**Date:** 2026-02-25  
+**Duration:** 1 hour  
+**Severity:** CRITICAL  
+**Status:** FIXED
+
+### Problem
+
+When the Agent opened the Dashboard using the `elefante-DashboardOpen` MCP tool, the user saw an entirely "EMPTY BLANK THING" on `http://localhost:8000` or the connection was immediately refused. The Agent would report that the dashboard was successfully opened, but the user could not see it.
+
+### Symptom
+
+Agent Zero logs: "The Elefante Knowledge Garden Dashboard is now open at http://localhost:8000. Data refreshed: 56 nodes, 41 edges."
+User sees: A blank white screen in the browser, or `ERR_CONNECTION_REFUSED`.
+`curl http://localhost:8000` returns `(7) Failed to connect to localhost port 8000`.
+
+### Root Cause
+
+**Transient MCP Client Connections vs Daemon Threads.**
+Agent Zero (like many MCP clients) often spins up the `src.mcp.server` process to execute a single task or tool. When the tool call finishes, the MCP client gracefully or forcefully closes the `stdio` connection to save RAM.
+
+In `src/mcp/server.py`, the dashboard was being launched like this:
+
+```python
+serve_dashboard_in_thread(port=port)
+```
+
+This started Uvicorn in a `daemon=True` background thread.
+
+Because daemon threads are immediately forcefully terminated when the main Python process exists, the very moment the MCP Server process shut down, the Dashboard thread was instantly vaporized. If the user's browser fetched `index.html` from cache just beforehand, the subsequent asset requests failed, resulting in a blank React root canvas.
+
+### Solution
+
+Rewrote `_start_dashboard_and_open()` in `src/mcp/server.py` to launch the dashboard as an entirely independent, detached background process using `subprocess.Popen` instead of a thread.
+
+```python
+                subprocess.Popen(
+                    [sys.executable, "-m", "src.dashboard.server"],
+                    start_new_session=True,  # Detach from parent process group
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+```
+
+### Why This Took So Long
+
+1. **Misleading Logs:** The server logs in Python correctly indicated "Dashboard started", and test scripts (which didn't close immediately) proved Uvicorn could run in a thread.
+2. **"Blank Screen" vs "Connection Error":** Assumed the issue was a Javascript exception or React fatal error in the frontend build, leading to unnecessary exploration of React hooks and rendering logic via headless browser screenshots.
+
+### Lesson
+
+> **Never bind long-living HTTP servers to daemon threads inside a transient/stateless worker process (like an MCP server). Always detach them into a true subprocess.**
+
 ---
 
-_Last verified: 2025-12-05 | Run `python scripts/health_check.py` to validate dashboard data path_
+_Last verified: 2026-02-25 | Run `python scripts/health_check.py` to validate dashboard data path_
