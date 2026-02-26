@@ -7,16 +7,22 @@ For full detail, see [CHANGELOG.md](CHANGELOG.md).
 
 ## Current Baseline (recommended)
 
+- **v2.1.4 (2026-02-26)**
+  - **Critical fix**: Memory deletion no longer poisons the co-activation graph with stale UUIDs.
+  - `_handle_delete_memory()` purges deleted IDs from `_session_retrieval_history`.
+  - `record_coactivation()` validates IDs exist in ChromaDB before running O(n^2) graph queries.
+  - `scripts/version_counsel.py` added: smart version advisor (MAJOR/MINOR/PATCH classification from staged diff).
+  - `bump_version.py` gets `[0-99]` range validation; `CONTRIBUTING.md` versioning rewritten.
+
+## Previous Releases
+
 - **v2.1.3 (2026-02-26)**
   - Windows clean installation: `fcntl` guard, `KUZU_DIR` fix, `install.bat` version parse fix, `py -3.11` launcher support.
   - Windows Golden Path documented in `docs/technical/installation.md`.
   - Windows Pitfalls section added to `docs/pitfall-index.md` (6 entries).
   - Pre-action gate promoted from memory to Directive (unconditional enforcement).
-  - `scripts/version_counsel.py` added: smart version advisor that analyses staged diff, classifies MAJOR/MINOR/PATCH, and asks for confirmation before bumping. `[0-99]` range validation enforced across both version scripts.
   - `bump_version.py` expanded to cover 25 files; Windows `encoding='utf-8'` fix.
   - All 25 version references updated to 2.1.3 across codebase.
-
-## Previous Releases
 
 - **v2.1.2 (2026-02-25)**
   - Passive Co-Activation: Automatically generates graph connections between memories retrieved sequentially.

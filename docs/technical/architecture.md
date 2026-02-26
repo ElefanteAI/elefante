@@ -1,6 +1,6 @@
 # Elefante Architecture: The Second Brain
 
-**Version:** 2.1.3 | **Status:** Production Ready (Windows validated)
+**Version:** 2.1.4 | **Status:** Production Ready (Windows validated)
 
 ## 1. System Overview
 

@@ -331,6 +331,13 @@ Before completing ANY task:
 **Why:** A pure heuristic equation can suppress highly relevant facts if they lack access count. Baseline guarantees true semantic matches floor at >=85% of their raw similarity.  
 **Source:** `docs/debug/memory-compendium.md` Issue #8
 
+### pitfall: memory delete stale coactivation CRITICAL
+
+**Trigger:** Deleting or updating a memory, then running any search or tool call  
+**Action:** After deleting a memory, its UUID MUST be purged from `_session_retrieval_history`. The `record_coactivation()` function MUST validate IDs exist before running graph queries.  
+**Why:** `_session_retrieval_history` is a sliding window of up to 20 UUIDs. If a deleted ID stays in the list, every subsequent search fires O(n^2) Kuzu MERGE queries referencing a nonexistent memory — creating orphan graph edges, wasting I/O, and corrupting the co-activation graph. Fixed in v2.1.4.  
+**Source:** `src/mcp/server.py` `_handle_delete_memory()`, `src/core/orchestrator.py` `record_coactivation()`
+
 ---
 
 ## Documentation Pitfalls

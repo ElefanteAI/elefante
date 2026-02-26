@@ -835,12 +835,23 @@ class MemoryOrchestrator:
             return
             
         try:
-            # We want to link all pairs of recently retrieved memories
-            # To avoid an N^2 query explosion, we pair them up sequentially or in combinations
-            # Kuzu Cypher doesn't easily support arbitrary array combinations in a single fast MERGE without UNWIND
-            # We will generate separate MERGE statements for unique pairs.
+            # Validate that IDs still exist in ChromaDB before burning O(n^2)
+            # graph queries.  Deleted/stale IDs are silently dropped.
+            valid_ids = []
+            for mid in set(memory_ids):
+                try:
+                    from uuid import UUID as _UUID
+                    mem = await self.vector_store.get_memory(_UUID(mid))
+                    if mem is not None:
+                        valid_ids.append(mid)
+                except Exception:
+                    pass  # skip invalid/missing
+
+            if len(valid_ids) < 2:
+                return
+
             import itertools
-            pairs = list(itertools.combinations(set(memory_ids), 2))
+            pairs = list(itertools.combinations(valid_ids, 2))
             
             for m1, m2 in pairs:
                 # Merge the undirected (or bidirectional) relationship

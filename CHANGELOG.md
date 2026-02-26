@@ -9,9 +9,36 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+---
+
+## [2.1.4] - 2026-02-26
+
+### Summary
+
+Critical fix: memory deletion/update no longer poisons the co-activation graph with stale IDs.
+
+### The Problem Solved
+
+When a user deleted or updated a memory, its UUID stayed in the MCP server's `_session_retrieval_history` sliding window. Every subsequent `MemorySearch` or auto-context injection (`_inject_context`) passed these stale IDs to `record_coactivation()`, which then:
+1. Ran O(n^2) Kuzu MERGE queries referencing nonexistent memories.
+2. Created orphan `CO_ACTIVATED` edges or silently failed, wasting graph I/O.
+3. Could cause inconsistent graph state if the deleted memory's Entity node was partially cleaned up.
+
+### The Fix
+
+1. **`src/mcp/server.py` — `_handle_delete_memory()`**: After successful deletion, the deleted memory's UUID is purged from `_session_retrieval_history`. No stale ID ever reaches `record_coactivation()`.
+2. **`src/core/orchestrator.py` — `record_coactivation()`**: Added existence-validation guard. Before generating O(n^2) pairs, each ID is checked against ChromaDB via `get_memory()`. Only confirmed-live IDs proceed to the MERGE loop. This is defense-in-depth — even if a stale ID leaks through another path, it gets filtered out here.
+
 ### Added
 
 - `scripts/version_counsel.py` — interactive smart version advisor. Analyses staged git diff, classifies the change as MAJOR / MINOR / PATCH, presents a recommendation with a short reason and the semantic versioning table, then asks for confirmation before calling `bump_version.py`. Supports manual override (type `x.y.z` at the prompt).
+
+### Fixed
+
+- `_handle_delete_memory()` now purges the deleted UUID from `_session_retrieval_history` immediately after successful deletion.
+- `record_coactivation()` validates memory IDs exist in ChromaDB before running O(n^2) graph MERGE queries. Stale/deleted IDs are silently dropped.
 
 ### Changed
 

@@ -1541,6 +1541,12 @@ You have access to a persistent memory system called **Elefante** - the user's s
             success = await vs.delete_memory(mid)
             
             if success:
+                # Purge deleted ID from session history to prevent stale
+                # co-activation queries against a nonexistent memory.
+                self._session_retrieval_history = [
+                    mid_str for mid_str in self._session_retrieval_history
+                    if mid_str != memory_id
+                ]
                 self.logger.info(f"Memory deleted (purposeful forgetting): {memory_id}", reason=reason)
                 return {
                     "success": True,
