@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.0.0 - Visualization Data Hooks
+// Elefante Dashboard v2.1.4 - Visualization Data Hooks
 import { useMemo } from 'react';
 import { useDashboardStore } from '@/store';
 import type { MemoryNode } from '@/types';

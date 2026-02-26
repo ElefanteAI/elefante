@@ -48,6 +48,30 @@ TARGETS = [
     ("tests/README.md",                               r'(\*\*Version:\*\*\s*)\S+',                             r'\g<1>{v}'),
 ]
 
+# Glob-based targets: matches multiple files sharing the same header pattern.
+# Format: (glob_pattern, regex_pattern, replacement_template)
+# These are expanded at runtime and processed alongside TARGETS.
+GLOB_TARGETS = [
+    ("src/dashboard/ui/src/**/*.tsx",  r'(// Elefante Dashboard v)\d+\.\d+\.\d+',  r'\g<1>{v}'),
+    ("src/dashboard/ui/src/**/*.ts",   r'(// Elefante Dashboard v)\d+\.\d+\.\d+',  r'\g<1>{v}'),
+]
+
+
+def _expand_glob_targets():
+    """Expand GLOB_TARGETS into concrete (rel_path, pattern, template) tuples.
+
+    Only files whose content actually matches the pattern are included.
+    Bootstrap/utility files without a version header are silently skipped.
+    """
+    expanded = []
+    for glob_pat, pattern, template in GLOB_TARGETS:
+        for fpath in sorted(ROOT.glob(glob_pat)):
+            text = fpath.read_text(encoding='utf-8')
+            if re.search(pattern, text):
+                rel = fpath.relative_to(ROOT).as_posix()
+                expanded.append((rel, pattern, template))
+    return expanded
+
 
 def read_current_version() -> str:
     text = VERSION_FILE.read_text(encoding='utf-8')
@@ -61,7 +85,8 @@ def check_versions() -> bool:
     """Return True if all files match src/__init__.py, False otherwise."""
     expected = read_current_version()
     ok = True
-    for rel_path, pattern, _ in TARGETS:
+    all_targets = TARGETS + _expand_glob_targets()
+    for rel_path, pattern, _ in all_targets:
         fpath = ROOT / rel_path
         if not fpath.exists():
             print(f"  MISSING  {rel_path}")
@@ -106,7 +131,8 @@ def bump(new_version: str):
             raise SystemExit(f"Version part '{label}={val}' is out of range [0, 99].")
 
     changed = []
-    for rel_path, pattern, template in TARGETS:
+    all_targets = TARGETS + _expand_glob_targets()
+    for rel_path, pattern, template in all_targets:
         fpath = ROOT / rel_path
         if not fpath.exists():
             print(f"  SKIP     {rel_path} (not found)")
