@@ -43,6 +43,45 @@ tests/          # Pytest suite
 
 **Single source of truth**: `src/__init__.py` → propagated by script.
 
+### Recommended workflow — smart advisor
+
+After staging your changes, run `version_counsel.py`. It analyses the diff,
+classifies the change level, and **asks before doing anything**:
+
+```bash
+# 1. Stage your work
+git add <files>
+
+# 2. Ask the advisor (Windows)
+.venv\Scripts\python.exe scripts\version_counsel.py
+
+# 2. Ask the advisor (macOS/Linux)
+.venv/bin/python scripts/version_counsel.py
+```
+
+The advisor will print:
+
+```
+  I believe this development, if you want to save it,
+  it should be v2.2.0  (bump y  (MINOR)),
+  because: new Elefante MCP tool added (src/mcp/tools/foo.py).
+
+  ┌──────┬──────────┬──────────────────────────────────────────────┐
+  │ Part │ Meaning  │ When to bump                                 │
+  ├──────┼──────────┼──────────────────────────────────────────────┤
+  │  x   │ MAJOR    │ Breaking change — existing installs break    │
+  │  y   │ MINOR    │ New feature, backward-compatible             │
+  │  z   │ PATCH    │ Bug fix, docs, internal cleanup              │
+  └──────┴──────────┴──────────────────────────────────────────────┘
+
+  Bump to v2.2.0?  [y / N / enter override e.g. 2.3.0]:
+```
+
+Confirm `y`, press `N` to cancel, or type a manual version to override.
+On confirmation it calls `bump_version.py` automatically.
+
+### Manual bump (if you already know the version)
+
 ```bash
 # Bump version in all 25 files at once (Windows)
 .venv\Scripts\python.exe scripts\bump_version.py 2.2.0
@@ -56,7 +95,7 @@ tests/          # Pytest suite
 
 **Rules — MANDATORY:**
 - NEVER edit version strings by hand in individual files.
-- ALWAYS run `bump_version.py X.Y.Z` to update all 25 files atomically.
+- ALWAYS use `version_counsel.py` (interactive) or `bump_version.py X.Y.Z` (direct) — never manual file edits.
 - Run `--check` before committing to catch drift.
 - CHANGELOG.md and RELEASES.md entries must be written manually (they are historical logs, not current-version declarations).
 - If a new doc file has a version marker, ADD IT to `scripts/bump_version.py` TARGETS before the next version bump.

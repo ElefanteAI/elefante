@@ -100,6 +100,10 @@ def bump(new_version: str):
     # Validate semver format
     if not re.match(r'^\d+\.\d+\.\d+$', new_version):
         raise SystemExit(f"Invalid version format: '{new_version}'. Use X.Y.Z")
+    parts = list(map(int, new_version.split(".")))
+    for label, val in zip(("x", "y", "z"), parts):
+        if not (0 <= val <= 99):
+            raise SystemExit(f"Version part '{label}={val}' is out of range [0, 99].")
 
     changed = []
     for rel_path, pattern, template in TARGETS:
