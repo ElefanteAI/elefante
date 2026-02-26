@@ -9,7 +9,7 @@ This runbook is operational (not a postmortem). Lessons learned belong in `docs/
 ## Preconditions
 
 1. **Tag the release** before making changes:
-   - `git tag v1.10.0` (or the current version, if not already tagged).
+   - `git tag v2.1.3` (or the current version, if not already tagged).
 
 2. **Take a data backup** before any changes that touch storage formats:
    - Databases live under `data/` by default (configurable in `config.yaml`).
@@ -49,7 +49,7 @@ python scripts/restore_elefante_data.py --latest --force
 3. **Roll back code** to the desired version:
 
 ```bash
-git checkout v1.10.0   # or whichever tagged version
+git checkout v2.1.3   # or whichever tagged version
 ```
 
 4. **Restart services**:

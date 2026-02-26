@@ -32,8 +32,6 @@ For full detail, see [CHANGELOG.md](CHANGELOG.md).
   - Installation bootstrap: Step 4a validates `copilot-instructions.md` exists
   - Tool count: 17 → 20 (added `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove`)
 
-## Previous Releases
-
 - **v2.1.0 (2026-02-19)**
   - Directive System, Tool Response Contract, installation bootstrap (superseded by v2.1.1)
 
