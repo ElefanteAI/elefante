@@ -1,55 +1,99 @@
 # Elefante
 
-**The Second Brain for AI Agents.** Your agent stops forgetting. Every preference, every decision, every pattern — remembered, scored, and surfaced at the moment of need.
+**Elefante never forgets.**
 
-> **v2.1.4** — Persistent Memory for AI Agents
+Your agent forgets the moment the conversation ends.
+Every preference you fought for. Every decision you refined. Every pattern you discovered. Gone.
+
+**Elefante ends that forever.**
+
+It gives any AI agent a living, local, automatically scored second brain that injects exactly the right context at the exact moment it is needed. No more hallucinations from missing history. Just answers that feel like they came from you — every single time.
+
+**v2.1.4** — Persistent Memory Engine
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        YOUR IDE                             │
-│  (VS Code, Cursor, Windsurf — any MCP-compatible client)    │
+│ YOUR IDE (VS Code · Cursor · Windsurf · any MCP client)     │
 └────────────────────────┬────────────────────────────────────┘
                          │ MCP stdio
 ┌────────────────────────▼────────────────────────────────────┐
-│              LAYER 1: MCP PROTOCOL                          │
-│  20 tools · Compliance Gate · Context Injection             │
-│  ┌─────────┐ ┌─────────────┐ ┌───────────┐ ┌────────────┐ │
-│  │ Memory  │ │   Graph     │ │   Tasks   │ │  System    │ │
-│  │ CRUD    │ │ Connect/    │ │ Create/   │ │ Status/    │ │
-│  │ Search  │ │ Query       │ │ Decompose │ │ Dashboard  │ │
-│  └────┬────┘ └──────┬──────┘ └─────┬─────┘ └─────┬──────┘ │
-└───────┼─────────────┼──────────────┼──────────────┼────────┘
-        │             │              │              │
-┌───────▼─────────────▼──────────────▼──────────────▼────────┐
-│              LAYER 2: INTELLIGENCE ENGINE                   │
-│  Orchestrator · Adaptive Weighting · Behavioral Relevance   │
-│  ┌──────────────┐ ┌──────────────┐ ┌────────────────────┐  │
-│  │  ChromaDB    │ │    Kuzu      │ │  Cognitive         │  │
-│  │  Semantic    │ │  Knowledge   │ │  Retrieval         │  │
-│  │  Vectors     │ │  Graph       │ │  (6-signal score)  │  │
-│  │  (768-dim)   │ │  (entities)  │ │                    │  │
-│  └──────────────┘ └──────────────┘ └────────────────────┘  │
-└──────────────────────┬──────────────────────────────────────┘
-                       │ snapshot.json
-┌──────────────────────▼──────────────────────────────────────┐
-│              LAYER 3: DASHBOARD                             │
-│  Read-only window into your knowledge system                │
-│  ┌──────────┐ ┌────────────┐ ┌───────────────────────────┐ │
-│  │ Overview │ │  Memories  │ │  Explore                  │ │
-│  │ Health   │ │  Search    │ │  Topics · Insights · Graph│ │
-│  │ Score    │ │  Table     │ │                           │ │
-│  └──────────┘ └────────────┘ └───────────────────────────┘ │
-│                 http://127.0.0.1:8000                       │
+│ LAYER 1 · MCP PROTOCOL                                      │
+│ 20 precision tools · Compliance Gate · Silent Context       │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────────────────┐
+│ LAYER 2 · INTELLIGENCE ENGINE                               │
+│ Orchestrator · 6-signal scoring · Hybrid Memory             │
+│ (ChromaDB vectors + Kuzu graph)                             │
+└────────────────────────┬────────────────────────────────────┘
+                         │ snapshot.json
+┌────────────────────────▼────────────────────────────────────┐
+│ LAYER 3 · DASHBOARD                                         │
+│ Live window into the health of your second brain            │
+│ http://127.0.0.1:8000                                       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**The product is the cohesion.** MCP tools capture knowledge. The Intelligence Engine scores and connects it. The Dashboard shows you the health of your second brain. All three layers serve one purpose: _your agent gives better answers because it remembers._
+**Cohesion is the product.**
+MCP captures. The Engine scores and connects. The Dashboard shows health. One unbreakable system.
+
+---
+
+## Why This Changes Everything
+
+Most agents are brilliant for one chat and useless the next.
+Elefante is the persistent memory layer they were missing — 100% local-first, zero telemetry, designed to travel cleanly from today's VS Code to tomorrow's fully autonomous environments like **Agent Zero**.
+
+Agent Zero is a Docker-sandboxed autonomous powerhouse that executes real actions (terminal, apps, multi-agent orchestration, 24/7 operation — the kind of "crazy things" OpenClaw popularized but Agent Zero does more reliably). Elefante ensures it never forgets context across wild sessions, making true long-term autonomy possible.
+
+---
+
+## Deep Dive: What Elefante Actually Does
+
+### Layer 1 — MCP Protocol (the bridge)
+
+20 battle-tested tools that let agents store, search, connect and manage knowledge.
+**Compliance Gate** blocks duplicates before they exist.
+**Context Injection** silently attaches relevant memories to every call.
+**Directives** enforce your unbreakable rules unconditionally.
+
+Full tool reference + parameter schemas → [docs/technical/usage.md](docs/technical/usage.md)
+IDE/MCP setup → [docs/technical/ide-mcp-configuration.md](docs/technical/ide-mcp-configuration.md)
+
+### Layer 2 — Intelligence Engine (the brain)
+
+- **ChromaDB** (768-dim semantic vectors) finds meaning across months.
+- **Kuzu** (knowledge graph) tracks entities and relationships.
+- **6-signal Behavioral Relevance** automatic scoring (recency + reinforcement + type + frequency + freshness + context fit) — no manual ratings ever.
+
+How scoring works + examples → [docs/README.md#behavioral-relevance](docs/README.md#behavioral-relevance-v1100)
+Full architecture → [docs/technical/architecture.md](docs/technical/architecture.md)
+
+### Layer 3 — Dashboard (your cockpit)
+
+Live read-only view: health score, searchable memories, topic map, live graph — all from a lightweight snapshot so the agent stays fast.
+
+Dashboard deep dive → [docs/technical/dashboard.md](docs/technical/dashboard.md)
+Docker version → [docs/technical/docker.md](docs/technical/docker.md)
+
+---
+
+## What Elefante Delivers Every Day
+
+- Stores facts, preferences, decisions, code patterns, tasks
+- Hybrid search (semantic + graph + session)
+- Automatic 6-signal scoring
+- Zero-friction context injection
+- Enforced quality (search-before-write)
+- Instant visual brain health
+
+Full "What It Does" with examples → [docs/README.md](docs/README.md)
 
 ---
 
 ## Quick Start
 
-**Requirements:** Python 3.11, ~5 GB disk space
+**Requirements:** Python 3.11+, ~5 GB disk
 
 ```bash
 # macOS / Linux
@@ -59,51 +103,11 @@ chmod +x install.sh && ./install.sh
 install.bat
 ```
 
-Connect to your IDE (VS Code, Cursor, etc.) via MCP stdio:
-
+Connect via MCP stdio:
 - **Command:** `<repo>/.venv/bin/python`
 - **Args:** `-m src.mcp.server`
-- **Env:** `PYTHONPATH` and `ELEFANTE_CONFIG_PATH` pointing to this repo
 
-Full setup: [docs/technical/installation.md](docs/technical/installation.md) · [IDE configuration](docs/technical/ide-mcp-configuration.md)
-
----
-
-## How It Works
-
-### Layer 1: MCP Protocol
-
-The bridge between your IDE and the brain. 20 tools that let agents store, search, connect, and manage knowledge. A **Compliance Gate** forces search-before-write — no duplicates, no noise. **Context Injection** silently attaches relevant memories to every tool call so the agent gets history without asking. **Directives** keep unconditional behavioral rules always present in every tool response — never dependent on search.
-
-### Layer 2: Intelligence Engine
-
-The brain. Two storage backends work together:
-
-- **ChromaDB** (semantic vectors) finds memories by meaning — "how do we handle auth?" matches a decision about JWT tokens made three months ago.
-- **Kuzu** (knowledge graph) tracks entities and relationships — who connects to what, which decisions depend on which facts.
-- **Behavioral Relevance** scores every memory automatically. Recent, frequently-accessed, and type-appropriate memories surface first. No manual ratings.
-
-### Layer 3: Dashboard
-
-The window. A snapshot-driven read-only view of your knowledge system:
-
-- **Overview**: Health score (freshness, coverage, connectivity) with diagnostic panels.
-- **Memories**: Searchable, sortable table with semantic search integration.
-- **Explore**: Topic distribution, memory insights, and a knowledge graph.
-
----
-
-## What It Does
-
-- **Stores** facts, preferences, decisions, code patterns, and tasks
-- **Searches** using hybrid retrieval: semantic vectors + knowledge graph + session context
-- **Scores** every memory automatically — recency, freshness, and reinforcement replace manual importance ratings
-- **Injects context** into every tool call — the agent gets relevant memories without asking
-- **Builds a knowledge graph** of entities and relationships
-- **Enforces quality** via a compliance gate: search before write, no duplicates
-- **Visualizes** knowledge through a snapshot-driven dashboard
-
-Everything runs locally. No cloud. No telemetry. Your data stays on your machine.
+Full installation → [docs/technical/installation.md](docs/technical/installation.md)
 
 ---
 
@@ -121,26 +125,26 @@ Everything runs locally. No cloud. No telemetry. Your data stays on your machine
 | Directives | `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove`                                                 |
 | System     | `elefante-System`, `elefante-SystemStatusGet`, `elefante-DashboardOpen`                                                       |
 
-Full reference with parameter schemas: [docs/technical/usage.md](docs/technical/usage.md)
+Full reference with parameter schemas → [docs/technical/usage.md](docs/technical/usage.md)
 
 ---
 
 ## Tech Stack
 
-| Component    | Technology                       |
-| ------------ | -------------------------------- |
-| Vector store | ChromaDB 1.3.5                   |
-| Graph store  | Kuzu 0.11.3                      |
-| Embeddings   | sentence-transformers (gte-base) |
-| Protocol     | MCP 1.23.1                       |
-| Dashboard    | React + TypeScript + Vite        |
-| Runtime      | Python 3.11                      |
+| Purpose       | Technology                      |
+| ------------- | ------------------------------- |
+| Vector store  | ChromaDB 1.3.5                  |
+| Graph store   | Kuzu 0.11.3                     |
+| Embeddings    | sentence-transformers (gte-base)|
+| Protocol      | MCP 1.23.1                      |
+| Dashboard     | React + TypeScript + Vite       |
+| Runtime       | Python 3.11                     |
 
 ---
 
 ## Documentation
 
-The full reference lives in [docs/README.md](docs/README.md), covering:
+Everything lives in [docs/README.md](docs/README.md).
 
 - [Tool reference](docs/technical/usage.md) — complete parameter schemas
 - [Behavioral Relevance](docs/README.md#behavioral-relevance-v1100) — how scoring works
@@ -152,14 +156,16 @@ The full reference lives in [docs/README.md](docs/README.md), covering:
 
 ---
 
-## Contributing
+## Contributing & License
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## License
+**License:** Business Source License 1.1 — free for non-competitive use. Converts to Apache 2.0 on 2029-02-10.
 
-[Business Source License 1.1](LICENSE) — free for any non-competitive use. Converts to Apache 2.0 on 2029-02-10.
+[Changelog](CHANGELOG.md) · [Full Docs](docs/README.md)
 
 ---
 
-[Changelog](CHANGELOG.md) · [Full Documentation](docs/README.md)
+This is Elefante.
+**Elefante never forgets.**
+**Elefante ends that forever.**

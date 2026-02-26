@@ -27,7 +27,7 @@ TARGETS = [
     ("config.yaml",                                   r'(  version:\s*")[^"]+(")',                               r'\g<1>{v}\2'),
     ("config.yaml",                                   r'(    version:\s*")[^"]+(")',                             r'\g<1>{v}\2'),
     ("src/dashboard/ui/package.json",                 r'("version":\s*")[^"]+(")',                               r'\g<1>{v}\2'),
-    ("README.md",                                     r'(\*\*v)[^*]+(\*\*\s*—)',                                r'\g<1>{v}\2'),
+    ("README.md",                                     r'(\*\*v)\d+\.\d+\.\d+(\*\*\s*—)',                     r'\g<1>{v}\2'),
     ("RELEASES.md",                                   r'(Current Baseline.*?\n\n- \*\*v)\d+\.\d+\.\d+',         r'\g<1>{v}'),
     ("CONTRIBUTING.md",                               r'(Pydantic models \(v)\d+\.\d+\.\d+( schema\))',          r'\g<1>{v}\2'),
     ("docs/README.md",                                r'(Current version:\*\*\s*v)\S+',                         r'\g<1>{v}'),
