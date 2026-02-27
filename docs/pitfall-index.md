@@ -132,6 +132,13 @@ Before completing ANY task:
 **Affected file:** `src/utils/elefante_mode.py`  
 **Source:** Discovered during Windows first-run, February 26, 2026
 
+### pitfall: installation ide reload stale connection
+
+**Trigger:** IDE continues using old MCP server (e.g. v1.6.3) after upgrading (e.g. to v2.1.4) and updating `mcp_config.json`.  
+**Action:** **Reload the IDE window** (e.g. `Developer: Reload Window` in VS Code/Cursor) or restart the MCP background process.  
+**Why:** IDEs do not hot-reload the MCP server when the config file changes. The old python background process runs indefinitely, holding locks/ports.  
+**Source:** `docs/debug/installation-compendium.md` Issue #6
+
 ---
 
 ## Windows Pitfalls
@@ -180,12 +187,14 @@ Before completing ANY task:
 **Trigger:** `~/.elefante/locks/` does not exist on Windows after first run  
 **Action:** Normal — `~` on Windows expands to `C:\Users\<name>`. The lock directory is auto-created by `TransactionLock._acquire()`. If missing after enable: check `ELEFANTE_HOME` in `src/utils/config.py` resolves to `Path.home() / ".elefante"`.  
 **Why:** `Path.home()` is cross-platform. `~` in shell commands may not expand the same way on all Windows terminals.
+
 ### pitfall: windows script read_text encoding cp1252
 
 **Trigger:** Any Python script that calls `Path.read_text()` or `Path.write_text()` crashes on Windows with `UnicodeDecodeError: 'charmap' codec can't decode byte...`  
 **Action:** Always pass `encoding='utf-8'` explicitly: `path.read_text(encoding='utf-8')` and `path.write_text(content, encoding='utf-8')`.  
 **Why:** On Windows, `Path.read_text()` defaults to `cp1252` (the Windows ANSI code page). UTF-8 text with non-ASCII characters (e.g., `ó`, emoji, curly quotes in doc files) will crash it.  
 **Affected:** `scripts/bump_version.py` — fixed February 26, 2026.
+
 ---
 
 ## Database Pitfalls
@@ -359,26 +368,27 @@ Before completing ANY task:
 
 ## Quick Reference
 
-| Category     | Most Common Pitfall        | Quick Fix                                             |
-| ------------ | -------------------------- | ----------------------------------------------------- |
-| Dashboard    | Stale snapshot             | `python scripts/update_dashboard_data.py`             |
-| Dashboard    | Browser cache              | `Ctrl+Shift+R`                                        |
-| Installation | Kuzu pre-existing dir      | Do not mkdir; let `GraphStore.__init__` handle it     |
-| Installation | Wrong Python path          | Use `sys.executable` not `"python"`                   |
-| Windows      | fcntl import               | `if sys.platform != "win32": import fcntl`            |
-| Windows      | Activate.ps1 blocked       | `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser` |
-| Windows      | Wrong venv path            | Use `.venv\Scripts\python.exe` not `.venv/bin/python` |
-| Windows      | MCP config not found       | `python scripts\configure_vscode_bob.py`              || Windows      | read_text encoding crash   | Always pass `encoding='utf-8'` to `read_text/write_text` |
-| Versioning   | Version part out of range  | Each of x, y, z must be in `[0, 99]` — scripts enforce this || Database     | Reserved word `properties` | Use `props`                                           |
-| Database     | Stale lock                 | Check `~/.elefante/locks/write.lock`, delete if stale |
-| MCP          | Tools not showing          | `list[types.Tool]` not `List[Tool]`                   |
-| MCP          | stdout pollution           | All logs → `sys.stderr`                               |
-| MCP          | Write gate blocked         | Call `elefante-MemorySearch` first                    |
-| MCP          | Response Bloat             | Recursive null-stripping payload                      |
-| MCP          | Rules Ignored              | Use `suggested_action` directive                      |
-| Memory       | Export truncated           | `collection._collection.get()` not `query()`          |
-| Memory       | High sim, low score        | Smoothed Vector Baseline                              |
-| Docs         | Ghost links after archive  | `grep -r "filename" docs/` before moving any file     |
+| Category     | Most Common Pitfall       | Quick Fix                                                   |
+| ------------ | ------------------------- | ----------------------------------------------------------- | --- | -------- | -------------------------- | -------------------------------------------------------- |
+| Dashboard    | Stale snapshot            | `python scripts/update_dashboard_data.py`                   |
+| Dashboard    | Browser cache             | `Ctrl+Shift+R`                                              |
+| Installation | Kuzu pre-existing dir     | Do not mkdir; let `GraphStore.__init__` handle it           |
+| Installation | Wrong Python path         | Use `sys.executable` not `"python"`                         |
+| Installation | IDE stale connection      | Reload the IDE window after installation                    |
+| Windows      | fcntl import              | `if sys.platform != "win32": import fcntl`                  |
+| Windows      | Activate.ps1 blocked      | `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`       |
+| Windows      | Wrong venv path           | Use `.venv\Scripts\python.exe` not `.venv/bin/python`       |
+| Windows      | MCP config not found      | `python scripts\configure_vscode_bob.py`                    |     | Windows  | read_text encoding crash   | Always pass `encoding='utf-8'` to `read_text/write_text` |
+| Versioning   | Version part out of range | Each of x, y, z must be in `[0, 99]` — scripts enforce this |     | Database | Reserved word `properties` | Use `props`                                              |
+| Database     | Stale lock                | Check `~/.elefante/locks/write.lock`, delete if stale       |
+| MCP          | Tools not showing         | `list[types.Tool]` not `List[Tool]`                         |
+| MCP          | stdout pollution          | All logs → `sys.stderr`                                     |
+| MCP          | Write gate blocked        | Call `elefante-MemorySearch` first                          |
+| MCP          | Response Bloat            | Recursive null-stripping payload                            |
+| MCP          | Rules Ignored             | Use `suggested_action` directive                            |
+| Memory       | Export truncated          | `collection._collection.get()` not `query()`                |
+| Memory       | High sim, low score       | Smoothed Vector Baseline                                    |
+| Docs         | Ghost links after archive | `grep -r "filename" docs/` before moving any file           |
 
 ---
 

@@ -2,21 +2,21 @@
 
 > **Domain:** Installation, Setup & Environment  
 > **Last Updated:** 2025-12-11  
-> **Total Issues Documented:** 5  
+> **Total Issues Documented:** 6  
 > **Status:** Production Reference  
 > **Maintainer:** Add new issues following Issue #N template at bottom
 
 ---
 
-##  CRITICAL LAWS (Extracted from Pain)
+## CRITICAL LAWS (Extracted from Pain)
 
-| # | Law | Violation Cost |
-|---|-----|----------------|
-| 1 | Do NOT pre-create Kuzu database directory | 12 minutes debugging |
-| 2 | Check library changelogs before upgrading | Breaking changes |
-| 3 | Test configuration files, not just code | Root cause missed |
-| 4 | Run `pip install -r requirements.txt` after git pull | Missing deps |
-| 5 | Verify Python version matches requirements | Cryptic errors |
+| #   | Law                                                  | Violation Cost       |
+| --- | ---------------------------------------------------- | -------------------- |
+| 1   | Do NOT pre-create Kuzu database directory            | 12 minutes debugging |
+| 2   | Check library changelogs before upgrading            | Breaking changes     |
+| 3   | Test configuration files, not just code              | Root cause missed    |
+| 4   | Run `pip install -r requirements.txt` after git pull | Missing deps         |
+| 5   | Verify Python version matches requirements           | Cryptic errors       |
 
 ---
 
@@ -26,6 +26,8 @@
 - [Issue #2: Missing Dependencies After Clone](#issue-2-missing-dependencies-after-clone)
 - [Issue #3: Python Version Mismatch](#issue-3-python-version-mismatch)
 - [Issue #4: Config Pre-creating Directories](#issue-4-config-pre-creating-directories)
+- [Issue #5: Broken Venv Escape (Trapped Agent)](#issue-5-broken-venv-escape-trapped-agent)
+- [Issue #6: IDE Holding Stale MCP Server Connections](#issue-6-ide-holding-stale-mcp-server-connections)
 - [Cognitive Failure Analysis](#cognitive-failure-analysis)
 - [Prevention Protocol](#prevention-protocol)
 - [Appendix: Issue Template](#appendix-issue-template)
@@ -37,37 +39,44 @@
 **Date:** 2025-11-27  
 **Duration:** 12 minutes (THE nightmare)  
 **Severity:** CRITICAL  
-**Status:**  FIXED
+**Status:** FIXED
 
 ### Problem
+
 Fresh installation fails with cryptic path error.
 
 ### Symptom
+
 ```
 RuntimeError: Database path cannot be a directory: C:\Users\...\kuzu_db
 ```
 
 ### Root Cause
+
 **Kuzu 0.11.x Breaking Change:** Database path handling fundamentally changed.
 
-| Version | Behavior |
-|---------|----------|
-| 0.1.x | Could pre-create `kuzu_db/` directory |
-| 0.11.x | Database path CANNOT exist beforehand |
+| Version | Behavior                              |
+| ------- | ------------------------------------- |
+| 0.1.x   | Could pre-create `kuzu_db/` directory |
+| 0.11.x  | Database path CANNOT exist beforehand |
 
 The `config.py` was pre-creating the directory:
+
 ```python
 KUZU_DIR.mkdir(exist_ok=True)  #  BREAKS Kuzu 0.11.x
 ```
 
 ### Solution
+
 **File 1:** `src/utils/config.py`
+
 ```python
 # REMOVED this line:
 # KUZU_DIR.mkdir(exist_ok=True)  # Kuzu 0.11.x cannot have pre-existing directory
 ```
 
 **File 2:** `src/core/graph_store.py`
+
 ```python
 def _ensure_database_path(self):
     """Ensure database path is ready for Kuzu 0.11.x"""
@@ -80,6 +89,7 @@ def _ensure_database_path(self):
 ```
 
 **File 3:** `scripts/install.py` - Added pre-flight check:
+
 ```python
 def check_kuzu_compatibility():
     kuzu_dir = Path("data/kuzu_db")
@@ -91,12 +101,14 @@ def check_kuzu_compatibility():
 ```
 
 ### Why This Took So Long
+
 1. **Misleading Error:** "cannot be a directory" sounds like permissions issue
 2. **Wrong File Focus:** Error appears in `graph_store.py` but fix is in `config.py`
 3. **Cognitive Bias:** Assumed database issue, not configuration issue
 4. **Time Pressure:** Made hasty assumptions instead of systematic analysis
 
 ### Lesson
+
 > **Always read error messages literally. Check configuration before implementation.**
 
 ---
@@ -106,24 +118,29 @@ def check_kuzu_compatibility():
 **Date:** 2025-11-27  
 **Duration:** 5 minutes  
 **Severity:** MEDIUM  
-**Status:**  DOCUMENTED
+**Status:** DOCUMENTED
 
 ### Problem
+
 Fresh clone fails with import errors.
 
 ### Symptom
+
 ```
 ModuleNotFoundError: No module named 'chromadb'
 ModuleNotFoundError: No module named 'kuzu'
 ```
 
 ### Root Cause
+
 User skipped `pip install -r requirements.txt` step. Common when:
+
 - Following partial instructions
 - Copy-pasting commands without reading
 - Assuming virtual environment has everything
 
 ### Solution
+
 ```bash
 # Always run after clone:
 pip install -r requirements.txt
@@ -134,11 +151,13 @@ install.bat  # Windows
 ```
 
 ### Why This Happens
+
 - README instructions may be skimmed
 - Users assume dependencies are bundled
 - Error message doesn't say "run pip install"
 
 ### Lesson
+
 > **Install scripts should run pip install automatically. Never assume user did it.**
 
 ---
@@ -148,30 +167,36 @@ install.bat  # Windows
 **Date:** 2025-11-27  
 **Duration:** 10 minutes  
 **Severity:** MEDIUM  
-**Status:**  DOCUMENTED
+**Status:** DOCUMENTED
 
 ### Problem
+
 System Python too old for some dependencies.
 
 ### Symptom
+
 ```
 ERROR: Package 'kuzu' requires a different Python: 3.9.7 not in '>=3.11'
 ```
 
 Or cryptic syntax errors:
+
 ```
 SyntaxError: invalid syntax
 # (usually from walrus operator := or | union types)
 ```
 
 ### Root Cause
+
 Elefante requires Python 3.11 for:
+
 - Type hints with `|` union syntax
 - Walrus operator `:=`
 - Modern async features
 - Kuzu and ChromaDB package compatibility
 
 ### Solution
+
 ```bash
 # Check current version
 python --version
@@ -188,11 +213,13 @@ source .venv/bin/activate  # Linux/Mac
 ```
 
 ### Why This Persists
+
 - Multiple Python versions on system
 - System Python often outdated
 - Virtual environment not activated
 
 ### Lesson
+
 > **Always specify Python version in requirements. Add version check to install script.**
 
 ---
@@ -202,16 +229,20 @@ source .venv/bin/activate  # Linux/Mac
 **Date:** 2025-11-27  
 **Duration:** Part of Issue #1  
 **Severity:** HIGH  
-**Status:**  FIXED
+**Status:** FIXED
 
 ### Problem
+
 Configuration module creates directories that break Kuzu initialization.
 
 ### Symptom
+
 Kuzu fails on first run even with clean install.
 
 ### Root Cause
+
 `config.py` had eager directory creation:
+
 ```python
 # These lines ran on IMPORT:
 DATA_DIR.mkdir(exist_ok=True)
@@ -220,7 +251,9 @@ KUZU_DIR.mkdir(exist_ok=True)  #  This breaks Kuzu 0.11.x
 ```
 
 ### Solution
+
 Changed to lazy directory creation:
+
 ```python
 # Only create directories when actually needed:
 def ensure_data_dirs():
@@ -230,11 +263,13 @@ def ensure_data_dirs():
 ```
 
 ### Why This Design Existed
+
 - Seemed like good practice to ensure directories exist
 - Worked fine with older Kuzu versions
 - No one anticipated library behavior change
 
 ### Lesson
+
 > **Let libraries manage their own resources. Don't be overly helpful with directories.**
 
 ---
@@ -256,12 +291,12 @@ def ensure_data_dirs():
 
 ### Why These Mistakes Happened
 
-| Bias | Description | How It Hurt |
-|------|-------------|-------------|
-| **Anchoring** | Fixated on error location | Debugged wrong file |
-| **Confirmation** | Looked for evidence supporting assumption | Ignored config.py |
-| **Time Pressure** | Rushed to solution | Skipped systematic analysis |
-| **Pattern Matching** | Applied previous debugging patterns | Wrong mental model |
+| Bias                 | Description                               | How It Hurt                 |
+| -------------------- | ----------------------------------------- | --------------------------- |
+| **Anchoring**        | Fixated on error location                 | Debugged wrong file         |
+| **Confirmation**     | Looked for evidence supporting assumption | Ignored config.py           |
+| **Time Pressure**    | Rushed to solution                        | Skipped systematic analysis |
+| **Pattern Matching** | Applied previous debugging patterns       | Wrong mental model          |
 
 ### The Learning
 
@@ -322,6 +357,7 @@ python scripts/init_databases.py
 ## Quick Install Reference
 
 ### Windows
+
 ```powershell
 git clone https://github.com/jsubiabreIBM/Elefante.git
 cd Elefante
@@ -332,6 +368,7 @@ python scripts/install.py
 ```
 
 ### Linux/Mac
+
 ```bash
 git clone https://github.com/jsubiabreIBM/Elefante.git
 cd Elefante
@@ -342,6 +379,7 @@ python scripts/install.py
 ```
 
 ### Verification
+
 ```bash
 python -c "from src.core.orchestrator import MemoryOrchestrator; print(' Import successful')"
 python scripts/health_check.py
@@ -354,7 +392,7 @@ python scripts/health_check.py
 **Date:** 2025-12-11  
 **Duration:** ~2 hours  
 **Severity:** HIGH  
-**Status:**  FIXED
+**Status:** FIXED
 
 ### Problem
 
@@ -399,6 +437,7 @@ subprocess.run(['/opt/homebrew/bin/python3.11', '-m', 'venv', '.venv'])
 ```
 
 **Alternative: Shebang override**
+
 ```python
 #!/usr/bin/env python3.11  # Forces system Python at OS level
 ```
@@ -420,6 +459,47 @@ See `docs/archive/historical/install-escape-2025-12-11/` for the 6 scripts that 
 
 ---
 
+## Issue #6: IDE Holding Stale MCP Server Connections
+
+**Date:** 2026-02-27  
+**Duration:** ~5 minutes  
+**Severity:** HIGH  
+**Status:** DOCUMENTED
+
+### Problem
+
+After a fresh Elefante update or re-installation, the IDE continues communicating with an older version of the MCP server.
+
+### Symptom
+
+Even after verifying the installation and confirming `mcp_config.json` points to the new repository path, calling the MCP server yields responses from the old version (e.g., v1.6.3 instead of v2.1.4).
+
+### Root Cause
+
+IDEs (VS Code, Cursor, Antigravity) launch the MCP server as a background process when the session starts. Updating the configuration file (`mcp_config.json` or `mcp.json`) does **not** automatically terminate the running instance. The IDE continues to route JSON-RPC traffic to the old background process holding the port/lock until the IDE window is explicitly reloaded.
+
+### Solution
+
+**Mandatory IDE Reload**: After any installation or configuration change, the user MUST manually reload the IDE window or explicitly restart the MCP server via the IDE's UI.
+
+```bash
+# In VS Code / Cursor:
+# Command Palette -> Developer: Reload Window
+
+# Or manually kill the old python process if IDE reload fails to drop the zombie process.
+```
+
+### Why This Took So Long
+
+1. **Assumption of Hot-Reload**: Expected the IDE to watch the configuration file and restart the subprocess automatically.
+2. **Hidden State**: MCP servers run statelessly in the background; there's no visual indicator in the IDE that it's talking to a specific path/PID unless explicitly queried.
+
+### Lesson
+
+> **Never assume the IDE hot-reloads MCP server configurations. Always mandate an explicit window reload after installation.**
+
+---
+
 ## Appendix: Issue Template
 
 ```markdown
@@ -428,30 +508,36 @@ See `docs/archive/historical/install-escape-2025-12-11/` for the 6 scripts that 
 **Date:** YYYY-MM-DD  
 **Duration:** X hours/minutes  
 **Severity:** LOW | MEDIUM | HIGH | CRITICAL  
-**Status:**  OPEN |  IN PROGRESS |  FIXED |  DOCUMENTED
+**Status:** OPEN | IN PROGRESS | FIXED | DOCUMENTED
 
 ### Problem
+
 [One sentence: what is broken]
 
 ### Symptom
+
 [What the user sees / exact error message]
 
 ### Root Cause
+
 [Technical explanation of WHY it broke]
 
 ### Solution
+
 [Code changes or steps that fixed it]
 
 ### Why This Took So Long
+
 [Honest reflection on methodology mistakes]
 
 ### Lesson
+
 > [One-line takeaway in blockquote format]
 ```
 
 ---
 
-*Last verified: 2026-02-16 | Tested on: macOS, Python 3.11, Kuzu 0.11.3*
+_Last verified: 2026-02-16 | Tested on: macOS, Python 3.11, Kuzu 0.11.3_
 
 ---
 
@@ -460,20 +546,20 @@ See `docs/archive/historical/install-escape-2025-12-11/` for the 6 scripts that 
 ### Lessons Learned
 
 1. **Pre-Flight Checks Are Essential**
-    - Detect issues before they cause problems
-    - Automated checks beat “read the docs” fixes
+   - Detect issues before they cause problems
+   - Automated checks beat “read the docs” fixes
 
 2. **User Experience Matters**
-    - Clear errors + automated remediations save time
-    - Backups provide safety and confidence
+   - Clear errors + automated remediations save time
+   - Backups provide safety and confidence
 
 3. **Breaking Changes Need Proactive Handling**
-    - Version updates can break installs
-    - Encode known issues + mitigations in code
+   - Version updates can break installs
+   - Encode known issues + mitigations in code
 
 4. **Fast Failure Beats Late Failure**
-    - Fail in seconds, not minutes
-    - Abort early with remediation steps
+   - Fail in seconds, not minutes
+   - Abort early with remediation steps
 
 ### Future Improvements
 
