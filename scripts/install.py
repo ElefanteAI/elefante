@@ -341,6 +341,36 @@ def install_dependencies(root_dir, python_cmd):
         logger.log("ERROR: Failed to install dependencies")
         return False
 
+def build_dashboard_ui(root_dir):
+    """Build the React frontend for the dashboard"""
+    logger.log("Building Dashboard UI (this may take a minute)...")
+    ui_dir = root_dir / "src" / "dashboard" / "ui"
+    
+    if not ui_dir.exists():
+        logger.log("WARN: Dashboard UI directory not found")
+        return True
+        
+    try:
+        npm_cmd = "npm.cmd" if platform.system() == 'Windows' else "npm"
+        subprocess.check_call([npm_cmd, "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        logger.log("WARN: 'npm' is not installed or not in PATH. Skipping UI build.")
+        logger.log("   To view the dashboard, install Node.js and run 'npm install && npm run build' in src/dashboard/ui")
+        return True
+
+    logger.log("   Installing npm dependencies...")
+    if not run_command([npm_cmd, "install"], cwd=ui_dir):
+        logger.log("WARN: Failed to install npm dependencies")
+        return True
+        
+    logger.log("   Building production assets...")
+    if not run_command([npm_cmd, "run", "build"], cwd=ui_dir):
+        logger.log("WARN: Failed to build Dashboard UI")
+        return True
+        
+    logger.log("OK: Dashboard UI built successfully")
+    return True
+
 def init_databases(root_dir, python_cmd):
     """Initialize ChromaDB and Kuzu"""
     logger.log("Initializing databases...")
@@ -437,6 +467,11 @@ def main():
     if not install_dependencies(root_dir, python_cmd):
         success = False
     
+    if success:
+        # 2a. Dashboard UI
+        print_step("2a", "Dashboard UI Build")
+        build_dashboard_ui(root_dir)
+        
     if success:
         # 3. Databases
         print_step(3, "Database Initialization")
