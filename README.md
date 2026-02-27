@@ -101,6 +101,7 @@ install.bat
 ```
 
 Connect via MCP stdio:
+
 - **Command:** `<repo>/.venv/bin/python`
 - **Args:** `-m src.mcp.server`
 
@@ -112,15 +113,15 @@ Full installation → [docs/technical/installation.md](docs/technical/installati
 
 20 tools + 2 prompts. All names follow `elefante-PascalCase` convention.
 
-| Category   | Tools                                                                                                                         |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Category   | Tools                                                                                                                                   |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | Memory     | `elefante-MemoryAdd`, `elefante-MemorySearch`, `elefante-MemoryUpdate`, `elefante-MemoryDelete`, `elefante-MemoryConsolidate` |
-| Graph      | `elefante-GraphConnect`, `elefante-GraphQuery`                                                                                |
-| Context    | `elefante-ContextGet`, `elefante-SessionsList`                                                                                |
-| Tasks      | `elefante-TaskCreate`, `elefante-TaskUpdate`, `elefante-TaskGraph`                                                            |
-| ETL        | `elefante-ETLProcess`, `elefante-ETLClassify`                                                                                 |
-| Directives | `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove`                                                 |
-| System     | `elefante-System`, `elefante-SystemStatusGet`, `elefante-DashboardOpen`                                                       |
+| Graph      | `elefante-GraphConnect`, `elefante-GraphQuery`                                                                                      |
+| Context    | `elefante-ContextGet`, `elefante-SessionsList`                                                                                      |
+| Tasks      | `elefante-TaskCreate`, `elefante-TaskUpdate`, `elefante-TaskGraph`                                                                |
+| ETL        | `elefante-ETLProcess`, `elefante-ETLClassify`                                                                                       |
+| Directives | `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove`                                                     |
+| System     | `elefante-System`, `elefante-SystemStatusGet`, `elefante-DashboardOpen`                                                           |
 
 Full reference with parameter schemas → [docs/technical/usage.md](docs/technical/usage.md)
 
@@ -128,14 +129,14 @@ Full reference with parameter schemas → [docs/technical/usage.md](docs/technic
 
 ## Tech Stack
 
-| Purpose       | Technology                       |
-| ------------- | -------------------------------- |
-| Vector store  | ChromaDB 1.3.5                   |
-| Graph store   | Kuzu 0.11.3                      |
-| Embeddings    | sentence-transformers (gte-base) |
-| Protocol      | MCP 1.23.1                       |
-| Dashboard     | React + TypeScript + Vite        |
-| Runtime       | Python 3.11                      |
+| Purpose      | Technology                       |
+| ------------ | -------------------------------- |
+| Vector store | ChromaDB 1.3.5                   |
+| Graph store  | Kuzu 0.11.3                      |
+| Embeddings   | sentence-transformers (gte-base) |
+| Protocol     | MCP 1.23.1                       |
+| Dashboard    | React + TypeScript + Vite        |
+| Runtime      | Python 3.11                      |
 
 ---
 
@@ -173,4 +174,3 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 **License:** [Business Source License 1.1](LICENSE) — free for non-competitive use. Converts to Apache 2.0 on 2029-02-10.
 
 [Changelog](CHANGELOG.md) · [Full Documentation](docs/README.md)
-**Elefante ends that forever.**
