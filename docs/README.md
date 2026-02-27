@@ -2,7 +2,7 @@
 
 Persistent memory for AI coding agents. Elefante runs locally on your machine via [MCP](https://modelcontextprotocol.io/) (Model Context Protocol), storing knowledge in a vector database and a knowledge graph. Your agent remembers what you care about, forgets what you don't, and scores every memory based on how you actually use it — not how important you _said_ it was.
 
-> **Current version:** v2.1.4
+> **Current version:** v2.1.5
 
 ---
 

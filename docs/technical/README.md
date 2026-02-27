@@ -1,6 +1,6 @@
 # Technical Documentation Index
 
-**Status**: Production (v2.1.4)  
+**Status**: Production (v2.1.5)  
 **Purpose**: Complete technical reference for Elefante AI Memory System
 
 ---

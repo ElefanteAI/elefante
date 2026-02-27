@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.1.4 - Memories Tab
+// Elefante Dashboard v2.1.5 - Memories Tab
 import { useState, useEffect } from 'react';
 import { useDashboardStore } from '@/store';
 import { useSearch } from '@/hooks/useSearch';

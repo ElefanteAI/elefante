@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.1.4 - Type Definitions
+// Elefante Dashboard v2.1.5 - Type Definitions
 
 export interface MemoryNode {
   id: string;
