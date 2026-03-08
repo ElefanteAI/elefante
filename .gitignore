@@ -70,3 +70,4 @@ CURRENT_SESSION_*.md
 
 # Local ChromaDB (generated if path config misses)
 chroma_db/
+src/elefante.egg-info/

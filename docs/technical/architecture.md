@@ -51,6 +51,15 @@ Instead of a static RAG formula, Elefante uses a multi-faceted 6-signal behavior
 
 **Immutable Authority (Native SDD):** Memory types classified as `specification` or `directive` completely bypass chronological decay, instantly receiving an absolute `1.0` authority score to ensure they dominate context retrieval and enable frictionless Spec-Driven Development workflows.
 
+### The Native SDD Workflow (Gatekeeper & Oracle)
+
+To prevent LLM context-window bloat, Elefante enforces Spec-Driven Development using a two-part architecture:
+
+1. **The Gatekeeper (System Prompt):** Configuration files like `.github/copilot-instructions.md` or `.cursorrules` should *only* contain the rules of engagement (e.g., "Always search Elefante before coding"). They should never contain large architectural specs.
+2. **The Oracle (Elefante DB):** Heavy architectural specs, schemas, and etiquette rules (e.g., `developer-etiquette.md`) are stored inside Elefante as `SPECIFICATION` memories. 
+
+When the agent receives a prompt, the Gatekeeper forces it to search. The Oracle returns the exact 1.0 Authority specification required for that specific task, keeping the active context window clean and focused.
+
 ### Data Flow: Storing a Memory
 
 1.  **Ingest:** Text received via `elefante-MemoryAdd`.

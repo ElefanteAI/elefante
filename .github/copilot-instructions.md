@@ -24,3 +24,7 @@ User-managed, persistent behavioral constraints. These are unconditional rules s
 
 ### `RELEVANT_CONTEXT`
 Auto-surfaced memories relevant to the current operation. Appears when applicable (not on search/system tools). Contains the top 3 most similar memories with similarity scores. This gives you ambient context without requiring an explicit `elefante-MemorySearch` call.
+
+## Developer Etiquette (Native SDD)
+
+Before you ever mark a task or feature implementation as "Complete" or "Done", you MUST read the `docs/technical/developer-etiquette.md` Specification and execute its exact sequence (Delete Leftovers, Update Documentation, and Semantic Versioning). Failure to do so is a violation of the Native SDD framework.

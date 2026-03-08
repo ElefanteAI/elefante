@@ -793,6 +793,7 @@ class MemoryOrchestrator:
                 created_at=metadata.created_at if hasattr(metadata, 'created_at') and metadata.created_at else datetime.utcnow(),
                 last_accessed=metadata.last_accessed if hasattr(metadata, 'last_accessed') and metadata.last_accessed else datetime.utcnow(),
                 vector_score=result.score,  # Original vector similarity score
+                memory_type=metadata.memory_type.value if hasattr(metadata, 'memory_type') and hasattr(metadata.memory_type, "value") else getattr(metadata, "memory_type", "fact"),
             )
             
             # Score candidate and get explanation

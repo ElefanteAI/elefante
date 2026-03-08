@@ -125,6 +125,14 @@ Full installation → [docs/technical/installation.md](docs/technical/installati
 
 Full reference with parameter schemas → [docs/technical/usage.md](docs/technical/usage.md)
 
+## Native Spec-Driven Development (SDD)
+
+Elefante is the foundation for context-safe Spec-Driven Development. To prevent your AI agent from hallucinating or overloading its token context with massive architectural specs, Elefante enforces the **Gatekeeper & Oracle** pattern:
+
+1. **The Gatekeeper (System Prompt):** Your `.cursorrules` or `copilot-instructions.md` should only contain strict instructions mandating that the agent query Elefante before writing code.
+2. **The Oracle (Elefante DB):** You store your massive architectural specs (like database schemas or API contracts) inside Elefante as `SPECIFICATION` memory types. 
+3. **The Retrieval:** Specs are mathematically guaranteed an Authority Score of `1.0`. When the Gatekeeper forces the agent to search, the Oracle perfectly surfaces only the exact specification needed for the current task.
+
 ---
 
 ## Tech Stack

@@ -30,6 +30,7 @@ class MemoryCandidate:
     created_at: datetime
     last_accessed: datetime
     embedding: Optional[list[float]] = None
+    memory_type: str = "fact"
     
     # Computed scores
     vector_score: float = 0.0
@@ -283,6 +284,12 @@ class CognitiveRetriever:
         vector_baseline = candidate.vector_score * 0.85
         if candidate.composite_score < vector_baseline:
             candidate.composite_score = vector_baseline
+            
+        # Native SDD Authority Override
+        # Ensures specifications and directives mathematically dominate typical context retrieval 
+        # while preserving vector-based sorting among multiple competing specifications.
+        if candidate.memory_type in ("specification", "directive"):
+            candidate.composite_score = min(1.0, candidate.composite_score + 0.30)
         
         # Build explanation if requested
         explanation = None
