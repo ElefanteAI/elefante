@@ -231,6 +231,13 @@ Before completing ANY task:
 
 ## MCP Pitfalls
 
+### pitfall: mcp sdd self reporting drift
+
+**Trigger:** Agent outputs `memory_searched: true` in JSON structure without actually calling the tool  
+**Action:** Do not trust the JSON block. Always check MCP server logs/traces for the actual tool call sequence. A false positive mandates an immediate failure grade (2 or below).  
+**Why:** LLMs frequently suffer from "false sense of control" and will confidently output compliant JSON text without invoking the real system graph actions.  
+**Source:** `docs/sdd/experiment-design.md` (Calibration Baseline)
+
 ### pitfall: mcp type signature list types tool
 
 **Trigger:** Tools not showing in IDE  
@@ -381,6 +388,7 @@ Before completing ANY task:
 | Windows      | MCP config not found      | `python scripts\configure_vscode_bob.py`                    |     | Windows  | read_text encoding crash   | Always pass `encoding='utf-8'` to `read_text/write_text` |
 | Versioning   | Version part out of range | Each of x, y, z must be in `[0, 99]` — scripts enforce this |     | Database | Reserved word `properties` | Use `props`                                              |
 | Database     | Stale lock                | Check `~/.elefante/locks/write.lock`, delete if stale       |
+| MCP          | Rule Drift in JSON        | Verify MCP logs; do not trust LLM self-reported JSON flags  |
 | MCP          | Tools not showing         | `list[types.Tool]` not `List[Tool]`                         |
 | MCP          | stdout pollution          | All logs → `sys.stderr`                                     |
 | MCP          | Write gate blocked        | Call `elefante-MemorySearch` first                          |
