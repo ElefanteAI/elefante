@@ -38,6 +38,8 @@ class MemoryType(str, Enum):
     INSIGHT = "insight"
     NOTE = "note"
     CONVERSATION = "conversation"
+    SPECIFICATION = "specification"
+    DIRECTIVE = "directive"
 
 
 class MemoryStatus(str, Enum):
@@ -94,6 +96,8 @@ TYPE_DECAY_RATES: Dict[str, float] = {
     "insight": 0.008,       # ~87 days   — insights are validated or forgotten
     "note": 0.015,          # ~46 days   — notes are transient
     "conversation": 0.025,  # ~28 days   — conversations are ephemeral
+    "specification": 0.0,   # Immutable  — specifications do not decay
+    "directive": 0.0,       # Immutable  — directives do not decay
 }
 
 

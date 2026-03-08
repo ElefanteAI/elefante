@@ -29,6 +29,8 @@ class EntityType(str, Enum):
     ROLE = "role"
     SESSION = "session"
     MEMORY = "memory"
+    SPECIFICATION = "specification"
+    DIRECTIVE = "directive"
     CUSTOM = "custom"
 
 
@@ -99,6 +101,8 @@ class RelationshipType(str, Enum):
     CHILD_OF = "CHILD_OF"
     WORKS_ON = "WORKS_ON"
     LOCATED_IN = "LOCATED_IN"
+    GOVERNS = "GOVERNS"
+    ENFORCES = "ENFORCES"
     CUSTOM = "CUSTOM"
     SUPERSEDES = "SUPERSEDES"
     CONTRADICTS = "CONTRADICTS"

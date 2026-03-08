@@ -398,6 +398,7 @@ class MemoryOrchestrator:
                 access_count=1,
                 days_since_created=0,
                 days_since_accessed=0,
+                memory_type=memory_type,
             )
             metadata["authority_score"] = authority_score
             

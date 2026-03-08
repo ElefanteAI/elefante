@@ -302,12 +302,16 @@ def compute_authority_score(
     access_count: int,
     days_since_created: int,
     days_since_accessed: int,
+    memory_type: str = "",
 ) -> float:
     """
     Compute authority score for retrieval ranking.
     
     Combines score, usage, and freshness.
     """
+    if memory_type.lower() in ("specification", "directive"):
+        return 1.0
+
     import math
     
     # Normalize score (0-100 → 0.0-1.0)
