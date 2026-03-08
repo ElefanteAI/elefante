@@ -448,6 +448,6 @@ Before claiming "MCP Server is working":
 
 ---
 
-**Document Version**: 2.1.5  
+**Document Version**: 2.2.0  
 **Status**: ESSENTIAL  
 **Last Validated**: 2026-02-25

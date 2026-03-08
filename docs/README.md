@@ -2,7 +2,7 @@
 
 Persistent memory for AI coding agents. Elefante runs locally on your machine via [MCP](https://modelcontextprotocol.io/) (Model Context Protocol), storing knowledge in a vector database and a knowledge graph. Your agent remembers what you care about, forgets what you don't, and scores every memory based on how you actually use it — not how important you _said_ it was.
 
-> **Current version:** v2.1.5
+> **Current version:** v2.2.0
 
 ---
 
@@ -89,6 +89,8 @@ The decay rate (λ) controls how quickly a memory loses relevance if it's never 
 | `observation`  | 0.015          | ~46 days  | Observations are contextual              |
 | `task`         | 0.02           | ~35 days  | Tasks complete or go stale               |
 | `conversation` | 0.025          | ~28 days  | Conversations are ephemeral              |
+| `specification`| 0.0            | Immutable | Specs define the system architecture     |
+| `directive`    | 0.0            | Immutable | Directives govern behavioral constraints |
 
 A rule you set 6 months ago and still use? Score stays high. An architecture decision from a year ago that you never reference? It fades. Naturally.
 

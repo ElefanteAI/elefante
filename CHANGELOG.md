@@ -13,6 +13,32 @@ _Nothing yet._
 
 ---
 
+## [2.2.0] - 2026-03-07
+
+### Summary
+
+Native Spec-Driven Development (SDD) Support — Added `SPECIFICATION` and `DIRECTIVE` as first-class entity and memory types with immutable authority scores to act as the ultimate architectural oracle for AI agents.
+
+### The Problem Solved
+
+Agents executing complex tasks need strict architectural rules (Spec-Driven Development), but placing these rules in standard memories meant they would decay over time or be out-competed by noisy ephemeral contexts.
+
+### The Solution
+
+We implemented the "Pure Second Brain" Option 1 for SDD:
+1. **New Schema:** Added `SPECIFICATION` and `DIRECTIVE` to both `EntityType` and `MemoryType` enumerations. Added `GOVERNS` and `ENFORCES` to `RelationshipType`.
+2. **Immutable Authority:** The `compute_authority_score` function now intercepts these types and permanently locks their authority score at `1.0`. They completely bypass chronological decay, ensuring they consistently surface at the top of context injection when relevant.
+3. Agents can now rely on Elefante to hold the complete, non-decaying canonical specification for a project.
+
+### Changes
+
+- **MODIFIED**: `src/models/entity.py` — Added `SPECIFICATION`, `DIRECTIVE`, `GOVERNS`, `ENFORCES`.
+- **MODIFIED**: `src/models/memory.py` — Added `SPECIFICATION`, `DIRECTIVE` with `0.0` decay rates.
+- **MODIFIED**: `src/utils/curation.py` — Adjusted `compute_authority_score` to intercept specs/directives for `1.0` authority.
+- **MODIFIED**: `src/core/orchestrator.py` — Passed `memory_type` into scoring function.
+
+---
+
 ## [2.1.4] - 2026-02-26
 
 ### Summary

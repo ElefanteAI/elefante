@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.1.5 - Explore Tab
+// Elefante Dashboard v2.2.0 - Explore Tab
 import { useDashboardStore } from '@/store';
 import { KnowledgeGraph } from '@/components/KnowledgeGraph';
 import { TopicTreemap } from '@/components/TopicTreemap';

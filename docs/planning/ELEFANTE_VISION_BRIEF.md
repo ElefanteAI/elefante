@@ -3,7 +3,7 @@
 > **Purpose:** This document captures the cohesive larger vision of Elefante for a new agent to implement without requiring clarification. Every file, function, variable, and architectural decision is documented here.
 >
 > **Generated:** 2026-02-18
-> **Version:** v2.1.5
+> **Version:** v2.2.0
 
 ---
 

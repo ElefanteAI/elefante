@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.1.5 - Main App
+// Elefante Dashboard v2.2.0 - Main App
 import { useEffect, useCallback } from 'react';
 import { useDashboardStore } from '@/store';
 import { HeaderBar } from '@/components/HeaderBar';

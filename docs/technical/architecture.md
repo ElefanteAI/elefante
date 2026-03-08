@@ -1,6 +1,6 @@
 # Elefante Architecture: The Second Brain
 
-**Version:** 2.1.5 | **Status:** Production Ready (Windows validated)
+**Version:** 2.2.0 | **Status:** Production Ready (Windows validated)
 
 ## 1. System Overview
 
@@ -48,6 +48,8 @@ Instead of a static RAG formula, Elefante uses a multi-faceted 6-signal behavior
 - **Temporal Freshness** (0.10)
 
 **Smoothed Vector Baseline:** To prevent valid semantic matches from suffering a mathematical cliff when heuristics are missing, the cognitive retriever enforces a static floor: `composite_score` can never fall below `0.85 * vector_score`.
+
+**Immutable Authority (Native SDD):** Memory types classified as `specification` or `directive` completely bypass chronological decay, instantly receiving an absolute `1.0` authority score to ensure they dominate context retrieval and enable frictionless Spec-Driven Development workflows.
 
 ### Data Flow: Storing a Memory
 
