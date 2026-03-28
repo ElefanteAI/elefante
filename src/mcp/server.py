@@ -1727,77 +1727,18 @@ You have access to a persistent memory system called **Elefante** - the user's s
 
         memories = await orchestrator.vector_store.get_all(limit=1000)
 
+        from src.utils.dashboard_serializer import memory_to_dashboard_node
+
         nodes = []
         edges = []
         seen_ids = set()
 
-        def _is_test_artifact(*, content: str, title: str) -> bool:
-            c = (content or "").strip().lower()
-            t = (title or "").strip().lower()
-
-            if c.startswith("elefante e2e test memory") or c.startswith("hybrid search test memory"):
-                return True
-
-            if c.startswith("entity relationship test ") or c.startswith("persistence test "):
-                return True
-
-            if t.startswith("e2e-test") or "hybrid_test_" in t:
-                return True
-
-            return False
-
         for mem in memories:
-            cm = mem.metadata.custom_metadata or {}
-            if cm.get("title"):
-                name = cm.get("title")
-            else:
-                words = mem.content.split()[:5]
-                name = " ".join(words) if words else "Untitled Memory"
-
-            if _is_test_artifact(content=mem.content, title=str(name)):
+            node = memory_to_dashboard_node(mem)
+            if node is None:
                 continue
-
-            status_value = mem.metadata.status.value if hasattr(mem.metadata.status, "value") else str(mem.metadata.status)
-            rel_type_value = (
-                mem.metadata.relationship_type.value
-                if getattr(mem.metadata, "relationship_type", None) and hasattr(mem.metadata.relationship_type, "value")
-                else str(getattr(mem.metadata, "relationship_type", "") or "")
-            )
-
-            processing_status = cm.get("processing_status")
-            canonical_key = cm.get("canonical_key")
-            namespace = cm.get("namespace")
-            topic = mem.metadata.category if mem.metadata.category and mem.metadata.category != "general" else cm.get("topic")
-            summary = cm.get("summary")
-
-            node = {
-                "id": str(mem.id),
-                "name": name,
-                "type": "memory",
-                "description": mem.content,
-                "created_at": mem.metadata.created_at.isoformat(),
-                "properties": {
-                    "content": mem.content,
-                    "memory_type": mem.metadata.memory_type.value if hasattr(mem.metadata.memory_type, "value") else str(mem.metadata.memory_type),
-                    "score": mem.metadata.score,
-                    "tags": ",".join(mem.metadata.tags) if mem.metadata.tags else "",
-                    "status": status_value,
-                    "relationship_type": rel_type_value,
-                    "archived": bool(getattr(mem.metadata, "archived", False)),
-                    "deprecated": bool(getattr(mem.metadata, "deprecated", False)),
-                    "supersedes_id": str(mem.metadata.supersedes_id) if mem.metadata.supersedes_id else "",
-                    "superseded_by_id": str(mem.metadata.superseded_by_id) if mem.metadata.superseded_by_id else "",
-                    "processing_status": processing_status,
-                    "canonical_key": canonical_key,
-                    "namespace": namespace,
-                    "title": cm.get("title", ""),
-                    "topic": topic,
-                    "summary": summary,
-                    "source": "chromadb",
-                }
-            }
             nodes.append(node)
-            seen_ids.add(str(mem.id))
+            seen_ids.add(node["id"])
 
         # Add explicit supersession edges from vector-store metadata.
         for mem in memories:

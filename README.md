@@ -88,24 +88,34 @@ Elefante works with any MCP-compatible client today — VS Code, Cursor, Windsur
 
 ---
 
-## Quick Start
+## One-Click Installation (Zero Config)
 
-**Requirements:** Python 3.11+, ~5 GB disk
+**Requirements:** Python 3.11+ (tested up to 3.13), Git
+
+Our installer detects your OS, creates a segregated virtual environment, installs all deps, initializes local graph and vector databases, and **automatically configures VS Code, Cursor, and Bob-IDE** to connect to Elefante via MCP.
 
 ```bash
-# macOS / Linux
+# macOS / Linux (Mac curl coming soon, git clone for now)
+git clone https://github.com/elefante/elefante.git
+cd elefante
 chmod +x install.sh && ./install.sh
 
 # Windows
+git clone https://github.com/elefante/elefante.git
+cd elefante
 install.bat
 ```
 
-Connect via MCP stdio:
+You possess full local control. The installer automatically bridges into your IDE and injects a single "Seed Memory" to prove the connection.
 
-- **Command:** `<repo>/.venv/bin/python`
-- **Args:** `-m src.mcp.server`
+**The 60-Second Proof of Work:**
+1. Restart your IDE.
+2. Open your AI Chat (Copilot, Cursor, etc).
+3. Copy/paste exactly this question: 
+   `What is my Elefante test passcode?`
+4. Watch the AI hit your local memory, cure its amnesia, and return the secret code.
 
-Full installation → [docs/technical/installation.md](docs/technical/installation.md)
+*Looking for manual setup or deep technical details? See the [Full Installation Guide](docs/technical/installation.md).*
 
 ---
 

@@ -16,45 +16,25 @@ echo  ELEFANTE INSTALLER
 echo ============================================================
 echo.
 
-REM 1. Check for Python 3.11 explicitly (mandatory)
-echo [INFO] Checking for Python 3.11... >> "%LOG_FILE%"
+REM 1. Check for Python 3.11 - 3.13
+echo [INFO] Checking for Python... >> "%LOG_FILE%"
 set PYTHON_CMD=
 
-REM Try python3.11 (common on developer machines with multiple Pythons)
-python3.11 --version >nul 2>&1 && set PYTHON_CMD=python3.11
+REM Try strictly supported python versions
+for %%P in (python3.13 python3.12 python3.11 python3 python) do (
+    %%P -c "import sys; sys.exit(0 if (3,11) <= sys.version_info < (3,14) else 1)" >nul 2>&1
+    if not errorlevel 1 (
+        set PYTHON_CMD=%%P
+        goto :python_found
+    )
+)
 
-REM Try Windows Python Launcher with explicit version (most reliable on Windows)
+:python_found
 if not defined PYTHON_CMD (
-    py -3.11 --version >nul 2>&1 && set PYTHON_CMD=py -3.11
-)
-
-REM Fall back to generic python (verify version below)
-if not defined PYTHON_CMD (
-    python --version >nul 2>&1 && set PYTHON_CMD=python
-)
-
-if not defined PYTHON_CMD (
-    echo [ERROR] Python is not installed or not in PATH.
-    echo [ERROR] Python is not installed or not in PATH. >> "%LOG_FILE%"
-    echo Please install Python 3.11 from https://python.org
-    echo Tip: On Windows, install the Python Launcher (py.exe) for easy version management.
-    pause
-    exit /b 1
-)
-
-REM Parse version: "Python 3.11.9" with delimiters=dot+space gives tokens Python, 3, 11, 9
-REM tokens=1,2,3 captures %%a=Python %%b=3 %%c=11
-for /f "tokens=1,2,3 delims=. " %%a in ('%PYTHON_CMD% --version 2^>^&1') do (
-    set MAJOR=%%b
-    set MINOR=%%c
-    goto :version_checked
-)
-:version_checked
-if not "%MAJOR%.%MINOR%"=="3.11" (
-    echo [ERROR] Python 3.11 is required but found %MAJOR%.%MINOR%.
-    echo [ERROR] Python 3.11 is required but found %MAJOR%.%MINOR%. >> "%LOG_FILE%"
-    echo Install Python 3.11 from https://python.org, then re-run.
-    echo Tip: Use the Windows Python Launcher: py -3.11 -m venv .venv
+    echo [ERROR] No compatible Python found. Requires 3.11, 3.12, or 3.13.
+    echo [ERROR] No compatible Python found. Requires 3.11, 3.12, or 3.13. >> "%LOG_FILE%"
+    echo Python 3.14+ is NOT supported due to Pydantic V1 limits.
+    echo Please install Python 3.13 from https://python.org
     pause
     exit /b 1
 )
@@ -89,7 +69,7 @@ if errorlevel 1 (
 REM 4. Run Python Installer
 echo [INFO] Starting installation wizard...
 echo [INFO] Starting installation wizard... >> "%LOG_FILE%"
-python scripts\install.py --log-file "%LOG_FILE%"
+%PYTHON_CMD% scripts\install.py --log-file "%LOG_FILE%"
 
 REM Keep window open if run from explorer
 echo.

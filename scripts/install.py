@@ -68,9 +68,13 @@ def print_header(msg):
 def print_step(step, msg):
     logger.log(f"\n[Step {step}] {msg}...")
 
-def run_command(cmd, cwd=None, shell=False):
+def run_command(cmd, cwd=None, shell=False, env=None):
     """Run a command and check for errors"""
     try:
+        run_env = os.environ.copy()
+        if env:
+            run_env.update(env)
+            
         # We want to capture output to log it, but also show it in real-time.
         # For simplicity in this script, we let subprocess write to stdout/stderr,
         # which means it goes to console.
@@ -85,7 +89,8 @@ def run_command(cmd, cwd=None, shell=False):
                 stderr=subprocess.STDOUT,
                 text=True,
                 encoding='utf-8',
-                errors='replace'
+                errors='replace',
+                env=run_env
             )
             
             while True:
@@ -97,7 +102,7 @@ def run_command(cmd, cwd=None, shell=False):
             
             return process.poll() == 0
         else:
-            subprocess.check_call(cmd, cwd=cwd, shell=shell)
+            subprocess.check_call(cmd, cwd=cwd, shell=shell, env=run_env)
             return True
     except subprocess.CalledProcessError:
         return False
@@ -375,18 +380,29 @@ def init_databases(root_dir, python_cmd):
     """Initialize ChromaDB and Kuzu"""
     logger.log("Initializing databases...")
     script_path = root_dir / "scripts" / "init_databases.py"
-    if run_command([python_cmd, str(script_path)], cwd=root_dir):
+    if run_command([python_cmd, str(script_path)], cwd=root_dir, env={'ELEFANTE_LOG_FORMAT': 'text', 'ELEFANTE_LOGGING_FORMAT': 'text'}):
         logger.log("OK: Databases initialized")
         return True
     else:
         logger.log("ERROR: Database initialization failed")
         return False
 
+def generate_dashboard_snapshot(root_dir, python_cmd):
+    """Generate initial dashboard snapshot so the dashboard works on first open."""
+    logger.log("Generating dashboard snapshot...")
+    script_path = root_dir / "scripts" / "update_dashboard_data.py"
+    if run_command([python_cmd, str(script_path)], cwd=root_dir, env={'ELEFANTE_LOG_FORMAT': 'text', 'ELEFANTE_LOGGING_FORMAT': 'text'}):
+        logger.log("OK: Dashboard snapshot generated")
+        return True
+    else:
+        logger.log("WARN: Dashboard snapshot generation failed (non-fatal)")
+        return True  # Non-fatal — dashboard will generate on first refresh
+
 def run_health_check(root_dir, python_cmd):
     """Run health check script"""
     logger.log("Running health check...")
     script_path = root_dir / "scripts" / "health_check.py"
-    if run_command([python_cmd, str(script_path)], cwd=root_dir):
+    if run_command([python_cmd, str(script_path)], cwd=root_dir, env={'ELEFANTE_LOG_FORMAT': 'text', 'ELEFANTE_LOGGING_FORMAT': 'text'}):
         logger.log("OK: Health check passed")
         return True
     else:
@@ -479,11 +495,17 @@ def main():
             success = False
             
     if success:
+        # 3a. Dashboard Snapshot
+        logger.log("")
+        logger.log("[Step 3a] Dashboard Snapshot...")
+        generate_dashboard_snapshot(root_dir, python_cmd)
+
+    if success:
         # 4. MCP Configuration
         print_step(4, "IDE Configuration")
         try:
-            vscode_success = configure_vscode()
-            antigravity_success = configure_antigravity()
+            vscode_success = configure_vscode([])
+            antigravity_success = configure_antigravity([])
             
             if vscode_success:
                 logger.log("OK: MCP Server configured for VSCode/Bob")
@@ -528,10 +550,12 @@ def main():
     
     if success:
         print_header("INSTALLATION COMPLETE")
-        logger.log("Next Steps:")
-        logger.log("1. Restart your IDE to load the MCP server.")
-        logger.log("2. Start using Elefante commands in your AI chat!")
-        logger.log("   - 'Remember that...'\n   - 'What do you know about...'\n")
+        logger.log("Let's prove it works.")
+        logger.log("\n1. Restart your IDE to load the Elefante MCP server.")
+        logger.log("2. Open your AI Chat (Copilot / Cursor / etc).")
+        logger.log("3. Copy and paste exactly this question:\n")
+        logger.log('   "What is my Elefante test passcode?"\n')
+        logger.log("4. Watch your AI fetch the embedded seed memory autonomously.")
     else:
         print_header("INSTALLATION FAILED")
         logger.log("Please check the logs above for errors.")

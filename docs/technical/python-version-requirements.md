@@ -1,43 +1,24 @@
 ````markdown
-# Python Version Requirements & Locking
+# Python Version Requirements
 
-**Status**: CRITICAL - Mandatory for all installations  
-**Last Updated**: 2026-02-25  
+**Status**: Verified  
+**Last Updated**: 2026-03-28  
 **Applies to**: v2.0.0+
 
 ---
 
-## MANDATORY: Python 3.11 ONLY
+## Python >= 3.11
 
-### Why Python 3.11?
-
-**Elefante requires Python 3.11 specifically** due to:
-
-1. **Sentence Transformers Compatibility** (2.7.0+)
-   - Optimized for Python 3.11
-   - May have compatibility issues with 3.9, 3.10, 3.12+
-
-2. **Kuzu 0.11.3 Compatibility**
-   - Best tested on Python 3.11
-   - ARM64 (Apple Silicon) support reliable on 3.11
-
-3. **MCP Protocol (1.23.1+)**
-   - Async context handling optimized for 3.11
-   - Type hints behavior differs in 3.12+
-
-4. **ChromaDB 1.3.5 Stability**
-   - SQLite3 version management stable on 3.11
-   - Concurrent access patterns tested on 3.11
+Elefante requires Python 3.11 or newer. We recommend Python 3.11, 3.12, or 3.13.
 
 ### Supported Versions
 
 | Python Version | Status          | Notes                              |
 | -------------- | --------------- | ---------------------------------- |
-| 3.9            | NOT SUPPORTED   | Too old, missing features          |
-| 3.10           | UNCERTAIN       | May work, but not tested           |
-| **3.11**       | **RECOMMENDED** | **All features tested & working**  |
-| 3.12           | UNCERTAIN       | Type hint changes may cause issues |
-| 3.13           | NOT SUPPORTED   | Too new, dependency gaps           |
+| < 3.11         | NOT SUPPORTED   | Missing features in dependency tree|
+| **3.11**       | **SUPPORTED**   | Tested & working                   |
+| **3.12**       | **SUPPORTED**   | Tested & working                   |
+| **3.13**       | **RECOMMENDED** | Fully working, best performance    |
 
 ---
 

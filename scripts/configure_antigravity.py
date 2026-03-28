@@ -18,7 +18,7 @@ def get_antigravity_config_path():
     home = Path.home()
     return home / ".gemini" / "antigravity" / "mcp_config.json"
 
-def configure_mcp():
+def configure_mcp(argv: list[str] | None = None):
     """Configure Antigravity to use Elefante MCP server"""
     
     print("\n" + "=" * 70)

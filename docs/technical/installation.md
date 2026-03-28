@@ -7,12 +7,12 @@
 
 ## Prerequisites
 
-- **Python**: **3.11 ONLY** (See [`python-version-requirements.md`](python-version-requirements.md) for mandatory details)
+- **Python**: **3.11+ Supported** (See [`python-version-requirements.md`](python-version-requirements.md) for details)
   - 3.9, 3.10: Not supported
-  - **3.11**: Required and tested
-  - 3.12+: Not supported
+  - **3.11**: Supported and tested
+  - **3.12, 3.13+**: Recommended and tested
 - **Git**: For cloning the repository
-- **Disk Space**: Minimum 5GB free
+- **Disk Space**: Minimum 2GB free
 - **OS**: Windows, macOS, or Linux
 
 ---
