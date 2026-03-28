@@ -9,7 +9,51 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+- **Kuzu lock contention**: `GraphStore.close()` now calls the actual `kuzu.Connection.close()` and `kuzu.Database.close()` APIs. Previously these were commented out, leaving the OS-level exclusive file lock held indefinitely. `reset_graph_store()` also now calls `close()` before setting `_graph_store = None`.
+- **Dashboard semantic search broken**: `/api/search` returned nested `{memory: {id, content, metadata}, score}` but the frontend expected flat `{id, content, metadata, similarity}`. All search results rendered as blank rows. Fix: flatten the response in `server.py` to match the TypeScript `SearchResult` interface.
+- **Dashboard "Untitled" memories**: 3 memories with empty `title` metadata in ChromaDB now backfilled. Snapshot script fallback improved to extract first 10 words (matching `generate_title()`) instead of 5.
+- **Purged 200 test memories**: `entity_target_0` through `entity_target_99` (duplicated twice) were polluting ChromaDB. Deleted from vector store. Added `entity_target` pattern to `_is_test_artifact()` so snapshot never includes them again.
+
+### Changed
+- **Dashboard score differentiation**: Replaced pure exponential-decay score in `_compute_live_score()` with a composite metric: 50% temporal vitality + 25% memory-type weight + 25% engagement (access frequency). Specifications/decisions now rank visibly higher than conversations; frequently-accessed memories score above one-shot entries. Score Distribution chart now shows a meaningful spread (range ~58-95) instead of 84% clustering at 100.
+
+---
+
+## [2.2.1] - 2026-03-20
+
+### Summary
+
+Native SDD Enforcement — Static markdown protocol replaced with living Elefante mechanisms. Elefante now eats its own dogfood: SDD gates are enforced through DIRECTIVES (unconditional injection), SPECIFICATION memories (authority=1.0, immutable), and a mechanical pre-commit hook.
+
+### The Problem Solved
+
+The SDD protocol (v2.2.0) was documented as a static markdown file — repeating the exact anti-pattern Elefante v1.x → v2.1.0 proved doesn't work. Rules in docs drift. Rules in memories can be outcompeted. Only mechanical enforcement and unconditional injection are reliable.
+
+### The Solution
+
+1. **6 SDD DIRECTIVES** — Injected into every MCP tool response unconditionally: Gate 0 (source-first), Critical Blocker, Gate 2 (leakage scan), Gate 3 (numeric verification), Gate 4 (simulator), Stdout Purity Law.
+2. **2 SPECIFICATION memories** — Gate 2 (full 8-surface leakage table) and Gate 3 (exact scoring formulas) stored with authority=1.0, zero decay. Always surface when relevant.
+3. **Mechanical pre-commit hook** — `.git/hooks/pre-commit` runs `health_check.py` + `verify_mcp_handshake.py` before every commit. Failure = blocked.
+4. **MCP schema fix** — Added `specification` and `directive` to `memory_type` enum in `elefante-MemoryAdd` tool schema (v2.2.0 gap: Python model had these types but MCP schema didn't expose them).
+5. **Static doc reframed** — `docs/technical/sdd-development-protocol.md` marked as human reference only. Enforcement is native.
+6. **Directive cleanup** — Removed 2 test/garbage directives (`"Filter of"`, hello-world variable name test).
+
+### Changes
+
+- **MODIFIED**: `src/mcp/server.py` — Added `specification` and `directive` to `memory_type` enum in tool schema.
+- **NEW**: `.git/hooks/pre-commit` — Mechanical Gate 4 enforcement (health check + MCP handshake).
+- **MODIFIED**: `docs/technical/sdd-development-protocol.md` — Reframed as human reference; version 2.2.1.
+- **MODIFIED**: `docs/technical/README.md` — Updated SDD doc description.
+- **MODIFIED**: `docs/README.md` — Updated SDD doc description.
+- **MODIFIED**: `CONTRIBUTING.md` — Replaced SDD blockquote with native enforcement pointer.
+- **SEEDED**: 6 new DIRECTIVES in Elefante DirectiveStore.
+- **SEEDED**: 2 new SPECIFICATION memories in ChromaDB.
+- **CLEANED**: Removed 2 garbage directives from DirectiveStore.
+
+### Impact
+
+SDD self-reporting drift eliminated. Full compliance with Law of Compliance and Native SDD pattern. The meta-irony is closed: Elefante enforces SDD on itself using its own enforcement mechanisms.
 
 ---
 

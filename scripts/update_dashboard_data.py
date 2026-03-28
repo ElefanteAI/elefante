@@ -73,17 +73,30 @@ _TYPE_DECAY_RATES = {
 
 def _compute_live_score(meta: dict) -> int:
     """
-    Recompute behavioral vitality from stored ChromaDB metadata fields.
+    Dashboard composite vitality score.
 
-    Formula (matches src/models/memory.py calculate_relevance_score):
-      effective_decay_rate = decay_rate / (1 + reinforcement_factor * log(access_count + 1))
-      vitality = exp(-effective_decay_rate * days_since_created) * freshness
+    Combines temporal decay with behavioral and type-based signals so the
+    score distribution is meaningful even for young memory populations.
 
-    Reinforcement slows the decay rate rather than multiplying the product,
-    so the score is always in [0, 100] and high-access memories show real
-    differentiated values (not a flat 100 wall).
+    Components (weighted blend):
+      - Vitality (50%): exponential decay matching calculate_relevance_score()
+      - Type weight (25%): inherent importance by memory type
+      - Engagement (25%): retrieval frequency relative to age
+
+    Result: 0-100 integer with real differentiation across types and usage.
     """
     import math
+
+    _TYPE_WEIGHTS = {
+        "specification": 1.0,
+        "directive": 1.0,
+        "decision": 0.85,
+        "preference": 0.80,
+        "fact": 0.75,
+        "insight": 0.70,
+        "note": 0.55,
+        "conversation": 0.45,
+    }
 
     try:
         memory_type = meta.get("memory_type", "fact")
@@ -103,8 +116,16 @@ def _compute_live_score(meta: dict) -> int:
         effective_decay_rate = decay_rate / (1.0 + 0.25 * math.log(access_count + 1))
         recency = math.exp(-effective_decay_rate * days_since_created)
         freshness = math.exp(-0.005 * days_since_access)
+        vitality = recency * freshness  # 0.0-1.0
 
-        return min(100, max(0, round(recency * freshness * 100)))
+        # Type weight: specifications and decisions are inherently more permanent
+        type_weight = _TYPE_WEIGHTS.get(str(memory_type), 0.60)
+
+        # Engagement: how actively this memory is being used (saturates at ~20 accesses)
+        engagement = min(1.0, math.log(max(access_count, 1) + 1) / math.log(20))
+
+        composite = vitality * 0.50 + type_weight * 0.25 + engagement * 0.25
+        return min(100, max(0, round(composite * 100)))
     except Exception:
         return int(meta.get("score") or 100)
 
@@ -120,6 +141,10 @@ def _is_test_artifact(*, content: str, title: str) -> bool:
         return True
 
     if t.startswith("e2e-test") or "hybrid_test_" in t:
+        return True
+
+    # entity_target_N test artifacts from graph/coactivation tests
+    if t.startswith("entity_target") or c.startswith("entity_target"):
         return True
 
     # Battery test artifacts — content starts with [BATTERY_TEST] marker
@@ -223,9 +248,9 @@ async def main():
         
         # Create node for this memory
         # PRIORITY: Use semantic title from metadata, fallback to content truncation
-        title = meta.get("title")
+        title = (meta.get("title") or "").strip()
         if not title:
-            words = doc.split()[:5]
+            words = (doc or "").split()[:10]
             title = " ".join(words) if words else "Untitled Memory"
         name = title
 
@@ -241,7 +266,7 @@ async def main():
             "properties": {
                 "content": doc_redacted,
                 # Curated-first fields (used by dashboard UI and snapshot validators)
-                "title": _redact_secrets(str(title) if title is not None else ""),
+                "title": _redact_secrets(name),
                 "memory_type": meta.get("memory_type", "unknown"),
                 "tags": meta.get("tags", ""),
                 "status": meta.get("status"),

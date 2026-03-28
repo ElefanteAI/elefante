@@ -161,19 +161,22 @@ class GraphStore:
             raise
 
     def close(self):
-        """Explicitly close connection and database to release locks."""
-        if self._conn:
-            # self._conn.close() # Kuzu Connection object doesn't have close(), it just goes out of scope? 
-            # Double check docs, but assuming we drop ref.
+        """Explicitly close connection and database to release the OS-level Kuzu file lock."""
+        if self._conn is not None:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
             self._conn = None
-            
-        if self._db:
-             # self._db.close() # Kuzu Database object might not have close either, but dropping refs is key.
-             # According to docs/debug/database-neural-register.md, we should implement close.
-             # If kuzu doesn't support specific close methods, assigning None allows GC to clean up.
-             # However, it's safer to check if they have it.
-             self._db = None
-             
+
+        if self._db is not None:
+            try:
+                self._db.close()
+            except Exception:
+                pass
+            self._db = None
+
+        self._schema_initialized = False
         logger.info("kuzu_connection_closed")
 
     def __enter__(self):
@@ -1281,6 +1284,8 @@ def get_graph_store() -> GraphStore:
 def reset_graph_store():
     """Reset global graph store (useful for testing)"""
     global _graph_store
+    if _graph_store is not None:
+        _graph_store.close()
     _graph_store = None
 
 

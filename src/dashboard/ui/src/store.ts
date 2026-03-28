@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.2.0 - Zustand Store
+// Elefante Dashboard v2.2.1 - Zustand Store
 import { create } from 'zustand';
 import type { Tab, Snapshot, StatsResponse, MemoryNode, VisualizationType } from './types';
 
@@ -102,31 +102,49 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   // Actions
   fetchSnapshot: async () => {
     set({ isLoading: true, error: null });
-    try {
-      const res = await fetch('/api/graph');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      set({ 
-        snapshot: { 
-          nodes: data.nodes || [], 
-          edges: data.edges || [], 
-          stats: data.stats 
-        }, 
-        isLoading: false 
-      });
-    } catch (e: any) {
-      set({ error: e.message, isLoading: false });
+    const maxRetries = 4;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const res = await fetch('/api/graph');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        set({ 
+          snapshot: { 
+            nodes: data.nodes || [], 
+            edges: data.edges || [], 
+            stats: data.stats 
+          }, 
+          isLoading: false,
+          error: null,
+        });
+        return;
+      } catch (e: any) {
+        if (attempt < maxRetries) {
+          // Exponential backoff: 1s, 2s, 4s, 8s
+          await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+        } else {
+          set({ error: e.message, isLoading: false });
+        }
+      }
     }
   },
 
   fetchStats: async () => {
-    try {
-      const res = await fetch('/api/stats');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      set({ stats: data });
-    } catch (e: any) {
-      console.error('Failed to fetch stats:', e);
+    const maxRetries = 4;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const res = await fetch('/api/stats');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        set({ stats: data });
+        return;
+      } catch (e: any) {
+        if (attempt < maxRetries) {
+          await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+        } else {
+          console.error('Failed to fetch stats after retries:', e);
+        }
+      }
     }
   },
 

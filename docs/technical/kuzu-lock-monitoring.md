@@ -442,6 +442,6 @@ Before claiming "Lock is healthy":
 
 ---
 
-**Document Version**: 2.2.0  
+**Document Version**: 2.2.1  
 **Status**: CRITICAL  
 **Last Validated**: 2026-02-25
