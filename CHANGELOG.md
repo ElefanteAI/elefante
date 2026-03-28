@@ -9,14 +9,51 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+---
+
+## [2.2.2] - 2026-03-28
+
+### Summary
+
+Dashboard Scoring Structural Fix — Eliminated the all-scores-100 bug architecturally by extracting a single shared serializer, hardening the installation pipeline, and merging upstream documentation.
+
+### The Problem Solved
+
+Dashboard scores were all stuck at 100 because two independent code paths (MCP server and standalone script) each had inline score-computation that read stale `mem.metadata.score` instead of live-computing from decay + type + engagement. Fixing one path left the other broken. The installation process never generated a snapshot, so fresh installs showed a blank dashboard.
+
+### The Solution
+
+1. **Single serializer** — `src/utils/dashboard_serializer.py` is now the sole source of truth for Memory → dashboard-node conversion with live composite scoring.
+2. **MCP server cleaned** — `_refresh_dashboard_snapshot()` replaced ~50 lines of inline node-building with a single import from the shared serializer.
+3. **Standalone script cleaned** — `scripts/update_dashboard_data.py` removed all duplicate helpers (`_redact_secrets`, `_derive_topic`, `_compute_live_score`, `_is_test_artifact`); imports from shared serializer.
+4. **Install hardened** — `scripts/install.py` Step 3a now generates a dashboard snapshot at install time.
+5. **Validator hardened** — `scripts/validate_dashboard_snapshot.py` now detects score staleness (>25% at score=100 = FAIL).
+6. **Upstream merged** — GitHub origin/main merged cleanly (zero conflicts). Brought in `ELEFANTE_DEVELOPMENT_SKILLS.md` (AI agent guide) and Issue #7 (IBM Bob MCP settings path) in installation-compendium.
+
 ### Fixed
-- **Kuzu lock contention**: `GraphStore.close()` now calls the actual `kuzu.Connection.close()` and `kuzu.Database.close()` APIs. Previously these were commented out, leaving the OS-level exclusive file lock held indefinitely. `reset_graph_store()` also now calls `close()` before setting `_graph_store = None`.
-- **Dashboard semantic search broken**: `/api/search` returned nested `{memory: {id, content, metadata}, score}` but the frontend expected flat `{id, content, metadata, similarity}`. All search results rendered as blank rows. Fix: flatten the response in `server.py` to match the TypeScript `SearchResult` interface.
-- **Dashboard "Untitled" memories**: 3 memories with empty `title` metadata in ChromaDB now backfilled. Snapshot script fallback improved to extract first 10 words (matching `generate_title()`) instead of 5.
-- **Purged 200 test memories**: `entity_target_0` through `entity_target_99` (duplicated twice) were polluting ChromaDB. Deleted from vector store. Added `entity_target` pattern to `_is_test_artifact()` so snapshot never includes them again.
+- **All dashboard scores stuck at 100** (Issue #9): Root cause was two divergent inline serializers reading stale `mem.metadata.score`. Fixed by extracting `dashboard_serializer.py` as single source of truth. Verified: 74 memories, Score=100: 0, Avg: 75.3, Min: 54, Max: 94.
+- **Kuzu lock contention**: `GraphStore.close()` now calls `kuzu.Connection.close()` and `kuzu.Database.close()` APIs. Previously commented out, leaving the OS-level exclusive file lock held indefinitely.
+- **Dashboard semantic search broken**: `/api/search` response flattened to match frontend `SearchResult` interface.
+- **Dashboard "Untitled" memories**: Backfilled 3 empty-title memories. Improved fallback to extract first 10 words.
+- **Purged 200 test memories**: `entity_target_0..99` (duplicated twice) deleted from ChromaDB. Added `entity_target` to `_is_test_artifact()`.
+- **No snapshot at install time**: Fresh installs showed blank dashboard. Added Step 3a to `install.py`.
+
+### Added
+- `src/utils/dashboard_serializer.py` — shared serializer with `_composite_dashboard_score()`, `compute_live_score()`, `memory_to_dashboard_node()`, `is_test_artifact()`, `_redact_secrets()`.
+- `tests/test_dashboard_serializer.py` — unit tests with delta=0 cross-validation between Memory-object and raw-dict scoring paths.
+- `tmp/verify_scores.py` — quick diagnostic for score health checks.
+- Score staleness detection in `validate_dashboard_snapshot.py`.
+- Issue #9 in `docs/debug/dashboard-compendium.md` with Critical Laws 8-9.
+- Score Contract section in `docs/technical/dashboard-snapshot-contract.md`.
+- `ELEFANTE_DEVELOPMENT_SKILLS.md` — AI agent development guide (merged from upstream).
+- Issue #7 (IBM Bob MCP settings) in `docs/debug/installation-compendium.md` (merged from upstream).
 
 ### Changed
-- **Dashboard score differentiation**: Replaced pure exponential-decay score in `_compute_live_score()` with a composite metric: 50% temporal vitality + 25% memory-type weight + 25% engagement (access frequency). Specifications/decisions now rank visibly higher than conversations; frequently-accessed memories score above one-shot entries. Score Distribution chart now shows a meaningful spread (range ~58-95) instead of 84% clustering at 100.
+- **Dashboard score formula**: Composite metric (50% temporal vitality + 25% type weight + 25% engagement) replaces pure exponential-decay. Meaningful spread (range ~54-94) instead of 84% at 100.
+- MCP server `_refresh_dashboard_snapshot()` reduced from ~50 lines to a 3-line import loop.
+- `scripts/update_dashboard_data.py` reduced by ~150 lines (removed all duplicate helper functions).
 
 ---
 

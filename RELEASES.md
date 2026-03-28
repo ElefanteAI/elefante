@@ -7,7 +7,7 @@ For full detail, see [CHANGELOG.md](CHANGELOG.md).
 
 ## Current Baseline (recommended)
 
-- **v2.2.1 (2026-02-26)**
+- **v2.2.2 (2026-02-26)**
   - **Critical fix**: Memory deletion no longer poisons the co-activation graph with stale UUIDs.
   - `_handle_delete_memory()` purges deleted IDs from `_session_retrieval_history`.
   - `record_coactivation()` validates IDs exist in ChromaDB before running O(n^2) graph queries.
