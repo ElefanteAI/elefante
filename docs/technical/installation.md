@@ -607,6 +607,22 @@ macOS/Linux: `python scripts/backup_elefante_data.py`
 
 ---
 
-**Version**: 2.1.3
-**Last Updated**: 2026-02-26
+## 8. Binary Compilation (Standalone)
+
+To build a zero-dependency standalone binary (no `pip` or venv required on the target machine):
+
+```bash
+source .venv/bin/activate
+pip install pyinstaller
+pyinstaller elefante.spec
+```
+
+The executable is created at `./dist/elefante/elefante`. Distribute the `dist/elefante/` folder as a zip.
+
+See also: [`docker.md`](docker.md) for container-based deployment.
+
+---
+
+**Version**: 2.2.1
+**Last Updated**: 2026-04-12
 **Status**: Production Ready (Windows validated)
