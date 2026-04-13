@@ -7,7 +7,7 @@ set -euo pipefail
 # Output:
 #   dist/elefante-docker-bundle.tar.gz
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT_DIR="$ROOT_DIR/dist"
 OUT_FILE="$OUT_DIR/elefante-docker-bundle.tar.gz"
 
@@ -25,8 +25,8 @@ INCLUDE_PATHS=(
   "src"
   "scripts/verify/verify_health.py"
   "scripts/pipeline/update_dashboard_data.py"
-  "docs/technical/agent_handoff.md"
-  "docs/technical/docker.md"
+  "docs/technical/ops-agent-handoff.md"
+  "docs/technical/ops-docker.md"
 )
 
 cd "$ROOT_DIR"

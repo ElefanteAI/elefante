@@ -47,7 +47,7 @@ CLEANUP_ENABLED = True  # Set False to inspect test data after run
 
 
 @dataclass
-class TestScenario:
+class BatteryScenario:
     """Defines a single test scenario"""
     name: str
     add_content: str
@@ -57,7 +57,7 @@ class TestScenario:
 
 
 @dataclass 
-class TestResult:
+class BatteryResult:
     """Result of a single test"""
     scenario_name: str
     add_success: bool
@@ -76,7 +76,7 @@ class TestResult:
 
 TEST_SCENARIOS = [
     # 1. User preference (coding style)
-    TestScenario(
+    BatteryScenario(
         name="user_preference_coding_style",
         add_content=f"{TEST_MARKER} User prefers 4-space indentation in Python code. Always use spaces, never tabs. This is a strict formatting preference for all Python files.",
         search_queries=[
@@ -90,7 +90,7 @@ TEST_SCENARIOS = [
     ),
     
     # 2. Project decision
-    TestScenario(
+    BatteryScenario(
         name="project_decision_architecture",
         add_content=f"{TEST_MARKER} Decision: Use FastAPI for all REST endpoints. Django was considered but rejected due to complexity. FastAPI provides async support and automatic OpenAPI docs.",
         search_queries=[
@@ -104,7 +104,7 @@ TEST_SCENARIOS = [
     ),
     
     # 3. Error solution (debugging)
-    TestScenario(
+    BatteryScenario(
         name="error_solution_chromadb",
         add_content=f"{TEST_MARKER} Solution: ChromaDB 'Collection not found' error is fixed by ensuring init_databases.py runs before server start. The collection 'elefante_memories' must exist.",
         search_queries=[
@@ -118,9 +118,9 @@ TEST_SCENARIOS = [
     ),
     
     # 4. Tool preference
-    TestScenario(
+    BatteryScenario(
         name="tool_preference_editor",
-        add_content=f"{TEST_MARKER} User prefers VS Code with Copilot for all development. PyCharm is acceptable but VS Code is primary. Always suggest VS Code extensions first.",
+        add_content=f"{TEST_MARKER} User prefers VS Code with Copilot for all development. PyCharm is acceptable but VS Code is primary. Always suggest the MCP-native path first.",
         search_queries=[
             "what editor does user prefer",
             "VS Code or PyCharm",
@@ -132,7 +132,7 @@ TEST_SCENARIOS = [
     ),
     
     # 5. Naming convention
-    TestScenario(
+    BatteryScenario(
         name="naming_convention_functions",
         add_content=f"{TEST_MARKER} Convention: All Python functions use snake_case. Class names use PascalCase. Constants use UPPER_SNAKE_CASE. No exceptions to this rule.",
         search_queries=[
@@ -146,7 +146,7 @@ TEST_SCENARIOS = [
     ),
     
     # 6. Workflow rule
-    TestScenario(
+    BatteryScenario(
         name="workflow_rule_testing",
         add_content=f"{TEST_MARKER} Rule: Always run pytest before committing. Never push code without tests passing. Use pytest -v for verbose output. This is mandatory for all commits.",
         search_queries=[
@@ -160,7 +160,7 @@ TEST_SCENARIOS = [
     ),
     
     # 7. API pattern
-    TestScenario(
+    BatteryScenario(
         name="api_pattern_error_handling",
         add_content=f"{TEST_MARKER} API response format and error handling pattern: JSON response structure must include 'success' boolean and 'data' or 'error' field. How to return errors in API: Use HTTP 200 for success, 400 for client errors, 500 for server errors. This API error handling pattern is mandatory.",
         search_queries=[
@@ -174,7 +174,7 @@ TEST_SCENARIOS = [
     ),
     
     # 8. Documentation preference
-    TestScenario(
+    BatteryScenario(
         name="documentation_preference_docstrings",
         add_content=f"{TEST_MARKER} Documentation preference: User prefers Google-style docstrings format for documenting all Python functions. How to document functions: Include Args section, Returns section, and Raises section. This docstring format preference is strictly enforced.",
         search_queries=[
@@ -188,7 +188,7 @@ TEST_SCENARIOS = [
     ),
     
     # 9. Git workflow
-    TestScenario(
+    BatteryScenario(
         name="git_workflow_branches",
         add_content=f"{TEST_MARKER} Git branch naming convention and PR workflow: How to create feature branch - use 'feat/description' naming. Commit to main allowed? No, never commit directly to main branch. PR workflow requires creating pull request for all changes and squash commits on merge.",
         search_queries=[
@@ -202,7 +202,7 @@ TEST_SCENARIOS = [
     ),
     
     # 10. Performance rule
-    TestScenario(
+    BatteryScenario(
         name="performance_rule_queries",
         add_content=f"{TEST_MARKER} Performance rule: Database queries must complete in under 100ms. If slower, add index or optimize query. Log all queries taking over 50ms for review.",
         search_queries=[
@@ -227,7 +227,7 @@ class ElefanteBatteryTest:
     def __init__(self):
         self.vector_store: Optional[VectorStore] = None
         self.added_memory_ids: List[str] = []
-        self.results: List[TestResult] = []
+        self.results: List[BatteryResult] = []
         self._test_dir: Optional[str] = None
         self._atexit_registered: bool = False
         
@@ -288,12 +288,12 @@ class ElefanteBatteryTest:
         print("  Deleted isolated test database")
         print("-"*50)
         
-    async def run_single_scenario(self, scenario: TestScenario) -> TestResult:
+    async def run_single_scenario(self, scenario: BatteryScenario) -> BatteryResult:
         """Run a single test scenario"""
         print(f"\n Testing: {scenario.name}")
         print(f"   Category: {scenario.category}")
         
-        result = TestResult(
+        result = BatteryResult(
             scenario_name=scenario.name,
             add_success=False,
             add_time_ms=0,
@@ -372,7 +372,7 @@ class ElefanteBatteryTest:
             
         return result
         
-    async def run_all_scenarios(self) -> List[TestResult]:
+    async def run_all_scenarios(self) -> List[BatteryResult]:
         """Run all 10 test scenarios"""
         print("\n" + "="*70)
         print("RUNNING 10 TEST SCENARIOS")

@@ -8,7 +8,7 @@
 
 AI agents start every conversation from zero. Your preferences, decisions, and discovered patterns don't carry over. Elefante gives any MCP-compatible agent a persistent, local second brain — memories are stored, scored automatically, and surfaced at the right moment without being asked.
 
-**v2.2.3** — Persistent Memory Engine
+**v2.3.0** — Persistent Memory Engine
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -139,13 +139,13 @@ You possess full local control. The installer automatically bridges into your ID
 
 Full reference with parameter schemas → [docs/technical/spec-tools.md](docs/technical/spec-tools.md)
 
-## Native Spec-Driven Development (SDD)
+## Specification And Directive Retrieval
 
-Elefante is the foundation for context-safe Spec-Driven Development. To prevent your AI agent from hallucinating or overloading its token context with massive architectural specs, Elefante enforces the **Gatekeeper & Oracle** pattern:
+Elefante keeps durable architecture rules out of the live prompt by separating lightweight agent instructions from retrieved knowledge:
 
-1. **The Gatekeeper (System Prompt):** Your `.cursorrules` or `copilot-instructions.md` should only contain strict instructions mandating that the agent query Elefante before writing code.
-2. **The Oracle (Elefante DB):** You store your massive architectural specs (like database schemas or API contracts) inside Elefante as `SPECIFICATION` memory types. 
-3. **The Retrieval:** Specs are mathematically guaranteed an Authority Score of `1.0`. When the Gatekeeper forces the agent to search, the Oracle perfectly surfaces only the exact specification needed for the current task.
+1. **Keep the instruction file small.** Your `.cursorrules`, `copilot-instructions.md`, or equivalent should tell the agent to search Elefante before writing code or declaring work complete.
+2. **Store durable rules in Elefante.** Architecture contracts, schemas, and team process belong in `specification` or `directive` memories rather than inside a giant prompt file.
+3. **Retrieve only what is relevant.** When the agent searches, Elefante surfaces the specific rule needed for the current task instead of injecting an entire handbook into every prompt.
 
 ---
 
@@ -170,7 +170,6 @@ docs/             Technical reference, guides, debug compendiums
 examples/         Agent tutorial and integration patterns
 tests/            Unit, integration, and verification tests
 scripts/          Setup, deployment, and maintenance tools
-vscode-extension/ VS Code extension source
 ```
 
 ---
@@ -185,7 +184,7 @@ Full reference → [docs/technical/spec-tools.md](docs/technical/spec-tools.md)
 - [Architecture](docs/technical/spec-architecture.md) — system design
 - [Dashboard](docs/technical/ops-dashboard.md) — visualization and health monitoring
 - [Docker](docs/technical/ops-docker.md) — containerized deployment
-- [Debugging](docs/debug/README.md) — troubleshooting guide
+- [Debugging](docs/debug/README.md) — known issues tracker, compendium routing, and verification commands
 
 ---
 

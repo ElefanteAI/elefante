@@ -14,7 +14,7 @@ import chromadb
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.utils.config import get_config
+from src.utils.config import get_config  # noqa: E402
 
 
 def _timestamp() -> str:

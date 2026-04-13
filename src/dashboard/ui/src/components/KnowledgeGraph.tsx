@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.2.3 — Hub-Spoke Knowledge Graph (pure SVG)
+// Elefante Dashboard v2.3.0 — Hub-Spoke Knowledge Graph (pure SVG)
 import { useMemo, useState, useRef, useLayoutEffect } from 'react';
 import { useDashboardStore } from '@/store';
 import type { MemoryNode, GraphEdge } from '@/types';

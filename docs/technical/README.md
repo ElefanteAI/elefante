@@ -1,6 +1,6 @@
 # Technical Documentation
 
-**Elefante v2.2.3** · 17 docs · 3 prefixes
+**Elefante v2.3.0** · 17 docs · 3 prefixes
 
 ---
 
@@ -8,7 +8,7 @@
 
 | Prefix | Meaning | Authority |
 |--------|---------|-----------|
-| `spec-` | What the system IS. Normative. Change requires SDD gates. | 1.0 |
+| `spec-` | What the system IS. Normative. Change requires the embedded verification and closure process. | 1.0 |
 | `ops-` | How to DO things. Procedural. | — |
 | `dev-` | How to BUILD things. Contributor process. | 1.0 |
 
@@ -27,7 +27,7 @@
 
 | File | Content |
 |------|---------|
-| [`spec-architecture.md`](spec-architecture.md) | System design, triple-layer brain, SDD workflow |
+| [`spec-architecture.md`](spec-architecture.md) | System design, triple-layer brain, specification/directive retrieval workflow |
 | [`spec-tools.md`](spec-tools.md) | API reference — 21 MCP tools + 2 prompts |
 | [`spec-ingestion.md`](spec-ingestion.md) | 5-step pipeline (Extract → Classify → Integrity → Write → Reinforce) |
 | [`spec-scoring.md`](spec-scoring.md) | Temporal decay, reinforcement, 4-factor scoring formula |
@@ -53,7 +53,7 @@
 | File | Content |
 |------|---------|
 | [`dev-etiquette.md`](dev-etiquette.md) | **SPECIFICATION**: Feature closure (clean, docs, version) |
-| [`dev-sdd.md`](dev-sdd.md) | Spec-Driven Development — 5 gates |
+| [`dev-sdd.md`](dev-sdd.md) | Embedded development process reference (legacy filename) |
 
 ---
 

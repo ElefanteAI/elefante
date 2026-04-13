@@ -1,8 +1,6 @@
 import sys
 import asyncio
 import json
-import subprocess
-import time
 import os
 from pathlib import Path
 
@@ -10,7 +8,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
 
-from src.utils.logger import get_logger
+from src.utils.logger import get_logger  # noqa: E402
 
 logger = get_logger("verification")
 

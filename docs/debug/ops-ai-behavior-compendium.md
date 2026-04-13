@@ -22,6 +22,18 @@
 
 ---
 
+## Verification Commands
+
+Run these BEFORE investigating. If tests pass, the protocol enforcement is intact.
+
+| Issue | Test Command | What It Proves |
+| ----- | ------------ | -------------- |
+| #2 Premature completion | `.venv/bin/python scripts/verify/verify_e2e_tests.py` | Real MCP server completes full lifecycle |
+| #6 Protocol enforcement | `pytest tests/test_autonomous_coactivation.py -v` | Co-activation, directive baseline, spec bootstrap |
+| Emoji policy | `pytest tests/test_no_emojis.py -v` | Source files comply with no-emoji rule |
+
+---
+
 ## Table of Contents
 
 - [Issue #1: Analysis-Action Gap](#issue-1-analysis-action-gap)
@@ -372,7 +384,7 @@ AGENT BEHAVIOR:
 | Tool Descriptions | Passive | Agent reads but can ignore |
 | Documentation | Passive | Agent must read files |
 | Pre-Action Checkpoint | Passive | Agent must follow protocol |
-| Pitfall Index | Passive | Agent must search it |
+| Debug Compendiums | Passive | Agent must choose the relevant compendium |
 
 **The Pattern:**
 

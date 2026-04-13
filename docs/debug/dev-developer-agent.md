@@ -9,12 +9,29 @@
 
 The normal Elefante agent constitution (`.github/copilot-instructions.md`) governs agents that **use** Elefante as a memory tool. You are an agent that **builds** Elefante. The rules are stricter.
 
+Before debugging anything, open [`README.md`](README.md) in this folder, then the relevant `ops-*-compendium.md`, then [`tests/README.md`](../../tests/README.md). Do not pick scripts first and invent the reason afterward.
+
+### Mandatory Entry Sequence (Non-Negotiable)
+
+```
+1. READ   docs/debug/README.md  → Check Known Issues table for matching BUG-NNN
+2. RUN    The verification command from the matching issue row
+3. IF     test passes → fix is intact, root-cause elsewhere
+4. IF     test fails → real regression, open the linked compendium
+5. READ   compendium Verification Commands block → run the specific test
+6. FIX    with compendium context loaded
+7. TEST   the fix with the same verification command
+8. CLOSE  update Known Issues status, compendium, dev-etiquette closure
+```
+
+Skipping step 1 is how BUG-001 (Kuzu SIGSEGV) recurred. The fix existed, the docs existed, the tests existed — the agent just didn't read them. Runtime error messages now cite compendium entries directly so even a non-compliant agent gets routed to the docs via terminal output.
+
 **Your governing documents, in authority order:**
 
 | Authority | Document | What it governs |
-|-----------|----------|-----------------|
+| --------- | -------- | --------------- |
 | Immutable | [`dev-etiquette.md`](../technical/dev-etiquette.md) | **SPECIFICATION**: The closure sequence (clean, docs, version, commit). Skip = fatal. |
-| Immutable | [`dev-sdd.md`](../technical/dev-sdd.md) | The 5-gate SDD protocol. Every change passes all 5 gates or it doesn't ship. |
+| Immutable | [`dev-sdd.md`](../technical/dev-sdd.md) | Embedded development process reference. Legacy filename retained for continuity. |
 | Immutable | [`planning/spec-vision.md`](../planning/spec-vision.md) | The Four Laws. Token efficiency is a law, not a suggestion. |
 | High | `docs/debug/` Compendiums | Read the relevant `ops-*-compendium.md` file when tackling a specific system domain. |
 | Reference | This file | Active constraints and routing protocol for the Developer Agent. |
@@ -28,17 +45,20 @@ When you encounter a bug, a repeated mistake, or a developer trap, you MUST embe
 Execute the following pattern based on the type of failure:
 
 ### 1. The User's AI Agent Used an MCP Tool Incorrectly
+
 - **Action:** Open `src/mcp/server.py` (or the respective tool definition file).
 - **Embed:** Append the warning or constraint directly into the tool's JSON schema `description` string.
 - **Why:** Agents always read tool schemas before calling them. It guarantees friction-point awareness.
 
 ### 2. A System Constraint or Local Dev Environment Failed
+
 - **Action:** Open the relevant `ops-<domain>-compendium.md` (e.g., `ops-database-compendium.md`) and document the root cause and solution.
 - **Embed (Critical):** In the actual Python/system codebase where the failure occurs, modify the error handling to throw an exception that *explicitly prints the path to the compendium entry*.
 - **Example:** `raise DatabaseError("Lock active. Read docs/debug/ops-database-compendium.md Issue #4 for resolution.")`
 - **Why:** The runtime error output in the terminal natively hands the future Dev Agent the exact documentation path it needs.
 
 ### 3. The User's AI Agent Exhibited Bad General Behavior
+
 - **Action:** Open `.github/copilot-instructions.md` or `AGENT.md`.
 - **Embed:** Add a strict rule to the constitution or trigger map.
 - **Why:** System prompts natively govern untethered agent behavior.
@@ -47,15 +67,33 @@ Execute the following pattern based on the type of failure:
 
 ## The Development Loop
 
-```
-2. TRACE     your change to a spec source (Gate 1)
-3. SCAN      all 8 leakage surfaces (Gate 2)
-4. VERIFY    formulas from src/, not from docs (Gate 3)
-5. TEST      verify_health.py + verify_mcp_handshake.py + round-trip (Gate 4)
-6. CLOSE     dev-etiquette.md sequence: CLEAN → DOCS → VERSION → COMMIT (Gate 5)
+```text
+1. ENTER     docs/debug/README.md Known Issues table (mandatory)
+2. ROUTE     check if existing test already proves/disproves the hypothesis
+3. TRACE     your change to a spec source
+4. SCAN      all 8 leakage surfaces
+5. VERIFY    formulas from src/, not from docs
+6. TEST      run the verification command from the Known Issues row
+7. CLOSE     dev-etiquette.md sequence: CLEAN → DOCS → VERSION → COMMIT
+8. UPDATE    Known Issues table status + compendium if new post-mortem
 ```
 
-Gate details: [`dev-sdd.md`](../technical/dev-sdd.md)
+Process details: [`dev-sdd.md`](../technical/dev-sdd.md) (legacy filename, embedded process reference)
+
+## Purposeful Script Routing
+
+Do not run scripts as a ritual. Every script call must answer a specific debugging question.
+
+Before writing any scratch reproducer or one-off validation, check whether `tests/README.md` already maps the failure mode to a maintained pytest target. If it does, run that first. If the test is stale, update the existing test instead of creating a parallel scratch path.
+
+| Question you are answering | Run this | Why this script exists |
+| ------------------------- | -------- | ---------------------- |
+| Is the installation or baseline healthy? | `scripts/verify/verify_health.py` | Verifies imports, data paths, directives, and required specification memories |
+| Does the MCP server actually speak stdio JSON-RPC? | `scripts/verify/verify_mcp_handshake.py` | Proves real `initialize`/handshake liveness instead of assuming startup succeeded |
+| Does the live server survive the full startup, restart, compliance, and shutdown-race path? | `scripts/verify/verify_e2e_tests.py` | Runs the highest-signal live MCP verification in an isolated temp Elefante home/data dir |
+| Did a specific code path regress? | targeted `pytest` test from `tests/README.md` | Smallest reproducible proof for the changed path |
+| Is the factory reset script safe? | `pytest tests/test_factory_reset.py -v` | Validates dry-run, safety gates, backup creation, and idempotency against isolated temp HOME |
+| Is there a severe operational failure the verify scripts cannot explain? | `scripts/debug/*` only if the compendium tells you to | Intervention tools, not routine validation |
 
 ---
 
@@ -64,7 +102,7 @@ Gate details: [`dev-sdd.md`](../technical/dev-sdd.md)
 **Do not memorize this. Navigate to the source.**
 
 | Question | Go to |
-|----------|-------|
+| -------- | ----- |
 | How does the scoring formula work? | `src/models/memory.py` (source of truth) → [`spec-scoring.md`](../technical/spec-scoring.md) (human reference) |
 | What are the MCP tool signatures? | `src/mcp/server.py` (source of truth) → [`spec-tools.md`](../technical/spec-tools.md) (human reference) |
 | What's the system architecture? | [`spec-architecture.md`](../technical/spec-architecture.md) |
@@ -72,6 +110,7 @@ Gate details: [`dev-sdd.md`](../technical/dev-sdd.md)
 | How do I version a release? | `CONTRIBUTING.md` (root) → `scripts/ci/advise_version_bump.py` |
 | How do I run tests? | `tests/README.md` |
 | How do I add a script? | `scripts/README.md` (naming convention) |
+| Which script do I run and why? | This file → **Purposeful Script Routing** → `scripts/README.md` |
 
 ---
 
@@ -80,7 +119,7 @@ Gate details: [`dev-sdd.md`](../technical/dev-sdd.md)
 The 5 compendiums in this directory are the developer agent's equivalent of Elefante's brain:
 
 | Compendium | Domain | Use when |
-|------------|--------|----------|
+| ---------- | ------ | -------- |
 | [`ops-ai-behavior-compendium.md`](ops-ai-behavior-compendium.md) | Agent misbehavior | Agent skips search, claims false completion, ignores rules |
 | [`ops-dashboard-compendium.md`](ops-dashboard-compendium.md) | Dashboard bugs | Blank screen, stale data, API shape mismatch |
 | [`ops-database-compendium.md`](ops-database-compendium.md) | Kuzu / ChromaDB | Reserved words, locks, corruption, async races |
@@ -94,12 +133,13 @@ The 5 compendiums in this directory are the developer agent's equivalent of Elef
 ## What You Must Never Do
 
 1. **Guess a formula.** Read `src/models/memory.py` or `src/core/retrieval.py`. Docs may lag.
-2. **Skip Gate 4.** "It looks correct" is not a test result.
+2. **Skip purposeful verification.** "It looks correct" is not a test result.
 3. **Create new documentation files** without proving all existing files are insufficient.
 4. **Edit version strings by hand.** Use `scripts/ci/advise_version_bump.py` or `scripts/ci/bump_version.py`.
 5. **Print to stdout** in any code reachable from the MCP server. All logging → `sys.stderr`.
-6. **Leave temp files, debug scripts, or commented code** after completing a task.
+6. **Run scripts without a concrete failure mode or validation target.**
+7. **Leave temp files, debug scripts, or commented code** after completing a task.
 
 ---
 
-_This file is a navigation protocol, not a specification. Authority lives in the documents it references._
+*This file is a navigation protocol, not a specification. Authority lives in the documents it references.*

@@ -158,7 +158,7 @@ def configure_mcp(argv: list[str] | None = None):
     
     # Get current Elefante path (AGNOSTIC)
     # We use the parent of the 'scripts' directory where this script resides
-    elefante_path = Path(__file__).parent.parent.absolute()
+    elefante_path = Path(__file__).resolve().parents[2]
     python_cmd = _infer_repo_python(elefante_path)
     
     print(f"Elefante Location: {elefante_path}")

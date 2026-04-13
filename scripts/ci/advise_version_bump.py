@@ -23,7 +23,7 @@ import sys
 import subprocess
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 
 # ── Classification signal tables ─────────────────────────────────────────────
 
@@ -203,7 +203,7 @@ def main() -> None:
     proposed      = bump(curr, level)
 
     print()
-    print(f"  I believe this development, if you want to save it,")
+    print("  I believe this development, if you want to save it,")
     print(f"  it should be v{proposed}  (bump {_LEVEL_LABEL[level]}),")
     print(f"  because: {reason}.")
     print()
@@ -237,7 +237,7 @@ def main() -> None:
         sys.exit(1)
 
     # ── Run bump_version.py ────────────────────────────────────────────────
-    bump_script = ROOT / "scripts" / "bump_version.py"
+    bump_script = ROOT / "scripts" / "ci" / "bump_version.py"
     result = subprocess.run([sys.executable, str(bump_script), target], cwd=ROOT)
     if result.returncode != 0:
         print("\n  bump_version.py failed. Version not updated.")
@@ -245,11 +245,11 @@ def main() -> None:
 
     print()
     print(f"  Version bumped to v{target}.")
-    print(f"  Next steps:")
+    print("  Next steps:")
     print(f"    1. Write the CHANGELOG.md entry for v{target}")
-    print(f"    2. git add -A")
+    print("    2. git add -A")
     print(f"    3. git commit -m \"chore: bump to v{target} <description>\"")
-    print(f"    4. git push")
+    print("    4. git push")
     print()
 
 

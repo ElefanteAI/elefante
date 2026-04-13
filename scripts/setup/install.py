@@ -14,24 +14,20 @@ import os
 import sys
 import subprocess
 import platform
-import json
 import shutil
 import argparse
 import datetime
 from pathlib import Path
 
-# Ensure we can import from scripts directory
-sys.path.append(str(Path(__file__).parent))
+SETUP_DIR = Path(__file__).resolve().parent
+ROOT_DIR = Path(__file__).resolve().parents[2]
 
-# Import existing configuration logic
-try:
-    from configure_vscode_bob import configure_mcp as configure_vscode
-    from configure_antigravity import configure_mcp as configure_antigravity
-except ImportError:
-    # Fallback if running from root
-    sys.path.append(str(Path(__file__).parent / "scripts"))
-    from configure_vscode_bob import configure_mcp as configure_vscode
-    from configure_antigravity import configure_mcp as configure_antigravity
+# Ensure sibling setup modules are importable when running as a script.
+sys.path.insert(0, str(SETUP_DIR))
+
+from configure_vscode_bob import configure_mcp as configure_vscode  # noqa: E402
+from configure_antigravity import configure_mcp as configure_antigravity  # noqa: E402
+
 
 class Logger:
     def __init__(self, log_file=None):
@@ -39,7 +35,7 @@ class Logger:
         if log_file:
             # Ensure log file exists and is writable
             try:
-                with open(log_file, 'a', encoding='utf-8') as f:
+                with open(log_file, 'a', encoding='utf-8'):
                     pass
             except Exception as e:
                 print(f"WARN: Could not open log file {log_file}: {e}")
@@ -58,7 +54,7 @@ class Logger:
             except Exception:
                 pass
 
-logger = None
+logger = Logger()
 
 def print_header(msg):
     logger.log("\n" + "="*60)
@@ -92,6 +88,7 @@ def run_command(cmd, cwd=None, shell=False, env=None):
                 errors='replace',
                 env=run_env
             )
+            assert process.stdout is not None
             
             while True:
                 line = process.stdout.readline()
@@ -228,8 +225,12 @@ def check_disk_space(root_dir):
     
     if platform.system() == 'Windows':
         import ctypes
+        windll = getattr(ctypes, "windll", None)
+        if windll is None:
+            logger.log("ERROR: ctypes.windll is unavailable on this Python build")
+            return False
         free_bytes = ctypes.c_ulonglong(0)
-        ctypes.windll.kernel32.GetDiskFreeSpaceExW(
+        windll.kernel32.GetDiskFreeSpaceExW(
             ctypes.c_wchar_p(str(root_dir)), 
             None, 
             None, 
@@ -316,6 +317,13 @@ def get_python_cmd():
         return sys.executable
     return sys.executable
 
+
+def get_repo_venv_python(root_dir):
+    """Return the repository virtualenv Python path."""
+    if sys.platform == 'win32':
+        return str(root_dir / ".venv" / "Scripts" / "python.exe")
+    return str(root_dir / ".venv" / "bin" / "python")
+
 def create_venv(root_dir):
     """Create virtual environment if it doesn't exist"""
     venv_dir = root_dir / ".venv"
@@ -379,7 +387,7 @@ def build_dashboard_ui(root_dir):
 def init_databases(root_dir, python_cmd):
     """Initialize ChromaDB and Kuzu"""
     logger.log("Initializing databases...")
-    script_path = root_dir / "scripts" / "init_databases.py"
+    script_path = root_dir / "scripts" / "setup" / "init_databases.py"
     if run_command([python_cmd, str(script_path)], cwd=root_dir, env={'ELEFANTE_LOG_FORMAT': 'text', 'ELEFANTE_LOGGING_FORMAT': 'text'}):
         logger.log("OK: Databases initialized")
         return True
@@ -390,7 +398,7 @@ def init_databases(root_dir, python_cmd):
 def generate_dashboard_snapshot(root_dir, python_cmd):
     """Generate initial dashboard snapshot so the dashboard works on first open."""
     logger.log("Generating dashboard snapshot...")
-    script_path = root_dir / "scripts" / "update_dashboard_data.py"
+    script_path = root_dir / "scripts" / "pipeline" / "update_dashboard_data.py"
     if run_command([python_cmd, str(script_path)], cwd=root_dir, env={'ELEFANTE_LOG_FORMAT': 'text', 'ELEFANTE_LOGGING_FORMAT': 'text'}):
         logger.log("OK: Dashboard snapshot generated")
         return True
@@ -401,7 +409,7 @@ def generate_dashboard_snapshot(root_dir, python_cmd):
 def run_health_check(root_dir, python_cmd):
     """Run health check script"""
     logger.log("Running health check...")
-    script_path = root_dir / "scripts" / "verify_health.py"
+    script_path = root_dir / "scripts" / "verify" / "verify_health.py"
     if run_command([python_cmd, str(script_path)], cwd=root_dir, env={'ELEFANTE_LOG_FORMAT': 'text', 'ELEFANTE_LOGGING_FORMAT': 'text'}):
         logger.log("OK: Health check passed")
         return True
@@ -451,7 +459,7 @@ def main():
     
     logger = Logger(args.log_file)
     
-    root_dir = Path(__file__).parent.parent.absolute()
+    root_dir = ROOT_DIR
     os.chdir(root_dir)
     
     print_header("ELEFANTE INSTALLATION WIZARD")
@@ -472,11 +480,19 @@ def main():
     # 1. Virtual Environment
     print_step(1, "Environment Setup")
     in_venv = sys.prefix != sys.base_prefix
+    python_cmd = get_python_cmd()
+
     if not in_venv:
         logger.log("WARN: Not running in a virtual environment")
         logger.log("   It is recommended to run this script via 'install.bat' (Windows) or 'install.sh' (Mac/Linux).")
-    
-    python_cmd = get_python_cmd()
+        if not create_venv(root_dir):
+            success = False
+        else:
+            python_cmd = get_repo_venv_python(root_dir)
+    else:
+        repo_python = get_repo_venv_python(root_dir)
+        if Path(repo_python).exists():
+            python_cmd = repo_python
     
     # 2. Dependencies
     print_step(2, "Dependencies")
@@ -538,7 +554,7 @@ def main():
         if success:
              # 5a. MCP Handshake Verification (Real Liveness Check)
              logger.log("\nVerifying MCP handshake...")
-             handshake_script = root_dir / "scripts" / "verify_mcp_handshake.py"
+             handshake_script = root_dir / "scripts" / "verify" / "verify_mcp_handshake.py"
              if run_command([python_cmd, str(handshake_script)], cwd=root_dir):
                  logger.log("OK: MCP handshake verified")
              else:

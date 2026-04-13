@@ -527,14 +527,19 @@ class TestAbsolutePathResolution:
         assert DATA_DIR.is_absolute(), "DATA_DIR is not absolute"
     
     def test_config_paths_exist(self):
-        """Verify that database directories are created"""
+        """Verify the configured runtime directories reflect the current lazy-Kuzu contract."""
         from src.utils.config import CHROMA_DIR, KUZU_DIR, DATA_DIR, LOGS_DIR
         
-        # Directories should exist
+        # Safe runtime directories are created eagerly.
         assert DATA_DIR.exists(), f"DATA_DIR does not exist: {DATA_DIR}"
         assert CHROMA_DIR.exists(), f"CHROMA_DIR does not exist: {CHROMA_DIR}"
-        assert KUZU_DIR.exists(), f"KUZU_DIR does not exist: {KUZU_DIR}"
         assert LOGS_DIR.exists(), f"LOGS_DIR does not exist: {LOGS_DIR}"
+
+        # Kuzu manages its own directory lifecycle and should not be pre-created
+        # by config import. The configured path must still resolve correctly.
+        assert KUZU_DIR.parent == DATA_DIR, f"KUZU_DIR is not rooted under DATA_DIR: {KUZU_DIR}"
+        if KUZU_DIR.exists():
+            assert KUZU_DIR.is_dir(), f"KUZU_DIR exists but is not a directory: {KUZU_DIR}"
     
     def test_vector_store_config_uses_absolute_path(self):
         """Verify VectorStoreConfig has absolute path"""

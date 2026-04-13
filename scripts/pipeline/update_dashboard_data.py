@@ -9,9 +9,9 @@ import chromadb
 # Add src to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from src.core.graph_store import GraphStore
-from src.utils.config import get_config
-from src.utils.dashboard_serializer import (
+from src.core.graph_store import GraphStore  # noqa: E402
+from src.utils.config import get_config  # noqa: E402
+from src.utils.dashboard_serializer import (  # noqa: E402
     _redact_secrets,
     _derive_topic,
     compute_live_score_from_raw as _compute_live_score,
@@ -223,7 +223,7 @@ async def main():
                             # Already have memories from ChromaDB, skip duplicates
                             continue
                         props.update(extra)
-                    except:
+                    except Exception:
                         pass
                 
                 # Determine if this is a real entity (person, tech, project) not a memory
@@ -260,8 +260,10 @@ async def main():
             
             if src and dst:
                 # REMAP Edges for deduplicated nodes
-                if src in id_remap: src = id_remap[src]
-                if dst in id_remap: dst = id_remap[dst]
+                if src in id_remap:
+                    src = id_remap[src]
+                if dst in id_remap:
+                    dst = id_remap[dst]
                 
                 # Avoid self-loops created by consolidation
                 if src == dst:
@@ -319,8 +321,10 @@ async def main():
                 dst = row.get('c.id')
                 
                 if src and dst:
-                    if src in id_remap: src = id_remap[src]
-                    if dst in id_remap: dst = id_remap[dst]
+                    if src in id_remap:
+                        src = id_remap[src]
+                    if dst in id_remap:
+                        dst = id_remap[dst]
                     
                     if src == dst:
                         continue

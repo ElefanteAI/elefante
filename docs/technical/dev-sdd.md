@@ -1,22 +1,22 @@
-# Spec-Driven Development (SDD) Protocol for Elefante Contributors
+# Embedded Development Process Reference (Legacy File: dev-sdd.md)
 
 > [!IMPORTANT]
 > **This file is HUMAN REFERENCE ONLY.**  
-> Living enforcement is inside Elefante as **DIRECTIVES** (6 SDD gates, injected unconditionally into every tool response) + **SPECIFICATION memories** (authority=1.0, zero decay) + **pre-commit hook** (`.git/hooks/pre-commit` — mechanical Gate 4).  
-> See the Gatekeeper & Oracle pattern in `docs/technical/spec-architecture.md` (section 2: The Native SDD Workflow).
+> The filename `dev-sdd.md` is retained for compatibility, but SDD is no longer a separate product surface or workflow mode. The checks below document the embedded development process already enforced through built-in directives, specification memories, compendiums, and verification scripts.  
+> See `docs/technical/spec-architecture.md` for the runtime retrieval model and `docs/debug/dev-developer-agent.md` for script routing.
 
-**Version**: 2.2.3  
-**Status**: Reference document — enforcement is native  
+**Version**: 2.3.0  
+**Status**: Reference document — embedded process, legacy filename retained  
 **Last Updated**: 2026-03-20
 
 ---
 
-## What This Is
+## What This File Is
 
-SDD is the development methodology for Elefante itself. It enforces the same principles Elefante enforces on AI agents — source-first grounding, gate-ordered verification, zero tolerance for drift — applied to the act of building Elefante.
+This file documents the development checks for building Elefante itself. Older repository language called this SDD. The name remains in some filenames and directive text, but the behavior is now embedded into the repository process rather than treated as a separate mode.
 
 > If Elefante prevents agents from hallucinating architecture decisions,  
-> then SDD prevents contributors from hallucinating patches.
+> then this embedded development process prevents contributors from hallucinating patches.
 
 The core discipline:
 
@@ -28,7 +28,7 @@ The core discipline:
 
 ---
 
-## The Five Gates (Run in Exact Order)
+## The Embedded Development Checks (Legacy "Five Gates")
 
 ---
 
@@ -193,7 +193,7 @@ Elefante enforces these same principles on agents using it:
 | Gate 4: Simulator Gate | Compliance Gate — write is blocked until search is proven real |
 | Gate 5: Output Discipline | Contributing standards + `bump_version.py` versioning contract |
 
-Elefante was built to give agents this discipline. SDD is that discipline applied to building Elefante itself.
+Elefante was built to give agents this discipline. Older repo language called this SDD; today it is the embedded development process for building Elefante itself.
 
 ---
 

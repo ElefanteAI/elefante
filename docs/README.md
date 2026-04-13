@@ -1,6 +1,6 @@
 # Elefante Documentation
 
-> **v2.2.3** · [Product overview & install](../README.md) · [Agent constitution](../.github/copilot-instructions.md)
+> **v2.3.0** · [Product overview & install](../README.md) · [Agent constitution](../.github/copilot-instructions.md)
 
 ---
 
@@ -48,13 +48,13 @@
 | Doc | Content |
 |-----|---------|
 | [`technical/dev-etiquette.md`](technical/dev-etiquette.md) | **SPECIFICATION**: Feature closure (clean, docs, version) |
-| [`technical/dev-sdd.md`](technical/dev-sdd.md) | Spec-Driven Development gates |
+| [`technical/dev-sdd.md`](technical/dev-sdd.md) | Embedded development process reference (legacy filename) |
 
 ### Debugging
 
 | Doc | Content |
 |-----|---------|
-| [`debug/`](debug/README.md) | 5 domain compendiums + [Developer Agent protocol](debug/dev-developer-agent.md) |
+| [`debug/`](debug/README.md) | Known Issues tracker, 5 domain compendiums, [Developer Agent protocol](debug/dev-developer-agent.md) |
 
 ### Planning
 

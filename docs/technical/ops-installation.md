@@ -77,7 +77,7 @@ chmod +x install.sh
 
 7. **Runtime Baseline Bootstrap**
    - Built-in system directives are available immediately on first server start
-   - Required SDD specification memories are seeded automatically on first orchestrator use
+   - Required specification memories are seeded automatically on first orchestrator use
    - No manual seeding step is required for a fresh installation
 
 **Installation Time**: ~10 minutes (depending on internet speed)
@@ -253,7 +253,7 @@ Expected output:
  All systems operational
 ```
 
-`verify_health.py` now also verifies the runtime SDD baseline:
+`verify_health.py` now also verifies the embedded runtime baseline:
 
 - Built-in system directives are present
 - The `STDOUT Purity Law` directive is active

@@ -26,6 +26,18 @@
 
 ---
 
+## Verification Commands
+
+Run these BEFORE investigating. If tests pass, the documented fix is intact.
+
+| Issue | Test Command | What It Proves |
+| ----- | ------------ | -------------- |
+| #8 Blank dashboard | `python scripts/verify/verify_health.py` | Dashboard data path and baseline health |
+| #9 Scores stuck at 100 | `pytest tests/test_dashboard_serializer.py -v` | Live score computation, secret redaction, serialization |
+| Full E2E | `.venv/bin/python scripts/verify/verify_e2e_tests.py` | Isolated end-to-end MCP workflow |
+
+---
+
 ## Table of Contents
 
 - [Issue #1: Kuzu Database Compatibility](#issue-1-kuzu-database-compatibility)
@@ -696,11 +708,9 @@ Cross-validation (5 samples): ALL SCORES VERIFIED (±1 for time-decay drift)
 ### Verification
 
 ```bash
-# Quick score health check:
-python3 tmp/verify_scores.py
-
-# Expected output:
-# Memories: 74, Score=100: 0, Avg: ~75, Min: ~54, Max: ~94
-# ALL SCORES VERIFIED
+# Maintained serializer regression:
+pytest tests/test_dashboard_serializer.py -v
 ```
+
+Use the maintained pytest coverage above instead of recreating the deleted `tmp/verify_scores.py` scratch script.
 

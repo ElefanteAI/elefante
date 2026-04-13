@@ -137,12 +137,3 @@ IF YOU ENCOUNTER ERRORS WHILE DEVELOPING ELEFANTE, DO NOT GUESS. STOP AND READ T
 - **MCP tool truncation / memory schemas**: `docs/debug/ops-memory-compendium.md`
 - **AI Agent behavior loops / parsing rules**: `docs/debug/ops-ai-behavior-compendium.md`
 </troubleshooting_trigger_map>
-
-<troubleshooting_trigger_map>
-IF YOU ENCOUNTER ERRORS WHILE DEVELOPING ELEFANTE, DO NOT GUESS. STOP AND READ THE RELEVANT COMPENDIUM:
-- **Dashboard / Frontend UI**: `docs/debug/ops-dashboard-compendium.md`
-- **ChromaDB / Kuzu / sqlite locks**: `docs/debug/ops-database-compendium.md`
-- **Docker / Python environments / Setup**: `docs/debug/ops-installation-compendium.md`
-- **MCP tool truncation / memory schemas**: `docs/debug/ops-memory-compendium.md`
-- **AI Agent behavior loops / parsing rules**: `docs/debug/ops-ai-behavior-compendium.md`
-</troubleshooting_trigger_map>

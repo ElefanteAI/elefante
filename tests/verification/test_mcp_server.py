@@ -43,6 +43,9 @@ def test_mcp_server():
             text=True,
             bufsize=0 # Unbuffered
         )
+        assert process.stdin is not None
+        assert process.stdout is not None
+        assert process.stderr is not None
         
         log("    Server process started.")
         
@@ -104,7 +107,7 @@ def test_mcp_server():
             
     except Exception as e:
         log(f"    Test failed: {e}")
-        return False
+        pytest.fail(f"MCP server smoke test failed: {e}")
     finally:
         if 'process' in locals() and process.poll() is None:
             process.terminate()

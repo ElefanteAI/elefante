@@ -41,6 +41,7 @@ EXCLUDED_DIR_NAMES = {
     ".pytest_cache",
     "dist",
     "build",
+    "archive",
 }
 
 
@@ -184,7 +185,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("mode", choices={"check", "apply"})
     parser.add_argument(
         "--root",
-        default=str(Path(__file__).resolve().parents[1]),
+        default=str(Path(__file__).resolve().parents[2]),
         help="Repository root directory (default: repo root)",
     )
     parser.add_argument(

@@ -6,7 +6,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
 
-from src.core.orchestrator import get_orchestrator
+from src.core.orchestrator import get_orchestrator  # noqa: E402
 
 async def list_recent():
     orchestrator = get_orchestrator()

@@ -1,78 +1,81 @@
-#!/usr/bin/env python3
-"""Quick validation of the shared dashboard_serializer module."""
-import sys, os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+"""Pytest coverage for the shared dashboard serializer module."""
 
+from datetime import datetime
+
+from src.models.memory import Memory, MemoryMetadata, MemoryType
 from src.utils.dashboard_serializer import (
+    _derive_topic,
+    _redact_secrets,
     compute_live_score,
     compute_live_score_from_raw,
     is_test_artifact,
-    _redact_secrets,
-    _derive_topic,
-    _composite_dashboard_score,
     memory_to_dashboard_node,
 )
 
-print("All imports OK")
 
-# 1. Raw score computation
-meta = {
-    "memory_type": "preference",
-    "created_at": "2025-05-01T12:00:00",
-    "last_accessed": "2025-06-01T12:00:00",
-    "access_count": 5,
-}
-score = compute_live_score_from_raw(meta)
-print(f"Raw score test: {score}")
-assert 20 < score < 95, f"Score {score} out of expected range"
+def _sample_raw_metadata() -> dict:
+    return {
+        "memory_type": "preference",
+        "created_at": "2025-05-01T12:00:00",
+        "last_accessed": "2025-06-01T12:00:00",
+        "access_count": 5,
+    }
 
-# 2. Test artifact detection
-assert is_test_artifact(content="elefante e2e test memory xyz", title="") is True
-assert is_test_artifact(content="[battery_test] something", title="") is True
-assert is_test_artifact(content="real memory about Python", title="My Pref") is False
-print("Test artifact filter OK")
 
-# 3. Topic derivation
-assert _derive_topic("Code Style | PEP8 rules", None) == "Code Style"
-assert _derive_topic("", "mycat") == "mycat"
-assert _derive_topic("", None) == "General"
-print("Topic derivation OK")
+def _sample_memory() -> Memory:
+    return Memory(
+        content="Test preference about coding style",
+        metadata=MemoryMetadata(
+            memory_type=MemoryType.PREFERENCE,
+            created_at=datetime(2025, 5, 1, 12, 0, 0),
+            last_accessed=datetime(2025, 6, 1, 12, 0, 0),
+            access_count=5,
+            decay_rate=0.002,
+            custom_metadata={"title": "Code Style | PEP8"},
+        ),
+    )
 
-# 4. Secret redaction
-assert "sk-" not in _redact_secrets("key is sk-abcdefghijklmnopqrstuvwxyz")
-print("Secret redaction OK")
 
-# 5. Memory-object scoring (need a real Memory)
-from src.models.memory import Memory, MemoryMetadata, MemoryType
-from datetime import datetime
+def test_compute_live_score_from_raw_returns_reasonable_range():
+    score = compute_live_score_from_raw(_sample_raw_metadata())
+    assert 20 < score < 95, f"Score {score} out of expected range"
 
-mem = Memory(
-    content="Test preference about coding style",
-    metadata=MemoryMetadata(
-        memory_type=MemoryType.PREFERENCE,
-        created_at=datetime(2025, 5, 1, 12, 0, 0),
-        last_accessed=datetime(2025, 6, 1, 12, 0, 0),
-        access_count=5,
-        decay_rate=0.002,
-        custom_metadata={"title": "Code Style | PEP8"},
-    ),
-)
-mem_score = compute_live_score(mem)
-print(f"Memory-object score: {mem_score}")
-assert 20 < mem_score < 95, f"Memory score {mem_score} out of expected range"
 
-# 6. Full node serialization
-node = memory_to_dashboard_node(mem)
-assert node is not None
-assert node["properties"]["score"] == mem_score
-assert node["name"] == "Code Style | PEP8"
-assert node["properties"]["topic"] == "Code Style"
-print(f"Node serialization OK: {node['name']} score={node['properties']['score']}")
+def test_is_test_artifact_filters_known_patterns():
+    assert is_test_artifact(content="elefante e2e test memory xyz", title="") is True
+    assert is_test_artifact(content="[battery_test] something", title="") is True
+    assert is_test_artifact(content="real memory about Python", title="My Pref") is False
 
-# 7. Verify raw-dict and Memory-object scores are close
-# They use slightly different vitality paths but same composite formula
-delta = abs(score - mem_score)
-print(f"Score delta (raw vs Memory): {delta} points")
-assert delta <= 3, f"Scores diverged too much: raw={score} mem={mem_score}"
 
-print("\n=== ALL TESTS PASSED ===")
+def test_derive_topic_prefers_title_prefix_then_category_then_general():
+    assert _derive_topic("Code Style | PEP8 rules", None) == "Code Style"
+    assert _derive_topic("", "mycat") == "mycat"
+    assert _derive_topic("", None) == "General"
+
+
+def test_redact_secrets_removes_api_key_pattern():
+    assert "sk-" not in _redact_secrets("key is sk-abcdefghijklmnopqrstuvwxyz")
+
+
+def test_compute_live_score_for_memory_object_returns_reasonable_range():
+    memory = _sample_memory()
+    score = compute_live_score(memory)
+    assert 20 < score < 95, f"Memory score {score} out of expected range"
+
+
+def test_memory_to_dashboard_node_serializes_score_and_topic():
+    memory = _sample_memory()
+    score = compute_live_score(memory)
+    node = memory_to_dashboard_node(memory)
+
+    assert node is not None
+    assert node["properties"]["score"] == score
+    assert node["name"] == "Code Style | PEP8"
+    assert node["properties"]["topic"] == "Code Style"
+
+
+def test_raw_and_memory_scores_stay_close():
+    raw_score = compute_live_score_from_raw(_sample_raw_metadata())
+    memory_score = compute_live_score(_sample_memory())
+    delta = abs(raw_score - memory_score)
+    assert delta <= 3, f"Scores diverged too much: raw={raw_score} mem={memory_score}"

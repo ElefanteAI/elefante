@@ -7,12 +7,16 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [2.3.0] - 2026-04-13
 
 ### Fixed
+
+- **Stale verification surface**: the maintained test/docs path now prefers existing `scripts/verify/*` and `tests/README.md` coverage over scratch validation, the dashboard serializer file is now real pytest coverage, the MCP smoke test no longer swallows generic failures, and stale extension-era or deleted-script references were removed from active docs and tests.
 - **Kuzu lock contention**: `GraphStore.close()` now calls the actual `kuzu.Connection.close()` and `kuzu.Database.close()` APIs. Previously these were commented out, leaving the OS-level exclusive file lock held indefinitely. `reset_graph_store()` also now calls `close()` before setting `_graph_store = None`.
 - **Kuzu native shutdown crash**: eliminated a persistent macOS `SIGSEGV` race where MCP tools could close the global `GraphStore` while background co-activation work or leaked `QueryResult` objects were still alive. `GraphStore` now serializes Kuzu access, materializes rows inside the worker thread, and waits for in-flight operations before closing.
+- **MCP cold-start handshake timeout**: `src.mcp.server.run()` no longer blocks `initialize` behind orchestrator and embedding-model warmup. Fresh stdio sessions now answer the MCP handshake immediately, while system baseline seeding occurs on first orchestrator use.
 - **Ghost memories after delete**: `elefante-MemoryDelete` now removes the matching graph entity as well as the Chroma record, so hybrid search and graph-backed retrieval cannot surface deleted memories after a successful delete.
+- **Standalone E2E harness drift**: `scripts/verify/verify_e2e_tests.py` now provisions its own temporary HOME and `ELEFANTE_DATA_DIR`, enables test-memory mode for spawned MCP servers, and reports the current Elefante version dynamically. The shipped verifier no longer depends on external shell env setup to avoid polluting the user's durable store.
 - **Fresh-install SDD drift**: new installs now get the runtime SDD baseline from core code. `DirectiveStore` exposes built-in system directives immediately, and `MemoryOrchestrator.ensure_system_baseline()` idempotently seeds the required specification memories on first use.
 - **Regression coverage gap**: the crash fix is now guarded three ways: a static raw-Kuzu-boundary test, an isolated live MCP subprocess regression under pytest, and the shipped E2E harness now exercises the repeated search/co-activation shutdown-race path.
 - **Version drift in specification docs**: `scripts/ci/bump_version.py` now updates `docs/technical/developer-etiquette.md`, `docs/technical/sdd-development-protocol.md`, and the footer version in `docs/technical/README.md`, preventing manual semver drift in closure-critical docs.
@@ -22,9 +26,18 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Purged 200 test memories**: `entity_target_0` through `entity_target_99` (duplicated twice) were polluting ChromaDB. Deleted from vector store. Added `entity_target` pattern to `_is_test_artifact()` so snapshot never includes them again.
 
 ### Changed
+
+- **Documentation authority alignment**: active docs now treat SDD as legacy/internal terminology, route verification through `docs/debug/dev-developer-agent.md`, remove the deleted VS Code extension from the active vision surface, and reframe the live E2E harness around concrete MCP verification goals.
+- **Debug-to-test routing**: every `ops-*-compendium.md` now has a Verification Commands table mapping documented issues to specific `pytest` targets. `docs/debug/README.md` is now a Known Issues tracker (BUG-001 through BUG-006) with status, compendium link, exact verification command, and recurrence count. Runtime error messages in `graph_store.py` and `server.py` now cite the relevant compendium entry so agents are routed to documentation through terminal output, not discipline.
 - **Dashboard score differentiation**: Replaced pure exponential-decay score in `_compute_live_score()` with a composite metric: 50% temporal vitality + 25% memory-type weight + 25% engagement (access frequency). Specifications/decisions now rank visibly higher than conversations; frequently-accessed memories score above one-shot entries. Score Distribution chart now shows a meaningful spread (range ~58-95) instead of 84% clustering at 100.
 - **Agent entry-point docs**: installation and IDE configuration docs now explicitly document the `AGENT.md` role-adoption entry point alongside `.cursorrules` and `.windsurfrules`.
 - **Cleanup**: removed the unreferenced `docs/planning/walkthrough.md` delivery artifact so the repo keeps only durable docs, specs, and changelog state.
+
+### Added
+
+- **Factory reset test**: `tests/test_factory_reset.py` — 10 tests covering dry-run safety, all 3 rejection gates (ELEFANTE_PRIVILEGED, --confirm DELETE, --apply), backup creation with content preservation, clean-state idempotency, and double-reset. All tests run against an isolated temp HOME; real user data is never touched.
+- **Known Issues tracker**: `docs/debug/README.md` now serves as the root bug-resolution entry point with a BUG-NNN table that links every tracked issue to its compendium post-mortem, verification command, and recurrence count.
+- **Runtime compendium citations**: `graph_store.py` error paths now print the exact compendium issue path (e.g., `docs/debug/ops-database-compendium.md Issue #7`) in the error message. `server.py` catch-all appends `docs/debug/README.md -> Known Issues` to unrecognized tool failures. Agents that never read docs still get routed.
 
 ---
 

@@ -19,12 +19,13 @@ import subprocess
 import argparse
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 
 # Add src to path
-WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
+WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(WORKSPACE_ROOT))
 
-from src.utils.logger import get_logger
+from src.utils.logger import get_logger  # noqa: E402
 
 logger = get_logger(__name__)
 
@@ -159,7 +160,7 @@ def start_mcp_server() -> bool:
         return False
 
 
-def verify_restart(expected_version: str = None) -> bool:
+def verify_restart(expected_version: Optional[str] = None) -> bool:
     """Verify the MCP server restarted successfully."""
     try:
         time.sleep(1)

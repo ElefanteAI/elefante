@@ -28,7 +28,7 @@ import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import List
 from uuid import UUID
 
 # Ensure repo root is on sys.path so `import src.*` works when running as a script.
@@ -40,8 +40,8 @@ for _ in range(6):
         break
     _REPO_ROOT = candidate
 
-from src.core.orchestrator import get_orchestrator
-from src.core.refinery import infer_namespace
+from src.core.orchestrator import get_orchestrator  # noqa: E402
+from src.core.refinery import infer_namespace  # noqa: E402
 
 
 @dataclass(frozen=True)

@@ -20,6 +20,19 @@
 
 ---
 
+## Verification Commands
+
+Run these BEFORE investigating. If tests pass, the documented fix is intact.
+
+| Issue | Test Command | What It Proves |
+| ----- | ------------ | -------------- |
+| #1-#4 Install health | `python scripts/verify/verify_health.py` | Imports, data paths, directives, specs |
+| MCP server starts | `python scripts/verify/verify_mcp_handshake.py` | stdio JSON-RPC handshake succeeds |
+| Factory reset | `pytest tests/test_factory_reset.py -v` | Dry-run safety, gate rejection, backup creation |
+| Full E2E | `.venv/bin/python scripts/verify/verify_e2e_tests.py` | Isolated end-to-end MCP workflow |
+
+---
+
 ## Table of Contents
 
 - [Issue #1: Kuzu 0.11.x Path Breaking Change](#issue-1-kuzu-011x-path-breaking-change)
@@ -348,7 +361,7 @@ python scripts/setup/init_databases.py
 ### When Upgrading Libraries
 
 1.  Read changelog for breaking changes
-2.  Test in isolated environment first
+2.  Run the existing isolated verifier first (`scripts/verify/*` or targeted pytest) before inventing a new scratch environment
 3.  Backup existing data directories
 4.  Check version constraints in `requirements.txt`
 5.  Update documentation if behavior changes

@@ -1,6 +1,6 @@
 # Elefante Vision
 
-> Last updated: 2026-04-12 · Current version: v2.2.1
+> Last updated: 2026-04-13 · Current version: v2.2.3
 
 ---
 
@@ -39,7 +39,7 @@ These are non-negotiable and define everything Elefante does:
 **Shipped and working:**
 
 | Capability | What It Does |
-|---|---|
+| ---------- | ------------ |
 | 21 MCP tools | Memory CRUD, graph queries, tasks, ETL, directives, context injection |
 | Dual storage | ChromaDB (semantic vectors) + Kuzu (knowledge graph) |
 | Behavioral scoring | System-computed relevance (0-100) with type-based decay rates |
@@ -51,7 +51,7 @@ These are non-negotiable and define everything Elefante does:
 | Response compression | Null-stripped, token-efficient payloads with behavioral directives |
 | Dashboard | React + SVG: health scores, memory table, knowledge graph visualization |
 | Session distiller | Scan, parse, and ingest knowledge from VS Code chat logs |
-| VS Code extension | `@elefante` chat participant for in-IDE memory grounding |
+| Runtime baseline bootstrap | Built-in directives and required specification memories are available on first use |
 | One-click install | `./install.sh` (macOS/Linux) or `install.bat` (Windows) |
 
 ---
@@ -86,7 +86,7 @@ The system discovers what matters. The user just works.
 Not all knowledge ages the same way:
 
 | Type | Half-Life | Why |
-|---|---|---|
+| ---- | --------- | --- |
 | Specification / Directive | ∞ | Architecture and rules don't decay |
 | Preference | ~347 days | Stable but can shift |
 | Decision / Fact | ~139 days | Get revisited over time |
@@ -141,12 +141,7 @@ Everything below emerged during development and represents where Elefante could 
 **Team Sync API** — Share distilled knowledge across team members. Dashboard metric for distiller throughput. Export functionality.
 *Status: Concept in task spec. Not built.*
 
-### E. VS Code Extension
-
-**Extension Build & Distribution** — The `@elefante` chat participant extension exists as source code (`vscode-extension/`). Has 8 TypeScript source files, registers commands and settings. Never been compiled or published.
-*Status: Source complete. Never built/packaged.*
-
-### F. Multi-Modal & Platform
+### E. Multi-Modal & Platform
 
 **Multi-Modal Memory** — Image memory support. Audio transcription integration. Store and retrieve non-text knowledge.
 *Status: Concept only.*

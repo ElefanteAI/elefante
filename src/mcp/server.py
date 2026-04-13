@@ -169,8 +169,7 @@ class ElefanteMCPServer:
                 self._session_retrieval_history.extend(new_ids)
                 # Keep sliding window of recent unique ids, max 20
                 self._session_retrieval_history = list(dict.fromkeys(self._session_retrieval_history))[-20:]
-                # Fire and forget passive co-activation recording
-                asyncio.create_task(orchestrator.record_coactivation(self._session_retrieval_history.copy()))
+                await orchestrator.record_coactivation(self._session_retrieval_history.copy())
 
             result["RELEVANT_CONTEXT"] = {
                 "note": "Auto-surfaced memories relevant to this operation. No search tool call was needed.",
@@ -308,6 +307,7 @@ class ElefanteMCPServer:
         if self.orchestrator is None:
             self.logger.info("Initializing Orchestrator (First Run)...")
             self.orchestrator = get_orchestrator()
+            await self.orchestrator.ensure_system_baseline()
             self.logger.info("Orchestrator initialized")
         return self.orchestrator
     
@@ -1121,10 +1121,14 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 
             except Exception as e:
                 self.logger.error(f"Tool execution failed: {name}", error=str(e), exc_info=True)
+                # Surface compendium citation for database-class errors
+                error_msg = str(e)
+                if "ops-database-compendium" not in error_msg:
+                    error_msg += "\nDebug: docs/debug/README.md -> Known Issues"
                 return [TextContent(
                     type="text",
                     text=json.dumps({
-                        "error": str(e),
+                        "error": error_msg,
                         "tool": name,
                         "success": False
                     }, indent=2)
@@ -1300,7 +1304,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         if new_ids:
             self._session_retrieval_history.extend(new_ids)
             self._session_retrieval_history = list(dict.fromkeys(self._session_retrieval_history))[-20:]
-            asyncio.create_task(orchestrator.record_coactivation(self._session_retrieval_history.copy()))
+            await orchestrator.record_coactivation(self._session_retrieval_history.copy())
         
         # Filter out deprecated/archived memories from results
         filtered_results = []
@@ -1541,7 +1545,13 @@ You have access to a persistent memory system called **Elefante** - the user's s
             
             orchestrator = await self._get_orchestrator()
             vs = orchestrator.vector_store
-            success = await vs.delete_memory(mid)
+            gs = orchestrator.graph_store
+
+            vector_deleted = await vs.delete_memory(mid)
+            graph_deleted = False
+            if vector_deleted:
+                graph_deleted = await gs.delete_entity(mid)
+            success = vector_deleted and graph_deleted
             
             if success:
                 # Purge deleted ID from session history to prevent stale
@@ -1556,6 +1566,16 @@ You have access to a persistent memory system called **Elefante** - the user's s
                     "memory_id": memory_id,
                     "reason": reason,
                     "message": "Memory permanently deleted"
+                }
+            elif vector_deleted and not graph_deleted:
+                self.logger.error(
+                    f"Memory delete partially failed: graph cleanup failed for {memory_id}",
+                    reason=reason,
+                )
+                return {
+                    "success": False,
+                    "memory_id": memory_id,
+                    "error": "Vector delete succeeded but graph cleanup failed"
                 }
             else:
                 return {"success": False, "error": f"Memory {memory_id} not found or deletion failed"}
@@ -2279,18 +2299,6 @@ You have access to a persistent memory system called **Elefante** - the user's s
     async def run(self):
         """Run the MCP server"""
         self.logger.info("Starting Elefante MCP Server...")
-        
-        # Pre-initialize orchestrator to load embedding model BEFORE handling requests
-        # This prevents timeout issues on first tool call
-        self.logger.info("Pre-initializing orchestrator and embedding model...")
-        try:
-            orchestrator = await self._get_orchestrator()
-            # Trigger model loading by generating a test embedding
-            await orchestrator.embedding_service.generate_embedding("initialization test")
-            self.logger.info("Orchestrator and embedding model initialized successfully")
-        except Exception as e:
-            self.logger.error(f"Failed to pre-initialize orchestrator: {e}")
-            # Continue anyway - will lazy load on first request
         
         async with stdio_server() as (read_stream, write_stream):
             self.logger.info("MCP Server running on stdio")

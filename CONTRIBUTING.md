@@ -11,7 +11,7 @@ Thank you for your interest in contributing to Elefante!
 **3. Behavioral Relevance**: We do not assign "importance" to memories manually. Scores (0-100) are computed by the system based on usage.
 **4. Token Efficiency**: Every token Elefante injects must earn its place. Wasted tokens — filler, redundant context, irrelevant memories — degrade the response. Quality per token is the metric.
 
-**For AI agents developing Elefante:** See [`docs/debug/dev-developer-agent.md`](docs/debug/dev-developer-agent.md) — the developer agent protocol with navigation to all authority documents.
+**For AI agents developing Elefante:** See [`docs/debug/README.md`](docs/debug/README.md) for the Known Issues tracker and entry flow, then [`docs/debug/dev-developer-agent.md`](docs/debug/dev-developer-agent.md) for the full developer agent protocol.
 
 ## Code Standards
 
@@ -28,7 +28,7 @@ Thank you for your interest in contributing to Elefante!
 src/
   mcp/          # MCP Server & Tools
   core/         # Logic (Orchestrator, Vector/Graph stores, ETL, Retrieval)
-  models/       # Pydantic models (v2.2.3 schema)
+  models/       # Pydantic models (v2.3.0 schema)
   modules/      # Session Distiller
   dashboard/    # React/Vite app
   utils/        # Config, curation, logging

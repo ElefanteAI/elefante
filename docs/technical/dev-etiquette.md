@@ -1,6 +1,6 @@
-# Elefante Developer Etiquette (Native SDD Specification)
+# Elefante Developer Etiquette Specification
 
-**Version:** 2.2.3
+**Version:** 2.3.0
 **Type:** SPECIFICATION
 
 This document governs the required closure sequence for all feature development, bug fixes, and architectural adjustments within the Elefante repository. 

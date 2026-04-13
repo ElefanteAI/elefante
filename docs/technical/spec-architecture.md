@@ -1,6 +1,6 @@
 # Elefante Architecture: The Second Brain
 
-**Version:** 2.2.3 | **Status:** Production Ready (Windows validated)
+**Version:** 2.3.0 | **Status:** Production Ready (Windows validated)
 
 ## 1. System Overview
 
@@ -37,7 +37,7 @@ To support multi-IDE usage without deadlocks:
 - **No Manual Toggle**: `elefante-System` with `action="enable"` is now a no-op; the system is always ready.
 - **Safe Kuzu Boundary**: `GraphStore` serializes access to the shared Kuzu connection, materializes result rows inside the worker thread that executed the query, and waits for in-flight operations before closing the database.
 - **Lifecycle Rule**: Graph maintenance tasks that touch Kuzu must complete inside the owning tool invocation; transaction-scoped cleanup cannot race background Kuzu work.
-- **Runtime Baseline Bootstrap**: The SDD runtime baseline is embedded in core code. Built-in system directives are always present in `DirectiveStore`, and `MemoryOrchestrator.ensure_system_baseline()` idempotently seeds the required specification memories on first use for every new installation.
+- **Runtime Baseline Bootstrap**: The directive and specification baseline is embedded in core code. Built-in system directives are always present in `DirectiveStore`, and `MemoryOrchestrator.ensure_system_baseline()` idempotently seeds the required specification memories on first use for every new installation.
 
 ### Cognitive Multi-Signal Scoring (V4)
 
@@ -52,16 +52,16 @@ Instead of a static RAG formula, Elefante uses a multi-faceted 6-signal behavior
 
 **Smoothed Vector Baseline:** To prevent valid semantic matches from suffering a mathematical cliff when heuristics are missing, the cognitive retriever enforces a static floor: `composite_score` can never fall below `0.85 * vector_score`.
 
-**Immutable Authority (Native SDD):** Memory types classified as `specification` or `directive` completely bypass chronological decay, instantly receiving an absolute `1.0` authority score to ensure they dominate context retrieval and enable frictionless Spec-Driven Development workflows.
+**Immutable Authority:** Memory types classified as `specification` or `directive` completely bypass chronological decay, instantly receiving an absolute `1.0` authority score so durable rules and contracts dominate context retrieval when relevant.
 
-### The Native SDD Workflow (Gatekeeper & Oracle)
+### Specification And Directive Retrieval Workflow
 
-To prevent LLM context-window bloat, Elefante enforces Spec-Driven Development using a two-part architecture:
+To prevent prompt bloat, Elefante uses a two-part retrieval architecture:
 
-1. **The Gatekeeper (System Prompt):** Configuration files like `.github/copilot-instructions.md` or `.cursorrules` should *only* contain the rules of engagement (e.g., "Always search Elefante before coding"). They should never contain large architectural specs.
-2. **The Oracle (Elefante DB):** Heavy architectural specs, schemas, and etiquette rules (e.g., `dev-etiquette.md`) are stored inside Elefante as `SPECIFICATION` memories. 
+1. **Instruction Layer:** Configuration files like `.github/copilot-instructions.md`, `AGENT.md`, or `.cursorrules` should stay small and tell the agent when it must search Elefante before acting.
+2. **Knowledge Layer:** Heavy architectural specs, schemas, and durable process rules are stored inside Elefante as `specification` or `directive` memories.
 
-When the agent receives a prompt, the Gatekeeper forces it to search. The Oracle returns the exact 1.0 Authority specification required for that specific task, keeping the active context window clean and focused.
+When the agent receives a task, the instruction layer forces retrieval. Elefante returns the exact rule required for that task, keeping the active context window clean and focused.
 
 ### Data Flow: Storing a Memory
 

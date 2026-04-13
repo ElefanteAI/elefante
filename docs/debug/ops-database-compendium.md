@@ -1,7 +1,7 @@
 # Database Debug Compendium
 
 > **Domain:** Kuzu Graph Database & ChromaDB Vector Store  
-> **Last Updated:** 2026-04-12  
+> **Last Updated:** 2026-04-13  
 > **Total Issues Documented:** 7  
 > **Status:** Production Reference  
 > **Maintainer:** Add new issues following Issue #N template at bottom
@@ -19,6 +19,20 @@
 | 5 | Kill all Python processes before deleting `.lock` file | Stale locks |
 | 6 | Use `read_only=True` for concurrent read access | Lock conflicts |
 | 7 | Never let Kuzu work outlive `GraphStore.close()` | Native SIGSEGV |
+
+---
+
+## Verification Commands
+
+Run these BEFORE investigating. If tests pass, the documented fix is intact. If they fail, the regression is real.
+
+| Issue | Test Command | What It Proves |
+| ----- | ------------ | -------------- |
+| #7 SIGSEGV crash | `pytest tests/test_memory_persistence.py -k "graph_store_close_waits_for_inflight_query or graph_store_raw_execute_calls_stay_in_safe_methods" -v` | Close barrier + ownership boundary enforced |
+| #7 Live regression | `pytest tests/test_memory_persistence.py -k "live_mcp_server_survives_shutdown_regression" -v` | Real MCP subprocess survives add/search/shutdown cycle |
+| #2 Lock / #4 Corruption | `pytest tests/test_memory_persistence.py -k "config_paths_exist" -v` | Data directory structure valid |
+| Full E2E (all issues) | `.venv/bin/python scripts/verify/verify_e2e_tests.py` | Isolated live MCP workflow including shutdown-race probe |
+| Factory reset safety | `pytest tests/test_factory_reset.py -v` | Dry-run, safety gates, backup creation, idempotency |
 
 ---
 

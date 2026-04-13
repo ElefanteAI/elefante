@@ -44,7 +44,7 @@ The MCP Server:
 2. Receives JSON-RPC requests from the IDE (VS Code, Cursor, Bob)
 3. Exposes 21 MCP tools for memory operations
 4. Returns JSON-RPC responses
-5. Bootstraps the runtime SDD baseline on first orchestrator use so fresh installs immediately have built-in directives and searchable specification memories
+5. Bootstraps the runtime directive/specification baseline on first orchestrator use so fresh installs immediately have built-in directives and searchable specification memories
 
 ### What It Does NOT Do
 
@@ -466,6 +466,6 @@ For restarting a running server, see [`ops-restart.md`](ops-restart.md).
 
 ---
 
-**Document Version**: 2.2.3  
+**Document Version**: 2.3.0  
 **Status**: ESSENTIAL  
 **Last Validated**: 2026-02-25

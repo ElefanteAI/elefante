@@ -4,10 +4,19 @@ Configures Antigravity IDE to use Elefante MCP server automatically
 """
 
 import json
-import os
 import sys
 import shutil
 from pathlib import Path
+
+
+def _infer_repo_python(elefante_path: Path) -> str:
+    if sys.platform == "win32":
+        candidate = elefante_path / ".venv" / "Scripts" / "python.exe"
+    else:
+        candidate = elefante_path / ".venv" / "bin" / "python"
+    if candidate.exists():
+        return str(candidate)
+    return sys.executable
 
 def get_antigravity_config_path():
     """Get the path to Antigravity's mcp_config.json"""
@@ -25,7 +34,7 @@ def configure_mcp(argv: list[str] | None = None):
     print("ELEFANTE - Antigravity MCP Configuration")
     print("=" * 70 + "\n")
     
-    elefante_path = Path(__file__).parent.parent.absolute()
+    elefante_path = Path(__file__).resolve().parents[2]
     config_path = get_antigravity_config_path()
 
     config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -54,7 +63,7 @@ def configure_mcp(argv: list[str] | None = None):
     # Prepare Elefante config
     # Use absolute path to the current python executable (in .venv)
     elefante_config = {
-        "command": sys.executable,
+        "command": _infer_repo_python(elefante_path),
         "args": ["-m", "src.mcp.server"],
         "cwd": str(elefante_path),
         "env": {

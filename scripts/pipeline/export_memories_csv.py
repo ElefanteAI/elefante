@@ -12,7 +12,7 @@ from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.core.orchestrator import get_orchestrator
+from src.core.orchestrator import get_orchestrator  # noqa: E402
 
 async def export_memories():
     orchestrator = get_orchestrator()
@@ -51,7 +51,8 @@ async def export_memories():
     
     # Prepare CSV output
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_file = f"data/memory_export_{timestamp}.csv"
+    output_path = Path("data") / f"memory_export_{timestamp}.csv"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     
     # Define all possible metadata fields
     fieldnames = [
@@ -89,7 +90,7 @@ async def export_memories():
         'has_embedding'
     ]
     
-    with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
+    with output_path.open('w', newline='', encoding='utf-8') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames, extrasaction='ignore')
         writer.writeheader()
         
@@ -104,7 +105,7 @@ async def export_memories():
             if isinstance(custom_meta, str):
                 try:
                     custom_meta = json.loads(custom_meta)
-                except:
+                except json.JSONDecodeError:
                     custom_meta = {}
             
             emotional = custom_meta.get('emotional_context', {})
@@ -149,7 +150,7 @@ async def export_memories():
             if (i + 1) % 10 == 0:
                 print(f"Exported {i + 1}/{len(results['ids'])} memories...")
     
-    print(f"\n Export complete: {output_file}")
+    print(f"\n Export complete: {output_path}")
     print(f"Total memories exported: {len(results['ids'])}")
     
     # Print summary statistics

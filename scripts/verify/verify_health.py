@@ -13,9 +13,9 @@ from datetime import datetime
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.core.orchestrator import get_orchestrator
-from src.utils.logger import get_logger
-from src.utils.config import get_config
+from src.core.orchestrator import get_orchestrator  # noqa: E402
+from src.utils.logger import get_logger  # noqa: E402
+from src.utils.config import get_config  # noqa: E402
 
 logger = get_logger(__name__)
 
@@ -226,7 +226,7 @@ async def main():
     all_healthy = True
     for name, result in results.items():
         status = result["status"]
-        symbol = "✓" if status == "healthy" else "✗"
+        symbol = "[OK]" if status == "healthy" else "[FAIL]"
         
         logger.info(f"\n{symbol} {name}: {status.upper()}")
         
@@ -241,10 +241,10 @@ async def main():
     logger.info("\n" + "=" * 60)
     
     if all_healthy:
-        logger.info("✓ All systems operational!")
+        logger.info("[OK] All systems operational!")
         logger.info("=" * 60)
     else:
-        logger.error("✗ Some systems are unhealthy")
+        logger.error("[FAIL] Some systems are unhealthy")
         logger.error("=" * 60)
     
     # Clean up resources before event loop closes

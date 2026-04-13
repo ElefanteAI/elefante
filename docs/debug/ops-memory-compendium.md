@@ -27,6 +27,20 @@
 
 ---
 
+## Verification Commands
+
+Run these BEFORE investigating. If tests pass, the documented fix is intact.
+
+| Issue | Test Command | What It Proves |
+| ----- | ------------ | -------------- |
+| #1-#3 Memory retrieval | `pytest tests/test_memory_persistence.py -v` | Persistence, path resolution, scoring |
+| #7 Response bloat | `pytest tests/test_integration_smoke.py -v` | Full ADD/SEARCH cycle with 10 scenarios |
+| #8 Low similarity | `pytest tests/test_scoring.py -v` | Score normalization and weight math |
+| Memory guard | `pytest tests/test_memory_guard.py -v` | Test-tagged memories blocked by default |
+| Full E2E | `.venv/bin/python scripts/verify/verify_e2e_tests.py` | Isolated end-to-end MCP workflow |
+
+---
+
 ## Table of Contents
 
 - [Issue #1: Partial Memory Export](#issue-1-partial-memory-export)

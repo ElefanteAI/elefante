@@ -1,32 +1,45 @@
 #!/usr/bin/env python3
 """
-Elefante E2E Developer Experience Engine v2.2.1
-Proves Elefante "never forgets" in real developer workflows.
+Elefante live MCP verification harness.
 
-Persona: Alex Rivera — Senior Autonomous Agent Engineer at FintechCo
-  Uses VS Code + Antigravity, Claude Code, and OpenClaw (custom multi-agent framework).
-  Builds production trading bots. Needs consistent context across all IDE sessions.
+Runs the real MCP server in an isolated temporary Elefante home/data dir and
+verifies the core behaviors the Developer Agent Protocol relies on.
 
 Runs: .venv/bin/python scripts/verify/verify_e2e_tests.py
 
-What it proves:
-  1. Memory persists across simulated IDE restarts
-  2. Directives inject unconditionally into every tool response
-  3. SPECIFICATION memories surface with authority=1.0
-  4. Compliance Gate blocks ungrounded writes
-  5. SDD gates are live and enforceable
+Isolation:
+    Creates a temporary HOME/USERPROFILE and ELEFANTE_DATA_DIR for spawned MCP servers.
+    Also enables ELEFANTE_ALLOW_TEST_MEMORIES=1 for the harness subprocesses so the probe
+    never pollutes the user's durable store and does not depend on external shell setup.
+
+What it verifies:
+    1. MCP initialize/handshake succeeds
+    2. Built-in directives inject into tool responses
+    3. Required specification memories are retrievable on fresh state
+    4. The Compliance Gate blocks ungrounded writes
+    5. Stored memory survives a simulated restart
+    6. Cleanup stays isolated from the user's durable store
+
+Documentation:
+        - docs/debug/dev-developer-agent.md
+    - tests/README.md
+    - scripts/README.md
+    - docs/technical/ops-mcp-server.md
+    - docs/debug/ops-database-compendium.md
 """
 
 import asyncio
 import json
 import os
 import sys
-import time
+import tempfile
 from pathlib import Path
 from uuid import uuid4
 
-project_root = Path(__file__).parent.parent
+project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
+
+from src import __version__ as ELEFANTE_VERSION
 
 # ---------------------------------------------------------------------------
 # MCP Client — drives the real Elefante server over JSON-RPC stdio
@@ -37,9 +50,10 @@ _REQ_ID = 0
 class MCPClient:
     """Thin JSON-RPC 2.0 client over stdin/stdout to a real MCP server subprocess."""
 
-    def __init__(self):
+    def __init__(self, env: dict[str, str]):
         self.process = None
         self._id = 0
+        self._env = env
 
     async def start(self):
         cmd = [sys.executable, "-m", "src.mcp.server"]
@@ -49,16 +63,15 @@ class MCPClient:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=str(project_root),
-            env={**os.environ, "PYTHONPATH": str(project_root)},
+            env=self._env,
         )
         # Handshake
         resp = await self._send("initialize", {
             "protocolVersion": "2024-11-05",
             "capabilities": {},
-            "clientInfo": {"name": "E2ETestEngine", "version": "2.2.1"},
+            "clientInfo": {"name": "E2ETestEngine", "version": ELEFANTE_VERSION},
         })
         await self._notify("notifications/initialized", {})
-        tools = resp.get("capabilities", {}).get("tools", {})
         return resp
 
     async def call_tool(self, name: str, args: dict) -> dict:
@@ -84,17 +97,28 @@ class MCPClient:
             except asyncio.TimeoutError:
                 self.process.kill()
 
+    def _require_streams(self):
+        if (
+            self.process is None
+            or self.process.stdin is None
+            or self.process.stdout is None
+            or self.process.stderr is None
+        ):
+            raise RuntimeError("MCP subprocess streams are not initialized")
+        return self.process.stdin, self.process.stdout, self.process.stderr
+
     # -- internals --
 
     async def _send(self, method: str, params: dict) -> dict:
         self._id += 1
         msg = {"jsonrpc": "2.0", "id": self._id, "method": method, "params": params}
-        self.process.stdin.write(json.dumps(msg).encode() + b"\n")
-        await self.process.stdin.drain()
-        line = await asyncio.wait_for(self.process.stdout.readline(), timeout=30)
+        stdin, stdout, stderr = self._require_streams()
+        stdin.write(json.dumps(msg).encode() + b"\n")
+        await stdin.drain()
+        line = await asyncio.wait_for(stdout.readline(), timeout=30)
         if not line:
-            stderr = (await self.process.stderr.read()).decode()
-            raise RuntimeError(f"Server closed. stderr: {stderr[:500]}")
+            stderr_text = (await stderr.read()).decode()
+            raise RuntimeError(f"Server closed. stderr: {stderr_text[:500]}")
         resp = json.loads(line.decode())
         if "error" in resp:
             raise RuntimeError(f"RPC error: {resp['error']}")
@@ -102,8 +126,9 @@ class MCPClient:
 
     async def _notify(self, method: str, params: dict):
         msg = {"jsonrpc": "2.0", "method": method, "params": params}
-        self.process.stdin.write(json.dumps(msg).encode() + b"\n")
-        await self.process.stdin.drain()
+        stdin, _, _ = self._require_streams()
+        stdin.write(json.dumps(msg).encode() + b"\n")
+        await stdin.drain()
 
 
 # ---------------------------------------------------------------------------
@@ -130,21 +155,36 @@ def _result(name: str, ok: bool, detail: str = ""):
 async def run_e2e():
     results = []
     test_tag = f"e2e-{uuid4().hex[:8]}"
+    temp_root_manager = tempfile.TemporaryDirectory(prefix="elefante-e2e-")
+    temp_root = Path(temp_root_manager.name)
+    temp_home = temp_root / "home"
+    temp_data_dir = temp_root / "data"
+    temp_home.mkdir(parents=True, exist_ok=True)
+    temp_data_dir.mkdir(parents=True, exist_ok=True)
+    harness_env = {
+        **os.environ,
+        "PYTHONPATH": str(project_root),
+        "HOME": str(temp_home),
+        "USERPROFILE": str(temp_home),
+        "ELEFANTE_DATA_DIR": str(temp_data_dir),
+        "ELEFANTE_ALLOW_TEST_MEMORIES": "1",
+    }
 
-    _header("Elefante E2E Developer Experience Engine v2.2.1")
-    print("  Persona : Alex Rivera (FintechCo)")
-    print("  Workflow: VS Code + Antigravity / Claude Code / OpenClaw")
+    _header(f"Elefante Live MCP Verification Harness v{ELEFANTE_VERSION}")
+    print("  Purpose : startup, baseline, restart, compliance, cleanup")
+    print("  Mode    : isolated temp HOME + data dir")
     print(f"  Tag     : {test_tag}")
 
     # ---------------------------------------------------------------
     # Boot server (simulates IDE session 1)
     # ---------------------------------------------------------------
-    _header("SESSION 1: Alex opens VS Code (MCP server starts)")
-    client = MCPClient()
+    _header("SESSION 1: Boot MCP server")
+    client = MCPClient(harness_env)
     try:
-        init = await client.start()
+        await client.start()
     except Exception as e:
         print(f"  [FAIL] Could not start MCP server: {e}")
+        temp_root_manager.cleanup()
         return
 
     results.append(_result("MCP handshake", True, "server initialized"))
@@ -152,7 +192,7 @@ async def run_e2e():
     # ---------------------------------------------------------------
     # Test 1: Directive injection proof
     # ---------------------------------------------------------------
-    _header("TEST 1: Directive Injection (SDD gates present?)")
+    _header("TEST 1: Directive Injection (built-in baseline present?)")
     dl = await client.call_tool("elefante-DirectiveList", {})
     directives = dl.get("directives", [])
     count = dl.get("count", 0)
@@ -167,7 +207,7 @@ async def run_e2e():
     results.append(_result(
         f"SDD gate directives = {len(sdd_gates)}",
         len(sdd_gates) >= 5,
-        f"expected >=5"
+        "expected >=5"
     ))
     results.append(_result(
         "STDOUT Purity Law present",
@@ -189,18 +229,18 @@ async def run_e2e():
     # ---------------------------------------------------------------
     # Test 2: Alex teaches a preference (memory write)
     # ---------------------------------------------------------------
-    _header("TEST 2: Alex teaches OpenClaw preference")
+    _header("TEST 2: Store representative project memory")
     pref_content = (
-        f"[{test_tag}] For all OpenClaw agents: use sandbox-v2 API key. "
-        "Never use production keys in test environments. "
-        "Preferred error pattern: structured logging + retry with exponential backoff."
+        f"[{test_tag}] For integration test environments: use sandbox API keys. "
+        "Never use production keys in test or staging workflows. "
+        "Preferred failure handling: structured logging plus exponential backoff."
     )
     add_resp = await client.call_tool("elefante-MemoryAdd", {
         "content": pref_content,
         "memory_type": "preference",
         "domain": "project",
-        "category": "openclaw",
-        "tags": ["openclaw", "api-keys", "error-handling", test_tag],
+        "category": "integration-testing",
+        "tags": ["sandbox", "api-keys", "error-handling", test_tag],
     })
     mem_id = add_resp.get("memory_id", "")
     stored_ok = add_resp.get("success", False) or bool(mem_id)
@@ -213,22 +253,23 @@ async def run_e2e():
     # ---------------------------------------------------------------
     # Test 3: Simulated IDE restart — does the memory survive?
     # ---------------------------------------------------------------
-    _header("TEST 3: Simulated IDE restart (new MCP session)")
+    _header("TEST 3: Simulated MCP restart (new session)")
     await client.stop()
     print("  ... server stopped (simulating IDE close)")
     await asyncio.sleep(1)
 
-    client2 = MCPClient()
+    client2 = MCPClient(harness_env)
     try:
         await client2.start()
     except Exception as e:
         print(f"  [FAIL] Could not restart MCP server: {e}")
+        temp_root_manager.cleanup()
         return
     print("  ... server restarted (simulating IDE reopen)")
 
-    # Search for Alex's preference in the new session
+    # Search for the stored preference in the new session
     find_resp = await client2.call_tool("elefante-MemorySearch", {
-        "query": "OpenClaw API key sandbox error handling preference",
+        "query": "sandbox API keys structured logging exponential backoff preference",
         "limit": 5,
     })
     found_memories = find_resp.get("results", [])
@@ -246,7 +287,7 @@ async def run_e2e():
     # ---------------------------------------------------------------
     # Test 4: SPECIFICATION oracle test
     # ---------------------------------------------------------------
-    _header("TEST 4: SPECIFICATION oracle (authority=1.0)")
+    _header("TEST 4: Specification baseline retrieval")
     spec_resp = await client2.call_tool("elefante-MemorySearch", {
         "query": "SDD Gate 2 leakage surface scan table specification",
         "limit": 5,
@@ -260,7 +301,7 @@ async def run_e2e():
     results.append(_result(
         "Gate 2 SPECIFICATION surfaces",
         has_spec,
-        "immutable oracle available to all agents"
+        "baseline specification retrievable"
         if has_spec else f"not in top {len(spec_results)} results"
     ))
 
@@ -289,13 +330,13 @@ async def run_e2e():
     # Delete it before spawning a fresh server to prove the gate blocks.
     await client2.stop()
 
-    compliance_file = Path.home() / ".elefante" / "compliance_state.json"
+    compliance_file = temp_home / ".elefante" / "compliance_state.json"
     backup = None
     if compliance_file.exists():
         backup = compliance_file.read_text()
         compliance_file.unlink()
 
-    client_gate = MCPClient()
+    client_gate = MCPClient(harness_env)
     try:
         await client_gate.start()
         # Immediately try a gated tool WITHOUT any prior search
@@ -323,13 +364,13 @@ async def run_e2e():
             compliance_file.write_text(backup)
 
     # Re-open session for remaining tests + cleanup
-    client2 = MCPClient()
+    client2 = MCPClient(harness_env)
     await client2.start()
 
     # ---------------------------------------------------------------
     # Test 6: Developer Etiquette SPECIFICATION present
     # ---------------------------------------------------------------
-    _header("TEST 6: Developer Etiquette SPECIFICATION")
+    _header("TEST 6: Developer process specification baseline")
     etiquette_resp = await client2.call_tool("elefante-MemorySearch", {
         "query": "Elefante Developer Etiquette specification versioning CLEAN DOC_SYNC",
         "limit": 3,
@@ -374,18 +415,17 @@ async def run_e2e():
     print(f"\n  {passed}/{total} tests passed\n")
 
     if passed == total:
-        print("  Elefante proved:")
-        print("    - Alex teaches once, every agent remembers forever")
-        print("    - SDD directives inject into every tool response")
-        print("    - SPECIFICATION memories surface with authority=1.0")
-        print("    - Compliance Gate blocks ungrounded mutations")
-        print("    - Context survives IDE restarts")
-        print()
-        print("  The meta-irony is closed.")
-        print("  Elefante enforces SDD on itself using its own mechanisms.")
+        print("  Verified:")
+        print("    - The real MCP server completes initialize over stdio")
+        print("    - Built-in directives are injected into tool responses")
+        print("    - Required specification memories are retrievable on fresh state")
+        print("    - The Compliance Gate blocks ungrounded mutations")
+        print("    - Stored memory survives a simulated restart")
+        print("    - Cleanup succeeds inside the isolated test store")
     else:
         print(f"  {total - passed} test(s) failed. Review output above.")
 
+    temp_root_manager.cleanup()
     sys.exit(0 if passed == total else 1)
 
 

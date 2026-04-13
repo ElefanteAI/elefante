@@ -57,9 +57,9 @@ for _ in range(5):
         break
     _REPO_ROOT = candidate
 
-from src.core.orchestrator import get_orchestrator
-from src.core.refinery import infer_namespace
-from src.models.query import QueryMode
+from src.core.orchestrator import get_orchestrator  # noqa: E402
+from src.core.refinery import infer_namespace  # noqa: E402
+from src.models.query import QueryMode  # noqa: E402
 
 
 # If Kuzu is locked by another process (dashboard/MCP), we avoid repeated init attempts.

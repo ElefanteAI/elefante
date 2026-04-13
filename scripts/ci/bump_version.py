@@ -14,7 +14,7 @@ import sys
 import json
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 VERSION_FILE = ROOT / "src" / "__init__.py"
 
 # Every file that declares the current version and how to find/replace it.
@@ -90,7 +90,6 @@ def check_versions() -> bool:
             ok = False
             continue
         text = fpath.read_text(encoding='utf-8')
-        matches = re.findall(r'\d+\.\d+\.\d+', ''.join(re.findall(pattern, text, re.MULTILINE).__repr__()))
         # Simpler: just check if expected version appears in pattern matches
         found = [m for m in re.finditer(pattern, text, re.DOTALL)]
         for m in found:

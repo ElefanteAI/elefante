@@ -12,18 +12,18 @@ Elefante MCP server command (same for all IDEs):
 - Recommended env:
   - `ANONYMIZED_TELEMETRY=False` (disables ChromaDB telemetry)
 
-## The Native SDD Gatekeeper (System Prompts)
+## Agent Grounding Instructions (System Prompts)
 
-To enable **Spec-Driven Development (SDD)** with Elefante, you must configure a "Gatekeeper" system prompt in your IDE. This instructs the agent to query Elefante's `SPECIFICATION` memories before writing code.
+To keep instruction files small and durable, configure your IDE prompt so the agent queries Elefante for relevant `specification` and `directive` memories before writing code.
 
-**Where to put the Gatekeeper prompt depending on your IDE:**
+**Where to put the grounding instructions depending on your IDE:**
 
 - **Cursor:** Create a `.cursorrules` file in the root of your project workspace.
 - **Roo Code / Cline:** Create a `.clinerules` file in the root of your project workspace.
 - **GitHub Copilot:** Create a `.github/copilot-instructions.md` file in the root of your project workspace.
 - **Manual role adoption for any agent:** Read `AGENT.md` at the repo root. Elefante's installer creates `AGENT.md` as a developer-local symlink to `.github/copilot-instructions.md` so agents can be told to "read AGENT.md and adopt this identity".
 
-**Recommended Gatekeeper text:**
+**Recommended grounding text:**
 > "Before you write any code or mark a task as complete, you MUST call `elefante-MemorySearch` to find any relevant `SPECIFICATION` or `DIRECTIVE` memories. You must comply with these architectural rules unconditionally."
 
 ## VS Code (Built-in MCP)
@@ -183,3 +183,4 @@ Run this in the Elefante repo to confirm the server boots and speaks MCP:
 ```
 
 If you hit a Kuzu “database locked” error, it usually means another process is holding the graph DB open. Close the other IDE/session first, then retry.
+

@@ -7,19 +7,19 @@ creates necessary directories, and verifies the setup.
 """
 
 import asyncio
+import os
 import sys
 from pathlib import Path
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.core.vector_store import get_vector_store
-from src.core.graph_store import get_graph_store
-from src.core.embeddings import get_embedding_service
-from src.utils.logger import get_logger
-from src.utils.config import get_config
+from src.core.vector_store import get_vector_store  # noqa: E402
+from src.core.graph_store import get_graph_store  # noqa: E402
+from src.core.embeddings import get_embedding_service  # noqa: E402
+from src.utils.logger import get_logger  # noqa: E402
+from src.utils.config import get_config  # noqa: E402
 
-import os
 os.environ["ELEFANTE_LOGGING_FORMAT"] = "text"
 logger = get_logger(__name__)
 
@@ -96,7 +96,7 @@ async def verify_setup():
     # Check data directories
     data_dir = Path(config.elefante.data_dir)
     vector_dir = data_dir / "chroma"
-    graph_dir = data_dir / "kuzu"
+    graph_dir = data_dir / "kuzu_db"
     
     logger.info(
         "Data directories",
@@ -187,14 +187,14 @@ async def main():
     logger.info("=" * 60)
     
     for component, success in results.items():
-        status = "✓ SUCCESS" if success else "✗ FAILED"
+        status = "[OK] SUCCESS" if success else "[FAIL] FAILED"
         logger.info(f"{component:20s}: {status}")
     
     all_success = all(results.values())
     
     if all_success:
         logger.info("=" * 60)
-        logger.info("✓ All components initialized successfully!")
+        logger.info("[OK] All components initialized successfully!")
         logger.info("=" * 60)
         logger.info("")
         logger.info("Next steps:")
@@ -203,7 +203,7 @@ async def main():
         logger.info("3. Start storing and retrieving memories!")
     else:
         logger.error("=" * 60)
-        logger.error("✗ Some components failed to initialize")
+        logger.error("[FAIL] Some components failed to initialize")
         logger.error("=" * 60)
         logger.error("Please check the logs above for details")
     
