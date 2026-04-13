@@ -104,3 +104,16 @@ def test_mcp_server_does_not_fire_and_forget_coactivation():
 
     assert "asyncio.create_task(orchestrator.record_coactivation" not in source
     assert source.count("await orchestrator.record_coactivation") >= 2
+
+
+def test_mcp_server_injects_entrypoint_protocol_on_success_and_error():
+    server_path = Path(__file__).resolve().parents[1] / "src" / "mcp" / "server.py"
+    source = server_path.read_text(encoding="utf-8")
+    directive_source = (Path(__file__).resolve().parents[1] / "src" / "core" / "directive_store.py").read_text(encoding="utf-8")
+
+    assert 'ENTRYPOINT_SEQUENCE_READ_THIS_FIRST' in source
+    assert 'result = self._inject_entrypoint_protocol(result)' in source
+    assert 'error_payload = self._inject_entrypoint_protocol(error_payload)' in source
+    assert 'docs/debug/README.md' in source
+    assert 'tests/README.md' in source
+    assert 'ENTRYPOINT_SEQUENCE_READ_THIS_FIRST' in directive_source

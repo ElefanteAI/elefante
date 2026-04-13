@@ -8,7 +8,7 @@
 
 AI agents start every conversation from zero. Your preferences, decisions, and discovered patterns don't carry over. Elefante gives any MCP-compatible agent a persistent, local second brain — memories are stored, scored automatically, and surfaced at the right moment without being asked.
 
-**v2.3.1** — Persistent Memory Engine
+**v2.4.0** — Persistent Memory Engine
 
 ```
 ┌─────────────────────────────────────────────────────────────┐

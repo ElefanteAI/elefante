@@ -14,11 +14,12 @@ Isolation:
 
 What it verifies:
     1. MCP initialize/handshake succeeds
-    2. Built-in directives inject into tool responses
-    3. Required specification memories are retrievable on fresh state
-    4. The Compliance Gate blocks ungrounded writes
-    5. Stored memory survives a simulated restart
-    6. Cleanup stays isolated from the user's durable store
+    2. Exact developer entry routing injects into first successful tool responses
+    3. Exact developer entry routing injects into failing tool responses
+    4. Required specification memories are retrievable on fresh state
+    5. The Compliance Gate blocks ungrounded writes
+    6. Stored memory survives a simulated restart
+    7. Cleanup stays isolated from the user's durable store
 
 Documentation:
         - docs/debug/dev-developer-agent.md
@@ -46,6 +47,7 @@ from src import __version__ as ELEFANTE_VERSION
 # ---------------------------------------------------------------------------
 
 _REQ_ID = 0
+REQUEST_TIMEOUT_SECONDS = 90
 
 class MCPClient:
     """Thin JSON-RPC 2.0 client over stdin/stdout to a real MCP server subprocess."""
@@ -115,7 +117,7 @@ class MCPClient:
         stdin, stdout, stderr = self._require_streams()
         stdin.write(json.dumps(msg).encode() + b"\n")
         await stdin.drain()
-        line = await asyncio.wait_for(stdout.readline(), timeout=30)
+        line = await asyncio.wait_for(stdout.readline(), timeout=REQUEST_TIMEOUT_SECONDS)
         if not line:
             stderr_text = (await stderr.read()).decode()
             raise RuntimeError(f"Server closed. stderr: {stderr_text[:500]}")
@@ -214,16 +216,42 @@ async def run_e2e():
         len(stdout_law) >= 1
     ))
 
-    # Check that DIRECTIVES key appears in a tool response
+    # Check that DIRECTIVES and exact entry routing appear in a tool response
     search_resp = await client.call_tool("elefante-MemorySearch", {
         "query": "directive injection test",
         "limit": 1,
     })
     has_directives_key = "DIRECTIVES" in search_resp
+    entry_sequence = search_resp.get("ENTRYPOINT_SEQUENCE_READ_THIS_FIRST", [])
+    mandatory_protocols = search_resp.get("MANDATORY_PROTOCOLS_READ_THIS_FIRST", [])
     results.append(_result(
         "DIRECTIVES injected in tool response",
         has_directives_key,
         "unconditional injection confirmed" if has_directives_key else "MISSING"
+    ))
+    results.append(_result(
+        "Exact entry sequence injected in first tool response",
+        any("docs/debug/README.md" in step for step in entry_sequence)
+        and any("tests/README.md" in step for step in entry_sequence),
+        "docs/debug/README.md and tests/README.md surfaced"
+        if entry_sequence else "ENTRYPOINT_SEQUENCE_READ_THIS_FIRST missing"
+    ))
+    results.append(_result(
+        "Mandatory protocol names verification-first routing",
+        any("verification command" in step for step in mandatory_protocols)
+        or any("verification command" in step for step in entry_sequence),
+        "verification-first route surfaced"
+    ))
+
+    error_resp = await client.call_tool("elefante-NotARealTool", {})
+    results.append(_result(
+        "Failing tool response injects entry sequence",
+        (not error_resp.get("success", True))
+        and "ENTRYPOINT_SEQUENCE_READ_THIS_FIRST" in error_resp
+        and "DIRECTIVES" in error_resp
+        and "docs/debug/README.md" in str(error_resp.get("error", "")),
+        "failure path routed to Known Issues"
+        if "ENTRYPOINT_SEQUENCE_READ_THIS_FIRST" in error_resp else str(error_resp)[:120]
     ))
 
     # ---------------------------------------------------------------
@@ -417,7 +445,8 @@ async def run_e2e():
     if passed == total:
         print("  Verified:")
         print("    - The real MCP server completes initialize over stdio")
-        print("    - Built-in directives are injected into tool responses")
+        print("    - Built-in directives and exact developer entry routing are injected into tool responses")
+        print("    - Failing first tool calls still route agents to Known Issues and maintained verification")
         print("    - Required specification memories are retrievable on fresh state")
         print("    - The Compliance Gate blocks ungrounded mutations")
         print("    - Stored memory survives a simulated restart")

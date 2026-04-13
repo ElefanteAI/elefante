@@ -7,6 +7,20 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.4.0] - 2026-04-13
+
+### Fixed
+
+- **BUG-006 agent entry point bypass**: The MCP server now injects the exact developer entry sequence into every tool response, including failure responses. The first successful and first failing tool calls now both route through `docs/debug/README.md`, the matching verification command, the linked compendium, and `tests/README.md` instead of exposing only generic passive hints.
+
+### Changed
+
+- **Tool response contract**: `ENTRYPOINT_SEQUENCE_READ_THIS_FIRST` is now part of the live MCP response contract alongside `MANDATORY_PROTOCOLS_READ_THIS_FIRST`, `DIRECTIVES`, and optional `RELEVANT_CONTEXT`.
+
+### Added
+
+- **BUG-006 live proof**: `scripts/verify/verify_e2e_tests.py` now proves entry routing on both success and failure paths, and `tests/test_autonomous_coactivation.py` now guards the source-level entrypoint injection contract.
+
 ## [2.3.1] - 2026-04-13
 
 ### Fixed

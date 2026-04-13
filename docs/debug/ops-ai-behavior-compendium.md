@@ -29,7 +29,7 @@ Run these BEFORE investigating. If tests pass, the protocol enforcement is intac
 | Issue | Test Command | What It Proves |
 | ----- | ------------ | -------------- |
 | #2 Premature completion | `.venv/bin/python scripts/verify/verify_e2e_tests.py` | Real MCP server completes full lifecycle |
-| #6 Protocol enforcement | `pytest tests/test_autonomous_coactivation.py -v` | Co-activation, directive baseline, spec bootstrap |
+| #6 Protocol enforcement | `.venv/bin/python scripts/verify/verify_e2e_tests.py` | First successful and failing tool responses inject exact entry routing, directives, and maintained verification surfaces |
 | #7 Developer routing drift | `pytest tests/test_developer_routing.py -v` | Active process guidance points to current paths and tool-count contract |
 | Emoji policy | `pytest tests/test_no_emojis.py -v` | Source files comply with no-emoji rule |
 
@@ -349,7 +349,7 @@ Please test:
 **Date:** 2025-12-11  
 **Duration:** Systemic (discovered after root cause analysis)  
 **Severity:** CRITICAL  
-**Status:**  OPEN (Architectural Problem)
+**Status:** FIXED (Guarded)
 
 ### Problem
 
@@ -411,46 +411,44 @@ ACTIVE:  System forces engagement -> Agent cannot skip -> Protocol followed
 
 **All three are being ignored because they require agent discipline.**
 
-### Solution Options (OPEN - Not Resolved)
+### Solution
 
-**Option A: Gate Tool Architecture**
+Elefante now injects the exact developer entry sequence into **every** MCP tool response, including error responses.
 
-```python
-# Tools refuse to work without clearance
-@server.tool()
-async def clearForAction(task_type: str) -> dict:
-    """MUST call before any action. Returns relevant pitfalls."""
-    pitfalls = await search_memories(f"{task_type} pitfalls")
-    return {"cleared": True, "warnings": pitfalls}
+Implemented surfaces:
 
-# Other tools check clearance
-@server.tool()  
-async def elefante-MemoryAdd(content: str, clearance_token: str = None):
-    if not valid_clearance(clearance_token):
-        return {"error": "Must call clearForAction first"}
+1. `src/mcp/server.py`
+     - Adds `ENTRYPOINT_SEQUENCE_READ_THIS_FIRST` to successful tool responses
+     - Adds the same entry sequence to failing tool responses before they are returned
+     - Upgrades generic debugging pitfalls to the exact route: `docs/debug/README.md` -> BUG row -> verification command -> compendium -> `tests/README.md`
+2. `src/core/directive_store.py`
+     - Tool-contract directive now explicitly requires reading `ENTRYPOINT_SEQUENCE_READ_THIS_FIRST` in addition to `MANDATORY_PROTOCOLS_READ_THIS_FIRST`, `DIRECTIVES`, and `RELEVANT_CONTEXT`
+3. `scripts/verify/verify_e2e_tests.py`
+     - Verifies first successful tool responses surface the exact entry sequence
+     - Verifies first failing tool responses still surface the exact entry sequence and Known Issues route
+
+This does not make agent compliance mathematically impossible, but it removes the old failure mode where the first tool response only exposed generic passive hints and the first error path exposed almost nothing.
+
+### Proof
+
+Run:
+
+```bash
+.venv/bin/python scripts/verify/verify_e2e_tests.py
+pytest tests/test_autonomous_coactivation.py -v
 ```
 
-**Option B: User Checkpoint Mode**
+The live harness now proves:
 
-```
-Agent: "I need to install dependencies"
-
-System (auto-triggered):
-┌─────────────────────────────────────────────────────┐
-│  ELEFANTE CHECKPOINT                              │
-│ Task: INSTALLATION                                  │
-│ Found 3 warnings:                                   │
-│ • Python 3.11 MANDATORY                             │
-│ • Do NOT pre-create kuzu_db directory              │
-│ Approve? [Y/N]                                      │
-└─────────────────────────────────────────────────────┘
-```
-
-**Option C: IDE-Level Enforcement**
-
-- VS Code / Cursor rules file
-- Custom mode with forced memory consultation
-- Different architectural layer
+1. The first successful MCP tool response injects:
+     - `ENTRYPOINT_SEQUENCE_READ_THIS_FIRST`
+     - `docs/debug/README.md`
+     - `tests/README.md`
+     - verification-first routing text
+2. The first failing MCP tool response still injects:
+     - `ENTRYPOINT_SEQUENCE_READ_THIS_FIRST`
+     - `DIRECTIVES`
+     - `Debug: docs/debug/README.md -> Known Issues`
 
 ### Why This Matters
 
@@ -464,7 +462,7 @@ This is the **ROOT CAUSE** of repeated failures:
 
 ### Lesson
 
-> **Passive protocols cannot enforce compliance. Structural enforcement (tools that refuse to work) or human gates (user approval) are required.**
+> **If exact routing is not injected on both success and failure paths, agents will skip the protocol at the moment they need it most.**
 
 ---
 

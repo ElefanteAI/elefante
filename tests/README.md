@@ -1,6 +1,6 @@
 # Elefante Test Suite
 
-> **Version:** 2.3.1  
+> **Version:** 2.4.0  
 > **Last Updated:** 2026-04-13
 
 ## Quick Reference
@@ -36,7 +36,7 @@ Use the existing tests in this file before writing any ad hoc validation script.
 | ---- | ------------- | ------------ |
 | [test_memory_persistence.py](test_memory_persistence.py) | Memories persist, GraphStore close barrier works, live MCP shutdown regression stays alive | Without this, users lose all their memories or crash the server |
 | [test_memory_guard.py](test_memory_guard.py) | `[test]` tagged memories blocked by default | Prevents test data polluting real memory DB |
-| [test_autonomous_coactivation.py](test_autonomous_coactivation.py) | Co-activation scoring, built-in directive baseline, system specification bootstrap | Prevents regressions in automatic graph maintenance and the embedded directive/specification baseline |
+| [test_autonomous_coactivation.py](test_autonomous_coactivation.py) | Co-activation scoring, built-in directive baseline, system specification bootstrap, entrypoint response-contract guard | Prevents regressions in automatic graph maintenance and the embedded directive/specification baseline |
 
 ### UNIT TESTS (Run during development)
 

@@ -189,7 +189,7 @@ class ElefanteMCPServer:
         """
         pitfalls = [
             "CRITICAL PROTOCOL: You MUST check for existing memories before creating new ones to avoid duplication.",
-            "CRITICAL PROTOCOL: If you are debugging, you MUST read the relevant 'Neural Register' in docs/debug/ first.",
+            "CRITICAL PROTOCOL: If you are debugging, read docs/debug/README.md first, match the BUG row, and run its verification command before editing source.",
             "CRITICAL PROTOCOL: Do not rely on your internal knowledge base for project specifics; use the memory system."
         ]
         
@@ -221,6 +221,22 @@ class ElefanteMCPServer:
             "3. Ask context questions ONLY if you are hard-blocked from proceeding."
         )
         result["MANDATORY_PROTOCOLS_READ_THIS_FIRST"] = pitfalls
+        return result
+
+    def _inject_entrypoint_protocol(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Inject the exact debug entry sequence into every tool response.
+
+        This is more specific than generic pitfalls: it gives the agent
+        the canonical first steps and maintained verification surfaces.
+        """
+        result["ENTRYPOINT_SEQUENCE_READ_THIS_FIRST"] = [
+            "1. Read docs/debug/README.md and match the current failure to a BUG row before changing code.",
+            "2. Run the verification command from that BUG row first. If it passes, the documented fix still holds and the root cause is elsewhere.",
+            "3. If the verification fails, open the linked docs/debug/*-compendium.md entry and use its exact commands and constraints.",
+            "4. Read tests/README.md before creating any scratch reproducer. Update an existing maintained test when possible.",
+            "5. Only then edit source, rerun the same verifier, and update bug docs plus CHANGELOG if behavior changed.",
+        ]
         return result
 
     def _get_compliance_file(self):
@@ -1112,6 +1128,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 if isinstance(result, dict):
                     result = await self._inject_context(result, name, arguments)
                     result = self._inject_pitfalls(result, name)
+                    result = self._inject_entrypoint_protocol(result)
                     result = self._inject_directives(result)
 
                 return [TextContent(
@@ -1125,13 +1142,17 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 error_msg = str(e)
                 if "ops-database-compendium" not in error_msg:
                     error_msg += "\nDebug: docs/debug/README.md -> Known Issues"
+                error_payload = {
+                    "error": error_msg,
+                    "tool": name,
+                    "success": False,
+                }
+                error_payload = self._inject_pitfalls(error_payload, name)
+                error_payload = self._inject_entrypoint_protocol(error_payload)
+                error_payload = self._inject_directives(error_payload)
                 return [TextContent(
                     type="text",
-                    text=json.dumps({
-                        "error": error_msg,
-                        "tool": name,
-                        "success": False
-                    }, indent=2)
+                    text=json.dumps(error_payload, indent=2)
                 )]
             finally:
                 # Release Kuzu write lock after every tool call.

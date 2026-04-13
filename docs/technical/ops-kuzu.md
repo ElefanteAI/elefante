@@ -2,7 +2,7 @@
 
 **Status**: UPDATED for Transaction-Scoped Locking  
 **Last Updated**: 2026-04-13  
-**Applies to**: v2.3.1+
+**Applies to**: v2.4.0+
 
 ---
 

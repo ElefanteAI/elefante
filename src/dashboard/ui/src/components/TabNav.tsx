@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.3.1 - Tab Navigation
+// Elefante Dashboard v2.4.0 - Tab Navigation
 import { useDashboardStore } from '@/store';
 import type { Tab } from '@/types';
 import { LayoutDashboard, Table2, Compass } from 'lucide-react';

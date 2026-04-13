@@ -1,4 +1,4 @@
-# Usage Guide & API Reference (v2.3.1)
+# Usage Guide & API Reference (v2.4.0)
 
 ## 1. Natural Language Interaction
 
@@ -25,6 +25,12 @@ Elefante exposes **20 tools** and **2 prompts**.
 **Critical workflow rule**:
 
 - Call `elefante-MemorySearch` before `elefante-MemoryAdd`, `elefante-MemoryUpdate`, `elefante-MemoryDelete`, or `elefante-GraphConnect`.
+
+**Tool response contract**:
+
+- Every tool response injects `ENTRYPOINT_SEQUENCE_READ_THIS_FIRST`, `MANDATORY_PROTOCOLS_READ_THIS_FIRST`, and `DIRECTIVES`.
+- Some responses also inject `RELEVANT_CONTEXT` when Elefante can surface related memories automatically.
+- `ENTRYPOINT_SEQUENCE_READ_THIS_FIRST` is the exact developer/debug routing path for repository work: Known Issues -> verification command -> compendium -> maintained test surface.
 
 ### Core Memory Operations
 

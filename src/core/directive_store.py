@@ -54,7 +54,7 @@ SYSTEM_DIRECTIVE_DEFINITIONS = (
     ),
     (
         "system-elefante-tool-contract",
-        "ELEFANTE Tool Contract: Read MANDATORY_PROTOCOLS_READ_THIS_FIRST, DIRECTIVES, and RELEVANT_CONTEXT on every tool response.",
+        "ELEFANTE Tool Contract: Read ENTRYPOINT_SEQUENCE_READ_THIS_FIRST, MANDATORY_PROTOCOLS_READ_THIS_FIRST, DIRECTIVES, and RELEVANT_CONTEXT on every tool response.",
     ),
     (
         "system-elefante-minimal-patch",
