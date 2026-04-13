@@ -28,27 +28,33 @@
 
 | File                                                 | Purpose                                             | Status |
 | ---------------------------------------------------- | --------------------------------------------------- | ------ |
-| [`mcp-server-startup.md`](mcp-server-startup.md)     | **Start MCP server, verification, troubleshooting** | NEW    |
-| [`dashboard-startup.md`](dashboard-startup.md)       | **Start Dashboard, verification, troubleshooting**  | NEW    |
-| [`kuzu-lock-monitoring.md`](kuzu-lock-monitoring.md) | **Prevent single-writer lock deadlocks**            | NEW    |
+| [`mcp-server-startup.md`](mcp-server-startup.md)     | **Start MCP server, verification, troubleshooting** |        |
+| [`safe-restart.md`](safe-restart.md)                 | Graceful restart, lock cleanup, force-kill fallback  |        |
+| [`dashboard-startup.md`](dashboard-startup.md)       | **Start Dashboard, verification, troubleshooting**  |        |
+| [`dashboard-snapshot-contract.md`](dashboard-snapshot-contract.md) | Snapshot JSON schema for dashboard consumption |     |
+| [`kuzu-lock-monitoring.md`](kuzu-lock-monitoring.md) | **Prevent single-writer lock deadlocks**            |        |
 
-### Release Safety
+### Deployment & Release
 
-| File                         | Purpose                        |
-| ---------------------------- | ------------------------------ |
-| [`rollback.md`](rollback.md) | Backup and rollback procedures |
+| File                         | Purpose                                              |
+| ---------------------------- | ---------------------------------------------------- |
+| [`docker.md`](docker.md)     | Docker setup for dashboard and container deployment   |
+| [`agent-handoff.md`](agent-handoff.md) | Agent Zero / autonomous agent integration guide |
+| [`rollback.md`](rollback.md) | Backup and rollback procedures                       |
 
 ### Core System
 
-| File                                 | Purpose                           |
-| ------------------------------------ | --------------------------------- |
-| [`architecture.md`](architecture.md) | System design, triple-layer brain |
-| [`usage.md`](usage.md)               | API reference, MCP tools          |
+| File                                                   | Purpose                                               |
+| ------------------------------------------------------ | ----------------------------------------------------- |
+| [`architecture.md`](architecture.md)                   | System design, triple-layer brain                     |
+| [`usage.md`](usage.md)                                 | API reference, MCP tools                              |
+| [`ingestion-protocol.md`](ingestion-protocol.md)       | 5-step ingestion pipeline (Extract → Classify → Integrity → Write → Reinforce) |
 
 ### Development Process
 
 | File                                                                       | Purpose                                                                  |
 | -------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [`developer-etiquette.md`](developer-etiquette.md)                         | **SPECIFICATION**: Feature closure discipline (clean, docs, version)     |
 | [`sdd-development-protocol.md`](sdd-development-protocol.md)               | **SDD protocol — human reference (enforcement is native via Directives + pre-commit hook)** |
 | [`second-brain-protocols.md`](second-brain-protocols.md)                   | Hierarchical agent protocols for cognitive continuity                    |
 

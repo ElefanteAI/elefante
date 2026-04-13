@@ -71,6 +71,8 @@ When the agent receives a prompt, the Gatekeeper forces it to search. The Oracle
     - **Graph:** A `Memory` node is created in Kuzu.
 3.  **Link:** The memory is linked to the current `Session` node for temporal grounding.
 
+Full pipeline details: [`ingestion-protocol.md`](ingestion-protocol.md)
+
 ---
 
 ## 3. The Enhanced Signal Flow (The "Hijack")

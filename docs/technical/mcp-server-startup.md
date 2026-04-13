@@ -462,6 +462,8 @@ Before claiming "MCP Server is working":
 - [ ] Can use memory tools in IDE (elefante-MemoryAdd, elefante-MemorySearch, etc.)
 - [ ] No Kuzu lock conflicts (if dashboard running separately)
 
+For restarting a running server, see [`safe-restart.md`](safe-restart.md).
+
 ---
 
 **Document Version**: 2.2.1  
