@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.2.1 - Main App
+// Elefante Dashboard v2.2.2 - Main App
 import { useEffect, useCallback } from 'react';
 import { useDashboardStore } from '@/store';
 import { HeaderBar } from '@/components/HeaderBar';
@@ -81,7 +81,8 @@ function App() {
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <div className="w-12 h-12 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-              <div className="text-slate-400">Loading dashboard...</div>
+              <div className="text-slate-400">Connecting to Elefante server...</div>
+              <div className="text-slate-600 text-xs mt-2">This may take a moment on first launch</div>
             </div>
           </div>
         ) : (

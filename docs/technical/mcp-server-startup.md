@@ -466,6 +466,6 @@ For restarting a running server, see [`safe-restart.md`](safe-restart.md).
 
 ---
 
-**Document Version**: 2.2.1  
+**Document Version**: 2.2.2  
 **Status**: ESSENTIAL  
 **Last Validated**: 2026-02-25

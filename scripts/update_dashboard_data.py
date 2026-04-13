@@ -2,7 +2,6 @@ import asyncio
 import sys
 import os
 import json
-import re
 from datetime import datetime
 from pathlib import Path
 import chromadb
@@ -12,150 +11,12 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.core.graph_store import GraphStore
 from src.utils.config import get_config
-
-
-_SECRET_PATTERNS: list[re.Pattern] = [
-    # OpenAI-style
-    re.compile(r"\bsk-[A-Za-z0-9]{20,}\b"),
-    # Slack tokens
-    re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"),
-    # Generic API key mentions
-    re.compile(r"(?i)(api[_ -]?key\s*[:=]\s*)([^\s\"']{8,})"),
-    re.compile(r"(?i)(secret\s*[:=]\s*)([^\s\"']{8,})"),
-    re.compile(r"(?i)(token\s*[:=]\s*)([^\s\"']{8,})"),
-]
-
-
-def _redact_secrets(text: str) -> str:
-    if not text:
-        return text
-    redacted = text
-    for pattern in _SECRET_PATTERNS:
-        # If the pattern has a "prefix" capture group, preserve it.
-        if pattern.groups >= 2:
-            redacted = pattern.sub(r"\1[REDACTED]", redacted)
-        else:
-            redacted = pattern.sub("[REDACTED]", redacted)
-    return redacted
-
-
-def _derive_topic(title: str, meta_topic: str | None) -> str:
-    """Derive a topic from the memory title when meta.topic is missing.
-
-    Two formats seen in the wild:
-      "Category | Rest of title..."  -> returns "Category"
-      "type.category: content..."    -> returns "Category" (title-cased)
-    Falls back to "General" if neither pattern matches.
-    """
-    if meta_topic and str(meta_topic).strip():
-        return meta_topic.strip()
-    if not title:
-        return "General"
-    # Format 1: "Category | ..." — the dominant pattern
-    if " | " in title:
-        return title.split(" | ")[0].strip()
-    # Format 2: "type.category: ..." e.g. "decision.general:" or "preference.general:"
-    if "." in title and ":" in title:
-        try:
-            category = title.split(".")[1].split(":")[0].strip()
-            if category:
-                return category.title()
-        except IndexError:
-            pass
-    return "General"
-
-
-_TYPE_DECAY_RATES = {
-    "preference": 0.002, "decision": 0.005, "fact": 0.005,
-    "insight": 0.008, "note": 0.015, "conversation": 0.025,
-}
-
-
-def _compute_live_score(meta: dict) -> int:
-    """
-    Dashboard composite vitality score.
-
-    Combines temporal decay with behavioral and type-based signals so the
-    score distribution is meaningful even for young memory populations.
-
-    Components (weighted blend):
-      - Vitality (50%): exponential decay matching calculate_relevance_score()
-      - Type weight (25%): inherent importance by memory type
-      - Engagement (25%): retrieval frequency relative to age
-
-    Result: 0-100 integer with real differentiation across types and usage.
-    """
-    import math
-
-    _TYPE_WEIGHTS = {
-        "specification": 1.0,
-        "directive": 1.0,
-        "decision": 0.85,
-        "preference": 0.80,
-        "fact": 0.75,
-        "insight": 0.70,
-        "note": 0.55,
-        "conversation": 0.45,
-    }
-
-    try:
-        memory_type = meta.get("memory_type", "fact")
-        decay_rate = _TYPE_DECAY_RATES.get(str(memory_type), 0.01)
-
-        now = datetime.utcnow()
-        created_str = meta.get("created_at") or ""
-        accessed_str = meta.get("last_accessed") or ""
-        access_count = int(meta.get("access_count") or 0)
-
-        created = datetime.fromisoformat(created_str.replace("Z", "")) if created_str else now
-        last_accessed = datetime.fromisoformat(accessed_str.replace("Z", "")) if accessed_str else created
-
-        days_since_created = max(0.0, (now - created).total_seconds() / 86400)
-        days_since_access = max(0.0, (now - last_accessed).total_seconds() / 86400)
-
-        effective_decay_rate = decay_rate / (1.0 + 0.25 * math.log(access_count + 1))
-        recency = math.exp(-effective_decay_rate * days_since_created)
-        freshness = math.exp(-0.005 * days_since_access)
-        vitality = recency * freshness  # 0.0-1.0
-
-        # Type weight: specifications and decisions are inherently more permanent
-        type_weight = _TYPE_WEIGHTS.get(str(memory_type), 0.60)
-
-        # Engagement: how actively this memory is being used (saturates at ~20 accesses)
-        engagement = min(1.0, math.log(max(access_count, 1) + 1) / math.log(20))
-
-        composite = vitality * 0.50 + type_weight * 0.25 + engagement * 0.25
-        return min(100, max(0, round(composite * 100)))
-    except Exception:
-        return int(meta.get("score") or 100)
-
-
-def _is_test_artifact(*, content: str, title: str) -> bool:
-    c = (content or "").strip().lower()
-    t = (title or "").strip().lower()
-
-    if c.startswith("elefante e2e test memory") or c.startswith("hybrid search test memory"):
-        return True
-
-    if c.startswith("entity relationship test ") or c.startswith("persistence test "):
-        return True
-
-    if t.startswith("e2e-test") or "hybrid_test_" in t:
-        return True
-
-    # entity_target_N test artifacts from graph/coactivation tests
-    if t.startswith("entity_target") or c.startswith("entity_target"):
-        return True
-
-    # Battery test artifacts — content starts with [BATTERY_TEST] marker
-    if c.startswith("[battery_test]"):
-        return True
-
-    # Battery test artifacts — title/tags contain test prefix
-    if "battery_test" in t or "test_battery_" in t:
-        return True
-
-    return False
+from src.utils.dashboard_serializer import (
+    _redact_secrets,
+    _derive_topic,
+    compute_live_score_from_raw as _compute_live_score,
+    is_test_artifact as _is_test_artifact,
+)
 
 async def main():
     """

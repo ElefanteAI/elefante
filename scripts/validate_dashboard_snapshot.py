@@ -170,6 +170,28 @@ def validate_snapshot(data: Dict[str, Any], *, require_curation: bool) -> Valida
         if isinstance(stat_edges, int) and stat_edges != expected_edges:
             warnings.append(f"stats.edges={stat_edges} does not match edges length={expected_edges}")
 
+    # Score health check — detect stale stored scores (the "all 100s" bug class)
+    memory_nodes = [n for n in nodes if isinstance(n, dict) and _is_memory_node(n)]
+    if memory_nodes:
+        scores = []
+        for mn in memory_nodes:
+            p = _as_dict(mn.get("properties"))
+            s = p.get("score")
+            if isinstance(s, (int, float)):
+                scores.append(int(s))
+        if scores:
+            count_100 = sum(1 for s in scores if s == 100)
+            pct_100 = count_100 / len(scores)
+            avg = sum(scores) / len(scores)
+            info.append(f"Scores: avg={avg:.0f}, min={min(scores)}, max={max(scores)}, count_100={count_100}/{len(scores)}")
+            if pct_100 > 0.25:
+                errors.append(
+                    f"Score staleness detected: {count_100}/{len(scores)} ({pct_100:.0%}) memories have score=100. "
+                    f"Scores must be live-computed via dashboard_serializer.py — see docs/debug/dashboard-compendium.md Issue #9"
+                )
+            elif count_100 > 5:
+                warnings.append(f"{count_100} memories have score=100 — verify scores are live-computed")
+
     info.append(f"Nodes: {len(nodes)}")
     info.append(f"Edges: {len(edges)}")
 

@@ -6,7 +6,6 @@ Supports Cypher-like queries for deterministic fact retrieval.
 """
 
 import asyncio
-import threading
 from typing import List, Optional, Dict, Any, Tuple
 from uuid import UUID
 from datetime import datetime
@@ -46,10 +45,7 @@ class GraphStore:
         self._conn = None
         self._db = None
         self._schema_initialized = False
-        self._lock = threading.RLock()
-        self._operation_condition = threading.Condition(threading.Lock())
-        self._active_operations = 0
-        self._closing = False
+        self._lock = None  # For thread safety
         
         logger.info(
             "initializing_graph_store",
@@ -96,6 +92,11 @@ class GraphStore:
         """Initialize Kuzu connection (lazy loading) with thread safety"""
         if self._conn is not None:
             return
+        
+        # Initialize lock for thread-safe access
+        if self._lock is None:
+            import threading
+            self._lock = threading.RLock()
         
         try:
             import kuzu
@@ -161,29 +162,21 @@ class GraphStore:
 
     def close(self):
         """Explicitly close connection and database to release the OS-level Kuzu file lock."""
-        with self._operation_condition:
-            self._closing = True
-            while self._active_operations > 0:
-                self._operation_condition.wait(timeout=0.1)
+        if self._conn is not None:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            self._conn = None
 
-        with self._lock:
-            if self._conn is not None:
-                try:
-                    self._conn.close()
-                except Exception:
-                    pass
-                self._conn = None
-
-            if self._db is not None:
-                try:
-                    self._db.close()
-                except Exception:
-                    pass
-                self._db = None
+        if self._db is not None:
+            try:
+                self._db.close()
+            except Exception:
+                pass
+            self._db = None
 
         self._schema_initialized = False
-        with self._operation_condition:
-            self._closing = False
         logger.info("kuzu_connection_closed")
 
     def __enter__(self):
@@ -201,63 +194,6 @@ class GraphStore:
             self.close()
         except:
             pass
-
-    def _begin_operation(self) -> None:
-        """Mark a Kuzu operation as active so close() can wait safely."""
-        with self._operation_condition:
-            if self._closing:
-                raise RuntimeError("GraphStore is closing")
-            self._active_operations += 1
-
-    def _end_operation(self) -> None:
-        """Release an active Kuzu operation and wake close() if needed."""
-        with self._operation_condition:
-            if self._active_operations > 0:
-                self._active_operations -= 1
-            if self._active_operations == 0:
-                self._operation_condition.notify_all()
-
-    def _execute_query_sync(
-        self,
-        cypher_query: str,
-        params: Optional[Dict[str, Any]] = None,
-        include_columns: bool = False,
-    ) -> Tuple[List[str], List[Any]]:
-        """
-        Execute and fully materialize a Kuzu query inside the worker thread.
-
-        This keeps native QueryResult ownership on the execution thread and
-        prevents teardown races with partially consumed result objects.
-        """
-        self._begin_operation()
-        try:
-            with self._lock:
-                if self._closing or self._conn is None:
-                    raise RuntimeError("GraphStore is closing")
-
-                result = self._conn.execute(cypher_query, params or {})
-                column_names = list(result.get_column_names()) if include_columns else []
-                rows = []
-                while result.has_next():
-                    rows.append(result.get_next())
-                return column_names, rows
-        finally:
-            self._end_operation()
-
-    async def _run_query(
-        self,
-        cypher_query: str,
-        params: Optional[Dict[str, Any]] = None,
-        include_columns: bool = False,
-    ) -> Tuple[List[str], List[Any]]:
-        """Run a Kuzu query through the serialized worker-thread boundary."""
-        self._initialize_connection()
-        return await asyncio.to_thread(
-            self._execute_query_sync,
-            cypher_query,
-            params,
-            include_columns,
-        )
     
     def _get_query_results(self, result) -> list:
         """
@@ -463,7 +399,11 @@ class GraphStore:
         }
         
         try:
-            await self._run_query(query, params)
+            await asyncio.to_thread(
+                self._conn.execute,
+                query,
+                params
+            )
             
             logger.info(
                 "entity_created",
@@ -505,10 +445,13 @@ class GraphStore:
         """
         
         try:
-            _, rows = await self._run_query(
+            result = await asyncio.to_thread(
+                self._conn.execute,
                 query_find,
                 {"name": entity.name, "type": entity.type.value}
             )
+            
+            rows = self._get_query_results(result)
             if rows:
                 # Entity exists, return its ID
                 existing_id = UUID(rows[0][0])
@@ -539,7 +482,11 @@ class GraphStore:
                 "created_at": entity.created_at
             }
             
-            await self._run_query(query_create, params)
+            await asyncio.to_thread(
+                self._conn.execute,
+                query_create,
+                params
+            )
             
             logger.info(
                 "entity_created",
@@ -579,7 +526,13 @@ class GraphStore:
         """
         
         try:
-            _, rows = await self._run_query(query, {"id": str(entity_id)})
+            result = await asyncio.to_thread(
+                self._conn.execute,
+                query,
+                {"id": str(entity_id)}
+            )
+            
+            rows = self._get_query_results(result)
             if not rows:
                 return None
             
@@ -645,7 +598,11 @@ class GraphStore:
         }
         
         try:
-            await self._run_query(query, params)
+            await asyncio.to_thread(
+                self._conn.execute,
+                query,
+                params
+            )
             
             logger.info(
                 "relationship_created",
@@ -696,9 +653,14 @@ class GraphStore:
             """
         
         try:
-            _, rows = await self._run_query(query, {"id": str(entity_id)})
+            result = await asyncio.to_thread(
+                self._conn.execute,
+                query,
+                {"id": str(entity_id)}
+            )
+            
             relationships = []
-            for row in rows:
+            for row in self._get_query_results(result):
                 rel = Relationship(
                     from_entity_id=UUID(row[0]),
                     to_entity_id=UUID(row[1]),
@@ -734,15 +696,19 @@ class GraphStore:
         validate_cypher_query(cypher_query)
         
         try:
-            column_names, rows = await self._run_query(
+            result = await asyncio.to_thread(
+                self._conn.execute,
                 cypher_query,
-                params or {},
-                include_columns=True
+                params or {}
             )
+            
+            # Get column names
+            column_names = result.get_column_names()
             
             # Convert results to list of dictionaries
             results = []
-            for row in rows:
+            while result.has_next():
+                row = result.get_next()
                 # Map column names to values
                 result_dict = {name: val for name, val in zip(column_names, row)}
                 # Also keep "values" for backward compatibility if needed, but preferably not
@@ -783,15 +749,17 @@ class GraphStore:
         """
         
         try:
-            _, rows = await self._run_query(
+            result = await asyncio.to_thread(
+                self._conn.execute,
                 query,
                 {
                     "from_id": str(from_entity_id),
                     "to_id": str(to_entity_id)
                 }
             )
+            
             paths = []
-            for row in rows:
+            for row in self._get_query_results(result):
                 # Extract entity IDs from path
                 # This is simplified - actual implementation depends on Kuzu's path format
                 path = [from_entity_id, to_entity_id]  # Placeholder
@@ -834,9 +802,14 @@ class GraphStore:
         """
         
         try:
-            _, rows = await self._run_query(query, {"id": str(entity_id)})
+            result = await asyncio.to_thread(
+                self._conn.execute,
+                query,
+                {"id": str(entity_id)}
+            )
+            
             neighbors = []
-            for row in rows:
+            for row in self._get_query_results(result):
                 entity = Entity(
                     id=UUID(row[0]),
                     name=row[1],
@@ -871,7 +844,11 @@ class GraphStore:
         """
         
         try:
-            await self._run_query(query, {"id": str(entity_id)})
+            await asyncio.to_thread(
+                self._conn.execute,
+                query,
+                {"id": str(entity_id)}
+            )
             
             logger.info("entity_deleted", entity_id=str(entity_id))
             return True
@@ -884,7 +861,8 @@ class GraphStore:
         """Delete a task node and its relationship edges."""
         self._initialize_connection()
         try:
-            await self._run_query(
+            await asyncio.to_thread(
+                self._conn.execute,
                 "MATCH (t:Task) WHERE t.id = $id DETACH DELETE t",
                 {"id": task_id}
             )
@@ -934,7 +912,8 @@ class GraphStore:
         """
         
         try:
-            _, rows = await self._run_query(
+            result = await asyncio.to_thread(
+                self._conn.execute,
                 cypher,
                 {"query": query, "limit": search_limit}
             )
@@ -942,7 +921,7 @@ class GraphStore:
             memories = []
             current_time = datetime.utcnow()
             
-            for row in rows:
+            for row in self._get_query_results(result):
                 # Reconstruct memory from graph data
                 memory_metadata = MemoryMetadata(
                     created_at=row[2] if isinstance(row[2], datetime) else datetime.fromisoformat(row[2]),
@@ -1000,11 +979,19 @@ class GraphStore:
         
         try:
             # Count entities
-            _, entity_rows = await self._run_query("MATCH (e:Entity) RETURN count(e)")
+            entity_result = await asyncio.to_thread(
+                self._conn.execute,
+                "MATCH (e:Entity) RETURN count(e)"
+            )
+            entity_rows = self._get_query_results(entity_result)
             entity_count = entity_rows[0][0] if entity_rows else 0
             
             # Count relationships
-            _, rel_rows = await self._run_query("MATCH ()-[r]->() RETURN count(r)")
+            rel_result = await asyncio.to_thread(
+                self._conn.execute,
+                "MATCH ()-[r]->() RETURN count(r)"
+            )
+            rel_rows = self._get_query_results(rel_result)
             rel_count = rel_rows[0][0] if rel_rows else 0
             
             return {
@@ -1047,7 +1034,13 @@ class GraphStore:
         """
         
         try:
-            _, rows = await self._run_query(query_find, {"canonical": canonical})
+            result = await asyncio.to_thread(
+                self._conn.execute,
+                query_find,
+                {"canonical": canonical}
+            )
+            
+            rows = self._get_query_results(result)
             if rows:
                 # Concept exists - increment usage count
                 concept_id = rows[0][0]
@@ -1058,7 +1051,8 @@ class GraphStore:
                     WHERE c.id = $id
                     SET c.usage_count = $count
                 """
-                await self._run_query(
+                await asyncio.to_thread(
+                    self._conn.execute,
                     query_update,
                     {"id": concept_id, "count": current_count + 1}
                 )
@@ -1078,7 +1072,8 @@ class GraphStore:
                 })
             """
             
-            await self._run_query(
+            await asyncio.to_thread(
+                self._conn.execute,
                 query_create,
                 {
                     "id": concept_id,
@@ -1133,10 +1128,13 @@ class GraphStore:
                     RETURN count(r)
                 """
                 
-                _, rows = await self._run_query(
+                result = await asyncio.to_thread(
+                    self._conn.execute,
                     query_check,
                     {"mem_id": str(memory_id), "concept_id": concept_id}
                 )
+                
+                rows = self._get_query_results(result)
                 if rows and rows[0][0] > 0:
                     continue  # Edge already exists
                 
@@ -1146,7 +1144,8 @@ class GraphStore:
                     CREATE (e)-[r:HAS_CONCEPT {created_at: $created_at}]->(c)
                 """
                 
-                await self._run_query(
+                await asyncio.to_thread(
+                    self._conn.execute,
                     query_edge,
                     {
                         "mem_id": str(memory_id),
@@ -1201,13 +1200,14 @@ class GraphStore:
         """
         
         try:
-            _, rows = await self._run_query(
+            result = await asyncio.to_thread(
+                self._conn.execute,
                 query,
                 {"canonical": canonical, "limit": limit}
             )
             
             memories = []
-            for row in rows:
+            for row in self._get_query_results(result):
                 memories.append({
                     "id": row[0],
                     "name": row[1],
@@ -1238,10 +1238,14 @@ class GraphStore:
         """
         
         try:
-            _, rows = await self._run_query(query, {"limit": limit})
+            result = await asyncio.to_thread(
+                self._conn.execute,
+                query,
+                {"limit": limit}
+            )
             
             concepts = []
-            for row in rows:
+            for row in self._get_query_results(result):
                 concepts.append({
                     "id": row[0],
                     "name": row[1],

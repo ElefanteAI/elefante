@@ -1,8 +1,8 @@
 # Installation Debug Compendium
 
 > **Domain:** Installation, Setup & Environment  
-> **Last Updated:** 2025-12-11  
-> **Total Issues Documented:** 6  
+> **Last Updated:** 2026-03-24
+> **Total Issues Documented:** 7
 > **Status:** Production Reference  
 > **Maintainer:** Add new issues following Issue #N template at bottom
 
@@ -28,6 +28,7 @@
 - [Issue #4: Config Pre-creating Directories](#issue-4-config-pre-creating-directories)
 - [Issue #5: Broken Venv Escape (Trapped Agent)](#issue-5-broken-venv-escape-trapped-agent)
 - [Issue #6: IDE Holding Stale MCP Server Connections](#issue-6-ide-holding-stale-mcp-server-connections)
+- [Issue #7: IBM Bob Non-Standard MCP Settings Path](#issue-7-ibm-bob-non-standard-mcp-settings-path)
 - [Cognitive Failure Analysis](#cognitive-failure-analysis)
 - [Prevention Protocol](#prevention-protocol)
 - [Appendix: Issue Template](#appendix-issue-template)
@@ -497,6 +498,124 @@ IDEs (VS Code, Cursor, Antigravity) launch the MCP server as a background proces
 ### Lesson
 
 > **Never assume the IDE hot-reloads MCP server configurations. Always mandate an explicit window reload after installation.**
+
+---
+
+## Issue #7: IBM Bob Non-Standard MCP Settings Path
+
+**Date:** 2026-03-24
+**Duration:** ~15 minutes
+**Severity:** MEDIUM
+**Status:** DOCUMENTED
+
+### Problem
+
+Auto-configuration script fails to configure IBM Bob IDE despite successfully configuring other IDEs (VS Code, Cursor).
+
+### Symptom
+
+```bash
+python scripts/configure_vscode_bob.py
+# Reports: "Configured VS Code successfully"
+# But IBM Bob IDE shows no Elefante MCP server
+```
+
+User must manually locate and edit the correct configuration file.
+
+### Root Cause
+
+**Non-Standard Path Convention:** IBM Bob IDE uses `C:\Users\<user>\.bob\settings\mcp_settings.json` instead of the standard AppData locations that other IDEs use.
+
+The auto-config script checks:
+- `%APPDATA%\Bob-IDE\User\globalStorage\ibm.bob-code\settings\mcp_settings.json` ❌
+- `%APPDATA%\Code\User\mcp.json` (VS Code) ✓
+- `%APPDATA%\Cursor\User\mcp_config.json` (Cursor) ✓
+
+But IBM Bob actually stores settings at:
+- `C:\Users\<user>\.bob\settings\mcp_settings.json` ✓ (not checked by script)
+
+### Solution
+
+**Manual Configuration (Immediate Fix):**
+
+1. Locate the actual IBM Bob settings file:
+   ```powershell
+   # Windows
+   C:\Users\<YourUsername>\.bob\settings\mcp_settings.json
+   
+   # Linux/Mac
+   ~/.bob/settings/mcp_settings.json
+   ```
+
+2. Add Elefante configuration to the `mcpServers` object:
+   ```json
+   {
+     "mcpServers": {
+       "elefante": {
+         "command": "C:/path/to/elefante/.venv/Scripts/python.exe",
+         "args": ["-m", "src.mcp.server"],
+         "cwd": "C:/path/to/elefante",
+         "env": {
+           "PYTHONPATH": "C:/path/to/elefante",
+           "ELEFANTE_CONFIG_PATH": "C:/path/to/elefante/config.yaml",
+           "ANONYMIZED_TELEMETRY": "False"
+         },
+         "alwaysAllow": [
+           "elefante-MemoryAdd",
+           "elefante-MemorySearch",
+           "elefante-System"
+         ]
+       }
+     }
+   }
+   ```
+
+3. Reload IBM Bob IDE window
+
+**Script Enhancement (Future Fix):**
+
+Update `scripts/configure_vscode_bob.py` to check additional paths:
+
+```python
+# Add to IDE path detection
+bob_paths = [
+    Path.home() / ".bob" / "settings" / "mcp_settings.json",  # IBM Bob standard
+    Path(os.getenv("APPDATA")) / "Bob-IDE" / "User" / "globalStorage" / "ibm.bob-code" / "settings" / "mcp_settings.json",  # IBM Bob AppData
+]
+```
+
+### Why This Took Time
+
+1. **Assumption of Standard Paths:** Expected all IDEs to follow Electron/VS Code conventions (AppData storage)
+2. **Hidden Configuration:** `.bob` directory is hidden by default on Unix systems
+3. **No Error Message:** Script reported success for VS Code, giving false confidence
+4. **Documentation Gap:** IBM Bob path not documented in `ide-mcp-configuration.md`
+
+### Lesson
+
+> **Never assume IDE configuration paths follow standards. Always verify actual file locations before declaring success. Document non-standard paths explicitly.**
+
+### Platform-Agnostic Discovery Method
+
+When auto-config fails for any IDE:
+
+1. **Search for existing config files:**
+   ```bash
+   # Windows
+   dir /s /b C:\Users\<user>\mcp*.json
+   
+   # Linux/Mac
+   find ~ -name "mcp*.json" 2>/dev/null
+   ```
+
+2. **Check IDE-specific directories:**
+   - Look for `.{ide-name}` in home directory
+   - Check `%APPDATA%\{IDE-Name}` on Windows
+   - Check `~/.config/{ide-name}` on Linux
+
+3. **Verify with IDE documentation or community forums**
+
+4. **Test configuration by reloading IDE window**
 
 ---
 

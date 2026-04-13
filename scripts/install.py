@@ -60,27 +60,6 @@ class Logger:
 
 logger = None
 
-SUPPORTED_PYTHON = (3, 11)
-
-
-def ensure_supported_python(logger_obj=None):
-    """Fail fast when installation is attempted with an unsupported Python runtime."""
-    current = sys.version_info[:2]
-    if current == SUPPORTED_PYTHON:
-        return True
-
-    message_lines = [
-        f"ERROR: Python 3.11 is required. Found {current[0]}.{current[1]}",
-        "Use install.sh or install.bat, or recreate .venv with python3.11 before continuing.",
-    ]
-    if logger_obj is not None:
-        for line in message_lines:
-            logger_obj.log(line)
-    else:
-        for line in message_lines:
-            print(line)
-    return False
-
 def print_header(msg):
     logger.log("\n" + "="*60)
     logger.log(msg)
@@ -89,9 +68,13 @@ def print_header(msg):
 def print_step(step, msg):
     logger.log(f"\n[Step {step}] {msg}...")
 
-def run_command(cmd, cwd=None, shell=False):
+def run_command(cmd, cwd=None, shell=False, env=None):
     """Run a command and check for errors"""
     try:
+        run_env = os.environ.copy()
+        if env:
+            run_env.update(env)
+            
         # We want to capture output to log it, but also show it in real-time.
         # For simplicity in this script, we let subprocess write to stdout/stderr,
         # which means it goes to console.
@@ -106,7 +89,8 @@ def run_command(cmd, cwd=None, shell=False):
                 stderr=subprocess.STDOUT,
                 text=True,
                 encoding='utf-8',
-                errors='replace'
+                errors='replace',
+                env=run_env
             )
             
             while True:
@@ -118,7 +102,7 @@ def run_command(cmd, cwd=None, shell=False):
             
             return process.poll() == 0
         else:
-            subprocess.check_call(cmd, cwd=cwd, shell=shell)
+            subprocess.check_call(cmd, cwd=cwd, shell=shell, env=run_env)
             return True
     except subprocess.CalledProcessError:
         return False
@@ -336,27 +320,6 @@ def create_venv(root_dir):
     """Create virtual environment if it doesn't exist"""
     venv_dir = root_dir / ".venv"
     if venv_dir.exists():
-        pyvenv_cfg = venv_dir / "pyvenv.cfg"
-        if pyvenv_cfg.exists():
-            try:
-                contents = pyvenv_cfg.read_text(encoding="utf-8")
-            except OSError as exc:
-                logger.log(f"ERROR: Could not read {pyvenv_cfg}: {exc}")
-                return False
-
-            version_line = next(
-                (line for line in contents.splitlines() if line.startswith("version = ")),
-                None,
-            )
-            if version_line is not None:
-                version = version_line.split("=", 1)[1].strip()
-                if not version.startswith("3.11."):
-                    logger.log(
-                        "ERROR: Existing .venv uses unsupported Python "
-                        f"{version}. Remove .venv and recreate it with Python 3.11."
-                    )
-                    return False
-
         logger.log("OK: Virtual environment already exists")
         return True
     
@@ -417,18 +380,29 @@ def init_databases(root_dir, python_cmd):
     """Initialize ChromaDB and Kuzu"""
     logger.log("Initializing databases...")
     script_path = root_dir / "scripts" / "init_databases.py"
-    if run_command([python_cmd, str(script_path)], cwd=root_dir):
+    if run_command([python_cmd, str(script_path)], cwd=root_dir, env={'ELEFANTE_LOG_FORMAT': 'text', 'ELEFANTE_LOGGING_FORMAT': 'text'}):
         logger.log("OK: Databases initialized")
         return True
     else:
         logger.log("ERROR: Database initialization failed")
         return False
 
+def generate_dashboard_snapshot(root_dir, python_cmd):
+    """Generate initial dashboard snapshot so the dashboard works on first open."""
+    logger.log("Generating dashboard snapshot...")
+    script_path = root_dir / "scripts" / "update_dashboard_data.py"
+    if run_command([python_cmd, str(script_path)], cwd=root_dir, env={'ELEFANTE_LOG_FORMAT': 'text', 'ELEFANTE_LOGGING_FORMAT': 'text'}):
+        logger.log("OK: Dashboard snapshot generated")
+        return True
+    else:
+        logger.log("WARN: Dashboard snapshot generation failed (non-fatal)")
+        return True  # Non-fatal — dashboard will generate on first refresh
+
 def run_health_check(root_dir, python_cmd):
     """Run health check script"""
     logger.log("Running health check...")
     script_path = root_dir / "scripts" / "health_check.py"
-    if run_command([python_cmd, str(script_path)], cwd=root_dir):
+    if run_command([python_cmd, str(script_path)], cwd=root_dir, env={'ELEFANTE_LOG_FORMAT': 'text', 'ELEFANTE_LOGGING_FORMAT': 'text'}):
         logger.log("OK: Health check passed")
         return True
     else:
@@ -448,58 +422,6 @@ def verify_copilot_instructions(root_dir):
         logger.log("   Without it, agents will NOT proactively search memory.")
         logger.log("   Expected at: " + str(instructions_path))
         return False
-
-
-def setup_agent_entry_points(root_dir):
-    """
-    Create agent entry point symlinks so every IDE and agent surface
-    resolves to the single canonical constitution file on first contact.
-
-    Symlinks created (gitignored — developer-local):
-      AGENT.md        → .github/copilot-instructions.md  (manual-instruction entry)
-      .cursorrules    → .github/copilot-instructions.md  (Cursor auto-load)
-      .windsurfrules  → .github/copilot-instructions.md  (Windsurf auto-load)
-
-    Windows: symlinks require elevated privileges; skipped with instructions printed.
-    """
-    logger.log("Setting up agent entry points...")
-
-    constitution = root_dir / ".github" / "copilot-instructions.md"
-    if not constitution.exists():
-        logger.log("WARN: Constitution file missing — skipping agent entry point creation.")
-        return False
-
-    # Relative target from repo root
-    target = Path(".github") / "copilot-instructions.md"
-
-    entry_points = ["AGENT.md", ".cursorrules", ".windsurfrules"]
-    is_windows = platform.system() == "Windows"
-
-    if is_windows:
-        logger.log("WARN: Windows detected — symlinks require elevated privileges.")
-        logger.log("   To enable agent entry points, run as Administrator or create manually:")
-        for name in entry_points:
-            logger.log(f"   mklink {name} .github\\copilot-instructions.md")
-        return True
-
-    created = []
-    for name in entry_points:
-        link = root_dir / name
-        if link.exists() or link.is_symlink():
-            logger.log(f"   OK (exists): {name}")
-            continue
-        try:
-            link.symlink_to(target)
-            created.append(name)
-            logger.log(f"   Created: {name} → {target}")
-        except Exception as e:
-            logger.log(f"   WARN: Could not create {name}: {e}")
-
-    if created:
-        logger.log(f"OK: Agent entry points created: {', '.join(created)}")
-    else:
-        logger.log("OK: Agent entry points already in place.")
-    return True
 
 
 def generate_proof(root_dir, success):
@@ -528,9 +450,6 @@ def main():
     args = parser.parse_args()
     
     logger = Logger(args.log_file)
-
-    if not ensure_supported_python(logger):
-        sys.exit(1)
     
     root_dir = Path(__file__).parent.parent.absolute()
     os.chdir(root_dir)
@@ -576,11 +495,17 @@ def main():
             success = False
             
     if success:
+        # 3a. Dashboard Snapshot
+        logger.log("")
+        logger.log("[Step 3a] Dashboard Snapshot...")
+        generate_dashboard_snapshot(root_dir, python_cmd)
+
+    if success:
         # 4. MCP Configuration
         print_step(4, "IDE Configuration")
         try:
-            vscode_success = configure_vscode()
-            antigravity_success = configure_antigravity()
+            vscode_success = configure_vscode([])
+            antigravity_success = configure_antigravity([])
             
             if vscode_success:
                 logger.log("OK: MCP Server configured for VSCode/Bob")
@@ -602,11 +527,6 @@ def main():
         if not verify_copilot_instructions(root_dir):
             logger.log("WARN: Agent behavior bootstrap missing. Agents will not proactively use Elefante.")
             logger.log("   See docs/technical/installation.md Section 4a for details.")
-
-        # 4b. Agent Entry Points (AGENT.md, .cursorrules, .windsurfrules)
-        logger.log("")
-        logger.log("[Step 4b] Agent Entry Points...")
-        setup_agent_entry_points(root_dir)
     
     if success:
         # 5. Verification
@@ -630,14 +550,12 @@ def main():
     
     if success:
         print_header("INSTALLATION COMPLETE")
-        logger.log("Next Steps:")
-        logger.log("1. Restart your IDE to load the MCP server.")
-        logger.log("2. Your agent entry points are ready:")
-        logger.log("   - AGENT.md       (any agent: 'read AGENT.md and adopt this identity')")
-        logger.log("   - .cursorrules   (Cursor auto-loads on project open)")
-        logger.log("   - .windsurfrules (Windsurf auto-loads on project open)")
-        logger.log("3. Start using Elefante commands in your AI chat!")
-        logger.log("   - 'Remember that...'\n   - 'What do you know about...'\n")
+        logger.log("Let's prove it works.")
+        logger.log("\n1. Restart your IDE to load the Elefante MCP server.")
+        logger.log("2. Open your AI Chat (Copilot / Cursor / etc).")
+        logger.log("3. Copy and paste exactly this question:\n")
+        logger.log('   "What is my Elefante test passcode?"\n')
+        logger.log("4. Watch your AI fetch the embedded seed memory autonomously.")
     else:
         print_header("INSTALLATION FAILED")
         logger.log("Please check the logs above for errors.")

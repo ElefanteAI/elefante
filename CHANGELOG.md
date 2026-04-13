@@ -65,6 +65,87 @@ SDD self-reporting drift eliminated. Full compliance with Law of Compliance and 
 
 ---
 
+## [2.2.2] - 2026-03-28
+
+### Summary
+
+Dashboard Scoring Structural Fix — Eliminated the all-scores-100 bug architecturally by extracting a single shared serializer, hardening the installation pipeline, and merging upstream documentation.
+
+### The Problem Solved
+
+Dashboard scores were all stuck at 100 because two independent code paths (MCP server and standalone script) each had inline score-computation that read stale `mem.metadata.score` instead of live-computing from decay + type + engagement. Fixing one path left the other broken. The installation process never generated a snapshot, so fresh installs showed a blank dashboard.
+
+### The Solution
+
+1. **Single serializer** — `src/utils/dashboard_serializer.py` is now the sole source of truth for Memory → dashboard-node conversion with live composite scoring.
+2. **MCP server cleaned** — `_refresh_dashboard_snapshot()` replaced ~50 lines of inline node-building with a single import from the shared serializer.
+3. **Standalone script cleaned** — `scripts/update_dashboard_data.py` removed all duplicate helpers (`_redact_secrets`, `_derive_topic`, `_compute_live_score`, `_is_test_artifact`); imports from shared serializer.
+4. **Install hardened** — `scripts/install.py` Step 3a now generates a dashboard snapshot at install time.
+5. **Validator hardened** — `scripts/validate_dashboard_snapshot.py` now detects score staleness (>25% at score=100 = FAIL).
+6. **Upstream merged** — GitHub origin/main merged cleanly (zero conflicts). Brought in `ELEFANTE_DEVELOPMENT_SKILLS.md` (AI agent guide) and Issue #7 (IBM Bob MCP settings path) in installation-compendium.
+
+### Fixed
+- **All dashboard scores stuck at 100** (Issue #9): Root cause was two divergent inline serializers reading stale `mem.metadata.score`. Fixed by extracting `dashboard_serializer.py` as single source of truth. Verified: 74 memories, Score=100: 0, Avg: 75.3, Min: 54, Max: 94.
+- **Kuzu lock contention**: `GraphStore.close()` now calls `kuzu.Connection.close()` and `kuzu.Database.close()` APIs. Previously commented out, leaving the OS-level exclusive file lock held indefinitely.
+- **Dashboard semantic search broken**: `/api/search` response flattened to match frontend `SearchResult` interface.
+- **Dashboard "Untitled" memories**: Backfilled 3 empty-title memories. Improved fallback to extract first 10 words.
+- **Purged 200 test memories**: `entity_target_0..99` (duplicated twice) deleted from ChromaDB. Added `entity_target` to `_is_test_artifact()`.
+- **No snapshot at install time**: Fresh installs showed blank dashboard. Added Step 3a to `install.py`.
+
+### Added
+- `src/utils/dashboard_serializer.py` — shared serializer with `_composite_dashboard_score()`, `compute_live_score()`, `memory_to_dashboard_node()`, `is_test_artifact()`, `_redact_secrets()`.
+- `tests/test_dashboard_serializer.py` — unit tests with delta=0 cross-validation between Memory-object and raw-dict scoring paths.
+- `tmp/verify_scores.py` — quick diagnostic for score health checks.
+- Score staleness detection in `validate_dashboard_snapshot.py`.
+- Issue #9 in `docs/debug/dashboard-compendium.md` with Critical Laws 8-9.
+- Score Contract section in `docs/technical/dashboard-snapshot-contract.md`.
+- `ELEFANTE_DEVELOPMENT_SKILLS.md` — AI agent development guide (merged from upstream).
+- Issue #7 (IBM Bob MCP settings) in `docs/debug/installation-compendium.md` (merged from upstream).
+
+### Changed
+- **Dashboard score formula**: Composite metric (50% temporal vitality + 25% type weight + 25% engagement) replaces pure exponential-decay. Meaningful spread (range ~54-94) instead of 84% at 100.
+- MCP server `_refresh_dashboard_snapshot()` reduced from ~50 lines to a 3-line import loop.
+- `scripts/update_dashboard_data.py` reduced by ~150 lines (removed all duplicate helper functions).
+
+---
+
+## [2.2.1] - 2026-03-20
+
+### Summary
+
+Native SDD Enforcement — Static markdown protocol replaced with living Elefante mechanisms. Elefante now eats its own dogfood: SDD gates are enforced through DIRECTIVES (unconditional injection), SPECIFICATION memories (authority=1.0, immutable), and a mechanical pre-commit hook.
+
+### The Problem Solved
+
+The SDD protocol (v2.2.0) was documented as a static markdown file — repeating the exact anti-pattern Elefante v1.x → v2.1.0 proved doesn't work. Rules in docs drift. Rules in memories can be outcompeted. Only mechanical enforcement and unconditional injection are reliable.
+
+### The Solution
+
+1. **6 SDD DIRECTIVES** — Injected into every MCP tool response unconditionally: Gate 0 (source-first), Critical Blocker, Gate 2 (leakage scan), Gate 3 (numeric verification), Gate 4 (simulator), Stdout Purity Law.
+2. **2 SPECIFICATION memories** — Gate 2 (full 8-surface leakage table) and Gate 3 (exact scoring formulas) stored with authority=1.0, zero decay. Always surface when relevant.
+3. **Mechanical pre-commit hook** — `.git/hooks/pre-commit` runs `health_check.py` + `verify_mcp_handshake.py` before every commit. Failure = blocked.
+4. **MCP schema fix** — Added `specification` and `directive` to `memory_type` enum in `elefante-MemoryAdd` tool schema (v2.2.0 gap: Python model had these types but MCP schema didn't expose them).
+5. **Static doc reframed** — `docs/technical/sdd-development-protocol.md` marked as human reference only. Enforcement is native.
+6. **Directive cleanup** — Removed 2 test/garbage directives (`"Filter of"`, hello-world variable name test).
+
+### Changes
+
+- **MODIFIED**: `src/mcp/server.py` — Added `specification` and `directive` to `memory_type` enum in tool schema.
+- **NEW**: `.git/hooks/pre-commit` — Mechanical Gate 4 enforcement (health check + MCP handshake).
+- **MODIFIED**: `docs/technical/sdd-development-protocol.md` — Reframed as human reference; version 2.2.1.
+- **MODIFIED**: `docs/technical/README.md` — Updated SDD doc description.
+- **MODIFIED**: `docs/README.md` — Updated SDD doc description.
+- **MODIFIED**: `CONTRIBUTING.md` — Replaced SDD blockquote with native enforcement pointer.
+- **SEEDED**: 6 new DIRECTIVES in Elefante DirectiveStore.
+- **SEEDED**: 2 new SPECIFICATION memories in ChromaDB.
+- **CLEANED**: Removed 2 garbage directives from DirectiveStore.
+
+### Impact
+
+SDD self-reporting drift eliminated. Full compliance with Law of Compliance and Native SDD pattern. The meta-irony is closed: Elefante enforces SDD on itself using its own enforcement mechanisms.
+
+---
+
 ## [2.2.0] - 2026-03-07
 
 ### Summary

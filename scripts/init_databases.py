@@ -19,6 +19,8 @@ from src.core.embeddings import get_embedding_service
 from src.utils.logger import get_logger
 from src.utils.config import get_config
 
+import os
+os.environ["ELEFANTE_LOGGING_FORMAT"] = "text"
 logger = get_logger(__name__)
 
 
@@ -112,6 +114,34 @@ async def verify_setup():
     return True
 
 
+async def inject_seed_memory():
+    """Inject the First Success 'Aha!' memory"""
+    logger.info("Injecting test seed memory...")
+    try:
+        from src.core.orchestrator import get_orchestrator
+        from src.models.memory import MemoryType, DomainType
+        
+        orc = get_orchestrator()
+        
+        # Check if already seeded to avoid duplicates on re-runs
+        results = await orc.search_memories(query="Indigo-Echo")
+        if results and any("Indigo-Echo" in getattr(m, 'content', '') for m in results):
+            logger.info("Seed memory already exists, skipping.")
+            return True
+            
+        await orc.add_memory(
+            content="The secret Elefante test passcode is 'Indigo-Echo'.",
+            memory_type=MemoryType.FACT,
+            tags=["seed", "test", "passcode"],
+            metadata={"domain": DomainType.SYSTEM, "category": "system-test"}
+        )
+        logger.info("Successfully injected seed memory.")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to inject seed memory: {e}", exc_info=True)
+        return False
+
+
 async def cleanup_resources():
     """Clean up database connections to prevent async cleanup errors"""
     try:
@@ -136,7 +166,8 @@ async def main():
         "embedding_service": False,
         "vector_store": False,
         "graph_store": False,
-        "verification": False
+        "verification": False,
+        "seed_memory": False
     }
     
     # Initialize components
@@ -144,6 +175,11 @@ async def main():
     results["vector_store"] = await init_vector_store()
     results["graph_store"] = await init_graph_store()
     results["verification"] = await verify_setup()
+    
+    if all([results["embedding_service"], results["vector_store"], results["graph_store"]]):
+        results["seed_memory"] = await inject_seed_memory()
+    else:
+        logger.warning("Skipping seed memory injection due to component failure")
     
     # Summary
     logger.info("=" * 60)

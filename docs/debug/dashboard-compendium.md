@@ -1,8 +1,8 @@
 # Dashboard Debug Compendium
 
 > **Domain:** Dashboard & Visualization  
-> **Last Updated:** 2025-12-07  
-> **Total Issues Documented:** 6  
+> **Last Updated:** 2026-03-28  
+> **Total Issues Documented:** 9  
 > **Status:** Production Reference
 >
 > **HISTORICAL NOTE:** Some issues below reference V3 concepts (layer, sublayer, classifier.py, importance 1-10) that have since been removed. These entries document the debugging process and lessons learned; the referenced code/fields no longer exist.  
@@ -21,6 +21,8 @@
 | 5   | Hard refresh browser after frontend changes (`Ctrl+Shift+R`)                   | "It's still broken!" |
 | 6   | Frontend reads `n.properties`, NOT `n.full_data.props` - check ALL occurrences | 8 hours              |
 | 7   | Long-running servers cache imports - restart after code changes                | Silent failures      |
+| 8   | Scores MUST be live-computed via `dashboard_serializer.py` — never from stored `mem.metadata.score` | Stale 100s |
+| 9   | ALL dashboard node building converges through `memory_to_dashboard_node()` — no inline serialization | Score divergence |
 
 ---
 
@@ -32,6 +34,9 @@
 - [Issue #4: Dashboard Shows 11 Instead of 71](#issue-4-dashboard-shows-11-instead-of-71)
 - [Issue #5: API Bypassed Snapshot File](#issue-5-api-bypassed-snapshot-file)
 - [Issue #6: V3 Metadata Display Bug Chain](#issue-6-v3-metadata-display-bug-chain)
+- [Issue #7: The Phantom Dashboard](#issue-7-the-phantom-dashboard-blank-screen--connection-death)
+- [Issue #8: Persistent Blank Dashboard on First Launch](#issue-8-persistent-blank-dashboard-on-first-launch)
+- [Issue #9: All Dashboard Scores Stuck at 100](#issue-9-all-dashboard-scores-stuck-at-100)
 - [Methodology Failures](#methodology-failures)
 - [Prevention Protocol](#prevention-protocol)
 - [Appendix: Issue Template](#appendix-issue-template)
@@ -604,4 +609,98 @@ open_result = await self._start_dashboard_and_open(force_restart=refresh)
 ### Lesson
 
 > **Never open the browser before the server is ready. When refreshing data, restart the server — a stale process cannot serve a new snapshot without a restart.**
+
+---
+
+## Issue #9: All Dashboard Scores Stuck at 100
+
+**Date:** 2026-03-28  
+**Duration:** 3 hours (investigation + structural fix)  
+**Severity:** CRITICAL  
+**Status:** FIXED (structural)
+
+### Problem
+
+Almost all memory scores in the dashboard showed 100. Scores had no differentiation — the entire scoring system was effectively dead.
+
+### Symptom
+
+Dashboard showed 22/74 memories with score=100, average 94.6. Real computed scores should range 54-94 with average ~75.
+
+### Root Cause
+
+**Three independent code paths built dashboard nodes with different scoring logic:**
+
+| Path | File | How it computed score | Result |
+|---|---|---|---|
+| MCP server refresh | `src/mcp/server.py` `_refresh_dashboard_snapshot()` | `mem.metadata.score` (stale stored value from ChromaDB) | **WRONG** — returns birth-time score, never recomputed |
+| Standalone script | `scripts/update_dashboard_data.py` | `_compute_live_score(meta)` (correct live formula) | Correct |
+| Dashboard API | `src/dashboard/server.py` | Reads `dashboard_snapshot.json` as-is | Depends on who wrote the snapshot |
+
+The MCP server's `_refresh_dashboard_snapshot()` read `mem.metadata.score` directly from ChromaDB. That stored value is set at memory creation time (defaults to 100) and only updated when `record_access()` is called during retrieval. Most memories are never retrieved — their stored score stays at 100 forever.
+
+The standalone script had a correct `_compute_live_score()` function, but it was a local duplicate — never shared with the MCP path. This architectural debt was documented in memory `c15f3b69` months earlier but never fixed.
+
+### Solution
+
+**Structural fix: single source of truth for all dashboard serialization.**
+
+Created `src/utils/dashboard_serializer.py` with:
+
+```python
+# THE scoring formula. Both Memory-object and raw-dict paths converge here.
+def _composite_dashboard_score(vitality, memory_type, access_count) -> int:
+    type_weight = _TYPE_WEIGHTS.get(memory_type, 0.60)
+    engagement = min(1.0, log(max(access_count, 1) + 1) / log(20))
+    composite = vitality * 0.50 + type_weight * 0.25 + engagement * 0.25
+    return min(100, max(0, round(composite * 100)))
+
+# Memory object path (MCP server)
+def compute_live_score(mem: Memory) -> int
+
+# Raw ChromaDB dict path (standalone script)
+def compute_live_score_from_raw(meta: dict) -> int
+
+# SINGLE node builder — no other code may build dashboard nodes
+def memory_to_dashboard_node(mem: Memory) -> Optional[Dict]
+```
+
+**Wiring:**
+- `src/mcp/server.py` `_refresh_dashboard_snapshot()`: Replaced ~50 lines of inline node-building with `memory_to_dashboard_node(mem)` import.
+- `scripts/update_dashboard_data.py`: Removed all local duplicates (`_redact_secrets`, `_derive_topic`, `_compute_live_score`, `_is_test_artifact`), now imports from shared module.
+
+**Verification result:**
+```
+Memories: 74, Score=100: 0, Avg: 75.3, Min: 54, Max: 94
+Cross-validation (5 samples): ALL SCORES VERIFIED (±1 for time-decay drift)
+```
+
+### Why This Took So Long
+
+1. **The bug was invisible to the MCP server.** It faithfully serialized `mem.metadata.score` — a real field that happened to be stale. No error, no warning.
+2. **Regression during fix.** Edited `server.py` on disk but forgot the running MCP process had old code in memory. Dashboard "Refresh" button triggered the old in-memory code, overwriting the correct snapshot.
+3. **Three code paths.** The duplication was known debt but was tolerated because "both produce the same output." They didn't.
+
+### Lesson
+
+> **Never trust stored scores. Scores are derived values — always compute them live from behavioral signals. Enforce this architecturally with a single shared serializer, not with documentation or rules.**
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `src/utils/dashboard_serializer.py` | **NEW** — single source of truth for Memory → dashboard node |
+| `src/mcp/server.py` | Replaced inline serialization with `memory_to_dashboard_node()` import |
+| `scripts/update_dashboard_data.py` | Replaced local helpers with imports from shared serializer |
+
+### Verification
+
+```bash
+# Quick score health check:
+python3 tmp/verify_scores.py
+
+# Expected output:
+# Memories: 74, Score=100: 0, Avg: ~75, Min: ~54, Max: ~94
+# ALL SCORES VERIFIED
+```
 

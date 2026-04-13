@@ -52,10 +52,34 @@ For `type == "memory"`, `properties` should include:
 - `content`: raw text (may be present but should not be shown by default in UI)
 - `title`: curated title (string)
 - `summary`: curated one-sentence summary (string)
+- `score`: **integer 0-100, ALWAYS live-computed** (see Score Contract below)
 
 Classification (recommended, V5):
 
 - `ring`, `topic`, `knowledge_type`
+
+### Score Contract (CRITICAL)
+
+**`score` MUST be computed live at snapshot generation time. NEVER read from stored `mem.metadata.score`.**
+
+The stored `mem.metadata.score` in ChromaDB is a stale birth-time value that is only updated on retrieval (`record_access()`). Most memories are never retrieved, so their stored score stays at 100 forever.
+
+**Single source of truth:** `src/utils/dashboard_serializer.py`
+
+Two entry points, both converging on `_composite_dashboard_score()`:
+- `compute_live_score(mem: Memory)` — from Memory objects (MCP server path)
+- `compute_live_score_from_raw(meta: dict)` — from raw ChromaDB metadata (standalone script path)
+
+**Formula:** `composite = vitality * 0.50 + type_weight * 0.25 + engagement * 0.25`
+
+Where:
+- `vitality` = `exp(-effective_decay_rate * age_days) * exp(-0.005 * days_since_access)`
+- `type_weight` = inherent importance (specification=1.0 ... conversation=0.45)
+- `engagement` = `min(1.0, log(access_count + 1) / log(20))`
+
+**Expected distribution:** Avg ~75, Min ~54, Max ~94. Score=100 count should be 0-1.
+
+**All node serialization** must go through `memory_to_dashboard_node()` in the shared module. No inline node-building is permitted anywhere.
 
 ## Edge schema
 

@@ -38,10 +38,8 @@ from src.models.entity import EntityType, RelationshipType
 from src.utils.logger import get_logger
 from src.utils.validators import validate_memory_content, validate_uuid
 from src.utils.elefante_mode import get_mode_manager, is_elefante_enabled, write_lock
-from src.utils.version import ensure_supported_python
 
 logger = get_logger(__name__)
-ensure_supported_python()
 
 # Tools that do NOT require Elefante Mode to be enabled
 # These are safe to call even when databases are locked by another IDE
@@ -171,7 +169,8 @@ class ElefanteMCPServer:
                 self._session_retrieval_history.extend(new_ids)
                 # Keep sliding window of recent unique ids, max 20
                 self._session_retrieval_history = list(dict.fromkeys(self._session_retrieval_history))[-20:]
-                await orchestrator.record_coactivation(self._session_retrieval_history.copy())
+                # Fire and forget passive co-activation recording
+                asyncio.create_task(orchestrator.record_coactivation(self._session_retrieval_history.copy()))
 
             result["RELEVANT_CONTEXT"] = {
                 "note": "Auto-surfaced memories relevant to this operation. No search tool call was needed.",
@@ -310,7 +309,6 @@ class ElefanteMCPServer:
             self.logger.info("Initializing Orchestrator (First Run)...")
             self.orchestrator = get_orchestrator()
             self.logger.info("Orchestrator initialized")
-        await self.orchestrator.ensure_system_baseline()
         return self.orchestrator
     
     def _register_handlers(self):
@@ -1299,7 +1297,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         if new_ids:
             self._session_retrieval_history.extend(new_ids)
             self._session_retrieval_history = list(dict.fromkeys(self._session_retrieval_history))[-20:]
-            await orchestrator.record_coactivation(self._session_retrieval_history.copy())
+            asyncio.create_task(orchestrator.record_coactivation(self._session_retrieval_history.copy()))
         
         # Filter out deprecated/archived memories from results
         filtered_results = []
@@ -1540,9 +1538,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
             
             orchestrator = await self._get_orchestrator()
             vs = orchestrator.vector_store
-            vector_deleted = await vs.delete_memory(mid)
-            graph_deleted = await orchestrator.graph_store.delete_entity(mid)
-            success = vector_deleted or graph_deleted
+            success = await vs.delete_memory(mid)
             
             if success:
                 # Purge deleted ID from session history to prevent stale
@@ -1556,8 +1552,6 @@ You have access to a persistent memory system called **Elefante** - the user's s
                     "success": True,
                     "memory_id": memory_id,
                     "reason": reason,
-                    "vector_deleted": vector_deleted,
-                    "graph_deleted": graph_deleted,
                     "message": "Memory permanently deleted"
                 }
             else:
@@ -1679,11 +1673,13 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 )
                 self.logger.info(f"Dashboard server started via subprocess on port {port}")
 
-                # Wait for Uvicorn to bind before opening the browser (fixes race condition).
-                ready = _wait_for_ready(max_wait=5.0)
+                # Wait for Uvicorn to bind before opening the browser.
+                # Cold Python starts (first launch) can take 10-15s due to imports.
+                ready = _wait_for_ready(max_wait=15.0)
                 if not ready:
-                    self.logger.warning("Dashboard server did not become ready within 5s.")
+                    self.logger.warning("Dashboard server did not become ready within 15s.")
             else:
+                ready = True
                 self.logger.info(f"Dashboard already running on port {port}")
 
             DASHBOARD_STARTED = True
@@ -1691,15 +1687,29 @@ You have access to a persistent memory system called **Elefante** - the user's s
         except Exception as e:
             self.logger.warning(f"Failed to start dashboard server: {e}")
             DASHBOARD_STARTED = True
+            ready = False
 
-        try:
-            webbrowser.open(url)
-            message = f"Dashboard opened at {url}"
-        except Exception as e:
-            message = f"Dashboard server running at {url}, but failed to open browser: {e}"
+        # Gate: only open browser once the server is confirmed ready.
+        # If not ready, do one final check — the server may have come up
+        # in the brief window between the wait loop and now.
+        if not ready:
+            ready = _is_server_up(timeout=2.0)
+
+        if ready:
+            try:
+                webbrowser.open(url)
+                message = f"Dashboard opened at {url}"
+            except Exception as e:
+                message = f"Dashboard server running at {url}, but failed to open browser: {e}"
+        else:
+            message = (
+                f"Dashboard server is still starting on port {port}. "
+                f"Open {url} manually once it's ready."
+            )
+            self.logger.warning(message)
 
         return {
-            "success": True,
+            "success": ready,
             "message": message,
             "url": url
         }
@@ -1717,77 +1727,18 @@ You have access to a persistent memory system called **Elefante** - the user's s
 
         memories = await orchestrator.vector_store.get_all(limit=1000)
 
+        from src.utils.dashboard_serializer import memory_to_dashboard_node
+
         nodes = []
         edges = []
         seen_ids = set()
 
-        def _is_test_artifact(*, content: str, title: str) -> bool:
-            c = (content or "").strip().lower()
-            t = (title or "").strip().lower()
-
-            if c.startswith("elefante e2e test memory") or c.startswith("hybrid search test memory"):
-                return True
-
-            if c.startswith("entity relationship test ") or c.startswith("persistence test "):
-                return True
-
-            if t.startswith("e2e-test") or "hybrid_test_" in t:
-                return True
-
-            return False
-
         for mem in memories:
-            cm = mem.metadata.custom_metadata or {}
-            if cm.get("title"):
-                name = cm.get("title")
-            else:
-                words = mem.content.split()[:5]
-                name = " ".join(words) if words else "Untitled Memory"
-
-            if _is_test_artifact(content=mem.content, title=str(name)):
+            node = memory_to_dashboard_node(mem)
+            if node is None:
                 continue
-
-            status_value = mem.metadata.status.value if hasattr(mem.metadata.status, "value") else str(mem.metadata.status)
-            rel_type_value = (
-                mem.metadata.relationship_type.value
-                if getattr(mem.metadata, "relationship_type", None) and hasattr(mem.metadata.relationship_type, "value")
-                else str(getattr(mem.metadata, "relationship_type", "") or "")
-            )
-
-            processing_status = cm.get("processing_status")
-            canonical_key = cm.get("canonical_key")
-            namespace = cm.get("namespace")
-            topic = mem.metadata.category if mem.metadata.category and mem.metadata.category != "general" else cm.get("topic")
-            summary = cm.get("summary")
-
-            node = {
-                "id": str(mem.id),
-                "name": name,
-                "type": "memory",
-                "description": mem.content,
-                "created_at": mem.metadata.created_at.isoformat(),
-                "properties": {
-                    "content": mem.content,
-                    "memory_type": mem.metadata.memory_type.value if hasattr(mem.metadata.memory_type, "value") else str(mem.metadata.memory_type),
-                    "score": mem.metadata.score,
-                    "tags": ",".join(mem.metadata.tags) if mem.metadata.tags else "",
-                    "status": status_value,
-                    "relationship_type": rel_type_value,
-                    "archived": bool(getattr(mem.metadata, "archived", False)),
-                    "deprecated": bool(getattr(mem.metadata, "deprecated", False)),
-                    "supersedes_id": str(mem.metadata.supersedes_id) if mem.metadata.supersedes_id else "",
-                    "superseded_by_id": str(mem.metadata.superseded_by_id) if mem.metadata.superseded_by_id else "",
-                    "processing_status": processing_status,
-                    "canonical_key": canonical_key,
-                    "namespace": namespace,
-                    "title": cm.get("title", ""),
-                    "topic": topic,
-                    "summary": summary,
-                    "source": "chromadb",
-                }
-            }
             nodes.append(node)
-            seen_ids.add(str(mem.id))
+            seen_ids.add(node["id"])
 
         # Add explicit supersession edges from vector-store metadata.
         for mem in memories:
@@ -2205,12 +2156,6 @@ You have access to a persistent memory system called **Elefante** - the user's s
         directive_id = args.get("directive_id", "").strip()
         if not directive_id:
             return {"success": False, "error": "directive_id is required"}
-
-        if self.directive_store.is_system_directive(directive_id):
-            return {
-                "success": False,
-                "error": f"Directive '{directive_id}' is a built-in system directive and cannot be removed"
-            }
 
         removed = self.directive_store.remove(directive_id)
         if removed:

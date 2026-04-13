@@ -22,24 +22,27 @@ log " ELEFANTE INSTALLER"
 log "============================================================"
 log ""
 
-# 1. Check for Python 3.11 explicitly (mandatory)
-log "[INFO] Checking for Python 3.11..."
-if command -v python3.11 &> /dev/null; then
-    PYTHON_CMD=python3.11
-elif command -v python3 &> /dev/null; then
-    PYTHON_CMD=python3
-elif command -v python &> /dev/null; then
-    PYTHON_CMD=python
-else
-    log "[ERROR] Python is not installed."
-    log "Please install Python 3.11 from python.org or Homebrew (brew install python@3.11)."
-    exit 1
-fi
+# 1. Check for Python 3.11 - 3.13
+log "[INFO] Checking for compatible Python (3.11 - 3.13)..."
 
-PY_VER="$($PYTHON_CMD -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
-if [ "$PY_VER" != "3.11" ]; then
-    log "[ERROR] Python 3.11 is required (found $PY_VER)."
-    log "Install Python 3.11 and re-run: python3.11 -m venv .venv"
+find_python() {
+    for cmd in python3.13 python3.12 python3.11 python3 python; do
+        if command -v "$cmd" &> /dev/null; then
+            if "$cmd" -c 'import sys; sys.exit(0 if (3,11) <= sys.version_info < (3,14) else 1)' &> /dev/null; then
+                echo "$cmd"
+                return 0
+            fi
+        fi
+    done
+    return 1
+}
+
+PYTHON_CMD=$(find_python)
+
+if [ -z "$PYTHON_CMD" ]; then
+    log "[ERROR] No compatible Python found. Requires 3.11, 3.12, or 3.13."
+    log "[ERROR] Python 3.14+ is NOT supported due to Pydantic V1 limits."
+    log "Please install Python 3.13 from python.org or Homebrew (brew install python@3.13)."
     exit 1
 fi
 
@@ -59,4 +62,4 @@ source .venv/bin/activate
 
 # 4. Run Python Installer
 log "[INFO] Starting installation wizard..."
-python scripts/install.py --log-file "$LOG_FILE"
+"$PYTHON_CMD" scripts/install.py --log-file "$LOG_FILE"

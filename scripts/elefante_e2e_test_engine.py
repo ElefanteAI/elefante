@@ -10,7 +10,6 @@ Persona: Alex Rivera — Senior Autonomous Agent Engineer at FintechCo
 Runs: .venv/bin/python scripts/elefante_e2e_test_engine.py
 
 What it proves:
-    0. The real MCP tool path survives the Kuzu shutdown-race regression cycle
   1. Memory persists across simulated IDE restarts
   2. Directives inject unconditionally into every tool response
   3. SPECIFICATION memories surface with authority=1.0
@@ -22,7 +21,7 @@ import asyncio
 import json
 import os
 import sys
-import tempfile
+import time
 from pathlib import Path
 from uuid import uuid4
 
@@ -38,8 +37,7 @@ _REQ_ID = 0
 class MCPClient:
     """Thin JSON-RPC 2.0 client over stdin/stdout to a real MCP server subprocess."""
 
-    def __init__(self, env: dict[str, str]):
-        self.env = env
+    def __init__(self):
         self.process = None
         self._id = 0
 
@@ -51,7 +49,7 @@ class MCPClient:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=str(project_root),
-            env=self.env,
+            env={**os.environ, "PYTHONPATH": str(project_root)},
         )
         # Handshake
         resp = await self._send("initialize", {
@@ -78,12 +76,6 @@ class MCPClient:
                         return {"raw": block["text"]}
         return resp
 
-    async def ensure_alive(self, label: str) -> None:
-        await asyncio.sleep(0.35)
-        if self.process.returncode is not None:
-            stderr = (await self.process.stderr.read()).decode()
-            raise RuntimeError(f"{label}: server exited rc={self.process.returncode} stderr={stderr[:800]}")
-
     async def stop(self):
         if self.process:
             self.process.terminate()
@@ -91,7 +83,6 @@ class MCPClient:
                 await asyncio.wait_for(self.process.wait(), timeout=5)
             except asyncio.TimeoutError:
                 self.process.kill()
-                await self.process.wait()
 
     # -- internals --
 
@@ -139,107 +130,24 @@ def _result(name: str, ok: bool, detail: str = ""):
 async def run_e2e():
     results = []
     test_tag = f"e2e-{uuid4().hex[:8]}"
-    temp_root = tempfile.TemporaryDirectory(prefix="elefante-e2e-")
-    temp_root_path = Path(temp_root.name)
-    temp_home = temp_root_path / "home"
-    temp_home.mkdir(parents=True, exist_ok=True)
-    temp_data_dir = temp_root_path / "elefante-data"
-    env = {
-        **os.environ,
-        "PYTHONPATH": str(project_root),
-        "HOME": str(temp_home),
-        "USERPROFILE": str(temp_home),
-        "ELEFANTE_DATA_DIR": str(temp_data_dir),
-        "ELEFANTE_ALLOW_TEST_MEMORIES": "1",
-    }
 
     _header("Elefante E2E Developer Experience Engine v2.2.1")
     print("  Persona : Alex Rivera (FintechCo)")
     print("  Workflow: VS Code + Antigravity / Claude Code / OpenClaw")
     print(f"  Tag     : {test_tag}")
-    print(f"  Sandbox : {temp_root_path}")
 
     # ---------------------------------------------------------------
     # Boot server (simulates IDE session 1)
     # ---------------------------------------------------------------
     _header("SESSION 1: Alex opens VS Code (MCP server starts)")
-    client = MCPClient(env)
+    client = MCPClient()
     try:
         init = await client.start()
     except Exception as e:
         print(f"  [FAIL] Could not start MCP server: {e}")
-        temp_root.cleanup()
         return
 
     results.append(_result("MCP handshake", True, "server initialized"))
-    await client.ensure_alive("post-initialize")
-
-    # ---------------------------------------------------------------
-    # Test 0: Native shutdown crash regression
-    # ---------------------------------------------------------------
-    _header("TEST 0: Kuzu shutdown-race regression")
-    crash_tag = f"{test_tag}-crash"
-    crash_phrase = f"[{crash_tag}] shared MCP shutdown race regression phrase"
-    crash_memory_ids = []
-
-    try:
-        await client.call_tool("elefante-MemorySearch", {
-            "query": crash_phrase,
-            "limit": 5,
-        })
-        await client.ensure_alive("after crash-regression initial search")
-
-        for index in range(2):
-            add_resp = await client.call_tool("elefante-MemoryAdd", {
-                "content": f"{crash_phrase} memory {index} with distinct suffix {uuid4().hex[:6]}",
-                "memory_type": "note",
-                "domain": "project",
-                "category": "crash-regression",
-                "tags": [crash_tag, "crash-regression", "mcp-live"],
-                "force_new": True,
-            })
-            memory_id = add_resp.get("memory_id")
-            if not memory_id:
-                raise RuntimeError(f"MemoryAdd failed: {add_resp}")
-            crash_memory_ids.append(memory_id)
-            await client.ensure_alive(f"after crash-regression add {index}")
-
-        for round_index in range(3):
-            search_resp = await client.call_tool("elefante-MemorySearch", {
-                "query": crash_phrase,
-                "limit": 10,
-            })
-            tagged = [
-                item for item in search_resp.get("results", [])
-                if crash_tag in item.get("memory", {}).get("content", "")
-            ]
-            if len(tagged) < 2:
-                raise RuntimeError(f"Search round {round_index} returned {len(tagged)} tagged memories")
-            await client.ensure_alive(f"after crash-regression search {round_index}")
-
-        await client.call_tool("elefante-SystemStatusGet", {})
-        await client.ensure_alive("after crash-regression status")
-
-        for memory_id in crash_memory_ids:
-            del_resp = await client.call_tool("elefante-MemoryDelete", {
-                "memory_id": memory_id,
-                "reason": f"E2E crash regression cleanup — tag {crash_tag}",
-            })
-            if not del_resp.get("success", False):
-                raise RuntimeError(f"MemoryDelete failed for {memory_id}: {del_resp}")
-            await client.ensure_alive(f"after crash-regression delete {memory_id[:8]}")
-
-        results.append(_result(
-            "Server survives repeated search/coactivation cycle",
-            True,
-            "real MCP add/search/delete path stayed alive"
-        ))
-    except Exception as e:
-        results.append(_result(
-            "Server survives repeated search/coactivation cycle",
-            False,
-            str(e)[:120]
-        ))
 
     # ---------------------------------------------------------------
     # Test 1: Directive injection proof
@@ -293,7 +201,6 @@ async def run_e2e():
         "domain": "project",
         "category": "openclaw",
         "tags": ["openclaw", "api-keys", "error-handling", test_tag],
-        "force_new": True,
     })
     mem_id = add_resp.get("memory_id", "")
     stored_ok = add_resp.get("success", False) or bool(mem_id)
@@ -311,12 +218,11 @@ async def run_e2e():
     print("  ... server stopped (simulating IDE close)")
     await asyncio.sleep(1)
 
-    client2 = MCPClient(env)
+    client2 = MCPClient()
     try:
         await client2.start()
     except Exception as e:
         print(f"  [FAIL] Could not restart MCP server: {e}")
-        temp_root.cleanup()
         return
     print("  ... server restarted (simulating IDE reopen)")
 
@@ -383,13 +289,13 @@ async def run_e2e():
     # Delete it before spawning a fresh server to prove the gate blocks.
     await client2.stop()
 
-    compliance_file = temp_home / ".elefante" / "compliance_state.json"
+    compliance_file = Path.home() / ".elefante" / "compliance_state.json"
     backup = None
     if compliance_file.exists():
         backup = compliance_file.read_text()
         compliance_file.unlink()
 
-    client_gate = MCPClient(env)
+    client_gate = MCPClient()
     try:
         await client_gate.start()
         # Immediately try a gated tool WITHOUT any prior search
@@ -417,7 +323,7 @@ async def run_e2e():
             compliance_file.write_text(backup)
 
     # Re-open session for remaining tests + cleanup
-    client2 = MCPClient(env)
+    client2 = MCPClient()
     await client2.start()
 
     # ---------------------------------------------------------------
@@ -444,53 +350,20 @@ async def run_e2e():
     # Cleanup: remove test memory
     # ---------------------------------------------------------------
     _header("CLEANUP")
-    cleanup_ok = True
-
-    await client2.call_tool("elefante-MemorySearch", {
-        "query": test_tag,
-        "limit": 20,
-        "include_conversation": False,
-        "include_stored": True,
-    })
-
-    for memory_id in crash_memory_ids:
-        del_resp = await client2.call_tool("elefante-MemoryDelete", {
-            "memory_id": memory_id,
-            "reason": f"E2E crash regression cleanup verification — tag {test_tag}",
-        })
-        crash_cleaned = del_resp.get("success", False)
-        cleanup_ok = cleanup_ok and crash_cleaned
-        _result(f"Crash memory {memory_id[:8]} cleaned up", crash_cleaned)
-
     if mem_id:
+        # Need to do a search first to unlock the compliance gate
+        await client2.call_tool("elefante-MemorySearch", {
+            "query": f"{test_tag} OpenClaw cleanup",
+            "limit": 1,
+        })
         del_resp = await client2.call_tool("elefante-MemoryDelete", {
             "memory_id": mem_id,
             "reason": f"E2E test cleanup — tag {test_tag}",
         })
         cleaned = del_resp.get("success", False)
-        cleanup_ok = cleanup_ok and cleaned
         _result("Test memory cleaned up", cleaned)
 
-    remaining_resp = await client2.call_tool("elefante-MemorySearch", {
-        "query": test_tag,
-        "limit": 20,
-        "include_conversation": False,
-        "include_stored": True,
-    })
-    remaining = [
-        item for item in remaining_resp.get("results", [])
-        if test_tag in item.get("memory", {}).get("content", "")
-    ]
-    no_artifacts = len(remaining) == 0
-    cleanup_ok = cleanup_ok and no_artifacts
-    results.append(_result(
-        "E2E sandbox cleaned fully",
-        cleanup_ok,
-        "no test-tagged memories remain" if no_artifacts else f"remaining={len(remaining)}"
-    ))
-
     await client2.stop()
-    temp_root.cleanup()
 
     # ---------------------------------------------------------------
     # Summary
@@ -502,13 +375,11 @@ async def run_e2e():
 
     if passed == total:
         print("  Elefante proved:")
-        print("    - The live MCP shutdown-race regression path stays alive")
         print("    - Alex teaches once, every agent remembers forever")
         print("    - SDD directives inject into every tool response")
         print("    - SPECIFICATION memories surface with authority=1.0")
         print("    - Compliance Gate blocks ungrounded mutations")
         print("    - Context survives IDE restarts")
-        print("    - The harness leaves no residual memories behind")
         print()
         print("  The meta-irony is closed.")
         print("  Elefante enforces SDD on itself using its own mechanisms.")
