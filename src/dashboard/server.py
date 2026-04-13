@@ -162,10 +162,21 @@ async def search_memories(query: str, limit: int = 5, min_similarity: float = 0.
         vector_store = get_vector_store()
         results = await vector_store.search(query, limit=limit, min_similarity=min_similarity)
         
+        # Flatten to match frontend SearchResult shape: {id, content, metadata, similarity}
+        flat_results = []
+        for r in results:
+            mem = r.memory.to_dict()
+            flat_results.append({
+                "id": mem["id"],
+                "content": mem["content"],
+                "metadata": mem["metadata"],
+                "similarity": r.score,
+            })
+        
         return {
             "success": True,
-            "count": len(results),
-            "results": [r.to_dict() for r in results]
+            "count": len(flat_results),
+            "results": flat_results
         }
     except Exception as e:
         logger.error(f"Search failed: {e}")

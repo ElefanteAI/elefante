@@ -1,6 +1,6 @@
 # Technical Documentation Index
 
-**Status**: Production (v2.2.0)  
+**Status**: Production (v2.2.1)  
 **Purpose**: Complete technical reference for Elefante AI Memory System
 
 ---
@@ -47,9 +47,10 @@
 
 ### Development Process
 
-| File                                                     | Purpose                                               |
-| -------------------------------------------------------- | ----------------------------------------------------- |
-| [`second-brain-protocols.md`](second-brain-protocols.md) | Hierarchical agent protocols for cognitive continuity |
+| File                                                                       | Purpose                                                                  |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [`sdd-development-protocol.md`](sdd-development-protocol.md)               | **SDD protocol — human reference (enforcement is native via Directives + pre-commit hook)** |
+| [`second-brain-protocols.md`](second-brain-protocols.md)                   | Hierarchical agent protocols for cognitive continuity                    |
 
 ### Memory Intelligence
 
@@ -98,5 +99,5 @@
 
 ---
 
-**Version**: 2.1.3  
-**Last Updated**: 2026-02-26
+**Version**: 2.2.1  
+**Last Updated**: 2026-04-12

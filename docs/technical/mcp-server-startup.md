@@ -44,6 +44,7 @@ The MCP Server:
 2. Receives JSON-RPC requests from the IDE (VS Code, Cursor, Bob)
 3. Exposes 20 MCP tools for memory operations
 4. Returns JSON-RPC responses
+5. Bootstraps the runtime SDD baseline on first orchestrator use so fresh installs immediately have built-in directives and searchable specification memories
 
 ### What It Does NOT Do
 
@@ -111,6 +112,20 @@ python scripts/health_check.py
  MCP Server: Running
  All systems operational!
 ```
+
+Health check now also confirms:
+
+- system directives are present
+- `STDOUT Purity Law` is active
+- required specification memories exist for fresh installs
+
+### Method 2b: Run the Full MCP E2E Harness
+
+```bash
+.venv/bin/python scripts/elefante_e2e_test_engine.py
+```
+
+This is the highest-signal startup verification because it launches the real server, performs the MCP handshake, exercises live tool calls, and checks the shutdown-race regression path by forcing repeated search/co-activation traffic.
 
 ### Method 3: List Available Tools
 
@@ -211,6 +226,7 @@ All IDE-specific MCP config file paths and JSON formats are documented here:
 - Include `.venv/bin/python` in command (not just `python`)
 - Set `PYTHONPATH` to project directory
 - Set `cwd` to project directory
+- If the server starts but the runtime baseline looks incomplete, run `scripts/health_check.py` once to verify built-in directives and auto-seeded specification memories
 
 ---
 
@@ -448,6 +464,6 @@ Before claiming "MCP Server is working":
 
 ---
 
-**Document Version**: 2.2.0  
+**Document Version**: 2.2.1  
 **Status**: ESSENTIAL  
 **Last Validated**: 2026-02-25

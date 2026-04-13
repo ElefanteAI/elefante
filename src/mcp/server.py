@@ -38,8 +38,10 @@ from src.models.entity import EntityType, RelationshipType
 from src.utils.logger import get_logger
 from src.utils.validators import validate_memory_content, validate_uuid
 from src.utils.elefante_mode import get_mode_manager, is_elefante_enabled, write_lock
+from src.utils.version import ensure_supported_python
 
 logger = get_logger(__name__)
+ensure_supported_python()
 
 # Tools that do NOT require Elefante Mode to be enabled
 # These are safe to call even when databases are locked by another IDE
@@ -169,8 +171,7 @@ class ElefanteMCPServer:
                 self._session_retrieval_history.extend(new_ids)
                 # Keep sliding window of recent unique ids, max 20
                 self._session_retrieval_history = list(dict.fromkeys(self._session_retrieval_history))[-20:]
-                # Fire and forget passive co-activation recording
-                asyncio.create_task(orchestrator.record_coactivation(self._session_retrieval_history.copy()))
+                await orchestrator.record_coactivation(self._session_retrieval_history.copy())
 
             result["RELEVANT_CONTEXT"] = {
                 "note": "Auto-surfaced memories relevant to this operation. No search tool call was needed.",
@@ -309,6 +310,7 @@ class ElefanteMCPServer:
             self.logger.info("Initializing Orchestrator (First Run)...")
             self.orchestrator = get_orchestrator()
             self.logger.info("Orchestrator initialized")
+        await self.orchestrator.ensure_system_baseline()
         return self.orchestrator
     
     def _register_handlers(self):
@@ -335,9 +337,9 @@ Classify the memory by providing memory_type, domain, and category. The system h
                             },
                             "memory_type": {
                                 "type": "string",
-                                "enum": ["fact", "decision", "preference", "insight", "note", "conversation"],
+                                "enum": ["fact", "decision", "preference", "insight", "note", "conversation", "specification", "directive"],
                                 "default": "fact",
-                                "description": "Type of memory — determines decay rate. Preferences decay slowest, conversations fastest."
+                                "description": "Type of memory — determines decay rate. Preferences decay slowest, conversations fastest. Specifications and directives are immutable (authority=1.0, zero decay)."
                             },
                             "domain": {
                                 "type": "string",
@@ -1297,7 +1299,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         if new_ids:
             self._session_retrieval_history.extend(new_ids)
             self._session_retrieval_history = list(dict.fromkeys(self._session_retrieval_history))[-20:]
-            asyncio.create_task(orchestrator.record_coactivation(self._session_retrieval_history.copy()))
+            await orchestrator.record_coactivation(self._session_retrieval_history.copy())
         
         # Filter out deprecated/archived memories from results
         filtered_results = []
@@ -1538,7 +1540,9 @@ You have access to a persistent memory system called **Elefante** - the user's s
             
             orchestrator = await self._get_orchestrator()
             vs = orchestrator.vector_store
-            success = await vs.delete_memory(mid)
+            vector_deleted = await vs.delete_memory(mid)
+            graph_deleted = await orchestrator.graph_store.delete_entity(mid)
+            success = vector_deleted or graph_deleted
             
             if success:
                 # Purge deleted ID from session history to prevent stale
@@ -1552,6 +1556,8 @@ You have access to a persistent memory system called **Elefante** - the user's s
                     "success": True,
                     "memory_id": memory_id,
                     "reason": reason,
+                    "vector_deleted": vector_deleted,
+                    "graph_deleted": graph_deleted,
                     "message": "Memory permanently deleted"
                 }
             else:
@@ -1609,45 +1615,82 @@ You have access to a persistent memory system called **Elefante** - the user's s
             "episodes": episodes
         }
     
-    async def _start_dashboard_and_open(self) -> Dict[str, Any]:
+    async def _start_dashboard_and_open(self, force_restart: bool = False) -> Dict[str, Any]:
         global DASHBOARD_STARTED
+
+        import subprocess
+        import sys
+        import time
+        import urllib.request
+        import urllib.error
 
         port = 8000
         url = f"http://localhost:{port}"
 
-        if not DASHBOARD_STARTED:
+        def _is_server_up(timeout: float = 1.0) -> bool:
             try:
-                import subprocess
-                import sys
-                
-                # Check if it's already running by trying to connect
-                import urllib.request
-                import urllib.error
-                is_running = False
-                try:
-                    req = urllib.request.Request(f"{url}/health", headers={"Accept": "application/json"})
-                    with urllib.request.urlopen(req, timeout=1) as resp:
-                        if resp.status == 200:
-                            is_running = True
-                except (urllib.error.URLError, TimeoutError):
-                    pass
-                
-                if not is_running:
-                    # Launch as an independent, detached subprocess so it survives the MCP server
-                    subprocess.Popen(
-                        [sys.executable, "-m", "src.dashboard.server"],
-                        start_new_session=True,  # Detach from parent process group
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL
-                    )
-                    self.logger.info(f"Dashboard server started via subprocess on port {port}")
-                else:
-                    self.logger.info(f"Dashboard already running on {port}")
-                
-                DASHBOARD_STARTED = True
-            except Exception as e:
-                self.logger.warning(f"Failed to start dashboard server: {e}")
-                DASHBOARD_STARTED = True  # Assume it's running
+                req = urllib.request.Request(f"{url}/health", headers={"Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    return resp.status == 200
+            except Exception:
+                return False
+
+        def _kill_existing() -> None:
+            """Kill any process currently listening on port 8000."""
+            try:
+                result = subprocess.run(
+                    ["lsof", "-ti", f":{port}"],
+                    capture_output=True, text=True
+                )
+                pids = result.stdout.strip().split()
+                for pid in pids:
+                    subprocess.run(["kill", pid], capture_output=True)
+                if pids:
+                    time.sleep(0.5)  # brief settle
+            except Exception:
+                pass
+
+        def _wait_for_ready(max_wait: float = 5.0) -> bool:
+            """Poll /health until the server responds or timeout expires."""
+            deadline = time.time() + max_wait
+            while time.time() < deadline:
+                if _is_server_up(timeout=1.0):
+                    return True
+                time.sleep(0.3)
+            return False
+
+        try:
+            already_running = _is_server_up()
+
+            if force_restart and already_running:
+                # Snapshot was just refreshed — restart so the new data is served immediately.
+                self.logger.info("Dashboard restart requested: killing existing server process.")
+                _kill_existing()
+                already_running = False
+                DASHBOARD_STARTED = False
+
+            if not already_running:
+                subprocess.Popen(
+                    [sys.executable, "-m", "src.dashboard.server"],
+                    start_new_session=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    cwd=str(self._get_project_root()),
+                )
+                self.logger.info(f"Dashboard server started via subprocess on port {port}")
+
+                # Wait for Uvicorn to bind before opening the browser (fixes race condition).
+                ready = _wait_for_ready(max_wait=5.0)
+                if not ready:
+                    self.logger.warning("Dashboard server did not become ready within 5s.")
+            else:
+                self.logger.info(f"Dashboard already running on port {port}")
+
+            DASHBOARD_STARTED = True
+
+        except Exception as e:
+            self.logger.warning(f"Failed to start dashboard server: {e}")
+            DASHBOARD_STARTED = True
 
         try:
             webbrowser.open(url)
@@ -1660,6 +1703,11 @@ You have access to a persistent memory system called **Elefante** - the user's s
             "message": message,
             "url": url
         }
+
+    def _get_project_root(self):
+        """Return the project root directory (parent of src/)."""
+        from pathlib import Path
+        return Path(__file__).parent.parent.parent
 
     async def _refresh_dashboard_snapshot(self) -> Dict[str, Any]:
         import os
@@ -1938,7 +1986,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 return self.mode_manager.get_disabled_response("elefante-DashboardOpen")
             refresh_result = await self._refresh_dashboard_snapshot()
 
-        open_result = await self._start_dashboard_and_open()
+        open_result = await self._start_dashboard_and_open(force_restart=refresh)
         result: Dict[str, Any] = {
             "success": True,
             "opened": open_result,
@@ -2157,6 +2205,12 @@ You have access to a persistent memory system called **Elefante** - the user's s
         directive_id = args.get("directive_id", "").strip()
         if not directive_id:
             return {"success": False, "error": "directive_id is required"}
+
+        if self.directive_store.is_system_directive(directive_id):
+            return {
+                "success": False,
+                "error": f"Directive '{directive_id}' is a built-in system directive and cannot be removed"
+            }
 
         removed = self.directive_store.remove(directive_id)
         if removed:

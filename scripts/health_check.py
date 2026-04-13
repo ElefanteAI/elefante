@@ -24,6 +24,7 @@ async def check_orchestrator():
     """Check orchestrator health"""
     try:
         orchestrator = get_orchestrator()
+        await orchestrator.ensure_system_baseline()
         stats = await orchestrator.get_stats()
         
         return {
@@ -132,6 +133,55 @@ async def check_configuration():
         }
 
 
+async def check_system_baseline():
+    """Verify that runtime directives and specification memories are present."""
+    try:
+        from src.core.directive_store import get_directive_store, SYSTEM_DIRECTIVE_DEFINITIONS
+        from src.core.orchestrator import SYSTEM_SPECIFICATIONS
+
+        orchestrator = get_orchestrator()
+        await orchestrator.ensure_system_baseline()
+
+        directive_store = get_directive_store()
+        directives = directive_store.list_all()
+        sdd_gate_count = sum(1 for directive in directives if directive.get("content", "").startswith("SDD "))
+        stdout_purity_present = any("STDOUT" in directive.get("content", "") for directive in directives)
+
+        missing_specifications = []
+        for specification in SYSTEM_SPECIFICATIONS:
+            memory = await orchestrator.vector_store.find_by_title(specification["title"])
+            if memory is None:
+                missing_specifications.append(specification["title"])
+                continue
+
+            memory_type = memory.metadata.memory_type
+            if hasattr(memory_type, "value"):
+                memory_type = memory_type.value
+            if str(memory_type).lower() != "specification":
+                missing_specifications.append(specification["title"])
+
+        healthy = (
+            directive_store.count() >= len(SYSTEM_DIRECTIVE_DEFINITIONS)
+            and sdd_gate_count >= 5
+            and stdout_purity_present
+            and not missing_specifications
+        )
+
+        return {
+            "status": "healthy" if healthy else "unhealthy",
+            "total_directives": directive_store.count(),
+            "sdd_directives": sdd_gate_count,
+            "stdout_purity_present": stdout_purity_present,
+            "specifications": len(SYSTEM_SPECIFICATIONS) - len(missing_specifications),
+            "missing_specifications": missing_specifications,
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "error": str(e)
+        }
+
+
 async def cleanup_resources():
     """Clean up database connections to prevent async cleanup errors"""
     try:
@@ -156,6 +206,7 @@ async def main():
     
     checks = {
         "Configuration": check_configuration(),
+        "System Baseline": check_system_baseline(),
         "Embedding Service": check_embedding_service(),
         "Vector Store": check_vector_store(),
         "Graph Store": check_graph_store(),

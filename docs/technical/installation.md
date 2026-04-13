@@ -68,11 +68,20 @@ chmod +x install.sh
    - Verifies `.github/copilot-instructions.md` exists
    - This file is the **entry point** that makes AI agents proactively use Elefante
    - Without it, agents can use Elefante tools but won't do so automatically
+   - Also creates developer-local entry points for role adoption:
+     - `AGENT.md` for manual "read AGENT.md and adopt this identity" onboarding
+     - `.cursorrules` for Cursor auto-load
+     - `.windsurfrules` for Windsurf auto-load
 
 6. **Health Check**
    - Verifies all components working
    - Tests database connections
    - Validates MCP server
+
+7. **Runtime Baseline Bootstrap**
+   - Built-in system directives are available immediately on first server start
+   - Required SDD specification memories are seeded automatically on first orchestrator use
+   - No manual seeding step is required for a fresh installation
 
 **Installation Time**: ~10 minutes (depending on internet speed)
 
@@ -281,6 +290,42 @@ Expected output:
  All systems operational
 ```
 
+`health_check.py` now also verifies the runtime SDD baseline:
+
+- Built-in system directives are present
+- The `STDOUT Purity Law` directive is active
+- Required specification memories are available to search on a fresh install
+
+### Verify MCP Handshake
+
+Windows:
+```cmd
+.venv\Scripts\python.exe scripts\verify_mcp_handshake.py
+```
+macOS/Linux:
+```bash
+./.venv/bin/python scripts/verify_mcp_handshake.py
+```
+
+### Run the Live E2E Harness
+
+Windows:
+```cmd
+.venv\Scripts\python.exe scripts\elefante_e2e_test_engine.py
+```
+macOS/Linux:
+```bash
+./.venv/bin/python scripts/elefante_e2e_test_engine.py
+```
+
+This harness now proves three installation-critical properties in one pass:
+
+- The real MCP server survives the Kuzu shutdown-race regression path
+- Built-in directives and specification memories are available without manual setup
+- Memory persistence still survives a simulated IDE restart
+
+It runs inside an isolated temporary Elefante home so verification does not pollute the user's durable memory store.
+
 ### List MCP Tools
 
 Windows:
@@ -312,6 +357,7 @@ Open: http://127.0.0.1:8000
 The installation script checks:
 
 - **MCP Liveness**: Performs a real JSON-RPC handshake (`scripts/verify_mcp_handshake.py`).
+- **Runtime Baseline**: Verifies built-in directives and seeded specification memories via `scripts/health_check.py`.
 
 ### Verification Command (Manual)
 
@@ -336,6 +382,12 @@ python -c "import sys; sys.path.append('.'); import asyncio; from src.core.orche
 ```
 
 This should return the Elefante Agentic Optimization Protocol.
+
+To verify the crash regression path specifically, run the E2E harness above and confirm the line:
+
+```text
+[PASS] Server survives repeated search/coactivation cycle
+```
 
 ---
 

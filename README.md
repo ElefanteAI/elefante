@@ -4,7 +4,7 @@
 
 AI agents start every conversation from zero. Your preferences, decisions, and discovered patterns don't carry over. Elefante gives any MCP-compatible agent a persistent, local second brain — memories are stored, scored automatically, and surfaced at the right moment without being asked.
 
-**v2.2.0** — Persistent Memory Engine
+**v2.2.1** — Persistent Memory Engine
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -90,7 +90,7 @@ Elefante works with any MCP-compatible client today — VS Code, Cursor, Windsur
 
 ## Quick Start
 
-**Requirements:** Python 3.11+, ~5 GB disk
+**Requirements:** Python 3.11, ~5 GB disk
 
 ```bash
 # macOS / Linux

@@ -546,3 +546,62 @@ Rewrote `_start_dashboard_and_open()` in `src/mcp/server.py` to launch the dashb
 ---
 
 _Last verified: 2026-02-25 | Run `python scripts/health_check.py` to validate dashboard data path_
+
+---
+
+## Issue #8: Persistent Blank Dashboard on First Launch
+
+**Date:** 2026-03-20
+**Duration:** 10 minutes
+**Severity:** HIGH
+**Status:** FIXED
+
+### Problem
+
+Every time `elefante-DashboardOpen` was called (especially with `refresh=true`), the user saw a blank white page at `http://localhost:8000`.
+
+### Symptom
+
+- Agent reports "Dashboard opened" and correct node/edge counts.
+- Browser shows a blank white page.
+- The server IS running (`lsof -i :8000` confirms it).
+
+### Root Cause
+
+**Two compounding bugs in `_start_dashboard_and_open()` in `src/mcp/server.py`:**
+
+**Bug 1 — Race condition (fresh start):**
+`subprocess.Popen` returned before Uvicorn finished binding to port 8000. `webbrowser.open()` fired immediately after. The browser sent its first request before the server was ready, got an error, and React rendered a blank root — permanently.
+
+**Bug 2 — Stale server (refresh case):**
+When `refresh=true`, `_refresh_dashboard_snapshot()` updated the snapshot file on disk, but the existing long-running server process was NOT restarted. The `is_running` health check found the old server alive and skipped the `Popen`. The browser received the old (or empty) snapshot data.
+
+### Solution
+
+Rewrote `_start_dashboard_and_open()` with two fixes:
+
+```python
+# Fix 1: Poll /health for up to 5s before opening browser
+def _wait_for_ready(max_wait: float = 5.0) -> bool:
+    deadline = time.time() + max_wait
+    while time.time() < deadline:
+        if _is_server_up(timeout=1.0):
+            return True
+        time.sleep(0.3)
+    return False
+
+# Fix 2: force_restart=True when refresh=true → kill old, start fresh
+if force_restart and already_running:
+    _kill_existing()   # lsof -ti :8000 | xargs kill
+    already_running = False
+```
+
+Handler call site updated:
+```python
+open_result = await self._start_dashboard_and_open(force_restart=refresh)
+```
+
+### Lesson
+
+> **Never open the browser before the server is ready. When refreshing data, restart the server — a stale process cannot serve a new snapshot without a restart.**
+

@@ -5,8 +5,13 @@ in ChromaDB and Kuzu without generating temporary scripts.
 This test suite ensures the write-path architecture is correct.
 """
 
+import ast
+import json
+import os
 import pytest
 import asyncio
+import sys
+import threading
 from uuid import uuid4
 from pathlib import Path
 
@@ -219,6 +224,268 @@ class TestMemoryPersistence:
         
         # Should have at least one relationship
         assert len(rel_results) > 0, "No relationships found for entity"
+
+
+@pytest.mark.asyncio
+async def test_graph_store_close_waits_for_inflight_query(isolated_graph_store, monkeypatch):
+    """close() must wait for active Kuzu work instead of destroying the store immediately."""
+
+    class FakeResult:
+        def __init__(self, columns, rows):
+            self._columns = columns
+            self._rows = list(rows)
+
+        def get_column_names(self):
+            return self._columns
+
+        def has_next(self):
+            return bool(self._rows)
+
+        def get_next(self):
+            return self._rows.pop(0)
+
+    class BlockingConnection:
+        def __init__(self):
+            self.started = threading.Event()
+            self.release = threading.Event()
+            self.closed = False
+
+        def execute(self, _query, params=None):
+            self.started.set()
+            assert self.release.wait(timeout=2.0), "Timed out waiting to release blocking query"
+            return FakeResult(["value"], [[(params or {}).get("value", 0)]])
+
+        def close(self):
+            self.closed = True
+
+    class FakeDatabase:
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    connection = BlockingConnection()
+    database = FakeDatabase()
+
+    isolated_graph_store._conn = connection
+    isolated_graph_store._db = database
+    isolated_graph_store._schema_initialized = True
+    monkeypatch.setattr(isolated_graph_store, "_initialize_connection", lambda: None)
+
+    query_task = asyncio.create_task(
+        isolated_graph_store.execute_query("RETURN $value AS value", {"value": 7})
+    )
+
+    assert await asyncio.to_thread(connection.started.wait, 1.0), "Query never started"
+
+    close_task = asyncio.create_task(asyncio.to_thread(isolated_graph_store.close))
+    await asyncio.sleep(0.05)
+
+    assert not database.closed
+    assert not connection.closed
+
+    connection.release.set()
+
+    results = await query_task
+    await close_task
+
+    assert results == [{"value": 7, "values": [7]}]
+    assert database.closed
+    assert connection.closed
+
+
+def test_graph_store_raw_execute_calls_stay_in_safe_methods():
+    graph_store_path = Path(__file__).resolve().parents[1] / "src" / "core" / "graph_store.py"
+    source = graph_store_path.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    allowed_functions = {"_initialize_schema", "_execute_query_sync"}
+    violations = []
+
+    class ExecuteVisitor(ast.NodeVisitor):
+        def __init__(self):
+            self.function_stack = []
+
+        def visit_FunctionDef(self, node):
+            self.function_stack.append(node.name)
+            self.generic_visit(node)
+            self.function_stack.pop()
+
+        def visit_AsyncFunctionDef(self, node):
+            self.function_stack.append(node.name)
+            self.generic_visit(node)
+            self.function_stack.pop()
+
+        def visit_Call(self, node):
+            func = node.func
+            if (
+                isinstance(func, ast.Attribute)
+                and func.attr == "execute"
+                and isinstance(func.value, ast.Attribute)
+                and func.value.attr == "_conn"
+                and isinstance(func.value.value, ast.Name)
+                and func.value.value.id == "self"
+            ):
+                current_function = self.function_stack[-1] if self.function_stack else "<module>"
+                if current_function not in allowed_functions:
+                    violations.append((current_function, node.lineno))
+            self.generic_visit(node)
+
+    ExecuteVisitor().visit(tree)
+
+    assert not violations, f"Raw self._conn.execute escaped safe boundaries: {violations}"
+
+
+@pytest.mark.asyncio
+async def test_live_mcp_server_survives_shutdown_regression(tmp_path):
+    project_root = Path(__file__).resolve().parents[1]
+    temp_home = tmp_path / "home"
+    temp_home.mkdir(parents=True, exist_ok=True)
+    temp_data_dir = tmp_path / "elefante-data"
+    token = f"pytest-crash-regression-{uuid4().hex[:8]}"
+    shared_phrase = f"[{token}] shared MCP shutdown race regression phrase"
+
+    class MCPClient:
+        def __init__(self):
+            self.process = None
+            self._id = 0
+
+        async def start(self):
+            env = {
+                **os.environ,
+                "PYTHONPATH": str(project_root),
+                "HOME": str(temp_home),
+                "USERPROFILE": str(temp_home),
+                "ELEFANTE_DATA_DIR": str(temp_data_dir),
+                "ELEFANTE_ALLOW_TEST_MEMORIES": "1",
+            }
+            self.process = await asyncio.create_subprocess_exec(
+                sys.executable,
+                "-m",
+                "src.mcp.server",
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=str(project_root),
+                env=env,
+            )
+            init = await self._send(
+                "initialize",
+                {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "PytestCrashProbe", "version": "1.0"},
+                },
+            )
+            await self._notify("notifications/initialized", {})
+            return init
+
+        async def stop(self):
+            if self.process is None:
+                return
+            if self.process.returncode is None:
+                self.process.terminate()
+                try:
+                    await asyncio.wait_for(self.process.wait(), timeout=5)
+                except asyncio.TimeoutError:
+                    self.process.kill()
+                    await self.process.wait()
+
+        async def call_tool(self, name, arguments):
+            result = await self._send("tools/call", {"name": name, "arguments": arguments})
+            if isinstance(result, dict) and "content" in result:
+                for block in result["content"]:
+                    if block.get("type") == "text":
+                        return json.loads(block["text"])
+            return result
+
+        async def ensure_alive(self, label):
+            await asyncio.sleep(0.35)
+            if self.process.returncode is not None:
+                stderr = (await self.process.stderr.read()).decode()
+                raise RuntimeError(f"{label}: server exited rc={self.process.returncode} stderr={stderr[:1000]}")
+
+        async def _send(self, method, params):
+            self._id += 1
+            payload = {"jsonrpc": "2.0", "id": self._id, "method": method, "params": params}
+            self.process.stdin.write(json.dumps(payload).encode() + b"\n")
+            await self.process.stdin.drain()
+            line = await asyncio.wait_for(self.process.stdout.readline(), timeout=30)
+            if not line:
+                stderr = (await self.process.stderr.read()).decode()
+                raise RuntimeError(f"{method}: no response, stderr={stderr[:1000]}")
+            response = json.loads(line.decode())
+            if "error" in response:
+                raise RuntimeError(f"{method}: {response['error']}")
+            return response.get("result", response)
+
+        async def _notify(self, method, params):
+            payload = {"jsonrpc": "2.0", "method": method, "params": params}
+            self.process.stdin.write(json.dumps(payload).encode() + b"\n")
+            await self.process.stdin.drain()
+
+    client = MCPClient()
+    memory_ids = []
+
+    try:
+        init = await client.start()
+        assert "capabilities" in init
+        await client.ensure_alive("post-initialize")
+
+        initial = await client.call_tool("elefante-MemorySearch", {"query": shared_phrase, "limit": 5})
+        assert isinstance(initial, dict)
+        await client.ensure_alive("after initial search")
+
+        for index in range(2):
+            response = await client.call_tool(
+                "elefante-MemoryAdd",
+                {
+                    "content": f"{shared_phrase} memory {index} with distinct suffix {uuid4().hex[:6]}",
+                    "memory_type": "note",
+                    "domain": "project",
+                    "category": "crash-regression",
+                    "tags": [token, "crash-regression", "pytest-live"],
+                    "force_new": True,
+                },
+            )
+            memory_id = response.get("memory_id")
+            assert memory_id, f"MemoryAdd did not return memory_id: {response}"
+            memory_ids.append(memory_id)
+            await client.ensure_alive(f"after add {index}")
+
+        for round_index in range(3):
+            response = await client.call_tool("elefante-MemorySearch", {"query": shared_phrase, "limit": 10})
+            tagged = [
+                item for item in response.get("results", [])
+                if token in item.get("memory", {}).get("content", "")
+            ]
+            assert len(tagged) >= 2, f"Expected >=2 tagged memories in round {round_index}, got {len(tagged)}"
+            await client.ensure_alive(f"after search {round_index}")
+
+        await client.call_tool("elefante-SystemStatusGet", {})
+        await client.ensure_alive("after status check")
+
+        for memory_id in memory_ids:
+            response = await client.call_tool(
+                "elefante-MemoryDelete",
+                {
+                    "memory_id": memory_id,
+                    "reason": f"Cleanup for live MCP crash regression probe {token}",
+                },
+            )
+            assert response.get("success", False), f"MemoryDelete failed for {memory_id}: {response}"
+            await client.ensure_alive(f"after delete {memory_id[:8]}")
+
+        final_search = await client.call_tool("elefante-MemorySearch", {"query": shared_phrase, "limit": 10})
+        tagged_after_delete = [
+            item for item in final_search.get("results", [])
+            if token in item.get("memory", {}).get("content", "")
+        ]
+        assert not tagged_after_delete, f"Deleted memories still surfaced after delete: {tagged_after_delete}"
+        await client.ensure_alive("after final delete verification")
+    finally:
+        await client.stop()
     
     @pytest.mark.asyncio
     async def test_hybrid_search_returns_persisted_memories(self, orchestrator):

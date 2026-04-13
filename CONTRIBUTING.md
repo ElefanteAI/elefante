@@ -4,6 +4,8 @@ Thank you for your interest in contributing to Elefante!
 
 ## Development Philosophy
 
+> **SDD enforcement is now native inside Elefante (v2.2.1).** Six SDD gate directives are injected into every tool response unconditionally. Gate 4 (simulator) is mechanically enforced via `.git/hooks/pre-commit`. Human-readable reference: [`docs/technical/sdd-development-protocol.md`](docs/technical/sdd-development-protocol.md).
+
 **1. Cleanliness**: Leave the repo cleaner than you found it. No temp files, no dead code.
 **2. Memory First**: New features must be memory-aware. Use `elefante-grounding` prompt principles.
 **3. Behavioral Relevance**: We do not assign "importance" to memories manually. Scores (0-100) are computed by the system based on usage.
@@ -23,7 +25,7 @@ Thank you for your interest in contributing to Elefante!
 src/
   mcp/          # MCP Server & Tools
   core/         # Logic (Orchestrator, Vector/Graph stores, ETL, Retrieval)
-  models/       # Pydantic models (v2.2.0 schema)
+  models/       # Pydantic models (v2.2.1 schema)
   modules/      # Session Distiller
   dashboard/    # React/Vite app
   utils/        # Config, curation, logging

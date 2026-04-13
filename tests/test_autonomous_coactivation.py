@@ -1,8 +1,12 @@
 """
 Tests for Passive Autonomous Co-Activation (Hebbian Learning)
 """
+from pathlib import Path
+
 import pytest
 from src.core.orchestrator import MemoryOrchestrator
+from src.core.directive_store import DirectiveStore, SYSTEM_DIRECTIVE_DEFINITIONS
+from src.core.orchestrator import SYSTEM_SPECIFICATIONS
 from src.models.query import QueryMode
 
 @pytest.mark.asyncio
@@ -65,3 +69,38 @@ async def test_record_coactivation_boosts_score(isolated_orchestrator: MemoryOrc
                 assert coact_val > 0.0
 
     assert m2_score_after > m2_score_before, f"Expected boosted score > {m2_score_before}, got {m2_score_after}"
+
+
+def test_directive_store_includes_system_sdd_baseline(tmp_path):
+    store = DirectiveStore(path=tmp_path / "directives.json")
+
+    directives = store.list_all()
+    sdd_gate_count = sum(1 for directive in directives if directive["content"].startswith("SDD "))
+
+    assert store.count() >= len(SYSTEM_DIRECTIVE_DEFINITIONS)
+    assert sdd_gate_count >= 5
+    assert any("STDOUT" in directive["content"] for directive in directives)
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_bootstraps_system_specifications(isolated_orchestrator: MemoryOrchestrator):
+    first = await isolated_orchestrator.ensure_system_baseline()
+    second = await isolated_orchestrator.ensure_system_baseline()
+
+    assert first["success"] is True
+    assert second["success"] is True
+    assert second["created"] == 0
+
+    for specification in SYSTEM_SPECIFICATIONS:
+        memory = await isolated_orchestrator.vector_store.find_by_title(specification["title"])
+        assert memory is not None, f"Missing specification memory: {specification['title']}"
+        memory_type = memory.metadata.memory_type.value if hasattr(memory.metadata.memory_type, "value") else str(memory.metadata.memory_type)
+        assert memory_type == "specification"
+
+
+def test_mcp_server_does_not_fire_and_forget_coactivation():
+    server_path = Path(__file__).resolve().parents[1] / "src" / "mcp" / "server.py"
+    source = server_path.read_text(encoding="utf-8")
+
+    assert "asyncio.create_task(orchestrator.record_coactivation" not in source
+    assert source.count("await orchestrator.record_coactivation") >= 2

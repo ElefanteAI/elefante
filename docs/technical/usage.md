@@ -1,4 +1,4 @@
-# Usage Guide & API Reference (v2.2.0)
+# Usage Guide & API Reference (v2.2.1)
 
 ## 1. Natural Language Interaction
 
@@ -232,6 +232,12 @@ elefante-MemorySearch(query="preferences for Python development")
 
 Directives are unconditional behavioral rules injected into **every** MCP tool response under the `DIRECTIVES` key. They are stored separately from memories (not in ChromaDB, not in Kuzu) and cannot be outcompeted by similarity scores. Use directives for rules that must be followed regardless of context — things that should never depend on whether a search happens to surface them.
 
+Elefante ships with a built-in system baseline in core code:
+
+- 13 system directives are always present on every install
+- at least 6 of them are SDD enforcement directives
+- user-added directives are stored alongside them in `~/.elefante/data/directives.json`
+
 #### `elefante-DirectiveAdd`
 
 **Purpose**: Add a persistent behavioral constraint.
@@ -252,6 +258,11 @@ Directives are unconditional behavioral rules injected into **every** MCP tool r
 
 **Purpose**: List all active directives (with their IDs for removal).
 
+**Response Notes**:
+
+- Includes both built-in `system` directives and user-stored directives
+- Built-in system directives are immutable and always injected
+
 #### `elefante-DirectiveRemove`
 
 **Purpose**: Remove a directive so it stops being injected.
@@ -260,7 +271,19 @@ Directives are unconditional behavioral rules injected into **every** MCP tool r
 
 - `directive_id` (required): The ID from `elefante-DirectiveList`
 
-**Storage**: `~/.elefante/data/directives.json` — created on first use, no installation step needed.
+**Removal Rule**: Only user directives are removable. Built-in system directives return an explicit error if removal is attempted.
+
+**Storage**: `~/.elefante/data/directives.json` — user directives only. System directives are embedded in core source code.
+
+### Runtime Specification Bootstrap
+
+On first orchestrator use, Elefante automatically seeds the required `specification` memories for:
+
+- SDD Gate 2 leakage surface scan
+- SDD Gate 3 scoring formulas
+- Elefante Developer Etiquette closure
+
+This is idempotent and requires no manual install step.
 
 ---
 

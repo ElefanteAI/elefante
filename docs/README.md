@@ -2,7 +2,7 @@
 
 Persistent memory for AI coding agents. Elefante runs locally on your machine via [MCP](https://modelcontextprotocol.io/) (Model Context Protocol), storing knowledge in a vector database and a knowledge graph. Your agent remembers what you care about, forgets what you don't, and scores every memory based on how you actually use it — not how important you _said_ it was.
 
-> **Current version:** v2.2.0
+> **Current version:** v2.2.1
 
 ---
 
@@ -316,6 +316,7 @@ tests/          Test suite
 | [`technical/mcp-server-startup.md`](technical/mcp-server-startup.md)         | Manual startup and handshake verification                                                                                                                  |
 | [`technical/dashboard-startup.md`](technical/dashboard-startup.md)           | Dashboard startup and verification                                                                                                                         |
 | [`technical/docker.md`](technical/docker.md)                                 | Docker setup                                                                                                                                               |
+| [`technical/sdd-development-protocol.md`](technical/sdd-development-protocol.md) | **SDD protocol — human reference (enforcement is native via Directives + pre-commit hook)**                                                             |
 | [`technical/second-brain-protocols.md`](technical/second-brain-protocols.md) | Safety protocols                                                                                                                                           |
 | [`technical/kuzu-lock-monitoring.md`](technical/kuzu-lock-monitoring.md)     | Lock behavior and troubleshooting                                                                                                                          |
 | [`technical/rollback.md`](technical/rollback.md)                             | Backup and rollback                                                                                                                                        |

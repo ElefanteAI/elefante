@@ -1,8 +1,8 @@
 # Database Debug Compendium
 
 > **Domain:** Kuzu Graph Database & ChromaDB Vector Store  
-> **Last Updated:** 2025-12-05  
-> **Total Issues Documented:** 6  
+> **Last Updated:** 2026-04-12  
+> **Total Issues Documented:** 7  
 > **Status:** Production Reference  
 > **Maintainer:** Add new issues following Issue #N template at bottom
 
@@ -18,6 +18,7 @@
 | 4 | ChromaDB = memories, Kuzu = entities - DIFFERENT PURPOSES | Data confusion |
 | 5 | Kill all Python processes before deleting `.lock` file | Stale locks |
 | 6 | Use `read_only=True` for concurrent read access | Lock conflicts |
+| 7 | Never let Kuzu work outlive `GraphStore.close()` | Native SIGSEGV |
 
 ---
 
@@ -29,6 +30,7 @@
 - [Issue #4: Database Structure Corruption](#issue-4-database-structure-corruption)
 - [Issue #5: Duplicate Entity Creation](#issue-5-duplicate-entity-creation)
 - [Issue #6: ChromaDB Schema vs Memory Model](#issue-6-chromadb-schema-vs-memory-model)
+- [Issue #7: Async Shutdown Race / QueryResult Lifetime Leak](#issue-7-async-shutdown-race--queryresult-lifetime-leak)
 - [Methodology Failures](#methodology-failures)
 - [Prevention Protocol](#prevention-protocol)
 - [Appendix: Issue Template](#appendix-issue-template)
@@ -340,6 +342,91 @@ memory = MemoryModel.from_chromadb_result(result)
 
 ---
 
+## Issue #7: Async Shutdown Race / QueryResult Lifetime Leak
+
+**Date:** 2026-04-12  
+**Duration:** Multi-session investigation  
+**Severity:** CRITICAL  
+**Status:** FIXED
+
+### Problem
+Elefante could segfault natively on macOS inside Kuzu during or immediately after MCP tool execution.
+
+### Symptom
+Crash reports showed two closely related signatures:
+
+```text
+Thread N: kuzu::main::QueryResult::~QueryResult()
+```
+
+and later:
+
+```text
+Thread 94: kuzu::main::ClientContext::TransactionHelper::runFuncInTransaction(...)
+Thread 0 : kuzu::main::Database::~Database()
+```
+
+The common pattern was a null or destroyed Kuzu object being touched while the database was closing.
+
+### Root Cause
+Elefante violated native Kuzu object ownership in two places at once:
+
+1. `src/core/graph_store.py` executed `self._conn.execute(...)` via `asyncio.to_thread(...)` but then iterated the returned `QueryResult` on the event-loop thread. Native result lifetime escaped the worker thread that created it.
+2. `src/mcp/server.py` launched `orchestrator.record_coactivation(...)` via `asyncio.create_task(...)`, then unconditionally called `close_graph_store()` in a `finally` block after every tool call.
+3. `GraphStore` defined a thread-safety lock but never used it to serialize the shared `kuzu.Connection`.
+
+Result: a background query or leaked native result could still be alive while `GraphStore.close()` destroyed the underlying `Connection` / `Database`.
+
+### Solution
+Implemented a safe Kuzu boundary:
+
+```python
+async def _run_query(...):
+    return await asyncio.to_thread(self._execute_query_sync, ...)
+
+def _execute_query_sync(...):
+    self._begin_operation()
+    try:
+        with self._lock:
+            result = self._conn.execute(...)
+            rows = []
+            while result.has_next():
+                rows.append(result.get_next())
+            return column_names, rows
+    finally:
+        self._end_operation()
+```
+
+And on shutdown:
+
+```python
+def close(self):
+    self._closing = True
+    while self._active_operations > 0:
+        wait()
+    self._conn.close()
+    self._db.close()
+```
+
+Also removed fire-and-forget co-activation writes so graph maintenance stays inside the owning MCP tool lifecycle.
+
+**Files Changed:** `src/core/graph_store.py`, `src/mcp/server.py`, `tests/test_memory_persistence.py`
+
+### Permanent Regression Guards
+- `tests/test_memory_persistence.py` now includes a live MCP subprocess regression that launches the real server against an isolated temporary `HOME` and `ELEFANTE_DATA_DIR`, then exercises repeated `MemorySearch` and co-activation traffic before cleanup.
+- `tests/test_memory_persistence.py` also statically enforces that raw `self._conn.execute(...)` calls remain confined to `_initialize_schema()` and `_execute_query_sync()`.
+- `scripts/elefante_e2e_test_engine.py` now embeds the shutdown-race regression probe so fresh installs can validate the real tool path without custom scratch code.
+
+### Why This Took So Long
+- The first crash looked like a `QueryResult` destructor bug, the second like a database destructor bug.
+- They were the same bug class: native Kuzu lifetime escaping Elefante's ownership model.
+- We initially inspected symptoms one by one instead of drawing the full lifecycle: query start -> background task -> tool return -> `finally` close.
+
+### Lesson
+> **Native database objects need a single owner. If you close Kuzu transaction-scoped, no Kuzu work may survive the tool call.**
+
+---
+
 ## Methodology Failures
 
 ### Pattern 1: Assuming Error Location = Root Cause
@@ -363,6 +450,13 @@ memory = MemoryModel.from_chromadb_result(result)
 ---
 
 ## Prevention Protocol
+
+### Code-Level Safeguards
+
+- Keep all Kuzu query execution inside `GraphStore._execute_query_sync()` and materialize rows there before returning to async callers.
+- Never launch Kuzu work with `asyncio.create_task(...)` if the owning tool or process can call `close_graph_store()` in `finally`.
+- Treat `MemoryOrchestrator.record_coactivation()` as owned tool work that must be awaited inside the MCP lifecycle.
+- Run the isolated live MCP subprocess regression before closing a crash investigation.
 
 ### Before Working with Kuzu
 

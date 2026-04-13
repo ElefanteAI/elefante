@@ -1,6 +1,10 @@
 import sys
 
+from src.utils.version import ensure_supported_python
+
 def main():
+    ensure_supported_python()
+
     if "--mcp" in sys.argv or "stdio" in sys.argv:
         from src.mcp.server import main as mcp_main
         sys.exit(mcp_main())

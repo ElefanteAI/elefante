@@ -68,6 +68,11 @@ RELEASE_V1.1.0_PREPARATION.md
 # Session notes
 CURRENT_SESSION_*.md
 
+# Developer-local agent symlinks (each dev creates their own)
+AGENT.md
+.cursorrules
+.windsurfrules
+
 # Local ChromaDB (generated if path config misses)
 chroma_db/
 src/elefante.egg-info/

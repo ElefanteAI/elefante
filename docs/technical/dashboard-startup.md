@@ -513,6 +513,6 @@ Before claiming "Dashboard is working":
 
 ---
 
-**Document Version**: 2.2.0  
+**Document Version**: 2.2.1  
 **Status**: ESSENTIAL  
 **Last Validated**: 2026-02-26

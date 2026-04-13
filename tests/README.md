@@ -1,6 +1,6 @@
 # Elefante Test Suite
 
-> **Version:** 2.2.0  
+> **Version:** 2.2.1  
 > **Last Updated:** 2026-02-26
 
 ## Quick Reference
@@ -12,9 +12,17 @@ pytest tests/ -v
 # Run only critical regression tests
 pytest tests/test_memory_persistence.py tests/test_memory_guard.py -v
 
+# Run the live MCP regression subset
+pytest tests/test_autonomous_coactivation.py tests/test_memory_persistence.py -v
+
 # Run smoke test (takes ~30s, needs DB)
 pytest tests/test_integration_smoke.py -v
+
+# Run the shipped MCP end-to-end harness
+./.venv/bin/python scripts/elefante_e2e_test_engine.py
 ```
+
+The shipped E2E harness runs against an isolated temporary Elefante home/data directory so it validates the live MCP workflow without polluting the user's durable memory store.
 
 ---
 
@@ -24,8 +32,9 @@ pytest tests/test_integration_smoke.py -v
 
 | File                                                     | What It Tests                                      | Why Critical                                |
 | -------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------- |
-| [test_memory_persistence.py](test_memory_persistence.py) | Memories written to ChromaDB/Kuzu actually persist | Without this, users lose all their memories |
+| [test_memory_persistence.py](test_memory_persistence.py) | Memories persist, GraphStore close barrier works, live MCP shutdown regression stays alive | Without this, users lose all their memories or crash the server |
 | [test_memory_guard.py](test_memory_guard.py)             | `[test]` tagged memories blocked by default        | Prevents test data polluting real memory DB |
+| [test_autonomous_coactivation.py](test_autonomous_coactivation.py) | Co-activation scoring, built-in directive baseline, system specification bootstrap | Prevents regressions in automatic graph maintenance and SDD baseline |
 
 ### UNIT TESTS (Run during development)
 
@@ -82,10 +91,12 @@ tests/
 | Scenario                        | Command                                                                 |
 | ------------------------------- | ----------------------------------------------------------------------- |
 | Before any commit               | `pytest tests/test_memory_persistence.py tests/test_memory_guard.py -v` |
+| Verify the crash regression fix | `pytest tests/test_autonomous_coactivation.py tests/test_memory_persistence.py -v` |
 | Changed scoring/retrieval logic | `pytest tests/test_scoring.py tests/test_refinery.py -v`                |
 | Before release                  | `pytest tests/ -v`                                                      |
 | Debugging search issues         | `python tests/manual/test_semantic_search.py`                           |
 | Verify MCP server works         | `python tests/verification/test_mcp_server.py`                          |
+| Verify real IDE-like workflow   | `./.venv/bin/python scripts/elefante_e2e_test_engine.py`                |
 
 ---
 

@@ -23,11 +23,66 @@ logger = get_logger(__name__)
 
 DIRECTIVES_FILE = DATA_DIR / "directives.json"
 
+SYSTEM_DIRECTIVE_DEFINITIONS = (
+    (
+        "system-sdd-gate-0",
+        "SDD Gate 0: Read the actual source file, docs/pitfall-index.md, and CHANGELOG.md before editing or naming a root cause.",
+    ),
+    (
+        "system-sdd-critical-blocker",
+        "SDD Critical Blocker: If a claim is not grounded in source, docs, tests, or user-provided logs, say UNKNOWN and stop.",
+    ),
+    (
+        "system-sdd-gate-2",
+        "SDD Gate 2: Scan leakage surfaces before shipping: MCP response contract, ChromaDB roundtrip, Kuzu schema and DML, stdout purity, compliance gate, dashboard snapshot, co-activation history, and documentation links.",
+    ),
+    (
+        "system-sdd-gate-3",
+        "SDD Gate 3: Verify formulas, scores, and logic from source code with real values; do not quote remembered docs as proof.",
+    ),
+    (
+        "system-sdd-gate-4",
+        "SDD Gate 4: Run health_check.py, verify_mcp_handshake.py, and targeted regression coverage before claiming completion.",
+    ),
+    (
+        "system-sdd-stdout-purity",
+        "SDD STDOUT Purity Law: Never print to stdout from MCP server code paths; stdout is reserved for JSON-RPC only.",
+    ),
+    (
+        "system-elefante-search-first",
+        "ELEFANTE Search-First: Search memory before asserting preferences, conventions, or past decisions.",
+    ),
+    (
+        "system-elefante-tool-contract",
+        "ELEFANTE Tool Contract: Read MANDATORY_PROTOCOLS_READ_THIS_FIRST, DIRECTIVES, and RELEVANT_CONTEXT on every tool response.",
+    ),
+    (
+        "system-elefante-minimal-patch",
+        "ELEFANTE Minimal Patch: Fix root cause with the smallest coherent change and avoid unrelated refactors.",
+    ),
+    (
+        "system-elefante-docs-sync",
+        "ELEFANTE Docs Sync: Update README, technical docs, and CHANGELOG when behavior or architecture changes.",
+    ),
+    (
+        "system-elefante-cleanup",
+        "ELEFANTE Cleanup: Delete scratch files, temp scripts, and dead code before completion.",
+    ),
+    (
+        "system-elefante-versioning",
+        "ELEFANTE Versioning: Use scripts/bump_version.py for semver cascades; do not hand-edit scattered version strings.",
+    ),
+    (
+        "system-elefante-verification",
+        "ELEFANTE Verification: Read back or actively test every write path instead of trusting success flags.",
+    ),
+)
+
 
 class Directive:
     """A single behavioral constraint."""
 
-    __slots__ = ("id", "content", "created_at", "active")
+    __slots__ = ("id", "content", "created_at", "active", "source", "removable")
 
     def __init__(
         self,
@@ -36,11 +91,15 @@ class Directive:
         directive_id: Optional[str] = None,
         created_at: Optional[str] = None,
         active: bool = True,
+        source: str = "user",
+        removable: bool = True,
     ):
         self.id: str = directive_id or uuid.uuid4().hex[:12]
         self.content: str = content
         self.created_at: str = created_at or datetime.now(timezone.utc).isoformat()
         self.active: bool = active
+        self.source: str = source
+        self.removable: bool = removable
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -48,6 +107,8 @@ class Directive:
             "content": self.content,
             "created_at": self.created_at,
             "active": self.active,
+            "source": self.source,
+            "removable": self.removable,
         }
 
     @classmethod
@@ -57,6 +118,8 @@ class Directive:
             directive_id=data.get("id"),
             created_at=data.get("created_at"),
             active=data.get("active", True),
+            source=data.get("source", "user"),
+            removable=data.get("removable", True),
         )
 
 
@@ -70,6 +133,7 @@ class DirectiveStore:
     def __init__(self, path: Optional[Path] = None):
         self._path = path or DIRECTIVES_FILE
         self._directives: List[Directive] = []
+        self._system_directives: List[Directive] = self._build_system_directives()
         self._load()
 
     # ------------------------------------------------------------------
@@ -82,6 +146,10 @@ class DirectiveStore:
         if not content:
             raise ValueError("Directive content cannot be empty")
 
+        existing = self._find_by_content(content)
+        if existing is not None:
+            return existing
+
         directive = Directive(content)
         self._directives.append(directive)
         self._persist()
@@ -90,6 +158,10 @@ class DirectiveStore:
 
     def remove(self, directive_id: str) -> bool:
         """Remove a directive by ID. Returns True if found and removed."""
+        if self.is_system_directive(directive_id):
+            logger.warning(f"Attempted to remove system directive: {directive_id}")
+            return False
+
         for i, d in enumerate(self._directives):
             if d.id == directive_id:
                 self._directives.pop(i)
@@ -100,7 +172,7 @@ class DirectiveStore:
 
     def list_all(self) -> List[Dict[str, Any]]:
         """Return all directives as dicts."""
-        return [d.to_dict() for d in self._directives]
+        return [d.to_dict() for d in self._all_directives()]
 
     def get_active_texts(self) -> List[str]:
         """Return the content strings of all active directives.
@@ -108,10 +180,19 @@ class DirectiveStore:
         This is the method called on every tool response injection.
         It should be fast — just a list comprehension over cached objects.
         """
-        return [d.content for d in self._directives if d.active]
+        return [d.content for d in self._all_directives() if d.active]
 
     def count(self) -> int:
+        return len(self._all_directives())
+
+    def system_count(self) -> int:
+        return len(self._system_directives)
+
+    def user_count(self) -> int:
         return len(self._directives)
+
+    def is_system_directive(self, directive_id: str) -> bool:
+        return any(d.id == directive_id for d in self._system_directives)
 
     # ------------------------------------------------------------------
     # Persistence
@@ -131,6 +212,29 @@ class DirectiveStore:
         except (json.JSONDecodeError, KeyError) as e:
             logger.error(f"Corrupt directives file, starting fresh: {e}")
             self._directives = []
+
+    def _build_system_directives(self) -> List[Directive]:
+        directives = []
+        for directive_id, content in SYSTEM_DIRECTIVE_DEFINITIONS:
+            directives.append(
+                Directive(
+                    content=content,
+                    directive_id=directive_id,
+                    source="system",
+                    removable=False,
+                )
+            )
+        return directives
+
+    def _all_directives(self) -> List[Directive]:
+        return [*self._system_directives, *self._directives]
+
+    def _find_by_content(self, content: str) -> Optional[Directive]:
+        normalized = content.strip()
+        for directive in self._all_directives():
+            if directive.content == normalized:
+                return directive
+        return None
 
     def _persist(self) -> None:
         """Write current directives to disk."""

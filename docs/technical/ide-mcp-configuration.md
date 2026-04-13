@@ -14,12 +14,14 @@ Elefante MCP server command (same for all IDEs):
 
 ## The Native SDD Gatekeeper (System Prompts)
 
-To enable **Spec-Driven Development (SDD)** with Elefante, you must configure a "Gatekeeper" system prompt in your IDE. This instructs the agent to query Elefante's `SPECIFICATION` memories before writing code. 
+To enable **Spec-Driven Development (SDD)** with Elefante, you must configure a "Gatekeeper" system prompt in your IDE. This instructs the agent to query Elefante's `SPECIFICATION` memories before writing code.
 
 **Where to put the Gatekeeper prompt depending on your IDE:**
+
 - **Cursor:** Create a `.cursorrules` file in the root of your project workspace.
 - **Roo Code / Cline:** Create a `.clinerules` file in the root of your project workspace.
 - **GitHub Copilot:** Create a `.github/copilot-instructions.md` file in the root of your project workspace.
+- **Manual role adoption for any agent:** Read `AGENT.md` at the repo root. Elefante's installer creates `AGENT.md` as a developer-local symlink to `.github/copilot-instructions.md` so agents can be told to "read AGENT.md and adopt this identity".
 
 **Recommended Gatekeeper text:**
 > "Before you write any code or mark a task as complete, you MUST call `elefante-MemorySearch` to find any relevant `SPECIFICATION` or `DIRECTIVE` memories. You must comply with these architectural rules unconditionally."

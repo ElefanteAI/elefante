@@ -41,6 +41,51 @@ logger = get_logger(__name__)
 # (Theoretical composite max without coactivation signal is ~0.65-0.70.)
 REINFORCEMENT_THRESHOLD = 0.55
 
+SYSTEM_SPECIFICATIONS = (
+    {
+        "title": "SDD Gate 2 Leakage Surface Scan",
+        "category": "sdd",
+        "canonical_key": "system:sdd:gate-2-leakage-surface-scan",
+        "summary": "SDD Gate 2 leakage surface scan table for Elefante contributors.",
+        "content": (
+            "SDD Gate 2 leakage surface scan table specification for Elefante contributors. "
+            "Every change must be checked against these leakage surfaces: MCP response contract, "
+            "ChromaDB write and read roundtrip, Kuzu schema and DML split, stdout purity, "
+            "compliance gate state machine, dashboard snapshot contract, co-activation history, "
+            "and documentation links. Reference docs: docs/technical/sdd-development-protocol.md "
+            "and docs/pitfall-index.md."
+        ),
+        "tags": ["system", "sdd", "gate-2", "leakage-scan", "specification"],
+    },
+    {
+        "title": "SDD Gate 3 Scoring Formulas",
+        "category": "sdd",
+        "canonical_key": "system:sdd:gate-3-scoring-formulas",
+        "summary": "SDD Gate 3 source-truth scoring formulas for behavioral relevance and cognitive retrieval.",
+        "content": (
+            "SDD Gate 3 scoring formulas specification for Elefante contributors. Verify the behavioral "
+            "relevance formula and the cognitive retrieval composite from source code, not from remembered "
+            "docs. Behavioral relevance: relevance = 0.5 * recency * freshness * reinforcement. Cognitive "
+            "retrieval composite: composite_score = 0.30 * vector_score + 0.20 * concept_score + 0.15 * "
+            "domain_score + 0.15 * coactivation_score + 0.10 * authority_score + 0.10 * temporal_score."
+        ),
+        "tags": ["system", "sdd", "gate-3", "scoring", "specification"],
+    },
+    {
+        "title": "Elefante Developer Etiquette",
+        "category": "developer-process",
+        "canonical_key": "system:developer-etiquette:closure",
+        "summary": "Completion protocol covering CLEAN, DOC_SYNC, and versioning for Elefante repo work.",
+        "content": (
+            "Elefante Developer Etiquette specification for versioning, CLEAN, and DOC_SYNC. Before claiming "
+            "done: CLEAN_ENVIRONMENT removes leftovers, scratch files, and dead code. DOC_SYNC updates README.md, "
+            "docs/README.md, docs/technical/architecture.md, and CHANGELOG.md. STRICT_SEMVER uses scripts/"
+            "bump_version.py instead of manual version edits. The working tree must be reviewed before finish."
+        ),
+        "tags": ["system", "developer-etiquette", "clean", "doc-sync", "versioning", "specification"],
+    },
+)
+
 
 class MemoryOrchestrator:
     """
@@ -75,8 +120,61 @@ class MemoryOrchestrator:
 
         # Cognitive Retriever - multi-signal scoring engine
         self.cognitive_retriever = CognitiveRetriever()
+        self._system_baseline_ready = False
 
         self.logger.info("Memory orchestrator initialized")
+
+    async def ensure_system_baseline(self) -> Dict[str, Any]:
+        """Ensure the runtime SDD specification baseline exists for every install."""
+        if self._system_baseline_ready:
+            return {
+                "success": True,
+                "created": 0,
+                "existing": len(SYSTEM_SPECIFICATIONS),
+                "titles": [spec["title"] for spec in SYSTEM_SPECIFICATIONS],
+            }
+
+        created = []
+        existing = []
+
+        for specification in SYSTEM_SPECIFICATIONS:
+            current = await self.vector_store.find_by_title(specification["title"])
+            if current is not None:
+                memory_type = current.metadata.memory_type
+                if hasattr(memory_type, "value"):
+                    memory_type = memory_type.value
+                if str(memory_type).lower() == "specification":
+                    existing.append(specification["title"])
+                    continue
+
+            await self.add_memory(
+                content=specification["content"],
+                memory_type="specification",
+                tags=specification["tags"],
+                metadata={
+                    "domain": "system",
+                    "category": specification["category"],
+                    "title": specification["title"],
+                    "summary": specification["summary"],
+                    "namespace": "system",
+                    "canonical_key": specification["canonical_key"],
+                },
+            )
+            created.append(specification["title"])
+
+        self._system_baseline_ready = True
+        self.logger.info(
+            "system_baseline_ready",
+            created=len(created),
+            existing=len(existing),
+        )
+        return {
+            "success": True,
+            "created": len(created),
+            "existing": len(existing),
+            "created_titles": created,
+            "existing_titles": existing,
+        }
     
     async def add_memory(
         self,

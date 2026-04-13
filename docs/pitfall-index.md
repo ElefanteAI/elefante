@@ -227,6 +227,13 @@ Before completing ANY task:
 **Why:** Interrupted database creation or permissions issue produces a file instead of a directory structure.  
 **Source:** `docs/debug/database-compendium.md` Issue #3
 
+### pitfall: kuzu fire and forget shutdown race
+
+**Trigger:** macOS `SIGSEGV` / `EXC_BAD_ACCESS` in `_kuzu.cpython-311-darwin.so`, especially `runFuncInTransaction(...)`, `QueryResult::~QueryResult()`, or `Database::~Database()`  
+**Action:** Never launch Kuzu work as an untracked `asyncio.create_task(...)` if the process/tool closes `GraphStore` in `finally`. Fully materialize `QueryResult` rows inside the worker thread and make `close()` wait for active operations.  
+**Why:** A background graph query or leaked native `QueryResult` can outlive the owning `Connection` / `Database`, causing a native use-after-free during transaction-scoped cleanup.  
+**Source:** `docs/debug/database-compendium.md` Issue #7
+
 ---
 
 ## MCP Pitfalls

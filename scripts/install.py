@@ -60,6 +60,27 @@ class Logger:
 
 logger = None
 
+SUPPORTED_PYTHON = (3, 11)
+
+
+def ensure_supported_python(logger_obj=None):
+    """Fail fast when installation is attempted with an unsupported Python runtime."""
+    current = sys.version_info[:2]
+    if current == SUPPORTED_PYTHON:
+        return True
+
+    message_lines = [
+        f"ERROR: Python 3.11 is required. Found {current[0]}.{current[1]}",
+        "Use install.sh or install.bat, or recreate .venv with python3.11 before continuing.",
+    ]
+    if logger_obj is not None:
+        for line in message_lines:
+            logger_obj.log(line)
+    else:
+        for line in message_lines:
+            print(line)
+    return False
+
 def print_header(msg):
     logger.log("\n" + "="*60)
     logger.log(msg)
@@ -315,6 +336,27 @@ def create_venv(root_dir):
     """Create virtual environment if it doesn't exist"""
     venv_dir = root_dir / ".venv"
     if venv_dir.exists():
+        pyvenv_cfg = venv_dir / "pyvenv.cfg"
+        if pyvenv_cfg.exists():
+            try:
+                contents = pyvenv_cfg.read_text(encoding="utf-8")
+            except OSError as exc:
+                logger.log(f"ERROR: Could not read {pyvenv_cfg}: {exc}")
+                return False
+
+            version_line = next(
+                (line for line in contents.splitlines() if line.startswith("version = ")),
+                None,
+            )
+            if version_line is not None:
+                version = version_line.split("=", 1)[1].strip()
+                if not version.startswith("3.11."):
+                    logger.log(
+                        "ERROR: Existing .venv uses unsupported Python "
+                        f"{version}. Remove .venv and recreate it with Python 3.11."
+                    )
+                    return False
+
         logger.log("OK: Virtual environment already exists")
         return True
     
@@ -408,6 +450,58 @@ def verify_copilot_instructions(root_dir):
         return False
 
 
+def setup_agent_entry_points(root_dir):
+    """
+    Create agent entry point symlinks so every IDE and agent surface
+    resolves to the single canonical constitution file on first contact.
+
+    Symlinks created (gitignored — developer-local):
+      AGENT.md        → .github/copilot-instructions.md  (manual-instruction entry)
+      .cursorrules    → .github/copilot-instructions.md  (Cursor auto-load)
+      .windsurfrules  → .github/copilot-instructions.md  (Windsurf auto-load)
+
+    Windows: symlinks require elevated privileges; skipped with instructions printed.
+    """
+    logger.log("Setting up agent entry points...")
+
+    constitution = root_dir / ".github" / "copilot-instructions.md"
+    if not constitution.exists():
+        logger.log("WARN: Constitution file missing — skipping agent entry point creation.")
+        return False
+
+    # Relative target from repo root
+    target = Path(".github") / "copilot-instructions.md"
+
+    entry_points = ["AGENT.md", ".cursorrules", ".windsurfrules"]
+    is_windows = platform.system() == "Windows"
+
+    if is_windows:
+        logger.log("WARN: Windows detected — symlinks require elevated privileges.")
+        logger.log("   To enable agent entry points, run as Administrator or create manually:")
+        for name in entry_points:
+            logger.log(f"   mklink {name} .github\\copilot-instructions.md")
+        return True
+
+    created = []
+    for name in entry_points:
+        link = root_dir / name
+        if link.exists() or link.is_symlink():
+            logger.log(f"   OK (exists): {name}")
+            continue
+        try:
+            link.symlink_to(target)
+            created.append(name)
+            logger.log(f"   Created: {name} → {target}")
+        except Exception as e:
+            logger.log(f"   WARN: Could not create {name}: {e}")
+
+    if created:
+        logger.log(f"OK: Agent entry points created: {', '.join(created)}")
+    else:
+        logger.log("OK: Agent entry points already in place.")
+    return True
+
+
 def generate_proof(root_dir, success):
     """Generate installation proof block"""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -434,6 +528,9 @@ def main():
     args = parser.parse_args()
     
     logger = Logger(args.log_file)
+
+    if not ensure_supported_python(logger):
+        sys.exit(1)
     
     root_dir = Path(__file__).parent.parent.absolute()
     os.chdir(root_dir)
@@ -505,6 +602,11 @@ def main():
         if not verify_copilot_instructions(root_dir):
             logger.log("WARN: Agent behavior bootstrap missing. Agents will not proactively use Elefante.")
             logger.log("   See docs/technical/installation.md Section 4a for details.")
+
+        # 4b. Agent Entry Points (AGENT.md, .cursorrules, .windsurfrules)
+        logger.log("")
+        logger.log("[Step 4b] Agent Entry Points...")
+        setup_agent_entry_points(root_dir)
     
     if success:
         # 5. Verification
@@ -530,7 +632,11 @@ def main():
         print_header("INSTALLATION COMPLETE")
         logger.log("Next Steps:")
         logger.log("1. Restart your IDE to load the MCP server.")
-        logger.log("2. Start using Elefante commands in your AI chat!")
+        logger.log("2. Your agent entry points are ready:")
+        logger.log("   - AGENT.md       (any agent: 'read AGENT.md and adopt this identity')")
+        logger.log("   - .cursorrules   (Cursor auto-loads on project open)")
+        logger.log("   - .windsurfrules (Windsurf auto-loads on project open)")
+        logger.log("3. Start using Elefante commands in your AI chat!")
         logger.log("   - 'Remember that...'\n   - 'What do you know about...'\n")
     else:
         print_header("INSTALLATION FAILED")

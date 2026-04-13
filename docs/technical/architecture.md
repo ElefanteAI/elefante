@@ -1,6 +1,6 @@
 # Elefante Architecture: The Second Brain
 
-**Version:** 2.2.0 | **Status:** Production Ready (Windows validated)
+**Version:** 2.2.1 | **Status:** Production Ready (Windows validated)
 
 ## 1. System Overview
 
@@ -35,6 +35,9 @@ To support multi-IDE usage without deadlocks:
 - **Per-Operation Locks**: Locks are acquired only for the duration of a write operation (milliseconds).
 - **Auto-Expiry**: Stale locks (>30s) are automatically cleared.
 - **No Manual Toggle**: `elefante-System` with `action="enable"` is now a no-op; the system is always ready.
+- **Safe Kuzu Boundary**: `GraphStore` serializes access to the shared Kuzu connection, materializes result rows inside the worker thread that executed the query, and waits for in-flight operations before closing the database.
+- **Lifecycle Rule**: Graph maintenance tasks that touch Kuzu must complete inside the owning tool invocation; transaction-scoped cleanup cannot race background Kuzu work.
+- **Runtime Baseline Bootstrap**: The SDD runtime baseline is embedded in core code. Built-in system directives are always present in `DirectiveStore`, and `MemoryOrchestrator.ensure_system_baseline()` idempotently seeds the required specification memories on first use for every new installation.
 
 ### Cognitive Multi-Signal Scoring (V4)
 
