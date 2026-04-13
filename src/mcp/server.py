@@ -325,7 +325,9 @@ class ElefanteMCPServer:
 
 Score is system-computed (0-100) based on behavioral signals: recency, freshness, and reinforcement. You do NOT assign importance — it emerges from how the memory is used over time.
 
-Classify the memory by providing memory_type, domain, and category. The system handles the rest: duplicate detection (REDUNDANT), relation detection (RELATED), and contradiction detection (CONTRADICTORY).""",
+Classify the memory by providing memory_type, domain, and category. The system handles the rest: duplicate detection (REDUNDANT), relation detection (RELATED), and contradiction detection (CONTRADICTORY).
+
+**CRITICAL PERSISTENCE RULE:** The chronological session context buffer clears magically on IDE restart! If the user makes an important decision, explicitly run `elefante-MemoryAdd` to store it permanently. Never assume recent conversation represents long-term learning.""",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -399,8 +401,9 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
 **AUTOMATIC USAGE RULES:**
 1.  **ALWAYS** call this tool when the user asks an open-ended question about the project (e.g., "How does the auth system work?", "What are the coding standards?").
 2.  **ALWAYS** call this tool when the user refers to past decisions or preferences (e.g., "Do it like we discussed", "Use the usual style").
-3.  **NEVER** assume you know the answer if it might be in the memory. Check first.
-4.  **IF RESULTS ARE CONTRADICTORY:** The most recent memory (by timestamp) usually takes precedence, but check for "decision" or "fact" types over "conversation".
+3.  **BROWSE VS SEARCH**: If the user asks for "ALL" memories (e.g. "show me all my memories about X"), you MUST use `list_all=true` to bypass semantic relevance filtering. Standard search will only return the top N most similar memories.
+4.  **NEVER** assume you know the answer if it might be in the memory. Check first.
+5.  **IF RESULTS ARE CONTRADICTORY:** The most recent memory (by timestamp) usually takes precedence, but check for "decision" or "fact" types over "conversation".
 5.  **IF RESULTS ARE IRRELEVANT:** Try a broader query or switch to `mode="semantic"` to catch fuzzy matches.""",
                     inputSchema={
                         "type": "object",

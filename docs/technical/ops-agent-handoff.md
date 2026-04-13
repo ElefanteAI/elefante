@@ -145,10 +145,9 @@ python scripts/verify_mcp_handshake.py
 
 ## What to read first (fast orientation)
 
-- `docs/pitfall-index.md` — quick-reference pitfalls by domain
 - `docs/debug/*-compendium.md` — detailed post-mortems
-- `docs/technical/architecture.md`
-- `docs/technical/docker.md`
+- `docs/technical/spec-architecture.md`
+- `docs/technical/ops-docker.md`
 
 ## Common failure modes
 

@@ -97,10 +97,10 @@ Dashboard scores were all stuck at 100 because two independent code paths (MCP s
 - `tests/test_dashboard_serializer.py` — unit tests with delta=0 cross-validation between Memory-object and raw-dict scoring paths.
 - `tmp/verify_scores.py` — quick diagnostic for score health checks.
 - Score staleness detection in `validate_dashboard_snapshot.py`.
-- Issue #9 in `docs/debug/dashboard-compendium.md` with Critical Laws 8-9.
+- Issue #9 in `docs/debug/ops-dashboard-compendium.md` with Critical Laws 8-9.
 - Score Contract section in `docs/technical/dashboard-snapshot-contract.md`.
 - `ELEFANTE_DEVELOPMENT_SKILLS.md` — AI agent development guide (merged from upstream).
-- Issue #7 (IBM Bob MCP settings) in `docs/debug/installation-compendium.md` (merged from upstream).
+- Issue #7 (IBM Bob MCP settings) in `docs/debug/ops-installation-compendium.md` (merged from upstream).
 
 ### Changed
 - **Dashboard score formula**: Composite metric (50% temporal vitality + 25% type weight + 25% engagement) replaces pure exponential-decay. Meaningful spread (range ~54-94) instead of 84% at 100.
@@ -1053,7 +1053,7 @@ Critical update addressing protocol enforcement and multi-IDE safety.
 
 - MCP Server now injects mandatory protocols (`MANDATORY_PROTOCOLS_READ_THIS_FIRST`) directly into every tool response
 - Context-Aware Warnings for `addMemory` (integrity), `searchMemories` (bias), and graph tools (consistency)
-- Updated `ai-behavior-compendium.md` with Issue #6 (Passive Protocol Enforcement Failure)
+- Updated `ops-ai-behavior-compendium.md` with Issue #6 (Passive Protocol Enforcement Failure)
 
 #### ELEFANTE_MODE (Multi-IDE Safety)
 

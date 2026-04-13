@@ -29,7 +29,7 @@ Memories were stored as raw text. Search only matched words. No understanding of
 | Cognitive retriever     | `src/core/retrieval.py`                        | Wired (orchestrator.py) |
 | Auto-populate on add    | `src/core/orchestrator.py`                     | Verified                |
 | SHARES_CONCEPT edges    | `scripts/update_dashboard_data.py`             | Verified (24 edges)     |
-| Documentation           | `docs/technical/memory-schema-v4-cognitive.md` | Done                    |
+| Documentation           | `docs/technical/spec-memory-schema.md` | Done                    |
 
 ### A.3 New Metadata Fields
 
@@ -427,7 +427,7 @@ Flag potential issues for user review rather than auto-asserting. The system sug
 - `src/core/retrieval.py` - CognitiveRetriever (wired to orchestrator)
 - `src/core/orchestrator.py` - Auto-populate V4 fields on add; CognitiveRetriever scoring on search
 - `scripts/update_dashboard_data.py` - SHARES_CONCEPT edges
-- `docs/technical/memory-schema-v4-cognitive.md` - Documentation
+- `docs/technical/spec-memory-schema.md` - Documentation
 
 ### To Modify in V5
 

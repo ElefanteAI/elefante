@@ -1,6 +1,11 @@
-# Elefante Protocol — System Prompt Injection
+# Elefante Protocol — System Prompt Template
 
-> Paste into `.github/copilot-instructions.md`, `.cursorrules`, or any agent system prompt.
+> For agents that connect to Elefante via MCP but don't use a workspace constitution
+> (e.g., Claude Desktop, generic MCP clients, custom agent frameworks).
+>
+> If you're using VS Code, Cursor, or Windsurf — the constitution at
+> `.github/copilot-instructions.md` already includes this content.
+> You do NOT need both.
 
 ---
 
@@ -95,14 +100,11 @@ This prompt is the **Gatekeeper**. Elefante is the **Oracle**. The Gatekeeper fo
 
 ## Integration Notes
 
-**For VS Code (GitHub Copilot):**
-Place in `.github/copilot-instructions.md` at workspace root.
+**For VS Code / Cursor / Windsurf:**
+Already handled by `.github/copilot-instructions.md` (the constitution). Do not duplicate.
 
-**For Cursor:**
-Place in `.cursorrules` at workspace root.
-
-**For any MCP client:**
-Inject as system prompt or prepend to conversation context.
+**For Claude Desktop / generic MCP clients:**
+Inject the block above as system prompt or prepend to conversation context.
 
 **Minimal version** (for token-constrained contexts):
 ```markdown

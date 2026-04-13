@@ -16,6 +16,7 @@ Then follow: examples/AGENT_TUTORIAL.md
 | File | Purpose |
 |------|---------|
 | `AGENT_TUTORIAL.md` | Step-by-step MCP tool guide for agents |
+| `system-prompt-template.md` | Paste-in prompt for non-workspace MCP clients (Claude Desktop, etc.) |
 
 ## Quick Reference
 

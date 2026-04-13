@@ -52,7 +52,7 @@ SYSTEM_SPECIFICATIONS = (
             "Every change must be checked against these leakage surfaces: MCP response contract, "
             "ChromaDB write and read roundtrip, Kuzu schema and DML split, stdout purity, "
             "compliance gate state machine, dashboard snapshot contract, co-activation history, "
-            "and documentation links. Reference docs: docs/technical/sdd-development-protocol.md "
+            "and documentation links. Reference docs: docs/technical/dev-sdd.md "
             "and docs/pitfall-index.md."
         ),
         "tags": ["system", "sdd", "gate-2", "leakage-scan", "specification"],

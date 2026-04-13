@@ -1,25 +1,23 @@
 # Planning Documentation
 
-This directory contains roadmaps and future plans for Project Elefante.
+This directory contains the project vision, ideas backlog, and active specs for Elefante.
 
 ## Contents
 
 | File | Purpose |
 |------|---------|
-| [`roadmap.md`](roadmap.md) | Main development roadmap (shipped features, planned work) |
-| [`vision.md`](vision.md) | Long-term project vision |
-| [`ELEFANTE_VISION_BRIEF.md`](ELEFANTE_VISION_BRIEF.md) | Comprehensive implementation guide (all 14 sections) |
-| [`native-sdd-enforcement.md`](native-sdd-enforcement.md) | SDD via Directives and Specifications (v2.2.1 implementation plan) |
-| [`usage-intelligence-prd.md`](usage-intelligence-prd.md) | Product requirements for usage metrics |
-| [`v5-cognitive-retrieval-requirements.md`](v5-cognitive-retrieval-requirements.md) | V5 cognitive retrieval feature requirements |
-| [`specs/`](specs/) | Detailed feature specifications (session distiller, etc.) |
+| [`spec-vision.md`](spec-vision.md) | **Start here.** What Elefante is, the vision, and all undone ideas |
+| [`spec-usage-intelligence.md`](spec-usage-intelligence.md) | Detailed PRD for dashboard usage metrics (backend 80% done, frontend 0%) |
 
-## Purpose
+## Archived
 
-Planning documents define **future work**. They are:
-- Forward-looking (what we WILL build)
-- Subject to change
-- High-level (implementation details go in `technical/`)
+These files documented work that shipped. Moved to `../archive/planning/`:
+
+- `v5-cognitive-retrieval-requirements.md` — historic spec from Dec 2025; V4 features wired, uncompleted items migrated to ideas backlog in vision.md
+- `ELEFANTE_VISION_BRIEF.md` — v2.2.2 implementation guide (superseded by spec-vision.md + technical docs)
+- `native-sdd-enforcement.md` — SDD enforcement spec (shipped in v2.2.1)
+- `walkthrough.md` — v2.2.1 delivery log
+- `specs/session-distiller/` — Session distiller spec (shipped in v2.0.0, pending live mode in ideas backlog)
 
 ## Related Directories
 

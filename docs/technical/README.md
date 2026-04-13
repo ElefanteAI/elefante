@@ -1,109 +1,60 @@
-# Technical Documentation Index
+# Technical Documentation
 
-**Status**: Production (v2.2.2)  
-**Purpose**: Complete technical reference for Elefante AI Memory System
+**Elefante v2.2.2** · 17 docs · 3 prefixes
+
+---
+
+## Naming Convention
+
+| Prefix | Meaning | Authority |
+|--------|---------|-----------|
+| `spec-` | What the system IS. Normative. Change requires SDD gates. | 1.0 |
+| `ops-` | How to DO things. Procedural. | — |
+| `dev-` | How to BUILD things. Contributor process. | 1.0 |
 
 ---
 
 ## Quick Start
 
-1. **New Users**: Start with [`installation.md`](installation.md)
-2. **Understanding the System**: Read [`architecture.md`](architecture.md)
-3. **Using the API**: See [`usage.md`](usage.md)
-4. **Visual Dashboard**: Check [`dashboard-startup.md`](dashboard-startup.md)
+1. **Install**: [`ops-installation.md`](ops-installation.md)
+2. **Understand**: [`spec-architecture.md`](spec-architecture.md)
+3. **Use the API**: [`spec-tools.md`](spec-tools.md)
+4. **Dashboard**: [`ops-dashboard.md`](ops-dashboard.md)
 
 ---
 
-## Documentation Map
+## Specifications (`spec-`)
 
-### Installation & Setup (START HERE)
+| File | Content |
+|------|---------|
+| [`spec-architecture.md`](spec-architecture.md) | System design, triple-layer brain, SDD workflow |
+| [`spec-tools.md`](spec-tools.md) | API reference — 21 MCP tools + 2 prompts |
+| [`spec-ingestion.md`](spec-ingestion.md) | 5-step pipeline (Extract → Classify → Integrity → Write → Reinforce) |
+| [`spec-scoring.md`](spec-scoring.md) | Temporal decay, reinforcement, 4-factor scoring formula |
+| [`spec-memory-schema.md`](spec-memory-schema.md) | V4 cognitive fields + V5 knowledge topology |
+| [`spec-dashboard-snapshot.md`](spec-dashboard-snapshot.md) | Snapshot JSON schema for dashboard |
 
-| File                                                               | Purpose                                                                |
-| ------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| [`python-version-requirements.md`](python-version-requirements.md) | **MANDATORY: Python 3.11 locking**                                     |
-| [`installation.md`](installation.md)                               | Full installation guide                                                |
-| [`ide-mcp-configuration.md`](ide-mcp-configuration.md)             | **Authoritative: MCP config for VS Code / Cursor / Bob / Antigravity** |
+## Operations (`ops-`)
 
-### Running Elefante
+| File | Content |
+|------|---------|
+| [`ops-installation.md`](ops-installation.md) | Full install guide + Python version details |
+| [`ops-ide-configuration.md`](ops-ide-configuration.md) | MCP config for VS Code, Cursor, Bob, Antigravity |
+| [`ops-mcp-server.md`](ops-mcp-server.md) | Server startup, handshake, troubleshooting |
+| [`ops-dashboard.md`](ops-dashboard.md) | Dashboard launch and verification |
+| [`ops-restart.md`](ops-restart.md) | Graceful restart, lock cleanup, force-kill |
+| [`ops-rollback.md`](ops-rollback.md) | Backup and restore |
+| [`ops-docker.md`](ops-docker.md) | Docker deployment |
+| [`ops-kuzu.md`](ops-kuzu.md) | Kuzu reserved words, locking, troubleshooting |
+| [`ops-agent-handoff.md`](ops-agent-handoff.md) | Agent Zero / autonomous agent integration |
 
-| File                                                 | Purpose                                             | Status |
-| ---------------------------------------------------- | --------------------------------------------------- | ------ |
-| [`mcp-server-startup.md`](mcp-server-startup.md)     | **Start MCP server, verification, troubleshooting** |        |
-| [`safe-restart.md`](safe-restart.md)                 | Graceful restart, lock cleanup, force-kill fallback  |        |
-| [`dashboard-startup.md`](dashboard-startup.md)       | **Start Dashboard, verification, troubleshooting**  |        |
-| [`dashboard-snapshot-contract.md`](dashboard-snapshot-contract.md) | Snapshot JSON schema for dashboard consumption |     |
-| [`kuzu-lock-monitoring.md`](kuzu-lock-monitoring.md) | **Prevent single-writer lock deadlocks**            |        |
+## Development (`dev-`)
 
-### Deployment & Release
-
-| File                         | Purpose                                              |
-| ---------------------------- | ---------------------------------------------------- |
-| [`docker.md`](docker.md)     | Docker setup for dashboard and container deployment   |
-| [`agent-handoff.md`](agent-handoff.md) | Agent Zero / autonomous agent integration guide |
-| [`rollback.md`](rollback.md) | Backup and rollback procedures                       |
-
-### Core System
-
-| File                                                   | Purpose                                               |
-| ------------------------------------------------------ | ----------------------------------------------------- |
-| [`architecture.md`](architecture.md)                   | System design, triple-layer brain                     |
-| [`usage.md`](usage.md)                                 | API reference, MCP tools                              |
-| [`ingestion-protocol.md`](ingestion-protocol.md)       | 5-step ingestion pipeline (Extract → Classify → Integrity → Write → Reinforce) |
-
-### Development Process
-
-| File                                                                       | Purpose                                                                  |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| [`developer-etiquette.md`](developer-etiquette.md)                         | **SPECIFICATION**: Feature closure discipline (clean, docs, version)     |
-| [`sdd-development-protocol.md`](sdd-development-protocol.md)               | **SDD protocol — human reference (enforcement is native via Directives + pre-commit hook)** |
-| [`second-brain-protocols.md`](second-brain-protocols.md)                   | Hierarchical agent protocols for cognitive continuity                    |
-
-### Memory Intelligence
-
-| File                                                             | Purpose                                                          | Status                               |
-| ---------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------ |
-| [`temporal-memory-decay.md`](temporal-memory-decay.md)           | Access-based reinforcement, decay over time                      | Implemented                          |
-| `memory-schema-v4.md`                                            | Canonical keys, versioning, namespaces (prod/test), TTL          | Archived (`docs/archive/technical/`) |
-| [`memory-schema-v4-cognitive.md`](memory-schema-v4-cognitive.md) | V4 Cognitive Retrieval: concepts, surfaces_when, authority_score | Production                           |
-| [`memory-schema-v5-topology.md`](memory-schema-v5-topology.md)   | Rings/topics/types topology fields for dashboard                 | Production                           |
-
-### Database
-
-| File                                               | Purpose                             |
-| -------------------------------------------------- | ----------------------------------- |
-| [`kuzu-best-practices.md`](kuzu-best-practices.md) | Reserved words, safe property names |
+| File | Content |
+|------|---------|
+| [`dev-etiquette.md`](dev-etiquette.md) | **SPECIFICATION**: Feature closure (clean, docs, version) |
+| [`dev-sdd.md`](dev-sdd.md) | Spec-Driven Development — 5 gates |
 
 ---
 
-## What's Implemented vs Planned
-
-| Feature                                                         | Status                                                                                                                      | Notes                                                                   |
-| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Dual Storage (ChromaDB + Kuzu)                                  |                                                                                                                             | Production                                                              |
-| MCP Server (20 tools + 2 prompts)                               |                                                                                                                             | Production                                                              |
-| [`copilot-instructions`](../../.github/copilot-instructions.md) | Agent behavior bootstrap + Tool Response Contract (`MANDATORY_PROTOCOLS_READ_THIS_FIRST`, `DIRECTIVES`, `RELEVANT_CONTEXT`) | Production                                                              |
-| Directive System (`src/core/directive_store.py`)                | Always-injected behavioral constraints, independent of memory retrieval                                                     | v2.1.0                                                                  |
-| Actionable Integration Header                                   | Hardcoded system prompt injected into MCP context to force agent compliance                                                 | v2.1.2                                                                  |
-| Null-Stripping Payload Compression                              | Aggressive JSON compression removing nulls and empty values                                                                 | v2.1.2                                                                  |
-| Transaction-Scoped Locking                                      |                                                                                                                             | v1.1.0 (replaced session-based locks)                                   |
-| **Compliance Gate**                                             |                                                                                                                             | **v1.6.0 (search-before-write enforcement)**                            |
-| Auto-Inject Pitfalls                                            |                                                                                                                             | v1.0.1                                                                  |
-| Cognitive Analysis (emotions, intent)                           |                                                                                                                             | Agent-managed (passed via tool inputs)                                  |
-| Temporal Decay                                                  |                                                                                                                             | Production                                                              |
-| Entity/Relationship Extraction                                  |                                                                                                                             | Agent-managed (provided entities/relationships; no internal extraction) |
-| 3-Level Taxonomy Auto-Classification                            |                                                                                                                             | Schema exists; agent can supply domain/category                         |
-| Smart UPDATE (merge)                                            |                                                                                                                             | Planned for v1.2.0                                                      |
-| Dashboard UX                                                    |                                                                                                                             | v2.0.0 (Overview, Memories, Explore tabs)                               |
-
----
-
-## Related Directories
-
-- [`../planning/`](../planning/) - Future roadmap
-- [`../debug/`](../debug/) - Neural Registers (lessons from failures)
-- [`../archive/`](../archive/) - Historical logs
-
----
-
-**Version**: 2.2.2  
-**Last Updated**: 2026-04-12
+**Last Updated**: 2026-04-13

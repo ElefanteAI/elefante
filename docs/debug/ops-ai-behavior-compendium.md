@@ -353,13 +353,12 @@ EXISTING TOOL DESCRIPTION (elefante-MemorySearch):
 1. ALWAYS call this tool when user asks open-ended questions"
 
 EXISTING DOCUMENTATION:
-- pitfall-index.md (searchable pitfalls + pre-action protocol)
 - Neural Registers (all laws)
 
 AGENT BEHAVIOR:
 - Attempted 15+ installation methods blindly
 - Never searched Elefante for "installation pitfalls"
-- Never consulted python-version-requirements.md
+- Never consulted spec-architecture.md
 - User had to manually run the command that WAS IN THE DOCS
 ```
 

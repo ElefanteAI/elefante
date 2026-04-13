@@ -516,7 +516,7 @@ def main():
             if not vscode_success and not antigravity_success:
                 logger.log("WARN: Automatic MCP configuration skipped")
                 logger.log("   Please configure your IDE manually.")
-                logger.log("   See docs/technical/installation.md and docs/technical/mcp-server-startup.md for instructions.")
+                logger.log("   See docs/technical/ops-installation.md and docs/technical/ops-mcp-server.md for instructions.")
         except Exception as e:
             logger.log(f"ERROR: Error configuring MCP: {e}")
             
@@ -526,7 +526,7 @@ def main():
         logger.log("[Step 4a] Agent Behavior Bootstrap...")
         if not verify_copilot_instructions(root_dir):
             logger.log("WARN: Agent behavior bootstrap missing. Agents will not proactively use Elefante.")
-            logger.log("   See docs/technical/installation.md Section 4a for details.")
+            logger.log("   See docs/technical/ops-installation.md Section 4a for details.")
     
     if success:
         # 5. Verification

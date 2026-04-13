@@ -1,6 +1,6 @@
 # Temporal Memory Decay & Reinforcement
 
-**Feature Version**: 2.2.2  
+**Feature Version**: 2.2.3  
 **Status**: Production  
 **Date**: 2026-02-26
 
@@ -36,7 +36,7 @@ where:
 
 ```python
 decay_rate = 0.01              # 1% decay per day
-reinforcement_factor = 0.1     # 10% boost per access
+reinforcement_factor = 0.25    # 25% boost per access (log scale)
 consolidation_threshold = 0.3  # Archive below 30% strength
 ```
 
@@ -380,9 +380,9 @@ temporal_decay:
 
 ## Related Documentation
 
-- [`architecture.md`](architecture.md) - System architecture
-- [`memory-schema-v4-cognitive.md`](memory-schema-v4-cognitive.md) - Memory data model
-- [`usage.md`](usage.md) - API reference
+- [`spec-architecture.md`](spec-architecture.md) - System architecture
+- [`spec-memory-schema.md`](spec-memory-schema.md) - Memory data model
+- [`spec-tools.md`](spec-tools.md) - API reference
 
 ---
 

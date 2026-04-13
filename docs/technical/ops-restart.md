@@ -1,6 +1,6 @@
 # Elefante Safe Restart
 
-**Version**: 2.2.2  
+**Version**: 2.2.3  
 **Script**: `scripts/restart_elefante.py`  
 **Purpose**: Safely restart MCP server to pick up code changes
 
@@ -292,12 +292,12 @@ Arguments: {
 
 ## Related Documentation
 
-- [`architecture.md`](architecture.md) - Transaction-scoped locking
-- [`mcp-server-startup.md`](mcp-server-startup.md) - Manual startup
-- [`installation.md`](installation.md) - Initial setup
+- [`spec-architecture.md`](spec-architecture.md) - Transaction-scoped locking
+- [`ops-mcp-server.md`](ops-mcp-server.md) - Manual startup
+- [`ops-installation.md`](ops-installation.md) - Initial setup
 
 ---
 
-**Version**: 2.2.2
+**Version**: 2.2.3
 **Last Updated**: 2026-02-26
 **Status**: Production Ready

@@ -29,7 +29,6 @@ If you need a new script, prefer adding a new `verb_object` script rather than c
 
 ## Debug scripts (`scripts/debug/`)
 
-Diagnostic and rescue tools for broken state. Referenced from [`docs/pitfall-index.md`](../docs/pitfall-index.md).
 
 | Script | Purpose | Safety |
 |---|---|---|

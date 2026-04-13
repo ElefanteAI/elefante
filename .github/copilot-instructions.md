@@ -45,13 +45,14 @@ STAMP: `[ELEFANTE] Searched: Found {N} relevant memories` | `No relevant memorie
 TRIGGER: Any `elefante-*` output.
 PARSE AND OBEY:
   MANDATORY_PROTOCOLS → no bypass
-  DIRECTIVES → unconditional authority
-  RELEVANT_CONTEXT → top 3 memories, ambient
+  DIRECTIVES → unconditional authority (injected into EVERY response)
+  RELEVANT_CONTEXT → top memories ranked by 6 behavioral signals
+  suggested_action → follow it when present
 </rule>
 
 <rule id="sdd_closure">
 TRIGGER: Declaring "Complete" or "Done".
-ACTION: `docs/technical/developer-etiquette.md`:
+ACTION: `docs/technical/dev-etiquette.md`:
   1. CLEAN — leftovers, temp files, debug artifacts
   2. DOCS — specs, changelogs, READMEs
   3. VERSION — SemVer via `scripts/bump_version.py`
@@ -80,3 +81,68 @@ No new deps without confirmation. No force push. No deploy without permission.
 Scoped changes. One concern/commit. Test after every change.
 Errors: graceful handling. No silent failures.
 </constraints>
+
+<tools><!-- Bootstrap: agents need this to operate -->
+| Tool | Purpose | Key Rule |
+|------|---------|----------|
+| `elefante-MemorySearch` | Search memory | DO THIS FIRST. Every session. Every task. |
+| `elefante-MemoryAdd` | Store knowledge | Requires prior search. Pick `memory_type` carefully. |
+| `elefante-MemoryUpdate` | Update memory | Use `supersedes_id` when decisions change. |
+| `elefante-MemoryDelete` | Delete memory | Requires prior search. Provide `reason`. |
+| `elefante-ContextGet` | Full context pull | Memories + graph for current task. |
+| `elefante-GraphConnect` | Link entities | Connect people, projects, technologies. |
+| `elefante-GraphQuery` | Query graph | Cypher queries for structural traversal. |
+| `elefante-TaskCreate` | Create tasks | Track work items with subtasks. |
+| `elefante-TaskUpdate` | Update tasks | pending → in_progress → completed/failed. |
+| `elefante-TaskGraph` | View task graph | Visualize task dependencies. |
+| `elefante-DirectiveAdd` | Add rule | Persistent rules injected into EVERY response. |
+| `elefante-DirectiveList` | List rules | See active behavioral constraints. |
+| `elefante-DirectiveRemove` | Remove rule | Delete a directive by ID. |
+| `elefante-ETLProcess` | Get raw memories | Returns unprocessed memories for agent enrichment. |
+| `elefante-ETLClassify` | Classify memory | Agent sends enrichment back after ETLProcess. |
+| `elefante-MemoryConsolidate` | Deduplicate | Run periodically. `force=false` for dry-run. |
+| `elefante-System` | Enable/disable | Toggle Elefante mode on/off. |
+| `elefante-SystemStatusGet` | Health check | Verify brain health. |
+| `elefante-SessionsList` | List sessions | See active sessions. |
+| `elefante-DashboardOpen` | Dashboard | Visual knowledge graph. |
+| `elefante-grounding` | System prompt | Inject memory-aware behavior into agent context. |
+</tools>
+
+<memory_types><!-- Wrong type = wrong lifespan. Choose deliberately. -->
+| Type | Half-Life | Use For |
+|------|-----------|---------|
+| `specification` | ∞ | Architecture specs, schemas, contracts (authority=1.0) |
+| `directive` | ∞ | Behavioral rules that must never fade |
+| `preference` | ~347 days | Stable user preferences and guidelines |
+| `decision` / `fact` | ~139 days | Choices and verified facts |
+| `insight` | ~87 days | Patterns discovered during work |
+| `note` | ~46 days | Transient context (NOT for decisions) |
+| `conversation` | ~28 days | Ephemeral session data |
+</memory_types>
+
+<cardinal_sins>
+- Asking user for preferences already stored in the brain
+- Guessing what isn't grounded in brain or workspace
+- Answering without searching first
+- Adding memories without checking for duplicates
+- Using `note` for architectural decisions (decays in 46 days)
+- Wasting tokens: injecting irrelevant context, filler, redundant content, signal dilution — any token that doesn't improve the response
+</cardinal_sins>
+
+<troubleshooting_trigger_map>
+IF YOU ENCOUNTER ERRORS WHILE DEVELOPING ELEFANTE, DO NOT GUESS. STOP AND READ THE RELEVANT COMPENDIUM:
+- **Dashboard / Frontend UI**: `docs/debug/ops-dashboard-compendium.md`
+- **ChromaDB / Kuzu / sqlite locks**: `docs/debug/ops-database-compendium.md`
+- **Docker / Python environments / Setup**: `docs/debug/ops-installation-compendium.md`
+- **MCP tool truncation / memory schemas**: `docs/debug/ops-memory-compendium.md`
+- **AI Agent behavior loops / parsing rules**: `docs/debug/ops-ai-behavior-compendium.md`
+</troubleshooting_trigger_map>
+
+<troubleshooting_trigger_map>
+IF YOU ENCOUNTER ERRORS WHILE DEVELOPING ELEFANTE, DO NOT GUESS. STOP AND READ THE RELEVANT COMPENDIUM:
+- **Dashboard / Frontend UI**: `docs/debug/ops-dashboard-compendium.md`
+- **ChromaDB / Kuzu / sqlite locks**: `docs/debug/ops-database-compendium.md`
+- **Docker / Python environments / Setup**: `docs/debug/ops-installation-compendium.md`
+- **MCP tool truncation / memory schemas**: `docs/debug/ops-memory-compendium.md`
+- **AI Agent behavior loops / parsing rules**: `docs/debug/ops-ai-behavior-compendium.md`
+</troubleshooting_trigger_map>

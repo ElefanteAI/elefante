@@ -1,4 +1,4 @@
-# Usage Guide & API Reference (v2.2.2)
+# Usage Guide & API Reference (v2.2.3)
 
 ## 1. Natural Language Interaction
 
@@ -13,9 +13,9 @@ Once connected to your IDE, use natural language to interact with Elefante. The 
 
 ---
 
-## 2. MCP Tools (20 Total)
+## 2. MCP Tools (21 Total)
 
-The MCP server exposes 20 tools to your AI agent. All tool names follow the `elefante-PascalCase` convention.
+The MCP server exposes 21 tools to your AI agent. All tool names follow the `elefante-PascalCase` convention.
 
 ### Core Memory Operations
 

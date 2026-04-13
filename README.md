@@ -8,7 +8,7 @@
 
 AI agents start every conversation from zero. Your preferences, decisions, and discovered patterns don't carry over. Elefante gives any MCP-compatible agent a persistent, local second brain — memories are stored, scored automatically, and surfaced at the right moment without being asked.
 
-**v2.2.2** — Persistent Memory Engine
+**v2.2.3** — Persistent Memory Engine
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -17,7 +17,7 @@ AI agents start every conversation from zero. Your preferences, decisions, and d
                          │ MCP stdio
 ┌────────────────────────▼────────────────────────────────────┐
 │ LAYER 1 · MCP PROTOCOL                                      │
-│ 20 tools · Compliance Gate · Context Injection              │
+│ 21 tools · Compliance Gate · Context Injection              │
 └────────────────────────┬────────────────────────────────────┘
                          │
 ┌────────────────────────▼────────────────────────────────────┐
@@ -57,10 +57,10 @@ Everything runs locally. No cloud. No telemetry. Your data stays on your machine
 
 ### Layer 1 — MCP Protocol
 
-The interface between your IDE and the memory engine. 20 tools that let agents store, search, connect, and manage knowledge. A **Compliance Gate** prevents duplicates before they exist. **Context Injection** attaches relevant memories to every tool response. **Directives** enforce persistent behavioral rules that survive across sessions.
+The interface between your IDE and the memory engine. 21 tools that let agents store, search, connect, and manage knowledge. A **Compliance Gate** prevents duplicates before they exist. **Context Injection** attaches relevant memories to every tool response. **Directives** enforce persistent behavioral rules that survive across sessions.
 
-Full tool reference → [docs/technical/usage.md](docs/technical/usage.md)
-IDE configuration → [docs/technical/ide-mcp-configuration.md](docs/technical/ide-mcp-configuration.md)
+Full tool reference → [docs/technical/spec-tools.md](docs/technical/spec-tools.md)
+IDE configuration → [docs/technical/ops-ide-configuration.md](docs/technical/ops-ide-configuration.md)
 
 ### Layer 2 — Intelligence Engine
 
@@ -70,8 +70,8 @@ Two storage backends working together:
 - **Kuzu** — a knowledge graph that tracks entities, relationships, and structural context.
 - **Behavioral Relevance** — a 6-signal scoring system that automatically surfaces the most useful memories. No manual importance ratings.
 
-Scoring details → [docs/README.md](docs/README.md#behavioral-relevance-v1100)
-Architecture → [docs/technical/architecture.md](docs/technical/architecture.md)
+Scoring details → [docs/technical/spec-scoring.md](docs/technical/spec-scoring.md)
+Architecture → [docs/technical/spec-architecture.md](docs/technical/spec-architecture.md)
 
 ### Layer 3 — Dashboard
 
@@ -82,7 +82,7 @@ A read-only view of your knowledge system, served from a lightweight snapshot so
 - Topic distribution, memory insights, and a knowledge graph
 
 Dashboard details → [docs/technical/dashboard.md](docs/technical/dashboard.md)
-Docker deployment → [docs/technical/docker.md](docs/technical/docker.md)
+Docker deployment → [docs/technical/ops-docker.md](docs/technical/ops-docker.md)
 
 ---
 
@@ -119,13 +119,13 @@ You possess full local control. The installer automatically bridges into your ID
    `What is my Elefante test passcode?`
 4. Watch the AI hit your local memory, cure its amnesia, and return the secret code.
 
-*Looking for manual setup or deep technical details? See the [Full Installation Guide](docs/technical/installation.md).*
+*Looking for manual setup or deep technical details? See the [Full Installation Guide](docs/technical/ops-installation.md).*
 
 ---
 
 ## MCP Tools
 
-20 tools + 2 prompts. All names follow `elefante-PascalCase` convention.
+21 tools + 2 prompts. All names follow `elefante-PascalCase` convention.
 
 | Category   | Tools                                                                                                                                   |
 | ---------- | --------------------------------------------------------------------------------------------------------------------------------------- |
@@ -137,7 +137,7 @@ You possess full local control. The installer automatically bridges into your ID
 | Directives | `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove`                                                     |
 | System     | `elefante-System`, `elefante-SystemStatusGet`, `elefante-DashboardOpen`                                                           |
 
-Full reference with parameter schemas → [docs/technical/usage.md](docs/technical/usage.md)
+Full reference with parameter schemas → [docs/technical/spec-tools.md](docs/technical/spec-tools.md)
 
 ## Native Spec-Driven Development (SDD)
 
@@ -177,14 +177,14 @@ vscode-extension/ VS Code extension source
 
 ## Documentation
 
-Full reference → [docs/README.md](docs/README.md)
+Full reference → [docs/technical/spec-tools.md](docs/technical/spec-tools.md)
 
-- [Tool reference](docs/technical/usage.md) — parameter schemas for all 20 tools
-- [Behavioral Relevance](docs/README.md#behavioral-relevance-v1100) — how automatic scoring works
-- [Installation](docs/technical/installation.md) — step-by-step setup
-- [Architecture](docs/technical/architecture.md) — system design
-- [Dashboard](docs/technical/dashboard.md) — visualization and health monitoring
-- [Docker](docs/technical/docker.md) — containerized deployment
+- [Tool reference](docs/technical/spec-tools.md) — parameter schemas for all 21 tools
+- [Behavioral Relevance](docs/technical/spec-scoring.md) — how automatic scoring works
+- [Installation](docs/technical/ops-installation.md) — step-by-step setup
+- [Architecture](docs/technical/spec-architecture.md) — system design
+- [Dashboard](docs/technical/ops-dashboard.md) — visualization and health monitoring
+- [Docker](docs/technical/ops-docker.md) — containerized deployment
 - [Debugging](docs/debug/README.md) — troubleshooting guide
 
 ---

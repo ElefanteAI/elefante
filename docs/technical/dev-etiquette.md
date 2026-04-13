@@ -1,6 +1,6 @@
 # Elefante Developer Etiquette (Native SDD Specification)
 
-**Version:** 2.2.1
+**Version:** 2.2.3
 **Type:** SPECIFICATION
 
 This document governs the required closure sequence for all feature development, bug fixes, and architectural adjustments within the Elefante repository. 
@@ -17,8 +17,8 @@ Never leave experimental artifacts, scratchpads, debug logs, or temporary script
 ## 2. Update Documentation (`DOC_SYNC`)
 Code is secondary; the specification is primary. You cannot consider a code change "done" until the public and technical documentation reflects it.
 
-*   **READMEs:** Ensure `README.md` and `docs/README.md` are updated if the core feature set, architecture, or installation process changes.
-*   **Architecture Specs:** Update `docs/technical/architecture.md` immediately if the cognitive flow or component interaction changes.
+*   **READMEs:** Ensure `README.md` is updated if the core feature set, architecture, or installation process changes. `docs/README.md` is a navigation index — update it only when files are added, moved, or deleted.
+*   **Architecture Specs:** Update `docs/technical/spec-architecture.md` immediately if the cognitive flow or component interaction changes.
 *   **Changelog:** Add an entry to `CHANGELOG.md` matching the current version bump. Explicitly document the "Why," "What," and "Impact."
 
 ## 3. Versioning (`STRICT_SEMVER`)

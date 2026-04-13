@@ -3,9 +3,9 @@
 > [!IMPORTANT]
 > **This file is HUMAN REFERENCE ONLY.**  
 > Living enforcement is inside Elefante as **DIRECTIVES** (6 SDD gates, injected unconditionally into every tool response) + **SPECIFICATION memories** (authority=1.0, zero decay) + **pre-commit hook** (`.git/hooks/pre-commit` — mechanical Gate 4).  
-> See the Gatekeeper & Oracle pattern in `docs/planning/native-sdd-enforcement.md`.
+> See the Gatekeeper & Oracle pattern in `docs/technical/spec-architecture.md` (section 2: The Native SDD Workflow).
 
-**Version**: 2.2.1  
+**Version**: 2.2.3  
 **Status**: Reference document — enforcement is native  
 **Last Updated**: 2026-03-20
 
@@ -39,7 +39,6 @@ The core discipline:
 Before any change:
 
 1. **Read the actual source file.** Not the docs about it — the file itself.
-2. **Read `docs/pitfall-index.md`** for the relevant category (dashboard / database / mcp / memory / installation / docs).
 3. **Read the relevant section of `CHANGELOG.md`** to understand what was already decided.
 
 If your memory of the file contradicts what you read: **the file wins. Always.**
@@ -54,16 +53,16 @@ Every change must trace back to a documented requirement. The accepted spec sour
 
 | Authority Level | Source | Decay? |
 |----------------|--------|--------|
-| **Immutable** | `docs/planning/ELEFANTE_VISION_BRIEF.md` — The Three Laws, the architecture contracts | Never |
-| **Immutable** | `docs/the-core.md` — The Cardinal Laws | Never |
-| **High** | `docs/technical/usage.md` — MCP tool schema contracts | On version bump |
-| **High** | `docs/planning/roadmap.md` — Planned features and known design flaws | On version bump |
+| **Immutable** | `docs/planning/spec-vision.md` — The Four Laws | Never |
+| **Immutable** | `docs/technical/spec-architecture.md` — Architecture contracts | Never |
+| **High** | `docs/technical/spec-tools.md` — MCP tool schema contracts | On version bump |
+| **High** | `docs/planning/spec-vision.md` — Vision and ideas backlog | On version bump |
 | **Reference** | `CHANGELOG.md` — Decisions already made and shipped | Historical |
 
 **"I think this would be better"** is not a spec.  
 A spec is: documented, version-stamped, traceable to one of the sources above.
 
-If you are proposing a new behavior not covered by any spec: **write the spec first**. Get it into `roadmap.md` or `ELEFANTE_VISION_BRIEF.md` before writing code.
+If you are proposing a new behavior not covered by any spec: **write the spec first**. Get it into `docs/planning/spec-vision.md` before writing code.
 
 ---
 
@@ -138,7 +137,7 @@ ELEFANTE_ALLOW_TEST_MEMORIES=1 .venv/bin/python -m pytest tests/ -k "your_test"
 | Check | Required |
 |-------|----------|
 | `health_check.py` | Exit code 0, no CRITICAL warnings |
-| MCP handshake | `"tools"` list returned, all 20 tools present |
+| MCP handshake | `"tools"` list returned, all 21 tools present |
 | Round-trip test | Changed fields present and correct in retrieved memory |
 
 Any failure → fix, then re-run from Gate 2. Do not skip back to Gate 4 directly.
@@ -152,7 +151,7 @@ Before committing:
 - [ ] **Minimal patch** — No unrelated refactors bundled in. One problem, one fix.
 - [ ] **CHANGELOG.md entry written** — `### The Problem Solved` + `### The Solution` + `### Changes` format
 - [ ] **Version bumped** using `scripts/version_counsel.py` — never edit version strings by hand
-- [ ] **All linked docs updated** — if you changed a tool signature, update `docs/technical/usage.md`
+- [ ] **All linked docs updated** — if you changed a tool signature, update `docs/technical/spec-tools.md`
 - [ ] **`grep -r "filename" docs/`** — if you moved or renamed any file, all links resolved
 
 ---
@@ -190,7 +189,6 @@ Elefante enforces these same principles on agents using it:
 |----------|-------------------|
 | Gate 0: Source-First | Law of Absolute Grounding — if not in Brain/Workspace, UNKNOWN |
 | Gate 1: Spec Integrity | `SPECIFICATION` memory type with authority=1.0 — immutable oracle |
-| Gate 2: Leakage Scan | `docs/pitfall-index.md` — all known failure surfaces |
 | Gate 3: Numeric Verification | Law of Compliance — verify before writing, not after |
 | Gate 4: Simulator Gate | Compliance Gate — write is blocked until search is proven real |
 | Gate 5: Output Discipline | Contributing standards + `bump_version.py` versioning contract |
@@ -204,7 +202,6 @@ Elefante was built to give agents this discipline. SDD is that discipline applie
 ```
 Before ANY change:
   1. Read the actual file (not memory of it)
-  2. Read pitfall-index.md for this category
 
 Before writing code:
   3. Trace your change to a spec source
@@ -213,7 +210,7 @@ Before writing code:
 
 Before committing:
   6. health_check.py → exit 0
-  7. verify_mcp_handshake.py → 20 tools listed
+  7. verify_mcp_handshake.py → 21 tools listed
   8. Round-trip test if memory path touched
   9. CHANGELOG entry written
  10. version_counsel.py run
@@ -226,7 +223,6 @@ Before committing:
 ---
 
 **Related docs**  
-- [`docs/the-core.md`](../the-core.md) — The Three Laws  
-- [`docs/pitfall-index.md`](../pitfall-index.md) — Operational failure index  
-- [`docs/technical/developer-etiquette.md`](developer-etiquette.md) — Code standards  
+- [`docs/planning/spec-vision.md`](../planning/spec-vision.md) — The Four Laws  
+- [`docs/technical/dev-etiquette.md`](dev-etiquette.md) — Code standards  
 - [`CONTRIBUTING.md`](../../CONTRIBUTING.md) — Versioning and PR workflow

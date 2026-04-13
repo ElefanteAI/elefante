@@ -42,7 +42,7 @@ The MCP Server:
 
 1. Starts and waits for connections on **stdin/stdout** (stdio protocol)
 2. Receives JSON-RPC requests from the IDE (VS Code, Cursor, Bob)
-3. Exposes 20 MCP tools for memory operations
+3. Exposes 21 MCP tools for memory operations
 4. Returns JSON-RPC responses
 5. Bootstraps the runtime SDD baseline on first orchestrator use so fresh installs immediately have built-in directives and searchable specification memories
 
@@ -136,7 +136,7 @@ This is the highest-signal startup verification because it launches the real ser
 **Expected Output**:
 
 ```text
-Available MCP Tools: 20
+Available MCP Tools: 21
   - elefante-MemoryAdd
   - elefante-MemorySearch
   - elefante-MemoryUpdate
@@ -218,7 +218,7 @@ python -m src.mcp.server
 
 All IDE-specific MCP config file paths and JSON formats are documented here:
 
-- See [docs/technical/ide-mcp-configuration.md](docs/technical/ide-mcp-configuration.md)
+- See [ops-ide-configuration.md](ops-ide-configuration.md)
 
 **Key Points**:
 
@@ -462,10 +462,10 @@ Before claiming "MCP Server is working":
 - [ ] Can use memory tools in IDE (elefante-MemoryAdd, elefante-MemorySearch, etc.)
 - [ ] No Kuzu lock conflicts (if dashboard running separately)
 
-For restarting a running server, see [`safe-restart.md`](safe-restart.md).
+For restarting a running server, see [`ops-restart.md`](ops-restart.md).
 
 ---
 
-**Document Version**: 2.2.2  
+**Document Version**: 2.2.3  
 **Status**: ESSENTIAL  
 **Last Validated**: 2026-02-25

@@ -1,6 +1,6 @@
 # Elefante Architecture: The Second Brain
 
-**Version:** 2.2.2 | **Status:** Production Ready (Windows validated)
+**Version:** 2.2.3 | **Status:** Production Ready (Windows validated)
 
 ## 1. System Overview
 
@@ -59,7 +59,7 @@ Instead of a static RAG formula, Elefante uses a multi-faceted 6-signal behavior
 To prevent LLM context-window bloat, Elefante enforces Spec-Driven Development using a two-part architecture:
 
 1. **The Gatekeeper (System Prompt):** Configuration files like `.github/copilot-instructions.md` or `.cursorrules` should *only* contain the rules of engagement (e.g., "Always search Elefante before coding"). They should never contain large architectural specs.
-2. **The Oracle (Elefante DB):** Heavy architectural specs, schemas, and etiquette rules (e.g., `developer-etiquette.md`) are stored inside Elefante as `SPECIFICATION` memories. 
+2. **The Oracle (Elefante DB):** Heavy architectural specs, schemas, and etiquette rules (e.g., `dev-etiquette.md`) are stored inside Elefante as `SPECIFICATION` memories. 
 
 When the agent receives a prompt, the Gatekeeper forces it to search. The Oracle returns the exact 1.0 Authority specification required for that specific task, keeping the active context window clean and focused.
 
@@ -71,7 +71,7 @@ When the agent receives a prompt, the Gatekeeper forces it to search. The Oracle
     - **Graph:** A `Memory` node is created in Kuzu.
 3.  **Link:** The memory is linked to the current `Session` node for temporal grounding.
 
-Full pipeline details: [`ingestion-protocol.md`](ingestion-protocol.md)
+Full pipeline details: [`spec-ingestion.md`](spec-ingestion.md)
 
 ---
 

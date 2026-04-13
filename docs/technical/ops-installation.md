@@ -1,16 +1,13 @@
 # Installation & Configuration
 
 **Quick Start**: Run `install.bat` (Windows) or `install.sh` (Mac/Linux)
-**Troubleshooting**: See [`pitfall-index.md`](../pitfall-index.md) for automated protection against common failures
+**Troubleshooting**: See [`debug/ops-installation-compendium.md`](../debug/ops-installation-compendium.md) for automated protection against common failures
 
 ---
 
 ## Prerequisites
 
-- **Python**: **3.11+ Supported** (See [`python-version-requirements.md`](python-version-requirements.md) for details)
-  - 3.9, 3.10: Not supported
-  - **3.11**: Supported and tested
-  - **3.12, 3.13+**: Recommended and tested
+- **Python 3.11+** required (3.11 supported, 3.12-3.13 recommended). See [Appendix A](#appendix-a-python-version-details) for OS-specific installation, pyenv setup, and troubleshooting.
 - **Git**: For cloning the repository
 - **Disk Space**: Minimum 2GB free
 - **OS**: Windows, macOS, or Linux
@@ -46,7 +43,7 @@ chmod +x install.sh
    - Disk space verification (5GB+ required)
    - Dependency version compatibility
    - Kuzu database path validation
-   - See [`pitfall-index.md`](../pitfall-index.md) for details
+   - See [`debug/ops-installation-compendium.md`](../debug/ops-installation-compendium.md) for details
 
 2. **Environment Setup**
    - Creates `.venv` virtual environment
@@ -167,7 +164,7 @@ cd elefante
 
 ### Step 2: Create Virtual Environment
 
-**CRITICAL**: Use Python 3.11 explicitly (see [`python-version-requirements.md`](python-version-requirements.md))
+**CRITICAL**: Use Python 3.11 explicitly (see [Appendix A](#appendix-a-python-version-details))
 
 Mac/Linux:
 
@@ -228,41 +225,7 @@ Supported IDEs:
 
 If automatic configuration fails, do not guess the JSON shape for your IDE. Use the authoritative reference:
 
-- See [docs/technical/ide-mcp-configuration.md](docs/technical/ide-mcp-configuration.md)
-
-**Rule of thumb**: your IDE should launch Elefante using the repo venv Python (absolute path) and `-m src.mcp.server`, with `PYTHONPATH` and `ELEFANTE_CONFIG_PATH` set.
-
-#### VS Code (Built-in MCP)
-
-VS Code supports MCP natively (Copilot Chat). Configure servers in `mcp.json`.
-
-You can open the correct file from the Command Palette:
-
-- `MCP: Open User Configuration`
-- `MCP: Open Workspace Folder Configuration`
-
-Common user configuration locations:
-
-- macOS (stable): `~/Library/Application Support/Code/User/mcp.json`
-- macOS (Insiders): `~/Library/Application Support/Code - Insiders/User/mcp.json`
-- Windows (stable): `%APPDATA%\Code\User\mcp.json`
-- Windows (Insiders): `%APPDATA%\Code - Insiders\User\mcp.json`
-- Linux (stable): `~/.config/Code/User/mcp.json`
-- Linux (Insiders): `~/.config/Code - Insiders/User/mcp.json`
-
-Example `mcp.json` (user or workspace config): see [docs/technical/ide-mcp-configuration.md](docs/technical/ide-mcp-configuration.md).
-
-Notes:
-
-- For a workspace-specific config, create `.vscode/mcp.json`.
-- You can open the right file from the Command Palette with `MCP: Open User Configuration` or `MCP: Open Workspace Folder Configuration`.
-
-#### Roo-Cline / Cursor / Bob / Antigravity
-
-These IDEs use different MCP config file locations and JSON keys.
-To avoid stale examples, this guide intentionally links to the canonical page instead of duplicating JSON blocks:
-
-- See [docs/technical/ide-mcp-configuration.md](docs/technical/ide-mcp-configuration.md)
+See [`ops-ide-configuration.md`](ops-ide-configuration.md) for the authoritative MCP configuration reference (VS Code, Cursor, Bob, Antigravity).
 
 ---
 
@@ -396,7 +359,7 @@ To verify the crash regression path specifically, run the E2E harness above and 
 ### Windows-Specific Issues
 
 **Issue**: `ImportError: No module named 'fcntl'`
-**Solution**: This is a known bug fixed in current code. Ensure you are running the latest version — `src/utils/elefante_mode.py` must have the `sys.platform != "win32"` guard around `import fcntl`. See `pitfall-index.md` → `pitfall: installation fcntl windows incompatibility`.
+**Solution**: This is a known bug fixed in current code. Ensure you are running the latest version — `src/utils/elefante_mode.py` must have the `sys.platform != "win32"` guard around `import fcntl`. See `debug/ops-installation-compendium.md` → `pitfall: installation fcntl windows incompatibility`.
 
 **Issue**: `install.bat` reports wrong Python version (e.g. `3.` instead of `3.11`)
 **Solution**: Fixed in current `install.bat` (was a `tokens=1,2` parsing bug, now `tokens=1,2,3`). If on an older version, run `py -3.11 -m venv .venv` manually and proceed with manual install.
@@ -416,7 +379,7 @@ To verify the crash regression path specifically, run the E2E harness above and 
 ### Common Issues (All Platforms)
 
 **Issue**: `Database path cannot be a directory`
-**Solution**: See [`pitfall-index.md`](../pitfall-index.md) — search `pitfall: installation kuzu`
+**Solution**: See [`debug/ops-installation-compendium.md`](../debug/ops-installation-compendium.md) — search `pitfall: installation kuzu`
 
 **Issue**: `ModuleNotFoundError: No module named 'src'`
 **Solution**: Ensure PYTHONPATH is set correctly in MCP config
@@ -433,7 +396,7 @@ To verify the crash regression path specifically, run the E2E harness above and 
 
 ### Getting Help
 
-1. Check [`pitfall-index.md`](../pitfall-index.md) for common installation pitfalls
+1. Check [`debug/ops-installation-compendium.md`](../debug/ops-installation-compendium.md) for common installation pitfalls
 2. Review `install.log` for detailed error messages
 3. See [`../debug/README.md`](../debug/README.md) for debugging guides
 4. Check GitHub Issues for known problems
@@ -444,9 +407,9 @@ To verify the crash regression path specifically, run the E2E harness above and 
 
 After successful installation:
 
-1. **Explore the API**: [`usage.md`](usage.md)
-2. **Try the Dashboard**: [`dashboard-startup.md`](dashboard-startup.md)
-3. **Understand Architecture**: [`architecture.md`](architecture.md)
+1. **Explore the API**: [`spec-tools.md`](spec-tools.md)
+2. **Try the Dashboard**: [`ops-dashboard.md`](ops-dashboard.md)
+3. **Understand Architecture**: [`spec-architecture.md`](spec-architecture.md)
 
 ---
 
@@ -619,10 +582,83 @@ pyinstaller elefante.spec
 
 The executable is created at `./dist/elefante/elefante`. Distribute the `dist/elefante/` folder as a zip.
 
-See also: [`docker.md`](docker.md) for container-based deployment.
+See also: [`ops-docker.md`](ops-docker.md) for container-based deployment.
 
 ---
 
-**Version**: 2.2.1
-**Last Updated**: 2026-04-12
+**Version**: 2.2.2
+**Last Updated**: 2026-04-13
 **Status**: Production Ready (Windows validated)
+
+---
+
+## Appendix A: Python Version Details
+
+### Supported Versions
+
+| Python Version | Status |
+| -------------- | ------ |
+| < 3.11 | NOT SUPPORTED |
+| **3.11** | Supported and tested |
+| **3.12** | Supported and tested |
+| **3.13** | Recommended — best performance |
+
+### OS-Specific Installation
+
+**macOS (Homebrew)**:
+```bash
+brew install python@3.11
+python3.11 -m venv .venv
+```
+
+**macOS (pyenv)**:
+```bash
+brew install pyenv && pyenv install 3.11.0 && pyenv local 3.11.0
+```
+
+**Windows**: Download from https://www.python.org/downloads/ — check "Add Python 3.11 to PATH". Or use Conda: `conda create -n elefante python=3.11`.
+
+**Linux (Debian/Ubuntu)**: `sudo apt install python3.11 python3.11-venv`
+
+**Linux (CentOS/RHEL)**: `sudo yum install python3.11 python3.11-devel`
+
+### Locked Dependencies
+
+**File**: `requirements.txt` — these versions are tested against Python 3.11:
+
+```
+kuzu==0.11.3
+chromadb==1.3.5
+sentence-transformers==2.7.0
+mcp==1.23.1
+fastapi==0.124.0
+uvicorn==0.38.0
+```
+
+Do NOT upgrade without testing on Python 3.11.
+
+### Wrong Python Version?
+
+Delete and recreate the venv:
+
+```bash
+deactivate
+rm -rf .venv
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### CI/CD Examples
+
+**GitHub Actions**:
+```yaml
+- uses: actions/setup-python@v4
+  with:
+    python-version: '3.11'
+```
+
+**Docker**:
+```dockerfile
+FROM python:3.11-slim
+```

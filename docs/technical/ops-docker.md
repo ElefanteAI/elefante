@@ -2,7 +2,7 @@
 
 This guide shows how to run Elefante in a clean Docker environment.
 
-If you are an autonomous agent operating inside an Agent Zero / A0 project layout, read `docs/technical/agent-handoff.md` first.
+If you are an autonomous agent operating inside an Agent Zero / A0 project layout, read `docs/technical/ops-agent-handoff.md` first.
 
 ## What you will get
 
@@ -113,7 +113,7 @@ docker compose up
 
 Elefante MCP is designed to be started by your IDE and communicate over stdio.
 
-If you are using **Agent Zero (A0)**, you can configure the MCP server by updating your `mcpServers` JSON object. See [docs/technical/agent-handoff.md](docs/technical/agent-handoff.md) for the exact JSON snippet to add to your `mcp_servers.json` or equivalent configuration file.
+If you are using **Agent Zero (A0)**, you can configure the MCP server by updating your `mcpServers` JSON object. See [ops-agent-handoff.md](ops-agent-handoff.md) for the exact JSON snippet to add to your `mcp_servers.json` or equivalent configuration file.
 
 Running MCP inside Docker is possible but is an advanced setup (you have to bridge stdio/tooling into your IDE).
 For beginners, use Docker for the dashboard and scripts first.

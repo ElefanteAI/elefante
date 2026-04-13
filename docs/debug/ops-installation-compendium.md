@@ -589,7 +589,7 @@ bob_paths = [
 1. **Assumption of Standard Paths:** Expected all IDEs to follow Electron/VS Code conventions (AppData storage)
 2. **Hidden Configuration:** `.bob` directory is hidden by default on Unix systems
 3. **No Error Message:** Script reported success for VS Code, giving false confidence
-4. **Documentation Gap:** IBM Bob path not documented in `ide-mcp-configuration.md`
+4. **Documentation Gap:** IBM Bob path not documented in `ops-ide-configuration.md`
 
 ### Lesson
 
