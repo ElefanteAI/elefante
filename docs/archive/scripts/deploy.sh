@@ -101,7 +101,7 @@ echo "STEP 3: Running Health Check"
 echo "============================================================"
 echo ""
 
-if $PYTHON_CMD scripts/health_check.py; then
+if $PYTHON_CMD scripts/verify_health.py; then
     print_success "Health check passed"
 else
     print_error "Health check failed"

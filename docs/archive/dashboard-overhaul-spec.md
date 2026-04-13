@@ -53,7 +53,7 @@
 
 ## 6) Verification
 
-- Run: `python scripts/validate_dashboard_snapshot.py --path ~/.elefante/data/dashboard_snapshot.json`
+- Run: `python scripts/verify_dashboard_snapshot.py --path ~/.elefante/data/dashboard_snapshot.json`
 - Optional stricter mode:
   - `--require-curation` to fail if title/summary missing
   - `--strict` to treat warnings as errors

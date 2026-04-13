@@ -7,7 +7,7 @@ Persona: Alex Rivera — Senior Autonomous Agent Engineer at FintechCo
   Uses VS Code + Antigravity, Claude Code, and OpenClaw (custom multi-agent framework).
   Builds production trading bots. Needs consistent context across all IDE sessions.
 
-Runs: .venv/bin/python scripts/elefante_e2e_test_engine.py
+Runs: .venv/bin/python scripts/verify_e2e_tests.py
 
 What it proves:
   1. Memory persists across simulated IDE restarts

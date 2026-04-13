@@ -71,8 +71,8 @@ dev:      `.venv/bin/python -m src.main --mcp`
 test:     `pytest tests/ -v`
 lint:     `ruff check . && mypy src`
 build:    `pyinstaller elefante.spec`
-version:  `.venv/bin/python scripts/version_counsel.py`
-reset:    `ELEFANTE_PRIVILEGED=1 python scripts/factory_reset.py --apply --confirm DELETE`
+version:  `.venv/bin/python scripts/advise_version_bump.py`
+reset:    `ELEFANTE_PRIVILEGED=1 python scripts/reset_factory.py --apply --confirm DELETE`
 </commands>
 
 <constraints>

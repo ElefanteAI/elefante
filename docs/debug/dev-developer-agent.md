@@ -51,7 +51,7 @@ Execute the following pattern based on the type of failure:
 2. TRACE     your change to a spec source (Gate 1)
 3. SCAN      all 8 leakage surfaces (Gate 2)
 4. VERIFY    formulas from src/, not from docs (Gate 3)
-5. TEST      health_check.py + verify_mcp_handshake.py + round-trip (Gate 4)
+5. TEST      verify_health.py + verify_mcp_handshake.py + round-trip (Gate 4)
 6. CLOSE     dev-etiquette.md sequence: CLEAN → DOCS → VERSION → COMMIT (Gate 5)
 ```
 
@@ -69,7 +69,7 @@ Gate details: [`dev-sdd.md`](../technical/dev-sdd.md)
 | What are the MCP tool signatures? | `src/mcp/server.py` (source of truth) → [`spec-tools.md`](../technical/spec-tools.md) (human reference) |
 | What's the system architecture? | [`spec-architecture.md`](../technical/spec-architecture.md) |
 | What's shipped vs planned? | [`planning/spec-vision.md`](../planning/spec-vision.md) |
-| How do I version a release? | `CONTRIBUTING.md` (root) → `scripts/version_counsel.py` |
+| How do I version a release? | `CONTRIBUTING.md` (root) → `scripts/advise_version_bump.py` |
 | How do I run tests? | `tests/README.md` |
 | How do I add a script? | `scripts/README.md` (naming convention) |
 
@@ -96,7 +96,7 @@ The 5 compendiums in this directory are the developer agent's equivalent of Elef
 1. **Guess a formula.** Read `src/models/memory.py` or `src/core/retrieval.py`. Docs may lag.
 2. **Skip Gate 4.** "It looks correct" is not a test result.
 3. **Create new documentation files** without proving all existing files are insufficient.
-4. **Edit version strings by hand.** Use `scripts/version_counsel.py` or `scripts/bump_version.py`.
+4. **Edit version strings by hand.** Use `scripts/advise_version_bump.py` or `scripts/bump_version.py`.
 5. **Print to stdout** in any code reachable from the MCP server. All logging → `sys.stderr`.
 6. **Leave temp files, debug scripts, or commented code** after completing a task.
 

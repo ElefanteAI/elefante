@@ -25,8 +25,8 @@ Use one of the clone patterns in the "Agent Zero / A0 projects" section below.
 If your Docker environment cannot access GitHub, generate a tarball on your machine and upload/copy it into the Docker environment.
 
 ```bash
-chmod +x scripts/package_docker_bundle.sh
-./scripts/package_docker_bundle.sh
+chmod +x scripts/bundle_docker_package.sh
+./scripts/bundle_docker_package.sh
 ```
 
 This creates `dist/elefante-docker-bundle.tar.gz`.
@@ -100,7 +100,7 @@ Run these one-time setup commands:
 docker compose run --rm elefante python scripts/update_dashboard_data.py
 
 # (Optional) verify the system
-docker compose run --rm elefante python scripts/health_check.py
+docker compose run --rm elefante python scripts/verify_health.py
 ```
 
 Then restart the dashboard server if needed:

@@ -383,7 +383,7 @@ python scripts/install.py
 
 ```bash
 python -c "from src.core.orchestrator import MemoryOrchestrator; print(' Import successful')"
-python scripts/health_check.py
+python scripts/verify_health.py
 ```
 
 ---

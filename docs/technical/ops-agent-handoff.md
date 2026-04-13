@@ -118,7 +118,7 @@ docker compose run --rm elefante python scripts/update_dashboard_data.py
 ### Verify health (optional)
 
 ```bash
-docker compose run --rm elefante python scripts/health_check.py
+docker compose run --rm elefante python scripts/verify_health.py
 ```
 
 ### Open dashboard
@@ -174,5 +174,5 @@ As an autonomous agent, you must prove you can use this system effectively. Comp
 **Command:**
 
 1. Call `elefante-MemorySearch` for "Jaime's output preferences".
-2. Based on the result, perform a `health_check.py` and save a new memory using `elefante-MemoryAdd` that summarizes the health status while following the output preferences.
+2. Based on the result, perform a `verify_health.py` and save a new memory using `elefante-MemoryAdd` that summarizes the health status while following the output preferences.
    **Required result:** A successful memory addition following the "No Emojis" and "BLUF" rules.

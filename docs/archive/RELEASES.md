@@ -11,7 +11,7 @@ For full detail, see [CHANGELOG.md](CHANGELOG.md).
   - **Critical fix**: Memory deletion no longer poisons the co-activation graph with stale UUIDs.
   - `_handle_delete_memory()` purges deleted IDs from `_session_retrieval_history`.
   - `record_coactivation()` validates IDs exist in ChromaDB before running O(n^2) graph queries.
-  - `scripts/version_counsel.py` added: smart version advisor (MAJOR/MINOR/PATCH classification from staged diff).
+  - `scripts/advise_version_bump.py` added: smart version advisor (MAJOR/MINOR/PATCH classification from staged diff).
   - `bump_version.py` gets `[0-99]` range validation; `CONTRIBUTING.md` versioning rewritten.
 
 ## Previous Releases

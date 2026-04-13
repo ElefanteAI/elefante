@@ -550,7 +550,7 @@ Rewrote `_start_dashboard_and_open()` in `src/mcp/server.py` to launch the dashb
 
 ---
 
-_Last verified: 2026-02-25 | Run `python scripts/health_check.py` to validate dashboard data path_
+_Last verified: 2026-02-25 | Run `python scripts/verify_health.py` to validate dashboard data path_
 
 ---
 

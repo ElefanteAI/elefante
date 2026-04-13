@@ -415,7 +415,7 @@ Also removed fire-and-forget co-activation writes so graph maintenance stays ins
 ### Permanent Regression Guards
 - `tests/test_memory_persistence.py` now includes a live MCP subprocess regression that launches the real server against an isolated temporary `HOME` and `ELEFANTE_DATA_DIR`, then exercises repeated `MemorySearch` and co-activation traffic before cleanup.
 - `tests/test_memory_persistence.py` also statically enforces that raw `self._conn.execute(...)` calls remain confined to `_initialize_schema()` and `_execute_query_sync()`.
-- `scripts/elefante_e2e_test_engine.py` now embeds the shutdown-race regression probe so fresh installs can validate the real tool path without custom scratch code.
+- `scripts/verify_e2e_tests.py` now embeds the shutdown-race regression probe so fresh installs can validate the real tool path without custom scratch code.
 
 ### Why This Took So Long
 - The first crash looked like a `QueryResult` destructor bug, the second like a database destructor bug.

@@ -23,7 +23,7 @@ INCLUDE_PATHS=(
   "requirements.txt"
   "config.yaml"
   "src"
-  "scripts/health_check.py"
+  "scripts/verify_health.py"
   "scripts/update_dashboard_data.py"
   "docs/technical/agent_handoff.md"
   "docs/technical/docker.md"

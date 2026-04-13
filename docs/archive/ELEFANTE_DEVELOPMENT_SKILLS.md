@@ -255,10 +255,10 @@ Layer 5: VERIFICATION
 
 ```bash
 # Check Elefante system status
-python scripts/health_check.py
+python scripts/verify_health.py
 
 # Validate dashboard snapshot
-python scripts/validate_dashboard_snapshot.py
+python scripts/verify_dashboard_snapshot.py
 
 # Check MCP server handshake
 python scripts/verify_mcp_handshake.py
@@ -481,7 +481,7 @@ elefante-DirectiveRemove {
 
 ```markdown
 - [ ] All tests pass: `pytest tests/`
-- [ ] Health check passes: `python scripts/health_check.py`
+- [ ] Health check passes: `python scripts/verify_health.py`
 - [ ] Dashboard builds: `cd src/dashboard/ui && npm run build`
 - [ ] MCP handshake works: `python scripts/verify_mcp_handshake.py`
 - [ ] No stale locks: `ls ~/.elefante/locks/`
@@ -499,10 +499,10 @@ python -c "from src.mcp.server import app; print('✓ MCP server imports')"
 python -c "from src.core.orchestrator import MemoryOrchestrator; print('✓ Orchestrator imports')"
 
 # Test databases
-python scripts/health_check.py
+python scripts/verify_health.py
 
 # Test dashboard snapshot
-python scripts/validate_dashboard_snapshot.py
+python scripts/verify_dashboard_snapshot.py
 
 # Test MCP handshake
 python scripts/verify_mcp_handshake.py

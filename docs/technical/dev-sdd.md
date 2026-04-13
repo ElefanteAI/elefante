@@ -122,7 +122,7 @@ Run in order:
 
 ```bash
 # 1. System health check
-.venv/bin/python scripts/health_check.py
+.venv/bin/python scripts/verify_health.py
 
 # 2. MCP handshake verification (proves the server actually responds)
 .venv/bin/python scripts/verify_mcp_handshake.py
@@ -136,7 +136,7 @@ ELEFANTE_ALLOW_TEST_MEMORIES=1 .venv/bin/python -m pytest tests/ -k "your_test"
 
 | Check | Required |
 |-------|----------|
-| `health_check.py` | Exit code 0, no CRITICAL warnings |
+| `verify_health.py` | Exit code 0, no CRITICAL warnings |
 | MCP handshake | `"tools"` list returned, all 21 tools present |
 | Round-trip test | Changed fields present and correct in retrieved memory |
 
@@ -150,7 +150,7 @@ Before committing:
 
 - [ ] **Minimal patch** — No unrelated refactors bundled in. One problem, one fix.
 - [ ] **CHANGELOG.md entry written** — `### The Problem Solved` + `### The Solution` + `### Changes` format
-- [ ] **Version bumped** using `scripts/version_counsel.py` — never edit version strings by hand
+- [ ] **Version bumped** using `scripts/advise_version_bump.py` — never edit version strings by hand
 - [ ] **All linked docs updated** — if you changed a tool signature, update `docs/technical/spec-tools.md`
 - [ ] **`grep -r "filename" docs/`** — if you moved or renamed any file, all links resolved
 
@@ -209,11 +209,11 @@ Before writing code:
   5. Verify any formula with actual math
 
 Before committing:
-  6. health_check.py → exit 0
+  6. verify_health.py → exit 0
   7. verify_mcp_handshake.py → 21 tools listed
   8. Round-trip test if memory path touched
   9. CHANGELOG entry written
- 10. version_counsel.py run
+ 10. advise_version_bump.py run
 ```
 
 ---

@@ -902,8 +902,8 @@ class RelationshipType(str, Enum):
 | ---------------------------------- | -------------------- |
 | `scripts/install.py`               | Unified installation |
 | `scripts/update_dashboard_data.py` | Snapshot generation  |
-| `scripts/health_check.py`          | System diagnostics   |
-| `scripts/factory_reset.py`         | Complete data wipe   |
+| `scripts/verify_health.py`          | System diagnostics   |
+| `scripts/reset_factory.py`         | Complete data wipe   |
 
 ### Documentation Files
 
@@ -977,7 +977,7 @@ class RelationshipType(str, Enum):
 1. **Unit tests** should mock database connections
 2. **Integration tests** should use temporary database paths
 3. **E2E tests** should set `ELEFANTE_ALLOW_TEST_MEMORIES=1`
-4. **Always verify** with `scripts/health_check.py` after changes
+4. **Always verify** with `scripts/verify_health.py` after changes
 
 ---
 

@@ -9,8 +9,8 @@ Policy:
 This script avoids printing emoji characters in its output.
 
 Usage:
-  python scripts/emoji_policy.py check
-  python scripts/emoji_policy.py apply
+  python scripts/verify_emoji_policy.py check
+  python scripts/verify_emoji_policy.py apply
 
 Exit codes:
   0: clean

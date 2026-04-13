@@ -401,7 +401,7 @@ def generate_dashboard_snapshot(root_dir, python_cmd):
 def run_health_check(root_dir, python_cmd):
     """Run health check script"""
     logger.log("Running health check...")
-    script_path = root_dir / "scripts" / "health_check.py"
+    script_path = root_dir / "scripts" / "verify_health.py"
     if run_command([python_cmd, str(script_path)], cwd=root_dir, env={'ELEFANTE_LOG_FORMAT': 'text', 'ELEFANTE_LOGGING_FORMAT': 'text'}):
         logger.log("OK: Health check passed")
         return True

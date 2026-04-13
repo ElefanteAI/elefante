@@ -61,7 +61,7 @@ python -m src.dashboard.server
 
 5. **Verify**:
    - `http://127.0.0.1:8000/api/stats` reports the correct `package_version`
-   - `python scripts/health_check.py` passes
+   - `python scripts/verify_health.py` passes
 
 ---
 

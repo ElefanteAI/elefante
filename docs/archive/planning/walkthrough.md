@@ -28,7 +28,7 @@ Static SDD protocol replaced with living Elefante enforcement mechanisms. The me
 
 | Check | Result |
 |-------|--------|
-| `health_check.py` | ✓ All systems operational (270 memories pre-change) |
+| `verify_health.py` | ✓ All systems operational (270 memories pre-change) |
 | `elefante-MemorySearch` | ✓ 17 results — existing SDD SPECIFICATION found |
 | File reads | ✓ All 5 source files read from disk |
 
@@ -36,7 +36,7 @@ Static SDD protocol replaced with living Elefante enforcement mechanisms. The me
 
 | Check | Result |
 |-------|--------|
-| `health_check.py` (post) | ✓ 272 memories, 35 entities, 145 relationships |
+| `verify_health.py` (post) | ✓ 272 memories, 35 entities, 145 relationships |
 | `elefante-DirectiveList` | ✓ 13 directives total (6 new SDD gates confirmed) |
 | Pre-commit hook test | ✓ Gate 4 PASSED — Kuzu lock detection working |
 | MCP handshake | ✓ PASSED |
@@ -50,9 +50,9 @@ Static SDD protocol replaced with living Elefante enforcement mechanisms. The me
 **MCP schema gap (v2.2.0)**: The Python `MemoryType` enum in [src/models/memory.py](file:///Volumes/Hard/2026/AI%20Projects/elefante/src/models/memory.py/Volumes/Hard/2026/AI%20Projects/elefante/src/models/memory.py) included `SPECIFICATION` and `DIRECTIVE`, but the MCP tool schema in [server.py](file:///Volumes/Hard/2026/AI%20Projects/elefante/src/mcp/server.py) line 338 only exposed the original 6 types. This was a Gate 2 leakage surface — the schema told agents these types don't exist, even though the engine supported them.
 
 **Pre-commit hook iterations**: Required 3 fixes:
-1. JSON-formatted logs from `health_check.py` — grep pattern didn't match
+1. JSON-formatted logs from `verify_health.py` — grep pattern didn't match
 2. macOS lacks GNU `timeout` command — replaced with shell watchdog
-3. Kuzu single-writer lock — MCP server holds the lock, blocking `health_check.py` → added lock error detection with graceful bypass
+3. Kuzu single-writer lock — MCP server holds the lock, blocking `verify_health.py` → added lock error detection with graceful bypass
 
 ---
 
@@ -4745,7 +4745,7 @@ When a user deleted or updated a memory, its UUID stayed in the MCP server's `_s
 
 ### Added
 
-- `scripts/version_counsel.py` — interactive smart version advisor. Analyses staged git diff, classifies the change as MAJOR / MINOR / PATCH, presents a recommendation with a short reason and the semantic versioning table, then asks for confirmation before calling `bump_version.py`. Supports manual override (type `x.y.z` at the prompt).
+- `scripts/advise_version_bump.py` — interactive smart version advisor. Analyses staged git diff, classifies the change as MAJOR / MINOR / PATCH, presents a recommendation with a short reason and the semantic versioning table, then asks for confirmation before calling `bump_version.py`. Supports manual override (type `x.y.z` at the prompt).
 
 ### Fixed
 
@@ -4755,9 +4755,9 @@ When a user deleted or updated a memory, its UUID stayed in the MCP server's `_s
 ### Changed
 
 - `scripts/bump_version.py` — added `[0, 99]` range validation for each version part (x, y, z). Rejects values outside this range with a clear error message.
-- `scripts/version_counsel.py` — same `[0, 99]` guard applied to manual override input at the prompt.
-- `CONTRIBUTING.md` — versioning section rewritten: recommends `version_counsel.py` as primary workflow, documents manual bump as secondary, includes example output and full rules.
-- VERSION BUMP GATE Directive updated to reference `version_counsel.py`.
+- `scripts/advise_version_bump.py` — same `[0, 99]` guard applied to manual override input at the prompt.
+- `CONTRIBUTING.md` — versioning section rewritten: recommends `advise_version_bump.py` as primary workflow, documents manual bump as secondary, includes example output and full rules.
+- VERSION BUMP GATE Directive updated to reference `advise_version_bump.py`.
 
 ---
 
@@ -5766,7 +5766,7 @@ The SDD protocol (v2.2.0) was documented as a static markdown file — repeating
 
 1. **6 SDD DIRECTIVES** — Injected into every MCP tool response unconditionally: Gate 0 (source-first), Critical Blocker, Gate 2 (leakage scan), Gate 3 (numeric verification), Gate 4 (simulator), Stdout Purity Law.
 2. **2 SPECIFICATION memories** — Gate 2 (full 8-surface leakage table) and Gate 3 (exact scoring formulas) stored with authority=1.0, zero decay. Always surface when relevant.
-3. **Mechanical pre-commit hook** — `.git/hooks/pre-commit` runs `health_check.py` + `verify_mcp_handshake.py` before every commit. Failure = blocked.
+3. **Mechanical pre-commit hook** — `.git/hooks/pre-commit` runs `verify_health.py` + `verify_mcp_handshake.py` before every commit. Failure = blocked.
 4. **MCP schema fix** — Added `specification` and `directive` to `memory_type` enum in `elefante-MemoryAdd` tool schema (v2.2.0 gap: Python model had these types but MCP schema didn't expose them).
 5. **Static doc reframed** — `docs/technical/sdd-development-protocol.md` marked as human reference only. Enforcement is native.
 6. **Directive cleanup** — Removed 2 test/garbage directives (`"Filter of"`, hello-world variable name test).
@@ -5835,7 +5835,7 @@ When a user deleted or updated a memory, its UUID stayed in the MCP server's `_s
 
 ### Added
 
-- `scripts/version_counsel.py` — interactive smart version advisor. Analyses staged git diff, classifies the change as MAJOR / MINOR / PATCH, presents a recommendation with a short reason and the semantic versioning table, then asks for confirmation before calling `bump_version.py`. Supports manual override (type `x.y.z` at the prompt).
+- `scripts/advise_version_bump.py` — interactive smart version advisor. Analyses staged git diff, classifies the change as MAJOR / MINOR / PATCH, presents a recommendation with a short reason and the semantic versioning table, then asks for confirmation before calling `bump_version.py`. Supports manual override (type `x.y.z` at the prompt).
 
 ### Fixed
 
@@ -5845,9 +5845,9 @@ When a user deleted or updated a memory, its UUID stayed in the MCP server's `_s
 ### Changed
 
 - `scripts/bump_version.py` — added `[0, 99]` range validation for each version part (x, y, z). Rejects values outside this range with a clear error message.
-- `scripts/version_counsel.py` — same `[0, 99]` guard applied to manual override input at the prompt.
-- `CONTRIBUTING.md` — versioning section rewritten: recommends `version_counsel.py` as primary workflow, documents manual bump as secondary, includes example output and full rules.
-- VERSION BUMP GATE Directive updated to reference `version_counsel.py`.
+- `scripts/advise_version_bump.py` — same `[0, 99]` guard applied to manual override input at the prompt.
+- `CONTRIBUTING.md` — versioning section rewritten: recommends `advise_version_bump.py` as primary workflow, documents manual bump as secondary, includes example output and full rules.
+- VERSION BUMP GATE Directive updated to reference `advise_version_bump.py`.
 
 ---
 
@@ -6875,7 +6875,7 @@ tests/          # Pytest suite
 
 ### Recommended workflow — smart advisor
 
-After staging your changes, run `version_counsel.py`. It analyses the diff,
+After staging your changes, run `advise_version_bump.py`. It analyses the diff,
 classifies the change level, and **asks before doing anything**:
 
 ```bash
@@ -6883,10 +6883,10 @@ classifies the change level, and **asks before doing anything**:
 git add <files>
 
 # 2. Ask the advisor (Windows)
-.venv\Scripts\python.exe scripts\version_counsel.py
+.venv\Scripts\python.exe scripts\advise_version_bump.py
 
 # 2. Ask the advisor (macOS/Linux)
-.venv/bin/python scripts/version_counsel.py
+.venv/bin/python scripts/advise_version_bump.py
 ```
 
 The advisor will print:
@@ -6925,7 +6925,7 @@ On confirmation it calls `bump_version.py` automatically.
 
 **Rules — MANDATORY:**
 - NEVER edit version strings by hand in individual files.
-- ALWAYS use `version_counsel.py` (interactive) or `bump_version.py X.Y.Z` (direct) — never manual file edits.
+- ALWAYS use `advise_version_bump.py` (interactive) or `bump_version.py X.Y.Z` (direct) — never manual file edits.
 - Run `--check` before committing to catch drift.
 - CHANGELOG.md and RELEASES.md entries must be written manually (they are historical logs, not current-version declarations).
 - If a new doc file has a version marker, ADD IT to `scripts/bump_version.py` TARGETS before the next version bump.
@@ -6989,7 +6989,7 @@ tests/          # Pytest suite
 
 ### Recommended workflow — smart advisor
 
-After staging your changes, run `version_counsel.py`. It analyses the diff,
+After staging your changes, run `advise_version_bump.py`. It analyses the diff,
 classifies the change level, and **asks before doing anything**:
 
 ```bash
@@ -6997,10 +6997,10 @@ classifies the change level, and **asks before doing anything**:
 git add <files>
 
 # 2. Ask the advisor (Windows)
-.venv\Scripts\python.exe scripts\version_counsel.py
+.venv\Scripts\python.exe scripts\advise_version_bump.py
 
 # 2. Ask the advisor (macOS/Linux)
-.venv/bin/python scripts/version_counsel.py
+.venv/bin/python scripts/advise_version_bump.py
 ```
 
 The advisor will print:
@@ -7039,7 +7039,7 @@ On confirmation it calls `bump_version.py` automatically.
 
 **Rules — MANDATORY:**
 - NEVER edit version strings by hand in individual files.
-- ALWAYS use `version_counsel.py` (interactive) or `bump_version.py X.Y.Z` (direct) — never manual file edits.
+- ALWAYS use `advise_version_bump.py` (interactive) or `bump_version.py X.Y.Z` (direct) — never manual file edits.
 - Run `--check` before committing to catch drift.
 - CHANGELOG.md and RELEASES.md entries must be written manually (they are historical logs, not current-version declarations).
 - If a new doc file has a version marker, ADD IT to `scripts/bump_version.py` TARGETS before the next version bump.
@@ -7181,7 +7181,7 @@ Run in order:
 
 ```bash
 # 1. System health check
-.venv/bin/python scripts/health_check.py
+.venv/bin/python scripts/verify_health.py
 
 # 2. MCP handshake verification (proves the server actually responds)
 .venv/bin/python scripts/verify_mcp_handshake.py
@@ -7195,7 +7195,7 @@ ELEFANTE_ALLOW_TEST_MEMORIES=1 .venv/bin/python -m pytest tests/ -k "your_test"
 
 | Check | Required |
 |-------|----------|
-| `health_check.py` | Exit code 0, no CRITICAL warnings |
+| `verify_health.py` | Exit code 0, no CRITICAL warnings |
 | MCP handshake | `"tools"` list returned, all 20 tools present |
 | Round-trip test | Changed fields present and correct in retrieved memory |
 
@@ -7209,7 +7209,7 @@ Before committing:
 
 - [ ] **Minimal patch** — No unrelated refactors bundled in. One problem, one fix.
 - [ ] **CHANGELOG.md entry written** — `### The Problem Solved` + `### The Solution` + `### Changes` format
-- [ ] **Version bumped** using `scripts/version_counsel.py` — never edit version strings by hand
+- [ ] **Version bumped** using `scripts/advise_version_bump.py` — never edit version strings by hand
 - [ ] **All linked docs updated** — if you changed a tool signature, update `docs/technical/usage.md`
 - [ ] **`grep -r "filename" docs/`** — if you moved or renamed any file, all links resolved
 
@@ -7270,11 +7270,11 @@ Before writing code:
   5. Verify any formula with actual math
 
 Before committing:
-  6. health_check.py → exit 0
+  6. verify_health.py → exit 0
   7. verify_mcp_handshake.py → 20 tools listed
   8. Round-trip test if memory path touched
   9. CHANGELOG entry written
- 10. version_counsel.py run
+ 10. advise_version_bump.py run
 ```
 
 ---

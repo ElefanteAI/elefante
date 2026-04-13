@@ -99,13 +99,13 @@ curl http://127.0.0.1:8000/api/stats
 ### Method 3.5: Run the Health Check Script
 
 ```bash
-python scripts/dashboard_health_check.py --port 8000
+python scripts/verify_dashboard_health.py --port 8000
 ```
 
 ### Method 3.6: Validate the Snapshot File
 
 ```bash
-python scripts/validate_dashboard_snapshot.py --path ~/.elefante/data/dashboard_snapshot.json
+python scripts/verify_dashboard_snapshot.py --path ~/.elefante/data/dashboard_snapshot.json
 ```
 
 ### Method 4: Open in Browser
@@ -186,7 +186,7 @@ python -m src.dashboard.server
 
 ```bash
 # Check memory count
-python scripts/health_check.py
+python scripts/verify_health.py
 
 # Look for: "total_memories: 0"
 

@@ -1109,7 +1109,7 @@ python3 scripts/golden_cleanup.py --apply
 |--------|---------|
 | [`scripts/golden_cleanup.py`](scripts/golden_cleanup.py) | Memory metadata cleanup (topic, score, status) with --dry-run/--apply |
 | [`scripts/update_dashboard_data.py`](scripts/update_dashboard_data.py) | Snapshot generation pipeline |
-| [`scripts/dashboard_health_check.py`](scripts/dashboard_health_check.py) | Dashboard health diagnostic |
+| [`scripts/verify_dashboard_health.py`](scripts/verify_dashboard_health.py) | Dashboard health diagnostic |
 
 ### Documentation
 

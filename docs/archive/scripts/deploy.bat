@@ -64,7 +64,7 @@ echo STEP 3: Running Health Check
 echo ============================================================
 echo.
 
-python scripts\health_check.py
+python scripts\verify_health.py
 if errorlevel 1 (
     echo [ERROR] Health check failed
     exit /b 1

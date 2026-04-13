@@ -237,11 +237,11 @@ After installation, verify everything works:
 
 Windows:
 ```cmd
-.venv\Scripts\python.exe scripts\health_check.py
+.venv\Scripts\python.exe scripts\verify_health.py
 ```
 macOS/Linux:
 ```bash
-./.venv/bin/python scripts/health_check.py
+./.venv/bin/python scripts/verify_health.py
 ```
 
 Expected output:
@@ -253,7 +253,7 @@ Expected output:
  All systems operational
 ```
 
-`health_check.py` now also verifies the runtime SDD baseline:
+`verify_health.py` now also verifies the runtime SDD baseline:
 
 - Built-in system directives are present
 - The `STDOUT Purity Law` directive is active
@@ -274,11 +274,11 @@ macOS/Linux:
 
 Windows:
 ```cmd
-.venv\Scripts\python.exe scripts\elefante_e2e_test_engine.py
+.venv\Scripts\python.exe scripts\verify_e2e_tests.py
 ```
 macOS/Linux:
 ```bash
-./.venv/bin/python scripts/elefante_e2e_test_engine.py
+./.venv/bin/python scripts/verify_e2e_tests.py
 ```
 
 This harness now proves three installation-critical properties in one pass:
@@ -320,17 +320,17 @@ Open: http://127.0.0.1:8000
 The installation script checks:
 
 - **MCP Liveness**: Performs a real JSON-RPC handshake (`scripts/verify_mcp_handshake.py`).
-- **Runtime Baseline**: Verifies built-in directives and seeded specification memories via `scripts/health_check.py`.
+- **Runtime Baseline**: Verifies built-in directives and seeded specification memories via `scripts/verify_health.py`.
 
 ### Verification Command (Manual)
 
 Windows:
 ```cmd
-.venv\Scripts\python.exe scripts\health_check.py
+.venv\Scripts\python.exe scripts\verify_health.py
 ```
 macOS/Linux:
 ```bash
-python scripts/health_check.py
+python scripts/verify_health.py
 ```
 
 To verify the Inception Memory (The Prime Directive):
