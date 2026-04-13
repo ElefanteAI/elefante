@@ -217,6 +217,7 @@ Before completing ANY task:
 
 **Trigger:** "Elefante Mode is DISABLED" despite prior `enable()`, or "Could not acquire lock"  
 **Action:** Check `~/.elefante/locks/write.lock`; if PID is dead or timestamp > 30s, delete it. v1.1.0+ auto-clears on next operation.  
+**Rescue:** `python scripts/debug/unlock_database.py --apply --confirm DELETE` or `python scripts/debug/remove_kuzu_lock.py --apply --confirm DELETE`  
 **Why:** v1.0.1 used session-scoped locks held indefinitely. A crashed IDE leaves an orphaned lock. v1.1.0 uses transaction-scoped locks (auto-expire 30s).  
 **Source:** `docs/debug/database-compendium.md` Issue #2, `docs/technical/kuzu-lock-monitoring.md`
 
@@ -224,6 +225,7 @@ Before completing ANY task:
 
 **Trigger:** `kuzu_db` exists as a single file (not a directory); `Cannot open file` errors  
 **Action:** Backup, delete `kuzu_db`, reinitialize. ChromaDB is unaffected.  
+**Rescue:** `ELEFANTE_PRIVILEGED=1 python scripts/debug/nuclear_reset_kuzu.py --apply --confirm DELETE`  
 **Why:** Interrupted database creation or permissions issue produces a file instead of a directory structure.  
 **Source:** `docs/debug/database-compendium.md` Issue #3
 
@@ -243,7 +245,7 @@ Before completing ANY task:
 **Trigger:** Agent outputs `memory_searched: true` in JSON structure without actually calling the tool  
 **Action:** Do not trust the JSON block. Always check MCP server logs/traces for the actual tool call sequence. A false positive mandates an immediate failure grade (2 or below).  
 **Why:** LLMs frequently suffer from "false sense of control" and will confidently output compliant JSON text without invoking the real system graph actions.  
-**Source:** `docs/sdd/experiment-design.md` (Calibration Baseline)
+**Source:** `docs/technical/sdd-development-protocol.md` (Calibration Baseline)
 
 ### pitfall: mcp type signature list types tool
 
@@ -383,7 +385,7 @@ Before completing ANY task:
 ## Quick Reference
 
 | Category     | Most Common Pitfall       | Quick Fix                                                   |
-| ------------ | ------------------------- | ----------------------------------------------------------- | --- | -------- | -------------------------- | -------------------------------------------------------- |
+| ------------ | ------------------------- | ----------------------------------------------------------- |
 | Dashboard    | Stale snapshot            | `python scripts/update_dashboard_data.py`                   |
 | Dashboard    | Browser cache             | `Ctrl+Shift+R`                                              |
 | Installation | Kuzu pre-existing dir     | Do not mkdir; let `GraphStore.__init__` handle it           |
@@ -392,9 +394,11 @@ Before completing ANY task:
 | Windows      | fcntl import              | `if sys.platform != "win32": import fcntl`                  |
 | Windows      | Activate.ps1 blocked      | `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`       |
 | Windows      | Wrong venv path           | Use `.venv\Scripts\python.exe` not `.venv/bin/python`       |
-| Windows      | MCP config not found      | `python scripts\configure_vscode_bob.py`                    |     | Windows  | read_text encoding crash   | Always pass `encoding='utf-8'` to `read_text/write_text` |
-| Versioning   | Version part out of range | Each of x, y, z must be in `[0, 99]` — scripts enforce this |     | Database | Reserved word `properties` | Use `props`                                              |
-| Database     | Stale lock                | Check `~/.elefante/locks/write.lock`, delete if stale       |
+| Windows      | MCP config not found      | `python scripts\configure_vscode_bob.py`                    |
+| Windows      | read_text encoding crash  | Always pass `encoding='utf-8'` to `read_text/write_text`   |
+| Versioning   | Version part out of range | Each of x, y, z must be in `[0, 99]` — scripts enforce this |
+| Database     | Reserved word `properties`| Use `props`                                                 |
+| Database     | Stale lock                | `python scripts/debug/unlock_database.py --apply --confirm DELETE` |
 | MCP          | Rule Drift in JSON        | Verify MCP logs; do not trust LLM self-reported JSON flags  |
 | MCP          | Tools not showing         | `list[types.Tool]` not `List[Tool]`                         |
 | MCP          | stdout pollution          | All logs → `sys.stderr`                                     |

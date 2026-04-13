@@ -1,7 +1,7 @@
 # Elefante Test Suite
 
 > **Version:** 2.2.1  
-> **Last Updated:** 2026-02-26
+> **Last Updated:** 2026-04-12
 
 ## Quick Reference
 
@@ -42,6 +42,8 @@ The shipped E2E harness runs against an isolated temporary Elefante home/data di
 | ------------------------------------ | ---------------------------------------------- | ------------------------------------ |
 | [test_scoring.py](test_scoring.py)   | Score normalization math, weight calculation   | When changing `src/core/scoring.py`  |
 | [test_refinery.py](test_refinery.py) | Memory deduplication, canonical key assignment | When changing `src/core/refinery.py` |
+| [test_no_emojis.py](test_no_emojis.py) | Emoji policy enforcement across source files | When changing emoji policy |
+| [test_v4_concept_overlap.py](test_v4_concept_overlap.py) | Concept overlap detection in memory schema | When changing concept fields |
 
 ### INTEGRATION (Run before release)
 
@@ -61,18 +63,13 @@ tests/
 │
 ├── test_memory_persistence.py   <- CRITICAL
 ├── test_memory_guard.py         <- CRITICAL
+├── test_autonomous_coactivation.py <- CRITICAL
 ├── test_scoring.py              <- Unit test
 ├── test_refinery.py             <- Unit test
+├── test_no_emojis.py            <- Unit test (policy)
+├── test_v4_concept_overlap.py   <- Unit test (schema)
 ├── test_integration_smoke.py    <- Integration
-│
-├── archive/                     <- Old tests, kept for reference
-│   ├── test_compliance_gate.py      ← v1.6 feature (shipped)
-│   ├── test_v5_explanation.py       ← v5 retrieval (shipped)
-│   ├── test_v5_health.py            ← v5 health analyzer (shipped)
-│   ├── test_v5_proactive.py         ← v5 proactive surfacing (shipped)
-│   ├── test_trigger_words.py        ← Merged into integration smoke
-│   ├── test_semantic_agnostic.py    ← Embedding quality (one-time)
-│   └── ... (more historical tests)
+├── test_end_to_end.py           <- Convenience shim → manual/test_end_to_end.py
 │
 ├── manual/                      <- Require human observation
 │   ├── README.md                    <- Instructions for each
@@ -99,16 +96,6 @@ tests/
 | Verify real IDE-like workflow   | `./.venv/bin/python scripts/elefante_e2e_test_engine.py`                |
 
 ---
-
-## Archive Policy
-
-Tests move to `archive/` when:
-
-- The feature they validate is **shipped and stable** (e.g., v5, compliance gate)
-- They were **one-time validation** tests (e.g., embedding quality)
-- They're **superseded** by a better test
-
-Archived tests can still run: `pytest tests/archive/ -v`
 
 ---
 

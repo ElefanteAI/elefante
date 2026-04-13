@@ -1,5 +1,9 @@
 # Elefante
 
+<p align="center">
+  <img src="docs/assets/Elefante Logo 1024 white.png" alt="Elefante" width="256">
+</p>
+
 **Elefante never forgets.**
 
 AI agents start every conversation from zero. Your preferences, decisions, and discovered patterns don't carry over. Elefante gives any MCP-compatible agent a persistent, local second brain — memories are stored, scored automatically, and surfaced at the right moment without being asked.

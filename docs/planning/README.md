@@ -8,6 +8,9 @@ This directory contains roadmaps and future plans for Project Elefante.
 |------|---------|
 | [`roadmap.md`](roadmap.md) | Main development roadmap (shipped features, planned work) |
 | [`vision.md`](vision.md) | Long-term project vision |
+| [`ELEFANTE_VISION_BRIEF.md`](ELEFANTE_VISION_BRIEF.md) | Comprehensive implementation guide (all 14 sections) |
+| [`native-sdd-enforcement.md`](native-sdd-enforcement.md) | SDD via Directives and Specifications (v2.2.1 implementation plan) |
+| [`usage-intelligence-prd.md`](usage-intelligence-prd.md) | Product requirements for usage metrics |
 | [`v5-cognitive-retrieval-requirements.md`](v5-cognitive-retrieval-requirements.md) | V5 cognitive retrieval feature requirements |
 | [`specs/`](specs/) | Detailed feature specifications (session distiller, etc.) |
 
@@ -26,4 +29,4 @@ Planning documents define **future work**. They are:
 
 ---
 
-**Last Updated**: 2026-02-16
+**Last Updated**: 2026-04-12

@@ -2,7 +2,7 @@
 
 **Compendiums and pitfall reference for Elefante v2.2.1**
 
-> **Last Updated:** 2026-02-26
+> **Last Updated:** 2026-04-12
 
 ---
 
@@ -15,7 +15,7 @@ docs/debug/
 ```
 
 Operational quick-reference (pitfalls, LAWs) lives in **[`docs/pitfall-index.md`](../pitfall-index.md)**.  
-Archived neural registers are in `docs/archive/deprecated-registers/`.
+Debug and diagnostic scripts live in **[`scripts/debug/`](../../scripts/debug/)**.
 
 ---
 

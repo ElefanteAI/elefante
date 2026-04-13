@@ -26,3 +26,24 @@ If you need a new script, prefer adding a new `verb_object` script rather than c
 | `bump_version.py --check` | Verify all 25 files declare the same version (exit 1 on drift) | Run before every commit |
 
 **Rules:** Version parts x, y, z must be natural numbers in `[0, 99]`. Both scripts enforce this. See `CONTRIBUTING.md` for the full versioning procedure.
+
+## Debug scripts (`scripts/debug/`)
+
+Diagnostic and rescue tools for broken state. Referenced from [`docs/pitfall-index.md`](../docs/pitfall-index.md).
+
+| Script | Purpose | Safety |
+|---|---|---|
+| `dump_all_memories.py` | Raw ChromaDB memory dump to stdout | Read-only |
+| `list_recent.py` | Show 10 most recent memories (via Orchestrator) | Read-only |
+| `unlock_database.py` | Clear stuck transaction locks | Requires `--apply --confirm DELETE` |
+| `remove_kuzu_lock.py` | Remove stale Kuzu write lock file | Requires `--apply --confirm DELETE` |
+| `nuclear_reset_kuzu.py` | Backup and destroy corrupted Kuzu database | Requires `ELEFANTE_PRIVILEGED=1` |
+
+## Privileged scripts (`scripts/privileged/`)
+
+See [`scripts/privileged/README.md`](privileged/README.md) for privilege gating rules.
+
+| Script | Purpose | Safety |
+|---|---|---|
+| `memory_surgeon.py` | Surgical memory removal with impact analysis | Dry-run by default |
+| `memory_workbench.py` | Read-only memory connectivity inspector | Read-only |
