@@ -1,7 +1,7 @@
 # Elefante
 
 <p align="center">
-  <img src="docs/assets/Elefante Logo 1024 white.png" alt="Elefante" width="256">
+  <img src="docs/assets/Elefante Logo 1024 black 2.png" alt="Elefante" width="256">
 </p>
 
 **Elefante never forgets.**
