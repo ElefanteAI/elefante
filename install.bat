@@ -69,7 +69,7 @@ if errorlevel 1 (
 REM 4. Run Python Installer
 echo [INFO] Starting installation wizard...
 echo [INFO] Starting installation wizard... >> "%LOG_FILE%"
-%PYTHON_CMD% scripts\install.py --log-file "%LOG_FILE%"
+%PYTHON_CMD% scripts\setup\install.py --log-file "%LOG_FILE%"
 
 REM Keep window open if run from explorer
 echo.

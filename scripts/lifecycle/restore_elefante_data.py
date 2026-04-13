@@ -4,9 +4,9 @@
 This overwrites ~/.elefante/data by default, so STOP all Elefante processes first.
 
 Usage:
-  python scripts/restore_elefante_data.py --latest --force
-  python scripts/restore_elefante_data.py --archive ~/.elefante/backups/elefante_data_backup_YYYYMMDD_HHMMSS.zip --force
-  python scripts/restore_elefante_data.py --elefante-home ~/.elefante --latest --force
+  python scripts/lifecycle/restore_elefante_data.py --latest --force
+  python scripts/lifecycle/restore_elefante_data.py --archive ~/.elefante/backups/elefante_data_backup_YYYYMMDD_HHMMSS.zip --force
+  python scripts/lifecycle/restore_elefante_data.py --elefante-home ~/.elefante --latest --force
 
 Notes:
 - The existing data dir is moved aside to data.pre_restore.<timestamp> unless --discard-existing is set.

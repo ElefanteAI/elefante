@@ -167,7 +167,7 @@ print('\n All dependencies compatible with Python 3.11')
 
 ```bash
 source .venv/bin/activate
-python scripts/verify_health.py
+python scripts/verify/verify_health.py
 
 # Should output:  All systems operational!
 ```
@@ -207,7 +207,7 @@ source .venv/bin/activate  # Mac/Linux
 pip install -r requirements.txt
 
 # Test
-python scripts/verify_health.py
+python scripts/verify/verify_health.py
 ```
 
 ### Fix #2: Explicitly Specify Python in Installation
@@ -312,7 +312,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # Verify
-python scripts/verify_health.py
+python scripts/verify/verify_health.py
 ```
 
 ### Step 4: Migrate Data (Optional)
@@ -320,7 +320,7 @@ python scripts/verify_health.py
 ```bash
 # If you have existing Kuzu database, it should still work
 # But recommend running integrity check
-python scripts/verify_health.py
+python scripts/verify/verify_health.py
 ```
 
 ### Step 5: Cleanup

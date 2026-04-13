@@ -28,7 +28,7 @@ Memories were stored as raw text. Search only matched words. No understanding of
 | Authority scoring       | `src/utils/curation.py`                        | Verified                |
 | Cognitive retriever     | `src/core/retrieval.py`                        | Wired (orchestrator.py) |
 | Auto-populate on add    | `src/core/orchestrator.py`                     | Verified                |
-| SHARES_CONCEPT edges    | `scripts/update_dashboard_data.py`             | Verified (24 edges)     |
+| SHARES_CONCEPT edges    | `scripts/pipeline/update_dashboard_data.py`             | Verified (24 edges)     |
 | Documentation           | `docs/technical/spec-memory-schema.md` | Done                    |
 
 ### A.3 New Metadata Fields
@@ -149,7 +149,7 @@ def compute_health(memory) -> HealthStatus:
 #### Files to Modify
 
 - `src/utils/curation.py` - Add `compute_health()`
-- `scripts/update_dashboard_data.py` - Add health to node properties
+- `scripts/pipeline/update_dashboard_data.py` - Add health to node properties
 - `src/dashboard/ui/src/components/` - Render health indicator
 
 #### Acceptance Criteria
@@ -214,7 +214,7 @@ POTENTIAL_OPPOSING_PATTERNS = [
 
 - `src/utils/curation.py` - Add `detect_potential_conflict()`
 - `src/core/orchestrator.py` - Check on add, populate `potential_conflicts`
-- `scripts/update_dashboard_data.py` - Add POTENTIAL_CONFLICT edges (dashed)
+- `scripts/pipeline/update_dashboard_data.py` - Add POTENTIAL_CONFLICT edges (dashed)
 - Dashboard - Add conflict review UI
 
 #### Acceptance Criteria
@@ -335,7 +335,7 @@ Signal hubs (topic, ring, knowledge_type) have rich cognitive metadata.
 
 #### Files to Modify
 
-- `scripts/update_dashboard_data.py` - Enrich hub properties
+- `scripts/pipeline/update_dashboard_data.py` - Enrich hub properties
 - `src/dashboard/ui/src/components/` - Show rich tooltips
 
 #### Acceptance Criteria
@@ -426,7 +426,7 @@ Flag potential issues for user review rather than auto-asserting. The system sug
 - `src/utils/curation.py` - extract_concepts, infer_surfaces_when, compute_authority_score
 - `src/core/retrieval.py` - CognitiveRetriever (wired to orchestrator)
 - `src/core/orchestrator.py` - Auto-populate V4 fields on add; CognitiveRetriever scoring on search
-- `scripts/update_dashboard_data.py` - SHARES_CONCEPT edges
+- `scripts/pipeline/update_dashboard_data.py` - SHARES_CONCEPT edges
 - `docs/technical/spec-memory-schema.md` - Documentation
 
 ### To Modify in V5
@@ -434,4 +434,4 @@ Flag potential issues for user review rather than auto-asserting. The system sug
 - `src/core/orchestrator.py` - Wire CognitiveRetriever (Phase 0)
 - `src/mcp/server.py` - Include explanation in search response
 - `src/dashboard/ui/src/components/` - Health indicators, tooltips
-- `scripts/update_dashboard_data.py` - Hub enrichment, health, conflict edges
+- `scripts/pipeline/update_dashboard_data.py` - Hub enrichment, health, conflict edges

@@ -274,7 +274,7 @@ This prevents lock conflicts: Dashboard can run anytime without accessing Kuzu d
 
 ```bash
 # Update snapshot
-python scripts/update_dashboard_data.py
+python scripts/pipeline/update_dashboard_data.py
 
 # Dashboard can now run without locking Kuzu
 python -m src.dashboard.server
@@ -438,7 +438,7 @@ Before claiming "Lock is healthy":
 - [ ] Database is accessible: `python -c "import kuzu; kuzu.Database(...)"`
 - [ ] No stale processes: `ps aux | grep python` shows expected processes only
 - [ ] Dashboard uses snapshot, not direct Kuzu access
-- [ ] Snapshot is updated before running Dashboard: `python scripts/update_dashboard_data.py`
+- [ ] Snapshot is updated before running Dashboard: `python scripts/pipeline/update_dashboard_data.py`
 
 ---
 

@@ -7,7 +7,7 @@ from pathlib import Path
 import chromadb
 
 # Add src to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from src.core.graph_store import GraphStore
 from src.utils.config import get_config

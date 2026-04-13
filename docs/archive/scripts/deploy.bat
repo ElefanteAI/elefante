@@ -50,7 +50,7 @@ echo STEP 2: Initializing Databases
 echo ============================================================
 echo.
 
-python scripts\init_databases.py
+python scripts\setup\init_databases.py
 if errorlevel 1 (
     echo [ERROR] Database initialization failed
     exit /b 1
@@ -64,7 +64,7 @@ echo STEP 3: Running Health Check
 echo ============================================================
 echo.
 
-python scripts\verify_health.py
+python scripts\verify\verify_health.py
 if errorlevel 1 (
     echo [ERROR] Health check failed
     exit /b 1

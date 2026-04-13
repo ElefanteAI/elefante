@@ -95,7 +95,7 @@ install.bat
    > PowerShell alternative (if you prefer PS):
    > ```powershell
    > .venv\Scripts\Activate.ps1
-   > python scripts\install.py
+   > python scripts\setup\install.py
    > ```
 
 2. Restart VS Code.
@@ -105,13 +105,13 @@ install.bat
 4. Verify tool registration:
 
 ```cmd
-.venv\Scripts\python.exe scripts\list_mcp_tools.py
+.venv\Scripts\python.exe scripts\ci\list_mcp_tools.py
 ```
 
 5. Dashboard (snapshot + server):
 
 ```cmd
-.venv\Scripts\python.exe scripts\update_dashboard_data.py
+.venv\Scripts\python.exe scripts\pipeline\update_dashboard_data.py
 .venv\Scripts\python.exe -m src.dashboard.server
 ```
 
@@ -137,13 +137,13 @@ chmod +x install.sh
 4. Verify tool registration:
 
 ```bash
-./.venv/bin/python scripts/list_mcp_tools.py
+./.venv/bin/python scripts/ci/list_mcp_tools.py
 ```
 
 5. Dashboard (snapshot + server):
 
 ```bash
-./.venv/bin/python scripts/update_dashboard_data.py
+./.venv/bin/python scripts/pipeline/update_dashboard_data.py
 ./.venv/bin/python -m src.dashboard.server
 ```
 
@@ -196,7 +196,7 @@ pip install -r requirements.txt
 ### Step 4: Initialize Databases
 
 ```bash
-python scripts/init_databases.py
+python scripts/setup/init_databases.py
 ```
 
 ### Step 5: Configure IDE (see section 3 below)
@@ -212,7 +212,7 @@ Elefante integrates with AI coding assistants via the **Model Context Protocol (
 Run the configuration script to auto-detect and configure your IDE:
 
 ```bash
-python scripts/configure_vscode_bob.py
+python scripts/setup/configure_vscode_bob.py
 ```
 
 Supported IDEs:
@@ -237,11 +237,11 @@ After installation, verify everything works:
 
 Windows:
 ```cmd
-.venv\Scripts\python.exe scripts\verify_health.py
+.venv\Scripts\python.exe scripts\verify\verify_health.py
 ```
 macOS/Linux:
 ```bash
-./.venv/bin/python scripts/verify_health.py
+./.venv/bin/python scripts/verify/verify_health.py
 ```
 
 Expected output:
@@ -263,22 +263,22 @@ Expected output:
 
 Windows:
 ```cmd
-.venv\Scripts\python.exe scripts\verify_mcp_handshake.py
+.venv\Scripts\python.exe scripts\verify\verify_mcp_handshake.py
 ```
 macOS/Linux:
 ```bash
-./.venv/bin/python scripts/verify_mcp_handshake.py
+./.venv/bin/python scripts/verify/verify_mcp_handshake.py
 ```
 
 ### Run the Live E2E Harness
 
 Windows:
 ```cmd
-.venv\Scripts\python.exe scripts\verify_e2e_tests.py
+.venv\Scripts\python.exe scripts\verify\verify_e2e_tests.py
 ```
 macOS/Linux:
 ```bash
-./.venv/bin/python scripts/verify_e2e_tests.py
+./.venv/bin/python scripts/verify/verify_e2e_tests.py
 ```
 
 This harness now proves three installation-critical properties in one pass:
@@ -293,23 +293,23 @@ It runs inside an isolated temporary Elefante home so verification does not poll
 
 Windows:
 ```cmd
-.venv\Scripts\python.exe scripts\list_mcp_tools.py
+.venv\Scripts\python.exe scripts\ci\list_mcp_tools.py
 ```
 macOS/Linux:
 ```bash
-./.venv/bin/python scripts/list_mcp_tools.py
+./.venv/bin/python scripts/ci/list_mcp_tools.py
 ```
 
 ### Dashboard Smoke Check
 
 Windows:
 ```cmd
-.venv\Scripts\python.exe scripts\update_dashboard_data.py
+.venv\Scripts\python.exe scripts\pipeline\update_dashboard_data.py
 .venv\Scripts\python.exe -m src.dashboard.server
 ```
 macOS/Linux:
 ```bash
-./.venv/bin/python scripts/update_dashboard_data.py
+./.venv/bin/python scripts/pipeline/update_dashboard_data.py
 ./.venv/bin/python -m src.dashboard.server
 ```
 
@@ -319,18 +319,18 @@ Open: http://127.0.0.1:8000
 
 The installation script checks:
 
-- **MCP Liveness**: Performs a real JSON-RPC handshake (`scripts/verify_mcp_handshake.py`).
-- **Runtime Baseline**: Verifies built-in directives and seeded specification memories via `scripts/verify_health.py`.
+- **MCP Liveness**: Performs a real JSON-RPC handshake (`scripts/verify/verify_mcp_handshake.py`).
+- **Runtime Baseline**: Verifies built-in directives and seeded specification memories via `scripts/verify/verify_health.py`.
 
 ### Verification Command (Manual)
 
 Windows:
 ```cmd
-.venv\Scripts\python.exe scripts\verify_health.py
+.venv\Scripts\python.exe scripts\verify\verify_health.py
 ```
 macOS/Linux:
 ```bash
-python scripts/verify_health.py
+python scripts/verify/verify_health.py
 ```
 
 To verify the Inception Memory (The Prime Directive):
@@ -374,7 +374,7 @@ To verify the crash regression path specifically, run the E2E harness above and 
 **Solution**: Fixed in current `src/utils/config.py` — constant is `kuzu_db` (not `kuzu`). If you see path errors, verify `KUZU_DIR = DATA_DIR / "kuzu_db"` in that file.
 
 **Issue**: MCP server not found at `%APPDATA%\Code\User\mcp.json`
-**Solution**: Run `python scripts\configure_vscode_bob.py` from the repo root (with venv activated). The script writes the correct absolute Windows path to the venv Python.
+**Solution**: Run `python scripts\setup\configure_vscode_bob.py` from the repo root (with venv activated). The script writes the correct absolute Windows path to the venv Python.
 
 ### Common Issues (All Platforms)
 
@@ -565,8 +565,8 @@ rm -rf ~/.elefante/
 
 **Warning**: Step 3 deletes all stored memories. Backup first:
 
-Windows: `python scripts\backup_elefante_data.py`
-macOS/Linux: `python scripts/backup_elefante_data.py`
+Windows: `python scripts\lifecycle\backup_elefante_data.py`
+macOS/Linux: `python scripts/lifecycle/backup_elefante_data.py`
 
 ---
 

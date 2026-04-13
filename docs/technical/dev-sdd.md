@@ -77,7 +77,7 @@ For every proposed change, scan ALL of the following surfaces. Any positive hit 
 | **Kuzu schema/DML split** | Any new property name: test `CREATE NODE TABLE (...)` AND `CREATE (entity {...})` in the same test. Schema-valid names can be Cypher-invalid. |
 | **stdout pollution** | Does any new code `print()` anywhere reachable from the MCP server? All logging MUST go to `sys.stderr`. One `print()` on stdout = corrupted JSON-RPC stream = dead connection. |
 | **Compliance Gate state machine** | Does the change touch `_compliance_state`, `GATED_TOOLS`, or any handler that calls `_check_compliance_gate()`? |
-| **Dashboard snapshot contract** | Dashboard reads from `snapshot.json`, not live DB. If you add a field, update `scripts/update_dashboard_data.py` AND `src/dashboard/server.py` AND the TypeScript types. |
+| **Dashboard snapshot contract** | Dashboard reads from `snapshot.json`, not live DB. If you add a field, update `scripts/pipeline/update_dashboard_data.py` AND `src/dashboard/server.py` AND the TypeScript types. |
 | **Co-activation history** | If a memory is deleted or updated, is its UUID purged from `_session_retrieval_history` before `record_coactivation()` can reference it? |
 | **Documentation links** | Before moving or archiving ANY file: `grep -r "filename" docs/` — update ALL inbound links first. Ghost links persist for weeks. |
 
@@ -122,10 +122,10 @@ Run in order:
 
 ```bash
 # 1. System health check
-.venv/bin/python scripts/verify_health.py
+.venv/bin/python scripts/verify/verify_health.py
 
 # 2. MCP handshake verification (proves the server actually responds)
-.venv/bin/python scripts/verify_mcp_handshake.py
+.venv/bin/python scripts/verify/verify_mcp_handshake.py
 
 # 3. If memory storage/retrieval path touched: round-trip test
 #    Store a memory → retrieve it → verify all changed fields survived
@@ -150,7 +150,7 @@ Before committing:
 
 - [ ] **Minimal patch** — No unrelated refactors bundled in. One problem, one fix.
 - [ ] **CHANGELOG.md entry written** — `### The Problem Solved` + `### The Solution` + `### Changes` format
-- [ ] **Version bumped** using `scripts/advise_version_bump.py` — never edit version strings by hand
+- [ ] **Version bumped** using `scripts/ci/advise_version_bump.py` — never edit version strings by hand
 - [ ] **All linked docs updated** — if you changed a tool signature, update `docs/technical/spec-tools.md`
 - [ ] **`grep -r "filename" docs/`** — if you moved or renamed any file, all links resolved
 

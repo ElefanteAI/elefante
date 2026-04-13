@@ -6,9 +6,9 @@ It checks structural integrity, edge endpoint validity, and (optionally)
 curated fields presence for memory nodes.
 
 Usage:
-  python scripts/verify_dashboard_snapshot.py --path ~/.elefante/data/dashboard_snapshot.json
-  python scripts/verify_dashboard_snapshot.py --path ~/.elefante/data/dashboard_snapshot.json --require-curation
-  python scripts/verify_dashboard_snapshot.py --path data/dashboard_snapshot.json --strict
+  python scripts/verify/verify_dashboard_snapshot.py --path ~/.elefante/data/dashboard_snapshot.json
+  python scripts/verify/verify_dashboard_snapshot.py --path ~/.elefante/data/dashboard_snapshot.json --require-curation
+  python scripts/verify/verify_dashboard_snapshot.py --path data/dashboard_snapshot.json --strict
 """
 
 from __future__ import annotations

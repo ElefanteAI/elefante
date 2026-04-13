@@ -89,7 +89,7 @@ def _ensure_database_path(self):
     self.db_path.parent.mkdir(parents=True, exist_ok=True)
 ```
 
-**File 3:** `scripts/install.py` - Added pre-flight check:
+**File 3:** `scripts/setup/install.py` - Added pre-flight check:
 
 ```python
 def check_kuzu_compatibility():
@@ -327,7 +327,7 @@ python -m venv .venv --clear
 pip install -r requirements.txt
 
 # 5. Run installation script
-python scripts/install.py
+python scripts/setup/install.py
 ```
 
 ### After Installation Failure
@@ -342,7 +342,7 @@ Remove-Item "data\chroma_db" -Recurse -Force -ErrorAction SilentlyContinue
 pip install -r requirements.txt --force-reinstall
 
 # 3. Run init script
-python scripts/init_databases.py
+python scripts/setup/init_databases.py
 ```
 
 ### When Upgrading Libraries
@@ -365,7 +365,7 @@ cd Elefante
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
-python scripts/install.py
+python scripts/setup/install.py
 ```
 
 ### Linux/Mac
@@ -376,14 +376,14 @@ cd Elefante
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python scripts/install.py
+python scripts/setup/install.py
 ```
 
 ### Verification
 
 ```bash
 python -c "from src.core.orchestrator import MemoryOrchestrator; print(' Import successful')"
-python scripts/verify_health.py
+python scripts/verify/verify_health.py
 ```
 
 ---
@@ -412,7 +412,7 @@ Agent trapped in corrupted workspace environment cannot run installation script.
 **Circular Dependency**: The agent (Claude/Copilot) runs within VS Code which uses the workspace's `.venv` Python. When that venv becomes corrupted:
 
 1. Agent's Python execution uses broken interpreter
-2. `scripts/install.py` can't run (needs working Python)
+2. `scripts/setup/install.py` can't run (needs working Python)
 3. Can't fix Python from within broken Python
 4. Agent has no "escape hatch" to system Python
 
@@ -446,7 +446,7 @@ subprocess.run(['/opt/homebrew/bin/python3.11', '-m', 'venv', '.venv'])
 ### Why This Took So Long
 
 1. **Environment blindness**: Agent didn't realize it was trapped
-2. **Assumed solutions work**: Kept trying `python scripts/install.py`
+2. **Assumed solutions work**: Kept trying `python scripts/setup/install.py`
 3. **Multiple escape attempts**: Had to try several strategies before finding working one
 4. **No documented pattern**: First time encountering this failure mode
 
@@ -515,7 +515,7 @@ Auto-configuration script fails to configure IBM Bob IDE despite successfully co
 ### Symptom
 
 ```bash
-python scripts/configure_vscode_bob.py
+python scripts/setup/configure_vscode_bob.py
 # Reports: "Configured VS Code successfully"
 # But IBM Bob IDE shows no Elefante MCP server
 ```
@@ -574,7 +574,7 @@ But IBM Bob actually stores settings at:
 
 **Script Enhancement (Future Fix):**
 
-Update `scripts/configure_vscode_bob.py` to check additional paths:
+Update `scripts/setup/configure_vscode_bob.py` to check additional paths:
 
 ```python
 # Add to IDE path detection

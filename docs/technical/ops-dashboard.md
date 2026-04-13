@@ -58,7 +58,7 @@ MCP Server (Live Write)
   ↓
 ~/.elefante/data/kuzu_db/ (Kuzu Graph DB)
   ↓
-scripts/update_dashboard_data.py (Export)
+scripts/pipeline/update_dashboard_data.py (Export)
   ↓
 data/dashboard_snapshot.json (Static File)
   ↓
@@ -99,13 +99,13 @@ curl http://127.0.0.1:8000/api/stats
 ### Method 3.5: Run the Health Check Script
 
 ```bash
-python scripts/verify_dashboard_health.py --port 8000
+python scripts/verify/verify_dashboard_health.py --port 8000
 ```
 
 ### Method 3.6: Validate the Snapshot File
 
 ```bash
-python scripts/verify_dashboard_snapshot.py --path ~/.elefante/data/dashboard_snapshot.json
+python scripts/verify/verify_dashboard_snapshot.py --path ~/.elefante/data/dashboard_snapshot.json
 ```
 
 ### Method 4: Open in Browser
@@ -186,7 +186,7 @@ python -m src.dashboard.server
 
 ```bash
 # Check memory count
-python scripts/verify_health.py
+python scripts/verify/verify_health.py
 
 # Look for: "total_memories: 0"
 
@@ -213,7 +213,7 @@ asyncio.run(add_test())
 
 ```bash
 # Update dashboard snapshot from live database
-python scripts/update_dashboard_data.py
+python scripts/pipeline/update_dashboard_data.py
 
 # Expected output:
 #  Snapshot updated: data/dashboard_snapshot.json
@@ -283,7 +283,7 @@ curl -H "Content-Type: application/json" http://127.0.0.1:8000/api/stats
 
 ```bash
 # Update snapshot
-python scripts/update_dashboard_data.py
+python scripts/pipeline/update_dashboard_data.py
 
 # Output should show:
 #  Exported 8 memories to dashboard_snapshot.json
@@ -295,7 +295,7 @@ python scripts/update_dashboard_data.py
 
 ```bash
 # Linux cron (every 5 minutes)
-*/5 * * * * cd /path/to/Elefante && python scripts/update_dashboard_data.py
+*/5 * * * * cd /path/to/Elefante && python scripts/pipeline/update_dashboard_data.py
 
 # Or add to MCP server startup script
 ```
@@ -347,7 +347,7 @@ curl http://127.0.0.1:8000/api/graph
 
 ```
 1. Add memory via MCP
-2. Run: python scripts/update_dashboard_data.py
+2. Run: python scripts/pipeline/update_dashboard_data.py
 3. Refresh browser: F5
 4. Graph updates with new memory
 ```
@@ -356,7 +356,7 @@ curl http://127.0.0.1:8000/api/graph
 
 ```
 1. Schedule snapshot updates (cron, systemd timer, etc.)
-2. Every 5-10 minutes: python scripts/update_dashboard_data.py
+2. Every 5-10 minutes: python scripts/pipeline/update_dashboard_data.py
 3. Dashboard always shows recent data (with slight delay)
 4. No manual updates needed
 ```

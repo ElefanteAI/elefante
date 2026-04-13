@@ -4745,7 +4745,7 @@ When a user deleted or updated a memory, its UUID stayed in the MCP server's `_s
 
 ### Added
 
-- `scripts/advise_version_bump.py` — interactive smart version advisor. Analyses staged git diff, classifies the change as MAJOR / MINOR / PATCH, presents a recommendation with a short reason and the semantic versioning table, then asks for confirmation before calling `bump_version.py`. Supports manual override (type `x.y.z` at the prompt).
+- `scripts/ci/advise_version_bump.py` — interactive smart version advisor. Analyses staged git diff, classifies the change as MAJOR / MINOR / PATCH, presents a recommendation with a short reason and the semantic versioning table, then asks for confirmation before calling `bump_version.py`. Supports manual override (type `x.y.z` at the prompt).
 
 ### Fixed
 
@@ -4754,8 +4754,8 @@ When a user deleted or updated a memory, its UUID stayed in the MCP server's `_s
 
 ### Changed
 
-- `scripts/bump_version.py` — added `[0, 99]` range validation for each version part (x, y, z). Rejects values outside this range with a clear error message.
-- `scripts/advise_version_bump.py` — same `[0, 99]` guard applied to manual override input at the prompt.
+- `scripts/ci/bump_version.py` — added `[0, 99]` range validation for each version part (x, y, z). Rejects values outside this range with a clear error message.
+- `scripts/ci/advise_version_bump.py` — same `[0, 99]` guard applied to manual override input at the prompt.
 - `CONTRIBUTING.md` — versioning section rewritten: recommends `advise_version_bump.py` as primary workflow, documents manual bump as secondary, includes example output and full rules.
 - VERSION BUMP GATE Directive updated to reference `advise_version_bump.py`.
 
@@ -4868,18 +4868,18 @@ A major cleanup pass removing dead model abstractions and historical archive con
 
 Two field name mismatches between ChromaDB storage and dashboard presentation caused all memories to display with wrong metadata:
 
-1. **All topics showed "General"**: The dashboard `topic` field was reading `meta.get("topic")` — a key that does not exist in ChromaDB. The actual field is `category`. This bug existed in two independent code paths: the snapshot builder (`scripts/update_dashboard_data.py`) and the live refresh path (`src/mcp/server.py` `_refresh_dashboard_snapshot()`).
+1. **All topics showed "General"**: The dashboard `topic` field was reading `meta.get("topic")` — a key that does not exist in ChromaDB. The actual field is `category`. This bug existed in two independent code paths: the snapshot builder (`scripts/pipeline/update_dashboard_data.py`) and the live refresh path (`src/mcp/server.py` `_refresh_dashboard_snapshot()`).
 2. **All usage counts showed "Never"**: The `/api/graph` endpoint served snapshot data that lacked `access_count` and `last_accessed` fields, defaulting to zero/null in the UI.
 
 ### The Solution
 
-1. **Snapshot builder**: Changed `meta.get("topic")` to `meta.get("category")` in `scripts/update_dashboard_data.py`.
+1. **Snapshot builder**: Changed `meta.get("topic")` to `meta.get("category")` in `scripts/pipeline/update_dashboard_data.py`.
 2. **Live refresh path**: Changed `cm.get("topic")` to `mem.metadata.category` in `src/mcp/server.py` `_refresh_dashboard_snapshot()`.
 3. **API hydration fallback**: Added server-side hydration in `src/dashboard/server.py` `get_graph()` that fetches live `access_count`, `last_accessed`, and `last_modified` from the vector store when the snapshot lacks them.
 
 ### Changes
 
-- **FIX**: `scripts/update_dashboard_data.py` — Read `category` instead of nonexistent `topic` from ChromaDB metadata for dashboard topic derivation.
+- **FIX**: `scripts/pipeline/update_dashboard_data.py` — Read `category` instead of nonexistent `topic` from ChromaDB metadata for dashboard topic derivation.
 - **FIX**: `src/mcp/server.py` `_refresh_dashboard_snapshot()` — Read `mem.metadata.category` instead of `cm.get("topic")` for live refresh topic assignment.
 - **FIX**: `src/dashboard/server.py` `get_graph()` — Added usage hydration fallback that populates `access_count`, `last_accessed`, `last_modified` from live vector store when snapshot properties lack them.
 - **REMOVED**: Deprecated `importance`, `layer`, `sublayer` fields from snapshot builder (removed in schema v4).
@@ -4904,14 +4904,14 @@ Directive System + Behavioral Bootstrap — Always-active behavioral constraints
 
 1. **Directive System**: A new `DirectiveStore` class (`src/core/directive_store.py`) stores behavioral constraints in `~/.elefante/data/directives.json`. Directives are injected into every MCP tool response unconditionally — no search, no similarity scores, no keyword matching. They cannot be outcompeted by memories.
 2. **Three Directive Tools**: `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove`.
-3. **Installation Bootstrap Validation**: `scripts/install.py` Step 4a now validates `copilot-instructions.md` exists. The installer warns with an explicit error if it is missing, explaining the behavioral consequence.
+3. **Installation Bootstrap Validation**: `scripts/setup/install.py` Step 4a now validates `copilot-instructions.md` exists. The installer warns with an explicit error if it is missing, explaining the behavioral consequence.
 4. **Tool Response Contract Documented**: Both `copilot-instructions.md` and `docs/technical/installation.md` now formally document all three injected keys as a first-class agent-facing contract.
 
 ### Changes
 
 - **NEW**: `src/core/directive_store.py` — `DirectiveStore` + `Directive` classes. JSON-backed persistent storage at `~/.elefante/data/directives.json`. Module-level singleton `get_directive_store()`.
 - **MODIFIED**: `src/mcp/server.py` — Added `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove` tools. Added `_inject_directives()` and `_handle_directive_*` methods. Updated `_CONTEXT_SKIP_TOOLS`.
-- **MODIFIED**: `scripts/install.py` — Added `verify_copilot_instructions()` function and Step 4a to installer flow.
+- **MODIFIED**: `scripts/setup/install.py` — Added `verify_copilot_instructions()` function and Step 4a to installer flow.
 - **MODIFIED**: `.github/copilot-instructions.md` — Added "Tool Response Contract" section documenting all three injected response keys with their sources, scope, and behavioral rules.
 - **MODIFIED**: `docs/technical/installation.md` — Replaced "Next Steps / Section 6.1" with "Behavioral Instruction Architecture": Layer 1 (Bootstrap), Tool Response Contract (three keys), Layer 2 (Directives), Layer 3 (Memories), and installation-to-runtime mapping table.
 - **MODIFIED**: `docs/technical/usage.md` — Added `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove` documentation under new "Directives" section.
@@ -5224,12 +5224,12 @@ V4 Cognitive Retrieval uses concept overlap (0.20 weight) for scoring, but:
 
 1. **Standardized Storage**: All cognitive fields stored as JSON strings in ChromaDB metadata
 2. **Migration Script**: `scripts/migrate_cognitive_fields_v161.py` to fix existing memories
-3. **Snapshot Update**: `scripts/update_dashboard_data.py` now includes cognitive fields
+3. **Snapshot Update**: `scripts/pipeline/update_dashboard_data.py` now includes cognitive fields
 
 ### Changes
 
 - **NEW**: `scripts/migrate_cognitive_fields_v161.py` - Migrates all memories to v1.6.1 format
-- **MODIFIED**: `scripts/update_dashboard_data.py` - Added concepts, surfaces_when, authority_score to node properties
+- **MODIFIED**: `scripts/pipeline/update_dashboard_data.py` - Added concepts, surfaces_when, authority_score to node properties
 - **MIGRATED**: 34 memories (9 updated, 25 already compliant)
 
 ---
@@ -5728,7 +5728,7 @@ These have been consolidated into this baseline release.
 If upgrading from internal development versions:
 
 1. Database schema changed (`properties` -> `props`)
-2. Run `python scripts/init_databases.py` to reinitialize
+2. Run `python scripts/setup/init_databases.py` to reinitialize
 3. Documentation restructured into `technical/`, `debug/`, `planning/`, `archive/`
 
 ---
@@ -5835,7 +5835,7 @@ When a user deleted or updated a memory, its UUID stayed in the MCP server's `_s
 
 ### Added
 
-- `scripts/advise_version_bump.py` — interactive smart version advisor. Analyses staged git diff, classifies the change as MAJOR / MINOR / PATCH, presents a recommendation with a short reason and the semantic versioning table, then asks for confirmation before calling `bump_version.py`. Supports manual override (type `x.y.z` at the prompt).
+- `scripts/ci/advise_version_bump.py` — interactive smart version advisor. Analyses staged git diff, classifies the change as MAJOR / MINOR / PATCH, presents a recommendation with a short reason and the semantic versioning table, then asks for confirmation before calling `bump_version.py`. Supports manual override (type `x.y.z` at the prompt).
 
 ### Fixed
 
@@ -5844,8 +5844,8 @@ When a user deleted or updated a memory, its UUID stayed in the MCP server's `_s
 
 ### Changed
 
-- `scripts/bump_version.py` — added `[0, 99]` range validation for each version part (x, y, z). Rejects values outside this range with a clear error message.
-- `scripts/advise_version_bump.py` — same `[0, 99]` guard applied to manual override input at the prompt.
+- `scripts/ci/bump_version.py` — added `[0, 99]` range validation for each version part (x, y, z). Rejects values outside this range with a clear error message.
+- `scripts/ci/advise_version_bump.py` — same `[0, 99]` guard applied to manual override input at the prompt.
 - `CONTRIBUTING.md` — versioning section rewritten: recommends `advise_version_bump.py` as primary workflow, documents manual bump as secondary, includes example output and full rules.
 - VERSION BUMP GATE Directive updated to reference `advise_version_bump.py`.
 
@@ -5958,18 +5958,18 @@ A major cleanup pass removing dead model abstractions and historical archive con
 
 Two field name mismatches between ChromaDB storage and dashboard presentation caused all memories to display with wrong metadata:
 
-1. **All topics showed "General"**: The dashboard `topic` field was reading `meta.get("topic")` — a key that does not exist in ChromaDB. The actual field is `category`. This bug existed in two independent code paths: the snapshot builder (`scripts/update_dashboard_data.py`) and the live refresh path (`src/mcp/server.py` `_refresh_dashboard_snapshot()`).
+1. **All topics showed "General"**: The dashboard `topic` field was reading `meta.get("topic")` — a key that does not exist in ChromaDB. The actual field is `category`. This bug existed in two independent code paths: the snapshot builder (`scripts/pipeline/update_dashboard_data.py`) and the live refresh path (`src/mcp/server.py` `_refresh_dashboard_snapshot()`).
 2. **All usage counts showed "Never"**: The `/api/graph` endpoint served snapshot data that lacked `access_count` and `last_accessed` fields, defaulting to zero/null in the UI.
 
 ### The Solution
 
-1. **Snapshot builder**: Changed `meta.get("topic")` to `meta.get("category")` in `scripts/update_dashboard_data.py`.
+1. **Snapshot builder**: Changed `meta.get("topic")` to `meta.get("category")` in `scripts/pipeline/update_dashboard_data.py`.
 2. **Live refresh path**: Changed `cm.get("topic")` to `mem.metadata.category` in `src/mcp/server.py` `_refresh_dashboard_snapshot()`.
 3. **API hydration fallback**: Added server-side hydration in `src/dashboard/server.py` `get_graph()` that fetches live `access_count`, `last_accessed`, and `last_modified` from the vector store when the snapshot lacks them.
 
 ### Changes
 
-- **FIX**: `scripts/update_dashboard_data.py` — Read `category` instead of nonexistent `topic` from ChromaDB metadata for dashboard topic derivation.
+- **FIX**: `scripts/pipeline/update_dashboard_data.py` — Read `category` instead of nonexistent `topic` from ChromaDB metadata for dashboard topic derivation.
 - **FIX**: `src/mcp/server.py` `_refresh_dashboard_snapshot()` — Read `mem.metadata.category` instead of `cm.get("topic")` for live refresh topic assignment.
 - **FIX**: `src/dashboard/server.py` `get_graph()` — Added usage hydration fallback that populates `access_count`, `last_accessed`, `last_modified` from live vector store when snapshot properties lack them.
 - **REMOVED**: Deprecated `importance`, `layer`, `sublayer` fields from snapshot builder (removed in schema v4).
@@ -5994,14 +5994,14 @@ Directive System + Behavioral Bootstrap — Always-active behavioral constraints
 
 1. **Directive System**: A new `DirectiveStore` class (`src/core/directive_store.py`) stores behavioral constraints in `~/.elefante/data/directives.json`. Directives are injected into every MCP tool response unconditionally — no search, no similarity scores, no keyword matching. They cannot be outcompeted by memories.
 2. **Three Directive Tools**: `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove`.
-3. **Installation Bootstrap Validation**: `scripts/install.py` Step 4a now validates `copilot-instructions.md` exists. The installer warns with an explicit error if it is missing, explaining the behavioral consequence.
+3. **Installation Bootstrap Validation**: `scripts/setup/install.py` Step 4a now validates `copilot-instructions.md` exists. The installer warns with an explicit error if it is missing, explaining the behavioral consequence.
 4. **Tool Response Contract Documented**: Both `copilot-instructions.md` and `docs/technical/installation.md` now formally document all three injected keys as a first-class agent-facing contract.
 
 ### Changes
 
 - **NEW**: `src/core/directive_store.py` — `DirectiveStore` + `Directive` classes. JSON-backed persistent storage at `~/.elefante/data/directives.json`. Module-level singleton `get_directive_store()`.
 - **MODIFIED**: `src/mcp/server.py` — Added `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove` tools. Added `_inject_directives()` and `_handle_directive_*` methods. Updated `_CONTEXT_SKIP_TOOLS`.
-- **MODIFIED**: `scripts/install.py` — Added `verify_copilot_instructions()` function and Step 4a to installer flow.
+- **MODIFIED**: `scripts/setup/install.py` — Added `verify_copilot_instructions()` function and Step 4a to installer flow.
 - **MODIFIED**: `.github/copilot-instructions.md` — Added "Tool Response Contract" section documenting all three injected response keys with their sources, scope, and behavioral rules.
 - **MODIFIED**: `docs/technical/installation.md` — Replaced "Next Steps / Section 6.1" with "Behavioral Instruction Architecture": Layer 1 (Bootstrap), Tool Response Contract (three keys), Layer 2 (Directives), Layer 3 (Memories), and installation-to-runtime mapping table.
 - **MODIFIED**: `docs/technical/usage.md` — Added `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove` documentation under new "Directives" section.
@@ -6314,12 +6314,12 @@ V4 Cognitive Retrieval uses concept overlap (0.20 weight) for scoring, but:
 
 1. **Standardized Storage**: All cognitive fields stored as JSON strings in ChromaDB metadata
 2. **Migration Script**: `scripts/migrate_cognitive_fields_v161.py` to fix existing memories
-3. **Snapshot Update**: `scripts/update_dashboard_data.py` now includes cognitive fields
+3. **Snapshot Update**: `scripts/pipeline/update_dashboard_data.py` now includes cognitive fields
 
 ### Changes
 
 - **NEW**: `scripts/migrate_cognitive_fields_v161.py` - Migrates all memories to v1.6.1 format
-- **MODIFIED**: `scripts/update_dashboard_data.py` - Added concepts, surfaces_when, authority_score to node properties
+- **MODIFIED**: `scripts/pipeline/update_dashboard_data.py` - Added concepts, surfaces_when, authority_score to node properties
 - **MIGRATED**: 34 memories (9 updated, 25 already compliant)
 
 ---
@@ -6818,7 +6818,7 @@ These have been consolidated into this baseline release.
 If upgrading from internal development versions:
 
 1. Database schema changed (`properties` -> `props`)
-2. Run `python scripts/init_databases.py` to reinitialize
+2. Run `python scripts/setup/init_databases.py` to reinitialize
 3. Documentation restructured into `technical/`, `debug/`, `planning/`, `archive/`
 
 ---
@@ -6883,10 +6883,10 @@ classifies the change level, and **asks before doing anything**:
 git add <files>
 
 # 2. Ask the advisor (Windows)
-.venv\Scripts\python.exe scripts\advise_version_bump.py
+.venv\Scripts\python.exe scripts\ci\advise_version_bump.py
 
 # 2. Ask the advisor (macOS/Linux)
-.venv/bin/python scripts/advise_version_bump.py
+.venv/bin/python scripts/ci/advise_version_bump.py
 ```
 
 The advisor will print:
@@ -6914,13 +6914,13 @@ On confirmation it calls `bump_version.py` automatically.
 
 ```bash
 # Bump version in all 25 files at once (Windows)
-.venv\Scripts\python.exe scripts\bump_version.py 2.2.0
+.venv\Scripts\python.exe scripts\ci\bump_version.py 2.2.0
 
 # Bump version (macOS/Linux)
-.venv/bin/python scripts/bump_version.py 2.2.0
+.venv/bin/python scripts/ci/bump_version.py 2.2.0
 
 # Verify no file has drifted (exit code 1 = drift detected)
-.venv\Scripts\python.exe scripts\bump_version.py --check
+.venv\Scripts\python.exe scripts\ci\bump_version.py --check
 ```
 
 **Rules — MANDATORY:**
@@ -6928,7 +6928,7 @@ On confirmation it calls `bump_version.py` automatically.
 - ALWAYS use `advise_version_bump.py` (interactive) or `bump_version.py X.Y.Z` (direct) — never manual file edits.
 - Run `--check` before committing to catch drift.
 - CHANGELOG.md and RELEASES.md entries must be written manually (they are historical logs, not current-version declarations).
-- If a new doc file has a version marker, ADD IT to `scripts/bump_version.py` TARGETS before the next version bump.
+- If a new doc file has a version marker, ADD IT to `scripts/ci/bump_version.py` TARGETS before the next version bump.
 
 **Semantic versioning (x.y.z):**
 - `x` — MAJOR: breaking changes requiring user action or migration
@@ -6997,10 +6997,10 @@ classifies the change level, and **asks before doing anything**:
 git add <files>
 
 # 2. Ask the advisor (Windows)
-.venv\Scripts\python.exe scripts\advise_version_bump.py
+.venv\Scripts\python.exe scripts\ci\advise_version_bump.py
 
 # 2. Ask the advisor (macOS/Linux)
-.venv/bin/python scripts/advise_version_bump.py
+.venv/bin/python scripts/ci/advise_version_bump.py
 ```
 
 The advisor will print:
@@ -7028,13 +7028,13 @@ On confirmation it calls `bump_version.py` automatically.
 
 ```bash
 # Bump version in all 25 files at once (Windows)
-.venv\Scripts\python.exe scripts\bump_version.py 2.2.0
+.venv\Scripts\python.exe scripts\ci\bump_version.py 2.2.0
 
 # Bump version (macOS/Linux)
-.venv/bin/python scripts/bump_version.py 2.2.0
+.venv/bin/python scripts/ci/bump_version.py 2.2.0
 
 # Verify no file has drifted (exit code 1 = drift detected)
-.venv\Scripts\python.exe scripts\bump_version.py --check
+.venv\Scripts\python.exe scripts\ci\bump_version.py --check
 ```
 
 **Rules — MANDATORY:**
@@ -7042,7 +7042,7 @@ On confirmation it calls `bump_version.py` automatically.
 - ALWAYS use `advise_version_bump.py` (interactive) or `bump_version.py X.Y.Z` (direct) — never manual file edits.
 - Run `--check` before committing to catch drift.
 - CHANGELOG.md and RELEASES.md entries must be written manually (they are historical logs, not current-version declarations).
-- If a new doc file has a version marker, ADD IT to `scripts/bump_version.py` TARGETS before the next version bump.
+- If a new doc file has a version marker, ADD IT to `scripts/ci/bump_version.py` TARGETS before the next version bump.
 
 **Semantic versioning (x.y.z):**
 - `x` — MAJOR: breaking changes requiring user action or migration
@@ -7136,7 +7136,7 @@ For every proposed change, scan ALL of the following surfaces. Any positive hit 
 | **Kuzu schema/DML split** | Any new property name: test `CREATE NODE TABLE (...)` AND `CREATE (entity {...})` in the same test. Schema-valid names can be Cypher-invalid. |
 | **stdout pollution** | Does any new code `print()` anywhere reachable from the MCP server? All logging MUST go to `sys.stderr`. One `print()` on stdout = corrupted JSON-RPC stream = dead connection. |
 | **Compliance Gate state machine** | Does the change touch `_compliance_state`, `GATED_TOOLS`, or any handler that calls `_check_compliance_gate()`? |
-| **Dashboard snapshot contract** | Dashboard reads from `snapshot.json`, not live DB. If you add a field, update `scripts/update_dashboard_data.py` AND `src/dashboard/server.py` AND the TypeScript types. |
+| **Dashboard snapshot contract** | Dashboard reads from `snapshot.json`, not live DB. If you add a field, update `scripts/pipeline/update_dashboard_data.py` AND `src/dashboard/server.py` AND the TypeScript types. |
 | **Co-activation history** | If a memory is deleted or updated, is its UUID purged from `_session_retrieval_history` before `record_coactivation()` can reference it? |
 | **Documentation links** | Before moving or archiving ANY file: `grep -r "filename" docs/` — update ALL inbound links first. Ghost links persist for weeks. |
 
@@ -7181,10 +7181,10 @@ Run in order:
 
 ```bash
 # 1. System health check
-.venv/bin/python scripts/verify_health.py
+.venv/bin/python scripts/verify/verify_health.py
 
 # 2. MCP handshake verification (proves the server actually responds)
-.venv/bin/python scripts/verify_mcp_handshake.py
+.venv/bin/python scripts/verify/verify_mcp_handshake.py
 
 # 3. If memory storage/retrieval path touched: round-trip test
 #    Store a memory → retrieve it → verify all changed fields survived
@@ -7209,7 +7209,7 @@ Before committing:
 
 - [ ] **Minimal patch** — No unrelated refactors bundled in. One problem, one fix.
 - [ ] **CHANGELOG.md entry written** — `### The Problem Solved` + `### The Solution` + `### Changes` format
-- [ ] **Version bumped** using `scripts/advise_version_bump.py` — never edit version strings by hand
+- [ ] **Version bumped** using `scripts/ci/advise_version_bump.py` — never edit version strings by hand
 - [ ] **All linked docs updated** — if you changed a tool signature, update `docs/technical/usage.md`
 - [ ] **`grep -r "filename" docs/`** — if you moved or renamed any file, all links resolved
 
@@ -7751,7 +7751,7 @@ The dashboard is a read-only graph visualization. It reads from a snapshot file,
 elefante-DashboardOpen(refresh=true)
 
 # Manual
-python scripts/update_dashboard_data.py   # refresh snapshot
+python scripts/pipeline/update_dashboard_data.py   # refresh snapshot
 python -m src.dashboard.server            # start on port 8000
 ```
 
@@ -8088,7 +8088,7 @@ The dashboard is a read-only graph visualization. It reads from a snapshot file,
 elefante-DashboardOpen(refresh=true)
 
 # Manual
-python scripts/update_dashboard_data.py   # refresh snapshot
+python scripts/pipeline/update_dashboard_data.py   # refresh snapshot
 python -m src.dashboard.server            # start on port 8000
 ```
 

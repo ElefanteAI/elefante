@@ -19,7 +19,7 @@ pytest tests/test_autonomous_coactivation.py tests/test_memory_persistence.py -v
 pytest tests/test_integration_smoke.py -v
 
 # Run the shipped MCP end-to-end harness
-./.venv/bin/python scripts/verify_e2e_tests.py
+./.venv/bin/python scripts/verify/verify_e2e_tests.py
 ```
 
 The shipped E2E harness runs against an isolated temporary Elefante home/data directory so it validates the live MCP workflow without polluting the user's durable memory store.
@@ -93,7 +93,7 @@ tests/
 | Before release                  | `pytest tests/ -v`                                                      |
 | Debugging search issues         | `python tests/manual/test_semantic_search.py`                           |
 | Verify MCP server works         | `python tests/verification/test_mcp_server.py`                          |
-| Verify real IDE-like workflow   | `./.venv/bin/python scripts/verify_e2e_tests.py`                |
+| Verify real IDE-like workflow   | `./.venv/bin/python scripts/verify/verify_e2e_tests.py`                |
 
 ---
 

@@ -195,7 +195,7 @@ MCP (Write) → Kuzu → Export Script → Snapshot File → Dashboard (Read)
 
 ```bash
 # Update snapshot
-python scripts/update_dashboard_data.py
+python scripts/pipeline/update_dashboard_data.py
 
 # Dashboard can now run without locking Kuzu
 python -m src.dashboard.server

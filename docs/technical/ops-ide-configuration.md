@@ -159,9 +159,9 @@ Notes:
 
 Auto-config:
 
-- Run: `python scripts/configure_vscode_bob.py`
+- Run: `python scripts/setup/configure_vscode_bob.py`
   - Default configures VS Code via `mcp.json` and removes duplicate `chat.mcp.servers.elefante`.
-  - To configure `chat.mcp.servers` explicitly: `python scripts/configure_vscode_bob.py --vscode chat-settings`
+  - To configure `chat.mcp.servers` explicitly: `python scripts/setup/configure_vscode_bob.py --vscode chat-settings`
 
 ## Antigravity (Gemini)
 
@@ -172,14 +172,14 @@ Antigravity uses a file similar to Cursor/Bob:
 
 Auto-config:
 
-- Run: `python scripts/configure_antigravity.py`
+- Run: `python scripts/setup/configure_antigravity.py`
 
 ## Quick verification (any IDE)
 
 Run this in the Elefante repo to confirm the server boots and speaks MCP:
 
 ```bash
-./.venv/bin/python scripts/verify_mcp_handshake.py
+./.venv/bin/python scripts/verify/verify_mcp_handshake.py
 ```
 
 If you hit a Kuzu “database locked” error, it usually means another process is holding the graph DB open. Close the other IDE/session first, then retry.

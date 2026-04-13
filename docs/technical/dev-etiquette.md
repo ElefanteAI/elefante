@@ -28,7 +28,7 @@ Elefante enforces strict, automated semantic versioning (`x.y.z`). Manual versio
     *   `MAJOR` (x): Breaking changes or DB migrations.
     *   `MINOR` (y): New features, backward compatible (e.g., adding `SPECIFICATION` schema).
     *   `PATCH` (z): Bug fixes, internal cleanup.
-*   **Use the Bumper:** Run `python3 scripts/bump_version.py <version>` to cascade the correct version across all 42+ project files simultaneously.
+*   **Use the Bumper:** Run `python3 scripts/ci/bump_version.py <version>` to cascade the correct version across all 42+ project files simultaneously.
 
 ## 4. Final Lock (Git Etiquette)
 Once the tree is clean, the docs are synced, and the version is cascaded, lock the state.

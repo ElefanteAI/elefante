@@ -1,7 +1,7 @@
 # Elefante Safe Restart
 
 **Version**: 2.2.3  
-**Script**: `scripts/restart_elefante.py`  
+**Script**: `scripts/lifecycle/restart_elefante.py`  
 **Purpose**: Safely restart MCP server to pick up code changes
 
 ---
@@ -32,13 +32,13 @@ The Safe Restart utility cleanly restarts the Elefante MCP server without corrup
 ### Basic Restart
 
 ```bash
-python scripts/restart_elefante.py
+python scripts/lifecycle/restart_elefante.py
 ```
 
 ### With Verification
 
 ```bash
-python scripts/restart_elefante.py --verify
+python scripts/lifecycle/restart_elefante.py --verify
 ```
 
 ### Force Restart
@@ -46,7 +46,7 @@ python scripts/restart_elefante.py --verify
 If graceful shutdown fails:
 
 ```bash
-python scripts/restart_elefante.py --force
+python scripts/lifecycle/restart_elefante.py --force
 ```
 
 ### Custom Timeout
@@ -54,13 +54,13 @@ python scripts/restart_elefante.py --force
 Wait longer for graceful shutdown:
 
 ```bash
-python scripts/restart_elefante.py --timeout 30
+python scripts/lifecycle/restart_elefante.py --timeout 30
 ```
 
 ### All Options
 
 ```bash
-python scripts/restart_elefante.py --force --timeout 20 --verify
+python scripts/lifecycle/restart_elefante.py --force --timeout 20 --verify
 ```
 
 ---
@@ -166,14 +166,14 @@ Lock cleanup only removes:
 git pull origin main
 
 # Restart to load new code
-python scripts/restart_elefante.py --verify
+python scripts/lifecycle/restart_elefante.py --verify
 ```
 
 ### Server Unresponsive
 
 ```bash
 # Force restart if needed
-python scripts/restart_elefante.py --force --verify
+python scripts/lifecycle/restart_elefante.py --force --verify
 ```
 
 ### After Config Change
@@ -183,14 +183,14 @@ python scripts/restart_elefante.py --force --verify
 vim config.yaml
 
 # Restart to apply
-python scripts/restart_elefante.py
+python scripts/lifecycle/restart_elefante.py
 ```
 
 ### Switching IDEs
 
 ```bash
 # Clean shutdown before switching
-python scripts/restart_elefante.py
+python scripts/lifecycle/restart_elefante.py
 ```
 
 ---

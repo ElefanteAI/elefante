@@ -7,9 +7,9 @@ Creates a timestamped zip archive under ~/.elefante/backups.
 Safe to run with Elefante Mode OFF.
 
 Usage:
-  python scripts/backup_elefante_data.py
-  python scripts/backup_elefante_data.py --elefante-home ~/.elefante
-  python scripts/backup_elefante_data.py --out-dir ~/.elefante/backups
+  python scripts/lifecycle/backup_elefante_data.py
+  python scripts/lifecycle/backup_elefante_data.py --elefante-home ~/.elefante
+  python scripts/lifecycle/backup_elefante_data.py --out-dir ~/.elefante/backups
 """
 
 from __future__ import annotations

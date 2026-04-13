@@ -924,7 +924,7 @@ AFTER:
 
 ### Snapshot Pipeline Fix (This Session)
 
-`scripts/update_dashboard_data.py` was missing `"score"` in the node properties mapping. Fixed by adding:
+`scripts/pipeline/update_dashboard_data.py` was missing `"score"` in the node properties mapping. Fixed by adding:
 
 ```python
 "score": meta.get("score"),
@@ -971,7 +971,7 @@ The server transforms snapshot data and spreads `properties` inside a `propertie
 ```bash
 # Before debugging dashboard issues:
 1. Check actual data counts in ChromaDB and Kuzu
-2. Regenerate snapshot: python scripts/update_dashboard_data.py
+2. Regenerate snapshot: python scripts/pipeline/update_dashboard_data.py
 3. Verify snapshot content
 4. Verify API returns snapshot data
 5. Hard refresh browser
@@ -1059,7 +1059,7 @@ The remaining work is best split across focused agents, each owning a specific d
 cd src/dashboard/ui && npm run build
 
 # Regenerate snapshot after data changes
-python3 scripts/update_dashboard_data.py
+python3 scripts/pipeline/update_dashboard_data.py
 
 # Start server
 python3 -m src.dashboard.server
@@ -1086,7 +1086,7 @@ python3 scripts/golden_cleanup.py --apply
 | [`src/dashboard/ui/src/hooks/useVisualizationData.ts`](src/dashboard/ui/src/hooks/useVisualizationData.ts) | Data transforms, health score, enriched HealthScore interface | ~220 |
 | [`src/dashboard/ui/src/hooks/useSearch.ts`](src/dashboard/ui/src/hooks/useSearch.ts) | Semantic search via /api/search | ~61 |
 | [`src/dashboard/server.py`](src/dashboard/server.py) | FastAPI backend (4 endpoints) | ~234 |
-| [`scripts/update_dashboard_data.py`](scripts/update_dashboard_data.py) | Snapshot generation from ChromaDB + Kuzu | ~930 |
+| [`scripts/pipeline/update_dashboard_data.py`](scripts/pipeline/update_dashboard_data.py) | Snapshot generation from ChromaDB + Kuzu | ~930 |
 
 ### Key Components
 
@@ -1108,8 +1108,8 @@ python3 scripts/golden_cleanup.py --apply
 | Script | Purpose |
 |--------|---------|
 | [`scripts/golden_cleanup.py`](scripts/golden_cleanup.py) | Memory metadata cleanup (topic, score, status) with --dry-run/--apply |
-| [`scripts/update_dashboard_data.py`](scripts/update_dashboard_data.py) | Snapshot generation pipeline |
-| [`scripts/verify_dashboard_health.py`](scripts/verify_dashboard_health.py) | Dashboard health diagnostic |
+| [`scripts/pipeline/update_dashboard_data.py`](scripts/pipeline/update_dashboard_data.py) | Snapshot generation pipeline |
+| [`scripts/verify/verify_dashboard_health.py`](scripts/verify/verify_dashboard_health.py) | Dashboard health diagnostic |
 
 ### Documentation
 

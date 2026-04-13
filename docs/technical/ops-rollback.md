@@ -26,7 +26,7 @@ This runbook is operational (not a postmortem). Lessons learned belong in `docs/
 Use the backup script (safe with Elefante Mode OFF):
 
 ```bash
-python scripts/backup_elefante_data.py
+python scripts/lifecycle/backup_elefante_data.py
 ```
 
 This creates a timestamped archive under the configured backup directory.
@@ -43,7 +43,7 @@ This creates a timestamped archive under the configured backup directory.
 2. **Restore data backup** (if the change touched storage formats or corrupted data):
 
 ```bash
-python scripts/restore_elefante_data.py --latest --force
+python scripts/lifecycle/restore_elefante_data.py --latest --force
 ```
 
 3. **Roll back code** to the desired version:
@@ -55,13 +55,13 @@ git checkout v2.1.3   # or whichever tagged version
 4. **Restart services**:
 
 ```bash
-python scripts/restart_elefante.py --verify
+python scripts/lifecycle/restart_elefante.py --verify
 python -m src.dashboard.server
 ```
 
 5. **Verify**:
    - `http://127.0.0.1:8000/api/stats` reports the correct `package_version`
-   - `python scripts/verify_health.py` passes
+   - `python scripts/verify/verify_health.py` passes
 
 ---
 

@@ -5,8 +5,8 @@ Checks that the dashboard server responds and that API endpoints return
 the expected JSON shapes.
 
 Usage:
-  python scripts/verify_dashboard_health.py --port 8000
-  python scripts/verify_dashboard_health.py --url http://127.0.0.1:8001
+  python scripts/verify/verify_dashboard_health.py --port 8000
+  python scripts/verify/verify_dashboard_health.py --url http://127.0.0.1:8001
 """
 
 from __future__ import annotations

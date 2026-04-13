@@ -7,11 +7,11 @@ presents a recommendation with reason, and asks for confirmation before
 calling bump_version.py.
 
 Usage:
-    python scripts/advise_version_bump.py
+    python scripts/ci/advise_version_bump.py
 
 Flow:
     1. git add <your files>
-    2. python scripts/advise_version_bump.py   ← this script
+    2. python scripts/ci/advise_version_bump.py   ← this script
     3. Confirm or override the proposed version
     4. Script calls bump_version.py automatically
     5. Write CHANGELOG.md entry

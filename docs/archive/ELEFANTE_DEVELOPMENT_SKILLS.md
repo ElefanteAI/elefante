@@ -158,7 +158,7 @@ MCP Server (Live Write)
     ↓
 ~/.elefante/data/kuzu_db/ (Kuzu Graph DB)
     ↓
-scripts/update_dashboard_data.py (Export)
+scripts/pipeline/update_dashboard_data.py (Export)
     ↓
 data/dashboard_snapshot.json (Static File)
     ↓
@@ -255,16 +255,16 @@ Layer 5: VERIFICATION
 
 ```bash
 # Check Elefante system status
-python scripts/verify_health.py
+python scripts/verify/verify_health.py
 
 # Validate dashboard snapshot
-python scripts/verify_dashboard_snapshot.py
+python scripts/verify/verify_dashboard_snapshot.py
 
 # Check MCP server handshake
-python scripts/verify_mcp_handshake.py
+python scripts/verify/verify_mcp_handshake.py
 
 # Update dashboard data
-python scripts/update_dashboard_data.py
+python scripts/pipeline/update_dashboard_data.py
 
 # Check for stale locks
 ls ~/.elefante/locks/
@@ -282,7 +282,7 @@ ls ~/.elefante/locks/
 
 **Symptom**: Blank page or "No memories yet"
 **Fix**:
-1. Run `python scripts/update_dashboard_data.py`
+1. Run `python scripts/pipeline/update_dashboard_data.py`
 2. Hard refresh browser (`Ctrl+Shift+R`)
 3. Check snapshot exists: `~/.elefante/data/dashboard_snapshot.json`
 
@@ -481,9 +481,9 @@ elefante-DirectiveRemove {
 
 ```markdown
 - [ ] All tests pass: `pytest tests/`
-- [ ] Health check passes: `python scripts/verify_health.py`
+- [ ] Health check passes: `python scripts/verify/verify_health.py`
 - [ ] Dashboard builds: `cd src/dashboard/ui && npm run build`
-- [ ] MCP handshake works: `python scripts/verify_mcp_handshake.py`
+- [ ] MCP handshake works: `python scripts/verify/verify_mcp_handshake.py`
 - [ ] No stale locks: `ls ~/.elefante/locks/`
 - [ ] Documentation updated if behavior changed
 - [ ] Pitfall-index.md updated if new issue discovered
@@ -499,13 +499,13 @@ python -c "from src.mcp.server import app; print('✓ MCP server imports')"
 python -c "from src.core.orchestrator import MemoryOrchestrator; print('✓ Orchestrator imports')"
 
 # Test databases
-python scripts/verify_health.py
+python scripts/verify/verify_health.py
 
 # Test dashboard snapshot
-python scripts/verify_dashboard_snapshot.py
+python scripts/verify/verify_dashboard_snapshot.py
 
 # Test MCP handshake
-python scripts/verify_mcp_handshake.py
+python scripts/verify/verify_mcp_handshake.py
 ```
 
 ---

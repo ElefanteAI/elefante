@@ -80,7 +80,7 @@ The IDE starts the server as a subprocess and communicates via pipes, not networ
 cd /path/to/Elefante
 source .venv/bin/activate
 
-python scripts/verify_mcp_handshake.py
+python scripts/verify/verify_mcp_handshake.py
 ```
 
 **Expected Output**:
@@ -103,7 +103,7 @@ python scripts/verify_mcp_handshake.py
 
 ```bash
 source .venv/bin/activate
-python scripts/verify_health.py
+python scripts/verify/verify_health.py
 ```
 
 **Expected Output** (includes MCP check):
@@ -122,7 +122,7 @@ Health check now also confirms:
 ### Method 2b: Run the Full MCP E2E Harness
 
 ```bash
-.venv/bin/python scripts/verify_e2e_tests.py
+.venv/bin/python scripts/verify/verify_e2e_tests.py
 ```
 
 This is the highest-signal startup verification because it launches the real server, performs the MCP handshake, exercises live tool calls, and checks the shutdown-race regression path by forcing repeated search/co-activation traffic.
@@ -130,7 +130,7 @@ This is the highest-signal startup verification because it launches the real ser
 ### Method 3: List Available Tools
 
 ```bash
-./.venv/bin/python scripts/list_mcp_tools.py
+./.venv/bin/python scripts/ci/list_mcp_tools.py
 ```
 
 **Expected Output**:
@@ -226,7 +226,7 @@ All IDE-specific MCP config file paths and JSON formats are documented here:
 - Include `.venv/bin/python` in command (not just `python`)
 - Set `PYTHONPATH` to project directory
 - Set `cwd` to project directory
-- If the server starts but the runtime baseline looks incomplete, run `scripts/verify_health.py` once to verify built-in directives and auto-seeded specification memories
+- If the server starts but the runtime baseline looks incomplete, run `scripts/verify/verify_health.py` once to verify built-in directives and auto-seeded specification memories
 
 ---
 
@@ -455,8 +455,8 @@ Before claiming "MCP Server is working":
 
 - [ ] Python 3.11 active in venv
 - [ ] `python -m src.mcp.server` starts without errors
-- [ ] Handshake test passes: `python scripts/verify_mcp_handshake.py`
-- [ ] Health check passes: `python scripts/verify_health.py`
+- [ ] Handshake test passes: `python scripts/verify/verify_mcp_handshake.py`
+- [ ] Health check passes: `python scripts/verify/verify_health.py`
 - [ ] IDE config points to venv Python (absolute path)
 - [ ] IDE shows "MCP Connected" status
 - [ ] Can use memory tools in IDE (elefante-MemoryAdd, elefante-MemorySearch, etc.)

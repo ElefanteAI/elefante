@@ -358,7 +358,7 @@ def main():
 
         print(f"  [OK] {len(changes)} memories updated.\n")
         print("  Next steps:")
-        print("    1. python scripts/update_dashboard_data.py")
+        print("    1. python scripts/pipeline/update_dashboard_data.py")
         print("    2. Restart dashboard server")
         print("    3. Verify dashboard health score\n")
     elif dry_run:

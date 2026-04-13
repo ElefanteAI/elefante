@@ -55,7 +55,7 @@ TRIGGER: Declaring "Complete" or "Done".
 ACTION: `docs/technical/dev-etiquette.md`:
   1. CLEAN — leftovers, temp files, debug artifacts
   2. DOCS — specs, changelogs, READMEs
-  3. VERSION — SemVer via `scripts/bump_version.py`
+  3. VERSION — SemVer via `scripts/ci/bump_version.py`
 Skip = fatal.
 </rule>
 
@@ -71,8 +71,8 @@ dev:      `.venv/bin/python -m src.main --mcp`
 test:     `pytest tests/ -v`
 lint:     `ruff check . && mypy src`
 build:    `pyinstaller elefante.spec`
-version:  `.venv/bin/python scripts/advise_version_bump.py`
-reset:    `ELEFANTE_PRIVILEGED=1 python scripts/reset_factory.py --apply --confirm DELETE`
+version:  `.venv/bin/python scripts/ci/advise_version_bump.py`
+reset:    `ELEFANTE_PRIVILEGED=1 python scripts/lifecycle/reset_factory.py --apply --confirm DELETE`
 </commands>
 
 <constraints>

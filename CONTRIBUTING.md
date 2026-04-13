@@ -89,13 +89,13 @@ On confirmation it calls `bump_version.py` automatically.
 
 ```bash
 # Bump version in all 25 files at once (Windows)
-.venv\Scripts\python.exe scripts\bump_version.py 2.2.0
+.venv\Scripts\python.exe scripts\ci\bump_version.py 2.2.0
 
 # Bump version (macOS/Linux)
-.venv/bin/python scripts/bump_version.py 2.2.0
+.venv/bin/python scripts/ci/bump_version.py 2.2.0
 
 # Verify no file has drifted (exit code 1 = drift detected)
-.venv\Scripts\python.exe scripts\bump_version.py --check
+.venv\Scripts\python.exe scripts\ci\bump_version.py --check
 ```
 
 **Rules — MANDATORY:**
@@ -103,7 +103,7 @@ On confirmation it calls `bump_version.py` automatically.
 - ALWAYS use `version_counsel.py` (interactive) or `bump_version.py X.Y.Z` (direct) — never manual file edits.
 - Run `--check` before committing to catch drift.
 - CHANGELOG.md entries must be written manually (it is a historical log, not a current-version declaration).
-- If a new doc file has a version marker, ADD IT to `scripts/bump_version.py` TARGETS before the next version bump.
+- If a new doc file has a version marker, ADD IT to `scripts/ci/bump_version.py` TARGETS before the next version bump.
 
 **Semantic versioning (x.y.z):**
 - `x` — MAJOR: breaking changes requiring user action or migration

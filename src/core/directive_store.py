@@ -70,7 +70,7 @@ SYSTEM_DIRECTIVE_DEFINITIONS = (
     ),
     (
         "system-elefante-versioning",
-        "ELEFANTE Versioning: Use scripts/bump_version.py for semver cascades; do not hand-edit scattered version strings.",
+        "ELEFANTE Versioning: Use scripts/ci/bump_version.py for semver cascades; do not hand-edit scattered version strings.",
     ),
     (
         "system-elefante-verification",

@@ -5,8 +5,8 @@ Bump Elefante version across all files.
 Single source of truth: src/__init__.py -> propagated everywhere.
 
 Usage:
-    python scripts/bump_version.py 2.2.0      # Set version to 2.2.0
-    python scripts/bump_version.py --check     # Verify all files match (exit 1 if drift)
+    python scripts/ci/bump_version.py 2.2.0      # Set version to 2.2.0
+    python scripts/ci/bump_version.py --check     # Verify all files match (exit 1 if drift)
 """
 
 import re

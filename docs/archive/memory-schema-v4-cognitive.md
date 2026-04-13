@@ -143,7 +143,7 @@ When `add_memory()` is called:
 | `src/utils/curation.py`            | Added `extract_concepts()`, `infer_surfaces_when()`, `compute_authority_score()` |
 | `src/core/retrieval.py`            | `CognitiveRetriever` (wired in orchestrator)                                     |
 | `src/core/orchestrator.py`         | Auto-populate V4 fields on add                                                   |
-| `scripts/update_dashboard_data.py` | Added SHARES_CONCEPT edges                                                       |
+| `scripts/pipeline/update_dashboard_data.py` | Added SHARES_CONCEPT edges                                                       |
 
 ---
 

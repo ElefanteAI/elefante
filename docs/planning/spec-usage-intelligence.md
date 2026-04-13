@@ -78,7 +78,7 @@ Transform the OverviewTab from "here's your data health" to "here's how your mem
 
 ### Phase A: Snapshot Pipeline Fix (1 file, 1 line)
 
-**File**: `scripts/update_dashboard_data.py`
+**File**: `scripts/pipeline/update_dashboard_data.py`
 
 **Change**: Add `last_accessed` to node properties mapping (it maps `last_modified` but forgot `last_accessed`).
 
@@ -160,7 +160,7 @@ Row 5 (NEW): Usage Intelligence
 
 | File | Phase | Type of Change |
 |------|-------|---------------|
-| `scripts/update_dashboard_data.py` | A | Add 1 line: `last_accessed` field |
+| `scripts/pipeline/update_dashboard_data.py` | A | Add 1 line: `last_accessed` field |
 | `src/dashboard/ui/src/types.ts` | B | Add 2 fields to interface |
 | `src/dashboard/ui/src/hooks/useVisualizationData.ts` | C, E | New hook + health formula update |
 | `src/dashboard/ui/src/components/OverviewTab.tsx` | D | New "Usage Intelligence" row |

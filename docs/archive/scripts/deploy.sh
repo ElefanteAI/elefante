@@ -87,7 +87,7 @@ echo "STEP 2: Initializing Databases"
 echo "============================================================"
 echo ""
 
-if $PYTHON_CMD scripts/init_databases.py; then
+if $PYTHON_CMD scripts/setup/init_databases.py; then
     print_success "Databases initialized successfully"
 else
     print_error "Database initialization failed"
@@ -101,7 +101,7 @@ echo "STEP 3: Running Health Check"
 echo "============================================================"
 echo ""
 
-if $PYTHON_CMD scripts/verify_health.py; then
+if $PYTHON_CMD scripts/verify/verify_health.py; then
     print_success "Health check passed"
 else
     print_error "Health check failed"

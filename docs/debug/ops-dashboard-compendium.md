@@ -208,7 +208,7 @@ Kuzu: 17 entities exist
 
 ### Solution
 
-Rewrote `scripts/update_dashboard_data.py` to pull from ChromaDB:
+Rewrote `scripts/pipeline/update_dashboard_data.py` to pull from ChromaDB:
 
 ```python
 # Before: Only queried Kuzu
@@ -427,7 +427,7 @@ python -c "from src.core.vector_store import VectorStore; vs = VectorStore(); pr
 python scripts/inspect_kuzu.py  # Check Kuzu count
 
 # 2. Regenerate snapshot
-python scripts/update_dashboard_data.py
+python scripts/pipeline/update_dashboard_data.py
 
 # 3. Verify snapshot content
 python -c "import json; d = json.load(open('data/dashboard_snapshot.json')); print(f'Snapshot: {len(d.get(\"nodes\", []))} nodes')"
@@ -439,7 +439,7 @@ Write-Host "API nodes: $($response.nodes.Count)"
 
 ### After Any Dashboard Changes
 
-1.  Run `python scripts/update_dashboard_data.py`
+1.  Run `python scripts/pipeline/update_dashboard_data.py`
 2.  Restart server: `python -m src.dashboard.server`
 3.  Hard refresh browser: `Ctrl+Shift+R`
 4.  Verify stats panel shows correct numbers
@@ -550,7 +550,7 @@ Rewrote `_start_dashboard_and_open()` in `src/mcp/server.py` to launch the dashb
 
 ---
 
-_Last verified: 2026-02-25 | Run `python scripts/verify_health.py` to validate dashboard data path_
+_Last verified: 2026-02-25 | Run `python scripts/verify/verify_health.py` to validate dashboard data path_
 
 ---
 
@@ -634,7 +634,7 @@ Dashboard showed 22/74 memories with score=100, average 94.6. Real computed scor
 | Path | File | How it computed score | Result |
 |---|---|---|---|
 | MCP server refresh | `src/mcp/server.py` `_refresh_dashboard_snapshot()` | `mem.metadata.score` (stale stored value from ChromaDB) | **WRONG** — returns birth-time score, never recomputed |
-| Standalone script | `scripts/update_dashboard_data.py` | `_compute_live_score(meta)` (correct live formula) | Correct |
+| Standalone script | `scripts/pipeline/update_dashboard_data.py` | `_compute_live_score(meta)` (correct live formula) | Correct |
 | Dashboard API | `src/dashboard/server.py` | Reads `dashboard_snapshot.json` as-is | Depends on who wrote the snapshot |
 
 The MCP server's `_refresh_dashboard_snapshot()` read `mem.metadata.score` directly from ChromaDB. That stored value is set at memory creation time (defaults to 100) and only updated when `record_access()` is called during retrieval. Most memories are never retrieved — their stored score stays at 100 forever.
@@ -667,7 +667,7 @@ def memory_to_dashboard_node(mem: Memory) -> Optional[Dict]
 
 **Wiring:**
 - `src/mcp/server.py` `_refresh_dashboard_snapshot()`: Replaced ~50 lines of inline node-building with `memory_to_dashboard_node(mem)` import.
-- `scripts/update_dashboard_data.py`: Removed all local duplicates (`_redact_secrets`, `_derive_topic`, `_compute_live_score`, `_is_test_artifact`), now imports from shared module.
+- `scripts/pipeline/update_dashboard_data.py`: Removed all local duplicates (`_redact_secrets`, `_derive_topic`, `_compute_live_score`, `_is_test_artifact`), now imports from shared module.
 
 **Verification result:**
 ```
@@ -691,7 +691,7 @@ Cross-validation (5 samples): ALL SCORES VERIFIED (±1 for time-decay drift)
 |---|---|
 | `src/utils/dashboard_serializer.py` | **NEW** — single source of truth for Memory → dashboard node |
 | `src/mcp/server.py` | Replaced inline serialization with `memory_to_dashboard_node()` import |
-| `scripts/update_dashboard_data.py` | Replaced local helpers with imports from shared serializer |
+| `scripts/pipeline/update_dashboard_data.py` | Replaced local helpers with imports from shared serializer |
 
 ### Verification
 

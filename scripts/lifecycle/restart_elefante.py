@@ -4,7 +4,7 @@
 Safely restarts the Elefante MCP server to pick up code changes.
 
 Usage:
-  python scripts/restart_elefante.py [--force] [--timeout SECONDS] [--verify] [--version X.Y.Z]
+  python scripts/lifecycle/restart_elefante.py [--force] [--timeout SECONDS] [--verify] [--version X.Y.Z]
 
 Notes:
 - This is a promoted entrypoint (previously under scripts/archive/historical/).

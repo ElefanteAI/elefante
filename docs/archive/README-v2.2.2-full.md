@@ -251,7 +251,7 @@ The dashboard is a read-only graph visualization. It reads from a snapshot file,
 elefante-DashboardOpen(refresh=true)
 
 # Manual
-python scripts/update_dashboard_data.py   # refresh snapshot
+python scripts/pipeline/update_dashboard_data.py   # refresh snapshot
 python -m src.dashboard.server            # start on port 8000
 ```
 

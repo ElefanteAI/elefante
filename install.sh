@@ -62,4 +62,4 @@ source .venv/bin/activate
 
 # 4. Run Python Installer
 log "[INFO] Starting installation wizard..."
-"$PYTHON_CMD" scripts/install.py --log-file "$LOG_FILE"
+"$PYTHON_CMD" scripts/setup/install.py --log-file "$LOG_FILE"

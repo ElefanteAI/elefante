@@ -112,13 +112,13 @@ docker compose up -d --build
 ### Generate the snapshot (required for meaningful dashboard data)
 
 ```bash
-docker compose run --rm elefante python scripts/update_dashboard_data.py
+docker compose run --rm elefante python scripts/pipeline/update_dashboard_data.py
 ```
 
 ### Verify health (optional)
 
 ```bash
-docker compose run --rm elefante python scripts/verify_health.py
+docker compose run --rm elefante python scripts/verify/verify_health.py
 ```
 
 ### Open dashboard
@@ -140,7 +140,7 @@ python -m src.mcp.server
 If you need to verify the MCP handshake (outside Docker, in this repo):
 
 ```bash
-python scripts/verify_mcp_handshake.py
+python scripts/verify/verify_mcp_handshake.py
 ```
 
 ## What to read first (fast orientation)
@@ -151,7 +151,7 @@ python scripts/verify_mcp_handshake.py
 
 ## Common failure modes
 
-- Dashboard shows empty/old data: rerun `python scripts/update_dashboard_data.py` (or Docker equivalent) to regenerate the snapshot.
+- Dashboard shows empty/old data: rerun `python scripts/pipeline/update_dashboard_data.py` (or Docker equivalent) to regenerate the snapshot.
 - Writes blocked: you forgot to call `elefante-MemorySearch` first.
 - Path problems in Docker: ensure `ELEFANTE_DATA_DIR=/data` is set and volume is mounted (see `docker-compose.yml`).
 

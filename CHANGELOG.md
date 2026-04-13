@@ -15,7 +15,7 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Ghost memories after delete**: `elefante-MemoryDelete` now removes the matching graph entity as well as the Chroma record, so hybrid search and graph-backed retrieval cannot surface deleted memories after a successful delete.
 - **Fresh-install SDD drift**: new installs now get the runtime SDD baseline from core code. `DirectiveStore` exposes built-in system directives immediately, and `MemoryOrchestrator.ensure_system_baseline()` idempotently seeds the required specification memories on first use.
 - **Regression coverage gap**: the crash fix is now guarded three ways: a static raw-Kuzu-boundary test, an isolated live MCP subprocess regression under pytest, and the shipped E2E harness now exercises the repeated search/co-activation shutdown-race path.
-- **Version drift in specification docs**: `scripts/bump_version.py` now updates `docs/technical/developer-etiquette.md`, `docs/technical/sdd-development-protocol.md`, and the footer version in `docs/technical/README.md`, preventing manual semver drift in closure-critical docs.
+- **Version drift in specification docs**: `scripts/ci/bump_version.py` now updates `docs/technical/developer-etiquette.md`, `docs/technical/sdd-development-protocol.md`, and the footer version in `docs/technical/README.md`, preventing manual semver drift in closure-critical docs.
 - **E2E harness residue**: `scripts/elefante_e2e_test_engine.py` now runs against an isolated temporary Elefante home/data directory and fails if tagged test memories remain after cleanup, preventing verification runs from polluting the real store.
 - **Dashboard semantic search broken**: `/api/search` returned nested `{memory: {id, content, metadata}, score}` but the frontend expected flat `{id, content, metadata, similarity}`. All search results rendered as blank rows. Fix: flatten the response in `server.py` to match the TypeScript `SearchResult` interface.
 - **Dashboard "Untitled" memories**: 3 memories with empty `title` metadata in ChromaDB now backfilled. Snapshot script fallback improved to extract first 10 words (matching `generate_title()`) instead of 5.
@@ -79,8 +79,8 @@ Dashboard scores were all stuck at 100 because two independent code paths (MCP s
 
 1. **Single serializer** — `src/utils/dashboard_serializer.py` is now the sole source of truth for Memory → dashboard-node conversion with live composite scoring.
 2. **MCP server cleaned** — `_refresh_dashboard_snapshot()` replaced ~50 lines of inline node-building with a single import from the shared serializer.
-3. **Standalone script cleaned** — `scripts/update_dashboard_data.py` removed all duplicate helpers (`_redact_secrets`, `_derive_topic`, `_compute_live_score`, `_is_test_artifact`); imports from shared serializer.
-4. **Install hardened** — `scripts/install.py` Step 3a now generates a dashboard snapshot at install time.
+3. **Standalone script cleaned** — `scripts/pipeline/update_dashboard_data.py` removed all duplicate helpers (`_redact_secrets`, `_derive_topic`, `_compute_live_score`, `_is_test_artifact`); imports from shared serializer.
+4. **Install hardened** — `scripts/setup/install.py` Step 3a now generates a dashboard snapshot at install time.
 5. **Validator hardened** — `scripts/validate_dashboard_snapshot.py` now detects score staleness (>25% at score=100 = FAIL).
 6. **Upstream merged** — GitHub origin/main merged cleanly (zero conflicts). Brought in `ELEFANTE_DEVELOPMENT_SKILLS.md` (AI agent guide) and Issue #7 (IBM Bob MCP settings path) in installation-compendium.
 
@@ -105,7 +105,7 @@ Dashboard scores were all stuck at 100 because two independent code paths (MCP s
 ### Changed
 - **Dashboard score formula**: Composite metric (50% temporal vitality + 25% type weight + 25% engagement) replaces pure exponential-decay. Meaningful spread (range ~54-94) instead of 84% at 100.
 - MCP server `_refresh_dashboard_snapshot()` reduced from ~50 lines to a 3-line import loop.
-- `scripts/update_dashboard_data.py` reduced by ~150 lines (removed all duplicate helper functions).
+- `scripts/pipeline/update_dashboard_data.py` reduced by ~150 lines (removed all duplicate helper functions).
 
 ---
 
@@ -201,7 +201,7 @@ When a user deleted or updated a memory, its UUID stayed in the MCP server's `_s
 
 ### Changed
 
-- `scripts/bump_version.py` — added `[0, 99]` range validation for each version part (x, y, z). Rejects values outside this range with a clear error message.
+- `scripts/ci/bump_version.py` — added `[0, 99]` range validation for each version part (x, y, z). Rejects values outside this range with a clear error message.
 - `scripts/version_counsel.py` — same `[0, 99]` guard applied to manual override input at the prompt.
 - `CONTRIBUTING.md` — versioning section rewritten: recommends `version_counsel.py` as primary workflow, documents manual bump as secondary, includes example output and full rules.
 - VERSION BUMP GATE Directive updated to reference `version_counsel.py`.
@@ -315,18 +315,18 @@ A major cleanup pass removing dead model abstractions and historical archive con
 
 Two field name mismatches between ChromaDB storage and dashboard presentation caused all memories to display with wrong metadata:
 
-1. **All topics showed "General"**: The dashboard `topic` field was reading `meta.get("topic")` — a key that does not exist in ChromaDB. The actual field is `category`. This bug existed in two independent code paths: the snapshot builder (`scripts/update_dashboard_data.py`) and the live refresh path (`src/mcp/server.py` `_refresh_dashboard_snapshot()`).
+1. **All topics showed "General"**: The dashboard `topic` field was reading `meta.get("topic")` — a key that does not exist in ChromaDB. The actual field is `category`. This bug existed in two independent code paths: the snapshot builder (`scripts/pipeline/update_dashboard_data.py`) and the live refresh path (`src/mcp/server.py` `_refresh_dashboard_snapshot()`).
 2. **All usage counts showed "Never"**: The `/api/graph` endpoint served snapshot data that lacked `access_count` and `last_accessed` fields, defaulting to zero/null in the UI.
 
 ### The Solution
 
-1. **Snapshot builder**: Changed `meta.get("topic")` to `meta.get("category")` in `scripts/update_dashboard_data.py`.
+1. **Snapshot builder**: Changed `meta.get("topic")` to `meta.get("category")` in `scripts/pipeline/update_dashboard_data.py`.
 2. **Live refresh path**: Changed `cm.get("topic")` to `mem.metadata.category` in `src/mcp/server.py` `_refresh_dashboard_snapshot()`.
 3. **API hydration fallback**: Added server-side hydration in `src/dashboard/server.py` `get_graph()` that fetches live `access_count`, `last_accessed`, and `last_modified` from the vector store when the snapshot lacks them.
 
 ### Changes
 
-- **FIX**: `scripts/update_dashboard_data.py` — Read `category` instead of nonexistent `topic` from ChromaDB metadata for dashboard topic derivation.
+- **FIX**: `scripts/pipeline/update_dashboard_data.py` — Read `category` instead of nonexistent `topic` from ChromaDB metadata for dashboard topic derivation.
 - **FIX**: `src/mcp/server.py` `_refresh_dashboard_snapshot()` — Read `mem.metadata.category` instead of `cm.get("topic")` for live refresh topic assignment.
 - **FIX**: `src/dashboard/server.py` `get_graph()` — Added usage hydration fallback that populates `access_count`, `last_accessed`, `last_modified` from live vector store when snapshot properties lack them.
 - **REMOVED**: Deprecated `importance`, `layer`, `sublayer` fields from snapshot builder (removed in schema v4).
@@ -351,14 +351,14 @@ Directive System + Behavioral Bootstrap — Always-active behavioral constraints
 
 1. **Directive System**: A new `DirectiveStore` class (`src/core/directive_store.py`) stores behavioral constraints in `~/.elefante/data/directives.json`. Directives are injected into every MCP tool response unconditionally — no search, no similarity scores, no keyword matching. They cannot be outcompeted by memories.
 2. **Three Directive Tools**: `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove`.
-3. **Installation Bootstrap Validation**: `scripts/install.py` Step 4a now validates `copilot-instructions.md` exists. The installer warns with an explicit error if it is missing, explaining the behavioral consequence.
+3. **Installation Bootstrap Validation**: `scripts/setup/install.py` Step 4a now validates `copilot-instructions.md` exists. The installer warns with an explicit error if it is missing, explaining the behavioral consequence.
 4. **Tool Response Contract Documented**: Both `copilot-instructions.md` and `docs/technical/installation.md` now formally document all three injected keys as a first-class agent-facing contract.
 
 ### Changes
 
 - **NEW**: `src/core/directive_store.py` — `DirectiveStore` + `Directive` classes. JSON-backed persistent storage at `~/.elefante/data/directives.json`. Module-level singleton `get_directive_store()`.
 - **MODIFIED**: `src/mcp/server.py` — Added `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove` tools. Added `_inject_directives()` and `_handle_directive_*` methods. Updated `_CONTEXT_SKIP_TOOLS`.
-- **MODIFIED**: `scripts/install.py` — Added `verify_copilot_instructions()` function and Step 4a to installer flow.
+- **MODIFIED**: `scripts/setup/install.py` — Added `verify_copilot_instructions()` function and Step 4a to installer flow.
 - **MODIFIED**: `.github/copilot-instructions.md` — Added "Tool Response Contract" section documenting all three injected response keys with their sources, scope, and behavioral rules.
 - **MODIFIED**: `docs/technical/installation.md` — Replaced "Next Steps / Section 6.1" with "Behavioral Instruction Architecture": Layer 1 (Bootstrap), Tool Response Contract (three keys), Layer 2 (Directives), Layer 3 (Memories), and installation-to-runtime mapping table.
 - **MODIFIED**: `docs/technical/usage.md` — Added `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove` documentation under new "Directives" section.
@@ -671,12 +671,12 @@ V4 Cognitive Retrieval uses concept overlap (0.20 weight) for scoring, but:
 
 1. **Standardized Storage**: All cognitive fields stored as JSON strings in ChromaDB metadata
 2. **Migration Script**: `scripts/migrate_cognitive_fields_v161.py` to fix existing memories
-3. **Snapshot Update**: `scripts/update_dashboard_data.py` now includes cognitive fields
+3. **Snapshot Update**: `scripts/pipeline/update_dashboard_data.py` now includes cognitive fields
 
 ### Changes
 
 - **NEW**: `scripts/migrate_cognitive_fields_v161.py` - Migrates all memories to v1.6.1 format
-- **MODIFIED**: `scripts/update_dashboard_data.py` - Added concepts, surfaces_when, authority_score to node properties
+- **MODIFIED**: `scripts/pipeline/update_dashboard_data.py` - Added concepts, surfaces_when, authority_score to node properties
 - **MIGRATED**: 34 memories (9 updated, 25 already compliant)
 
 ---
@@ -1175,7 +1175,7 @@ These have been consolidated into this baseline release.
 If upgrading from internal development versions:
 
 1. Database schema changed (`properties` -> `props`)
-2. Run `python scripts/init_databases.py` to reinitialize
+2. Run `python scripts/setup/init_databases.py` to reinitialize
 3. Documentation restructured into `technical/`, `debug/`, `planning/`, `archive/`
 
 ---
