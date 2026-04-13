@@ -1,6 +1,6 @@
 # Elefante Test Suite
 
-> **Version:** 2.3.0  
+> **Version:** 2.3.1  
 > **Last Updated:** 2026-04-13
 
 ## Quick Reference
@@ -44,6 +44,7 @@ Use the existing tests in this file before writing any ad hoc validation script.
 | ---- | ------------- | ----------- |
 | [test_scoring.py](test_scoring.py) | Score normalization math, weight calculation | When changing `src/core/scoring.py` |
 | [test_refinery.py](test_refinery.py) | Memory deduplication, canonical key assignment | When changing `src/core/refinery.py` |
+| [test_developer_routing.py](test_developer_routing.py) | Active developer-routing paths, current doc references, MCP tool-count guidance | When changing developer process docs or built-in SDD/directive text |
 | [test_no_emojis.py](test_no_emojis.py) | Emoji policy enforcement across source files | When changing emoji policy |
 | [test_v4_concept_overlap.py](test_v4_concept_overlap.py) | Concept overlap detection in memory schema | When changing concept fields |
 | [test_dashboard_serializer.py](test_dashboard_serializer.py) | Dashboard node scoring algorithms & secret redaction | When changing `src/utils/dashboard_serializer.py` |
@@ -68,6 +69,7 @@ tests/
 ├── test_memory_persistence.py   <- CRITICAL
 ├── test_memory_guard.py         <- CRITICAL
 ├── test_autonomous_coactivation.py <- CRITICAL
+├── test_developer_routing.py    <- Unit test (developer process routing)
 ├── test_scoring.py              <- Unit test
 ├── test_refinery.py             <- Unit test
 ├── test_no_emojis.py            <- Unit test (policy)
@@ -94,6 +96,7 @@ tests/
 | -------- | ------- |
 | Before any commit | `pytest tests/test_memory_persistence.py tests/test_memory_guard.py -v` |
 | Verify the crash regression fix | `pytest tests/test_autonomous_coactivation.py tests/test_memory_persistence.py -v` |
+| Verify developer routing references | `pytest tests/test_developer_routing.py -v` |
 | Changed scoring/retrieval logic | `pytest tests/test_scoring.py tests/test_refinery.py -v` |
 | Changed dashboard serialization | `pytest tests/test_dashboard_serializer.py -v` |
 | Verify factory reset safety | `pytest tests/test_factory_reset.py -v` |

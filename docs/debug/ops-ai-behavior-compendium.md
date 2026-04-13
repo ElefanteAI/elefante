@@ -1,8 +1,8 @@
 # AI Behavior Debug Compendium
 
 > **Domain:** AI Protocol Failures, Self-Analysis & Methodology  
-> **Last Updated:** 2026-02-16  
-> **Total Issues Documented:** 6  
+> **Last Updated:** 2026-04-13  
+> **Total Issues Documented:** 7  
 > **Status:** Production Reference  
 > **Maintainer:** Add new issues following Issue #N template at bottom
 
@@ -30,6 +30,7 @@ Run these BEFORE investigating. If tests pass, the protocol enforcement is intac
 | ----- | ------------ | -------------- |
 | #2 Premature completion | `.venv/bin/python scripts/verify/verify_e2e_tests.py` | Real MCP server completes full lifecycle |
 | #6 Protocol enforcement | `pytest tests/test_autonomous_coactivation.py -v` | Co-activation, directive baseline, spec bootstrap |
+| #7 Developer routing drift | `pytest tests/test_developer_routing.py -v` | Active process guidance points to current paths and tool-count contract |
 | Emoji policy | `pytest tests/test_no_emojis.py -v` | Source files comply with no-emoji rule |
 
 ---
@@ -42,6 +43,7 @@ Run these BEFORE investigating. If tests pass, the protocol enforcement is intac
 - [Issue #4: Knowledge Not Applied](#issue-4-knowledge-not-applied)
 - [Issue #5: Environment Assumption Failures](#issue-5-environment-assumption-failures)
 - [Issue #6: Passive Protocol Enforcement Failure](#issue-6-passive-protocol-enforcement-failure)  CRITICAL
+- [Issue #7: Developer Routing Drift](#issue-7-developer-routing-drift--stale-paths-and-ritual-changelog-reads)
 - [The 5-Layer Protocol](#the-5-layer-protocol)
 - [Verification Checklist](#verification-checklist)
 - [Prevention Protocol](#prevention-protocol)
@@ -463,6 +465,92 @@ This is the **ROOT CAUSE** of repeated failures:
 ### Lesson
 
 > **Passive protocols cannot enforce compliance. Structural enforcement (tools that refuse to work) or human gates (user approval) are required.**
+
+---
+
+## Issue #7: Developer Routing Drift -- Stale Paths and Ritual Changelog Reads
+
+**Date:** 2026-04-13  
+**Duration:** Recurrent documentation/runtime drift  
+**Severity:** HIGH  
+**Status:** FIXED (Guarded)
+
+### Problem
+
+Active Elefante developer guidance still pointed agents to deleted files and told them to read `CHANGELOG.md` as a ritual instead of as an assumption check.
+
+### Symptom
+
+```
+Directive / spec text surfaced to agent:
+- read docs/pitfall-index.md
+- follow docs/technical/sdd-development-protocol.md
+- use docs/technical/developer-etiquette.md
+
+Actual repo state:
+- docs/pitfall-index.md does not exist
+- docs/technical/dev-sdd.md is the live file
+- docs/technical/dev-etiquette.md is the live file
+
+Process effect:
+- agent routes to dead paths
+- debugging starts with file hunting instead of issue routing
+- changelog browsing becomes ceremony instead of verification
+```
+
+### Root Cause
+
+The drift existed in three layers at once:
+
+| Layer | Failure |
+|------|---------|
+| Source strings | Built-in directive text and system specification seed still named retired files |
+| Human reference | `dev-sdd.md` still said "Read the relevant section of CHANGELOG.md" without naming an assumption |
+| Stored Elefante knowledge | Existing specification and decision memories still surfaced the old paths |
+
+This is why the bug was sticky. Fixing only markdown would not fix retrieved memory. Fixing only memory would not fix future baseline seeding.
+
+### Solution
+
+Patched the active source of truth and the stored knowledge:
+
+1. `src/core/directive_store.py`
+     - Replaced dead `docs/pitfall-index.md` routing with `docs/debug/README.md`
+     - Replaced ritual changelog reading with "confirm or falsify a concrete assumption"
+2. `src/core/orchestrator.py`
+     - Updated the SDD leakage-scan specification seed to point to `docs/debug/README.md`
+     - Updated developer-etiquette baseline content to current files: `docs/technical/spec-architecture.md` and `scripts/ci/bump_version.py`
+3. `docs/technical/dev-sdd.md`
+     - Gate 0 now routes debugging through `docs/debug/README.md`
+     - Gate 0 now requires naming the assumption before reading the changelog
+     - MCP handshake guidance corrected from 21 tools to 20 tools
+4. Stored Elefante memories
+     - Amended the affected specification and decision memories so retrieval stops surfacing stale paths
+5. Live-session mitigation
+     - Added a corrective directive so already-running MCP sessions stop routing through dead filenames before restart
+
+### Proof
+
+The fix is now guarded by `pytest tests/test_developer_routing.py -v`.
+
+That test proves two things:
+
+1. Active developer-routing files do **not** contain these retired paths:
+     - `docs/pitfall-index.md`
+     - `docs/technical/sdd-development-protocol.md`
+     - `docs/technical/developer-etiquette.md`
+     - `docs/technical/architecture.md`
+     - `scripts/bump_version.py`
+2. Active developer-routing files **do** contain the current contract:
+     - `docs/debug/README.md`
+     - `docs/technical/spec-architecture.md`
+     - `scripts/ci/bump_version.py`
+     - `confirm or falsify a concrete assumption`
+     - `all 20 tools present`
+
+### Lesson
+
+> **A developer-process bug is not solved until source text, stored memory, and verification all agree on the same path.**
 
 ---
 

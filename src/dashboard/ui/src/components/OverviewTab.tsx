@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.3.0 - Overview Tab
+// Elefante Dashboard v2.3.1 - Overview Tab
 // Meaningful metrics that explain memory health for AI agent behavior
 import { useHealthScore, useUsageData } from '@/hooks/useVisualizationData';
 import type { HealthScore } from '@/hooks/useVisualizationData';

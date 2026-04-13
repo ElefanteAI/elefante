@@ -1,6 +1,6 @@
 # Elefante Documentation
 
-> **v2.3.0** · [Product overview & install](../README.md) · [Agent constitution](../.github/copilot-instructions.md)
+> **v2.3.1** · [Product overview & install](../README.md) · [Agent constitution](../.github/copilot-instructions.md)
 
 ---
 
@@ -10,7 +10,7 @@
 |------|-------|
 | What is Elefante and where is it going? | [`planning/spec-vision.md`](planning/spec-vision.md) |
 | Install and connect to your IDE | [`technical/ops-installation.md`](technical/ops-installation.md) → [`technical/ops-ide-configuration.md`](technical/ops-ide-configuration.md) |
-| Full tool reference (21 tools, 2 prompts) | [`technical/spec-tools.md`](technical/spec-tools.md) |
+| Full tool reference (20 tools, 2 prompts) | [`technical/spec-tools.md`](technical/spec-tools.md) |
 | How behavioral scoring works | [`technical/spec-scoring.md`](technical/spec-scoring.md) |
 | System architecture | [`technical/spec-architecture.md`](technical/spec-architecture.md) |
 

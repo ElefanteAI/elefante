@@ -53,7 +53,7 @@ SYSTEM_SPECIFICATIONS = (
             "ChromaDB write and read roundtrip, Kuzu schema and DML split, stdout purity, "
             "compliance gate state machine, dashboard snapshot contract, co-activation history, "
             "and documentation links. Reference docs: docs/technical/dev-sdd.md "
-            "and docs/pitfall-index.md."
+            "for the gate definition and docs/debug/README.md for issue routing."
         ),
         "tags": ["system", "sdd", "gate-2", "leakage-scan", "specification"],
     },
@@ -79,8 +79,8 @@ SYSTEM_SPECIFICATIONS = (
         "content": (
             "Elefante Developer Etiquette specification for versioning, CLEAN, and DOC_SYNC. Before claiming "
             "done: CLEAN_ENVIRONMENT removes leftovers, scratch files, and dead code. DOC_SYNC updates README.md, "
-            "docs/README.md, docs/technical/architecture.md, and CHANGELOG.md. STRICT_SEMVER uses scripts/"
-            "bump_version.py instead of manual version edits. The working tree must be reviewed before finish."
+            "docs/README.md, docs/technical/spec-architecture.md, and CHANGELOG.md. STRICT_SEMVER uses scripts/"
+            "ci/bump_version.py instead of manual version edits. The working tree must be reviewed before finish."
         ),
         "tags": ["system", "developer-etiquette", "clean", "doc-sync", "versioning", "specification"],
     },

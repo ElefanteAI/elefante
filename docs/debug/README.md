@@ -1,6 +1,6 @@
 # Debug Documentation Index
 
-**Compendiums and pitfall reference for Elefante v2.3.0**
+**Compendiums and pitfall reference for Elefante v2.3.1**
 
 > **Last Updated:** 2026-04-13
 
@@ -29,6 +29,7 @@ Active bugs and recurring failure classes. Each links to its compendium post-mor
 | BUG-004 | Dashboard scores stuck at 100 | FIXED | [ops-dashboard #9](ops-dashboard-compendium.md#issue-9-all-dashboard-scores-stuck-at-100) | `pytest tests/test_dashboard_serializer.py -v` | 1x |
 | BUG-005 | Factory reset safety (destructive operation) | TESTED | [ops-database](ops-database-compendium.md) | `pytest tests/test_factory_reset.py -v` | 0x — 10 safety tests cover dry-run, gates, backup |
 | BUG-006 | Agent entry point bypass — skips docs, guesses fix | OPEN | [ops-ai-behavior #6](ops-ai-behavior-compendium.md#issue-6-passive-protocol-enforcement-failure) | `.venv/bin/python scripts/verify/verify_e2e_tests.py` | Structural — mitigated by runtime citations |
+| BUG-007 | Developer routing drift — stale paths and ritual changelog reads in active process guidance | FIXED (guarded) | [ops-ai-behavior #7](ops-ai-behavior-compendium.md#issue-7-developer-routing-drift--stale-paths-and-ritual-changelog-reads) | `pytest tests/test_developer_routing.py -v` | 1x — guarded by source-path regression test + live memory amendments |
 
 ### How to Use This Table
 
@@ -110,4 +111,4 @@ docs/debug/
 
 ---
 
-_Last verified: 2026-04-13 | Elefante v2.3.0_
+_Last verified: 2026-04-13 | Elefante v2.3.1_

@@ -8,7 +8,7 @@
 
 AI agents start every conversation from zero. Your preferences, decisions, and discovered patterns don't carry over. Elefante gives any MCP-compatible agent a persistent, local second brain — memories are stored, scored automatically, and surfaced at the right moment without being asked.
 
-**v2.3.0** — Persistent Memory Engine
+**v2.3.1** — Persistent Memory Engine
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -17,7 +17,7 @@ AI agents start every conversation from zero. Your preferences, decisions, and d
                          │ MCP stdio
 ┌────────────────────────▼────────────────────────────────────┐
 │ LAYER 1 · MCP PROTOCOL                                      │
-│ 21 tools · Compliance Gate · Context Injection              │
+│ 20 tools · 2 prompts · Context Injection                    │
 └────────────────────────┬────────────────────────────────────┘
                          │
 ┌────────────────────────▼────────────────────────────────────┐
@@ -57,7 +57,7 @@ Everything runs locally. No cloud. No telemetry. Your data stays on your machine
 
 ### Layer 1 — MCP Protocol
 
-The interface between your IDE and the memory engine. 21 tools that let agents store, search, connect, and manage knowledge. A **Compliance Gate** prevents duplicates before they exist. **Context Injection** attaches relevant memories to every tool response. **Directives** enforce persistent behavioral rules that survive across sessions.
+The interface between your IDE and the memory engine. 20 tools and 2 prompts let agents store, search, connect, and manage knowledge. A **Compliance Gate** prevents duplicates before they exist. **Context Injection** attaches relevant memories to every tool response. **Directives** enforce persistent behavioral rules that survive across sessions.
 
 Full tool reference → [docs/technical/spec-tools.md](docs/technical/spec-tools.md)
 IDE configuration → [docs/technical/ops-ide-configuration.md](docs/technical/ops-ide-configuration.md)
@@ -81,7 +81,7 @@ A read-only view of your knowledge system, served from a lightweight snapshot so
 - Searchable, sortable memory table
 - Topic distribution, memory insights, and a knowledge graph
 
-Dashboard details → [docs/technical/dashboard.md](docs/technical/dashboard.md)
+Dashboard details → [docs/technical/ops-dashboard.md](docs/technical/ops-dashboard.md)
 Docker deployment → [docs/technical/ops-docker.md](docs/technical/ops-docker.md)
 
 ---
@@ -125,7 +125,7 @@ You possess full local control. The installer automatically bridges into your ID
 
 ## MCP Tools
 
-21 tools + 2 prompts. All names follow `elefante-PascalCase` convention.
+20 tools + 2 prompts. All names follow `elefante-PascalCase` convention.
 
 | Category   | Tools                                                                                                                                   |
 | ---------- | --------------------------------------------------------------------------------------------------------------------------------------- |
@@ -178,7 +178,7 @@ scripts/          Setup, deployment, and maintenance tools
 
 Full reference → [docs/technical/spec-tools.md](docs/technical/spec-tools.md)
 
-- [Tool reference](docs/technical/spec-tools.md) — parameter schemas for all 21 tools
+- [Tool reference](docs/technical/spec-tools.md) — parameter schemas for all 20 tools and 2 prompts
 - [Behavioral Relevance](docs/technical/spec-scoring.md) — how automatic scoring works
 - [Installation](docs/technical/ops-installation.md) — step-by-step setup
 - [Architecture](docs/technical/spec-architecture.md) — system design

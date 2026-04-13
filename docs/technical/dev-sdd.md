@@ -5,9 +5,9 @@
 > The filename `dev-sdd.md` is retained for compatibility, but SDD is no longer a separate product surface or workflow mode. The checks below document the embedded development process already enforced through built-in directives, specification memories, compendiums, and verification scripts.  
 > See `docs/technical/spec-architecture.md` for the runtime retrieval model and `docs/debug/dev-developer-agent.md` for script routing.
 
-**Version**: 2.3.0  
+**Version**: 2.3.1  
 **Status**: Reference document — embedded process, legacy filename retained  
-**Last Updated**: 2026-03-20
+**Last Updated**: 2026-04-13
 
 ---
 
@@ -39,7 +39,8 @@ The core discipline:
 Before any change:
 
 1. **Read the actual source file.** Not the docs about it — the file itself.
-3. **Read the relevant section of `CHANGELOG.md`** to understand what was already decided.
+2. **If debugging an existing failure, read `docs/debug/README.md` first** and route through the matching Known Issue, compendium, and verification command.
+3. **Name the assumption you are checking, then read only the `CHANGELOG.md` entry that could confirm or falsify it.** Do not browse the changelog as a ritual.
 
 If your memory of the file contradicts what you read: **the file wins. Always.**
 
@@ -137,7 +138,7 @@ ELEFANTE_ALLOW_TEST_MEMORIES=1 .venv/bin/python -m pytest tests/ -k "your_test"
 | Check | Required |
 |-------|----------|
 | `verify_health.py` | Exit code 0, no CRITICAL warnings |
-| MCP handshake | `"tools"` list returned, all 21 tools present |
+| MCP handshake | `"tools"` list returned, all 20 tools present |
 | Round-trip test | Changed fields present and correct in retrieved memory |
 
 Any failure → fix, then re-run from Gate 2. Do not skip back to Gate 4 directly.
@@ -202,18 +203,20 @@ Elefante was built to give agents this discipline. Older repo language called th
 ```
 Before ANY change:
   1. Read the actual file (not memory of it)
+  2. If debugging, route through docs/debug/README.md and the matching verification path
+  3. Name the assumption, then read only the changelog entry that can confirm or falsify it
 
 Before writing code:
-  3. Trace your change to a spec source
-  4. Scan ALL leakage surfaces (Gate 2 table)
-  5. Verify any formula with actual math
+  4. Trace your change to a spec source
+  5. Scan ALL leakage surfaces (Gate 2 table)
+  6. Verify any formula with actual math
 
 Before committing:
-  6. verify_health.py → exit 0
-  7. verify_mcp_handshake.py → 21 tools listed
-  8. Round-trip test if memory path touched
-  9. CHANGELOG entry written
- 10. advise_version_bump.py run
+  7. verify_health.py → exit 0
+  8. verify_mcp_handshake.py → 20 tools listed
+  9. Round-trip test if memory path touched
+ 10. CHANGELOG entry written
+ 11. advise_version_bump.py run
 ```
 
 ---

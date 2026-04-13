@@ -7,6 +7,21 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.3.1] - 2026-04-13
+
+### Fixed
+
+- **Developer routing drift**: Active developer-process guidance no longer routes through deleted files like `docs/pitfall-index.md` or retired doc names. Gate 0 now routes debugging through `docs/debug/README.md`, changelog reads are assumption-driven instead of ritual, and the MCP handshake expectation is corrected to 20 tools.
+- **Tool reference drift**: `README.md`, `docs/README.md`, and `docs/technical/spec-tools.md` now match the live MCP schema in `src/mcp/server.py`, including the 20-tool plus 2-prompt surface, current ETL fields, and the correct dashboard operations doc path.
+
+### Changed
+
+- **Bug tracking**: `docs/debug/README.md` and `docs/debug/ops-ai-behavior-compendium.md` now record BUG-007 with a formal post-mortem, exact proof command, and guarded status.
+
+### Added
+
+- **Developer routing regression**: `tests/test_developer_routing.py` now guards active developer-routing files against retired paths and verifies the current contract points to the right docs and tool-count expectation.
+
 ## [2.3.0] - 2026-04-13
 
 ### Fixed

@@ -466,6 +466,6 @@ For restarting a running server, see [`ops-restart.md`](ops-restart.md).
 
 ---
 
-**Document Version**: 2.3.0  
+**Document Version**: 2.3.1  
 **Status**: ESSENTIAL  
 **Last Validated**: 2026-02-25
