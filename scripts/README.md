@@ -1,47 +1,68 @@
-# Scripts naming convention
+# Elefante Scripts Directory
 
-Goal: make each script name immediately communicate **purpose** and **scope**.
+Every Python file in this directory has a uniquely important, explicit purpose. This avoids redundancy and ensures clarity for continuous integration, deployment, and debugging.
 
-## Pattern
+## Active Production & Delivery Scripts
 
-- `verb_object[_qualifier].py` (snake_case)
-- Use clear verbs: `install`, `configure`, `verify`, `export`, `ingest`, `migrate`, `update`, `inspect`, `demo`, `debug`.
-- Put experimental/one-off helpers under `scripts/debug/` or name them with a `debug_` prefix.
-
-## Examples in this repo
-
-- `configure_*` = write IDE/MCP client configs
-- `verify_*` = run checks (health, protocol handshakes, repo hygiene)
-- `export_*` / `ingest_*` / `migrate_*` = data workflows
-
-If you need a new script, prefer adding a new `verb_object` script rather than creating another near-duplicate with a vague name.
-
-## Versioning scripts
-
-| Script | Purpose | When to use |
+| Script | Purpose & Uniqueness | Importance |
 |---|---|---|
-| `version_counsel.py` | Smart advisor: analyses staged diff, classifies MAJOR/MINOR/PATCH, asks for confirmation before bumping | **Primary workflow** — run after `git add` |
-| `bump_version.py X.Y.Z` | Atomically update version string across all 25 tracked files | Direct bump when version is already decided |
-| `bump_version.py --check` | Verify all 25 files declare the same version (exit 1 on drift) | Run before every commit |
+| `install.py` | Single-entry universal installer for the Elefante server, managing venv, dependencies, and pathing. | **Critical** (Client setup entrypoint) |
+| `configure_vscode_bob.py` | Generates the specifically required JSON schema to inject Elefante MCP configuration into Bob IDE (VS Code fork). | **Critical** (IDE integration) |
+| `configure_antigravity.py` | Equivalent to Bob script, but outputs the specific format required by the Antigravity IDE plugin structure. | **Critical** (IDE integration) |
+| `health_check.py` | Performs a system-wide structural check (paths, python versions, import readiness) strictly for the core engine. | **High** (Deployment & pre-commit) |
+| `dashboard_health_check.py` | Executes independent HTTP protocol checks on the Dashboard React server, isolated from core engine testing. | **High** (Dashboard stability) |
+| `verify_mcp_handshake.py` | Standalone protocol verification script simulating an MCP heartbeat to ensure the server communicates correctly. | **High** (Protocol verification) |
+| `init_databases.py` | Safe bootstrap script strictly for initializing/re-verifying ChromaDB collections and Kuzu table schemas locally. | **Critical** (Database safety) |
+| `elefante_e2e_test_engine.py` | Unifies the integration test framework to execute a complete end-to-end memory pipeline simulation. | **High** (Release confidence) |
 
-**Rules:** Version parts x, y, z must be natural numbers in `[0, 99]`. Both scripts enforce this. See `CONTRIBUTING.md` for the full versioning procedure.
+## Control & Lifecyle
 
-## Debug scripts (`scripts/debug/`)
-
-
-| Script | Purpose | Safety |
+| Script | Purpose & Uniqueness | Importance |
 |---|---|---|
-| `dump_all_memories.py` | Raw ChromaDB memory dump to stdout | Read-only |
-| `list_recent.py` | Show 10 most recent memories (via Orchestrator) | Read-only |
-| `unlock_database.py` | Clear stuck transaction locks | Requires `--apply --confirm DELETE` |
-| `remove_kuzu_lock.py` | Remove stale Kuzu write lock file | Requires `--apply --confirm DELETE` |
-| `nuclear_reset_kuzu.py` | Backup and destroy corrupted Kuzu database | Requires `ELEFANTE_PRIVILEGED=1` |
+| `restart_elefante.py` | Triggers a clean shutdown and reboot sequence explicitly for the MCP Server process tree. | **High** (Daemon management) |
+| `factory_reset.py` | Performs a total semantic destruction of the databases. Used for unrecoverable corruption or complete user wipe. | **High** (Emergency recovery) |
+| `backup_elefante_data.py` | Dumps production ChromaDB/Kuzu local files to a safe rollback archive directory. | **High** (Maintenance safety) |
+| `restore_elefante_data.py` | Inverts the backup script, migrating a specific archived state back over the active production path. | **High** (Maintenance safety) |
 
-## Privileged scripts (`scripts/privileged/`)
+## CI/CD Utilities
 
-See [`scripts/privileged/README.md`](privileged/README.md) for privilege gating rules.
-
-| Script | Purpose | Safety |
+| Script | Purpose & Uniqueness | Importance |
 |---|---|---|
-| `memory_surgeon.py` | Surgical memory removal with impact analysis | Dry-run by default |
-| `memory_workbench.py` | Read-only memory connectivity inspector | Read-only |
+| `version_counsel.py` | Smart Git Hook evaluating the semantic differences to recommend Major/Minor/Patch deployment numbers. | **Medium** (DevOps velocity) |
+| `bump_version.py` | A forced literal string replacement engine syncing the chosen version string across ~25 scattered project files. | **Critical** (Release formatting) |
+| `emoji_policy.py` | Regex-driven linter enforcing the absolute "no emojis in strict docs" policy during commit sequences. | **Medium** (Codebase etiquette) |
+| `list_mcp_tools.py` | Evaluates the actual code AST to print a human-readable list of available MCP actions for documentation. | **Medium** (Spec syncing) |
+
+## Data & Dashboard Pipelines
+
+| Script | Purpose & Uniqueness | Importance |
+|---|---|---|
+| `update_dashboard_data.py` | Extracts the raw structural Kuzu/ChromaDB state into `.json` for the frontend React dashboard to consume snapshot data statically. | **High** (Dashboard backend) |
+| `validate_dashboard_snapshot.py` | Verifies the snapshot `.json` structural integrity generated by `update_dashboard_data.py` to prevent React rendering crashes. | **High** (Dashboard stability) |
+| `export_all_memories_json.py` | Raw data pipeline dumping the entire memory state strictly into a transportable JSON format for external analysis. | **Medium** (Portability) |
+| `export_memories_csv.py` | Same as JSON export, but explicitly flattened for spreadsheet/relational manipulation by non-technical users. | **Medium** (Portability) |
+
+---
+
+## Debugging Scripts (`scripts/debug/`)
+
+Only invoke these explicitly during severe operational failure modes (locks, database freezing, corruption).
+
+| Script | Purpose & Uniqueness | Importance |
+|---|---|---|
+| `dump_all_memories.py` | Raw ChromaDB stdout dump bypassing orchestration filters to let developers forcibly view hidden strings. | **High** (Developer visibility) |
+| `list_recent.py` | Lightweight orchestrator query strictly returning the 10 most recent events for rapid testing validation. | **Medium** (Agile testing) |
+| `unlock_database.py` | Destructive intervention explicitly killing frozen SQLite or Chroma transaction locks blocking memory writes. | **High** (Database recovery) |
+| `remove_kuzu_lock.py` | Equivalent unlock tool targeting specifically the Kuzu knowledge graph lockfiles (separate subsystem). | **High** (Database recovery) |
+| `nuclear_reset_kuzu.py` | Total isolation wipe purely for the Kuzu graph database when it becomes corrupt independent of the Chroma vectors. | **High** (Database recovery) |
+
+---
+
+## Privileged Operations (`scripts/privileged/`)
+
+These files interact directly with Elefante core state manipulation. They require `ELEFANTE_PRIVILEGED=1` context.
+
+| Script | Purpose & Uniqueness | Importance |
+|---|---|---|
+| `memory_surgeon.py` | Precise surgical excision of specific memory IDs spanning both vector and graph databases synchronously. | **Critical** (Targeted maintenance) |
+| `memory_workbench.py` | Agnostic read-only connectivity scanner for finding the semantic neighbors surrounding a target UUID. | **Critical** (Graph visualization) |
