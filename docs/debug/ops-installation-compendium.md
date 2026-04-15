@@ -4,12 +4,7 @@
 > **Last Updated:** 2026-03-24
 > **Total Issues Documented:** 7
 > **Status:** Production Reference  
-> **Maintainer:** Add new issues following Issue #N template at bottom
-
----
-
-## CRITICAL LAWS (Extracted from Pain)
-
+> **Applies to**: v2.5.2+
 | #   | Law                                                  | Violation Cost       |
 | --- | ---------------------------------------------------- | -------------------- |
 | 1   | Do NOT pre-create Kuzu database directory            | 12 minutes debugging |

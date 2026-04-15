@@ -1,8 +1,20 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# NAME    : verify_mcp_handshake.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Minimal JSON-RPC initialize probe that proves the MCP server can
+#           answer a real handshake; narrower than the full self-protocol.
+# WHEN    : After restart_elefante.py, to quickly confirm the server came back
+#           and is accepting connections before running the full self-protocol.
+#           Use this as the second check in the verification ladder:
+#           verify_health → verify_mcp_handshake → verify_e2e_tests.
+# USAGE   : python scripts/verify/verify_mcp_handshake.py
+# NOTES   : Starts the server briefly, sends one JSON-RPC initialize request,
+#           checks the response, then exits. Much faster than verify_e2e_tests.py
+#           but proves only that the handshake succeeds, not tool correctness.
+# LASTRUN : yyyy-mm-dd hh:mm — update manually
+# ─────────────────────────────────────────────────────────────────────────────
 import sys
-import asyncio
-import json
-import os
-from pathlib import Path
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent

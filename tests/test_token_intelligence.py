@@ -1,3 +1,13 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TEST    : tests/test_token_intelligence.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PROVES  : Token counting accuracy, density scoring, session ledger, and
+#           TOKEN_STATS injection in MCP tool responses.
+# RUN     : pytest tests/test_token_intelligence.py -v
+# WHEN    : After any change to src/utils/token_counter.py or TOKEN_STATS
+#           injection logic in server.py.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Tests for token intelligence: token counting, density scoring, session ledger,
 and MCP server integration.

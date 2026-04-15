@@ -1,3 +1,12 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/models/query.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Query and search parameter models for MemorySearch and related tools.
+# ROLE    : Models — used by server.py to validate and deserialize search requests
+#           before passing to orchestrator.
+# TOUCHED : When adding new search filter fields or changing query parameter types.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Query models for search and retrieval operations
 """

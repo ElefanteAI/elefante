@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+# ─────────────────────────────────────────────────────────────────────────────
+# NAME    : verify_health.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Structural health check for the core engine: paths, imports, config,
+#           and baseline readiness without mutating any durable data.
+# WHEN    : First check after any install or reinstall. After config.yaml changes.
+#           When any core import fails or Elefante refuses to start — run this
+#           before reaching for deeper diagnostics. Fastest non-destructive check.
+# USAGE   : python scripts/verify/verify_health.py
+# NOTES   : Does NOT start the MCP server or open databases. If this passes but
+#           the server still fails, move to verify_mcp_handshake.py. If that fails
+#           too, run verify_e2e_tests.py for the full surface diagnosis.
+# LASTRUN : yyyy-mm-dd hh:mm — update manually
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Health check script for Elefante Memory System
 

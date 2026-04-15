@@ -1,5 +1,7 @@
 # Specification: Native SDD Enforcement Engine (v1.0)
 
+> ⚠️ **ARCHIVED** — SDD enforcement spec, shipped as part of v2.2.x. For current SDD process see [docs/technical/dev-sdd.md](../../technical/dev-sdd.md).
+
 ## 1. Overview
 The objective is to evolve Elefante from a passive structured memory database into an active **Spec-Driven Development (SDD) runtime engine**. Elefante will natively store technical specifications as high-authority system entities and actively enforce agent compliance via pre-flight MCP injection and rigorous gate checks, entirely eradicating agent drift.
 

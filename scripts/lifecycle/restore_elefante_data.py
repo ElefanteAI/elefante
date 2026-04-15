@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+# ─────────────────────────────────────────────────────────────────────────────
+# NAME    : restore_elefante_data.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : File-level restore from a backup zip to ~/.elefante/data; moves
+#           existing data aside (or discards with --discard-existing).
+# WHEN    : After accidental data loss or after a factory/nuclear reset that you
+#           want to undo. The backup must have been created by backup_elefante_data.py.
+#           Also use when migrating Elefante to a new machine.
+# USAGE   : python scripts/lifecycle/restore_elefante_data.py --latest --force
+# NOTES   : STOP all Elefante processes before restore — overwriting live DB files
+#           will corrupt them. Existing data is moved to data.pre_restore.<timestamp>
+#           unless --discard-existing is set. --latest auto-selects newest backup.
+# LASTRUN : yyyy-mm-dd hh:mm — update manually
+# ─────────────────────────────────────────────────────────────────────────────
 """Restore Elefante on-disk data from a backup archive.
 
 This overwrites ~/.elefante/data by default, so STOP all Elefante processes first.

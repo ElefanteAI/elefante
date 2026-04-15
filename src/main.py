@@ -1,6 +1,13 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/main.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Application entry point for non-MCP execution paths (CLI, scripts).
+# ROLE    : Top-level launcher — enforces Python version, then delegates.
+# TOUCHED : Rarely. Only when the entry point dispatch logic changes or a new
+#           top-level execution mode is added.
+# ─────────────────────────────────────────────────────────────────────────────
 import sys
-
-from src.utils.version import ensure_supported_python
 
 def main():
     ensure_supported_python()

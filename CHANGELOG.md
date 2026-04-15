@@ -7,6 +7,51 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.5.2] - 2026-04-15
+
+### Fixed
+
+- **BUG-011 README row**: Status was still showing OPEN after the fix landed in 2.5.1. Row now reads "FIXED (guarded)" with recurrence count updated to 2x and a note on the `rejection_reason` guard.
+
+### Changed
+
+- **`bump_version.py` enforcement gates**: Three new pre-conditions prevent unsafe version cascades: (1) CHANGELOG presence gate — `_check_changelog_entry()` validates a `## [X.Y.Z]` entry exists before writing any file; (2) downgrade guard — `_check_no_downgrade()` blocks any bump where the new semver tuple is ≤ the current one; (3) pattern-miss WARNING — every TARGETS entry that matches zero bytes in its target file now prints a WARNING line and is collected in a `warned` list shown at the end. Previously all three conditions were silent.
+- **`bump_version.py` TARGETS expanded**: 9 new targets added covering all living documentation that carries a version declaration: `docs/technical/ops-installation.md`, `docs/planning/spec-vision.md`, `docs/technical/ops-rollback.md`, `docs/technical/spec-ingestion.md`, `docs/debug/best_practices.md`, `docs/debug/ops-ai-behavior-compendium.md`, `docs/debug/ops-dashboard-compendium.md`, `docs/debug/ops-installation-compendium.md`, `docs/debug/ops-memory-compendium.md`. Previously these could drift silently across bumps.
+- **Version headers added to 7 living docs**: `best_practices.md`, `ops-ai-behavior-compendium.md`, `ops-dashboard-compendium.md`, `ops-installation-compendium.md`, `ops-memory-compendium.md` now declare `**Applies to**: v2.5.2+`; `ops-rollback.md` and `spec-ingestion.md` now declare `**Version**: 2.5.2`. Without these declarations the documents could silently describe stale behaviour.
+
+### Removed
+
+- **8 redundant archive files deleted**: `docs/archive/kuzu-best-practices.md`, `docs/archive/kuzu-lock-monitoring.md`, `docs/archive/ELEFANTE_DEVELOPMENT_SKILLS.md`, `docs/archive/memory-schema-v4-cognitive.md`, `docs/archive/memory-schema-v5-topology.md`, `docs/archive/python-version-requirements.md`, `docs/archive/RELEASES.md`, `docs/archive/planning/v5-cognitive-retrieval-requirements.md`. All content was already superseded by and present in living documentation. Retaining them created confusion about canonical source.
+- **Empty folder `docs/debug/phoenix-handoff-2026-04-13/` deleted**.
+
+### Documentation
+
+- **ARCHIVED banners on 12 historical archive files**: All remaining files in `docs/archive/` now carry `> ⚠️ ARCHIVED — ...` banners immediately after the title, with an explicit pointer to the current living document. Readers can no longer mistake historical snapshots for current guidance.
+- **Agent-oriented headers — all 22 scripts**: Every file in `scripts/` now carries a `NAME · VERSION · CHANGED · PURPOSE · WHEN · USAGE · NOTES · LASTRUN` header block with concrete trigger conditions (WHEN) and prerequisites/caveats (NOTES). Previously headers described what a script does but gave no guidance on when to reach for it vs. an alternative. `LASTRUN` is now a fillable placeholder (`yyyy-mm-dd hh:mm — update manually`) rather than the static "not tracked".
+- **MODULE headers — all `src/` Python files**: Every substantive file in `src/core/`, `src/mcp/`, `src/utils/`, `src/models/`, `src/main.py`, and `src/desktop.py` now carries a `MODULE · VERSION · CHANGED · PURPOSE · ROLE · TOUCHED` header with critical TOUCHED warnings (e.g., the BUG-010 concurrency constraint in `embeddings.py`, the Kuzu schema-reset requirement in `graph_store.py`).
+- **TEST headers — all 14 `tests/` files**: Every test file now carries a `TEST · VERSION · CHANGED · PROVES · RUN · WHEN` header documenting the exact contract each suite guards and the precise `pytest` invocation to run it.
+- **`scripts/README.md` complete rewrite**: Rewritten with 4-column tables (What / When / Why / Why Here) per script group, a verification ladder (`verify_health → verify_mcp_handshake → verify_e2e_tests`), a 5-step release workflow sequence, and a lock guidance section. Old entries for the 4 deleted scripts removed; `export_memories.py --format` documented.
+
+### Removed
+
+- **4 scripts merged and originals deleted**: `scripts/debug/remove_lock_kuzu.py` and `scripts/debug/unlock_database_transactions.py` were merged into `scripts/debug/manage_lock.py` (adds `--kill` flag; dry-run by default; requires `ELEFANTE_PRIVILEGED=1 --apply --confirm DELETE`). `scripts/pipeline/export_memories_csv.py` and `scripts/pipeline/export_memories_json.py` were merged into `scripts/pipeline/export_memories.py` (unified `--format json|csv|all` flag). The two originals for each merge were strict subsets with no independent functionality — retaining them created duplicate maintenance surfaces.
+
+---
+
+## [2.5.1] - 2026-04-15
+
+### Fixed
+
+- **BUG-010 — Self-protocol cold-start deadlock**: `from sentence_transformers import SentenceTransformer` (which imports torch) deadlocks indefinitely when executed in a worker thread under an active anyio 4.x event loop with piped stdio on Windows + Python 3.11. Root cause was misdiagnosed twice: first as a timeout (90 → 180 s had no effect) then as a threading issue (`asyncio.to_thread` moved the deadlock rather than eliminating it). Fix: pre-load the embedding model synchronously in `server.py __main__` before `asyncio.run()`. `_load_model()` becomes a no-op at runtime because `self._model` is already set. Self-protocol result: 45/45 PASS, 1 SKIP, 0 FAIL.
+- **BUG-010 ARAA follow-up — contradicting docstring**: `src/core/embeddings.py` CONCURRENCY RULE docstring previously stated the model "MUST run via `asyncio.to_thread()`" — directly contradicting the fix and guiding future contributors toward the deadlock. Docstring now states operations DEADLOCK in a worker thread and MUST be pre-loaded in `__main__` before `asyncio.run()`.
+- **BUG-010 ARAA follow-up — silent fallback**: `generate_embeddings_batch()` retains `asyncio.to_thread(self._load_model)` as a last-resort path for non-`__main__` entry points, but now fires `logger.critical("embedding_model_not_preloaded")` with an explicit BUG-010 attribution before attempting it. The failure path is no longer silent.
+- **BUG-011 — MemoryAdd silent IGNORE with opaque rejection reason**: `elefante-MemoryAdd` was returning `status: ignored` with only `"Memory filtered by Intelligence Pipeline"` and no indication which of the 9 heuristic conditions fired. Fix: `src/core/orchestrator.py` now captures `_last_rejection_reason` with the exact condition label and `src/mcp/server.py` injects it as `rejection_reason` in the IGNORE response body. Agents can now correct and retry without guessing.
+
+### Changed
+
+- **BUG-010 platform scope in `docs/debug/README.md`**: BUG-010 status row now reads "FIXED (guarded) ⚠️ Windows/Python 3.11/CPU only — untested on Linux, macOS, Python 3.12" to prevent overclaiming across untested configurations.
+- **`docs/debug/best_practices.md`**: Replaced the stale "Verifier Timeout Constants" entry (written when the bug was misdiagnosed as a timeout) with three updated/new entries: (1) "Verifier Timeout Constants" — reframed to note the initial timeout misdiagnosis, (2) "Heavy Imports Must Run Before The Event Loop" — rule against deferring C-extension imports to `asyncio.to_thread`, (3) "Differentiate Slow From Hung Before Choosing A Fix" — heuristic: if 2× timeout still fails, investigate deadlock not latency.
+
 ## [2.5.0] - 2026-04-15
 
 ### Added

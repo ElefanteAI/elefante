@@ -1,3 +1,14 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/core/conversation_context.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Searches conversation history for context-aware memory retrieval;
+#           enriches search results with recent conversational signals.
+# ROLE    : Core auxiliary — injected into retrieval pipeline when conversation
+#           history is present in the context payload.
+# TOUCHED : When changing conversation weighting, window size, or the shape of
+#           context payloads passed by agents via elefante-ContextGet.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Conversation Context Retriever for Elefante
 

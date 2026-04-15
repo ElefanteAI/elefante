@@ -12,7 +12,7 @@ long_description = readme_file.read_text(encoding="utf-8") if readme_file.exists
 
 setup(
     name="elefante",
-    version="2.5.0",
+    version="2.5.2",
     author="Elefante Contributors",
     author_email="elefante@proton.me",
     description="Local AI Memory System with Vector and Graph Storage",

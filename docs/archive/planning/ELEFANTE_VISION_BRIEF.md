@@ -1,5 +1,7 @@
 # Elefante Vision Brief: Comprehensive Implementation Guide
 
+> ⚠️ **ARCHIVED** — Implementation guide written at v2.2.2. For current architecture and process see [docs/technical/spec-architecture.md](../../technical/spec-architecture.md) and [docs/debug/dev-developer-agent.md](../../debug/dev-developer-agent.md).
+
 > **Purpose:** This document captures the cohesive larger vision of Elefante for a new agent to implement without requiring clarification. Every file, function, variable, and architectural decision is documented here.
 >
 > **Generated:** 2026-02-18

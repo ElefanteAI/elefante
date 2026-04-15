@@ -1,4 +1,17 @@
 #!/usr/bin/env python3
+# ─────────────────────────────────────────────────────────────────────────────
+# NAME    : advise_version_bump.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Inspect staged git diff, classify MAJOR/MINOR/PATCH, then hand off
+#           to bump_version.py after operator confirms the recommendation.
+# WHEN    : Before any version bump. Run AFTER staging changes but BEFORE writing
+#           the CHANGELOG entry — use it to determine what bump level is warranted.
+# USAGE   : python scripts/ci/advise_version_bump.py
+# NOTES   : Requires staged git changes (git add first). Does not write any files
+#           itself; bump_version.py does the actual write after confirmation.
+# LASTRUN : yyyy-mm-dd hh:mm — update manually
+# ─────────────────────────────────────────────────────────────────────────────
 """
 advise_version_bump.py — Smart version bump advisor.
 

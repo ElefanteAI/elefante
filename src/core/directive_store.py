@@ -1,3 +1,13 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/core/directive_store.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Persistent always-on behavioral constraints; separate from memories
+#           and injected into every tool response regardless of query relevance.
+# ROLE    : Core — directives are injected by server.py on every MCP response.
+# TOUCHED : When changing directive persistence, injection rules, or the
+#           elefante-DirectiveAdd/Remove/List tool contracts.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Directive Store — Persistent, always-on behavioral constraints.
 

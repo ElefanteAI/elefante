@@ -1,4 +1,20 @@
 #!/usr/bin/env python3
+# ─────────────────────────────────────────────────────────────────────────────
+# NAME    : restart_elefante.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Safe process-level restart of the MCP server with stale lock
+#           cleanup and optional post-restart verification.
+# WHEN    : After any change to src/ that needs to be picked up by the live server
+#           (code reload). Also when the server is unresponsive and a clean restart
+#           is preferred over a manual kill. Use --verify to confirm the server
+#           came back healthy.
+# USAGE   : python scripts/lifecycle/restart_elefante.py [--force] [--timeout N] [--verify]
+# NOTES   : Handles stale write-lock cleanup automatically. --force skips the
+#           graceful shutdown wait. --verify runs verify_mcp_handshake after restart.
+#           Prefer this over manual kill/start to avoid orphan lock files.
+# LASTRUN : yyyy-mm-dd hh:mm — update manually
+# ─────────────────────────────────────────────────────────────────────────────
 """Elefante Safe Restart Utility.
 
 Safely restarts the Elefante MCP server to pick up code changes.

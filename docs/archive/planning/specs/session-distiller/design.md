@@ -1,5 +1,7 @@
 # Elefante Session Distiller — Design Specification (Dv2)
 
+> ⚠️ **ARCHIVED** — Design spec for the session distiller feature. Shipped. For current implementation see `src/modules/distiller/`.
+
 [Phase: D | Version: Dv2 | Supersedes: Dv1]
 
 ---

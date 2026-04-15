@@ -1,8 +1,33 @@
 #!/usr/bin/env python3
+# ─────────────────────────────────────────────────────────────────────────────
+# NAME    : bump_version.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Cascade a semver string across every tracked version declaration in
+#           the repo. Has CHANGELOG gate, downgrade guard, and pattern-miss WARNING.
+# WHEN    : After writing the CHANGELOG entry for the new version. Never run before
+#           the CHANGELOG entry exists — the script will refuse. After bumping, run
+#           --check to confirm all 48 tracked files agree.
+# USAGE   : python scripts/ci/bump_version.py X.Y.Z | --check
+# NOTES   : Mandatory sequence: (1) write CHANGELOG entry, (2) bump, (3) --check,
+#           (4) git commit. Downgrade (e.g. 2.5.2 -> 2.5.1) is blocked by design.
+# LASTRUN : yyyy-mm-dd hh:mm — update manually
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Bump Elefante version across all files.
 
 Single source of truth: src/__init__.py -> propagated everywhere.
+
+Protocol (MANDATORY — enforced by this script):
+    1. Write a CHANGELOG.md entry for the new version FIRST.
+       Format: ## [X.Y.Z] - YYYY-MM-DD
+    2. Run: python scripts/ci/bump_version.py X.Y.Z
+       The script will refuse to proceed if:
+         - No CHANGELOG entry exists for the new version.
+         - The new version is <= the current version (no downgrades).
+    3. Run: python scripts/ci/bump_version.py --check
+       Verify every tracked file declares the new version (exit 1 if drift).
+    4. git commit && git push
 
 Usage:
     python scripts/ci/bump_version.py 2.2.0      # Set version to 2.2.0
@@ -43,6 +68,15 @@ TARGETS = [
     ("docs/technical/ops-kuzu.md",                     r'(Applies to\*\*: v)\d+\.\d+\.\d+',                     r'\g<1>{v}'),
     ("examples/AGENT_TUTORIAL.md",                    r'(\*\*Version:\*\*\s*)\S+',                             r'\g<1>{v}'),
     ("tests/README.md",                               r'(\*\*Version:\*\*\s*)\S+',                             r'\g<1>{v}'),
+    ("docs/technical/ops-installation.md",            r'(\*\*Version\*\*: )\d+\.\d+\.\d+',                    r'\g<1>{v}'),
+    ("docs/planning/spec-vision.md",                  r'(Current version: v)\d+\.\d+\.\d+',                   r'\g<1>{v}'),
+    ("docs/technical/ops-rollback.md",                r'(\*\*Version\*\*: )\d+\.\d+\.\d+',                    r'\g<1>{v}'),
+    ("docs/technical/spec-ingestion.md",              r'(\*\*Version\*\*: )\d+\.\d+\.\d+',                    r'\g<1>{v}'),
+    ("docs/debug/best_practices.md",                  r'(\*\*Applies to\*\*: v)\d+\.\d+\.\d+\+',              r'\g<1>{v}+'),
+    ("docs/debug/ops-ai-behavior-compendium.md",      r'(\*\*Applies to\*\*: v)\d+\.\d+\.\d+\+',              r'\g<1>{v}+'),
+    ("docs/debug/ops-dashboard-compendium.md",        r'(\*\*Applies to\*\*: v)\d+\.\d+\.\d+\+',              r'\g<1>{v}+'),
+    ("docs/debug/ops-installation-compendium.md",     r'(\*\*Applies to\*\*: v)\d+\.\d+\.\d+\+',              r'\g<1>{v}+'),
+    ("docs/debug/ops-memory-compendium.md",           r'(\*\*Applies to\*\*: v)\d+\.\d+\.\d+\+',              r'\g<1>{v}+'),
 ]
 
 # Glob-based targets: matches multiple files sharing the same header pattern.
@@ -116,6 +150,31 @@ def check_versions() -> bool:
     return ok
 
 
+def _check_changelog_entry(new_version: str):
+    """Abort if CHANGELOG.md has no entry for new_version."""
+    changelog = ROOT / "CHANGELOG.md"
+    if not changelog.exists():
+        raise SystemExit("CHANGELOG.md not found. Write the changelog entry first.")
+    text = changelog.read_text(encoding='utf-8')
+    pattern = rf'^## \[{re.escape(new_version)}\]'
+    if not re.search(pattern, text, re.MULTILINE):
+        raise SystemExit(
+            f"GATE FAILED: No CHANGELOG.md entry found for [{new_version}].\n"
+            f"  Write '## [{new_version}] - YYYY-MM-DD' in CHANGELOG.md first, then re-run."
+        )
+
+
+def _check_no_downgrade(new_version: str):
+    """Abort if new_version is <= the current version."""
+    current = read_current_version()
+    def _parts(v): return tuple(int(x) for x in v.split("."))
+    if _parts(new_version) <= _parts(current):
+        raise SystemExit(
+            f"GATE FAILED: New version {new_version} is not greater than current {current}.\n"
+            f"  Downgrades and same-version re-applies are not allowed."
+        )
+
+
 def bump(new_version: str):
     """Write new_version to all target files."""
     # Validate semver format
@@ -126,7 +185,12 @@ def bump(new_version: str):
         if not (0 <= val <= 99):
             raise SystemExit(f"Version part '{label}={val}' is out of range [0, 99].")
 
+    # Precondition gates — abort before touching any file
+    _check_no_downgrade(new_version)
+    _check_changelog_entry(new_version)
+
     changed = []
+    warned = []
     all_targets = TARGETS + _expand_glob_targets()
     for rel_path, pattern, template in all_targets:
         fpath = ROOT / rel_path
@@ -141,6 +205,10 @@ def bump(new_version: str):
         if new_text != text:
             fpath.write_text(new_text, encoding='utf-8')
             changed.append(rel_path)
+        elif not re.search(pattern, text, flags):
+            # File exists but pattern never matched — version header may have changed format
+            print(f"  WARNING  {rel_path}: pattern matched nothing — version may not have been updated")
+            warned.append(rel_path)
 
     # package-lock.json: update project-level version (top-level + packages[""])
     lockfile = ROOT / "src" / "dashboard" / "ui" / "package-lock.json"
@@ -157,6 +225,11 @@ def bump(new_version: str):
     print(f"\n  Bumped to {new_version} — {len(changed)} file(s) updated:")
     for f in changed:
         print(f"    {f}")
+
+    if warned:
+        print(f"\n  WARNINGS — {len(warned)} file(s) had no pattern match (inspect manually):")
+        for f in warned:
+            print(f"    {f}")
 
     if not changed:
         print("    (no changes needed — already at this version)")

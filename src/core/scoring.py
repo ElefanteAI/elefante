@@ -1,3 +1,13 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/core/scoring.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Score normalization and weight calculation for hybrid search results
+#           across heterogeneous sources (vector, graph, behavioral).
+# ROLE    : Core utility — used by retrieval.py and orchestrator.py.
+# TOUCHED : When adding new scoring signals, adjusting score normalization ranges,
+#           or modifying adaptive weight logic. Unit-tested by test_scoring.py.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Score Normalization and Weighting for Hybrid Search
 

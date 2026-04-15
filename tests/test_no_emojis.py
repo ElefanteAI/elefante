@@ -1,7 +1,14 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TEST    : tests/test_no_emojis.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PROVES  : No-emoji policy enforcement across strict source/docs surfaces.
+#           Mirrors the logic of verify_emoji_policy.py but as a pytest test.
+# RUN     : pytest tests/test_no_emojis.py -v
+# WHEN    : After adding LLM-generated content (high emoji-injection risk) or
+#           new files in docs/ or src/. Part of standard pre-commit suite.
+# ─────────────────────────────────────────────────────────────────────────────
 from __future__ import annotations
-
-import unicodedata
-from pathlib import Path
 
 import regex
 

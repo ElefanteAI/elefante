@@ -1,3 +1,18 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# NAME    : list_memories_recent.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Quick peek at the last 10 memories via the orchestrator for fast
+#           manual validation without a full export.
+# WHEN    : Immediately after a MemoryAdd to confirm the memory was stored and
+#           is visible through the orchestrator. Use before reaching for a full
+#           export — this is the fastest spot-check.
+# USAGE   : python scripts/debug/list_memories_recent.py
+# NOTES   : Uses the orchestrator (not raw ChromaDB), so intelligence-pipeline
+#           filters apply. If a memory is missing here but present in
+#           dump_memories_all.py, the filter is blocking it.
+# LASTRUN : yyyy-mm-dd hh:mm — update manually
+# ─────────────────────────────────────────────────────────────────────────────
 import sys
 import asyncio
 from pathlib import Path

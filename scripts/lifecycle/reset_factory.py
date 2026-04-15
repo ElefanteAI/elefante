@@ -1,10 +1,19 @@
-import argparse
-import os
-import shutil
-from datetime import datetime
-from pathlib import Path
-
-def _utc_ts() -> str:
+# ─────────────────────────────────────────────────────────────────────────────
+# NAME    : reset_factory.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Destructive full reset of all Elefante durable state with backup
+#           gates; for unrecoverable corruption or an explicit wipe.
+# WHEN    : Last resort only — when both ChromaDB AND Kuzu are unrecoverable, or
+#           when an operator explicitly wants a clean-slate install. NOT for
+#           Kuzu-only issues (use reset_kuzu_nuclear.py) or lock issues (manage_lock.py).
+# USAGE   : ELEFANTE_PRIVILEGED=1 python scripts/lifecycle/reset_factory.py --apply --confirm RESET
+# NOTES   : Backup is created automatically before deletion, but backup_elefante_data.py
+#           beforehand is still recommended. Stop all Elefante processes first.
+#           This removes ALL memory data — ChromaDB + Kuzu + logs.
+# LASTRUN : yyyy-mm-dd hh:mm — update manually
+# ─────────────────────────────────────────────────────────────────────────────
+import argparse() -> str:
     return datetime.utcnow().strftime("%Y%m%d_%H%M%S")
 
 

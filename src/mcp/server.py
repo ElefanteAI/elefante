@@ -1,3 +1,16 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/mcp/server.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : MCP server: exposes all Elefante operations as JSON-RPC tools and
+#           prompts over stdio transport. Entry point for all agent interactions.
+# ROLE    : MCP surface layer — this is what agents talk to. Every tool call,
+#           every prompt, every TOKEN_STATS injection goes through this file.
+# TOUCHED : When adding/removing/renaming MCP tools or prompts; when changing
+#           response envelope (TOKEN_STATS, DIRECTIVES, rejection_reason);
+#           when fixing transport-level bugs. __main__ pre-loads the embedding
+#           model here (BUG-010 fix) — do NOT move that call inside asyncio.run().
+# ─────────────────────────────────────────────────────────────────────────────
 """
 MCP Server implementation for Elefante Memory System
 
@@ -1283,6 +1296,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         
         # Handle case where memory was IGNORED by cognitive pipeline
         if memory is None:
+            rejection_reason = getattr(orchestrator, '_last_rejection_reason', None)
             return {
                 "status": "ignored",
                 "classification": "IGNORE",
@@ -1290,7 +1304,8 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 "relationship_count": 0,
                 "embedding_id": None,
                 "graph_ids": [],
-                "message": "Memory filtered by Intelligence Pipeline"
+                "message": "Memory filtered by Intelligence Pipeline",
+                "rejection_reason": rejection_reason or "Unknown — orchestrator returned None without setting a reason",
             }
         
         # Authoritative Output Format
@@ -2448,6 +2463,20 @@ async def main():
 
 
 if __name__ == "__main__":
+    # BUG-010 fix: Pre-load the embedding model BEFORE the asyncio event loop
+    # starts.  `from sentence_transformers import SentenceTransformer` (which
+    # imports torch) deadlocks when executed inside a worker thread under an
+    # active anyio event loop with piped stdio on Windows + Python 3.11.
+    # Loading eagerly here (~7-10 s on CPU) avoids the issue entirely because
+    # _load_model() becomes a no-op once self._model is set.
+    import sys as _sys
+    _sys.stderr.write("[elefante] pre-loading embedding model ...\n")
+    _sys.stderr.flush()
+    from src.core.embeddings import get_embedding_service as _get_emb
+    _get_emb()._load_model()
+    _sys.stderr.write("[elefante] embedding model ready\n")
+    _sys.stderr.flush()
+
     asyncio.run(main())
 
 

@@ -1,3 +1,13 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/models/conversation.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Conversation message and search candidate dataclasses for context-
+#           aware retrieval using recent conversation history.
+# ROLE    : Models — used by conversation_context.py and server.py.
+# TOUCHED : When changing the conversation message shape or adding new attributes
+#           to context payloads passed by agents.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Conversation context models for Elefante
 

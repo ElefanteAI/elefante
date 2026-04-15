@@ -1,3 +1,12 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TEST    : tests/test_scoring.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PROVES  : ScoreNormalizer correctness, adaptive weight calculation, and
+#           behavioral vitality scores across heterogeneous sources.
+# RUN     : pytest tests/test_scoring.py -v
+# WHEN    : After any change to src/core/scoring.py or retrieval.py score weights.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Unit tests for scoring normalization and behavioral vitality.
 

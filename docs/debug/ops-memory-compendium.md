@@ -1,6 +1,11 @@
 # Memory System Debug Compendium
 
-> **Domain:** Memory Retrieval, Storage & Reinforcement  
+> **Domain:** Memory Retrieval, Storage & Reinforcement
+> **Last Updated:** 2026-02-16
+> **Total Issues Documented:** 9
+> **Status:** Production Reference - All Documented Flaws Fixed
+> **Applies to**: v2.5.2+
+> **Maintainer:** Add new issues following Issue #N template at bottomcement  
 > **Last Updated:** 2026-02-16  
 > **Total Issues Documented:** 9  
 > **Status:** Production Reference - All Documented Flaws Fixed
@@ -37,6 +42,7 @@ Run these BEFORE investigating. If tests pass, the documented fix is intact.
 | #7 Response bloat | `pytest tests/test_integration_smoke.py -v` | Full ADD/SEARCH cycle with 10 scenarios |
 | #8 Low similarity | `pytest tests/test_scoring.py -v` | Score normalization and weight math |
 | Memory guard | `pytest tests/test_memory_guard.py -v` | Test-tagged memories blocked by default |
+| #10 Silent IGNORE | `pytest tests/test_memory_guard.py -v` | Guard blocks test-like memories; response must include rejection reason |
 | Full E2E | `.venv/bin/python scripts/verify/verify_e2e_tests.py` | Isolated end-to-end MCP workflow |
 
 ---
@@ -52,6 +58,7 @@ Run these BEFORE investigating. If tests pass, the documented fix is intact.
 - [Issue #7: elefante-MemorySearch Response Bloat](#issue-7-elefantememorysearch-response-bloat-token-waste) FIXED
 - [Issue #8: Low Similarity Scores](#issue-8-low-similarity-scores-for-exact-matches) FIXED
 - [Issue #9: No Actionable Integration](#issue-9-no-actionable-integration-in-search-results) FIXED
+- [Issue #10: MemoryAdd Silent IGNORE](#issue-10-memoryadd-silent-ignore--opaque-test-memory-guard-rejection) OPEN
 - [Memory Export Guide](#memory-export-guide)
 - [Reinforcement Protocol](#reinforcement-protocol)
 - [Prevention Protocol](#prevention-protocol)
@@ -829,6 +836,83 @@ We inject a loud, unmissable `suggested_action` header at the very top of every 
 
 ---
 
+## Issue #10: MemoryAdd Silent IGNORE -- Opaque Test-Memory Guard Rejection
+
+**Date:** 2026-04-15  
+**Duration:** 1 debugging cycle  
+**Severity:** HIGH  
+**Status:** OPEN
+
+### Problem
+
+`elefante-MemoryAdd` silently drops memories that match a broad "test-like" heuristic and returns only a generic `"Memory filtered by Intelligence Pipeline"` message with no indication of which condition triggered the rejection. The calling agent cannot diagnose or correct the input.
+
+### Symptom
+
+An agent calls MemoryAdd with legitimate diagnostic content and tags `["bug-010", "diagnostic", "test"]`:
+
+```json
+{
+  "status": "ignored",
+  "classification": "IGNORE",
+  "entity_count": 0,
+  "relationship_count": 0,
+  "embedding_id": null,
+  "graph_ids": [],
+  "message": "Memory filtered by Intelligence Pipeline"
+}
+```
+
+No field explains **why** the memory was filtered. The agent sees success-shaped JSON (no `error` field, no `isError` flag) with `status: ignored` but no actionable information. The same content without the `"test"` tag stores successfully.
+
+During installation, this same guard silently blocked the seed passcode memory (logged as `blocked_test_memory_submission`) while the installer reported "Successfully injected seed memory" -- a false-positive success claim.
+
+### Root Cause
+
+The test-memory guard in `src/core/orchestrator.py` (lines ~207-241) applies 9 heuristic conditions that flag a memory as "test-like":
+
+| Condition | Source |
+|---|---|
+| `namespace == "test"` | metadata |
+| `category == "test"` | metadata |
+| `category.startswith("hybrid_test_")` | metadata |
+| `"test" in tags` | tags |
+| `"e2e" in tags` | tags |
+| any tag starts with `"hybrid_test_"` | tags |
+| content starts with `"elefante e2e test memory"` | content |
+| content starts with `"hybrid search test memory"` | content |
+| `" test memory"` appears in content | content |
+
+When any condition matches and `ELEFANTE_ALLOW_TEST_MEMORIES` is not set, the orchestrator returns `None`. The MCP server handler at `src/mcp/server.py` (lines ~1284-1294) translates this `None` into the generic IGNORE response.
+
+**Two contract violations:**
+
+1. **No rejection reason in the response.** The detailed reason (`blocked_test_memory_submission` with the matching tags) is only written to `self.logger.warning` on stderr -- invisible to the calling agent via the MCP tool response.
+
+2. **Overly broad heuristic.** The word `"test"` in any tag matches legitimate use cases: "test passcode", "diagnostic test", "load test results", "A/B test findings". The guard was designed for E2E test isolation but its blast radius covers normal operational tags.
+
+### Solution
+
+**Pending.** The fix should:
+
+1. **Include the rejection reason in the MCP response.** Add a `"rejection_reason"` field (e.g., `"tag 'test' matched test-memory guard"`) so the calling agent can correct and retry.
+2. **Narrow the heuristic.** Replace the broad `"test" in tags` with more specific patterns that only match actual test-framework artifacts (e.g., `"e2e_test"`, `"pytest"`, `"test_fixture"`) rather than any tag containing the word "test".
+3. **Fix the installer false-positive.** `scripts/setup/init_databases.py` should check the return value and not claim "Successfully injected seed memory" when the guard blocked it.
+
+**Files to change:** `src/core/orchestrator.py`, `src/mcp/server.py`, `scripts/setup/init_databases.py`, `tests/test_memory_guard.py`
+
+### Why This Took So Long
+
+- The IGNORE response has no `error` field and no `isError` flag, so it superficially looks like a non-error result. An agent that doesn't read the `status` field carefully will assume the operation succeeded.
+- The generic message "Memory filtered by Intelligence Pipeline" gives no hint that a specific tag was the trigger. The agent would need to guess which of the 9 conditions fired.
+- The installer's false "Successfully injected seed memory" claim masked the guard rejection during the original installation, so the passcode was never actually stored.
+
+### Lesson
+
+> **A tool that silently drops input without explaining why is worse than a tool that throws an error. MCP tool responses must include the rejection reason when refusing to act, not just a generic classification.**
+
+---
+
 ## Appendix: Issue Template
 
 ```markdown
@@ -866,4 +950,4 @@ We inject a loud, unmissable `suggested_action` header at the very top of every 
 
 ---
 
-_Last verified: 2025-12-10 | Issues: 9 | Status: 3 OPEN design flaws identified_
+_Last verified: 2026-04-15 | Issues: 10 | Status: 4 OPEN design flaws identified_

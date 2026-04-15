@@ -1,3 +1,13 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/utils/curation.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Deterministic (no LLM) curation helpers: generate title/summary
+#           fields at ingestion time and during batch backfills.
+# ROLE    : Utils — called by orchestrator.py and ETL pipeline at write time.
+# TOUCHED : When changing title generation rules, summary truncation, or
+#           the fields that get auto-populated on MemoryAdd.
+# ─────────────────────────────────────────────────────────────────────────────
 """Deterministic curation helpers (no LLMs).
 
 These utilities are used to ensure memories have reasonable `title` and `summary`

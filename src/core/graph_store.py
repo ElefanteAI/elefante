@@ -1,3 +1,13 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/core/graph_store.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Kuzu graph database wrapper for entity/relationship storage.
+# ROLE    : Core persistence layer 2 of 2 (graph/relational side).
+# TOUCHED : When changing graph schema (node types, relationship types, properties),
+#           or when Kuzu version is upgraded. Schema changes here require a Kuzu
+#           reset (reset_kuzu_nuclear.py) on existing installs.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Graph store implementation using Kuzu
 

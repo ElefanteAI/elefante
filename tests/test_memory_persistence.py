@@ -1,3 +1,13 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TEST    : tests/test_memory_persistence.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PROVES  : Memories are durably stored in ChromaDB and Kuzu without generating
+#           temporary scripts; graph/session schema contract and relationship
+#           property constraints.
+# RUN     : pytest tests/test_memory_persistence.py -v
+# WHEN    : After changes to vector_store.py, graph_store.py, or memory.py schema.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Tests for memory persistence - verifies that memories are stored directly
 in ChromaDB and Kuzu without generating temporary scripts.

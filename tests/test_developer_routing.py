@@ -1,7 +1,14 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TEST    : tests/test_developer_routing.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PROVES  : Self-protocol verifier routing and contract: dashboard snapshot path
+#           resolution, large-payload stream sizing, and protocol verification.
+# RUN     : pytest tests/test_developer_routing.py -v
+# WHEN    : After changes to server.py routing, verify_e2e_tests.py, or the
+#           self-protocol verification contract. Required before each release.
+# ─────────────────────────────────────────────────────────────────────────────
 from __future__ import annotations
-
-import re
-import subprocess
 import sys
 from pathlib import Path
 

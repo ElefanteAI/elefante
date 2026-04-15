@@ -1,3 +1,14 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/utils/config.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Load config.yaml with env var overrides; single source of truth
+#           for all Elefante configuration at runtime.
+# ROLE    : Utils — imported by virtually every other module via get_config().
+# TOUCHED : When adding new config keys, changing defaults, or adding env var
+#           override support for a new setting. config.yaml is the operator
+#           interface; this file is the validator and loader.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Configuration management for Elefante memory system
 

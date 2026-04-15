@@ -1,7 +1,14 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TEST    : tests/test_memory_guard.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PROVES  : MemoryAdd intelligence-pipeline guard: ensures rejection_reason is
+#           returned for filtered memories (BUG-011 guard).
+# RUN     : pytest tests/test_memory_guard.py -v
+# WHEN    : After any change to orchestrator.py memory guard logic or
+#           server.py IGNORE response body. Required before any release.
+# ─────────────────────────────────────────────────────────────────────────────
 import pytest
-from uuid import uuid4
-
-from src.core.orchestrator import MemoryOrchestrator
 from src.core.vector_store import VectorStore
 from src.core.graph_store import GraphStore
 

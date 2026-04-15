@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+# ─────────────────────────────────────────────────────────────────────────────
+# NAME    : init_databases.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Initialize or re-verify ChromaDB collections and Kuzu schema without
+#           running the full installer; safe bootstrap safety check.
+# WHEN    : After a Kuzu nuclear reset or ChromaDB wipe, to re-initialize the
+#           data stores without reinstalling everything. Also run if you see
+#           'collection not found' or 'schema mismatch' errors on server start.
+# USAGE   : python scripts/setup/init_databases.py
+# NOTES   : Idempotent — safe to re-run on already-initialized databases (will
+#           verify, not double-initialize). Called automatically by install.py;
+#           use this standalone only when you need DB init without a full reinstall.
+# LASTRUN : yyyy-mm-dd hh:mm — update manually
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Database initialization script for Elefante
 

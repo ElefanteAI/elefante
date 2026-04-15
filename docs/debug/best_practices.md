@@ -3,6 +3,7 @@
 > **Purpose:** Distilled reusable debugging rules for Elefante contributors
 > **Companion Docs:** [README.md](README.md) and [dev-developer-agent.md](dev-developer-agent.md)
 > **Status:** Live feedback-loop ledger
+> **Applies to**: v2.5.2+
 
 ---
 
@@ -108,8 +109,40 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Trigger:** You are validating live MCP behavior, startup, restart, or first-use flows.
 - **Rule:** Treat isolated temporary HOME and data directories as real product conditions, not artificial edge cases.
 - **Why:** Fresh users and fresh IDE sessions hit cold start. Warm local state hides latency and initialization defects.
-- **Proof:** [ops-ai-behavior-compendium.md Issue #6](ops-ai-behavior-compendium.md#issue-6-passive-protocol-enforcement-failure) and [../../scripts/verify/verify_e2e_tests.py](../../scripts/verify/verify_e2e_tests.py).
+- **Proof:** [ops-ai-behavior-compendium.md Issue #6](ops-ai-behavior-compendium.md#issue-6-passive-protocol-enforcement-failure), [ops-ai-behavior-compendium.md Issue #9](ops-ai-behavior-compendium.md#issue-9-self-protocol-cold-start-timeout--request_timeout_seconds-too-tight-for-cpu-only-embedding-init), and [../../scripts/verify/verify_e2e_tests.py](../../scripts/verify/verify_e2e_tests.py).
 - **Avoid:** Sizing timeouts and confidence only around a warmed-up development shell.
+
+### Verifier Timeout Constants Must Cover The Slowest Supported Target
+
+- **Trigger:** A maintained harness uses a hardcoded timeout constant for MCP subprocess communication.
+- **Rule:** Size `REQUEST_TIMEOUT_SECONDS` (or equivalent) for CPU-only cold start on the slowest supported platform, not for a warm GPU development machine. Make the constant overridable via environment variable if platform variance is wide.
+- **Why:** Embedding model cold-start (`sentence-transformers` + `thenlper/gte-base` on CPU) can add 8+ seconds to the first tool call in an isolated temp environment. Combined with multiple assertions in a single phase, a tight timeout produces a deterministic failure that masquerades as a product defect.
+- **Proof:** BUG-010 initial symptom. [ops-ai-behavior-compendium.md Issue #9](ops-ai-behavior-compendium.md#issue-9-self-protocol-cold-start-deadlock--import-sentence_transformers-deadlocks-in-worker-thread-under-anyio--piped-stdio).
+- **Avoid:** Hard-coding a timeout that passes on the development machine but fails on a clean CI or user install. Catch-all exception handlers that hide the timeout source.
+
+### Heavy Imports Must Run Before The Event Loop, Not In Worker Threads
+
+- **Trigger:** A heavy C-extension import (torch, sentence-transformers) must execute at runtime inside an MCP server subprocess with piped stdio.
+- **Rule:** Pre-load the module in the `__main__` block before `asyncio.run()`. Never defer a heavy import to `asyncio.to_thread()` or any threaded executor running under an anyio-managed event loop with piped stdio.
+- **Why:** `from sentence_transformers import SentenceTransformer` (which triggers `import torch`) deadlocks when executed in a worker thread under anyio 4.x + Python 3.11 + Windows ProactorEventLoop with piped stdin/stdout. The same import completes in ~3s when run synchronously before the event loop starts.
+- **Proof:** BUG-010 — traced via 6 raw `sys.stderr.write` probes to confirm the import line is the exact deadlock point. Pre-loading in `server.py __main__` before `asyncio.run(main())` resolved the deadlock. Self-protocol: 45/45 PASS. [ops-ai-behavior-compendium.md Issue #9](ops-ai-behavior-compendium.md#issue-9-self-protocol-cold-start-deadlock--import-sentence_transformers-deadlocks-in-worker-thread-under-anyio--piped-stdio).
+- **Avoid:** Wrapping heavy imports in `asyncio.to_thread()` as a "non-blocking" fix — this moves the deadlock to the thread instead of eliminating it. Confusing "slow" (fixable by timeout increase) with "hung" (requires lifecycle change).
+
+### Differentiate Slow From Hung Before Choosing A Fix
+
+- **Trigger:** A subprocess operation times out and you're considering increasing the timeout.
+- **Rule:** If doubling the timeout (90→180s) still fails, the operation is hung, not slow. Stop tuning timeouts and investigate the deadlock mechanism. Use raw `sys.stderr.write` + `flush` probes (not structured logging) to trace execution through threaded/async boundaries.
+- **Why:** Timeout increases fix latency. Deadlocks require lifecycle changes (moving operations to a different phase) or eliminating the threading that causes the lock contention.
+- **Proof:** BUG-010 — three debugging cycles wasted on timeout increases and asyncio.to_thread wrapping before raw probes revealed the import deadlocks indefinitely in a thread. [ops-ai-behavior-compendium.md Issue #9](ops-ai-behavior-compendium.md#issue-9-self-protocol-cold-start-deadlock--import-sentence_transformers-deadlocks-in-worker-thread-under-anyio--piped-stdio).
+- **Avoid:** Incrementally increasing timeouts hoping the operation "just needs more time." Relying on structured logging (which may buffer or drop messages) for probe-level diagnostics in threaded/async contexts.
+
+### MCP Tool Rejections Must Include The Specific Reason
+
+- **Trigger:** An MCP tool handler returns a non-error response that silently drops or ignores the caller's input.
+- **Rule:** Always include a `rejection_reason` field that names the exact condition that triggered the rejection. The calling agent must be able to correct and retry without guessing.
+- **Why:** Opaque rejections like `"Memory filtered by Intelligence Pipeline"` are indistinguishable from bugs. Agents cannot introspect server-side logs, so the MCP response is the only diagnostic channel.
+- **Proof:** BUG-011 — MemoryAdd with tag `"test"` returned `status: ignored` with no indication which of 9 heuristic conditions fired. The same guard silently blocked the installer's seed passcode, producing a false-positive "Successfully injected" claim. [ops-memory-compendium.md Issue #10](ops-memory-compendium.md#issue-10-memoryadd-silent-ignore--opaque-test-memory-guard-rejection).
+- **Avoid:** Generic rejection messages. Silent `None` returns from internal functions that get translated into success-shaped MCP responses.
 
 ### Whole-System Claims Require A Whole-System Verifier
 

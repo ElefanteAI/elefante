@@ -1,5 +1,126 @@
 # Elefante Scripts Directory
 
+This directory contains direct operator entrypoints. These files live outside `src/` because they orchestrate Elefante from the outside — installation, verification, lifecycle control, exports, destructive recovery, or release packaging. If logic belongs to the runtime itself, it belongs in `src/`. If a human, CI job, or packaging flow runs it directly, it belongs here.
+
+For repository debugging, choose scripts through [`docs/debug/dev-developer-agent.md`](../docs/debug/dev-developer-agent.md). `scripts/verify/` is for purposeful proof. `scripts/debug/` is for non-routine intervention only when a compendium explicitly directs it.
+
+## Documentation Contract
+
+- Every live `.py` and `.sh` entrypoint under `scripts/` must be listed in this file.
+- Every entry must explain **what** the script does, **when** to reach for it, and what distinguishes it from alternatives.
+- Every section must explain why those scripts belong in that subdirectory instead of another one.
+- If a script is added, moved, or deleted, update this file in the same change.
+
+## Placement Rules
+
+- `scripts/setup/`: bootstrap and first-run preparation before the normal runtime is healthy.
+- `scripts/verify/`: maintained proofs that validate the product or a shipped contract.
+- `scripts/lifecycle/`: safe operational control over the running system or its durable on-disk state.
+- `scripts/ci/`: release, packaging, and documentation-sync helpers tied to build/release workflow.
+- `scripts/pipeline/`: data extraction and snapshot generation for downstream consumption.
+- `scripts/debug/`: manual intervention tools for incident response and recovery, not routine validation.
+- `scripts/privileged/`: high-authority maintenance tools that inspect or mutate core state and require stronger operator intent.
+
+---
+
+## `scripts/setup/` — Bootstrap & First-Run
+
+Why here: these scripts prepare an environment or client integration before day-to-day runtime and verification flows make sense.
+
+| Script | What it does | When to use it | Why here |
+| --- | --- | --- | --- |
+| `install.py` | Single-entry cross-platform installer: venv, deps, DB init, MCP config for VS Code + Antigravity, system verification. | First-time install or clean reinstall. NOT for routine restarts or IDE reconfiguration alone. | Bootstrap, not runtime logic. |
+| `configure_vscode_bob.py` | Writes VS Code `mcp.json` and removes `settings.json` duplicates to wire Elefante as an MCP server. | Initial VS Code/Bob setup, or after moving the repo. Also if you see two Elefante entries in VS Code. | IDE onboarding is setup work. |
+| `configure_antigravity.py` | Writes `~/.gemini/antigravity/mcp_config.json` to wire Elefante for Antigravity IDE. | Initial Antigravity setup, or after moving the repo path. | Prepares a client environment. |
+| `init_databases.py` | Initializes or re-verifies ChromaDB collections and Kuzu schema without running the full installer. | After a Kuzu nuclear reset or ChromaDB wipe; when you see "collection not found" errors. | Bootstrap safety tool, not lifecycle. |
+
+---
+
+## `scripts/verify/` — Health & Validation Ladder
+
+Why here: these are maintained checks that prove a contract. Use them in order — each step is faster but narrower.
+
+**Verification ladder**: `verify_health` → `verify_mcp_handshake` → `verify_e2e_tests`
+
+| Script | What it does | When to use it | Why here |
+| --- | --- | --- | --- |
+| `verify_health.py` | Structural health check: paths, imports, config, and baseline readiness. No DB access, no server start. | First check after install, after config changes, or when any core import fails. Fastest non-destructive check. | Proves baseline health without mutating data. |
+| `verify_mcp_handshake.py` | Minimal JSON-RPC initialize probe — proves the MCP server can answer a real handshake. | After restart_elefante.py, to confirm the server came back before running the full self-protocol. | Narrow protocol proof below the full self-protocol. |
+| `verify_e2e_tests.py` | **Authoritative self-protocol harness.** Launches a real MCP server in an isolated temp dir and proves the full live tool/prompt surface, routing, memory/graph/ETL/refinery flows, and cleanup. | Before any release. After changes to server.py, orchestrator.py, or any core module. Not a substitute for unit tests — this proves the live surface. | Whole-system proof for release confidence. |
+| `verify_dashboard_health.py` | HTTP-level probe of running dashboard endpoints; checks reachability and JSON response shape. | After starting the dashboard server, or when the UI is blank and you need to isolate server vs. data issues. | Validates the served dashboard surface. |
+| `verify_dashboard_snapshot.py` | Offline validation of `dashboard_snapshot.json` structural integrity and edge validity. | After `update_dashboard_data.py` — confirm the snapshot is valid before the frontend consumes it. | Proves the export artifact, not the live server. |
+| `verify_emoji_policy.py` | Enforces the no-emojis rule across strict docs/source surfaces. | After LLM-generated content is added (high emoji-injection risk). Also part of pre-commit hygiene. | Policy verifier, not a formatter. |
+
+---
+
+## `scripts/lifecycle/` — Server & Data Control
+
+Why here: these scripts operate the running system or its durable on-disk state. They are operational controls, not setup or incident-only tools.
+
+| Script | What it does | When to use it | Why here |
+| --- | --- | --- | --- |
+| `restart_elefante.py` | Safe process-level restart with stale lock cleanup and optional post-restart verification. | After `src/` changes that need to be picked up by the live server. Preferred over manual kill/start. | Controls the live daemon lifecycle. |
+| `backup_elefante_data.py` | File-level zip backup of `~/.elefante/data`; no DB handles opened. | **Always run before any destructive operation** (reset, nuclear reset, surgical delete) or before a version upgrade. | Manages durable state safely. |
+| `restore_elefante_data.py` | File-level restore from a backup zip; moves existing data aside (or discards with `--discard-existing`). | After accidental data loss or to undo a factory reset. Stop all Elefante processes first. | Inverse lifecycle operation of backup. |
+| `reset_factory.py` | **Destructive full reset** of all Elefante durable state with backup gates. | Last resort — when both ChromaDB AND Kuzu are unrecoverable. NOT for Kuzu-only issues or lock issues. | Lifecycle-level state reset, broader than debug intervention. |
+
+---
+
+## `scripts/ci/` — Build & Release Chain
+
+Why here: these scripts support release preparation, packaging, and source-of-truth sync for shipped artifacts and docs.
+
+**Release workflow**: (1) `advise_version_bump` → (2) write CHANGELOG → (3) `bump_version X.Y.Z` → (4) `bump_version --check` → (5) git commit
+
+| Script | What it does | When to use it | Why here |
+| --- | --- | --- | --- |
+| `advise_version_bump.py` | Inspects staged git diff, classifies MAJOR/MINOR/PATCH, and recommends a bump level. | Before writing the CHANGELOG entry — use it to determine the right bump level from the diff. | Release workflow guidance, not the write step. |
+| `bump_version.py` | Cascades a chosen version string across all 48 tracked version declarations. Has CHANGELOG gate, downgrade guard, and pattern-miss WARNING. | After writing the CHANGELOG entry. Never before. Run `--check` after every bump. | Authoritative release write step. |
+| `list_mcp_tools.py` | Reads `server.py` and prints the live MCP tool + prompt inventory without booting the runtime. | After modifying `server.py` to verify the inventory matches spec-tools.md. | Supports spec/doc sync around the MCP surface. |
+| `bundle_docker_package.sh` | Builds a copy-friendly tarball of the Docker-facing bundle for shipping into environments without full repo access. | Distribution packaging only. | Distribution packaging, not runtime. |
+
+---
+
+## `scripts/pipeline/` — Data Extracts & Snapshots
+
+Why here: these scripts transform stored Elefante state into downstream artifacts for dashboards, exports, and external analysis.
+
+| Script | What it does | When to use it | Why here |
+| --- | --- | --- | --- |
+| `update_dashboard_data.py` | Reads ChromaDB + Kuzu state and emits `dashboard_snapshot.json` for the dashboard frontend. | After bulk memory changes or when the dashboard shows stale counts/nodes. Run `verify_dashboard_snapshot.py` after. | Snapshot/export pipeline, not a live API verifier. |
+| `export_memories.py` | Exports the full memory corpus to JSON and/or CSV via direct ChromaDB read (no filtering). `--format json\|csv\|all`. | Before a surgical delete (for before/after comparison). For offline analysis or spreadsheet review. | Data extraction path, not a maintenance tool. |
+
+---
+
+## `scripts/debug/` — Raw Interventions
+
+Why here: manual incident-response tools. Intentionally separate from `scripts/verify/` so destructive or low-level intervention is not mistaken for routine proof.
+
+| Script | What it does | When to use it | Why here |
+| --- | --- | --- | --- |
+| `dump_memories_all.py` | Direct ChromaDB dump bypassing all orchestrator filtering. | When `elefante-MemorySearch` returns unexpected results — confirms what is truly stored. | Emergency visibility tool, not a supported flow. |
+| `list_memories_recent.py` | Lightweight recent-memory inspection via the orchestrator (last 10 entries). | Quick sanity check after a MemoryAdd before reaching for a full export. | Narrow debug peek, not a maintained verifier. |
+| `manage_lock.py` | Inspect and optionally remove the Elefante write lock; `--kill` to stop the MCP process first. | When write operations hang or return "lock held" errors. Always dry-run (no flags) first. | Incident tooling for lock contention. |
+| `reset_kuzu_nuclear.py` | Backup-and-remove the Kuzu graph database path only so the next init starts fresh. | When Kuzu is corrupted and cannot be opened. Use ONLY when you need the graph reset but want to preserve ChromaDB. | Specialized graph-store intervention, not a full factory reset. |
+
+### Lock Guidance
+
+- Default (no flags): inspect/dry-run only — always safe.
+- `ELEFANTE_PRIVILEGED=1 --apply --confirm DELETE`: removes the lock file.
+- `--kill`: attempts to stop `src.mcp.server` processes before removal — use when the server is unresponsive.
+
+---
+
+## `scripts/privileged/` — Deep Overrides
+
+Why here: these scripts inspect or mutate high-authority Elefante state. They require stronger operator intent and, for mutations, `ELEFANTE_PRIVILEGED=1`.
+
+| Script | What it does | When to use it | Why here |
+| --- | --- | --- | --- |
+| `delete_memories_surgical.py` | Risk-scored deletion workbench: impact report + backup JSON, then deletes from both ChromaDB and Kuzu only when authorized. Default is dry-run. | When the memory graph has low-value artifacts degrading dashboard clarity. Always `backup_elefante_data.py` first, then `--auto` dry-run, then targeted `--apply`. | Privileged: can excise durable memory state across both persistence layers. |
+| `inspect_memory_graph.py` | Read-only semantic/temporal review of specific memories or backup JSONs. Uses Chroma kNN — no external embedding calls. | Before passing IDs to `delete_memories_surgical.py` — understand connectivity first. Also to audit backup JSONs after a deletion run. | Paired with high-authority maintenance; inspects internal state more deeply than debug scripts. |
+
+
 This directory contains direct operator entrypoints. These files live outside `src/` because they orchestrate Elefante from the outside: installation, verification, lifecycle control, exports, destructive recovery, or release packaging. If logic belongs to the runtime itself, it belongs in `src/`. If it is a script a human, CI job, or packaging flow runs directly, it belongs here.
 
 For repository debugging, choose scripts through [`docs/debug/dev-developer-agent.md`](../docs/debug/dev-developer-agent.md). `scripts/verify/` is for purposeful proof. `scripts/debug/` is for non-routine intervention only when a compendium explicitly directs it.

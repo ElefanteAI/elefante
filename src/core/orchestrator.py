@@ -1,3 +1,14 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/core/orchestrator.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Central intelligence layer: routes queries to vector/graph stores,
+#           applies intelligence-pipeline filters, enforces memory guards.
+# ROLE    : Core — highest-traffic module; every MCP tool call passes through here.
+# TOUCHED : When changing memory filtering logic, add/remove a memory type,
+#           modify intelligence-pipeline guards, or adjust scoring weights.
+#           BUG-011 rejection_reason field lives here.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Hybrid Query Orchestrator - Routes queries between Vector and Graph stores
 
@@ -124,6 +135,7 @@ class MemoryOrchestrator:
         # Cognitive Retriever - multi-signal scoring engine
         self.cognitive_retriever = CognitiveRetriever()
         self._system_baseline_ready = False
+        self._last_rejection_reason: Optional[str] = None
 
         self.logger.info("Memory orchestrator initialized")
 
@@ -233,11 +245,38 @@ class MemoryOrchestrator:
         )
 
         if is_test_like and not allow_test:
+            matched_conditions = []
+            if namespace_lower == "test":
+                matched_conditions.append("namespace='test'")
+            if category_lower == "test":
+                matched_conditions.append("category='test'")
+            if category_lower.startswith("hybrid_test_"):
+                matched_conditions.append(f"category='{category_lower}' starts with 'hybrid_test_'")
+            if "test" in tags_lower:
+                matched_conditions.append("tag 'test' present")
+            if "e2e" in tags_lower:
+                matched_conditions.append("tag 'e2e' present")
+            hybrid_tags = [t for t in tags_lower if t.startswith("hybrid_test_")]
+            if hybrid_tags:
+                matched_conditions.append(f"tag '{hybrid_tags[0]}' starts with 'hybrid_test_'")
+            if content_lower.startswith("elefante e2e test memory"):
+                matched_conditions.append("content starts with 'elefante e2e test memory'")
+            if content_lower.startswith("hybrid search test memory"):
+                matched_conditions.append("content starts with 'hybrid search test memory'")
+            if " test memory" in content_lower:
+                matched_conditions.append("content contains ' test memory'")
+            reason = (
+                f"Test-memory guard blocked this submission. "
+                f"Matched conditions: {'; '.join(matched_conditions)}. "
+                f"Set ELEFANTE_ALLOW_TEST_MEMORIES=1 to override."
+            )
+            self._last_rejection_reason = reason
             self.logger.warning(
                 "blocked_test_memory_submission",
                 category=category_lower or None,
                 namespace=namespace_lower or None,
                 tags=sorted(tags_lower),
+                reason=reason,
             )
             return None
 

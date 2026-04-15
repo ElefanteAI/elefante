@@ -1,3 +1,18 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# NAME    : install.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Single-entry installer: venv, deps, DB init, MCP config (VS Code +
+#           Antigravity), and system verification in one cross-platform script.
+# WHEN    : First-time installation on any machine, or clean reinstall after a
+#           factory reset. NOT for routine restarts (use restart_elefante.py) or
+#           IDE reconfiguration (use configure_vscode_bob.py standalone).
+# USAGE   : python scripts/setup/install.py [--skip-vscode] [--skip-antigravity]
+# NOTES   : Creates .venv, installs requirements.txt, calls init_databases.py,
+#           then calls both configure_*.py scripts. Safe to re-run if install is
+#           interrupted — steps are idempotent. Requires Python 3.11+.
+# LASTRUN : yyyy-mm-dd hh:mm — update manually
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Elefante Unified Installation Script
 ------------------------------------

@@ -1,3 +1,13 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/utils/logger.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Structured JSON logging with file rotation; ELEFANTE_LOGGING_FORMAT
+#           env var switches between json and text output.
+# ROLE    : Utils — imported via get_logger(__name__) by every module.
+# TOUCHED : When changing log format, rotation policy, or adding new log levels.
+#           ELEFANTE_LOGGING_FORMAT=text for human-readable dev output.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Logging configuration for Elefante memory system
 

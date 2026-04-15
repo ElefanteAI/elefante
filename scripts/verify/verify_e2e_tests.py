@@ -1,4 +1,20 @@
 #!/usr/bin/env python3
+# ─────────────────────────────────────────────────────────────────────────────
+# NAME    : verify_e2e_tests.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Authoritative self-protocol harness: launches MCP server in an
+#           isolated temp environment and proves the full live tool/prompt surface.
+# WHEN    : Before any release. After changes to server.py, orchestrator.py,
+#           or any core module. After a version bump to confirm the deployed
+#           surface is intact. This is the ONLY script that proves the live
+#           MCP surface end-to-end — do not substitute with unit tests.
+# USAGE   : python scripts/verify/verify_e2e_tests.py [--with-dashboard-open]
+# NOTES   : Launches a real MCP server subprocess in a temp dir. Slow (~60s)
+#           but definitive. --with-dashboard-open enables the optional 20-tool
+#           sweep including dashboard tools. Requires all dependencies installed.
+# LASTRUN : yyyy-mm-dd hh:mm — update manually
+# ─────────────────────────────────────────────────────────────────────────────
 """Elefante self-protocol verification harness.
 
 Runs the real MCP server in an isolated temporary Elefante home/data dir and
@@ -63,7 +79,7 @@ sys.path.insert(0, str(project_root))
 from src import __version__ as ELEFANTE_VERSION
 
 
-REQUEST_TIMEOUT_SECONDS = 90
+REQUEST_TIMEOUT_SECONDS = 180
 STREAM_LIMIT_BYTES = 1024 * 1024
 PASS = "PASS"
 FAIL = "FAIL"
@@ -319,6 +335,14 @@ async def run_e2e(with_dashboard_open: bool) -> int:
     temp_home.mkdir(parents=True, exist_ok=True)
     temp_data_dir.mkdir(parents=True, exist_ok=True)
 
+    # Preserve real model cache paths so the isolated subprocess does not
+    # re-download embedding models.  HOME/USERPROFILE are overridden for
+    # Elefante data isolation, but HuggingFace and torch resolve their caches
+    # from those vars on Windows.  Pin the real cache locations explicitly.
+    real_home = os.environ.get("USERPROFILE") or os.environ.get("HOME", "")
+    real_hf_home = os.environ.get("HF_HOME", os.path.join(real_home, ".cache", "huggingface"))
+    real_torch_home = os.environ.get("TORCH_HOME", os.path.join(real_home, ".cache", "torch"))
+
     harness_env = {
         **os.environ,
         "PYTHONPATH": str(project_root),
@@ -327,6 +351,12 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         "ELEFANTE_DATA_DIR": str(temp_data_dir),
         "ELEFANTE_ALLOW_TEST_MEMORIES": "1",
         "BROWSER": "/usr/bin/true",
+        "HF_HOME": real_hf_home,
+        "TORCH_HOME": real_torch_home,
+        "SENTENCE_TRANSFORMERS_HOME": os.environ.get(
+            "SENTENCE_TRANSFORMERS_HOME",
+            os.path.join(real_hf_home, "hub"),
+        ),
     }
 
     client: MCPClient | None = None
@@ -1100,7 +1130,8 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         )
 
     except Exception as exc:
-        results.append(_result("Harness execution", False, str(exc)[:180]))
+        exc_type = type(exc).__name__
+        results.append(_result("Harness execution", False, f"[{exc_type}] {str(exc)[:160]}"))
 
     finally:
         if client is not None:

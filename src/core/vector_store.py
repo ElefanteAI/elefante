@@ -1,3 +1,13 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/core/vector_store.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : ChromaDB wrapper for semantic memory storage and kNN retrieval.
+# ROLE    : Core persistence layer 1 of 2 (semantic/vector side).
+# TOUCHED : When changing collection schema, embedding dimensions, or ChromaDB
+#           client initialization. Do NOT call directly from scripts — use
+#           the orchestrator or export_memories.py for external access.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Vector store implementation using ChromaDB
 

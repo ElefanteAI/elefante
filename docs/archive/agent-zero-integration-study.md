@@ -1,5 +1,7 @@
 # ELEFANTE + Agent Zero Integration Architecture Study
 
+> ⚠️ **ARCHIVED** — Historical record from pre-v2.3.0. Content may describe a system that no longer exists. For current guidance see [docs/technical/](../technical/) and [docs/debug/](../debug/).
+
 ## Executive Summary
 
 The current state reveals a critical insight: ELEFANTE IS ALREADY PARTIALLY INTEGRATED with Agent Zero via FAISS project memory. The NO EMOJIS memory was present in the EXTRAS section but was IGNORED by the AI - this is a BEHAVIORAL failure, not a technical integration failure.

@@ -1,8 +1,20 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# NAME    : update_dashboard_data.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Read ChromaDB + Kuzu state and emit dashboard_snapshot.json
+#           consumed by the dashboard server/frontend.
+# WHEN    : After bulk memory changes (import, surgical delete, factory reset +
+#           re-seed) to refresh the dashboard without restarting the full server.
+#           Also when the dashboard shows stale counts or missing nodes.
+#           Run verify_dashboard_snapshot.py after this to validate the output.
+# USAGE   : python scripts/pipeline/update_dashboard_data.py
+# NOTES   : Reads both ChromaDB (all memories) and Kuzu (entities/relationships).
+#           The output file path is determined by config.yaml. Dashboard must be
+#           restarted or will auto-poll for the new snapshot depending on config.
+# LASTRUN : yyyy-mm-dd hh:mm — update manually
+# ─────────────────────────────────────────────────────────────────────────────
 import asyncio
-import sys
-import os
-import json
-from datetime import datetime
 from pathlib import Path
 import chromadb
 

@@ -1,15 +1,10 @@
 # AI Behavior Debug Compendium
 
 > **Domain:** AI Protocol Failures, Self-Analysis & Methodology  
-> **Last Updated:** 2026-04-13  
-> **Total Issues Documented:** 8  
+> **Last Updated:** 2026-04-15  
+> **Total Issues Documented:** 9  
 > **Status:** Production Reference  
-> **Maintainer:** Add new issues following Issue #N template at bottom
-
----
-
-##  CRITICAL LAWS (Extracted from Pain)
-
+> **Applies to**: v2.5.2+
 | # | Law | Violation Cost |
 |---|-----|----------------|
 | 1 | VERIFY before claiming completion - never assume code works | Repeated iterations |
@@ -20,6 +15,7 @@
 | 6 | User environment ≠ Test environment - account for differences | "It works for me" |
 | 7 | **PASSIVE protocols CANNOT force agent compliance** | System prompt ignored |
 | 8 | Maintained verifiers must follow the live runtime contract, not convenience assumptions | False failures |
+| 9 | **Timeout constants must be sized for cold-start CPU-only environments** | Silent Phase 3 failure |
 
 ---
 
@@ -33,6 +29,7 @@ Run these BEFORE investigating. If tests pass, the protocol enforcement is intac
 | #6 Protocol enforcement | `.venv/bin/python scripts/verify/verify_e2e_tests.py` | First successful and failing tool responses inject exact entry routing, directives, and maintained verification surfaces |
 | #7 Developer routing drift | `pytest tests/test_developer_routing.py -v` | Active process guidance points to current paths and tool-count contract |
 | #8 Self-protocol verifier drift | `pytest tests/test_developer_routing.py -k "TestSelfProtocolContract" -v` | Whole-system verifier tracks the live dashboard snapshot path contract and sizes the MCP client for large tool payloads |
+| #9 Self-protocol cold-start timeout | `.venv/Scripts/python.exe scripts/verify/verify_e2e_tests.py` | Full self-protocol completes within timeout on CPU-only cold start |
 | Emoji policy | `pytest tests/test_no_emojis.py -v` | Source files comply with no-emoji rule |
 
 ---
@@ -47,6 +44,7 @@ Run these BEFORE investigating. If tests pass, the protocol enforcement is intac
 - [Issue #6: Passive Protocol Enforcement Failure](#issue-6-passive-protocol-enforcement-failure)  CRITICAL
 - [Issue #7: Developer Routing Drift](#issue-7-developer-routing-drift--stale-paths-and-ritual-changelog-reads)
 - [Issue #8: Self-Protocol Verifier Drift](#issue-8-self-protocol-verifier-drift--runtime-path-and-payload-assumptions)
+- [Issue #9: Self-Protocol Cold-Start Deadlock](#issue-9-self-protocol-cold-start-deadlock--import-sentence_transformers-deadlocks-in-worker-thread-under-anyio--piped-stdio)
 - [The 5-Layer Protocol](#the-5-layer-protocol)
 - [Verification Checklist](#verification-checklist)
 - [Prevention Protocol](#prevention-protocol)
@@ -640,6 +638,96 @@ The guarded checks now prove:
 ### Lesson
 
 > **A maintained verifier is part of the product confidence surface; if it assumes the wrong runtime path or payload shape, it becomes a false bug generator.**
+
+---
+
+## Issue #9: Self-Protocol Cold-Start Deadlock — `import sentence_transformers` Deadlocks in Worker Thread Under anyio + Piped stdio
+
+**Date:** 2026-04-15  
+**Duration:** 3 debugging cycles (timeout hypothesis → asyncio.to_thread fix → pre-load fix)  
+**Severity:** HIGH  
+**Status:** FIXED (guarded)
+
+### Problem
+
+The self-protocol harness (`scripts/verify/verify_e2e_tests.py`) reproducibly hangs at Phase 3. Every tool call that triggers `_get_orchestrator()` → `ensure_system_baseline()` → `add_memory()` → `generate_embedding()` → `_load_model()` never returns.
+
+### Symptom
+
+```text
+===== PHASE 3: Baseline routing and system status =====
+[FAIL] Harness execution -- [TimeoutError]
+SELF-PROTOCOL: 5/6 checks passed, 1 FAILED
+```
+
+### Root Cause
+
+**`from sentence_transformers import SentenceTransformer` (which imports torch) deadlocks when executed inside a worker thread** (`asyncio.to_thread()`) under an active anyio event loop with piped stdin/stdout/stderr (the MCP subprocess transport) on Windows + Python 3.11.
+
+**Diagnostic trace** (raw `sys.stderr.write` probes):
+```
+chromadb_initialized                              ← OK
+find_by_title → asyncio.to_thread(collection.get) ← OK (2 calls, <20ms each)
+PROBE_D: about to generate_embedding
+PROBE_E: about to asyncio.to_thread(_load_model)
+PROBE_F: _load_sentence_transformer entered
+PROBE_F: about to import SentenceTransformer
+──── HANG ──── (never returns)
+```
+
+The import completes in ~3s when run directly, in a terminal subprocess, or via `asyncio.run()` in-process. It ONLY deadlocks when:
+- Running in a **worker thread** (via `asyncio.to_thread()`)
+- Inside a **subprocess with piped stdio** (MCP transport)
+- Under an **anyio-managed event loop** (MCP library v1.23.1, anyio 4.13.0)
+
+The exact mechanism is likely a GIL/DLL-loader interaction between torch's C extension loading and the ProactorEventLoop's I/O completion ports on Windows, but the observable proof is clear from the trace.
+
+**Environment:**
+- OS: Windows 10/11
+- Python: 3.11.9, CPU-only (no CUDA)
+- MCP library: 1.23.1 (anyio 4.13.0, asyncio backend)
+- Embedding model: `thenlper/gte-base` via `sentence-transformers 2.7.0`
+
+### Investigation Path (Failed Approaches)
+
+1. **Approach #1: Increase timeout (90→180s).** Logic: maybe model loading was slow, not hung. **Failed:** hang is indefinite, not slow. Timeout increase doesn't fix a deadlock.
+
+2. **Approach #2: Wrap `_load_model()` in `asyncio.to_thread()`.** Logic: blocking sync call on event loop starves anyio transport. **Failed:** the import itself deadlocks in the worker thread. Moving it OFF the event loop moved the deadlock to the thread.
+
+3. **Approach #3 (SUCCESS): Pre-load model before event loop starts.** Logic: if the import deadlocks only under an active anyio loop with piped stdio, execute it before `asyncio.run()`. The import runs as plain synchronous Python — no threads, no event loop, no piped transport yet.
+
+### Solution
+
+**Pre-load the embedding model in the `__main__` block of `src/mcp/server.py`, before `asyncio.run(main())`.** This adds ~8-10s startup delay but makes `_load_model()` a no-op during runtime (model already loaded in singleton).
+
+```python
+# src/mcp/server.py, __main__ block
+if __name__ == "__main__":
+    from src.core.embeddings import get_embedding_service as _get_emb
+    _get_emb()._load_model()       # sync, pre-event-loop (BUG-010)
+    asyncio.run(main())
+```
+
+Additional defensive changes in `src/core/embeddings.py`:
+- `generate_embeddings_batch()`: wraps `_load_model()` in `asyncio.to_thread()` as fallback
+- `_generate_sentence_transformer_batch()`: uses `asyncio.to_thread()` instead of deprecated `loop.run_in_executor()`
+
+### Verification
+
+```bash
+.venv/Scripts/python.exe scripts/verify/verify_e2e_tests.py
+# Result: 45/45 PASS, 1 SKIP, 0 FAIL
+```
+
+### Why Approach #1 and #2 Failed
+
+**Approach #1** assumed the issue was latency (slow model loading). The actual issue was a deadlock — the import never completes, regardless of timeout duration. Increasing a timeout cannot fix a deadlock.
+
+**Approach #2** correctly identified that blocking the event loop was bad, but the fix moved the blocking operation to a worker thread, where the _import_ (not the model load) deadlocked due to Windows-specific thread/DLL-loader interactions. The hypothesis was directionally correct (don't block the event loop) but targeted the wrong layer (thread vs pre-event-loop).
+
+### Lesson
+
+> **When a blocking operation deadlocks in a thread under an event loop, moving it to a different thread doesn't help. Move it to a different PHASE of the process lifecycle — before the event loop starts. Differentiate "slow" from "hung": if a 180s timeout doesn't help, it's a deadlock, not latency.**
 
 ---
 

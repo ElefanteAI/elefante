@@ -1,5 +1,7 @@
 # Elefante v2.2.1 — Native SDD Enforcement Walkthrough
 
+> ⚠️ **ARCHIVED** — Delivery record for v2.2.1. Historical context only. For current system state see [CHANGELOG.md](../../../CHANGELOG.md).
+
 ## Delivered: 2026-03-20
 
 ---

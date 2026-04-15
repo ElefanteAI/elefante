@@ -1,8 +1,8 @@
 # Debug Documentation Index
 
-**Compendiums and pitfall reference for Elefante v2.5.0**
+**Compendiums and pitfall reference for Elefante v2.5.2**
 
-> **Last Updated:** 2026-04-13
+> **Last Updated:** 2026-04-15
 
 ---
 
@@ -32,6 +32,8 @@ Active bugs and recurring failure classes. Each links to its compendium post-mor
 | BUG-007 | Developer routing drift — stale paths and ritual changelog reads in active process guidance | FIXED (guarded) | [ops-ai-behavior #7](ops-ai-behavior-compendium.md#issue-7-developer-routing-drift--stale-paths-and-ritual-changelog-reads) | `pytest tests/test_developer_routing.py -v` | 1x — guarded by source-path regression test + live memory amendments |
 | BUG-008 | Graph/session schema contract drift — GraphConnect injected unsupported relationship properties and SessionsList assumed synthetic session columns | FIXED (guarded) | [ops-database #8](ops-database-compendium.md#issue-8-graph-and-session-schema-contract-drift) | `pytest tests/test_memory_persistence.py -k "TestGraphToolContract" -v` | 1x — guarded by rel-table execution coverage and SessionsList source-contract checks |
 | BUG-009 | Self-protocol verifier drift — stale snapshot-path assumptions and default line limits broke the maintained whole-system proof | FIXED (guarded) | [ops-ai-behavior #8](ops-ai-behavior-compendium.md#issue-8-self-protocol-verifier-drift--runtime-path-and-payload-assumptions) | `pytest tests/test_developer_routing.py -k "TestSelfProtocolContract" -v` | 1x — guarded by source-level checks for dashboard snapshot path resolution and large-payload stream sizing |
+| BUG-010 | Self-protocol cold-start deadlock — `from sentence_transformers import SentenceTransformer` hangs when executed in a worker thread under an active anyio event loop with piped stdio on Windows + Python 3.11 | FIXED (guarded) ⚠️ Windows/Python 3.11/CPU only — untested on Linux, macOS, Python 3.12 | [ops-ai-behavior #9](ops-ai-behavior-compendium.md#issue-9-self-protocol-cold-start-deadlock--import-sentence_transformers-deadlocks-in-worker-thread-under-anyio--piped-stdio) | `.venv/Scripts/python.exe scripts/verify/verify_e2e_tests.py` | 1x — guarded by pre-loading embedding model before event loop starts in server.py __main__ |
+| BUG-011 | MemoryAdd silent IGNORE — test-memory guard returns opaque "Memory filtered by Intelligence Pipeline" with no rejection reason, overly broad heuristic blocks legitimate tags | FIXED (guarded) | [ops-memory #10](ops-memory-compendium.md#issue-10-memoryadd-silent-ignore--opaque-test-memory-guard-rejection) | `pytest tests/test_memory_guard.py -v` | 2x — guarded by `rejection_reason` field in IGNORE response body |
 
 ### How to Use This Table
 
@@ -126,4 +128,4 @@ docs/debug/
 
 ---
 
-_Last verified: 2026-04-13 | Elefante v2.5.0_
+_Last verified: 2026-04-15 | Elefante v2.5.2_

@@ -1,3 +1,13 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/core/deduplication.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Remove near-duplicate results from hybrid search using embedding
+#           similarity to prevent redundant returns to the agent.
+# ROLE    : Core post-processing — applied to retrieval results before injection.
+# TOUCHED : When adjusting deduplication similarity threshold or the window over
+#           which duplicates are detected.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Result Deduplication for Hybrid Search
 

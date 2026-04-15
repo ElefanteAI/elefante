@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+# ─────────────────────────────────────────────────────────────────────────────
+# NAME    : verify_dashboard_snapshot.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Validate the generated dashboard_snapshot.json for structural
+#           integrity and edge validity without booting the live server.
+# WHEN    : After running update_dashboard_data.py, to confirm the snapshot is
+#           valid before the frontend consumes it. Run in CI after any change
+#           to dashboard_serializer.py or update_dashboard_data.py.
+# USAGE   : python scripts/verify/verify_dashboard_snapshot.py [--snapshot PATH]
+# NOTES   : Offline — no server required. If this fails, the dashboard will
+#           show broken graphs or missing nodes. Fix update_dashboard_data.py
+#           or dashboard_serializer.py, re-run the pipeline, then re-verify.
+# LASTRUN : yyyy-mm-dd hh:mm — update manually
+# ─────────────────────────────────────────────────────────────────────────────
 """Validate dashboard_snapshot.json (offline).
 
 This script is safe to run with Elefante Mode OFF.

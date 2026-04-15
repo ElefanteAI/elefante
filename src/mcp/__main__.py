@@ -1,3 +1,12 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/mcp/__main__.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Module entry point enabling `python -m src.mcp` execution.
+#           Fixes the RuntimeWarning about src.mcp.server in sys.modules.
+# ROLE    : MCP package glue — do not put logic here; delegate to server.py.
+# TOUCHED : Only if the module launch mechanism changes. Do not add business logic.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Entry point for running Elefante MCP server as a module.
 

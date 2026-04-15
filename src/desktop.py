@@ -1,7 +1,13 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/desktop.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Desktop/system-tray integration for Elefante (non-MCP GUI path).
+# ROLE    : Optional UI layer — not required for MCP/agent operation.
+# TOUCHED : When changing the system-tray menu, desktop notifications, or the
+#           OS-level integration. Agents never interact with this directly.
+# ─────────────────────────────────────────────────────────────────────────────
 import os
-import sys
-import json
-from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, ttk
 

@@ -1,3 +1,12 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TEST    : tests/conftest.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PROVES  : Shared pytest fixtures and test configuration for the whole suite.
+# RUN     : loaded automatically by pytest — do not run directly.
+# WHEN    : Modify when adding new shared fixtures, changing temp-dir setup,
+#           or adjusting test-wide environment variables.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Pytest configuration and shared fixtures for Elefante test suite.
 """

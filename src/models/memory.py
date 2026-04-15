@@ -1,3 +1,15 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/models/memory.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Core Memory dataclass and MemoryMetadata; the canonical in-memory
+#           representation passed through the entire pipeline.
+# ROLE    : Models — imported everywhere. This is the data contract between
+#           vector_store, graph_store, orchestrator, server, and serializers.
+# TOUCHED : When adding new memory fields, changing the metadata schema, or
+#           adding new memory_type values. Changes here ripple across the entire
+#           system including ChromaDB schema and Kuzu schema.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Memory data models for Elefante.
 """

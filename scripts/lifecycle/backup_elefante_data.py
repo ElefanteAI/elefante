@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+# ─────────────────────────────────────────────────────────────────────────────
+# NAME    : backup_elefante_data.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : File-level zip backup of ~/.elefante/data; safe with Elefante OFF;
+#           does not open any database connection.
+# WHEN    : BEFORE any destructive operation (reset_factory, reset_kuzu_nuclear,
+#           delete_memories_surgical --apply). Also before version upgrades that
+#           change schema. Routine pre-maintenance hygiene.
+# USAGE   : python scripts/lifecycle/backup_elefante_data.py [--elefante-home PATH] [--out-dir PATH]
+# NOTES   : Safe to run with Elefante ON or OFF — no DB handles opened. Output
+#           goes to ~/.elefante/backups/ by default. Backup is a simple zip; no
+#           special tool needed to inspect or restore.
+# LASTRUN : yyyy-mm-dd hh:mm — update manually
+# ─────────────────────────────────────────────────────────────────────────────
 """Backup Elefante on-disk data (no DB access).
 
 Default target is ~/.elefante/data.

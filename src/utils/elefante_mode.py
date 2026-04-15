@@ -1,3 +1,14 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/utils/elefante_mode.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Transaction-scoped write locking: acquire, work, release in 
+#           milliseconds — not session-level. Exposes WRITE_LOCK_FILE path.
+# ROLE    : Utils — wraps all state-mutating operations in orchestrator.py.
+# TOUCHED : When changing lock file location, lock acquisition timeout, or
+#           adding new lock-guarded operation types. manage_lock.py imports
+#           WRITE_LOCK_FILE from here for lock path resolution.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Elefante Mode Manager — Transaction-Scoped Locking
 

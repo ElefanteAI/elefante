@@ -1,3 +1,17 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# NAME    : list_mcp_tools.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Parse server.py and print the live MCP tool + prompt inventory for
+#           spec sync and audit without booting the runtime.
+# WHEN    : After modifying server.py (tool added, renamed, or removed) to verify
+#           the inventory matches spec-tools.md. Also run if tool count in docs
+#           seems incorrect.
+# USAGE   : python scripts/ci/list_mcp_tools.py
+# NOTES   : Read-only; no runtime started. Shows only what is registered in
+#           server.py source — not what is actually healthy at runtime.
+# LASTRUN : yyyy-mm-dd hh:mm — update manually
+# ─────────────────────────────────────────────────────────────────────────────
 """List MCP tools and prompts registered by Elefante."""
 
 import re

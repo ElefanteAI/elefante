@@ -1,3 +1,13 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TEST    : tests/test_dashboard_serializer.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PROVES  : Dashboard serialization correctness and launch safeguards; ensures
+#           Memory objects are converted to valid dashboard node/edge JSON.
+# RUN     : pytest tests/test_dashboard_serializer.py -v
+# WHEN    : After changes to src/utils/dashboard_serializer.py or
+#           update_dashboard_data.py node schema.
+# ─────────────────────────────────────────────────────────────────────────────
 """Pytest coverage for dashboard serialization and launch safeguards."""
 
 import re

@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+# ─────────────────────────────────────────────────────────────────────────────
+# NAME    : dump_memories_all.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Bypass-the-orchestrator raw ChromaDB dump for emergency visibility
+#           when normal routes are broken or filtered.
+# WHEN    : When elefante-MemorySearch returns unexpected results and you need to
+#           confirm what is actually stored in ChromaDB without any filtering. Also
+#           useful before and after a surgical delete to verify the raw count.
+# USAGE   : python scripts/debug/dump_memories_all.py
+# NOTES   : Reads directly from ChromaDB — bypasses all orchestrator logic. Output
+#           may contain memories that the intelligence pipeline would normally filter.
+#           Safe to run with Elefante ON or OFF.
+# LASTRUN : yyyy-mm-dd hh:mm — update manually
+# ─────────────────────────────────────────────────────────────────────────────
 """Dump all memories from ChromaDB — raw inspection."""
 import os
 import sys

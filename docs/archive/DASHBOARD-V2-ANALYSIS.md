@@ -1,5 +1,7 @@
 # Elefante Dashboard v2.1 - Deep Analysis & Handoff Document
 
+> ⚠️ **ARCHIVED** — Handoff document written at v1.10/v2.1. For current dashboard architecture see [docs/technical/ops-dashboard.md](../technical/ops-dashboard.md) and [docs/technical/spec-architecture.md](../technical/spec-architecture.md).
+
 > **Purpose**: Comprehensive analysis for a new agent to understand the work done on Elefante at v1.10 and Dashboard at v2.1. This document explains the reasoning for changes, the current state, and the path forward.
 >
 > **Audience**: Incoming developer/agent taking over the dashboard development

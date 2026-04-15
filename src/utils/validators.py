@@ -1,3 +1,12 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/utils/validators.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Input validation utilities for MCP tool arguments at system boundaries.
+# ROLE    : Utils — called by server.py before passing args to orchestrator.
+# TOUCHED : When adding new MCP tools (add corresponding validators) or when
+#           tightening/relaxing validation rules for existing fields.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Input validation utilities for Elefante memory system
 """

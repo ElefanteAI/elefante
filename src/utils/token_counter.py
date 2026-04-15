@@ -1,3 +1,14 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/utils/token_counter.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Heuristic token counting and TOKEN_STATS injection for all MCP
+#           tool responses; negligible CPU cost; multilingual support.
+# ROLE    : Utils — called by server.py to inject TOKEN_STATS on every response.
+# TOUCHED : When changing token budget constants (per memory type), heuristic
+#           counting formula, CJK/Arabic ratio blending, or the TOKEN_STATS
+#           field names exposed in tool responses.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Token counting and intelligence for Elefante.
 

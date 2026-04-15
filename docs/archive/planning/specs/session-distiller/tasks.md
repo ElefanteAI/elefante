@@ -1,5 +1,7 @@
 # Elefante Session Distiller — Task List (Phase T v2)
 
+> ⚠️ **ARCHIVED** — Implementation task list, all items completed. Historical record only. For current implementation see `src/modules/distiller/`.
+
 ## T1: Infrastructure & Core Pipeline
 - [x] **T1.1**: Create module structure `src/modules/distiller/`
 - [x] **T1.2**: Define typed models — `ResponseChunk`, `ChatTurn`, `ChatSession`, `DistilledInsight`

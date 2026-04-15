@@ -1,5 +1,7 @@
 # Dashboard Overhaul SPEC (Snapshot-First, Curated-First)
 
+> ⚠️ **ARCHIVED** — Design record for v2.0.0. Shipped and superseded. For current dashboard ops see [docs/technical/ops-dashboard.md](../technical/ops-dashboard.md).
+
 **Status**: Production (shipped in v2.0.0)
 
 ## 1) Goals

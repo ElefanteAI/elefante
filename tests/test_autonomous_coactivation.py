@@ -1,3 +1,13 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TEST    : tests/test_autonomous_coactivation.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PROVES  : Passive autonomous co-activation (Hebbian learning): related memories
+#           reinforce each other's access scores automatically over time.
+# RUN     : pytest tests/test_autonomous_coactivation.py -v
+# WHEN    : After changes to access reinforcement or co-activation logic in
+#           orchestrator.py or retrieval.py.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Tests for Passive Autonomous Co-Activation (Hebbian Learning)
 """

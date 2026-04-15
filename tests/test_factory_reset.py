@@ -1,3 +1,12 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TEST    : tests/test_factory_reset.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PROVES  : reset_factory.py safety gates: dry-run behavior, backup creation,
+#           confirmation gate, and correct data removal on apply.
+# RUN     : pytest tests/test_factory_reset.py -v
+# WHEN    : After any change to scripts/lifecycle/reset_factory.py.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Factory Reset Safety Tests
 ==========================

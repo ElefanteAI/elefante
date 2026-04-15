@@ -1,8 +1,28 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/core/embeddings.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Local sentence-transformers embedding service; no external API calls.
+# ROLE    : Core infrastructure — called by vector_store for all embedding ops.
+# TOUCHED : When changing the embedding model, batch size, or concurrency rules.
+#           CRITICAL: model MUST be pre-loaded in server.py __main__ BEFORE
+#           asyncio.run() — loading in a worker thread DEADLOCKS on Windows/
+#           Python 3.11 (BUG-010). See CONCURRENCY RULE docstring inside.
+# ─────────────────────────────────────────────────────────────────────────────
 """Embedding service for Elefante memory system.
 
 ARCHITECTURE RULE:
 Elefante must not make external AI API calls. Embeddings are therefore generated
 locally using Sentence Transformers.
+
+CONCURRENCY RULE (BUG-010):
+_load_sentence_transformer() imports torch and loads the model — both heavy,
+blocking operations that DEADLOCK when executed in a worker thread under an
+active anyio event loop with piped stdio on Windows + Python 3.11.
+The model MUST be pre-loaded synchronously in server.py __main__ BEFORE
+asyncio.run() is called.  _load_model() becomes a no-op during normal runtime
+because self._model is already set.  Do NOT rely on asyncio.to_thread() here.
+See docs/debug/ops-ai-behavior-compendium.md Issue #9.
 """
 
 import asyncio
@@ -117,8 +137,18 @@ class EmbeddingService:
         if not texts:
             return []
         
-        # Ensure model is loaded
-        self._load_model()
+        # BUG-010: model MUST be pre-loaded in server.py __main__ before
+        # asyncio.run().  Reaching this branch at runtime means the pre-load
+        # was bypassed — log a critical warning so the failure is not silent.
+        # asyncio.to_thread() does NOT fix the deadlock; it only moves it.
+        if self._model is None:
+            logger.critical(
+                "embedding_model_not_preloaded",
+                warning="BUG-010: _load_model() was not called before asyncio.run(). "
+                        "This path is deadlock-prone under anyio+piped stdio on Windows. "
+                        "Ensure server.py __main__ calls _load_model() before asyncio.run().",
+            )
+            await asyncio.to_thread(self._load_model)
         
         logger.debug("generating_embeddings", count=len(texts))
         
@@ -137,9 +167,6 @@ class EmbeddingService:
         self, texts: List[str]
     ) -> List[List[float]]:
         """Generate embeddings using Sentence Transformers"""
-        # Run in thread pool to avoid blocking
-        loop = asyncio.get_event_loop()
-        
         def _encode():
             embeddings = self._model.encode(
                 texts,
@@ -150,7 +177,8 @@ class EmbeddingService:
             )
             return embeddings.tolist()
         
-        embeddings = await loop.run_in_executor(None, _encode)
+        # Run in thread pool to avoid blocking the event loop (BUG-010).
+        embeddings = await asyncio.to_thread(_encode)
         return embeddings
     
     def get_embedding_dimension(self) -> int:

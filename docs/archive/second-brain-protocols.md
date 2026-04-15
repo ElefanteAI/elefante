@@ -1,5 +1,7 @@
 # The Second Brain Protocols (Hierarchical Framework)
 
+> ⚠️ **ARCHIVED** — Behavioral constitution from v2.2.2. Superseded by [.github/copilot-instructions.md](../../.github/copilot-instructions.md) and [docs/debug/dev-developer-agent.md](../debug/dev-developer-agent.md).
+
 **Version**: V2.2.2 (Cognitive Continuity + Windows Support)  
 **Last Updated**: 2026-02-16
 

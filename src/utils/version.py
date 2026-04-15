@@ -1,3 +1,15 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/utils/version.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Single source of truth for the runtime version string; enforces
+#           minimum Python version at startup.
+# ROLE    : Utils — imported by __init__.py and main.py. Do NOT use
+#           src/__init__.py directly for version; read it from here.
+# TOUCHED : When adding a new Python version constraint or changing how the
+#           version constant is exposed. bump_version.py updates src/__init__.py,
+#           not this file directly.
+# ─────────────────────────────────────────────────────────────────────────────
 """Single source of truth for the Elefante runtime version."""
 
 from __future__ import annotations

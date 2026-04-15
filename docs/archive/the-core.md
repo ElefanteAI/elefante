@@ -1,5 +1,7 @@
 # Elefante: The Core
 
+> ⚠️ **ARCHIVED** — Vision document from early Elefante development. For current vision see [docs/planning/spec-vision.md](../planning/spec-vision.md).
+
 Elefante exists to bridge the cognitive gap between human intent and agentic execution through **Persistent Cognitive Continuity**.
 
 It is the machine-resident nervous system that allows AI agents to stop restarting and start evolving.

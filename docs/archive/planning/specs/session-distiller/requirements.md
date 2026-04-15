@@ -1,5 +1,7 @@
 # Requirements v1 — Elefante Session Distiller
 
+> ⚠️ **ARCHIVED** — Original requirements for the session distiller. Shipped. For current implementation see `src/modules/distiller/`.
+
 [Phase: R | Versions: Rv1 Dv0 Tv0 | Open Questions: 3]
 
 ---

@@ -1,3 +1,14 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE  : src/utils/dashboard_serializer.py
+# VERSION : 2.5.2
+# CHANGED : 2026-04-15
+# PURPOSE : Single source of truth for converting Memory objects into dashboard
+#           node/edge JSON consumed by the frontend and snapshot pipeline.
+# ROLE    : Utils — shared by update_dashboard_data.py and the live server.
+# TOUCHED : When changing the dashboard node schema, adding new node fields,
+#           changing the redaction/scoring rules applied at serialization time.
+#           Changes here affect both live dashboard and snapshot export.
+# ─────────────────────────────────────────────────────────────────────────────
 """
 Shared Memory → Dashboard Node serializer.
 
