@@ -9,14 +9,20 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [2.5.4] - 2026-04-15
 
+### Fixed
+
+- **BUG-014 — CI binary build: missing frontend build step and wrong Vite output directory**: `build-binaries.yml` had no Node.js/npm step — `src/dashboard/ui/dist/` is gitignored so CI checked out a repo with no built UI. Additionally, `elefante.spec` referenced `src/dashboard/ui/build` but Vite outputs to `src/dashboard/ui/dist` (configured in `vite.config.ts`). The `build/` directory has never existed. Fix: added `setup-node@v4` + `npm ci` + `npm run build` before the PyInstaller step; corrected spec `datas` path from `build` to `dist`. First discovered on v2.5.3 tag push — this was the first binary release attempt. Full post-mortem: `docs/debug/ops-installation-compendium.md` Issue #8.
+
 ### Documentation
 
 - **GAP-013 post-mortem**: `docs/debug/ops-ai-behavior-compendium.md` Issue #11 documents the missing import path for JSON exports. Root cause: `export_memories.py` was built for offline analysis, not migration. Embeddings are stored explicitly using `thenlper/gte-base` and are NOT in the JSON output — any import script must regenerate them using the same model or semantic search will be silently corrupted by ChromaDB's default `all-MiniLM-L6-v2`. Import is confirmed feasible (~120 lines, direct ChromaDB upsert). Issue labels the JSON export as read-only analysis output (not a backup) pending `import_memories.py`.
+- **BUG-014 post-mortem**: `docs/debug/ops-installation-compendium.md` Issue #8 — CI build pipeline: missing frontend compilation step and wrong spec output path.
 - **best_practices.md**: New entry "A Write-Only Export Is Not a Backup" — every export format must document its import path or be explicitly labeled read-only.
+- **best_practices.md**: New entry "CI Pipelines Must Build Every Artifact They Package" — gitignored build outputs do not exist in CI; verify output dir names against build tool config before referencing them in build specs.
 
-### Planned (v2.5.4 deliverable)
+### Known Gap (next release)
 
-- **`scripts/pipeline/import_memories.py`** — seeds a fresh Elefante install from a JSON export; regenerates embeddings via configured model; supports `--dry-run`, `--skip-existing`, `--conflict skip|overwrite`; closes the round-trip gap.
+- **`scripts/pipeline/import_memories.py`** — seeds a fresh Elefante install from a JSON export; regenerates embeddings via configured model; supports `--dry-run`, `--skip-existing`, `--conflict skip|overwrite`; closes the round-trip gap (GAP-013).
 
 ---
 

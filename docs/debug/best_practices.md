@@ -184,6 +184,14 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Proof:** GAP-013 — `export_memories.py --format json` produced a JSON file with all memory content and metadata. No `import_memories.py` existed. Embeddings were not included (ChromaDB stores them explicitly from `thenlper/gte-base`; the export's `collection.get()` call omits them). A user who exported, factory reset, then tried to restore from JSON would lose their brain. The binary zip backup (`backup_elefante_data.py`) is the only real restore path — but it is not surfaced in the install flow. See [ops-ai-behavior-compendium.md](ops-ai-behavior-compendium.md#issue-11-json-export-is-not-a-backup--missing-import-path-and-embeddings).
 - **Avoid:** Shipping an export script without a companion import script and without labeling the export as read-only.
 
+### CI Pipelines Must Build Every Artifact They Package
+
+- **Trigger:** A CI workflow calls a build tool (PyInstaller, Webpack, Docker) that packages a compiled artifact.
+- **Rule:** Every build step that produces files required by the packager must be explicitly listed in the workflow, in order, before the packager runs. Never assume a file exists because it exists locally — if it is in `.gitignore`, it does not exist in CI.
+- **Why:** CI checks out only what is committed. Gitignored build outputs (compiled JS, generated CSS, transpiled code) are absent. A packager that references a missing path will fail silently or with a confusing error, and the failure only surfaces on the first real release attempt — potentially days after the workflow was written.
+- **Proof:** BUG-014 — `build-binaries.yml` had no `setup-node` or `npm` step. `src/dashboard/ui/dist/` is gitignored. `elefante.spec` also referenced the wrong path (`build` instead of `dist`). All three matrix jobs (Ubuntu, macOS, Windows) failed on the first `v*` tag push (v2.5.3). Neither bug was caught during development because PyInstaller was never run in CI during that period. See [ops-installation-compendium.md](ops-installation-compendium.md#issue-8-ci-binary-build--missing-frontend-build-step-and-wrong-vite-output-directory).
+- **Avoid:** Writing a build spec that references a directory without verifying it matches the actual build tool output path (`outDir` in `vite.config.ts`, `output.path` in `webpack.config.js`, etc.).
+
 ---
 
 ## Update Protocol

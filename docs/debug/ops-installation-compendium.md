@@ -627,6 +627,92 @@ When auto-config fails for any IDE:
 
 ---
 
+## Issue #8: CI Binary Build — Missing Frontend Build Step and Wrong Vite Output Directory
+
+**Date:** 2026-04-15
+**Duration:** Discovered immediately on first tag push (v2.5.3)
+**Severity:** HIGH
+**Status:** FIXED — v2.5.4 (`406baba`)
+
+### Problem
+
+Every push to a `v*` tag triggers `build-binaries.yml` which calls `pyinstaller elefante.spec`. The build fails on all three platforms (Ubuntu, macOS, Windows) because:
+1. The `src/dashboard/ui/dist/` directory does not exist in the checked-out repo (it is gitignored).
+2. Even if it existed, `elefante.spec` referenced the wrong path (`src/dashboard/ui/build`).
+
+### Symptom
+
+GitHub Actions email: **"Run failed: Build One-Click Binaries - v2.5.3 (9f4f116)"**
+
+PyInstaller terminates with a path-not-found error on the `datas` entry. All three matrix jobs fail. The `release` job is skipped (no artifacts).
+
+### Root Cause (2 layers)
+
+1. **Wrong path in `elefante.spec`**: The spec declared `('src/dashboard/ui/build', 'src/dashboard/ui/build')` but Vite is configured in `src/dashboard/ui/vite.config.ts` with `outDir: 'dist'`. The `build/` directory has never existed. The `dist/` directory is the correct output.
+
+2. **Missing Node.js build step in workflow**: `src/dashboard/ui/dist/` and `src/dashboard/ui/node_modules/` are both listed in `.gitignore`. CI checks out the repo with neither present. Without an `npm ci && npm run build` step before PyInstaller, the dist directory does not exist at build time.
+
+### Where Each Was Wrong
+
+| File | What Was Wrong | Fix |
+|---|---|---|
+| `elefante.spec` | `datas` entry: `src/dashboard/ui/build` | Changed to `src/dashboard/ui/dist` |
+| `.github/workflows/build-binaries.yml` | No `setup-node` or `npm` steps before PyInstaller | Added `setup-node@v4` + `npm ci` + `npm run build` in `src/dashboard/ui` |
+
+### Fix Applied
+
+**`elefante.spec`** — single line change:
+```python
+# Before
+datas = collect_data_files('chromadb') + [
+    ('src/dashboard/ui/build', 'src/dashboard/ui/build'),
+]
+
+# After
+datas = collect_data_files('chromadb') + [
+    ('src/dashboard/ui/dist', 'src/dashboard/ui/dist'),
+]
+```
+
+**`build-binaries.yml`** — added before the Python install step:
+```yaml
+- name: Setup Node.js
+  uses: actions/setup-node@v4
+  with:
+    node-version: "20"
+
+- name: Build Dashboard UI
+  working-directory: src/dashboard/ui
+  run: |
+    npm ci
+    npm run build
+```
+
+### Why This Was Silent Until First Tag
+
+The workflow only triggers on `v*` tag pushes and `workflow_dispatch`. No tag had been pushed before v2.5.3 — this was the first binary release attempt. The bug existed from the moment the workflow and spec were first written but was never exercised.
+
+### Verification
+
+Manual: push a `v*` tag and confirm all three matrix jobs (ubuntu-latest, macos-latest, windows-latest) complete with green status and artifacts uploaded to the GitHub Release.
+
+No automated local test exists for GitHub Actions workflows. The spec path can be spot-checked:
+```powershell
+# Confirm spec references the correct directory
+Select-String -Path elefante.spec -Pattern "dashboard/ui"
+# Should output: src/dashboard/ui/dist
+
+# Confirm workflow has Node step
+Select-String -Path .github/workflows/build-binaries.yml -Pattern "setup-node|npm ci"
+# Should output: setup-node@v4, npm ci
+```
+
+### Lesson
+
+> **A CI pipeline that builds a compiled artifact must include every build step required to produce that artifact — including frontend compilation. Gitignored build outputs do not exist in CI. Verify the output directory name against the build tool config (`vite.config.ts`, `webpack.config.js`, etc.) before referencing it in a build spec.**
+
+---
+
 ## Appendix: Issue Template
 
 ```markdown
