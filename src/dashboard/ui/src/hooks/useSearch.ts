@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.5.2 - Search Hook
+// Elefante Dashboard v2.5.3 - Search Hook
 import { useState, useCallback, useRef } from 'react';
 import type { SearchResult } from '@/types';
 

@@ -4,7 +4,7 @@
 > **Last Updated:** 2026-03-28
 > **Total Issues Documented:** 9
 > **Status:** Production Reference
-> **Applies to**: v2.5.2+
+> **Applies to**: v2.5.3+
 >
 > **HISTORICAL NOTE:** Some issues below reference V3 concepts(layer, sublayer, classifier.py, importance 1-10) that have since been removed. These entries document the debugging process and lessons learned; the referenced code/fields no longer exist.  
 > **Maintainer:** Add new issues following Issue #N template at bottom

@@ -3,7 +3,7 @@
 > **Purpose:** Distilled reusable debugging rules for Elefante contributors
 > **Companion Docs:** [README.md](README.md) and [dev-developer-agent.md](dev-developer-agent.md)
 > **Status:** Live feedback-loop ledger
-> **Applies to**: v2.5.2+
+> **Applies to**: v2.5.3+
 
 ---
 
@@ -143,6 +143,14 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Why:** Opaque rejections like `"Memory filtered by Intelligence Pipeline"` are indistinguishable from bugs. Agents cannot introspect server-side logs, so the MCP response is the only diagnostic channel.
 - **Proof:** BUG-011 — MemoryAdd with tag `"test"` returned `status: ignored` with no indication which of 9 heuristic conditions fired. The same guard silently blocked the installer's seed passcode, producing a false-positive "Successfully injected" claim. [ops-memory-compendium.md Issue #10](ops-memory-compendium.md#issue-10-memoryadd-silent-ignore--opaque-test-memory-guard-rejection).
 - **Avoid:** Generic rejection messages. Silent `None` returns from internal functions that get translated into success-shaped MCP responses.
+
+### Instruction Delivery Scope Must Match The Broadest Usage Scope
+
+- **Trigger:** An agent has access to an MCP server but never calls it, even when the context clearly warrants it.
+- **Rule:** Behavioral instructions (search-first rules, tool contracts, engagement objectives) must be delivered at the broadest available scope — not the narrowest that works in one demo. For VS Code Copilot: `settings.json` user-level `codeGeneration.instructions` is system-scoped; `.github/copilot-instructions.md` is workspace-scoped only.
+- **Why:** A workspace-scoped instructions file is invisible the moment the user opens a parent folder, a sibling project, or any subfolder as the workspace root. The cold-start trigger gap silently returns with no visible indication.
+- **Proof:** BUG-012 — working from `BOB/` workspace, agent answered "what is the code?" by reading README directly, never calling `elefante-MemorySearch`, despite Elefante being registered and running. [ops-ai-behavior-compendium.md Issue #10](ops-ai-behavior-compendium.md#issue-10-elefante-cold-start-trigger-gap--instructions-file-is-workspace-scoped-not-system-scoped).
+- **Avoid:** Conflating MCP registration scope with instruction delivery scope — they are orthogonal systems. A fix that works in the demo scenario but fails silently in adjacent ones is worse than a documented gap.
 
 ### Whole-System Claims Require A Whole-System Verifier
 

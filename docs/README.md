@@ -1,6 +1,6 @@
 # Elefante Documentation
 
-> **v2.5.2** · [Product overview & install](../README.md) · [Agent constitution](../.github/copilot-instructions.md)
+> **v2.5.3** · [Product overview & install](../README.md) · [Agent constitution](../.github/copilot-instructions.md)
 
 ---
 

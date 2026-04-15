@@ -1,6 +1,6 @@
 # Debug Documentation Index
 
-**Compendiums and pitfall reference for Elefante v2.5.2**
+**Compendiums and pitfall reference for Elefante v2.5.3**
 
 > **Last Updated:** 2026-04-15
 
@@ -34,6 +34,7 @@ Active bugs and recurring failure classes. Each links to its compendium post-mor
 | BUG-009 | Self-protocol verifier drift — stale snapshot-path assumptions and default line limits broke the maintained whole-system proof | FIXED (guarded) | [ops-ai-behavior #8](ops-ai-behavior-compendium.md#issue-8-self-protocol-verifier-drift--runtime-path-and-payload-assumptions) | `pytest tests/test_developer_routing.py -k "TestSelfProtocolContract" -v` | 1x — guarded by source-level checks for dashboard snapshot path resolution and large-payload stream sizing |
 | BUG-010 | Self-protocol cold-start deadlock — `from sentence_transformers import SentenceTransformer` hangs when executed in a worker thread under an active anyio event loop with piped stdio on Windows + Python 3.11 | FIXED (guarded) ⚠️ Windows/Python 3.11/CPU only — untested on Linux, macOS, Python 3.12 | [ops-ai-behavior #9](ops-ai-behavior-compendium.md#issue-9-self-protocol-cold-start-deadlock--import-sentence_transformers-deadlocks-in-worker-thread-under-anyio--piped-stdio) | `.venv/Scripts/python.exe scripts/verify/verify_e2e_tests.py` | 1x — guarded by pre-loading embedding model before event loop starts in server.py __main__ |
 | BUG-011 | MemoryAdd silent IGNORE — test-memory guard returns opaque "Memory filtered by Intelligence Pipeline" with no rejection reason, overly broad heuristic blocks legitimate tags | FIXED (guarded) | [ops-memory #10](ops-memory-compendium.md#issue-10-memoryadd-silent-ignore--opaque-test-memory-guard-rejection) | `pytest tests/test_memory_guard.py -v` | 2x — guarded by `rejection_reason` field in IGNORE response body |
+| BUG-012 | Elefante cold-start trigger gap — agent never calls `elefante-MemorySearch` when working outside the `elefante/` workspace because `.github/copilot-instructions.md` is workspace-scoped and only loads when `elefante/` is the VS Code workspace root | FIXED (partial) ⚠️ VS Code Copilot only — cross-client fix (Cursor, Windsurf) requires client-specific bootstrap files | [ops-ai-behavior #10](ops-ai-behavior-compendium.md#issue-10-elefante-cold-start-trigger-gap--instructions-file-is-workspace-scoped-not-system-scoped) | Manual: open a workspace outside `elefante/`, ask a memory-relevant question, confirm `[ELEFANTE] Searched:` stamp appears in response | 1x — guarded by BOB-level `copilot-instructions.md` bootstrap + system-level `settings.json` user instruction injection |
 
 ### How to Use This Table
 
@@ -128,4 +129,4 @@ docs/debug/
 
 ---
 
-_Last verified: 2026-04-15 | Elefante v2.5.2_
+_Last verified: 2026-04-15 | Elefante v2.5.3_

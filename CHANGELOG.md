@@ -7,6 +7,20 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.5.3] - 2026-04-15
+
+### Fixed
+
+- **BUG-012 — Elefante cold-start trigger gap**: Agent never called `elefante-MemorySearch` when working in any workspace other than `elefante/`, because `.github/copilot-instructions.md` is workspace-scoped and only loads when `elefante/` is the VS Code workspace root. Fix is two-layer: (1) system-level — `github.copilot.chat.codeGeneration.instructions` in VS Code user `settings.json` now points to `elefante/.github/copilot-instructions.md`, loading the full Elefante constitution globally for every workspace; (2) workspace fallback — `BOB/.github/copilot-instructions.md` provides a minimal `search_before_assert` bootstrap for the BOB workspace root. ARAA rejected a workspace-only fix as insufficient: the correct scope for behavioral instructions is the broadest available scope, not the narrowest that works in the demo scenario.
+
+### Documentation
+
+- **BUG-012 post-mortem**: `docs/debug/ops-ai-behavior-compendium.md` Issue #10 documents the three-layer root cause (instruction delivery scope vs. MCP registration scope vs. server-side directive cold-start gap), the ARAA audit that rejected the weak fix, and the verification procedure.
+- **BUG-012 Known Issues row**: `docs/debug/README.md` now tracks BUG-012 with status FIXED (partial) and a manual verification procedure.
+- **best_practices.md**: New entry "Instruction Delivery Scope Must Match The Broadest Usage Scope" — distilled rule from BUG-012, promoting the lesson that workspace-scoped instruction files silently degrade coverage for adjacent usage patterns.
+
+---
+
 ## [2.5.2] - 2026-04-15
 
 ### Fixed

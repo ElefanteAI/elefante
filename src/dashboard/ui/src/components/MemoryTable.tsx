@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.5.2 - Memory Table with TanStack Table
+// Elefante Dashboard v2.5.3 - Memory Table with TanStack Table
 import { useState, useMemo } from 'react';
 import {
   useReactTable,

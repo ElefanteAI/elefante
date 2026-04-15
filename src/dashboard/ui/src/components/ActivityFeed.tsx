@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.5.2 - Activity Feed
+// Elefante Dashboard v2.5.3 - Activity Feed
 import { useMemo } from 'react';
 import { Clock, ArrowRight } from 'lucide-react';
 import { useDashboardStore } from '@/store';

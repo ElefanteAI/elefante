@@ -4,7 +4,7 @@
 > **Last Updated:** 2026-04-15  
 > **Total Issues Documented:** 9  
 > **Status:** Production Reference  
-> **Applies to**: v2.5.2+
+> **Applies to**: v2.5.3+
 | # | Law | Violation Cost |
 |---|-----|----------------|
 | 1 | VERIFY before claiming completion - never assume code works | Repeated iterations |
@@ -45,6 +45,7 @@ Run these BEFORE investigating. If tests pass, the protocol enforcement is intac
 - [Issue #7: Developer Routing Drift](#issue-7-developer-routing-drift--stale-paths-and-ritual-changelog-reads)
 - [Issue #8: Self-Protocol Verifier Drift](#issue-8-self-protocol-verifier-drift--runtime-path-and-payload-assumptions)
 - [Issue #9: Self-Protocol Cold-Start Deadlock](#issue-9-self-protocol-cold-start-deadlock--import-sentence_transformers-deadlocks-in-worker-thread-under-anyio--piped-stdio)
+- [Issue #10: Elefante Cold-Start Trigger Gap](#issue-10-elefante-cold-start-trigger-gap--instructions-file-is-workspace-scoped-not-system-scoped)  CRITICAL
 - [The 5-Layer Protocol](#the-5-layer-protocol)
 - [Verification Checklist](#verification-checklist)
 - [Prevention Protocol](#prevention-protocol)
@@ -728,6 +729,64 @@ Additional defensive changes in `src/core/embeddings.py`:
 ### Lesson
 
 > **When a blocking operation deadlocks in a thread under an event loop, moving it to a different thread doesn't help. Move it to a different PHASE of the process lifecycle — before the event loop starts. Differentiate "slow" from "hung": if a 180s timeout doesn't help, it's a deadlock, not latency.**
+
+---
+
+## Issue #10: Elefante Cold-Start Trigger Gap — Instructions File Is Workspace-Scoped, Not System-Scoped
+
+### Problem
+
+Agent asks Elefante-relevant questions (preferences, past decisions, project state) and receives answers derived solely from training data or workspace file reads. No `elefante-MemorySearch` is called. No `[ELEFANTE] Searched:` stamp appears. The Elefante MCP server is running and registered correctly.
+
+### Symptom
+
+User asks: "what is the code?" (referring to Elefante). Agent reads README directly with its own file tools and answers without ever touching Elefante. Brain context is ignored. Directives and RELEVANT_CONTEXT are never injected because no Elefante tool was called to deliver them.
+
+### Root Cause (3 layers)
+
+1. **Instruction delivery is workspace-scoped**: VS Code Copilot loads `copilot-instructions.md` only from the **active workspace root's** `.github/` folder. `elefante/.github/copilot-instructions.md` only loads when `elefante/` is the workspace root. When the user works from a parent workspace (`BOB/`) or any subfolder, the file is invisible to the agent.
+2. **Cold-start bootstrap gap**: Even with a BOB-level or user-level instructions file, the Elefante server-side directives (including `system-elefante-search-first`) are only injected *after* the first Elefante tool call. There is no delivery path for them before that first call.
+3. **The two problems are orthogonal**: MCP registration scope (where the server is declared) is unrelated to instruction delivery scope (where the agent is told to use it). Elefante was already registered at user-level in `mcp.json` — moving the MCP config to a different scope would not have fixed the trigger gap.
+
+### What Was Tried First (And Why It Was Insufficient)
+
+- **Proposed fix**: Create `BOB/.github/copilot-instructions.md`. ARAA rejected this as insufficient — it only covers the case where `BOB/` is the workspace root. Opening any subfolder directly (`BOB/Projects/`, `BOB/SkillBot/`) regresses the bug.
+- **ARAA verdict**: The fix must be system-scoped — injected globally regardless of which workspace root is active.
+
+### Solution
+
+**Two-layer fix:**
+
+| Layer | Mechanism | Scope | What It Fixes |
+|---|---|---|---|
+| 1 — VS Code user-level | `settings.json` → `github.copilot.chat.codeGeneration.instructions` pointing to `elefante/.github/copilot-instructions.md` | Every workspace, every folder, every session | Cold-start trigger gap for VS Code Copilot globally |
+| 2 — BOB workspace fallback | `BOB/.github/copilot-instructions.md` | BOB workspace root only | Backup if settings.json injection is ever cleared |
+
+**Layer 1 settings.json entry:**
+```json
+"github.copilot.chat.codeGeneration.instructions": [
+    {
+        "file": "C:\\Users\\JaimeSubiabreCistern\\Documents\\Agentic\\BOB\\elefante\\.github\\copilot-instructions.md"
+    }
+]
+```
+
+**Why user-level settings.json is the right mechanism**: It is the only VS Code Copilot injection path that is truly workspace-agnostic. It loads for every workspace, every subfolder opened directly, and every new project without requiring a per-project file.
+
+**Why not duplicate the constitution**: The BOB-level bootstrap should be minimal — just enough to trigger the first Elefante tool call. Once any tool fires, the server-side directives (including `system-elefante-search-first`) take over for the session.
+
+### Verification
+
+1. Open any workspace that is NOT `elefante/` (e.g., `BOB/Projects/`)
+2. Ask a memory-relevant question
+3. Confirm `[ELEFANTE] Searched:` stamp appears in the response
+4. Confirm `RELEVANT_CONTEXT` is present in the answer if memories exist
+
+No automated regression test exists for this — the failure mode is an absence of agent behavior, not a runtime exception. Verification is manual.
+
+### Lesson
+
+> **Instruction delivery and MCP registration are separate systems at separate layers. Fixing one does not fix the other. The correct scope for behavioral instructions is the broadest available scope — not the narrowest that works in the demo scenario. System-level = settings.json user injection, not workspace-level file presence.**
 
 ---
 

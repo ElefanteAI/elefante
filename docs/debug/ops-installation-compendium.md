@@ -4,7 +4,7 @@
 > **Last Updated:** 2026-03-24
 > **Total Issues Documented:** 7
 > **Status:** Production Reference  
-> **Applies to**: v2.5.2+
+> **Applies to**: v2.5.3+
 | #   | Law                                                  | Violation Cost       |
 | --- | ---------------------------------------------------- | -------------------- |
 | 1   | Do NOT pre-create Kuzu database directory            | 12 minutes debugging |
