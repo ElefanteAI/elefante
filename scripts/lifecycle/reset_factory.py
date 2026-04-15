@@ -13,7 +13,14 @@
 #           This removes ALL memory data — ChromaDB + Kuzu + logs.
 # LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
-import argparse() -> str:
+import argparse
+import os
+import shutil
+from datetime import datetime
+from pathlib import Path
+
+
+def _utc_ts() -> str:
     return datetime.utcnow().strftime("%Y%m%d_%H%M%S")
 
 

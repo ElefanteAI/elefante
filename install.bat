@@ -41,32 +41,9 @@ if not defined PYTHON_CMD (
 
 %PYTHON_CMD% --version >> "%LOG_FILE%" 2>&1
 
-REM 2. Create Virtual Environment
-if not exist .venv (
-    echo [INFO] Creating virtual environment...
-    echo [INFO] Creating virtual environment... >> "%LOG_FILE%"
-    %PYTHON_CMD% -m venv .venv
-    if errorlevel 1 (
-        echo [ERROR] Failed to create virtual environment.
-        echo [ERROR] Failed to create virtual environment. >> "%LOG_FILE%"
-        pause
-        exit /b 1
-    )
-) else (
-    echo [INFO] Virtual environment already exists. >> "%LOG_FILE%"
-)
+echo [INFO] Repository virtual environment strategy will be handled by install.py >> "%LOG_FILE%"
 
-REM 3. Activate Virtual Environment
-echo [INFO] Activating virtual environment... >> "%LOG_FILE%"
-call .venv\Scripts\activate.bat
-if errorlevel 1 (
-    echo [ERROR] Failed to activate virtual environment.
-    echo [ERROR] Failed to activate virtual environment. >> "%LOG_FILE%"
-    pause
-    exit /b 1
-)
-
-REM 4. Run Python Installer
+REM 2. Run Python Installer
 echo [INFO] Starting installation wizard...
 echo [INFO] Starting installation wizard... >> "%LOG_FILE%"
 %PYTHON_CMD% scripts\setup\install.py --log-file "%LOG_FILE%"

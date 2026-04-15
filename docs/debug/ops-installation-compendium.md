@@ -1,10 +1,10 @@
 # Installation Debug Compendium
 
 > **Domain:** Installation, Setup & Environment  
-> **Last Updated:** 2026-03-24
-> **Total Issues Documented:** 7
+> **Last Updated:** 2026-04-15
+> **Total Issues Documented:** 9
 > **Status:** Production Reference  
-> **Applies to**: v2.5.4+
+> **Applies to**: v2.6.0+
 | #   | Law                                                  | Violation Cost       |
 | --- | ---------------------------------------------------- | -------------------- |
 | 1   | Do NOT pre-create Kuzu database directory            | 12 minutes debugging |
@@ -37,6 +37,8 @@ Run these BEFORE investigating. If tests pass, the documented fix is intact.
 - [Issue #5: Broken Venv Escape (Trapped Agent)](#issue-5-broken-venv-escape-trapped-agent)
 - [Issue #6: IDE Holding Stale MCP Server Connections](#issue-6-ide-holding-stale-mcp-server-connections)
 - [Issue #7: IBM Bob Non-Standard MCP Settings Path](#issue-7-ibm-bob-non-standard-mcp-settings-path)
+- [Issue #8: CI Binary Build](#issue-8-ci-binary-build--missing-frontend-build-step-and-wrong-vite-output-directory)
+- [Issue #9: GitHub Release Publish Failure](#issue-9-github-release-publish-failure-after-successful-matrix-builds)
 - [Cognitive Failure Analysis](#cognitive-failure-analysis)
 - [Prevention Protocol](#prevention-protocol)
 - [Appendix: Issue Template](#appendix-issue-template)
@@ -710,6 +712,86 @@ Select-String -Path .github/workflows/build-binaries.yml -Pattern "setup-node|np
 ### Lesson
 
 > **A CI pipeline that builds a compiled artifact must include every build step required to produce that artifact — including frontend compilation. Gitignored build outputs do not exist in CI. Verify the output directory name against the build tool config (`vite.config.ts`, `webpack.config.js`, etc.) before referencing it in a build spec.**
+
+---
+
+## Issue #9: GitHub Release Publish Failure After Successful Matrix Builds
+
+**Date:** 2026-04-15  
+**Duration:** Unknown — failed log not yet captured  
+**Severity:** HIGH  
+**Status:** OPEN — root cause not yet evidenced
+
+### Problem
+
+The `Build One-Click Binaries` workflow can complete all three platform builds and still fail in the final GitHub Release publication step.
+
+### Symptom
+
+GitHub Actions warning email reports:
+
+- `Build on macos-latest` — succeeded
+- `Build on ubuntu-latest` — succeeded
+- `Build on windows-latest` — succeeded
+- `Create GitHub Release` — failed
+
+This proves artifacts were built, but the release was not published cleanly.
+
+### Root Cause
+
+**UNKNOWN from currently available evidence.**
+
+What is proven from the workflow source and the warning email:
+
+1. **BUG-014 held.** The current workflow contains `setup-node@v4`, `npm ci`, and `npm run build`, and the three platform build jobs completed successfully.
+2. **The failure boundary moved downstream.** The `release` job contains only two steps: `actions/download-artifact@v4` and `softprops/action-gh-release@v1`.
+3. **This is a separate bug class from BUG-014.** Reclassifying it as the old build-stage failure would erase the evidence that the v2.5.4 fix actually worked.
+
+### Current State Of The Workflow
+
+```yaml
+release:
+  name: Create GitHub Release
+  needs: build
+  if: startsWith(github.ref, 'refs/tags/')
+  runs-on: ubuntu-latest
+  permissions:
+    contents: write
+  steps:
+    - uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          artifacts/elefante-Linux-binary/elefante-Linux.zip
+          artifacts/elefante-macOS-binary/elefante-macOS.zip
+          artifacts/elefante-Windows-binary/elefante-Windows.zip
+        generate_release_notes: true
+```
+
+### Required Evidence Before Any Fix
+
+Capture the failed `Create GitHub Release` job log and inspect:
+
+1. The `Download all artifacts` output — exact artifact directories downloaded under `artifacts/`
+2. The `Create Release` step stderr/HTTP response from `softprops/action-gh-release@v1`
+3. Whether the target tag/release already exists and whether the action attempted create vs update
+
+Without that log, any workflow change would be speculative.
+
+### Verification
+
+Manual: trigger `Build One-Click Binaries` on a fresh `v*` tag and confirm:
+
+1. All three build jobs succeed
+2. `Create GitHub Release` succeeds
+3. The release page contains all three zip assets
+
+### Lesson
+
+> **A green build matrix is not an end-to-end release proof. Separate artifact-creation failures from artifact-publication failures or you will keep reopening the wrong bug.**
 
 ---
 

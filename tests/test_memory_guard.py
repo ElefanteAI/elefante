@@ -9,6 +9,9 @@
 #           server.py IGNORE response body. Required before any release.
 # ─────────────────────────────────────────────────────────────────────────────
 import pytest
+from uuid import uuid4
+
+from src.core.orchestrator import MemoryOrchestrator
 from src.core.vector_store import VectorStore
 from src.core.graph_store import GraphStore
 

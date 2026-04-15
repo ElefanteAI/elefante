@@ -7,6 +7,40 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+---
+
+## [2.6.0] - 2026-04-15
+
+### Added
+
+- **Installer `.venv` strategy prompt**: One-click installation now asks how to handle an existing repository virtual environment before dependency work starts. Why: reruns previously reused `.venv` silently, which made stale or wrong-version environments too easy to carry forward. What: `scripts/setup/install.py` now offers four explicit choices when `.venv` exists — fresh delete and reinstall (default), backup+fresh, reuse, or abort — and records the decision before proceeding. Impact: reinstall behavior is explicit, recoverable, and safer during upgrades or repairs.
+
+### Changed
+
+- **Wrapper installers no longer activate `.venv` before the installer decides**: `install.sh` and `install.bat` now launch `scripts/setup/install.py` directly with the detected compatible Python instead of sourcing the existing `.venv` first. Why: activating a stale environment before installer logic ran recreated the same ambiguity the installer is meant to resolve. What: environment selection moved into the Python installer as the single authority. Impact: fresh reinstall and backup+fresh paths can run before any stale repo-local interpreter is trusted.
+
+### Documentation
+
+- **Installation flow updated for explicit `.venv` choices**: The README, technical installation guide, and scripts overview now describe the new existing-environment prompt and the safer PowerShell/manual entrypoint. Why: install docs previously implied `.venv` would always be silently reused or freshly created. What: the new docs explain the four choices and the default destructive reinstall path. Impact: operators know exactly what will happen to an old repository environment before rerunning the installer.
+
+---
+
+## [2.5.5] - 2026-04-15
+
+### Fixed
+
+- **Verification and maintenance scripts no longer crash at import time**: `scripts/verify/verify_mcp_handshake.py`, `scripts/pipeline/update_dashboard_data.py`, and `scripts/lifecycle/reset_factory.py` shipped with missing imports and a malformed module header. Why: the documented verification and recovery ladder could fail before doing any useful work. What: restored the missing imports and repaired the `_utc_ts()` helper/module preamble. Impact: handshake verification, dashboard snapshot refresh, and factory reset utilities execute instead of dying on load.
+- **Maintained regression tests run cleanly in isolated environments again**: `tests/test_memory_guard.py`, `tests/test_developer_routing.py`, `tests/test_no_emojis.py`, and `tests/test_refinery.py` were missing required imports, and `tests/test_memory_persistence.py` dropped model-cache environment variables in its subprocess harness. Why: the full suite could fail for harness drift rather than product regressions. What: added the missing imports and propagated `HF_HOME`, `TORCH_HOME`, and `SENTENCE_TRANSFORMERS_HOME` into the live MCP shutdown-regression subprocess. Impact: the Python 3.11 verification path returns to a trustworthy full-suite pass state.
+
+### Documentation
+
+- **BUG-014 scope clarification + BUG-015 logging**: Debug documentation now separates the already-fixed matrix build failure from the new open release-stage failure in `Build One-Click Binaries`. Why: the latest warning email shows all three platform builds succeeded, which proves the v2.5.4 build-stage fix held. What: `docs/debug/README.md` keeps BUG-014 fixed and adds BUG-015 as an open release-publication issue; `docs/debug/ops-installation-compendium.md` adds Issue #9 with the proven fault boundary (`actions/download-artifact` / `softprops/action-gh-release`) and explicitly marks root cause as unknown pending the failed job log. Impact: future debugging starts at the release job instead of relitigating the resolved frontend/dist failure.
+- **No-emoji policy cleanup in active docs**: Active documentation and changelog rows no longer rely on emoji/status glyphs in user-facing policy tables. Why: the no-emoji guard treated those markers as test failures. What: converted archive/warning/import-status markers to plain-text equivalents and added the rule "A Green Build Matrix Is Not A Release Proof" to `docs/debug/best_practices.md`. Impact: documentation now matches repository policy and the docs themselves stop tripping the guardrails they describe.
+
+---
+
 ## [2.5.4] - 2026-04-15
 
 ### Fixed
@@ -59,7 +93,7 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Documentation
 
-- **ARCHIVED banners on 12 historical archive files**: All remaining files in `docs/archive/` now carry `> ⚠️ ARCHIVED — ...` banners immediately after the title, with an explicit pointer to the current living document. Readers can no longer mistake historical snapshots for current guidance.
+- **ARCHIVED banners on 12 historical archive files**: All remaining files in `docs/archive/` now carry `> [ARCHIVED] — ...` banners immediately after the title, with an explicit pointer to the current living document. Readers can no longer mistake historical snapshots for current guidance.
 - **Agent-oriented headers — all 22 scripts**: Every file in `scripts/` now carries a `NAME · VERSION · CHANGED · PURPOSE · WHEN · USAGE · NOTES · LASTRUN` header block with concrete trigger conditions (WHEN) and prerequisites/caveats (NOTES). Previously headers described what a script does but gave no guidance on when to reach for it vs. an alternative. `LASTRUN` is now a fillable placeholder (`yyyy-mm-dd hh:mm — update manually`) rather than the static "not tracked".
 - **MODULE headers — all `src/` Python files**: Every substantive file in `src/core/`, `src/mcp/`, `src/utils/`, `src/models/`, `src/main.py`, and `src/desktop.py` now carries a `MODULE · VERSION · CHANGED · PURPOSE · ROLE · TOUCHED` header with critical TOUCHED warnings (e.g., the BUG-010 concurrency constraint in `embeddings.py`, the Kuzu schema-reset requirement in `graph_store.py`).
 - **TEST headers — all 14 `tests/` files**: Every test file now carries a `TEST · VERSION · CHANGED · PROVES · RUN · WHEN` header documenting the exact contract each suite guards and the precise `pytest` invocation to run it.
@@ -82,7 +116,7 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **BUG-010 platform scope in `docs/debug/README.md`**: BUG-010 status row now reads "FIXED (guarded) ⚠️ Windows/Python 3.11/CPU only — untested on Linux, macOS, Python 3.12" to prevent overclaiming across untested configurations.
+- **BUG-010 platform scope in `docs/debug/README.md`**: BUG-010 status row now reads "FIXED (guarded) [WARN] Windows/Python 3.11/CPU only — untested on Linux, macOS, Python 3.12" to prevent overclaiming across untested configurations.
 - **`docs/debug/best_practices.md`**: Replaced the stale "Verifier Timeout Constants" entry (written when the bug was misdiagnosed as a timeout) with three updated/new entries: (1) "Verifier Timeout Constants" — reframed to note the initial timeout misdiagnosis, (2) "Heavy Imports Must Run Before The Event Loop" — rule against deferring C-extension imports to `asyncio.to_thread`, (3) "Differentiate Slow From Hung Before Choosing A Fix" — heuristic: if 2× timeout still fails, investigate deadlock not latency.
 
 ## [2.5.0] - 2026-04-15

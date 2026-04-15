@@ -8,6 +8,9 @@
 # WHEN    : After any change to src/core/refinery.py staleness or scoring logic.
 # ─────────────────────────────────────────────────────────────────────────────
 from datetime import datetime, timedelta
+from uuid import uuid4
+
+from src.core.refinery import build_refinery_plan
 from src.models.memory import Memory, MemoryMetadata, MemoryStatus
 
 

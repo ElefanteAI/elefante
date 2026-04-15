@@ -4,7 +4,7 @@
 > **Last Updated:** 2026-04-15  
 > **Total Issues Documented:** 9  
 > **Status:** Production Reference  
-> **Applies to**: v2.5.4+
+> **Applies to**: v2.6.0+
 | # | Law | Violation Cost |
 |---|-----|----------------|
 | 1 | VERIFY before claiming completion - never assume code works | Repeated iterations |
@@ -760,9 +760,9 @@ User runs `python scripts/pipeline/export_memories.py --format json`, gets a fil
 
 | Mechanism | Format | Re-importable | Encrypted | Version-safe | Status |
 |---|---|---|---|---|---|
-| `backup_elefante_data.py` | Binary zip of `~/.elefante/data` | ✅ via restore script | ❌ plaintext | ⚠️ same schema only | EXISTS |
-| `export_memories.py --format json` | JSON (content + metadata, no embeddings) | ❌ no import path | ❌ plaintext | ✅ content-portable | EXISTS — BROKEN as backup |
-| `import_memories.py` | Reads JSON export, regenerates embeddings | ✅ after v2.5.4 | ❌ plaintext | ✅ content-portable | TO BUILD |
+| `backup_elefante_data.py` | Binary zip of `~/.elefante/data` | yes, via restore script | no, plaintext | warn, same schema only | EXISTS |
+| `export_memories.py --format json` | JSON (content + metadata, no embeddings) | no, no import path | no, plaintext | yes, content-portable | EXISTS — BROKEN as backup |
+| `import_memories.py` | Reads JSON export, regenerates embeddings | yes, after v2.5.4 | no, plaintext | yes, content-portable | TO BUILD |
 
 ### Solution
 

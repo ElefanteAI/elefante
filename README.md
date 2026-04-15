@@ -8,7 +8,7 @@
 
 AI agents start every conversation from zero. Your preferences, decisions, and discovered patterns don't carry over. Elefante gives any MCP-compatible agent a persistent, local second brain — memories are stored, scored automatically, and surfaced at the right moment without being asked.
 
-**v2.5.4** — Persistent Memory Engine
+**v2.6.0** — Persistent Memory Engine
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -96,7 +96,14 @@ Elefante works with any MCP-compatible client today — VS Code, Cursor, Windsur
 
 **Requirements:** Python 3.11+ (tested up to 3.13), Git
 
-Our installer detects your OS, creates a segregated virtual environment, installs all deps, initializes local graph and vector databases, and **automatically configures VS Code, Cursor, and Bob-IDE** to connect to Elefante via MCP.
+Our installer detects your OS, manages the repository virtual environment, installs all deps, initializes local graph and vector databases, and **automatically configures VS Code, Cursor, and Bob-IDE** to connect to Elefante via MCP.
+
+If `.venv` already exists, the installer offers four paths:
+
+- Delete existing `.venv` and install fresh (default)
+- Backup existing `.venv` and install fresh
+- Reuse existing `.venv`
+- Abort installation
 
 ```bash
 # macOS / Linux (Mac curl coming soon, git clone for now)

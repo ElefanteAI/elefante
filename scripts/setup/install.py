@@ -1,16 +1,18 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : install.py
-# VERSION : 2.5.2
+# VERSION : 2.6.0
 # CHANGED : 2026-04-15
 # PURPOSE : Single-entry installer: venv, deps, DB init, MCP config (VS Code +
 #           Antigravity), and system verification in one cross-platform script.
 # WHEN    : First-time installation on any machine, or clean reinstall after a
 #           factory reset. NOT for routine restarts (use restart_elefante.py) or
 #           IDE reconfiguration (use configure_vscode_bob.py standalone).
-# USAGE   : python scripts/setup/install.py [--skip-vscode] [--skip-antigravity]
-# NOTES   : Creates .venv, installs requirements.txt, calls init_databases.py,
-#           then calls both configure_*.py scripts. Safe to re-run if install is
-#           interrupted — steps are idempotent. Requires Python 3.11+.
+# USAGE   : python scripts/setup/install.py [--log-file install.log]
+#           [--venv-mode ask|fresh|backup|reuse|abort]
+# NOTES   : Creates .venv or explicitly handles an existing one, installs
+#           requirements.txt, calls init_databases.py, then calls both
+#           configure_*.py scripts. Safe to re-run if install is interrupted.
+#           Requires Python 3.11+.
 # LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """
@@ -36,6 +38,11 @@ from pathlib import Path
 
 SETUP_DIR = Path(__file__).resolve().parent
 ROOT_DIR = Path(__file__).resolve().parents[2]
+VENV_MODE_ASK = "ask"
+VENV_MODE_FRESH = "fresh"
+VENV_MODE_BACKUP = "backup"
+VENV_MODE_REUSE = "reuse"
+VENV_MODE_ABORT = "abort"
 
 # Ensure sibling setup modules are importable when running as a script.
 sys.path.insert(0, str(SETUP_DIR))
@@ -339,26 +346,186 @@ def get_python_cmd():
     return sys.executable
 
 
+def get_repo_venv_dir(root_dir):
+    """Return the repository virtualenv directory."""
+    return root_dir / ".venv"
+
+
 def get_repo_venv_python(root_dir):
     """Return the repository virtualenv Python path."""
+    venv_dir = get_repo_venv_dir(root_dir)
     if sys.platform == 'win32':
-        return str(root_dir / ".venv" / "Scripts" / "python.exe")
-    return str(root_dir / ".venv" / "bin" / "python")
+        return str(venv_dir / "Scripts" / "python.exe")
+    return str(venv_dir / "bin" / "python")
 
-def create_venv(root_dir):
+
+def read_venv_metadata(venv_dir):
+    """Read lightweight metadata from pyvenv.cfg if available."""
+    cfg_path = venv_dir / "pyvenv.cfg"
+    metadata = {"version": None, "home": None}
+
+    if not cfg_path.exists():
+        return metadata
+
+    try:
+        for raw_line in cfg_path.read_text(encoding='utf-8').splitlines():
+            if "=" not in raw_line:
+                continue
+            key, value = [part.strip() for part in raw_line.split("=", 1)]
+            if key == "version":
+                metadata["version"] = value
+            elif key == "home":
+                metadata["home"] = value
+    except Exception:
+        return metadata
+
+    return metadata
+
+
+def current_process_uses_repo_venv(root_dir):
+    """Return True when this installer is running from the repo-local .venv."""
+    try:
+        repo_venv = get_repo_venv_dir(root_dir).resolve()
+        current_exec = Path(sys.executable).resolve()
+        return repo_venv in current_exec.parents
+    except Exception:
+        return False
+
+
+def prompt_existing_venv_choice(root_dir, allow_destructive=True):
+    """Ask the operator how to handle an existing repository virtualenv."""
+    venv_dir = get_repo_venv_dir(root_dir)
+    metadata = read_venv_metadata(venv_dir)
+
+    logger.log("Existing repository virtual environment detected:")
+    logger.log(f"   Path: {venv_dir}")
+    if metadata["version"]:
+        logger.log(f"   Python: {metadata['version']}")
+    if metadata["home"]:
+        logger.log(f"   Base Interpreter: {metadata['home']}")
+    logger.log("")
+
+    if allow_destructive:
+        logger.log("Choose how to continue:")
+        logger.log("   1. Delete existing .venv and install fresh [default]")
+        logger.log("   2. Backup existing .venv and install fresh")
+        logger.log("   3. Reuse existing .venv")
+        logger.log("   4. Abort installation")
+        options = {
+            "": VENV_MODE_FRESH,
+            "1": VENV_MODE_FRESH,
+            "2": VENV_MODE_BACKUP,
+            "3": VENV_MODE_REUSE,
+            "4": VENV_MODE_ABORT,
+        }
+        prompt = "Select option [1-4, Enter=1]: "
+    else:
+        logger.log("Installer is currently running from this .venv.")
+        logger.log("Fresh delete or backup+recreate is blocked while the active interpreter is inside the environment.")
+        logger.log("Re-run via install.sh/install.bat, or run this script from system Python outside .venv for a fresh reinstall.")
+        logger.log("")
+        logger.log("Choose how to continue:")
+        logger.log("   1. Reuse existing .venv [default]")
+        logger.log("   2. Abort installation")
+        options = {
+            "": VENV_MODE_REUSE,
+            "1": VENV_MODE_REUSE,
+            "2": VENV_MODE_ABORT,
+        }
+        prompt = "Select option [1-2, Enter=1]: "
+
+    while True:
+        response = input(prompt).strip()
+        if response in options:
+            return options[response]
+        logger.log("Invalid selection. Please try again.")
+
+
+def delete_existing_venv(venv_dir):
+    """Delete an existing .venv directory."""
+    try:
+        shutil.rmtree(venv_dir)
+        logger.log("OK: Existing virtual environment removed")
+        return True
+    except Exception as e:
+        logger.log(f"ERROR: Failed to remove existing .venv: {e}")
+        return False
+
+
+def backup_existing_venv(venv_dir):
+    """Move an existing .venv directory aside before creating a new one."""
+    stamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_dir = venv_dir.parent / f".venv.backup.{stamp}"
+    suffix = 1
+    while backup_dir.exists():
+        backup_dir = venv_dir.parent / f".venv.backup.{stamp}.{suffix}"
+        suffix += 1
+
+    try:
+        shutil.move(str(venv_dir), str(backup_dir))
+        logger.log(f"OK: Existing virtual environment moved to {backup_dir}")
+        return True
+    except Exception as e:
+        logger.log(f"ERROR: Failed to back up existing .venv: {e}")
+        return False
+
+
+def create_venv(root_dir, python_executable):
     """Create virtual environment if it doesn't exist"""
-    venv_dir = root_dir / ".venv"
+    venv_dir = get_repo_venv_dir(root_dir)
     if venv_dir.exists():
         logger.log("OK: Virtual environment already exists")
         return True
     
     logger.log("Creating virtual environment...")
-    if run_command([sys.executable, "-m", "venv", ".venv"], cwd=root_dir):
+    if run_command([python_executable, "-m", "venv", ".venv"], cwd=root_dir):
         logger.log("OK: Virtual environment created")
         return True
     else:
         logger.log("ERROR: Failed to create virtual environment")
         return False
+
+
+def ensure_virtual_environment(root_dir, launcher_python, requested_mode):
+    """Resolve how to handle .venv and return the Python executable to use."""
+    venv_dir = get_repo_venv_dir(root_dir)
+    repo_python = get_repo_venv_python(root_dir)
+    allow_destructive = not current_process_uses_repo_venv(root_dir)
+
+    if requested_mode in {VENV_MODE_FRESH, VENV_MODE_BACKUP} and venv_dir.exists() and not allow_destructive:
+        logger.log("ERROR: Cannot replace the active repository .venv from within itself.")
+        logger.log("   Re-run via install.sh/install.bat, or run this installer from system Python outside .venv.")
+        return "failed", None
+
+    if venv_dir.exists():
+        chosen_mode = requested_mode
+        if requested_mode == VENV_MODE_ASK:
+            chosen_mode = prompt_existing_venv_choice(root_dir, allow_destructive=allow_destructive)
+
+        if chosen_mode == VENV_MODE_ABORT:
+            logger.log("Installation cancelled by user before dependency changes.")
+            return "aborted", None
+
+        if chosen_mode == VENV_MODE_REUSE:
+            if Path(repo_python).exists():
+                logger.log("OK: Reusing existing virtual environment")
+                return "ready", repo_python
+            logger.log("ERROR: Existing .venv does not contain a usable Python executable.")
+            logger.log("   Re-run and choose a fresh or backup+fresh install.")
+            return "failed", None
+
+        if chosen_mode == VENV_MODE_BACKUP:
+            logger.log("Backing up existing virtual environment before fresh install...")
+            if not backup_existing_venv(venv_dir):
+                return "failed", None
+        elif chosen_mode == VENV_MODE_FRESH:
+            logger.log("Deleting existing virtual environment before fresh install...")
+            if not delete_existing_venv(venv_dir):
+                return "failed", None
+
+    if create_venv(root_dir, launcher_python):
+        return "ready", repo_python
+    return "failed", None
 
 def install_dependencies(root_dir, python_cmd):
     """Install requirements.txt"""
@@ -476,6 +643,12 @@ def main():
     
     parser = argparse.ArgumentParser()
     parser.add_argument("--log-file", help="Path to log file")
+    parser.add_argument(
+        "--venv-mode",
+        choices=[VENV_MODE_ASK, VENV_MODE_FRESH, VENV_MODE_BACKUP, VENV_MODE_REUSE, VENV_MODE_ABORT],
+        default=VENV_MODE_ASK,
+        help="How to handle an existing repository .venv: ask, fresh, backup, reuse, or abort.",
+    )
     args = parser.parse_args()
     
     logger = Logger(args.log_file)
@@ -500,20 +673,16 @@ def main():
     
     # 1. Virtual Environment
     print_step(1, "Environment Setup")
-    in_venv = sys.prefix != sys.base_prefix
     python_cmd = get_python_cmd()
-
-    if not in_venv:
-        logger.log("WARN: Not running in a virtual environment")
-        logger.log("   It is recommended to run this script via 'install.bat' (Windows) or 'install.sh' (Mac/Linux).")
-        if not create_venv(root_dir):
-            success = False
-        else:
-            python_cmd = get_repo_venv_python(root_dir)
+    venv_status, venv_python = ensure_virtual_environment(root_dir, python_cmd, args.venv_mode)
+    if venv_status == "aborted":
+        print_header("INSTALLATION CANCELLED")
+        logger.log("No changes were made to the repository virtual environment.")
+        return
+    if venv_status != "ready" or not venv_python:
+        success = False
     else:
-        repo_python = get_repo_venv_python(root_dir)
-        if Path(repo_python).exists():
-            python_cmd = repo_python
+        python_cmd = venv_python
     
     # 2. Dependencies
     print_step(2, "Dependencies")

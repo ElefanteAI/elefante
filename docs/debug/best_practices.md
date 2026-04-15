@@ -3,7 +3,7 @@
 > **Purpose:** Distilled reusable debugging rules for Elefante contributors
 > **Companion Docs:** [README.md](README.md) and [dev-developer-agent.md](dev-developer-agent.md)
 > **Status:** Live feedback-loop ledger
-> **Applies to**: v2.5.4+
+> **Applies to**: v2.6.0+
 
 ---
 
@@ -191,6 +191,14 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Why:** CI checks out only what is committed. Gitignored build outputs (compiled JS, generated CSS, transpiled code) are absent. A packager that references a missing path will fail silently or with a confusing error, and the failure only surfaces on the first real release attempt — potentially days after the workflow was written.
 - **Proof:** BUG-014 — `build-binaries.yml` had no `setup-node` or `npm` step. `src/dashboard/ui/dist/` is gitignored. `elefante.spec` also referenced the wrong path (`build` instead of `dist`). All three matrix jobs (Ubuntu, macOS, Windows) failed on the first `v*` tag push (v2.5.3). Neither bug was caught during development because PyInstaller was never run in CI during that period. See [ops-installation-compendium.md](ops-installation-compendium.md#issue-8-ci-binary-build--missing-frontend-build-step-and-wrong-vite-output-directory).
 - **Avoid:** Writing a build spec that references a directory without verifying it matches the actual build tool output path (`outDir` in `vite.config.ts`, `output.path` in `webpack.config.js`, etc.).
+
+### A Green Build Matrix Is Not A Release Proof
+
+- **Trigger:** A CI workflow has build jobs and a downstream publish or release job.
+- **Rule:** Verify the publish step explicitly. Successful build jobs prove artifacts were created, not that the release was published.
+- **Why:** If publication fails after packaging, collapsing the failure back into the old build bug destroys causal precision and reopens the wrong incident.
+- **Proof:** BUG-015 — after BUG-014 was fixed, `Build on ubuntu-latest`, `Build on macos-latest`, and `Build on windows-latest` all succeeded, but `Create GitHub Release` still failed. The current workflow source proves the remaining fault is in the release stage, not frontend compilation or PyInstaller packaging. See [ops-installation-compendium.md](ops-installation-compendium.md#issue-9-github-release-publish-failure-after-successful-matrix-builds).
+- **Avoid:** Declaring a previously fixed CI build bug "back again" without first checking whether the failure moved to a later workflow stage.
 
 ---
 

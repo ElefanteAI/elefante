@@ -14,7 +14,11 @@
 #           but proves only that the handshake succeeds, not tool correctness.
 # LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
+import asyncio
+import json
+import os
 import sys
+from pathlib import Path
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent

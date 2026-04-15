@@ -148,7 +148,7 @@ Why here: these scripts prepare an environment or client integration before the 
 
 | Script | Purpose & Uniqueness | Why Here | Importance |
 | --- | --- | --- | --- |
-| `install.py` | Single-entry installer that creates the venv, installs dependencies, initializes data, and wires the local environment into a usable Elefante install. | It is bootstrap, not runtime logic or verification. | **Critical** (Client setup entrypoint) |
+| `install.py` | Single-entry installer that creates or replaces the repo `.venv`, installs dependencies, initializes data, and wires the local environment into a usable Elefante install. Existing `.venv` handling is explicit: fresh delete, backup+fresh, reuse, or abort. | It is bootstrap, not runtime logic or verification. | **Critical** (Client setup entrypoint) |
 | `configure_vscode_bob.py` | Writes the exact MCP configuration shape required by the Bob/VS Code client integration. No other script targets that IDE format. | IDE onboarding is setup work, not lifecycle control. | **Critical** (IDE integration) |
 | `configure_antigravity.py` | Writes the exact MCP configuration required by the Antigravity IDE integration. No other script emits that format. | It prepares a client environment before use. | **Critical** (IDE integration) |
 | `init_databases.py` | Initializes or re-verifies the ChromaDB collections and Kuzu schema without running the whole installer. | It is a bootstrap safety tool for local data stores. | **Critical** (Database safety) |

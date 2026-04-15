@@ -364,6 +364,9 @@ async def test_live_mcp_server_survives_shutdown_regression(tmp_path):
             self._id = 0
 
         async def start(self):
+            real_home = os.environ.get("USERPROFILE") or os.environ.get("HOME", "")
+            real_hf_home = os.environ.get("HF_HOME", os.path.join(real_home, ".cache", "huggingface"))
+            real_torch_home = os.environ.get("TORCH_HOME", os.path.join(real_home, ".cache", "torch"))
             env = {
                 **os.environ,
                 "PYTHONPATH": str(project_root),
@@ -371,6 +374,12 @@ async def test_live_mcp_server_survives_shutdown_regression(tmp_path):
                 "USERPROFILE": str(temp_home),
                 "ELEFANTE_DATA_DIR": str(temp_data_dir),
                 "ELEFANTE_ALLOW_TEST_MEMORIES": "1",
+                "HF_HOME": real_hf_home,
+                "TORCH_HOME": real_torch_home,
+                "SENTENCE_TRANSFORMERS_HOME": os.environ.get(
+                    "SENTENCE_TRANSFORMERS_HOME",
+                    os.path.join(real_hf_home, "hub"),
+                ),
             }
             self.process = await asyncio.create_subprocess_exec(
                 sys.executable,

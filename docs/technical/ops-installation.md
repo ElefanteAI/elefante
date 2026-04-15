@@ -24,6 +24,13 @@ The installation scripts handle everything automatically:
 - Configure IDE integration
 - Run health checks
 
+If `.venv` already exists, the installer prompts for one of four actions:
+
+- Delete existing `.venv` and install fresh (default)
+- Backup existing `.venv` to `.venv.backup.<timestamp>` and install fresh
+- Reuse existing `.venv`
+- Abort installation
+
 ### Windows
 
 ```cmd
@@ -37,6 +44,8 @@ chmod +x install.sh
 ./install.sh
 ```
 
+If `.venv` already exists, press Enter for a destructive fresh reinstall, choose backup+fresh to preserve the old environment, choose reuse to keep it, or abort.
+
 ### What Happens During Installation
 
 1. **Pre-Flight Checks** (automated safeguards)
@@ -47,6 +56,7 @@ chmod +x install.sh
 
 2. **Environment Setup**
    - Creates `.venv` virtual environment
+   - If `.venv` already exists, offers fresh delete, backup+fresh, reuse, or abort
    - Installs all dependencies from `requirements.txt`
    - Configures Python path
 
@@ -94,8 +104,7 @@ install.bat
 
    > PowerShell alternative (if you prefer PS):
    > ```powershell
-   > .venv\Scripts\Activate.ps1
-   > python scripts\setup\install.py
+   > py -3.11 scripts\setup\install.py
    > ```
 
 2. Restart VS Code.
@@ -586,7 +595,7 @@ See also: [`ops-docker.md`](ops-docker.md) for container-based deployment.
 
 ---
 
-**Version**: 2.5.4
+**Version**: 2.6.0
 **Last Updated**: 2026-04-15
 **Status**: Production Ready (Windows validated)
 

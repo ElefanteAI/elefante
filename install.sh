@@ -47,19 +47,8 @@ if [ -z "$PYTHON_CMD" ]; then
 fi
 
 log "[INFO] Using $($PYTHON_CMD --version)"
+log "[INFO] Repository virtual environment strategy will be handled by install.py"
 
-# 2. Create Virtual Environment
-if [ ! -d ".venv" ]; then
-    log "[INFO] Creating virtual environment..."
-    $PYTHON_CMD -m venv .venv
-else
-    log "[INFO] Virtual environment already exists."
-fi
-
-# 3. Activate Virtual Environment
-log "[INFO] Activating virtual environment..."
-source .venv/bin/activate
-
-# 4. Run Python Installer
+# 2. Run Python Installer
 log "[INFO] Starting installation wizard..."
 "$PYTHON_CMD" scripts/setup/install.py --log-file "$LOG_FILE"

@@ -2,7 +2,7 @@
 
 **Target**: `src.core.orchestrator.MemoryOrchestrator`
 **Status**: ENFORCED (Law #4)
-**Version**: 2.5.4
+**Version**: 2.6.0
 
 > **Philosophy**: The Agent is the **BRAIN**, not a scribe. We do not ask "should I add this?". We ingest, process, and structure information authoritatively.
 
