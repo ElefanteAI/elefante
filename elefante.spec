@@ -15,7 +15,7 @@ hidden_imports = (
 )
 
 datas = collect_data_files('chromadb') + [
-    ('src/dashboard/ui/build', 'src/dashboard/ui/build'),
+    ('src/dashboard/ui/dist', 'src/dashboard/ui/dist'),
 ]
 
 a = Analysis(

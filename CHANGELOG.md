@@ -7,6 +7,19 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.5.4] - 2026-04-15
+
+### Documentation
+
+- **GAP-013 post-mortem**: `docs/debug/ops-ai-behavior-compendium.md` Issue #11 documents the missing import path for JSON exports. Root cause: `export_memories.py` was built for offline analysis, not migration. Embeddings are stored explicitly using `thenlper/gte-base` and are NOT in the JSON output — any import script must regenerate them using the same model or semantic search will be silently corrupted by ChromaDB's default `all-MiniLM-L6-v2`. Import is confirmed feasible (~120 lines, direct ChromaDB upsert). Issue labels the JSON export as read-only analysis output (not a backup) pending `import_memories.py`.
+- **best_practices.md**: New entry "A Write-Only Export Is Not a Backup" — every export format must document its import path or be explicitly labeled read-only.
+
+### Planned (v2.5.4 deliverable)
+
+- **`scripts/pipeline/import_memories.py`** — seeds a fresh Elefante install from a JSON export; regenerates embeddings via configured model; supports `--dry-run`, `--skip-existing`, `--conflict skip|overwrite`; closes the round-trip gap.
+
+---
+
 ## [2.5.3] - 2026-04-15
 
 ### Fixed

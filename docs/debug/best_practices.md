@@ -3,7 +3,7 @@
 > **Purpose:** Distilled reusable debugging rules for Elefante contributors
 > **Companion Docs:** [README.md](README.md) and [dev-developer-agent.md](dev-developer-agent.md)
 > **Status:** Live feedback-loop ledger
-> **Applies to**: v2.5.3+
+> **Applies to**: v2.5.4+
 
 ---
 
@@ -175,6 +175,14 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Why:** Runtime behavior changes faster than old post-mortems decay. The most dangerous stale docs are the ones that still sound plausible.
 - **Proof:** BUG-002 required source checks plus fresh `GraphStore` initialization to prove that `kuzu_db` now materializes as a file path and that recovery should route through transaction-scoped `write.lock`, not an older internal-lock story. Guarded by [../../tests/test_memory_persistence.py](../../tests/test_memory_persistence.py).
 - **Avoid:** Treating filesystem shape or old lock instructions as corruption proof without revalidating the active contract.
+
+### A Write-Only Export Is Not a Backup
+
+- **Trigger:** A script exports data to a human-readable format (JSON, CSV, YAML).
+- **Rule:** Every export format must either (a) have a documented import counterpart, or (b) be explicitly labeled "read-only analysis output — not a backup" at the top of the script and in the relevant README.
+- **Why:** Users will treat any exportable format as a backup. If no import path exists, the export creates false confidence and a data-loss trap.
+- **Proof:** GAP-013 — `export_memories.py --format json` produced a JSON file with all memory content and metadata. No `import_memories.py` existed. Embeddings were not included (ChromaDB stores them explicitly from `thenlper/gte-base`; the export's `collection.get()` call omits them). A user who exported, factory reset, then tried to restore from JSON would lose their brain. The binary zip backup (`backup_elefante_data.py`) is the only real restore path — but it is not surfaced in the install flow. See [ops-ai-behavior-compendium.md](ops-ai-behavior-compendium.md#issue-11-json-export-is-not-a-backup--missing-import-path-and-embeddings).
+- **Avoid:** Shipping an export script without a companion import script and without labeling the export as read-only.
 
 ---
 

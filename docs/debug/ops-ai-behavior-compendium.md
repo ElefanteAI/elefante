@@ -4,7 +4,7 @@
 > **Last Updated:** 2026-04-15  
 > **Total Issues Documented:** 9  
 > **Status:** Production Reference  
-> **Applies to**: v2.5.3+
+> **Applies to**: v2.5.4+
 | # | Law | Violation Cost |
 |---|-----|----------------|
 | 1 | VERIFY before claiming completion - never assume code works | Repeated iterations |
@@ -729,6 +729,57 @@ Additional defensive changes in `src/core/embeddings.py`:
 ### Lesson
 
 > **When a blocking operation deadlocks in a thread under an event loop, moving it to a different thread doesn't help. Move it to a different PHASE of the process lifecycle — before the event loop starts. Differentiate "slow" from "hung": if a 180s timeout doesn't help, it's a deadlock, not latency.**
+
+---
+
+## Issue #11: JSON Export Is Not a Backup — Missing Import Path and Embeddings
+
+**Date:** 2026-04-15
+**Severity:** HIGH
+**Status:** DOCUMENTED — `import_memories.py` to be built (v2.5.4)
+
+### Problem
+
+`export_memories.py --format json` produces a JSON file that looks like a backup but is not restorable. There is no `import_memories.py`. A user who exports to JSON, factory resets, and tries to restore from JSON will lose their brain with no recovery path.
+
+### Symptom
+
+User runs `python scripts/pipeline/export_memories.py --format json`, gets a file with all their memories, later discovers there is no script to re-import it into a fresh Elefante instance. The binary backup (`backup_elefante_data.py`) is the only real restore path, but this is not documented prominently.
+
+### Root Cause (3 layers)
+
+1. **No import counterpart**: `export_memories.py` was built for "offline analysis" (before/after surgical delete validation), not as a migration tool. No `import_memories.py` was ever written to complete the round trip.
+2. **Embeddings are not in the export**: ChromaDB stores embeddings explicitly via `collection.add(..., embeddings=[memory.embedding])`. The embedding model is `thenlper/gte-base` (configured in `config.py`). The JSON export calls `collection.get(include=["metadatas", "documents"])` — embeddings are not in the `include` list and are NOT written to the file.
+3. **ChromaDB has no named embedding function**: `get_or_create_collection()` is called without an `embedding_function` argument. This means ChromaDB's default (`all-MiniLM-L6-v2`) would be used if documents were upserted without providing embeddings. The two models are incompatible — mixing them silently corrupts semantic search results.
+
+### Critical Dependency Discovered
+
+> `thenlper/gte-base` embeddings are stored explicitly. Any import script **must** regenerate embeddings using `sentence_transformers.SentenceTransformer("thenlper/gte-base")` before calling `collection.upsert()`. Relying on ChromaDB's default embedding function is a silent corruption path.
+
+### What Two Separate Persistence Paths Exist (and their limits)
+
+| Mechanism | Format | Re-importable | Encrypted | Version-safe | Status |
+|---|---|---|---|---|---|
+| `backup_elefante_data.py` | Binary zip of `~/.elefante/data` | ✅ via restore script | ❌ plaintext | ⚠️ same schema only | EXISTS |
+| `export_memories.py --format json` | JSON (content + metadata, no embeddings) | ❌ no import path | ❌ plaintext | ✅ content-portable | EXISTS — BROKEN as backup |
+| `import_memories.py` | Reads JSON export, regenerates embeddings | ✅ after v2.5.4 | ❌ plaintext | ✅ content-portable | TO BUILD |
+
+### Solution
+
+**Phase 1 (documentation):** Surface backup/restore as the primary persistence mechanism in the main `README.md` install flow and add a note to `export_memories.py` header that JSON is not a backup.
+
+**Phase 2 (feature):** Build `scripts/pipeline/import_memories.py`:
+- Reads JSON produced by `export_memories.py --format json`
+- Regenerates embeddings using `thenlper/gte-base` (reads model name from config)
+- Calls `collection.upsert()` with explicit embeddings
+- Supports `--dry-run`, `--skip-existing` (by ID), and `--conflict` (`skip|overwrite|rename`) flags
+- Does NOT go through the MCP orchestrator (same direct-ChromaDB pattern as export)
+
+**Feasibility:** Confirmed YES. The JSON schema captures `id`, full `content` (not truncated), and all `metadata` fields. Embeddings are regenerable from content. `collection.upsert()` is idempotent on ID. Estimated ~120 lines.
+
+### Lesson
+
+> **A write-only export is not a backup. Every export format needs a documented import path or must be explicitly labeled as read-only analysis output. Never infer "exportable = restorable."**
 
 ---
 

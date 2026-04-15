@@ -1,6 +1,6 @@
 # Elefante Vision
 
-> Last updated: 2026-04-15 · Current version: v2.5.3
+> Last updated: 2026-04-15 · Current version: v2.5.4
 
 ---
 

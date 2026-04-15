@@ -490,6 +490,6 @@ Before claiming "Dashboard is working":
 
 ---
 
-**Document Version**: 2.5.3  
+**Document Version**: 2.5.4  
 **Status**: ESSENTIAL  
 **Last Validated**: 2026-02-26

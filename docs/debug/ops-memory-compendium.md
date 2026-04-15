@@ -4,7 +4,7 @@
 > **Last Updated:** 2026-02-16
 > **Total Issues Documented:** 9
 > **Status:** Production Reference - All Documented Flaws Fixed
-> **Applies to**: v2.5.3+
+> **Applies to**: v2.5.4+
 > **Maintainer:** Add new issues following Issue #N template at bottomcement  
 > **Last Updated:** 2026-02-16  
 > **Total Issues Documented:** 9  

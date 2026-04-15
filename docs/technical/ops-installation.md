@@ -586,7 +586,7 @@ See also: [`ops-docker.md`](ops-docker.md) for container-based deployment.
 
 ---
 
-**Version**: 2.5.3
+**Version**: 2.5.4
 **Last Updated**: 2026-04-15
 **Status**: Production Ready (Windows validated)
 

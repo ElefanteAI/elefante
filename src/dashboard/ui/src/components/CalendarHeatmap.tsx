@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.5.3 — Memory Insights
+// Elefante Dashboard v2.5.4 — Memory Insights
 import { useMemo } from 'react';
 import { useDashboardStore } from '@/store';
 
