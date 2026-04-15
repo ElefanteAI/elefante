@@ -22,6 +22,25 @@ from src.utils.validators import validate_memory_content, validate_limit
 logger = get_logger(__name__)
 
 
+def _parse_system_metadata(metadata: Dict[str, Any], custom_metadata: Dict[str, Any]) -> Dict[str, Any]:
+    """Recover system_metadata from ChromaDB storage (JSON string or nested dict)."""
+    raw = metadata.get("system_metadata")
+    if raw is None:
+        raw = custom_metadata.pop("system_metadata", None)
+    if raw is None:
+        return {}
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str) and raw.strip():
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            pass
+    return {}
+
+
 class VectorStore:
     """
     Vector store for semantic memory using ChromaDB
@@ -192,6 +211,10 @@ class VectorStore:
             for k, v in memory.metadata.custom_metadata.items():
                 if k not in metadata: # Don't overwrite core fields
                     metadata[k] = str(v) if not isinstance(v, (str, int, float, bool)) else v
+        
+        # Persist system_metadata as JSON string (ADV-001: token intelligence roundtrip)
+        if memory.metadata.system_metadata:
+            metadata["system_metadata"] = json.dumps(memory.metadata.system_metadata)
         
         # Add to collection
         try:
@@ -443,6 +466,8 @@ class VectorStore:
             "session_id", "last_accessed", "last_modified", "access_count", "version", "deprecated", "archived",
             # Cognitive Retrieval
             "concepts", "surfaces_when", "authority_score",
+            # Token Intelligence
+            "system_metadata",
         }
         custom_metadata = {k: v for k, v in metadata.items() if k not in known_keys}
 
@@ -597,6 +622,7 @@ class VectorStore:
             deprecated=metadata.get("deprecated", False),
             archived=metadata.get("archived", False),
             custom_metadata=custom_metadata,
+            system_metadata=_parse_system_metadata(metadata, custom_metadata),
         )
 
         # Derive decay_rate from memory_type (not stored in ChromaDB — always

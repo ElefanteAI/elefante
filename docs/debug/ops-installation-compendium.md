@@ -540,7 +540,7 @@ User must manually locate and edit the correct configuration file.
 **Non-Standard Path Convention:** IBM Bob IDE uses `C:\Users\<user>\.bob\settings\mcp_settings.json` instead of the standard AppData locations that other IDEs use.
 
 The auto-config script checks:
-- `%APPDATA%\Bob-IDE\User\globalStorage\ibm.bob-code\settings\mcp_settings.json` ❌
+- `%APPDATA%\Bob-IDE\User\globalStorage\ibm.bob-code\settings\mcp_settings.json` [WRONG]
 - `%APPDATA%\Code\User\mcp.json` (VS Code) ✓
 - `%APPDATA%\Cursor\User\mcp_config.json` (Cursor) ✓
 

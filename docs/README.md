@@ -1,6 +1,6 @@
 # Elefante Documentation
 
-> **v2.4.0** · [Product overview & install](../README.md) · [Agent constitution](../.github/copilot-instructions.md)
+> **v2.5.0** · [Product overview & install](../README.md) · [Agent constitution](../.github/copilot-instructions.md)
 
 ---
 
@@ -54,7 +54,8 @@
 
 | Doc | Content |
 |-----|---------|
-| [`debug/`](debug/README.md) | Known Issues tracker, 5 domain compendiums, [Developer Agent protocol](debug/dev-developer-agent.md) |
+| [`debug/`](debug/README.md) | Known Issues tracker, 5 domain compendiums, [Developer Agent protocol](debug/dev-developer-agent.md), and [self-Elefante whole-system verification](debug/self-elefante-protocol.md) |
+| [`debug/self-elefante-protocol.md`](debug/self-elefante-protocol.md) | Authoritative isolated MCP self-protocol for proving Elefante is actually running end-to-end |
 
 ### Planning
 

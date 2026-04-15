@@ -22,16 +22,19 @@ high-connectivity memories.
 
 Usage examples:
   # Dry-run: list auto-detected test memories + risk scores
-  python scripts/privileged/memory_surgeon.py --auto test
+    python scripts/privileged/delete_memories_surgical.py --auto test
 
   # Delete specific IDs (after review)
-  ELEFANTE_PRIVILEGED=1 python scripts/privileged/memory_surgeon.py --ids <uuid> <uuid> --apply --confirm DELETE
+    ELEFANTE_PRIVILEGED=1 python scripts/privileged/delete_memories_surgical.py --ids <uuid> <uuid> --apply --confirm DELETE
 
   # Delete auto-detected test memories (after review)
-  ELEFANTE_PRIVILEGED=1 python scripts/privileged/memory_surgeon.py --auto test --apply --confirm DELETE
+    ELEFANTE_PRIVILEGED=1 python scripts/privileged/delete_memories_surgical.py --auto test --apply --confirm DELETE
 
   # Select by query (semantic search), then decide by --apply
-  python scripts/privileged/memory_surgeon.py --query "Hybrid search test memory" --query-mode semantic
+    python scripts/privileged/delete_memories_surgical.py --query "Hybrid search test memory" --query-mode semantic
+
+Notes:
+- Backup JSONs currently live under the legacy `memory_surgeon` backup directory name for compatibility.
 
 """
 

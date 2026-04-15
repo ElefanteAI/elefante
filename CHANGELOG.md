@@ -7,6 +7,49 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.5.0] - 2026-04-15
+
+### Added
+
+- **Token intelligence**: Every tool response now includes a `TOKEN_STATS` block with `output_tokens`, `overhead_tokens`, and `signal_ratio`. Agents can see what each tool call costs in tokens and how much is payload vs. protocol overhead. New module `src/utils/token_counter.py` provides heuristic token counting with negligible CPU cost and multilingual support (CJK/Arabic ratio blending). Memory type budgets (`specification`: 800, `directive`: 200, etc.) drive proportionality scoring. `elefante-MemoryAdd` responses now include `content_tokens`, `token_density`, and a `density_warning` when content exceeds 2.0x its type budget. 39 new tests in `tests/test_token_intelligence.py` guard the full surface.
+- **Token Intelligence architecture section**: `docs/technical/spec-architecture.md` now documents the 6-step token measurement pipeline (heuristic counting, overhead measurement, per-call snapshots, session ledger, type-proportional budgets, TOKEN_STATS injection).
+- **TOKEN_STATS in tool response contract**: `docs/technical/spec-tools.md` now documents `TOKEN_STATS` as part of the standard tool response contract alongside `MANDATORY_PROTOCOLS`, `DIRECTIVES`, and `RELEVANT_CONTEXT`.
+- **TOKEN_STATS in agent constitution**: `.github/copilot-instructions.md` `tool_response_contract` rule now documents TOKEN_STATS fields and includes actionable TOKEN_STATS AWARENESS guidance (signal_ratio < 0.3, density_warning thresholds).
+- **E2E TOKEN_STATS assertions**: `scripts/verify/verify_e2e_tests.py` now verifies TOKEN_STATS presence and field validity on success responses, error responses, and MemoryAdd responses (content_tokens, token_density). 46/46 E2E checks.
+- **Token Intelligence PRD**: `docs/planning/spec-token-intelligence.md` formally specifies the feature with honest leakage surface scan, success criteria, deferred items, risks, and competitive position.
+
+### Fixed
+
+- **Dynamic stats_overhead (ADV-013)**: `stats_overhead` in `_record_and_inject_token_stats()` is now computed dynamically via `estimate_tokens_json()` instead of a magic constant. Previously hardcoded at 45, then 25 -- both drifted from reality. Dynamic measurement (currently 22 tokens) can never drift.
+- **"zero CPU" false claim (ADV-011)**: `src/utils/token_counter.py` docstrings corrected from "zero CPU cost" to "negligible CPU cost".
+- **PRD leakage honesty (ADV-016)**: Dashboard snapshot row in `docs/planning/spec-token-intelligence.md` changed from "PASS (by design)" to "FAIL (accepted risk)" with explicit rationale.
+- **spec-vision.md tool count**: Changed "21 MCP tools" to "20 MCP tools and 2 prompts" to match the live surface.
+
+### Changed
+
+- **spec-vision.md shipped table**: Token intelligence now listed as a shipped capability.
+- **README.md Layer 1 description**: Now describes Token Intelligence alongside Compliance Gate, Context Injection, and Directives.
+
+## [2.4.1] - 2026-04-13
+
+### Added
+
+- **Self-Elefante protocol**: `scripts/verify/verify_e2e_tests.py` now serves as the authoritative isolated whole-system verifier. It proves the live MCP tool/prompt inventory, prompt retrieval, routing injection, compliance gate, memory/graph/context/session/task/ETL/refinery flows, restart persistence, and cleanup in a temporary Elefante home/data directory. `--with-dashboard-open` enables the browser/port side-effect tool only in explicit full-surface mode.
+- **Whole-system verification doc**: `docs/debug/self-elefante-protocol.md` now explains when to use the self-protocol, what it proves, how cleanup works, and why `elefante-DashboardOpen` stays opt-in by default.
+
+### Fixed
+
+- **Graph/session schema contract drift**: `src/core/graph_store.py` now creates `CREATED_IN` and `WORKS_ON` relationships without injecting unsupported `strength` properties, and `src/mcp/server.py` now lists synthetic session entities by `created_at` while parsing optional metadata from JSON `props`. `tests/test_memory_persistence.py` guards both contracts.
+- **Self-protocol verifier drift**: `scripts/verify/verify_e2e_tests.py` now accepts the live home-derived dashboard snapshot path during `--with-dashboard-open` and sizes the MCP subprocess stream for large `ContextGet` payloads, so the maintained 20-tool proof no longer reports false failures.
+
+### Changed
+
+- **Verification routing**: `docs/debug/README.md`, `docs/debug/dev-developer-agent.md`, `docs/README.md`, `scripts/README.md`, and `tests/README.md` now route "is Elefante actually running?" claims through the maintained self-protocol instead of relying on a collection of narrow regressions.
+- **Closure rules**: `docs/technical/dev-sdd.md`, `docs/technical/dev-etiquette.md`, built-in system directives, and the seeded Developer Etiquette specification now all enforce the live changelog contract `### Added` / `### Fixed` / `### Changed` plus the choose-then-apply versioning flow `advise_version_bump.py` -> `bump_version.py`. `tests/test_developer_routing.py` guards the contract.
+- **Scripts documentation**: `scripts/README.md` now documents every live script as an operator entrypoint, explains why each subdirectory exists, and distinguishes overlapping recovery tools like the two write-lock helpers. `tests/test_developer_routing.py` now guards the live scripts inventory and the privileged script command names.
+- **Tool-surface auditability**: `scripts/ci/list_mcp_tools.py` now reports tools and prompts separately from source instead of mislabeling the 2 prompts as tools, and `docs/debug/self-elefante-protocol.md` now includes an explicit coverage map for every live tool and prompt. `tests/test_developer_routing.py` guards both surfaces.
+- **Prompt and response-contract docs**: `docs/technical/spec-tools.md` now documents that `RELEVANT_CONTEXT` is conditional and that `elefante-context` requires a `topic` argument and performs a live hybrid search. The manual registration checker `tests/manual/test_tools.py` now audits tools and prompts separately against the current surface.
+
 ## [2.4.0] - 2026-04-13
 
 ### Fixed

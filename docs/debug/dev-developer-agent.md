@@ -9,7 +9,7 @@
 
 The normal Elefante agent constitution (`.github/copilot-instructions.md`) governs agents that **use** Elefante as a memory tool. You are an agent that **builds** Elefante. The rules are stricter.
 
-Before debugging anything, open [`README.md`](README.md) in this folder, then the relevant `ops-*-compendium.md`, then [`tests/README.md`](../../tests/README.md). Do not pick scripts first and invent the reason afterward.
+Before debugging anything, open [`README.md`](README.md) in this folder, then [`best_practices.md`](best_practices.md), then the relevant `ops-*-compendium.md`, then [`tests/README.md`](../../tests/README.md). Do not pick scripts first and invent the reason afterward.
 
 ### Mandatory Entry Sequence (Non-Negotiable)
 
@@ -33,6 +33,7 @@ Skipping step 1 is how BUG-001 (Kuzu SIGSEGV) recurred. The fix existed, the doc
 | Immutable | [`dev-etiquette.md`](../technical/dev-etiquette.md) | **SPECIFICATION**: The closure sequence (clean, docs, version, commit). Skip = fatal. |
 | Immutable | [`dev-sdd.md`](../technical/dev-sdd.md) | Embedded development process reference. Legacy filename retained for continuity. |
 | Immutable | [`planning/spec-vision.md`](../planning/spec-vision.md) | The Four Laws. Token efficiency is a law, not a suggestion. |
+| High | [`best_practices.md`](best_practices.md) | Distilled cross-bug feedback loop learnings that should stay online and tracked. |
 | High | `docs/debug/` Compendiums | Read the relevant `ops-*-compendium.md` file when tackling a specific system domain. |
 | Reference | This file | Active constraints and routing protocol for the Developer Agent. |
 
@@ -40,7 +41,7 @@ Skipping step 1 is how BUG-001 (Kuzu SIGSEGV) recurred. The fix existed, the doc
 
 ## Knowledge Embedding Protocol (How to Fix Bugs Permanently)
 
-When you encounter a bug, a repeated mistake, or a developer trap, you MUST embed the solution where it will be automatically read by the relevant agent in the future. **Do not create "tips", "indexes", or human-style reference manuals.**
+When you encounter a bug, a repeated mistake, or a developer trap, you MUST embed the solution where it will be automatically read by the relevant agent in the future. **Do not create ad hoc "tips", duplicate indexes, or parallel reference manuals. Use [`best_practices.md`](best_practices.md) as the designated cross-bug feedback ledger.**
 
 Execute the following pattern based on the type of failure:
 
@@ -63,6 +64,12 @@ Execute the following pattern based on the type of failure:
 - **Embed:** Add a strict rule to the constitution or trigger map.
 - **Why:** System prompts natively govern untethered agent behavior.
 
+### 4. The Lesson Generalizes Beyond One Bug
+
+- **Action:** Open [`best_practices.md`](best_practices.md).
+- **Embed:** Add the distilled rule using `Trigger -> Rule -> Why -> Proof -> Avoid`, link it back to the relevant compendium entry and verifier, and keep it short enough to stay useful during active development.
+- **Why:** This keeps the feedback loop online. Compendiums keep the full post-mortem; `best_practices.md` keeps the reusable rule that should shape the next debugging pass.
+
 ---
 
 ## The Development Loop
@@ -75,7 +82,7 @@ Execute the following pattern based on the type of failure:
 5. VERIFY    formulas from src/, not from docs
 6. TEST      run the verification command from the Known Issues row
 7. CLOSE     dev-etiquette.md sequence: CLEAN → DOCS → VERSION → COMMIT
-8. UPDATE    Known Issues table status + compendium if new post-mortem
+8. UPDATE    Known Issues table status + compendium; add to best_practices.md if the lesson generalizes
 ```
 
 Process details: [`dev-sdd.md`](../technical/dev-sdd.md) (legacy filename, embedded process reference)
@@ -90,7 +97,7 @@ Before writing any scratch reproducer or one-off validation, check whether `test
 | ------------------------- | -------- | ---------------------- |
 | Is the installation or baseline healthy? | `scripts/verify/verify_health.py` | Verifies imports, data paths, directives, and required specification memories |
 | Does the MCP server actually speak stdio JSON-RPC? | `scripts/verify/verify_mcp_handshake.py` | Proves real `initialize`/handshake liveness instead of assuming startup succeeded |
-| Does the live server survive the full startup, restart, compliance, and shutdown-race path? | `scripts/verify/verify_e2e_tests.py` | Runs the highest-signal live MCP verification in an isolated temp Elefante home/data dir |
+| Does Elefante actually run end-to-end in isolation? | `scripts/verify/verify_e2e_tests.py` | Runs the self-protocol: live MCP surface, prompt retrieval, routing injection, compliance, memory/graph/task/ETL flows, restart persistence, and cleanup in an isolated temp Elefante home/data dir |
 | Did a specific code path regress? | targeted `pytest` test from `tests/README.md` | Smallest reproducible proof for the changed path |
 | Is the factory reset script safe? | `pytest tests/test_factory_reset.py -v` | Validates dry-run, safety gates, backup creation, and idempotency against isolated temp HOME |
 | Is there a severe operational failure the verify scripts cannot explain? | `scripts/debug/*` only if the compendium tells you to | Intervention tools, not routine validation |
@@ -127,6 +134,10 @@ The 5 compendiums in this directory are the developer agent's equivalent of Elef
 | [`ops-memory-compendium.md`](ops-memory-compendium.md) | Memory system | Scoring, export, schema drift, response bloat |
 
 **After every significant debugging session:** add the post-mortem to the relevant compendium using the template at the bottom of that file.
+
+## Best Practices Is The Distilled Loop
+
+[`best_practices.md`](best_practices.md) is the short-form companion to the compendiums. Use it for reusable development rules that connect multiple issues, not for full narratives. If the compendiums are the long-term memory, `best_practices.md` is the distilled operating layer that keeps the feedback loop visible during active development.
 
 ---
 

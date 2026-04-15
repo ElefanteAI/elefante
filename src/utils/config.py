@@ -20,7 +20,7 @@ USER_HOME = Path.home()
 ELEFANTE_HOME = USER_HOME / ".elefante"
 DATA_DIR = ELEFANTE_HOME / "data"
 CHROMA_DIR = DATA_DIR / "chroma"
-KUZU_DIR = DATA_DIR / "kuzu_db"  # Actual Kuzu database path (matches GraphStoreConfig)
+KUZU_DIR = DATA_DIR / "kuzu_db"  # Kuzu-owned database path (materialized lazily by GraphStore/Kuzu)
 LOGS_DIR = ELEFANTE_HOME / "logs"
 
 # Ensure directories exist
@@ -29,8 +29,8 @@ ELEFANTE_HOME.mkdir(exist_ok=True)
 # Ensure directories exist
 DATA_DIR.mkdir(exist_ok=True)
 CHROMA_DIR.mkdir(exist_ok=True)
-# Note: KUZU_DIR should NOT be created here - Kuzu creates its own directory structure
-# KUZU_DIR.mkdir(exist_ok=True)  # Commented out - causes conflict with Kuzu 0.11+
+# Note: KUZU_DIR should NOT be created here. Kuzu owns that path and will
+# materialize it on first open.
 LOGS_DIR.mkdir(exist_ok=True)
 
 
@@ -250,8 +250,8 @@ class Config:
         if self._config is None:
             return
 
-        # Data dir and Chroma dir are safe to create. Kuzu DB directory should
-        # not be pre-created (Kuzu manages the DB directory itself).
+        # Data dir and Chroma dir are safe to create. KUZU_DIR itself should
+        # not be pre-created; Kuzu manages the database path lifecycle.
         data_dir = Path(self._config.data_dir)
         data_dir.mkdir(parents=True, exist_ok=True)
 

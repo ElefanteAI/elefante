@@ -47,26 +47,25 @@ def _default_db_paths() -> list[Path]:
 
 
 def unlock_database(*, apply: bool, confirm: str, kill: bool) -> bool:
-    """Attempt to unlock the Kuzu database (safe-by-default).
+    """Attempt to clear Elefante's transaction write lock (safe-by-default).
 
     Default is dry-run. To actually kill processes / delete lock files you must provide:
     - environment: ELEFANTE_PRIVILEGED=1
     - flag: --apply
     - flag: --confirm DELETE
     """
-    print("KUZU DATABASE UNLOCKER")
-    print("----------------------")
+    print("ELEFANTE WRITE LOCK UNLOCKER")
+    print("----------------------------")
 
-    db_paths = _default_db_paths()
-    lock_files = [p / ".lock" for p in db_paths]
+    lock_files = [Path.home() / ".elefante" / "locks" / "write.lock"]
 
-    print("DB paths checked:")
-    for p in db_paths:
-        print(f"- {p}")
+    print("Lock paths checked:")
+    for lock_path in lock_files:
+        print(f"- {lock_path}")
 
     found = [lf for lf in lock_files if lf.exists()]
     if not found:
-        print("No lock file found in known locations.")
+        print("No write lock found in known locations.")
         return True
 
     print("Lock files found:")
@@ -109,15 +108,15 @@ def unlock_database(*, apply: bool, confirm: str, kill: bool) -> bool:
             print(f"Failed to remove {lf}: {e}")
 
     if lock_removed:
-        print("Database lock file(s) removed.")
+        print("Write lock file(s) removed.")
         return True
 
-    print("No lock files could be removed.")
+    print("No write lock files could be removed.")
     return False
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="Unlock Kuzu database (dry-run by default)")
+    p = argparse.ArgumentParser(description="Unlock Elefante transaction write lock (dry-run by default)")
     p.add_argument("--apply", action="store_true", help="Actually remove lock file(s)")
     p.add_argument("--confirm", type=str, default="", help="Must be exactly 'DELETE' to apply")
     p.add_argument("--kill", action="store_true", help="Also attempt to stop src.mcp.server processes")

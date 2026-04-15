@@ -2,7 +2,7 @@
 
 **Status**: UPDATED for Transaction-Scoped Locking  
 **Last Updated**: 2026-04-13  
-**Applies to**: v2.4.0+
+**Applies to**: v2.5.0+
 
 ---
 
@@ -157,114 +157,105 @@ rm ~/.elefante/locks/write.lock
 
 ---
 
-## 6. Kuzu Internal Single-Writer Lock
+## 6. Live Kuzu Access Model
 
 ### Architecture
 
 ```
-~/.elefante/data/kuzu_db/
-├── .lock                    <- Lock file (exists when in use)
-├── catalog/                 <- Metadata
-├── wal/                     <- Write-ahead log
-└── storage/                 <- Data files
+~/.elefante/data/kuzu_db        # Kuzu database path on disk
+~/.elefante/locks/write.lock    # Elefante transaction-scoped write lock
 ```
 
-**Rule**: Only ONE process can access Kuzu database at a time.
+Current runtime behavior:
 
-### Lock Lifecycle
-
-```
-Process A opens Kuzu -> .lock created -> exclusive access
-Process B tries to open -> blocked until Process A closes
-Process A closes -> .lock removed -> Process B acquires
-```
+- A fresh `GraphStore` init materializes `kuzu_db` as a single file path.
+- Kuzu access is still effectively single-owner across live processes.
+- `read_only=True` is for short-lived export and snapshot workflows. Do not treat it as a guarantee that a second live process can share Kuzu while another writer is active.
+- The dashboard reads `dashboard_snapshot.json`, not live Kuzu.
 
 ### Why This Matters
 
-MCP Server and Dashboard both use Kuzu:
-
 ```
-MCP Server (Write) → Kuzu (Single-writer lock) ← Dashboard (Read)
-```
-
-**Solution**: Dashboard reads from **static snapshot**, not live database:
-
-```
-MCP (Write) → Kuzu → Export Script → Snapshot File → Dashboard (Read)
+MCP Server (Write) -> Kuzu
+Snapshot Export (Short-lived read_only GraphStore) -> dashboard_snapshot.json
+Dashboard Server -> static snapshot only
 ```
 
 ```bash
 # Update snapshot
 python scripts/pipeline/update_dashboard_data.py
 
-# Dashboard can now run without locking Kuzu
+# Dashboard reads the snapshot, not live Kuzu
 python -m src.dashboard.server
 ```
 
 ---
 
-## 7. Checking Kuzu Lock Status
+## 7. Checking Lock Status
 
-### Method 1: List Lock File
+### Method 1: Inspect Elefante Transaction Locks
 
 ```bash
-ls -la ~/.elefante/data/kuzu_db/.lock
-# If exists: locked. If doesn't exist: free.
+ls -la ~/.elefante/locks/
+cat ~/.elefante/locks/write.lock
 ```
 
-### Method 2: Try to Access
+### Method 2: Find the Process Holding Kuzu
+
+```bash
+lsof ~/.elefante/data/kuzu_db
+```
+
+### Method 3: Reproduce Access Safely
 
 ```bash
 python -c "
-import kuzu
-db = kuzu.Database('data/kuzu_db')
-print('Database unlocked and accessible')
+from src.core.graph_store import GraphStore
+store = GraphStore('~/.elefante/data/kuzu_db')
+store._initialize_connection()
+print('Database accessible from this process')
+store.close()
 "
 ```
 
-### Method 3: Find Holding Process
-
-```bash
-lsof ~/.elefante/data/kuzu_db/
-```
+If this fails, the runtime error should route you to `docs/debug/ops-database-compendium.md` Issue #2.
 
 ---
 
 ## 8. Fixing Kuzu Lock Issues
 
-### Scenario 1: Dashboard Won't Start (MCP Running)
+### Scenario 1: Snapshot Refresh Collides With Active Writes
 
 ```bash
-# Stop MCP server first (Ctrl+C), then start dashboard
-# Or use snapshot mode (recommended)
+# Wait for the current write transaction to finish, then retry the snapshot export.
+python scripts/pipeline/update_dashboard_data.py
 ```
 
-### Scenario 2: Lock Stuck (Process Crashed)
+### Scenario 2: Transaction Lock Looks Stale
 
 ```bash
-# 1. Verify no process is using it
-ps aux | grep -E "mcp.server|dashboard.server"
+# 1. Inspect the lock holder
+cat ~/.elefante/locks/write.lock
+ps aux | grep -E "src.mcp.server|restart_elefante"
 
-# 2. Remove stale lock file
-rm ~/.elefante/data/kuzu_db/.lock
+# 2. Only if the PID is dead and the lock is stale, remove the write lock
+rm ~/.elefante/locks/write.lock
 
-# 3. Try again
-python -m src.mcp.server
+# 3. Restart and verify
+python scripts/lifecycle/restart_elefante.py --verify
 ```
 
-### Scenario 3: Both Processes Deadlocked
+### Scenario 3: Another Live Process Owns Kuzu
 
 ```bash
-# 1. Kill all
+# Stop the competing process or wait for it to release Kuzu.
 pkill -f "src.mcp.server"
-pkill -f "src.dashboard.server"
 
-# 2. Remove lock
-rm ~/.elefante/data/kuzu_db/.lock
-
-# 3. Start one at a time
+# Then retry cleanly
 python -m src.mcp.server
 ```
+
+Do NOT use manual deletion of Kuzu's internal lockfile as a standard recovery path. That is stale guidance.
 
 ---
 

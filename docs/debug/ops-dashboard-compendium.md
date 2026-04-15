@@ -32,7 +32,7 @@ Run these BEFORE investigating. If tests pass, the documented fix is intact.
 
 | Issue | Test Command | What It Proves |
 | ----- | ------------ | -------------- |
-| #8 Blank dashboard | `python scripts/verify/verify_health.py` | Dashboard data path and baseline health |
+| #8 Blank dashboard | `pytest tests/test_dashboard_serializer.py -k "dashboard" -v` | Readiness wait, forced refresh restart, and frontend retry/backoff remain intact |
 | #9 Scores stuck at 100 | `pytest tests/test_dashboard_serializer.py -v` | Live score computation, secret redaction, serialization |
 | Full E2E | `.venv/bin/python scripts/verify/verify_e2e_tests.py` | Isolated end-to-end MCP workflow |
 
@@ -571,7 +571,7 @@ _Last verified: 2026-02-25 | Run `python scripts/verify/verify_health.py` to val
 **Date:** 2026-03-20
 **Duration:** 10 minutes
 **Severity:** HIGH
-**Status:** FIXED
+**Status:** FIXED (guarded)
 
 ### Problem
 
@@ -621,6 +621,18 @@ open_result = await self._start_dashboard_and_open(force_restart=refresh)
 ### Lesson
 
 > **Never open the browser before the server is ready. When refreshing data, restart the server — a stale process cannot serve a new snapshot without a restart.**
+
+### Verification
+
+```bash
+pytest tests/test_dashboard_serializer.py -k "dashboard" -v
+```
+
+This guard checks three contracts that caused the blank first-launch behavior:
+
+1. `_start_dashboard_and_open()` waits for `/health` readiness before calling `webbrowser.open()`.
+2. `force_restart=True` kills the existing dashboard server before reopening after refresh.
+3. The frontend store retries `/api/stats` and `/api/graph` with exponential backoff so a just-started server can recover cleanly.
 
 ---
 

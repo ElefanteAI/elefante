@@ -117,6 +117,12 @@ def check_kuzu_compatibility(root_dir):
     # Check if Kuzu database directory exists
     kuzu_db_path = Path.home() / ".elefante" / "data" / "kuzu_db"
     
+    if kuzu_db_path.exists() and kuzu_db_path.is_file():
+        logger.log(f"OK: Found existing Kuzu database path at: {kuzu_db_path}")
+        logger.log("   Current runtime contract allows kuzu_db to exist as a single file.")
+        logger.log("   Leaving it in place.")
+        return True
+
     if kuzu_db_path.exists() and kuzu_db_path.is_dir():
         # Check if it's a valid Kuzu database or empty directory
         kuzu_files = list(kuzu_db_path.glob("*.kz")) + list(kuzu_db_path.glob(".lock"))

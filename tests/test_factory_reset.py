@@ -32,36 +32,34 @@ def isolated_home(tmp_path):
     fake_home = tmp_path / "fakehome"
     data_dir = fake_home / ".elefante" / "data"
     chroma_dir = data_dir / "chroma"
-    kuzu_dir = data_dir / "kuzu_db"
+    kuzu_path = data_dir / "kuzu_db"
 
     # Seed fake database content
     chroma_dir.mkdir(parents=True)
     (chroma_dir / "chroma.sqlite3").write_text("fake-chroma-data")
     (chroma_dir / "collections").mkdir()
 
-    kuzu_dir.mkdir(parents=True)
-    (kuzu_dir / ".lock").write_text("")
-    (kuzu_dir / "catalog").mkdir()
-    (kuzu_dir / "storage").mkdir()
+    data_dir.mkdir(parents=True, exist_ok=True)
+    kuzu_path.write_text("fake-kuzu-data")
 
     # Patch Path.home() to return our fake home
     with patch("scripts.lifecycle.reset_factory.Path.home", return_value=fake_home):
-        yield fake_home, chroma_dir, kuzu_dir
+        yield fake_home, chroma_dir, kuzu_path
 
 
 class TestDryRun:
     """Dry-run must never modify anything."""
 
     def test_dry_run_leaves_databases_intact(self, isolated_home):
-        fake_home, chroma_dir, kuzu_dir = isolated_home
+        fake_home, chroma_dir, kuzu_path = isolated_home
 
         result = factory_reset(apply=False, confirm="")
         assert result is True
         assert chroma_dir.exists(), "Dry-run must not touch ChromaDB"
-        assert kuzu_dir.exists(), "Dry-run must not touch KuzuDB"
+        assert kuzu_path.exists(), "Dry-run must not touch KuzuDB"
 
     def test_dry_run_creates_no_backup(self, isolated_home):
-        fake_home, chroma_dir, kuzu_dir = isolated_home
+        fake_home, chroma_dir, kuzu_path = isolated_home
         backup_root = fake_home / ".elefante" / "data" / "backups" / "factory_reset"
 
         factory_reset(apply=False, confirm="")
@@ -91,7 +89,7 @@ class TestSafetyGates:
 
     def test_databases_survive_rejected_reset(self, isolated_home):
         """After any rejection, databases must still exist."""
-        fake_home, chroma_dir, kuzu_dir = isolated_home
+        fake_home, chroma_dir, kuzu_path = isolated_home
 
         # Try all rejection paths
         with patch.dict(os.environ, {"ELEFANTE_PRIVILEGED": ""}, clear=False):
@@ -100,14 +98,14 @@ class TestSafetyGates:
             factory_reset(apply=True, confirm="wrong")
 
         assert chroma_dir.exists(), "Rejected reset must not touch ChromaDB"
-        assert kuzu_dir.exists(), "Rejected reset must not touch KuzuDB"
+        assert kuzu_path.exists(), "Rejected reset must not touch KuzuDB"
 
 
 class TestLiveReset:
     """Actual reset with all gates satisfied."""
 
     def test_reset_moves_databases_to_backup(self, isolated_home):
-        fake_home, chroma_dir, kuzu_dir = isolated_home
+        fake_home, chroma_dir, kuzu_path = isolated_home
         backup_root = fake_home / ".elefante" / "data" / "backups" / "factory_reset"
 
         with patch.dict(os.environ, {"ELEFANTE_PRIVILEGED": "1"}, clear=False):
@@ -115,7 +113,7 @@ class TestLiveReset:
 
         assert result is True
         assert not chroma_dir.exists(), "ChromaDB must be moved away"
-        assert not kuzu_dir.exists(), "KuzuDB must be moved away"
+        assert not kuzu_path.exists(), "KuzuDB must be moved away"
         assert backup_root.exists(), "Backup directory must be created"
 
         # Verify backups contain our data
@@ -127,7 +125,7 @@ class TestLiveReset:
         assert any("kuzu_db" in name for name in backup_names), "KuzuDB backup missing"
 
     def test_backup_preserves_original_content(self, isolated_home):
-        fake_home, chroma_dir, kuzu_dir = isolated_home
+        fake_home, chroma_dir, kuzu_path = isolated_home
         backup_root = fake_home / ".elefante" / "data" / "backups" / "factory_reset"
 
         with patch.dict(os.environ, {"ELEFANTE_PRIVILEGED": "1"}, clear=False):
@@ -139,11 +137,11 @@ class TestLiveReset:
 
     def test_reset_on_already_clean_state(self, isolated_home):
         """Reset when databases already absent -> success, no crash."""
-        fake_home, chroma_dir, kuzu_dir = isolated_home
+        fake_home, chroma_dir, kuzu_path = isolated_home
 
         # Remove databases manually first
         shutil.rmtree(chroma_dir)
-        shutil.rmtree(kuzu_dir)
+        kuzu_path.unlink()
 
         with patch.dict(os.environ, {"ELEFANTE_PRIVILEGED": "1"}, clear=False):
             result = factory_reset(apply=True, confirm="DELETE")

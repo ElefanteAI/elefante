@@ -1,6 +1,6 @@
 # Elefante Architecture: The Second Brain
 
-**Version:** 2.4.0 | **Status:** Production Ready (Windows validated)
+**Version:** 2.5.0 | **Status:** Production Ready (Windows validated)
 
 ## 1. System Overview
 
@@ -74,6 +74,19 @@ When the agent receives a task, the instruction layer forces retrieval. Elefante
 Full pipeline details: [`spec-ingestion.md`](spec-ingestion.md)
 
 ---
+
+### Token Intelligence Layer
+
+The MCP server measures every tool response before returning it:
+
+1.  **Heuristic Token Counting**: `estimate_tokens()` uses a zero-CPU-cost character-ratio heuristic (~3.5 chars/token for English, blending toward ~2.0 for CJK/Arabic). No tokenizer dependency.
+2.  **Protocol Overhead Measurement**: Each response's `MANDATORY_PROTOCOLS`, `DIRECTIVES`, and `ENTRYPOINT_SEQUENCE` blocks are measured separately to distinguish payload from overhead.
+3.  **Per-Call Snapshot**: A `CallTokenSnapshot` records input, output, overhead, and context tokens for every tool call. The `signal_ratio` (payload / total) tells agents how efficient each call was.
+4.  **Session-Level Ledger**: A `SessionTokenLedger` accumulates totals across an MCP session, tracking aggregate overhead ratio and signal ratio.
+5.  **Type-Proportional Budgets**: Each memory type has a token budget (`specification`: 800, `directive`: 200, etc.) reflecting its lifespan and injection frequency. `token_density_score()` surfaces over-budget memories.
+6.  **TOKEN_STATS Injection**: Every tool response includes a `TOKEN_STATS` block with `output_tokens`, `overhead_tokens`, and `signal_ratio`. This makes Elefante the first MCP server that tells agents what memory costs.
+
+Source: `src/utils/token_counter.py`, `src/mcp/server.py` (`_record_and_inject_token_stats`)
 
 ## 3. The Enhanced Signal Flow (The "Hijack")
 

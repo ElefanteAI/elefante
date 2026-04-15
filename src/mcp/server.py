@@ -38,6 +38,10 @@ from src.models.entity import EntityType, RelationshipType
 from src.utils.logger import get_logger
 from src.utils.validators import validate_memory_content, validate_uuid
 from src.utils.elefante_mode import get_mode_manager, is_elefante_enabled, write_lock
+from src.utils.token_counter import (
+    estimate_tokens, estimate_tokens_json, token_density_score,
+    TYPE_TOKEN_BUDGETS, CallTokenSnapshot, SessionTokenLedger,
+)
 
 logger = get_logger(__name__)
 
@@ -82,6 +86,9 @@ class ElefanteMCPServer:
         
         # Session state for autonomous graph maintenance (passive co-activation)
         self._session_retrieval_history: list[str] = []
+        
+        # Token intelligence ledger (per server lifecycle)
+        self._token_ledger = SessionTokenLedger()
         
         # Register tool handlers
         self._register_handlers()
@@ -1062,6 +1069,9 @@ You have access to a persistent memory system called **Elefante** - the user's s
             """Handle tool calls"""
             self.logger.info(f"Tool called: {name}", arguments=arguments)
             
+            # Measure input tokens once (arguments sent by the agent)
+            input_tokens = estimate_tokens_json(arguments)
+            
             try:
                 # Handle mode management + safe tools FIRST (always available)
                 if name == "elefante-System":
@@ -1070,22 +1080,34 @@ You have access to a persistent memory system called **Elefante** - the user's s
                         result = await self._handle_disable_elefante(arguments)
                     else:
                         result = await self._handle_enable_elefante(arguments)
+                    if isinstance(result, dict):
+                        result = self._record_and_inject_token_stats(result, name, input_tokens)
                     return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
                 elif name == "elefante-SystemStatusGet":
                     result = await self._handle_get_system_status(arguments)
+                    if isinstance(result, dict):
+                        result = self._record_and_inject_token_stats(result, name, input_tokens)
                     return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
                 elif name == "elefante-DashboardOpen":
                     result = await self._handle_get_elefante_dashboard(arguments)
+                    if isinstance(result, dict):
+                        result = self._record_and_inject_token_stats(result, name, input_tokens)
                     return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
                 # Directive tools — safe, no DB locks needed
                 elif name == "elefante-DirectiveAdd":
                     result = self._handle_directive_add(arguments)
+                    if isinstance(result, dict):
+                        result = self._record_and_inject_token_stats(result, name, input_tokens)
                     return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
                 elif name == "elefante-DirectiveList":
                     result = self._handle_directive_list(arguments)
+                    if isinstance(result, dict):
+                        result = self._record_and_inject_token_stats(result, name, input_tokens)
                     return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
                 elif name == "elefante-DirectiveRemove":
                     result = self._handle_directive_remove(arguments)
+                    if isinstance(result, dict):
+                        result = self._record_and_inject_token_stats(result, name, input_tokens)
                     return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
                 
                 # Mode check removed - operations auto-acquire/release locks
@@ -1130,6 +1152,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                     result = self._inject_pitfalls(result, name)
                     result = self._inject_entrypoint_protocol(result)
                     result = self._inject_directives(result)
+                    result = self._record_and_inject_token_stats(result, name, input_tokens)
 
                 return [TextContent(
                     type="text",
@@ -1150,6 +1173,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 error_payload = self._inject_pitfalls(error_payload, name)
                 error_payload = self._inject_entrypoint_protocol(error_payload)
                 error_payload = self._inject_directives(error_payload)
+                error_payload = self._record_and_inject_token_stats(error_payload, name, input_tokens)
                 return [TextContent(
                     type="text",
                     text=json.dumps(error_payload, indent=2)
@@ -1207,6 +1231,10 @@ You have access to a persistent memory system called **Elefante** - the user's s
         stats = await orchestrator.get_stats()
         status["stats"] = stats
         status["message"] = "Elefante Mode is ENABLED"
+        
+        # Token intelligence: session-level analytics
+        status["token_intelligence"] = self._token_ledger.to_dict()
+        
         return status
 
     async def _handle_add_memory(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -1233,6 +1261,16 @@ You have access to a persistent memory system called **Elefante** - the user's s
             metadata["domain"] = args["domain"]
         if args.get("category"):
             metadata["category"] = args["category"]
+        
+        # Token intelligence: stamp content token count at ingestion
+        content = args["content"]
+        memory_type = args.get("memory_type", "conversation")
+        content_tokens = estimate_tokens(content)
+        density = token_density_score(content_tokens, memory_type)
+        system_meta = metadata.get("system_metadata", {})
+        system_meta["content_tokens"] = content_tokens
+        system_meta["token_density"] = density
+        metadata["system_metadata"] = system_meta
         
         memory = await orchestrator.add_memory(
             content=args["content"],
@@ -1271,7 +1309,12 @@ You have access to a persistent memory system called **Elefante** - the user's s
             "graph_ids": [str(memory.id)],  # Memory node ID
             "score": memory.metadata.score,
             "memory_type": memory.metadata.memory_type.value if hasattr(memory.metadata.memory_type, 'value') else str(memory.metadata.memory_type),
-            "memory_id": str(memory.id)
+            "memory_id": str(memory.id),
+            "content_tokens": content_tokens,
+            "token_density": density,
+            **({
+                "density_warning": f"Memory is {density:.1f}x over budget for {memory_type} (budget: {TYPE_TOKEN_BUDGETS.get(memory_type, 300)} tokens). Consider trimming or splitting."
+            } if density > 2.0 else {}),
         }
     
     async def _handle_search_memories(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -1619,6 +1662,8 @@ You have access to a persistent memory system called **Elefante** - the user's s
     
     async def _handle_get_episodes(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Handle elefante-SessionsList tool call"""
+        import json
+
         limit = args.get("limit", 10)
         offset = args.get("offset", 0)
         
@@ -1629,7 +1674,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         cypher = f"""
         MATCH (s:Entity {{type: 'session'}})
         RETURN s
-        ORDER BY s.last_active DESC
+        ORDER BY s.created_at DESC
         SKIP {offset}
         LIMIT {limit}
         """
@@ -1640,11 +1685,23 @@ You have access to a persistent memory system called **Elefante** - the user's s
         for row in results:
             session = row.get("s")
             if session:
+                props_raw = session.get("props") if isinstance(session, dict) else getattr(session, "props", None)
+                props: Dict[str, Any] = {}
+                if isinstance(props_raw, str) and props_raw:
+                    try:
+                        props = json.loads(props_raw)
+                    except Exception:
+                        props = {}
+
+                session_id = session.get("id") if isinstance(session, dict) else getattr(session, "id", None)
+                session_name = session.get("name") if isinstance(session, dict) else getattr(session, "name", None)
+                created_at = session.get("created_at") if isinstance(session, dict) else getattr(session, "created_at", None)
+
                 episodes.append({
-                    "id": str(session.id),
-                    "name": session.name,
-                    "last_active": session.properties.get("last_active"),
-                    "source": session.properties.get("source")
+                    "id": str(session_id),
+                    "name": session_name,
+                    "last_active": props.get("last_active") or created_at,
+                    "source": props.get("source")
                 })
         
         return {
@@ -2226,6 +2283,60 @@ You have access to a persistent memory system called **Elefante** - the user's s
         active = self.directive_store.get_active_texts()
         if active:
             result["DIRECTIVES"] = active
+        return result
+
+    def _measure_overhead_tokens(self, result: Dict[str, Any]) -> int:
+        """Count tokens consumed by static protocol injections."""
+        overhead = 0
+        for key in ("MANDATORY_PROTOCOLS_READ_THIS_FIRST",
+                     "ENTRYPOINT_SEQUENCE_READ_THIS_FIRST",
+                     "DIRECTIVES"):
+            if key in result:
+                overhead += estimate_tokens_json(result[key])
+        return overhead
+
+    def _measure_context_tokens(self, result: Dict[str, Any]) -> int:
+        """Count tokens consumed by dynamic context injection."""
+        ctx = result.get("RELEVANT_CONTEXT")
+        if ctx:
+            return estimate_tokens_json(ctx)
+        return 0
+
+    def _record_and_inject_token_stats(
+        self,
+        result: Dict[str, Any],
+        tool_name: str,
+        input_tokens: int,
+    ) -> Dict[str, Any]:
+        """Measure output tokens, record in ledger, inject stats into response.
+        
+        ADV-006: Measures payload BEFORE injecting TOKEN_STATS, then accounts
+        for TOKEN_STATS own size in the final output_tokens count.
+        """
+        overhead = self._measure_overhead_tokens(result)
+        context = self._measure_context_tokens(result)
+        # Measure payload before TOKEN_STATS injection
+        payload_tokens = estimate_tokens_json(result)
+        
+        # Measure TOKEN_STATS block size dynamically (ADV-013: eliminates magic constant)
+        stats_stub = {"TOKEN_STATS": {"output_tokens": payload_tokens, "overhead_tokens": overhead, "signal_ratio": 0.500}}
+        stats_overhead = estimate_tokens_json(stats_stub)
+        output_total = payload_tokens + stats_overhead
+
+        snapshot = CallTokenSnapshot(
+            tool_name=tool_name,
+            input_tokens=input_tokens,
+            output_tokens=output_total,
+            overhead_tokens=overhead + stats_overhead,
+            context_tokens=context,
+        )
+        self._token_ledger.record(snapshot)
+
+        result["TOKEN_STATS"] = {
+            "output_tokens": output_total,
+            "overhead_tokens": overhead + stats_overhead,
+            "signal_ratio": snapshot.signal_ratio,
+        }
         return result
 
     # =========================================================================

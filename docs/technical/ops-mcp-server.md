@@ -261,31 +261,29 @@ python -m src.mcp.server
 **Symptom**:
 
 ```text
-RuntimeError: Kuzu database lock in use
-Cannot acquire lock at ~/.elefante/data/kuzu_db/.lock
+RuntimeError: Kuzu database is locked by another process.
+Read docs/debug/ops-database-compendium.md Issue #2 for resolution.
 ```
 
-**Root Cause**: Dashboard or another process is using Kuzu database (single-writer lock)
+**Root Cause**: Another live process currently owns Kuzu, or Elefante's transaction-scoped `~/.elefante/locks/write.lock` has gone stale.
 
 **Fix**:
 
 ```bash
-# 1. Stop dashboard
-# Ctrl+C in dashboard terminal
+# 1. Stop the competing process or wait for the current transaction to finish
+pkill -f "dashboard.server"  # Mac/Linux, if an old dashboard/export process is still live
 
-# 2. Kill any Python processes accessing Kuzu
-pkill -f "dashboard.server"  # Mac/Linux
-# or
-taskkill /F /IM python.exe  # Windows
+# 2. Inspect the Elefante transaction lock
+cat ~/.elefante/locks/write.lock
 
-# 3. Remove stale lock
-rm ~/.elefante/data/kuzu_db/.lock  # Mac/Linux
-# or
-del %USERPROFILE%\.elefante\data\kuzu_db\.lock  # Windows
+# 3. Only if the PID is dead and the lock is stale, remove the write lock
+rm ~/.elefante/locks/write.lock  # Mac/Linux
 
 # 4. Start MCP server again
 python -m src.mcp.server
 ```
+
+Do not remove Kuzu's internal lockfile as a default fix. Current recovery routing lives in Issue #2 of the database compendium.
 
 ---
 
@@ -466,6 +464,6 @@ For restarting a running server, see [`ops-restart.md`](ops-restart.md).
 
 ---
 
-**Document Version**: 2.4.0  
+**Document Version**: 2.5.0  
 **Status**: ESSENTIAL  
 **Last Validated**: 2026-02-25

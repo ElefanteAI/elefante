@@ -1,4 +1,4 @@
-# Usage Guide & API Reference (v2.4.0)
+# Usage Guide & API Reference (v2.5.0)
 
 ## 1. Natural Language Interaction
 
@@ -28,9 +28,19 @@ Elefante exposes **20 tools** and **2 prompts**.
 
 **Tool response contract**:
 
-- Every tool response injects `ENTRYPOINT_SEQUENCE_READ_THIS_FIRST`, `MANDATORY_PROTOCOLS_READ_THIS_FIRST`, and `DIRECTIVES`.
+- Every tool response injects `ENTRYPOINT_SEQUENCE_READ_THIS_FIRST`, `MANDATORY_PROTOCOLS_READ_THIS_FIRST`, `DIRECTIVES`, and `TOKEN_STATS`.
 - Some responses also inject `RELEVANT_CONTEXT` when Elefante can surface related memories automatically.
 - `ENTRYPOINT_SEQUENCE_READ_THIS_FIRST` is the exact developer/debug routing path for repository work: Known Issues -> verification command -> compendium -> maintained test surface.
+- `RELEVANT_CONTEXT` is conditional, not universal. It is skipped for tools that already return memory-heavy data, and when present it contains a short `note` plus a `memories` list of summarized snippets rather than full raw memory payloads.
+- `TOKEN_STATS` is injected into every tool response. It tells the agent what each tool call costs in tokens. Fields:
+  - `output_tokens` (int): Total tokens in the response, including protocol overhead and the TOKEN_STATS block itself.
+  - `overhead_tokens` (int): Tokens consumed by protocol injection (MANDATORY_PROTOCOLS, DIRECTIVES, ENTRYPOINT_SEQUENCE) plus TOKEN_STATS itself. Not content the agent requested.
+  - `signal_ratio` (float, 0.0-1.0): Fraction of output that is actual payload. `1.0` = zero overhead, `0.0` = all overhead. Higher is better.
+
+**Token intelligence on `elefante-MemoryAdd`**:
+
+- `elefante-MemoryAdd` responses include `content_tokens` (estimated token count of the stored content) and `token_density` (ratio of actual tokens to the type's budget). When density exceeds 2.0x, a `density_warning` string is included advising the caller to trim or split the memory.
+- Token budgets are proportional to memory type lifespan: `specification` (800), `insight` (500), `decision` (400), `preference` (300), `fact` (250), `directive` (200), `note` (150), `conversation` (100).
 
 ### Core Memory Operations
 
@@ -460,11 +470,27 @@ Prompts are not tools. They inject memory-aware instructions or pre-fetched cont
 
 **Why this exists**: It teaches the model to search Elefante before answering questions about preferences, project conventions, or past decisions.
 
+**Arguments**: None.
+
+**Important**:
+
+- This is a prompt retrieved through MCP prompt APIs, not a tool call.
+- The content is instructional grounding. It does not itself fetch memories.
+
 #### `elefante-context`
 
 **Purpose**: Inject a small retrieved memory bundle for a specific topic.
 
 **Why this exists**: It gives the model targeted context before answering a memory-related question.
+
+**Arguments**:
+
+- `topic` (required, string): What topic to retrieve context for.
+
+**Important**:
+
+- This prompt performs a live hybrid memory search before returning content.
+- It is a focused prefetch path for one topic, not a replacement for explicit tool calls when the caller needs structured results or mutations.
 
 ---
 

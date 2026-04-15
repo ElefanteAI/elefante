@@ -2,7 +2,7 @@
 
 > **Domain:** AI Protocol Failures, Self-Analysis & Methodology  
 > **Last Updated:** 2026-04-13  
-> **Total Issues Documented:** 7  
+> **Total Issues Documented:** 8  
 > **Status:** Production Reference  
 > **Maintainer:** Add new issues following Issue #N template at bottom
 
@@ -19,6 +19,7 @@
 | 5 | "Should be done" ≠ "Is done" - only real tests matter | False confidence |
 | 6 | User environment ≠ Test environment - account for differences | "It works for me" |
 | 7 | **PASSIVE protocols CANNOT force agent compliance** | System prompt ignored |
+| 8 | Maintained verifiers must follow the live runtime contract, not convenience assumptions | False failures |
 
 ---
 
@@ -31,6 +32,7 @@ Run these BEFORE investigating. If tests pass, the protocol enforcement is intac
 | #2 Premature completion | `.venv/bin/python scripts/verify/verify_e2e_tests.py` | Real MCP server completes full lifecycle |
 | #6 Protocol enforcement | `.venv/bin/python scripts/verify/verify_e2e_tests.py` | First successful and failing tool responses inject exact entry routing, directives, and maintained verification surfaces |
 | #7 Developer routing drift | `pytest tests/test_developer_routing.py -v` | Active process guidance points to current paths and tool-count contract |
+| #8 Self-protocol verifier drift | `pytest tests/test_developer_routing.py -k "TestSelfProtocolContract" -v` | Whole-system verifier tracks the live dashboard snapshot path contract and sizes the MCP client for large tool payloads |
 | Emoji policy | `pytest tests/test_no_emojis.py -v` | Source files comply with no-emoji rule |
 
 ---
@@ -44,6 +46,7 @@ Run these BEFORE investigating. If tests pass, the protocol enforcement is intac
 - [Issue #5: Environment Assumption Failures](#issue-5-environment-assumption-failures)
 - [Issue #6: Passive Protocol Enforcement Failure](#issue-6-passive-protocol-enforcement-failure)  CRITICAL
 - [Issue #7: Developer Routing Drift](#issue-7-developer-routing-drift--stale-paths-and-ritual-changelog-reads)
+- [Issue #8: Self-Protocol Verifier Drift](#issue-8-self-protocol-verifier-drift--runtime-path-and-payload-assumptions)
 - [The 5-Layer Protocol](#the-5-layer-protocol)
 - [Verification Checklist](#verification-checklist)
 - [Prevention Protocol](#prevention-protocol)
@@ -549,6 +552,94 @@ That test proves two things:
 ### Lesson
 
 > **A developer-process bug is not solved until source text, stored memory, and verification all agree on the same path.**
+
+---
+
+## Issue #8: Self-Protocol Verifier Drift -- Runtime Path and Payload Assumptions
+
+**Date:** 2026-04-13  
+**Duration:** 1 full-sweep debugging cycle  
+**Severity:** HIGH  
+**Status:** FIXED (Guarded)
+
+### Problem
+
+The maintained whole-system verifier failed even though the live Elefante MCP surface was healthy, because the harness made stale assumptions about where dashboard refresh writes its snapshot and how large a single JSON-RPC line can be.
+
+### Symptom
+
+Two failures surfaced in sequence during `scripts/verify/verify_e2e_tests.py --with-dashboard-open`:
+
+```text
+[FAIL] DashboardOpen refresh writes snapshot and reports ready state
+```
+
+and after that was fixed:
+
+```text
+[FAIL] Harness execution -- Separator is found, but chunk is longer than limit
+```
+
+The first looked like a dashboard bug. The second looked like a generic transport failure. Neither was the actual product defect.
+
+### Root Cause
+
+The self-protocol drifted from the live runtime contract in two places:
+
+1. The optional dashboard phase checked only `temp_data_dir / "dashboard_snapshot.json"`, but `src.mcp.server` refresh writes through module-level `DATA_DIR`, which is derived from `HOME`, so the actual snapshot landed under `temp_home/.elefante/data/dashboard_snapshot.json`.
+2. The harness MCP client used asyncio's default subprocess stream limit, which is too small for large one-line JSON-RPC responses. `elefante-ContextGet` can legitimately exceed that limit.
+
+In both cases, the verifier encoded a convenience assumption instead of following the current runtime behavior.
+
+### Solution
+
+Hardened the verifier to match the live contract:
+
+```python
+STREAM_LIMIT_BYTES = 1024 * 1024
+
+self.process = await asyncio.create_subprocess_exec(
+     ...,
+     limit=STREAM_LIMIT_BYTES,
+)
+```
+
+```python
+candidate_snapshot_paths = [
+     temp_home / ".elefante" / "data" / "dashboard_snapshot.json",
+     temp_data_dir / "dashboard_snapshot.json",
+]
+snapshot_path = next((path for path in candidate_snapshot_paths if path.exists()), candidate_snapshot_paths[0])
+```
+
+This keeps the self-protocol aligned with the actual dashboard refresh path and the actual size of live MCP tool payloads.
+
+**Files Changed:** `scripts/verify/verify_e2e_tests.py`, `tests/test_developer_routing.py`, `docs/debug/self-elefante-protocol.md`
+
+### Proof
+
+Run:
+
+```bash
+pytest tests/test_developer_routing.py -k "TestSelfProtocolContract" -v
+.venv/bin/python scripts/verify/verify_e2e_tests.py --with-dashboard-open
+```
+
+The guarded checks now prove:
+
+1. The verifier accepts the home-derived dashboard snapshot path used by the live MCP server.
+2. The verifier sizes the MCP subprocess stream for large `ContextGet` payloads.
+3. The full 20-tool sweep completes successfully when port `8000` is free.
+
+### Why This Took So Long
+
+- A verifier failure is easy to misclassify as a product regression.
+- The dashboard path bug looked real because the tool returned success while the assertion still failed.
+- The stream-limit failure appeared only after the first verifier bug was removed, so it was masked until the sweep got deeper into the protocol.
+
+### Lesson
+
+> **A maintained verifier is part of the product confidence surface; if it assumes the wrong runtime path or payload shape, it becomes a false bug generator.**
 
 ---
 

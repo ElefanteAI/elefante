@@ -8,6 +8,7 @@ This test suite ensures the write-path architecture is correct.
 import ast
 import json
 import os
+import subprocess
 import pytest
 import asyncio
 import sys
@@ -18,6 +19,7 @@ from pathlib import Path
 from src.core.orchestrator import MemoryOrchestrator
 from src.core.vector_store import VectorStore
 from src.core.graph_store import GraphStore
+from src.models.entity import Entity, EntityType, Relationship, RelationshipType
 from src.models.query import QueryMode
 
 
@@ -535,11 +537,13 @@ class TestAbsolutePathResolution:
         assert CHROMA_DIR.exists(), f"CHROMA_DIR does not exist: {CHROMA_DIR}"
         assert LOGS_DIR.exists(), f"LOGS_DIR does not exist: {LOGS_DIR}"
 
-        # Kuzu manages its own directory lifecycle and should not be pre-created
-        # by config import. The configured path must still resolve correctly.
+        # Kuzu manages its own database path lifecycle and config import should
+        # not assume a directory layout.
         assert KUZU_DIR.parent == DATA_DIR, f"KUZU_DIR is not rooted under DATA_DIR: {KUZU_DIR}"
         if KUZU_DIR.exists():
-            assert KUZU_DIR.is_dir(), f"KUZU_DIR exists but is not a directory: {KUZU_DIR}"
+            assert KUZU_DIR.is_file() or KUZU_DIR.is_dir(), (
+                f"KUZU_DIR exists but is not a regular filesystem node: {KUZU_DIR}"
+            )
     
     def test_vector_store_config_uses_absolute_path(self):
         """Verify VectorStoreConfig has absolute path"""
@@ -558,5 +562,169 @@ class TestAbsolutePathResolution:
         db_path = Path(config.elefante.graph_store.database_path)
         
         assert db_path.is_absolute(), "Graph store database_path is not absolute"
+
+
+class TestKuzuLockContract:
+    """Guards the live Kuzu path and contention contract used by Elefante."""
+
+    def test_graph_store_database_path_materializes_as_file(self, tmp_path):
+        """Fresh GraphStore init should materialize the Kuzu path as a file."""
+        db_path = tmp_path / "kuzu_db"
+        store = GraphStore(database_path=str(db_path))
+
+        try:
+            store._initialize_connection()
+            assert db_path.exists(), f"Kuzu database path was not created: {db_path}"
+            assert db_path.is_file(), f"Fresh Kuzu database path is not a file: {db_path}"
+        finally:
+            store.close()
+
+    def test_cross_process_kuzu_lock_error_cites_issue_2(self, tmp_path):
+        """A competing process must surface the Issue #2 runtime citation."""
+        db_path = tmp_path / "kuzu_db"
+        store = GraphStore(database_path=str(db_path))
+        repo_root = Path(__file__).resolve().parents[1]
+
+        env = os.environ.copy()
+        current_pythonpath = env.get("PYTHONPATH")
+        env["PYTHONPATH"] = (
+            f"{repo_root}{os.pathsep}{current_pythonpath}"
+            if current_pythonpath
+            else str(repo_root)
+        )
+
+        child_code = """
+from src.core.graph_store import GraphStore
+import sys
+
+store = GraphStore(database_path=sys.argv[1], read_only=True)
+try:
+    store._initialize_connection()
+    print('open-ok')
+except Exception as exc:
+    print(type(exc).__name__)
+    print(str(exc))
+finally:
+    store.close()
+"""
+
+        try:
+            store._initialize_connection()
+            result = subprocess.run(
+                [sys.executable, "-c", child_code, str(db_path)],
+                capture_output=True,
+                text=True,
+                cwd=str(repo_root),
+                env=env,
+                check=False,
+            )
+        finally:
+            store.close()
+
+        output = result.stdout.strip()
+        assert "RuntimeError" in output, output
+        assert "docs/debug/ops-database-compendium.md Issue #2" in output, output
+        assert "Database path:" in output, output
+        assert "open-ok" not in output, output
+
+    def test_dashboard_lock_avoidance_uses_snapshot_and_read_only_export(self):
+        """Dashboard lock avoidance must stay on snapshot + read-only export."""
+        repo_root = Path(__file__).resolve().parents[1]
+        dashboard_source = (repo_root / "src" / "dashboard" / "server.py").read_text(encoding="utf-8")
+        export_source = (repo_root / "scripts" / "pipeline" / "update_dashboard_data.py").read_text(encoding="utf-8")
+        export_tree = ast.parse(export_source)
+
+        assert "dashboard_snapshot.json" in dashboard_source
+        assert "from src.core.graph_store" not in dashboard_source
+        assert "import kuzu" not in dashboard_source
+
+        found_read_only_graph_store = False
+        for node in ast.walk(export_tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if not isinstance(node.func, ast.Name) or node.func.id != "GraphStore":
+                continue
+            for keyword in node.keywords:
+                if keyword.arg != "read_only":
+                    continue
+                if isinstance(keyword.value, ast.Constant) and keyword.value.value is True:
+                    found_read_only_graph_store = True
+                    break
+
+        assert found_read_only_graph_store, "Snapshot export no longer opens GraphStore(read_only=True)"
+
+    def test_active_kuzu_docs_do_not_reference_internal_lock_path(self):
+        """Active docs must not send users to a stale kuzu_db/.lock recovery path."""
+        repo_root = Path(__file__).resolve().parents[1]
+        active_docs = [
+            repo_root / "docs" / "debug" / "ops-database-compendium.md",
+            repo_root / "docs" / "technical" / "ops-kuzu.md",
+            repo_root / "docs" / "technical" / "ops-dashboard.md",
+            repo_root / "docs" / "technical" / "ops-mcp-server.md",
+        ]
+
+        for doc_path in active_docs:
+            text = doc_path.read_text(encoding="utf-8")
+            assert "kuzu_db/.lock" not in text, f"{doc_path.name} still references stale kuzu_db/.lock recovery"
+
+
+class TestGraphToolContract:
+    """Guards graph/session tool assumptions exposed by the self-protocol."""
+
+    @pytest.mark.asyncio
+    async def test_graph_relationship_tables_support_created_in_and_works_on(self, tmp_path):
+        db_path = tmp_path / "kuzu_db"
+        store = GraphStore(database_path=str(db_path))
+
+        memory_entity = Entity(name="Protocol Memory", type=EntityType.MEMORY)
+        session_entity = Entity(name="Protocol Session", type=EntityType.SESSION)
+        project_entity = Entity(name="Protocol Project", type=EntityType.PROJECT)
+
+        try:
+            await store.create_entity(memory_entity)
+            await store.create_entity(session_entity)
+            await store.create_entity(project_entity)
+
+            await store.create_relationship(
+                Relationship(
+                    from_entity_id=memory_entity.id,
+                    to_entity_id=session_entity.id,
+                    relationship_type=RelationshipType.CREATED_IN,
+                )
+            )
+            await store.create_relationship(
+                Relationship(
+                    from_entity_id=session_entity.id,
+                    to_entity_id=project_entity.id,
+                    relationship_type=RelationshipType.WORKS_ON,
+                )
+            )
+
+            created_in_rows = await store.execute_query(
+                "MATCH (a:Entity)-[r:CREATED_IN]->(b:Entity) RETURN a.id, b.id"
+            )
+            works_on_rows = await store.execute_query(
+                "MATCH (a:Entity)-[r:WORKS_ON]->(b:Entity) RETURN a.id, b.id"
+            )
+
+            assert any(
+                row.get("a.id") == str(memory_entity.id) and row.get("b.id") == str(session_entity.id)
+                for row in created_in_rows
+            )
+            assert any(
+                row.get("a.id") == str(session_entity.id) and row.get("b.id") == str(project_entity.id)
+                for row in works_on_rows
+            )
+        finally:
+            store.close()
+
+    def test_sessions_list_handler_uses_entity_created_at_and_props(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        server_source = (repo_root / "src" / "mcp" / "server.py").read_text(encoding="utf-8")
+
+        assert "ORDER BY s.created_at DESC" in server_source
+        assert "session.get(\"props\")" in server_source
+        assert "json.loads(props_raw)" in server_source
+        assert "ORDER BY s.last_active DESC" not in server_source
 
 

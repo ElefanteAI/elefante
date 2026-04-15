@@ -75,14 +75,17 @@ SYSTEM_SPECIFICATIONS = (
         "title": "Elefante Developer Etiquette",
         "category": "developer-process",
         "canonical_key": "system:developer-etiquette:closure",
-        "summary": "Completion protocol covering CLEAN, DOC_SYNC, and versioning for Elefante repo work.",
+        "summary": "Completion protocol covering CLEAN, DOC_SYNC, changelog contract, and versioning for Elefante repo work.",
         "content": (
             "Elefante Developer Etiquette specification for versioning, CLEAN, and DOC_SYNC. Before claiming "
             "done: CLEAN_ENVIRONMENT removes leftovers, scratch files, and dead code. DOC_SYNC updates README.md, "
-            "docs/README.md, docs/technical/spec-architecture.md, and CHANGELOG.md. STRICT_SEMVER uses scripts/"
-            "ci/bump_version.py instead of manual version edits. The working tree must be reviewed before finish."
+            "docs/README.md, docs/technical/spec-architecture.md, and CHANGELOG.md. CHANGELOG.md must use the "
+            "current Keep a Changelog headings `### Added`, `### Fixed`, or `### Changed` and document Why, What, "
+            "and Impact in the matching section. STRICT_SEMVER uses scripts/ci/advise_version_bump.py to choose a "
+            "version when needed and scripts/ci/bump_version.py instead of manual version edits. The working tree "
+            "must be reviewed before finish."
         ),
-        "tags": ["system", "developer-etiquette", "clean", "doc-sync", "versioning", "specification"],
+        "tags": ["system", "developer-etiquette", "clean", "doc-sync", "changelog", "versioning", "specification"],
     },
 )
 
@@ -500,6 +503,10 @@ class MemoryOrchestrator:
             )
             metadata["authority_score"] = authority_score
             
+            # Extract system_metadata before building custom_metadata
+            # (ADV-001: system_metadata must reach MemoryMetadata explicitly)
+            system_metadata = metadata.pop("system_metadata", {})
+            
             custom_metadata = {
                 k: v for k, v in metadata.items()
                 if k not in ["domain", "category", "confidence", "source"]
@@ -533,6 +540,7 @@ class MemoryOrchestrator:
                 surfaces_when=surfaces_when,
                 authority_score=authority_score,
                 custom_metadata=custom_metadata,
+                system_metadata=system_metadata,
                 summary=summary_text,
                 # ==================================================================================
                 # STEP 4: REINFORCE (Plasticity & Decay)

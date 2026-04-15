@@ -7,6 +7,7 @@ This directory contains the project vision, ideas backlog, and active specs for 
 | File | Purpose |
 |------|---------|
 | [`spec-vision.md`](spec-vision.md) | **Start here.** What Elefante is, the vision, and all undone ideas |
+| [`spec-token-intelligence.md`](spec-token-intelligence.md) | PRD for token intelligence — per-call cost transparency (SHIPPED v2.5.0) |
 | [`spec-usage-intelligence.md`](spec-usage-intelligence.md) | Detailed PRD for dashboard usage metrics (backend 80% done, frontend 0%) |
 
 ## Archived

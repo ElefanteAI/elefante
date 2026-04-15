@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Nuclear Reset Script for Kuzu Database
-Backs up and removes corrupted kuzu_db file, allowing fresh initialization.
+"""Nuclear reset for the Kuzu database path.
+
+Backs up and removes the current `kuzu_db` path, whether it is a file or a
+directory, so the next initialization starts fresh.
 """
 
 import sys
@@ -22,7 +23,7 @@ def _truthy_env(name: str) -> bool:
 
 
 def nuclear_reset_kuzu(*, apply: bool, confirm: str):
-    """Backup and remove corrupted Kuzu database file."""
+    """Backup and remove the current Kuzu database path."""
     
     # Paths
     data_dir = Path.home() / ".elefante" / "data"
@@ -39,90 +40,59 @@ def nuclear_reset_kuzu(*, apply: bool, confirm: str):
         print("  Database is ready for fresh initialization.")
         return True
     
-    # Check if it's a file (corrupted) or directory (normal)
     if kuzu_path.is_file():
-        print("[!] CORRUPTION DETECTED: kuzu_db is a FILE (should be directory)")
+        print("[INFO] kuzu_db is a file under the current runtime contract")
         print(f"  Path: {kuzu_path}")
         print(f"  Size: {kuzu_path.stat().st_size:,} bytes")
         print()
-        
-        if not apply:
-            print("Dry-run only. Re-run with: ELEFANTE_PRIVILEGED=1 --apply --confirm DELETE")
-            return False
-
-        if not _truthy_env("ELEFANTE_PRIVILEGED"):
-            print("Refusing to apply: set ELEFANTE_PRIVILEGED=1")
-            return False
-
-        if (confirm or "").strip() != "DELETE":
-            print("Refusing to apply: pass --confirm DELETE")
-            return False
-
-        # Create backup
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = data_dir / f"kuzu_db.corrupted.{timestamp}.backup"
-        
-        print("[1/2] Creating backup...")
-        print(f"      From: {kuzu_path}")
-        print(f"      To:   {backup_path}")
-        
-        try:
-            shutil.copy2(kuzu_path, backup_path)
-            print("      [OK] Backup created successfully")
-        except Exception as e:
-            print(f"      [FAIL] Backup failed: {e}")
-            return False
-        
-        print()
-        print("[2/2] Removing corrupted file...")
-        
-        try:
-            kuzu_path.unlink()
-            print("      [OK] Corrupted file removed")
-            print()
-            print("=" * 70)
-            print("SUCCESS: Kuzu database reset complete")
-            print("=" * 70)
-            print()
-            print("Next steps:")
-            print("1. Kuzu will auto-create proper directory structure on next init")
-            print("2. Run scripts/verify/verify_health.py to test database access")
-            print("3. Rebuild graph from ChromaDB memories")
-            return True
-            
-        except Exception as e:
-            print(f"      [FAIL] Removal failed: {e}")
-            print()
-            print("Manual intervention required:")
-            print(f"  del \"{kuzu_path}\"")
-            return False
-    
     elif kuzu_path.is_dir():
-        print("[OK] kuzu_db is a directory (correct structure)")
+        print("[INFO] kuzu_db is a directory (legacy or alternate layout)")
         print(f"  Path: {kuzu_path}")
         print()
-        
-        # Check for lock file
-        lock_file = kuzu_path / ".lock"
-        if lock_file.exists():
-            print(f"[!] Lock file exists: {lock_file}")
-            print("  This indicates another process may be using the database.")
-            print("  Or a previous process crashed without cleanup.")
-            print()
-            print("Options:")
-            print("  1. Stop all processes using Elefante")
-            print("  2. Manually remove lock file if you're sure no process is using it")
-            return False
-        else:
-            print("[OK] No lock file found")
-            print("  Database appears ready for use.")
-            return True
-    
     else:
         print("[FAIL] UNKNOWN: kuzu_db exists but is neither file nor directory")
         print(f"  Path: {kuzu_path}")
         print("  Manual investigation required.")
         return False
+
+    if not apply:
+        print("Dry-run only. Re-run with: ELEFANTE_PRIVILEGED=1 --apply --confirm DELETE")
+        return True
+
+    if not _truthy_env("ELEFANTE_PRIVILEGED"):
+        print("Refusing to apply: set ELEFANTE_PRIVILEGED=1")
+        return False
+
+    if (confirm or "").strip() != "DELETE":
+        print("Refusing to apply: pass --confirm DELETE")
+        return False
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = data_dir / f"kuzu_db.reset_backup.{timestamp}"
+
+    print("[1/2] Moving current Kuzu path to backup...")
+    print(f"      From: {kuzu_path}")
+    print(f"      To:   {backup_path}")
+
+    try:
+        shutil.move(str(kuzu_path), str(backup_path))
+        print("      [OK] Backup move completed")
+    except Exception as e:
+        print(f"      [FAIL] Backup move failed: {e}")
+        return False
+
+    print()
+    print("[2/2] Reset complete")
+    print()
+    print("=" * 70)
+    print("SUCCESS: Kuzu database path removed")
+    print("=" * 70)
+    print()
+    print("Next steps:")
+    print("1. Next init will recreate the current Kuzu database path")
+    print("2. Run scripts/verify/verify_health.py to test database access")
+    print("3. Rebuild graph from ChromaDB memories if needed")
+    return True
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Backup and remove corrupted Kuzu DB file (dry-run by default)")

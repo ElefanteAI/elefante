@@ -56,7 +56,7 @@ All data comes from a static snapshot — no live database access.
 ```
 MCP Server (Live Write)
   ↓
-~/.elefante/data/kuzu_db/ (Kuzu Graph DB)
+~/.elefante/data/kuzu_db (Kuzu Graph DB path)
   ↓
 scripts/pipeline/update_dashboard_data.py (Export)
   ↓
@@ -235,7 +235,7 @@ python scripts/pipeline/update_dashboard_data.py
 
 MCP server or another process is using Kuzu. See [`ops-kuzu.md`](ops-kuzu.md) § 8 for full diagnostics and fix procedures.
 
-**Quick fix**: Stop the other process, or `rm ~/.elefante/data/kuzu_db/.lock` if stale.
+**Quick fix**: Stop the other process or wait for the current transaction to finish, then rerun the snapshot export. If the transaction lock is stale, inspect `~/.elefante/locks/write.lock`. Do not remove Kuzu's internal lockfile as a default fix.
 
 ---
 
@@ -490,6 +490,6 @@ Before claiming "Dashboard is working":
 
 ---
 
-**Document Version**: 2.4.0  
+**Document Version**: 2.5.0  
 **Status**: ESSENTIAL  
 **Last Validated**: 2026-02-26

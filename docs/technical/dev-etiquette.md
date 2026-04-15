@@ -1,6 +1,6 @@
 # Elefante Developer Etiquette Specification
 
-**Version:** 2.4.0
+**Version:** 2.5.0
 **Type:** SPECIFICATION
 
 This document governs the required closure sequence for all feature development, bug fixes, and architectural adjustments within the Elefante repository. 
@@ -19,7 +19,7 @@ Code is secondary; the specification is primary. You cannot consider a code chan
 
 *   **READMEs:** Ensure `README.md` is updated if the core feature set, architecture, or installation process changes. `docs/README.md` is a navigation index — update it only when files are added, moved, or deleted.
 *   **Architecture Specs:** Update `docs/technical/spec-architecture.md` immediately if the cognitive flow or component interaction changes.
-*   **Changelog:** Add an entry to `CHANGELOG.md` matching the current version bump. Explicitly document the "Why," "What," and "Impact."
+*   **Changelog:** Add an entry to `CHANGELOG.md` matching the current version bump. Use the live Keep a Changelog headings `### Added`, `### Fixed`, and `### Changed`, place the change in the correct section, and explicitly document the "Why," "What," and "Impact." Never use retired headings such as `### The Problem Solved`, `### The Solution`, or `### Changes`.
 
 ## 3. Versioning (`STRICT_SEMVER`)
 Elefante enforces strict, automated semantic versioning (`x.y.z`). Manual version edits in individual files are prohibited.
@@ -28,7 +28,7 @@ Elefante enforces strict, automated semantic versioning (`x.y.z`). Manual versio
     *   `MAJOR` (x): Breaking changes or DB migrations.
     *   `MINOR` (y): New features, backward compatible (e.g., adding `SPECIFICATION` schema).
     *   `PATCH` (z): Bug fixes, internal cleanup.
-*   **Use the Bumper:** Run `python3 scripts/ci/bump_version.py <version>` to cascade the correct version across all 42+ project files simultaneously.
+*   **Use the Bumper:** If you need help choosing the next version, run `python3 scripts/ci/advise_version_bump.py`, then apply the cascade with `python3 scripts/ci/bump_version.py <version>`. Never hand-edit version strings.
 
 ## 4. Final Lock (Git Etiquette)
 Once the tree is clean, the docs are synced, and the version is cascaded, lock the state.

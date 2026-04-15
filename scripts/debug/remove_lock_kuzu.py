@@ -1,12 +1,14 @@
-"""Remove Kuzu database lock file (safe-by-default).
+"""Remove Elefante's transaction write lock (safe-by-default).
+
+Legacy script name retained for compatibility with older Kuzu-lock guidance.
 
 Default is dry-run. To actually delete the lock file you must provide:
 - environment: ELEFANTE_PRIVILEGED=1
 - flag: --apply
 - flag: --confirm DELETE
 
-This is a debug tool. Deleting a lock file while Kuzu is genuinely in use can
-corrupt the database; prefer stopping the MCP/dashboard process first.
+This is a debug tool. Deleting the write lock while another process is genuinely
+writing can corrupt state; prefer stopping the MCP process first.
 """
 
 from __future__ import annotations
@@ -22,35 +24,34 @@ def _truthy_env(name: str) -> bool:
 
 
 def _default_lock_path() -> Path:
-    # Best-effort: use config if importable, otherwise default location.
+    # Best-effort: use Elefante lock config if importable, otherwise default location.
     try:
         repo_root = Path(__file__).resolve().parents[2]
         sys.path.insert(0, str(repo_root))
-        from src.utils.config import get_config  # type: ignore
+        from src.utils.elefante_mode import WRITE_LOCK_FILE  # type: ignore
 
-        cfg = get_config()
-        return Path(cfg.elefante.graph_store.database_path) / ".lock"
+        return Path(WRITE_LOCK_FILE)
     except Exception:
-        return Path.home() / ".elefante" / "data" / "kuzu_db" / ".lock"
+        return Path.home() / ".elefante" / "locks" / "write.lock"
 
 
 def remove_lock(*, apply: bool, confirm: str) -> bool:
-    """Remove stale Kuzu lock file."""
+    """Remove a stale Elefante transaction write lock."""
     lock_path = _default_lock_path()
 
-    print(f"Lock file path: {lock_path}")
+    print(f"Transaction lock path: {lock_path}")
 
     if not lock_path.exists():
-        print("No lock file found.")
+        print("No transaction lock file found.")
         return True
 
     try:
         stat = lock_path.stat()
-        print("Lock file exists.")
+        print("Transaction lock exists.")
         print(f"size_bytes={stat.st_size}")
         print(f"mtime={stat.st_mtime}")
     except Exception:
-        print("Lock file exists (could not stat).")
+        print("Transaction lock exists (could not stat).")
 
     if not apply:
         print("Dry-run only. Re-run with: ELEFANTE_PRIVILEGED=1 --apply --confirm DELETE")
@@ -65,7 +66,7 @@ def remove_lock(*, apply: bool, confirm: str) -> bool:
 
     try:
         lock_path.unlink()
-        print("Lock file removed.")
+        print("Transaction lock removed.")
         return True
     except Exception as e:
         print(f"Failed to remove lock: {e}")
@@ -73,7 +74,7 @@ def remove_lock(*, apply: bool, confirm: str) -> bool:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="Remove Kuzu lock file (dry-run by default)")
+    p = argparse.ArgumentParser(description="Remove Elefante write lock file (dry-run by default)")
     p.add_argument("--apply", action="store_true", help="Actually delete lock file")
     p.add_argument("--confirm", type=str, default="", help="Must be exactly 'DELETE' to apply")
     args = p.parse_args()

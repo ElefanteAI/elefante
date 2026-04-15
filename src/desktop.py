@@ -116,7 +116,7 @@ def run_gui():
     frame = ttk.Frame(root, padding="20")
     frame.pack(fill=tk.BOTH, expand=True)
     
-    ttk.Label(frame, text="🐘 Elefante Core", font=("Helvetica", 24, "bold")).pack(pady=(10, 5))
+    ttk.Label(frame, text="Elefante Core", font=("Helvetica", 24, "bold")).pack(pady=(10, 5))
     ttk.Label(frame, text="The fastest, 100% local MCP Hybrid Memory Server.", font=("Helvetica", 12)).pack(pady=(0, 20))
     
     ttk.Label(frame, text="One-Click Integrations:", font=("Helvetica", 14, "bold")).pack(anchor="w", pady=(10, 5))

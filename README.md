@@ -8,7 +8,7 @@
 
 AI agents start every conversation from zero. Your preferences, decisions, and discovered patterns don't carry over. Elefante gives any MCP-compatible agent a persistent, local second brain — memories are stored, scored automatically, and surfaced at the right moment without being asked.
 
-**v2.4.0** — Persistent Memory Engine
+**v2.5.0** — Persistent Memory Engine
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -57,7 +57,7 @@ Everything runs locally. No cloud. No telemetry. Your data stays on your machine
 
 ### Layer 1 — MCP Protocol
 
-The interface between your IDE and the memory engine. 20 tools and 2 prompts let agents store, search, connect, and manage knowledge. A **Compliance Gate** prevents duplicates before they exist. **Context Injection** attaches relevant memories to every tool response. **Directives** enforce persistent behavioral rules that survive across sessions.
+The interface between your IDE and the memory engine. 20 tools and 2 prompts let agents store, search, connect, and manage knowledge. A **Compliance Gate** prevents duplicates before they exist. **Context Injection** attaches relevant memories to every tool response. **Directives** enforce persistent behavioral rules that survive across sessions. **Token Intelligence** measures every response and tells the agent what each tool call costs — output tokens, protocol overhead, and signal ratio — so memory never becomes invisible bloat.
 
 Full tool reference → [docs/technical/spec-tools.md](docs/technical/spec-tools.md)
 IDE configuration → [docs/technical/ops-ide-configuration.md](docs/technical/ops-ide-configuration.md)

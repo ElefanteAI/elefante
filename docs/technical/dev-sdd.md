@@ -5,9 +5,9 @@
 > The filename `dev-sdd.md` is retained for compatibility, but SDD is no longer a separate product surface or workflow mode. The checks below document the embedded development process already enforced through built-in directives, specification memories, compendiums, and verification scripts.  
 > See `docs/technical/spec-architecture.md` for the runtime retrieval model and `docs/debug/dev-developer-agent.md` for script routing.
 
-**Version**: 2.4.0  
+**Version**: 2.5.0  
 **Status**: Reference document — embedded process, legacy filename retained  
-**Last Updated**: 2026-04-13
+**Last Updated**: 2026-04-14
 
 ---
 
@@ -150,8 +150,8 @@ Any failure → fix, then re-run from Gate 2. Do not skip back to Gate 4 directl
 Before committing:
 
 - [ ] **Minimal patch** — No unrelated refactors bundled in. One problem, one fix.
-- [ ] **CHANGELOG.md entry written** — `### The Problem Solved` + `### The Solution` + `### Changes` format
-- [ ] **Version bumped** using `scripts/ci/advise_version_bump.py` — never edit version strings by hand
+- [ ] **CHANGELOG.md entry written** — use the live Keep a Changelog headings `### Added`, `### Fixed`, or `### Changed`; place the change in the correct section and explicitly state Why, What, and Impact. Never resurrect retired headings.
+- [ ] **Version bumped** — use `scripts/ci/advise_version_bump.py` if you need help choosing the next semver, then apply it with `scripts/ci/bump_version.py`. Never edit version strings by hand.
 - [ ] **All linked docs updated** — if you changed a tool signature, update `docs/technical/spec-tools.md`
 - [ ] **`grep -r "filename" docs/`** — if you moved or renamed any file, all links resolved
 
@@ -161,10 +161,10 @@ Before committing:
 
 | Severity | Meaning | Action |
 |----------|---------|--------|
-| 🔴 **CRITICAL** | Wrong behavior, spec violation, leakage surface hit, stdout pollution | **Stop. Do not proceed. Fix first.** |
-| 🟠 **HIGH** | Simulator fails, missing roundtrip update, undocumented change | Fix before merging |
-| 🟡 **MEDIUM** | Documentation drift, naming inconsistency, missing test | Fix in same PR |
-| ✅ **CLEAN** | All gates passed, simulator verified, CHANGELOG written | Ship |
+| [CRITICAL] | Wrong behavior, spec violation, leakage surface hit, stdout pollution | **Stop. Do not proceed. Fix first.** |
+| [HIGH] | Simulator fails, missing roundtrip update, undocumented change | Fix before merging |
+| [MEDIUM] | Documentation drift, naming inconsistency, missing test | Fix in same PR |
+| [CLEAN] | All gates passed, simulator verified, CHANGELOG written | Ship |
 
 **One CRITICAL = blocked.** Not noted. Not flagged for later. Blocked.
 
@@ -215,8 +215,8 @@ Before committing:
   7. verify_health.py → exit 0
   8. verify_mcp_handshake.py → 20 tools listed
   9. Round-trip test if memory path touched
- 10. CHANGELOG entry written
- 11. advise_version_bump.py run
+ 10. CHANGELOG entry written using `### Added` / `### Fixed` / `### Changed`
+ 11. advise_version_bump.py consulted if needed, then bump_version.py run
 ```
 
 ---

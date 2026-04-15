@@ -33,9 +33,10 @@ class GraphStore:
         Initialize graph store
         
         Args:
-            database_path: Path to Kuzu database directory
-            read_only: If True, open in read-only mode (allows concurrent reads; multiple read-only
-                   connections can coexist; a write connection and read-only connections can coexist)
+            database_path: Path to the Kuzu database path on disk
+            read_only: If True, open without write intent. Used for short-lived
+                snapshot/export workflows. Do not assume this guarantees live
+                cross-process sharing while another process already owns Kuzu.
         """
         self.config = get_config()
         self.database_path = database_path or self.config.elefante.graph_store.database_path
@@ -112,13 +113,14 @@ class GraphStore:
         try:
             import kuzu
             
-            # Create database parent directory if it doesn't exist
+            # Create the parent directory if it doesn't exist.
             db_path = Path(self.database_path)
             db_path.parent.mkdir(parents=True, exist_ok=True)
 
             # --- ROBUST INIT START ---
-            # Fix for Kuzu 0.11+ "clean install crash"
-            # Issue: If kuzu_db exists as an empty directory (from manual mkdir) or file, Kuzu fails.
+            # Kuzu owns the database path itself. Fresh paths currently
+            # materialize as a single file. Legacy empty directories from manual
+            # setup still need to be removed before open.
             if db_path.exists():
                 if db_path.is_file():
                     if db_path.stat().st_size == 0:
@@ -133,13 +135,12 @@ class GraphStore:
 
 
             
-            # Kuzu expects the database path to be a directory that it manages
-            # The directory should exist and contain Kuzu database files
             # Convert buffer_pool_size from string (e.g., "512MB") to bytes integer
             buffer_size_bytes = self._parse_buffer_size(self.buffer_pool_size)
             
-            # Initialize database - Kuzu will use the directory as-is
-            # read_only=True allows concurrent reads without lock contention
+            # Initialize database. read_only=True avoids write intent for
+            # snapshot/export paths, but live cross-process contention can still
+            # fail and should surface Issue #2 guidance.
             self._db = kuzu.Database(str(self.database_path), buffer_pool_size=buffer_size_bytes, read_only=self.read_only)
             self._conn = kuzu.Connection(self._db)
             
@@ -163,7 +164,8 @@ class GraphStore:
                     f"Kuzu database is locked by another process. "
                     f"Read docs/debug/ops-database-compendium.md Issue #2 for resolution.\n"
                     f"Database path: {self.database_path}\n"
-                    f"Solution: Stop the dashboard server or other processes accessing the database."
+                    f"Solution: Stop the competing process or wait for the current transaction to release. "
+                    f"Dashboard access should use snapshot mode, not live Kuzu."
                 ) from e
             logger.error("failed_to_initialize_kuzu", error=error_msg)
             raise
@@ -354,6 +356,11 @@ class GraphStore:
                 """,
                 """
                 CREATE REL TABLE CREATED_IN(
+                    FROM Entity TO Entity
+                )
+                """,
+                """
+                CREATE REL TABLE WORKS_ON(
                     FROM Entity TO Entity
                 )
                 """,
@@ -634,26 +641,35 @@ class GraphStore:
         # Map relationship type to Kuzu relationship table
         rel_type_map = {
             RelationshipType.RELATES_TO: "RELATES_TO",
+            RelationshipType.PART_OF: "PART_OF",
             RelationshipType.DEPENDS_ON: "DEPENDS_ON",
             RelationshipType.REFERENCES: "REFERENCES",
             RelationshipType.CREATED_IN: "CREATED_IN",
+            RelationshipType.WORKS_ON: "WORKS_ON",
         }
         
         rel_table = rel_type_map.get(relationship.relationship_type, "RELATES_TO")
-        
-        # FIX: Kuzu 0.1.0 requires properties to be set during CREATE, not with SET afterward
-        # Properties must be included in the CREATE clause: CREATE ()-[r:TYPE {prop: value}]->()
+        rel_tables_with_strength = {"RELATES_TO"}
+
+        # Kuzu requires relationship properties to match the rel-table schema exactly.
+        # Do not inject `strength` for tables like CREATED_IN or WORKS_ON that do not define it.
+        if rel_table in rel_tables_with_strength:
+            create_clause = f"CREATE (fromNode)-[r:{rel_table} {{strength: $strength}}]->(toNode)"
+        else:
+            create_clause = f"CREATE (fromNode)-[r:{rel_table}]->(toNode)"
+
         query = f"""
             MATCH (fromNode:Entity), (toNode:Entity)
             WHERE fromNode.id = $from_id AND toNode.id = $to_id
-            CREATE (fromNode)-[r:{rel_table} {{strength: $strength}}]->(toNode)
+            {create_clause}
         """
-        
+
         params = {
             "from_id": str(relationship.from_entity_id),
             "to_id": str(relationship.to_entity_id),
-            "strength": relationship.strength
         }
+        if rel_table in rel_tables_with_strength:
+            params["strength"] = relationship.strength
         
         try:
             await self._run_query(query, params)
@@ -691,19 +707,19 @@ class GraphStore:
             query = """
                 MATCH (fromNode:Entity)-[r]->(toNode:Entity)
                 WHERE fromNode.id = $id
-                RETURN fromNode.id, toNode.id, type(r), r.strength
+                RETURN fromNode.id, toNode.id, type(r)
             """
         elif direction == "incoming":
             query = """
                 MATCH (fromNode:Entity)-[r]->(toNode:Entity)
                 WHERE toNode.id = $id
-                RETURN fromNode.id, toNode.id, type(r), r.strength
+                RETURN fromNode.id, toNode.id, type(r)
             """
         else:  # both
             query = """
                 MATCH (e1:Entity)-[r]-(e2:Entity)
                 WHERE e1.id = $id OR e2.id = $id
-                RETURN e1.id, e2.id, type(r), r.strength
+                RETURN e1.id, e2.id, type(r)
             """
         
         try:

@@ -21,7 +21,7 @@ It runs locally on your machine. No cloud. No API keys for memory. Your data sta
 
 ### How It Works (One Paragraph)
 
-Elefante runs as an MCP server that your IDE connects to via stdio. When your agent works, Elefante intercepts tool calls and injects relevant memories from its dual storage system (ChromaDB for semantic search, Kuzu for knowledge graph). Every memory has a system-computed relevance score based on recency, freshness, and how often it's been useful. Memories that matter rise to the top. Memories that don't, decay naturally. The agent can store new knowledge, search existing knowledge, manage tasks, and build a knowledge graph — all through 21 MCP tools.
+Elefante runs as an MCP server that your IDE connects to via stdio. When your agent works, Elefante intercepts tool calls and injects relevant memories from its dual storage system (ChromaDB for semantic search, Kuzu for knowledge graph). Every memory has a system-computed relevance score based on recency, freshness, and how often it's been useful. Memories that matter rise to the top. Memories that don't, decay naturally. The agent can store new knowledge, search existing knowledge, manage tasks, and build a knowledge graph — all through 20 MCP tools and 2 prompts.
 
 ### The Four Laws
 
@@ -49,6 +49,7 @@ These are non-negotiable and define everything Elefante does:
 | Autonomous co-activation | Passive graph wiring between memories retrieved together |
 | Context injection | Top memories surfaced automatically in every tool response |
 | Response compression | Null-stripped, token-efficient payloads with behavioral directives |
+| Token intelligence | Per-call TOKEN_STATS (output tokens, overhead, signal ratio), type-proportional budgets, density warnings |
 | Dashboard | React + SVG: health scores, memory table, knowledge graph visualization |
 | Session distiller | Scan, parse, and ingest knowledge from VS Code chat logs |
 | Runtime baseline bootstrap | Built-in directives and required specification memories are available on first use |

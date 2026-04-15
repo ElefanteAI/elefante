@@ -62,7 +62,7 @@ SYSTEM_DIRECTIVE_DEFINITIONS = (
     ),
     (
         "system-elefante-docs-sync",
-        "ELEFANTE Docs Sync: Update README, technical docs, and CHANGELOG when behavior or architecture changes.",
+        "ELEFANTE Docs Sync: Update README, technical docs, and CHANGELOG when behavior or architecture changes. CHANGELOG entries must use the current Keep a Changelog headings `### Added`, `### Fixed`, or `### Changed`, not retired headings.",
     ),
     (
         "system-elefante-cleanup",
@@ -70,7 +70,7 @@ SYSTEM_DIRECTIVE_DEFINITIONS = (
     ),
     (
         "system-elefante-versioning",
-        "ELEFANTE Versioning: Use scripts/ci/bump_version.py for semver cascades; do not hand-edit scattered version strings.",
+        "ELEFANTE Versioning: Use scripts/ci/advise_version_bump.py to choose the next semver when needed and scripts/ci/bump_version.py to apply the cascade; do not hand-edit scattered version strings.",
     ),
     (
         "system-elefante-verification",

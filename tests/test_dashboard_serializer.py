@@ -1,4 +1,7 @@
-"""Pytest coverage for the shared dashboard serializer module."""
+"""Pytest coverage for dashboard serialization and launch safeguards."""
+
+import re
+from pathlib import Path
 
 from datetime import datetime
 
@@ -79,3 +82,34 @@ def test_raw_and_memory_scores_stay_close():
     memory_score = compute_live_score(_sample_memory())
     delta = abs(raw_score - memory_score)
     assert delta <= 3, f"Scores diverged too much: raw={raw_score} mem={memory_score}"
+
+
+def test_dashboard_open_waits_for_readiness_before_browser_launch():
+    repo_root = Path(__file__).resolve().parents[1]
+    server_source = (repo_root / "src" / "mcp" / "server.py").read_text(encoding="utf-8")
+
+    assert "def _wait_for_ready" in server_source
+    assert "ready = _wait_for_ready(max_wait=15.0)" in server_source
+    assert re.search(r"if ready:\n\s+try:\n\s+webbrowser\.open\(url\)", server_source)
+    assert "Dashboard server is still starting on port" in server_source
+
+
+def test_dashboard_refresh_forces_restart_of_existing_server():
+    repo_root = Path(__file__).resolve().parents[1]
+    server_source = (repo_root / "src" / "mcp" / "server.py").read_text(encoding="utf-8")
+
+    assert "if force_restart and already_running:" in server_source
+    assert "Dashboard restart requested: killing existing server process." in server_source
+    assert "_kill_existing()" in server_source
+    assert "already_running = False" in server_source
+    assert "DASHBOARD_STARTED = False" in server_source
+
+
+def test_dashboard_frontend_retries_stats_and_snapshot_fetches():
+    repo_root = Path(__file__).resolve().parents[1]
+    store_source = (repo_root / "src" / "dashboard" / "ui" / "src" / "store.ts").read_text(encoding="utf-8")
+
+    assert store_source.count("const maxRetries = 4;") >= 2
+    assert store_source.count("1000 * Math.pow(2, attempt)") >= 2
+    assert "fetch('/api/graph')" in store_source
+    assert "fetch('/api/stats')" in store_source

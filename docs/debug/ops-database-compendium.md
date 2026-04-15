@@ -2,7 +2,7 @@
 
 > **Domain:** Kuzu Graph Database & ChromaDB Vector Store  
 > **Last Updated:** 2026-04-13  
-> **Total Issues Documented:** 7  
+> **Total Issues Documented:** 8  
 > **Status:** Production Reference  
 > **Maintainer:** Add new issues following Issue #N template at bottom
 
@@ -14,10 +14,10 @@
 |---|-----|----------------|
 | 1 | NEVER use `properties` as column name - Cypher reserved word | Schema rewrite |
 | 2 | Single-Writer Lock - only ONE process can access Kuzu at a time | Error 15105 |
-| 3 | Kuzu 0.11+ creates its own directory - do NOT pre-create | Init failure |
+| 3 | Kuzu owns the `kuzu_db` path - do NOT pre-create it as a directory | Init failure |
 | 4 | ChromaDB = memories, Kuzu = entities - DIFFERENT PURPOSES | Data confusion |
-| 5 | Kill all Python processes before deleting `.lock` file | Stale locks |
-| 6 | Use `read_only=True` for concurrent read access | Lock conflicts |
+| 5 | Clear Elefante `write.lock` only when stale - do NOT treat manual Kuzu internal lock surgery as the default recovery path | Wrong recovery action |
+| 6 | `read_only=True` is for short-lived export/snapshot work, not a promise of live cross-process sharing | False confidence |
 | 7 | Never let Kuzu work outlive `GraphStore.close()` | Native SIGSEGV |
 
 ---
@@ -30,7 +30,8 @@ Run these BEFORE investigating. If tests pass, the documented fix is intact. If 
 | ----- | ------------ | -------------- |
 | #7 SIGSEGV crash | `pytest tests/test_memory_persistence.py -k "graph_store_close_waits_for_inflight_query or graph_store_raw_execute_calls_stay_in_safe_methods" -v` | Close barrier + ownership boundary enforced |
 | #7 Live regression | `pytest tests/test_memory_persistence.py -k "live_mcp_server_survives_shutdown_regression" -v` | Real MCP subprocess survives add/search/shutdown cycle |
-| #2 Lock / #4 Corruption | `pytest tests/test_memory_persistence.py -k "config_paths_exist" -v` | Data directory structure valid |
+| #2 Lock / #4 Path contract | `pytest tests/test_memory_persistence.py -k "TestKuzuLockContract" -v` | Fresh Kuzu path shape, cross-process routing, snapshot isolation, and active-doc sync stay correct |
+| #8 Graph/session schema contract | `pytest tests/test_memory_persistence.py -k "TestGraphToolContract" -v` | Relationship-table writes and SessionsList reads respect the current graph/session schema |
 | Full E2E (all issues) | `.venv/bin/python scripts/verify/verify_e2e_tests.py` | Isolated live MCP workflow including shutdown-race probe |
 | Factory reset safety | `pytest tests/test_factory_reset.py -v` | Dry-run, safety gates, backup creation, idempotency |
 
@@ -45,6 +46,7 @@ Run these BEFORE investigating. If tests pass, the documented fix is intact. If 
 - [Issue #5: Duplicate Entity Creation](#issue-5-duplicate-entity-creation)
 - [Issue #6: ChromaDB Schema vs Memory Model](#issue-6-chromadb-schema-vs-memory-model)
 - [Issue #7: Async Shutdown Race / QueryResult Lifetime Leak](#issue-7-async-shutdown-race--queryresult-lifetime-leak)
+- [Issue #8: Graph and Session Schema Contract Drift](#issue-8-graph-and-session-schema-contract-drift)
 - [Methodology Failures](#methodology-failures)
 - [Prevention Protocol](#prevention-protocol)
 - [Appendix: Issue Template](#appendix-issue-template)
@@ -103,55 +105,45 @@ Renamed column from `properties` to `props`:
 **Date:** 2025-12-03  
 **Duration:** Multiple occurrences (30 min each)  
 **Severity:** CRITICAL  
-**Status:**  RESOLVED (Workaround documented)
+**Status:**  FIXED (guarded)
 
 ### Problem
-Kuzu database locked and inaccessible after crash or concurrent access.
+Kuzu database becomes inaccessible when a second live process tries to open it while another process already owns the database path.
 
 ### Symptom
 ```
-RuntimeError: Cannot open file. path: .../kuzu_db/.lock - Error 15105: unknown error
+RuntimeError: Kuzu database is locked by another process.
+Read docs/debug/ops-database-compendium.md Issue #2 for resolution.
 ```
 
 ### Root Cause
-Kuzu uses **file-based locking** (`.lock` file):
-1. Lock created when `kuzu.Database()` instantiated
-2. Lock should release when object destroyed
-3. **BUT:** Crashed processes leave stale locks
-4. **AND:** Multiple processes can't share access
+Current Elefante no longer uses the old "delete the internal Kuzu lockfile" mental model:
+
+1. The active runtime materializes `~/.elefante/data/kuzu_db` as a single database path on disk.
+2. Kuzu access is still effectively single-owner across live processes.
+3. A second process can still fail even if it opens `GraphStore(..., read_only=True)` while another process already owns Kuzu.
+4. Elefante now avoids long-lived contention by using transaction-scoped `~/.elefante/locks/write.lock`, closing the global `GraphStore` after each MCP tool call, and keeping the dashboard on snapshot files instead of live Kuzu.
 
 **Failure Scenarios:**
 | Scenario | Cause |
 |----------|-------|
-| Stale Lock | Process crashed without cleanup |
-| Concurrent Access | Dashboard + MCP server both accessing |
-| Process Leak | Multiple Python processes competing |
+| Cross-process contention | Another live process already holds Kuzu open |
+| Stale transaction lock | `~/.elefante/locks/write.lock` outlives the owning process |
+| Legacy operator guidance | Docs or scripts still point at internal Kuzu lockfile deletion or assume dashboard shares live Kuzu |
 
 ### Solution
-```powershell
-# Recovery procedure:
-# 1. Kill all Python processes
-taskkill /F /IM python.exe
-
-# 2. Delete stale lock (if exists)
-Remove-Item "$env:USERPROFILE\.elefante\data\kuzu_db\.lock" -Force -ErrorAction SilentlyContinue
-
-# 3. Restart single process
-python -m src.mcp.server
-```
-
-**Prevention:** Dashboard now uses `read_only=True` mode:
-```python
-db = kuzu.Database(db_path, read_only=True)
-```
+1. Keep dashboard reads on `dashboard_snapshot.json`, not live Kuzu.
+2. Run snapshot export in a short-lived subprocess that opens `GraphStore(..., read_only=True)`.
+3. Release the global `GraphStore` after each MCP tool call so Kuzu ownership stays transaction-scoped.
+4. If contention occurs, stop the competing process or wait for the current transaction to finish. Do not use manual Kuzu internal lock deletion as the default recovery step.
 
 ### Why This Took So Long
 - Error 15105 is generic Windows file error
-- Didn't know about Kuzu's single-writer model
-- Tried complex solutions before simple "kill processes"
+- Historical docs froze an older internal-lock story around manual Kuzu lockfile deletion
+- `read_only=True` looked like a shared-access cure until a real cross-process check proved otherwise
 
 ### Lesson
-> **Kuzu is single-writer. Use `read_only=True` for concurrent reads.**
+> **Model Kuzu contention as short-lived process ownership, not as manual surgery on Kuzu's internal lockfile.**
 
 ---
 
@@ -171,9 +163,10 @@ RuntimeError: Database path cannot be a directory: C:\Users\...\kuzu_db
 ```
 
 ### Root Cause
-Kuzu 0.11.x changed from **directory-based** to expecting to create its own structure:
-- Old (0.1.x): Could pre-create `kuzu_db/` directory
-- New (0.11.x): **CANNOT** have pre-existing directory
+Kuzu 0.11.x changed path ownership semantics:
+- Do not pre-create `kuzu_db` as a directory
+- Let Kuzu materialize the database path itself
+- Under the current runtime contract, a fresh Kuzu path materializes as a single file
 
 `config.py` was pre-creating the directory:
 ```python
@@ -182,14 +175,11 @@ KUZU_DIR.mkdir(exist_ok=True)  #  This breaks Kuzu 0.11.x
 
 ### Solution
 ```python
-# config.py - Removed:
-# KUZU_DIR.mkdir(exist_ok=True)
-
-# graph_store.py - Added directory handling:
-def _ensure_database_path(self):
-    if self.db_path.exists() and self.db_path.is_dir():
-        shutil.rmtree(self.db_path)  # Remove pre-existing directory
-    self.db_path.parent.mkdir(parents=True, exist_ok=True)
+# config.py - Do not pre-create KUZU_DIR
+# graph_store.py - Only create the parent directory; remove legacy empty dirs
+db_path.parent.mkdir(parents=True, exist_ok=True)
+if db_path.exists() and db_path.is_dir() and not any(db_path.iterdir()):
+    db_path.rmdir()
 ```
 
 ### Why This Took So Long
@@ -198,55 +188,37 @@ def _ensure_database_path(self):
 - Didn't check Kuzu changelog for breaking changes
 
 ### Lesson
-> **Check library changelogs when upgrading. Version changes break things.**
+> **Kuzu owns the database path. Never infer the final on-disk shape from old versions.**
 
 ---
 
-## Issue #4: Database Structure Corruption
+## Issue #4: Legacy Path-Shape Diagnosis Drift
 
-**Date:** 2025-12-03  
-**Duration:** 20 minutes  
-**Severity:** CRITICAL  
-**Status:**  RESOLVED (Reset required)
+**Date:** 2025-12-03, revalidated 2026-04-13  
+**Duration:** 20 minutes originally, then recurring documentation drift  
+**Severity:** HIGH  
+**Status:**  FIXED (guarded)
 
 ### Problem
-`kuzu_db` was a **single file** instead of directory structure.
+Operators and scripts treated a single `kuzu_db` file as corruption.
 
 ### Symptom
-Database initialization failed silently or with structure errors.
-
-**Expected Structure:**
-```
-kuzu_db/                    (directory)
-├── .lock
-├── catalog/
-├── wal/
-└── storage/
-```
-
-**Actual State:**
-```
-kuzu_db                     (single 10MB file - WRONG!)
-```
+Fresh/current runtime shows `~/.elefante/data/kuzu_db` as a file, while stale docs and tools still expect a directory tree.
 
 ### Root Cause
-Likely caused by interrupted initialization or version mismatch between Kuzu versions.
+Historical filesystem assumptions drifted after the runtime contract changed. The current `GraphStore` implementation allows Kuzu to own the database path and a fresh init now materializes that path as a file.
 
 ### Solution
-```powershell
-# 1. Backup corrupted file (just in case)
-Move-Item kuzu_db kuzu_db.backup
-
-# 2. Re-initialize
-python scripts/setup/init_databases.py
-```
+1. Guard the fresh path contract in maintained tests.
+2. Remove file-is-corruption logic from docs and destructive scripts.
+3. Only reset the Kuzu path when initialization actually fails or the data is known-bad.
 
 ### Why This Took So Long
-- File vs directory wasn't obvious at first glance
-- Had to compare against known-good installation
+- A file at `kuzu_db` looks suspicious if you remember the old directory-tree model.
+- The stale assumption spread across tests, docs, and debug tools.
 
 ### Lesson
-> **When database acts weird, check if structure matches expected format.**
+> **Never classify corruption from filesystem shape alone. Verify the current runtime contract from source and a fresh init first.**
 
 ---
 
@@ -441,6 +413,68 @@ Also removed fire-and-forget co-activation writes so graph maintenance stays ins
 
 ---
 
+## Issue #8: Graph and Session Schema Contract Drift
+
+**Date:** 2026-04-13  
+**Duration:** 1 self-protocol cycle  
+**Severity:** HIGH  
+**Status:** FIXED (guarded)
+
+### Problem
+`elefante-GraphConnect` and `elefante-SessionsList` drifted away from the actual Kuzu graph/session schema, so the whole-system tool flow broke even though narrower checks still passed.
+
+### Symptom
+The self-protocol exposed two linked failures:
+
+1. Graph relationship creation failed when a protocol run created `CREATED_IN` and `WORKS_ON` edges through the real MCP surface.
+2. Session listing assumed synthetic session entities had a top-level `last_active` field and direct object-style properties.
+
+In practice, the graph phase could not complete cleanly and the session phase could not trust the returned entity shape.
+
+### Root Cause
+Both failures came from the same bad assumption: Elefante treated graph/session records as if every relation table and every session-shaped entity shared one generic schema.
+
+1. `src/core/graph_store.py` reused the `RELATES_TO` creation pattern for other relation tables and injected `strength` into edges like `CREATED_IN` and `WORKS_ON` even though those tables do not define that property.
+2. `src/mcp/server.py` queried session entities as `Entity` rows but then ordered by `s.last_active` and read properties as if they were top-level Python attributes instead of JSON stored in `props`.
+
+### Solution
+Aligned both tool paths to the real schema:
+
+```python
+# graph_store.py
+rel_tables_with_strength = {"RELATES_TO"}
+if rel_table in rel_tables_with_strength:
+    create_clause = f"CREATE (fromNode)-[r:{rel_table} {{strength: $strength}}]->(toNode)"
+else:
+    create_clause = f"CREATE (fromNode)-[r:{rel_table}]->(toNode)"
+```
+
+```python
+# server.py
+MATCH (s:Entity {type: 'session'})
+RETURN s
+ORDER BY s.created_at DESC
+```
+
+Then parse `props` JSON for optional session metadata and fall back to `created_at` when `last_active` is absent.
+
+**Files Changed:** `src/core/graph_store.py`, `src/mcp/server.py`, `tests/test_memory_persistence.py`
+
+### Permanent Regression Guards
+- `tests/test_memory_persistence.py -k "TestGraphToolContract" -v` now creates real `CREATED_IN` and `WORKS_ON` edges against a temporary Kuzu store and confirms both relation tables work.
+- The same test class statically guards that `SessionsList` orders by `created_at`, parses `props`, and no longer references `s.last_active`.
+- `scripts/verify/verify_e2e_tests.py` exercises both paths through the live MCP surface, so the whole-system proof now catches future schema drift.
+
+### Why This Took So Long
+- The graph code looked generic enough to seem reusable, but Kuzu relation tables are not interchangeable.
+- Synthetic session entities were close enough to ordinary objects that the wrong field access pattern still looked plausible in code review.
+- The break only became obvious when the self-protocol created the exact relation types and session entity shape the live tools use together.
+
+### Lesson
+> **Graph tools must target the concrete node and relation-table schema that exists, not a generic mental model of what the graph “should” look like.**
+
+---
+
 ## Methodology Failures
 
 ### Pattern 1: Assuming Error Location = Root Cause
@@ -535,4 +569,4 @@ python scripts/setup/init_databases.py
 
 ---
 
-*Last verified: 2025-12-05 | Kuzu version: 0.11.x | ChromaDB version: check requirements.txt*
+*Last verified: 2026-04-13 | Kuzu version: 0.11.x | ChromaDB version: check requirements.txt*

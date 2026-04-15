@@ -1,6 +1,6 @@
 # Elefante Safe Restart
 
-**Version**: 2.4.0  
+**Version**: 2.5.0  
 **Script**: `scripts/lifecycle/restart_elefante.py`  
 **Purpose**: Safely restart MCP server to pick up code changes
 
@@ -130,7 +130,7 @@ If `--verify` flag set:
 All user data persists across restarts:
 
 - **ChromaDB**: `~/.elefante/data/chroma/` (persistent on disk)
-- **Kuzu**: `~/.elefante/data/kuzu_db/` (persistent on disk)
+- **Kuzu**: `~/.elefante/data/kuzu_db` (persistent on disk)
 - **Logs**: `~/.elefante/logs/` (append-only)
 
 ### Transaction Safety
@@ -298,6 +298,6 @@ Arguments: {
 
 ---
 
-**Version**: 2.4.0
+**Version**: 2.5.0
 **Last Updated**: 2026-02-26
 **Status**: Production Ready

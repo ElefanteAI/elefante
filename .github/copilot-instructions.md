@@ -47,7 +47,11 @@ PARSE AND OBEY:
   MANDATORY_PROTOCOLS → no bypass
   DIRECTIVES → unconditional authority (injected into EVERY response)
   RELEVANT_CONTEXT → top memories ranked by 6 behavioral signals
+  TOKEN_STATS → per-call cost transparency (output_tokens, overhead_tokens, signal_ratio)
   suggested_action → follow it when present
+TOKEN_STATS AWARENESS:
+  signal_ratio < 0.3 → response is mostly overhead; consider fewer results or lighter queries
+  density_warning present on MemoryAdd → stored content is bloated for its type; consider trimming
 </rule>
 
 <rule id="sdd_closure">
