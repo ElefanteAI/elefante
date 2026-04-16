@@ -1,8 +1,9 @@
 """
-generate_100_memories.py - Self-Contained 6-Month Demo Dataset Injector
+generate_100_memories.py - Self-Contained Elefante History Demo Dataset Injector
 
 PURPOSE : Populate an isolated Elefante database with 100 deterministic memories
-          that exercise every dashboard metric, with realistic behavioral history.
+          drawn from Elefante's actual development history, plus realistic
+          behavioral history for dashboard completeness.
 INJECTION: Direct VectorStore + GraphStore writes. Zero LLM. Instant.
 SPEC    : scripts/demo/SPEC_behavioral_history.md
 
@@ -32,123 +33,161 @@ from src.models.entity import Entity, EntityType
 random.seed(42)
 
 
-def _facts(n=35):
-    services = ["AuthService", "PaymentGateway", "SearchIndexer", "NotificationHub",
-                "UserProfileAPI", "AnalyticsPipeline", "BillingEngine"]
-    techs = ["Redis cluster", "Kafka topic", "RabbitMQ exchange", "SQS queue",
-             "gRPC endpoint", "REST API", "GraphQL resolver"]
-    langs = ["Python 3.12", "Java 21", "TypeScript 5.4", "Go 1.22", "Rust 1.77"]
-    return [{"content": f"{services[i % len(services)]} communicates via {techs[i % len(techs)]} and is written in {langs[i % len(langs)]}.",
-             "type": "fact", "category": "infrastructure", "tags": ["backend", "architecture"]}
-            for i in range(n)]
+def _memory_item(content, memory_type, category, tags=None, **extra):
+    payload = {
+        "content": content,
+        "type": memory_type,
+        "category": category,
+        "tags": tags or [],
+    }
+    payload.update(extra)
+    return payload
 
 
-def _conversations(n=20):
-    topics = [
-        "Debugged CORS preflight failures on the Vite dev proxy.",
-        "Discussed migrating from Webpack to esbuild for faster builds.",
-        "Reviewed PR #247: refactored the retry logic in PaymentGateway.",
-        "Investigated OOM kills in the Kubernetes staging cluster.",
-        "Paired on fixing flaky Playwright E2E tests in CI.",
-        "Triaged a customer report about duplicate invoice emails.",
-        "Reviewed Java 21 virtual threads adoption for the BillingEngine.",
-        "Debugged a race condition in the Redis pub/sub consumer.",
-        "Discussed adding OpenTelemetry tracing to all Python services.",
-        "Sprint retro: agreed to reduce WIP limit from 5 to 3.",
-        "Investigated slow PostgreSQL queries on the analytics dashboard.",
-        "Reviewed security audit findings for the AuthService.",
-        "Discussed API versioning strategy for the public REST endpoints.",
-        "Debugged TypeScript strict-mode errors after upgrading to 5.4.",
-        "Paired on writing integration tests for the Kafka consumer.",
-        "Reviewed deployment runbook for the new blue-green strategy.",
-        "Discussed monorepo vs polyrepo tradeoffs for the frontend.",
-        "Investigated memory leaks in the long-running Go worker.",
-        "Sprint planning: prioritized the search relevance improvements.",
-        "Debugged a certificate rotation failure in the staging environment.",
+def _foundation_memories():
+    return [
+        _memory_item("Elefante splits storage by purpose: ChromaDB holds semantic memories and Kuzu holds entities and relationships. Confusing the two caused dashboard data bugs early in the project.", "fact", "architecture", ["chroma", "kuzu", "architecture"], cluster="architecture"),
+        _memory_item("The retrieval model in v2.7.0 uses five signals: vector 0.35, concept 0.30, coactivation 0.15, authority 0.10, temporal 0.10. Domain signal was removed after proving it contributed nothing.", "fact", "retrieval", ["v2.7.0", "scoring", "retrieval"], cluster="architecture"),
+        _memory_item("Memory type half-lives are intentional product behavior: conversation about 28 days, note 46, insight 87, fact and decision 139, preference 347, specification and directive infinite.", "fact", "memory-model", ["decay", "memory-types", "product-behavior"], cluster="architecture"),
+        _memory_item("Elefante exposes 20 MCP tools and 2 prompts across memory, directives, graph, tasks, ETL, context, sessions, dashboard, and system control.", "fact", "mcp", ["tools", "mcp", "surface-area"], cluster="architecture"),
+        _memory_item("The tool response contract injects MANDATORY_PROTOCOLS, DIRECTIVES, RELEVANT_CONTEXT when available, and TOKEN_STATS.", "fact", "protocol", ["response-contract", "protocol", "mcp"]),
+        _memory_item("Memory metadata is wide by design: 40 plus flattened fields covering classification, lifecycle, relationships, temporal state, and extensibility.", "fact", "memory-model", ["metadata", "schema", "memory-model"]),
+        _memory_item("Token intelligence landed in v2.5.0. Every tool response reports output_tokens, overhead_tokens, and signal_ratio.", "fact", "token-intelligence", ["v2.5.0", "tokens", "telemetry"]),
+        _memory_item("The runtime stack is Python 3.11, ChromaDB, Kuzu, sentence-transformers, FastAPI, and a React/Vite dashboard.", "fact", "stack", ["python", "dashboard", "stack"]),
+        _memory_item("Co-activation is generated automatically from retrieval history. The server records memories retrieved together and writes CO_ACTIVATED edges to Kuzu.", "fact", "retrieval", ["coactivation", "graph", "retrieval"]),
+        _memory_item("The dashboard must read dashboard_snapshot.json, not live database queries. Direct Kuzu calls caused the 11-nodes-vs-71-memories confusion.", "fact", "dashboard", ["dashboard", "snapshot", "known-issue"]),
+        _memory_item("Dashboard composite score is weighted 50 percent temporal vitality, 25 percent memory-type weight, and 25 percent engagement.", "fact", "dashboard", ["dashboard", "scoring", "composite-score"]),
+        _memory_item("Compliance is mechanical: search before write. MemoryAdd must not bypass duplicate and contradiction checks.", "fact", "compliance", ["compliance", "memory-add", "search-first"]),
+        _memory_item("ETL classification is agent-driven, not handled by an internal Elefante LLM. The agent enriches memories through ETLProcess and ETLClassify.", "fact", "etl", ["etl", "agent-driven", "classification"]),
+        _memory_item("A pre-commit hook blocks commits by running health_check.py and verify_mcp_handshake.py.", "fact", "quality-gates", ["pre-commit", "health-check", "handshake"]),
+        _memory_item("The project moved from v1.0.0 in December 2025 to v2.7.1 in April 2026, with major changes around directives, SDD support, token intelligence, and scoring.", "fact", "project-history", ["versions", "timeline", "release-history"]),
+        _memory_item("No emojis in source code or docs. The codebase treats decoration as signal loss and enforces that preference with tests.", "preference", "communication", ["no-emojis", "style", "tests"]),
+        _memory_item("Use structured logging for normal diagnostics. Reserve raw stderr writes for probe-level debugging in threaded or async startup paths.", "preference", "debugging", ["logging", "stderr", "debugging"]),
+        _memory_item("Keep Elefante local-first. Memory, backups, and reset paths must work on the user's machine without cloud dependency.", "preference", "product-direction", ["local-first", "privacy", "product"]),
+        _memory_item("Never print to stdout from the MCP server. Stdout is JSON-RPC transport and any stray print corrupts the protocol.", "preference", "protocol", ["stdout", "json-rpc", "protocol"]),
+        _memory_item("Keep commits scoped to one concern. Do not force-push and do not deploy without permission.", "preference", "workflow", ["commits", "workflow", "safety"]),
+        _memory_item("Prefer maintained proof over scratch reproduction. Check tests/README.md and scripts/verify before inventing another debug script.", "preference", "debugging", ["tests", "verification", "proof"]),
+        _memory_item("Python 3.11 is the floor because the codebase relies on modern typing, async, and current Kuzu and ChromaDB support.", "preference", "runtime", ["python-3.11", "runtime", "compatibility"]),
+        _memory_item("Do not add new dependencies without explicit confirmation.", "preference", "workflow", ["dependencies", "approval", "constraints"]),
+        _memory_item("Passive documentation does not make agents comply. The routing rules only started working when they were injected into every MCP response.", "insight", "agent-behavior", ["routing", "agents", "injection"]),
+        _memory_item("Never let a Kuzu QueryResult escape the worker-thread helper. Materialize rows inside the lock or you will eventually hit native crashes.", "insight", "database", ["kuzu", "asyncio", "native-crash"]),
+        _memory_item("If doubling the timeout still fails, stop calling it slow and treat it as a hang. BUG-010 only moved once that distinction was made.", "insight", "debugging", ["bug-010", "timeouts", "deadlock"]),
+        _memory_item("Fix the whole live surface, not just the hurt file. Runtime messages, docs, tests, source strings, and stored memories drift together.", "insight", "maintenance", ["drift", "docs", "tests"]),
+        _memory_item("Source-derived guards beat static prose. Tests that assert real paths, counts, and schemas fail loudly when reality changes.", "insight", "quality-gates", ["tests", "guards", "source-derived"]),
+        _memory_item("Entry routing must appear at first contact. Agents skip instructions that are merely available somewhere else.", "insight", "agent-behavior", ["routing", "instructions", "first-contact"]),
+        _memory_item("Analysis without action is entertainment. The correct pattern is state, do, verify in the same response.", "insight", "agent-behavior", ["execution", "verification", "workflow"]),
     ]
-    return [{"content": topics[i], "type": "conversation", "category": "troubleshooting",
-             "tags": ["ci-cd", "debugging"]} for i in range(n)]
 
 
-def _decisions(n=15):
-    rules = [
-        "All React components must use Zustand for state management, not Redux.",
-        "Python services must target 90% test coverage before merge.",
-        "Java modules require Checkstyle + SpotBugs in the CI gate.",
-        "Frontend bundle size budget is 200KB gzipped, enforced by CI.",
-        "All database migrations must be backward-compatible (expand-contract).",
-        "API response times must stay below p99 = 200ms in staging.",
-        "Secrets are stored in AWS Secrets Manager, never in env vars.",
-        "All public endpoints require rate limiting at the API gateway.",
-        "Error responses must follow RFC 7807 Problem Details format.",
-        "Logging must use structured JSON, never printf-style strings.",
-        "Docker images must be based on distroless, not Alpine.",
-        "All async Python code must use structured concurrency (TaskGroups).",
-        "GraphQL mutations must be idempotent with client-generated IDs.",
-        "Feature flags are managed via LaunchDarkly, no homegrown toggles.",
-        "Dependency updates are automated via Renovate with auto-merge for patch.",
+def _conversations():
+    return [
+        _memory_item("Boot failed with 'Database path cannot be a directory'. First guess was leftover Kuzu files or a corrupted test database.", "conversation", "database-debugging", ["kuzu", "startup", "path"], session_group=0),
+        _memory_item("We spent time in graph_store.py before noticing the failure was happening earlier in startup. The hypothesis shifted from storage corruption to path setup.", "conversation", "database-debugging", ["kuzu", "debugging", "path"], session_group=0),
+        _memory_item("A search for mkdir calls found config.py pre-creating KUZU_DIR. That was the exact thing Kuzu 0.11.x no longer tolerates.", "conversation", "database-debugging", ["kuzu", "config", "mkdir"], session_group=0),
+        _memory_item("Removed the eager mkdir and let Kuzu own the path. The error vanished; the bug was in our bootstrap, not the database.", "conversation", "database-debugging", ["kuzu", "fix", "bootstrap"], session_group=0),
+        _memory_item("Migration reported 78 memories migrated with 0 errors, but the dashboard still showed empty V3 layer metadata. We assumed the migration logic was broken.", "conversation", "metadata-debugging", ["v3", "migration", "metadata"], session_group=1),
+        _memory_item("The classifier only had five regex patterns, so many memories were never labeled. Fixing that exposed a second gap in add_memory.", "conversation", "metadata-debugging", ["v3", "classifier", "metadata"], session_group=1),
+        _memory_item("layer and sublayer were also missing in _reconstruct_memory, and a long-lived server cache hid the code changes.", "conversation", "metadata-debugging", ["v3", "reconstruct", "cache"], session_group=1),
+        _memory_item("The frontend then failed again because it read the wrong property path in two places. The issue spanned six layers, not one file.", "conversation", "metadata-debugging", ["v3", "frontend", "six-layers"], session_group=1),
+        _memory_item("Windows startup kept hanging near sentence-transformers. First assumption was a slow cold start, so we doubled the timeout.", "conversation", "startup-debugging", ["bug-010", "windows", "startup"], session_group=2, cluster="deadlock-investigation"),
+        _memory_item("Timeout increases changed nothing. We moved the import into asyncio.to_thread, which only relocated the hang.", "conversation", "startup-debugging", ["bug-010", "asyncio", "deadlock"], session_group=2, cluster="deadlock-investigation"),
+        _memory_item("Added raw stderr probes around startup because structured logs were too late. The freeze point was exactly import SentenceTransformer.", "conversation", "startup-debugging", ["bug-010", "stderr", "import"], session_group=2, cluster="deadlock-investigation"),
+        _memory_item("Fixed startup by pre-loading the embedding model before asyncio.run(). Lesson: stop calling a deadlock slow after the second timeout.", "conversation", "startup-debugging", ["bug-010", "fix", "sentence-transformers"], session_group=2, cluster="deadlock-investigation"),
+        _memory_item("Agent said the dashboard opened on localhost:8000 with nodes and edges, but the user only saw a blank page. Initial focus went to React rendering.", "conversation", "dashboard-debugging", ["dashboard", "blank-screen", "ui"], session_group=3),
+        _memory_item("We checked frontend hooks and snapshot generation, but the blank page reproduced before the app could fully boot. Browser launch timing looked suspicious.", "conversation", "dashboard-debugging", ["dashboard", "race-condition", "startup"], session_group=3),
+        _memory_item("The real issue was process lifetime: the dashboard was started as a daemon thread inside the MCP server. When the client closed stdio, the thread died immediately.", "conversation", "dashboard-debugging", ["dashboard", "daemon-thread", "stdio"], session_group=3),
+        _memory_item("Switched to subprocess.Popen with start_new_session=True and waited for readiness before opening the browser. The blank page was lifecycle, not UI.", "conversation", "dashboard-debugging", ["dashboard", "subprocess", "readiness"], session_group=3),
+        _memory_item("A proposed fix for memory-search behavior was adding BOB/.github/copilot-instructions.md. That looked acceptable until the audit considered opening subfolders.", "conversation", "agent-behavior", ["bug-012", "instructions", "scope"], session_group=4),
+        _memory_item("ARAA rejected the workspace-only fix because behavior would regress outside that exact root. The scope of the bug was broader than the patch.", "conversation", "agent-behavior", ["bug-012", "audit", "scope"], session_group=4),
+        _memory_item("We separated MCP registration scope from instruction delivery scope. Registering the server does not make the agent use it.", "conversation", "agent-behavior", ["bug-012", "mcp", "instructions"], session_group=4),
+        _memory_item("Final fix moved codeGeneration.instructions to VS Code user settings so every workspace and folder inherits the routing rules.", "conversation", "agent-behavior", ["bug-012", "settings-json", "routing"], session_group=4),
     ]
-    return [{"content": rules[i], "type": "preference", "category": "standards",
-             "tags": ["rules", "engineering"]} for i in range(n)]
 
 
-def _supersessions(n=5):
+def _decisions():
+    return [
+        _memory_item("Chose ChromaDB plus Kuzu dual-store architecture because semantic retrieval and relationship queries are different workloads.", "decision", "architecture", ["v2.0.0", "architecture", "storage"]),
+        _memory_item("Pinned embeddings to thenlper/gte-base and store vectors explicitly. Mixing ChromaDB defaults with project embeddings silently corrupts search.", "decision", "retrieval", ["embeddings", "gte-base", "retrieval"]),
+        _memory_item("Adopted behavioral scoring instead of user-assigned importance. Score should emerge from recency, freshness, access frequency, and memory type.", "decision", "scoring", ["v2.0.0", "scoring", "behavioral"], cluster="scoring"),
+        _memory_item("Created a directive system outside normal memories so hard rules are injected unconditionally and cannot be outcompeted by similarity.", "decision", "directives", ["v2.1.0", "directives", "mcp"]),
+        _memory_item("Promoted specification and directive to first-class memory types with authority 1.0 and zero decay.", "decision", "memory-model", ["v2.2.0", "authority", "memory-types"]),
+        _memory_item("Moved sentence-transformers preload before asyncio.run() because import SentenceTransformer deadlocks in worker threads under anyio plus piped stdio.", "decision", "startup", ["v2.5.1", "bug-010", "startup"]),
+        _memory_item("Removed the domain signal from ranking and redistributed its weight to vector and concept signals after proving the value spaces never intersected.", "decision", "scoring", ["v2.7.0", "bug-016", "scoring"], cluster="scoring"),
+        _memory_item("Gated the specification override on system intent only. The unconditional boost created a ranking monopoly.", "decision", "scoring", ["v2.7.0", "bug-017", "specifications"], cluster="scoring"),
+        _memory_item("Committed to MCP stdio instead of a REST-first architecture. Core memory operations should work as an IDE-connected server, not an HTTP app.", "decision", "protocol", ["mcp", "stdio", "architecture"]),
+        _memory_item("Renamed importance to score across the codebase to match behavioral scoring semantics.", "decision", "scoring", ["v2.1.1", "naming", "scoring"], cluster="scoring"),
+        _memory_item("Curated the stored memories from 19 down to 13 by deleting duplicates, generic checklists, and unimplemented concepts.", "decision", "curation", ["v2.0.0", "curation", "quality"]),
+        _memory_item("Merged four maintenance scripts into two to remove duplicated lock-handling and export logic.", "decision", "tooling", ["v2.5.2", "scripts", "maintenance"]),
+        _memory_item("Changed the installer to ask what to do with an existing .venv instead of silently reusing it.", "decision", "installation", ["v2.6.0", "installer", "venv"]),
+        _memory_item("Standardized the dashboard on React, Vite, and SVG with a snapshot file as the only data source.", "decision", "dashboard", ["dashboard", "react", "vite"]),
+        _memory_item("Persisted session retrieval history to disk with 7-day expiry so co-activation does not reset to zero on every restart.", "decision", "retrieval", ["v2.7.0", "bug-018", "coactivation"]),
+    ]
+
+
+def _supersessions():
     pairs = [
-        ("Formatting uses Prettier with default config.", "Migrated from Prettier to Biome for 10x faster formatting."),
-        ("CI runs on GitHub Actions with Ubuntu 22.04.", "CI migrated to Buildkite with self-hosted ARM runners."),
-        ("Frontend tests use Jest + React Testing Library.", "Frontend tests migrated to Vitest for Vite-native speed."),
-        ("Python linting uses flake8 + isort.", "Python linting consolidated to Ruff (replaces flake8, isort, black)."),
-        ("Deployments use Helm charts on EKS.", "Deployments migrated to ArgoCD GitOps on EKS."),
+        ("The dashboard server can run as a daemon thread inside the MCP process.", "The dashboard server must run as a detached subprocess with a readiness check before the browser opens.", "dashboard-runtime", ["dashboard", "lifecycle", "supersession"]),
+        ("Dashboard node payloads can be serialized inline wherever they are needed.", "All dashboard nodes must be built through dashboard_serializer.py with live score computation.", "dashboard-serialization", ["dashboard", "serializer", "supersession"]),
+        ("Workspace-scoped copilot-instructions files are enough to make agents call Elefante.", "Instruction delivery must be system-scoped through VS Code user settings so every workspace inherits the routing.", "instruction-delivery", ["instructions", "scope", "supersession"]),
+        ("The ranking model should keep a 15 percent domain signal.", "The ranking model removes the broken domain signal and reallocates that weight to vector and concept signals.", "scoring", ["scoring", "domain-signal", "supersession"]),
+        ("Specification memories always receive a 0.30 override boost.", "Specification boost only applies when inferred intent is system.", "scoring", ["scoring", "specification", "supersession"]),
     ]
     items = []
-    for i in range(n):
-        items.append({"content": pairs[i][0], "type": "fact", "category": "tooling",
-                       "tags": ["migration"], "is_old": True, "pair_id": i})
-        items.append({"content": pairs[i][1], "type": "decision", "category": "tooling",
-                       "tags": ["migration"], "is_new": True, "pair_id": i})
+    for pair_id, (old_content, new_content, category, tags) in enumerate(pairs):
+        items.append(_memory_item(old_content, "fact", category, tags, is_old=True, pair_id=pair_id))
+        items.append(_memory_item(new_content, "decision", category, tags, is_new=True, pair_id=pair_id, cluster="tooling-evolution"))
     return items
 
 
-def _contradictions(n=5):
+def _contradictions():
     pairs = [
-        ("Production database timezone is set to UTC.", "Production database timezone is set to America/New_York."),
-        ("The default branch is main.", "The default branch is master."),
-        ("API authentication uses JWT with RS256.", "API authentication uses opaque OAuth2 tokens."),
-        ("Search uses Elasticsearch 8.", "Search uses OpenSearch 2."),
-        ("Cache TTL for user sessions is 30 minutes.", "Cache TTL for user sessions is 24 hours."),
+        ("The 'Database path cannot be a directory' failure means the Kuzu database files are corrupted.", "The 'Database path cannot be a directory' failure came from config.py pre-creating the database directory before Kuzu opened it.", "database-debugging", ["kuzu", "path", "assumption"]),
+        ("import SentenceTransformer is just slow on Windows cold start.", "import SentenceTransformer deadlocks in worker threads under anyio plus piped stdio and must be pre-loaded.", "startup-debugging", ["bug-010", "windows", "deadlock"]),
+        ("The blank dashboard after launch is a React rendering bug.", "The blank dashboard after launch is a process-lifecycle bug caused by daemon-thread shutdown and browser timing.", "dashboard-debugging", ["dashboard", "blank-screen", "assumption"]),
+        ("JSON export from export_memories.py is sufficient backup coverage.", "JSON export is read-only analysis output because embeddings are excluded and there is no import path.", "backup", ["export", "backup", "assumption"]),
+        ("MCP registration scope and instruction delivery scope are basically the same thing.", "MCP registration and instruction delivery are orthogonal; the agent still needs explicit system-scoped routing.", "instruction-delivery", ["mcp", "instructions", "scope"]),
     ]
     items = []
-    for i in range(n):
-        items.append({"content": pairs[i][0], "type": "fact", "category": "config", "tags": ["contradiction-a"]})
-        items.append({"content": pairs[i][1], "type": "fact", "category": "config", "tags": ["contradiction-b"]})
+    for pair_id, (left, right, category, tags) in enumerate(pairs):
+        items.append(_memory_item(left, "note", category, tags + ["contradiction-a"], pair_id=pair_id, conflict_side="a"))
+        items.append(_memory_item(right, "note", category, tags + ["contradiction-b"], pair_id=pair_id, conflict_side="b"))
     return items
 
 
-def _specifications(n=5):
-    specs = [
-        "NEVER commit plaintext secrets to the repository. Enforced by pre-commit hook.",
-        "All production data access requires an approved IAM role with MFA.",
-        "PII must be encrypted at rest (AES-256) and in transit (TLS 1.3).",
-        "Incident response SLA: P1 acknowledged within 15 minutes.",
-        "All third-party dependencies must pass license compliance (no GPL in proprietary code).",
+def _specifications():
+    return [
+        _memory_item("The Four Laws govern the system: continuity, compliance, grounding, and efficiency. Sessions continue, search precedes claims, unknown stays unknown, and every token must earn its place.", "specification", "system-law", ["four-laws", "system", "sdd"]),
+        _memory_item("Search before assert: when the user asks about preferences, past decisions, or project conventions, call MemorySearch with an explicit standalone query before answering.", "specification", "retrieval-rule", ["search-first", "retrieval", "compliance"]),
+        _memory_item("Stdout Purity Law: never print to stdout from the MCP server because stdout is the JSON-RPC transport.", "specification", "protocol-law", ["stdout", "protocol", "json-rpc"]),
+        _memory_item("Memory type selection is deliberate: specification for architecture, preference for user preferences, conversation for ephemeral dialogue, and never note for architectural decisions.", "specification", "memory-model", ["memory-types", "classification", "lifespan"]),
+        _memory_item("Critical database laws: properties cannot be a column name, Kuzu is single-writer, let Kuzu own its path, and never let database work outlive GraphStore.close().", "specification", "database-law", ["kuzu", "database", "safety"]),
     ]
-    return [{"content": specs[i], "type": "specification", "category": "security",
-             "tags": ["critical", "compliance"]} for i in range(n)]
+
+
+def _ephemera():
+    return [
+        _memory_item("Windows crashed on import because fcntl was imported unconditionally. The immediate fix was a sys.platform != 'win32' guard.", "note", "platform-bug", ["windows", "fcntl", "bug"], delete_candidate=True),
+        _memory_item("Dashboard topic kept showing General because two code paths read topic instead of category.", "note", "dashboard-bug", ["dashboard", "topic", "category"], delete_candidate=True),
+        _memory_item("Deleting a memory left stale UUIDs inside session retrieval history and created orphan co-activation edges.", "note", "graph-bug", ["coactivation", "delete", "graph"], delete_candidate=True),
+        _memory_item("A cleanup pass removed 200 test memories like entity_target_0 through entity_target_99 from ChromaDB and added a guard to detect that artifact pattern.", "note", "data-hygiene", ["cleanup", "test-data", "chromadb"], delete_candidate=True),
+        _memory_item("Using properties as a Kuzu column name works in schema DDL but collides with Cypher parsing. Renaming the field to props fixed the binder error.", "note", "database-bug", ["kuzu", "cypher", "schema"], delete_candidate=True),
+        _memory_item("A write-only export is not a backup. If there is no import path, the tool must say read-only analysis output.", "insight", "backup", ["backup", "export", "product-safety"]),
+        _memory_item("CI must build every artifact it packages. Gitignored dashboard assets made the first binary release pipeline fail.", "insight", "release", ["ci", "release", "assets"]),
+        _memory_item("A green build matrix is not release proof. Publication can still fail later on asset size limits or release assembly.", "insight", "release", ["release", "ci", "proof"]),
+        _memory_item("GitHub releases cap assets at 2 GiB. The Linux artifact exceeded 4 GiB, so release automation had to filter oversized assets.", "fact", "release", ["github-release", "asset-cap", "v2.7.1"]),
+        _memory_item("API working does not prove dashboard working. The frontend can still bind to the wrong response shape and render blank rows.", "insight", "dashboard", ["dashboard", "frontend", "contract"]),
+    ]
 
 
 def build_corpus():
-    # 30 + 20 + 15 + 10(5 pairs) + 10(5 pairs) + 5 = 90 + 10 = 100
     corpus = []
-    corpus.extend(_facts(30))
-    corpus.extend(_conversations(20))
-    corpus.extend(_decisions(15))
-    corpus.extend(_supersessions(5))   # yields 10
-    corpus.extend(_contradictions(5))  # yields 10
-    corpus.extend(_specifications(5))
-    # Pad to exactly 100 with 5 extra diverse facts
-    while len(corpus) < 100:
-        corpus.append({"content": f"Extra fact: deployment region {len(corpus)} uses multi-AZ.",
-                        "type": "fact", "category": "infrastructure", "tags": ["cloud"]})
+    corpus.extend(_foundation_memories())
+    corpus.extend(_conversations())
+    corpus.extend(_decisions())
+    corpus.extend(_supersessions())
+    corpus.extend(_contradictions())
+    corpus.extend(_specifications())
+    corpus.extend(_ephemera())
     assert len(corpus) == 100, f"Expected 100, got {len(corpus)}"
     return corpus
 
@@ -174,10 +213,10 @@ async def run_injection(db_path):
 
     all_ids = []
     supersession_old_ids = {}
-    # Track indices by role for behavioral history pass
-    conversation_ids = []
-    contradiction_pair_ids = []  # list of (id_a, id_b)
-    _contradiction_buffer = {}   # pair_id -> first id
+    conversation_groups = {}
+    contradiction_pairs = {}
+    cluster_members = {}
+    delete_candidates = []
 
     for idx, payload in enumerate(corpus):
         days_ago = 180 - int((idx / len(corpus)) * 180)
@@ -223,18 +262,23 @@ async def run_injection(db_path):
 
         all_ids.append(str(mem_id))
 
-        # Track conversation memories
+        # Track grouped conversation memories
         if payload["type"] == "conversation":
-            conversation_ids.append(str(mem_id))
+            conversation_groups.setdefault(payload.get("session_group", 0), []).append(str(mem_id))
 
-        # Track contradiction pairs
-        if "contradiction-a" in payload.get("tags", []):
-            _contradiction_buffer[idx] = str(mem_id)
-        elif "contradiction-b" in payload.get("tags", []):
-            # The previous index was the "a" side
-            a_id = _contradiction_buffer.get(idx - 1)
-            if a_id:
-                contradiction_pair_ids.append((a_id, str(mem_id)))
+        # Track contradiction pairs by explicit pair_id
+        if payload.get("conflict_side") == "a":
+            contradiction_pairs.setdefault(payload["pair_id"], {})["a"] = str(mem_id)
+        elif payload.get("conflict_side") == "b":
+            contradiction_pairs.setdefault(payload["pair_id"], {})["b"] = str(mem_id)
+
+        # Track related-memory clusters explicitly
+        if payload.get("cluster"):
+            cluster_members.setdefault(payload["cluster"], []).append(str(mem_id))
+
+        # Track low-signal memories for purposeful deletion later
+        if payload.get("delete_candidate"):
+            delete_candidates.append(str(mem_id))
 
         # Track supersession pairs
         if payload.get("is_old"):
@@ -257,9 +301,15 @@ async def run_injection(db_path):
         session_ids = random.sample(all_ids, k=min(4, len(all_ids)))
         await orchestrator.record_coactivation(session_ids)
 
-    # Purposeful Deletions - 5 extra-fact-range memories (indices 90-94)
+    contradiction_pair_ids = []
+    for pair in sorted(contradiction_pairs):
+        sides = contradiction_pairs[pair]
+        if "a" in sides and "b" in sides:
+            contradiction_pair_ids.append((sides["a"], sides["b"]))
+
+    # Purposeful Deletions - 5 low-signal notes marked for pruning
     print("Executing 5 purposeful deletions...")
-    delete_targets = all_ids[90:95]
+    delete_targets = delete_candidates[:5]
     deleted_set = set(delete_targets)
     for del_id in delete_targets:
         await orchestrator.vector_store.delete_memory(uuid.UUID(del_id))
@@ -267,13 +317,26 @@ async def run_injection(db_path):
 
     # Remove deleted IDs from tracking lists
     surviving_ids = [mid for mid in all_ids if mid not in deleted_set]
-    conversation_ids = [mid for mid in conversation_ids if mid not in deleted_set]
+    surviving_conversation_groups = {
+        group: [mid for mid in mids if mid not in deleted_set]
+        for group, mids in conversation_groups.items()
+    }
+    surviving_clusters = {
+        name: [mid for mid in mids if mid not in deleted_set]
+        for name, mids in cluster_members.items()
+    }
 
     # =========================================================================
     # BEHAVIORAL HISTORY PASS (Spec: scripts/demo/SPEC_behavioral_history.md)
     # =========================================================================
-    await _behavioral_history_pass(orchestrator, surviving_ids, conversation_ids,
-                                   contradiction_pair_ids, now)
+    await _behavioral_history_pass(
+        orchestrator,
+        surviving_ids,
+        surviving_conversation_groups,
+        contradiction_pair_ids,
+        surviving_clusters,
+        now,
+    )
 
     # Final stats
     surviving = await asyncio.to_thread(orchestrator.vector_store._collection.get)
@@ -283,8 +346,8 @@ async def run_injection(db_path):
     print(f"  ELEFANTE_DB_PATH={abs_db} python -m src.dashboard")
 
 
-async def _behavioral_history_pass(orchestrator, surviving_ids, conversation_ids,
-                                    contradiction_pair_ids, now):
+async def _behavioral_history_pass(orchestrator, surviving_ids, conversation_groups,
+                                    contradiction_pair_ids, cluster_members, now):
     """Simulate 6 months of realistic usage patterns. Spec-driven."""
     vs = orchestrator.vector_store
 
@@ -292,16 +355,19 @@ async def _behavioral_history_pass(orchestrator, surviving_ids, conversation_ids
     # Phase 1: Session IDs on Conversations (20 → 5 sessions of 4)
     # ------------------------------------------------------------------
     print("\n[Phase 1] Assigning session IDs to conversations...")
-    session_uuids = [uuid.UUID(int=random.getrandbits(128)) for _ in range(5)]
-    for i, cid in enumerate(conversation_ids):
-        session_idx = i // 4  # 0-3 → session 0, 4-7 → session 1, ...
-        if session_idx >= len(session_uuids):
-            session_idx = len(session_uuids) - 1
-        mem = await vs.get_memory(uuid.UUID(cid))
-        if mem:
-            mem.metadata.session_id = session_uuids[session_idx]
-            await vs.replace_memory(mem)
-    print(f"  {len(conversation_ids)} conversations across {len(session_uuids)} sessions")
+    session_uuids = {
+        group: uuid.UUID(int=random.getrandbits(128))
+        for group in sorted(conversation_groups)
+    }
+    conversation_count = 0
+    for group, ids in conversation_groups.items():
+        for cid in ids:
+            mem = await vs.get_memory(uuid.UUID(cid))
+            if mem:
+                mem.metadata.session_id = session_uuids[group]
+                await vs.replace_memory(mem)
+                conversation_count += 1
+    print(f"  {conversation_count} conversations across {len(session_uuids)} sessions")
 
     # ------------------------------------------------------------------
     # Phase 2: Conflict Cross-Links (5 contradiction pairs → 10 memories)
@@ -320,28 +386,24 @@ async def _behavioral_history_pass(orchestrator, surviving_ids, conversation_ids
     print(f"  {len(contradiction_pair_ids)} pairs cross-linked")
 
     # ------------------------------------------------------------------
-    # Phase 3: Related Memory Links (4 topical clusters)
+    # Phase 3: Related Memory Links (explicit topical clusters)
     # ------------------------------------------------------------------
     print("[Phase 3] Building topical clusters...")
-    # Cluster by index ranges in surviving_ids
-    # Facts (0-29) → infra cluster, Conversations (30-49) → CI/CD cluster
-    # Decisions (50-64) → standards cluster, Specs (85-89) → security cluster
-    clusters = [
-        surviving_ids[0:4],     # Backend infrastructure facts
-        surviving_ids[30:34],   # CI/CD conversations
-        surviving_ids[50:53],   # Standards decisions + security
-        surviving_ids[60:64],   # Tooling supersession area
-    ]
+    surviving_set = set(surviving_ids)
     linked_count = 0
-    for cluster in clusters:
-        valid = [mid for mid in cluster if mid in set(surviving_ids)]
+    active_cluster_count = 0
+    for cluster in cluster_members.values():
+        valid = [mid for mid in cluster if mid in surviving_set]
+        if len(valid) < 2:
+            continue
+        active_cluster_count += 1
         for mid in valid:
             mem = await vs.get_memory(uuid.UUID(mid))
             if mem:
                 mem.metadata.related_memory_ids = [uuid.UUID(other) for other in valid if other != mid]
                 await vs.replace_memory(mem)
                 linked_count += 1
-    print(f"  {linked_count} memories linked across {len(clusters)} clusters")
+    print(f"  {linked_count} memories linked across {active_cluster_count} clusters")
 
     # ------------------------------------------------------------------
     # Phase 4: Access Pattern Simulation (power law / Zipf)
