@@ -3,7 +3,7 @@
 > **Purpose:** Distilled reusable debugging rules for Elefante contributors
 > **Companion Docs:** [README.md](README.md) and [dev-developer-agent.md](dev-developer-agent.md)
 > **Status:** Live feedback-loop ledger
-> **Applies to**: v2.7.1+
+> **Applies to**: v2.9.0+
 
 ---
 
@@ -227,6 +227,34 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Why:** A signal whose write-side enum (`DomainType.REFERENCE`) can never match its read-side inference (`None`/`"work"`/`"personal"`) produces a constant or penalty — 15% of weight budget wasted. An unconditional override (+0.30 for specs) that ignores query intent creates a ranking monopoly. Volatile state (`[]` on restart) makes a signal zero at cold start.
 - **Proof:** BUG-016 — domain signal write→read mismatch proved in `retrieval.py:138-148` vs `memory.py:128`. BUG-017 — spec override at `retrieval.py:301` dominates all queries (3 real ARAA queries returned same top 4 specs). BUG-018 — co-activation read path requires `_session_retrieval_history` which resets at `server.py:101`. See [ops-memory-compendium.md](ops-memory-compendium.md#issue-11-domain-signal-value-space-disjunction--15-of-scoring-weight-is-dysfunctional).
 - **Avoid:** Assuming a multi-signal system works because it is documented. Documentation describes the design, not the runtime behavior. Only a source trace with real queries proves intersection.
+
+---
+
+### New Features Are Not Exempt From Gate 1
+
+- **Trigger:** A new feature (script, tool, surface) that does not modify existing runtime code.
+- **Rule:** Write the spec entry in `spec-vision.md` before writing any implementation code. Gate 1 applies to new behavior, not just changes to existing behavior. "If you are proposing a new behavior not covered by any spec: write the spec first."
+- **Why:** Concrete tasks create false confidence. An agent told "build a DMG" knows hdiutil, knows zip, knows icons — and jumps straight to implementation. The spec-first gate catches scope drift, missing requirements, and misalignment with the product vision before code exists. Code-first means reconciliation; spec-first means alignment.
+- **Proof:** DMG installer feature (2026-04-16) — `build_dmg.py` was written, tested, and verified mounting before `spec-vision.md` section F existed. The code worked, but "works" is not the standard. The spec had to be written retroactively and the implementation verified against it. No design issues were found, but the process failure was real: a future feature with actual scope drift would have shipped before the spec could catch it.
+- **Avoid:** Treating the Five Gates as "change management for existing code." They govern all development. New features feel exempt because they don't touch existing surfaces — but Gate 1 explicitly covers them.
+
+---
+
+### Gate 4 Must Test The Distribution Path, Not The Build Path
+
+- **Trigger:** Any artifact (DMG, EXE, zip, binary) intended for end-user download from a platform with a trust gate (macOS Gatekeeper, Windows SmartScreen, Linux package signing).
+- **Rule:** Gate 4 verification must include the platform's trust-gate check, not just structural validity. For macOS: `codesign -dvv` and `spctl --assess`. For Windows: check Authenticode signature. "Does it mount?" is not "Can a user open it?"
+- **Why:** Local testing bypasses the trust gate. The artifact works on the build machine because it was never downloaded through the browser quarantine path. The user's first contact is the platform's security warning — if that blocks the artifact, the entire install experience fails at step zero.
+- **Proof:** DMG installer (2026-04-16) — `hdiutil attach` + `ls` passed, `codesign -dvv` returned "code object is not signed at all", `spctl --assess` returned "rejected / source=no usable signature". The DMG was structurally perfect and distributionally blocked. ARAA caught it; Gate 4 did not, because Gate 4 tested the wrong path.
+- **Avoid:** Declaring a distribution artifact "verified" based on local structural tests. The claim is "ready for users." The test must simulate what users encounter.
+
+### Multi-Edit Sessions Require Syntax Verification Before Closure (BUG-019)
+
+- **Trigger:** A file is patched more than once in a single session via string-replacement edits, especially aesthetic rewrites (dark→light theme, layout restructuring).
+- **Rule:** After the final edit, run `python3 -c "import py_compile; py_compile.compile('FILE', doraise=True)"` (or the language-equivalent syntax check). If the file is not covered by the test suite, this check is the ONLY gate preventing a broken ship. Commit working intermediate states before aesthetic rewrites.
+- **Why:** Overlapping string replacements on large files produce Frankenstein merges — interleaved fragments from both versions with orphaned kwargs, undefined variables, and duplicate widget constructors. The corruption is syntactically fatal but invisible to tests that don't import the file. A process exit code 1 observed mid-session was not diagnosed because the session moved on to unrelated questions.
+- **Proof:** BUG-019 — `installer_gui.py` patched 3+ times (chmod fix, dark→light palette, path display additions). Final file had `SyntaxError` at line 173, bare `C` instead of `self.C`, `C["entry"]`/`C["white"]` keys that don't exist in the light palette, duplicate `_build_ui` sections. File was never committed (untracked), so no recovery was possible. 137/137 pytest passed because no test imports the installer GUI. See [ops-installation-compendium.md](ops-installation-compendium.md#issue-10-dmg-gui-installer-app-broken--corrupted-multi-edit-merge).
+- **Avoid:** Trusting a green test suite as proof that ALL files in the commit are syntactically valid. If a file is not imported by any test, the test suite is blind to it.
 
 ---
 

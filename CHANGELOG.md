@@ -9,7 +9,26 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [2.9.0] - 2026-04-16
+
+### Added
+
+- **Downloadable installer bundle bootstrap path**: Elefante now ships a dedicated stable-path bootstrap surface through `scripts/setup/bootstrap_release_bundle.py` and `scripts/ci/build_installer_bundle.py`. Why: the phase-1 installer product must stop assuming `git clone` and disposable working directories. What: release packaging can now build `elefante-installer-<OS>.zip`, generate top-level installer entrypoints, place the payload into `~/.elefante/app/current` or `%LOCALAPPDATA%\Elefante\app\current`, and then delegate the real setup work to the installed `scripts/setup/install.py`. Impact: Elefante now has a real installer-bundle path without forking installer logic.
+- **Branded macOS DMG installer**: `scripts/ci/build_dmg.py` wraps the installer bundle zip into a compressed `.dmg` with the Elefante logo as volume icon, branded README, and www.elefante.ai link. Why: macOS users expect a native disk image, not a raw zip. What: CI builds the DMG on macOS after the installer bundle, uploads it as a release artifact. Optional `--sign` for notarized releases. Impact: GitHub Releases now ship a branded `.dmg` alongside the existing zip bundles. Spec: `spec-vision.md` section F.
+- **Native macOS GUI installer**: `scripts/ci/installer_gui.py` provides a tkinter-based installer window launched from the DMG `.app` bundle. Why: users expect a graphical install experience, not a Terminal session. What: the `.app` launcher probes system Python interpreters for tkinter support, opens a branded window with install path picker, real-time progress bar, and scrollable output log. Falls back to Terminal via osascript if tkinter is unavailable. Impact: double-clicking "Install Elefante" in the DMG now opens a native GUI window.
+
+### Changed
+
+- **Release pipeline now publishes installer bundles alongside binary artifacts**: `.github/workflows/build-binaries.yml` builds and uploads platform-specific installer zips, and `scripts/ci/select_release_assets.py` now considers those installer artifacts during release publication. Why: the phase-1 installer product must be a downloadable release artifact, not just a PRD. What: CI now packages the bundle after dashboard assets are built and keeps the selection logic locally testable. Impact: GitHub Releases can ship a stable-path installer bundle for Elefante instead of only the PyInstaller runtime bundle.
+
+### Fixed
+
+- **BUG-019: DMG GUI installer .app regression** — `installer_gui.py` was corrupted by overlapping multi-edit patches during a dark-to-light palette rewrite. Fatal `SyntaxError` at line 173, undefined variables, duplicate widget constructors. The `.app` exited immediately with code 1. Rewrote the corrupted UI construction zone (~140 lines) as a single coherent light-mode version. See `ops-installation-compendium.md` Issue #10.
+
+### Documentation
+
+- **Installer procedure PRD corrected to phase 1**: `docs/planning/spec-installer-procedure.md` now defines the correct first milestone for installer work: a downloadable Elefante installer product that removes `git clone` from the end-user flow while preserving `scripts/setup/install.py` as the single installation authority. Why: the real gap is product packaging and first-run entrypoint, not provider selection. What: the draft now centers stable install location, visible terminal UX, cancel/status/log behavior, bundled dashboard assets, and maintained Elefante verifiers, while explicitly deferring provider choices to phase 2. Impact: installer work is now scoped to the actual highest-risk surface without mixing in optional runtime-provider features too early.
+- **BUG-019 post-mortem**: Added to `ops-installation-compendium.md` Issue #10, `best_practices.md` (multi-edit syntax verification rule), and Known Issues table.
 
 ---
 

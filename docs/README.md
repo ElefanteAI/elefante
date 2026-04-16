@@ -1,6 +1,6 @@
 # Elefante Documentation
 
-> **v2.7.1** · [Product overview & install](../README.md) · [Agent constitution](../.github/copilot-instructions.md)
+> **v2.9.0** · [Product overview & install](../README.md) · [Agent constitution](../.github/copilot-instructions.md)
 
 ---
 
@@ -61,6 +61,7 @@
 
 | Doc | Content |
 |-----|---------|
+| [`planning/spec-installer-procedure.md`](planning/spec-installer-procedure.md) | Draft phase-1 PRD for a downloadable Elefante installer product that wraps the existing installer and removes `git clone` from the end-user flow |
 | [`planning/spec-vision.md`](planning/spec-vision.md) | What Elefante is, the Four Laws, vision, ideas backlog |
 | [`planning/spec-usage-intelligence.md`](planning/spec-usage-intelligence.md) | Usage metrics PRD (backend 80%, frontend 0%) |
 

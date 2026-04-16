@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : select_release_assets.py
-# VERSION : 2.7.1
-# CHANGED : 2026-04-15
+# VERSION : 2.7.2
+# CHANGED : 2026-04-16
 # PURPOSE : Select GitHub release assets that fit under the platform's hard
 #           per-file size cap and emit the workflow outputs consumed by the
 #           release job.
 # WHEN    : In CI after artifact download and before action-gh-release, or
 #           locally when validating release publication behavior.
 # USAGE   : python scripts/ci/select_release_assets.py
-# NOTES   : Defaults to the Elefante build artifact paths and uses GITHUB_OUTPUT
-#           and GITHUB_STEP_SUMMARY when present.
+# NOTES   : Defaults to the Elefante binary and installer-bundle artifact paths
+#           and uses GITHUB_OUTPUT and GITHUB_STEP_SUMMARY when present.
 # LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Select releasable GitHub assets under the platform file-size cap."""
@@ -27,6 +27,10 @@ DEFAULT_CANDIDATES = [
     Path("artifacts/elefante-Linux-binary/elefante-Linux.zip"),
     Path("artifacts/elefante-macOS-binary/elefante-macOS.zip"),
     Path("artifacts/elefante-Windows-binary/elefante-Windows.zip"),
+    Path("artifacts/elefante-Linux-installer/elefante-installer-Linux.zip"),
+    Path("artifacts/elefante-macOS-installer/elefante-installer-macOS.zip"),
+    Path("artifacts/elefante-Windows-installer/elefante-installer-Windows.zip"),
+    Path("artifacts/elefante-macOS-dmg/Elefante-Installer.dmg"),
 ]
 
 
@@ -88,7 +92,7 @@ def parse_args() -> argparse.Namespace:
         "--candidate",
         action="append",
         default=[],
-        help="Artifact path to consider. Defaults to the Elefante build artifact trio.",
+        help="Artifact path to consider. Defaults to the Elefante binary and installer bundle artifacts.",
     )
     parser.add_argument(
         "--max-bytes",

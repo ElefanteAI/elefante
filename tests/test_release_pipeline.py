@@ -91,6 +91,16 @@ def test_select_release_assets_cli_writes_outputs(tmp_path):
     assert str(large) in summary
 
 
+def test_select_release_assets_defaults_include_installer_bundles():
+    module = _load_module(ROOT / "scripts/ci/select_release_assets.py", "select_release_assets_defaults")
+
+    defaults = {str(path) for path in module.DEFAULT_CANDIDATES}
+
+    assert "artifacts/elefante-Linux-installer/elefante-installer-Linux.zip" in defaults
+    assert "artifacts/elefante-macOS-installer/elefante-installer-macOS.zip" in defaults
+    assert "artifacts/elefante-Windows-installer/elefante-installer-Windows.zip" in defaults
+
+
 def test_render_release_notes_uses_matching_changelog_entry():
     module = _load_module(ROOT / "scripts/ci/render_release_notes.py", "render_release_notes")
 
@@ -111,8 +121,10 @@ def test_release_documentation_audit_passes_for_repo_history():
 def test_build_workflow_uses_maintained_release_scripts():
     workflow = (ROOT / ".github/workflows/build-binaries.yml").read_text(encoding="utf-8")
 
+    assert "python scripts/ci/build_installer_bundle.py" in workflow
     assert "python3 scripts/ci/render_release_notes.py" in workflow
     assert "python3 scripts/ci/select_release_assets.py" in workflow
     assert "body_path: release-notes.md" in workflow
     assert "files: ${{ steps.select_release_assets.outputs.files }}" in workflow
+    assert "name: elefante-${{ runner.os }}-installer" in workflow
     assert "python3 - <<'PY'" not in workflow

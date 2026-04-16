@@ -8,7 +8,7 @@
 
 AI agents start every conversation from zero. Your preferences, decisions, and discovered patterns don't carry over. Elefante gives any MCP-compatible agent a persistent, local second brain — memories are stored, scored automatically, and surfaced at the right moment without being asked.
 
-**v2.7.1** — Persistent Memory Engine
+**v2.9.0** — Persistent Memory Engine
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -94,9 +94,14 @@ Elefante works with any MCP-compatible client today — VS Code, Cursor, Windsur
 
 ## One-Click Installation (Zero Config)
 
-**Requirements:** Python 3.11+ (tested up to 3.13), Git
+**Requirements:** Python 3.11+ (tested up to 3.13). Git is only required for the source-checkout fallback path.
 
 Our installer detects your OS, manages the repository virtual environment, installs all deps, initializes local graph and vector databases, and **automatically configures VS Code, Cursor, and Bob-IDE** to connect to Elefante via MCP.
+
+**Release bundle (preferred):** Download `elefante-installer-<OS>.zip` from GitHub Releases, extract it, then run the top-level `install.sh` or `install.bat`. The bootstrap places Elefante in a stable install root first, then delegates the real setup work to `scripts/setup/install.py`.
+
+- macOS / Linux stable root: `~/.elefante/app/current`
+- Windows stable root: `%LOCALAPPDATA%\Elefante\app\current`
 
 If `.venv` already exists, the installer offers four paths:
 
@@ -106,7 +111,8 @@ If `.venv` already exists, the installer offers four paths:
 - Abort installation
 
 ```bash
-# macOS / Linux (Mac curl coming soon, git clone for now)
+# Source checkout fallback
+# macOS / Linux
 git clone https://github.com/elefante/elefante.git
 cd elefante
 chmod +x install.sh && ./install.sh

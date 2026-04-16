@@ -59,6 +59,9 @@ temp_*
 # Local packaging output
 dist/
 
+# Local demo/data directories
+a0-data/
+
 # Cleanup and planning artifacts
 CLEANUP_PLAN.md
 RELEASE_V1.1.0_PREPARATION.md

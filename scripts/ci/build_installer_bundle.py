@@ -1,0 +1,258 @@
+#!/usr/bin/env python3
+# ─────────────────────────────────────────────────────────────────────────────
+# NAME    : build_installer_bundle.py
+# VERSION : 2.7.2
+# CHANGED : 2026-04-16
+# PURPOSE : Build a downloadable Elefante installer bundle that carries a full
+#           payload plus a bootstrap entrypoint for stable-path installation.
+# WHEN    : In CI after dashboard assets are built, or locally when validating
+#           installer bundle contents before release publication.
+# USAGE   : python scripts/ci/build_installer_bundle.py --platform macOS
+#           [--output dist/elefante-installer-macOS.zip]
+# NOTES   : Requires src/dashboard/ui/dist/index.html to exist. It packages a
+#           repo-like payload without .git, .venv, dist/, node_modules, or data artifacts.
+# LASTRUN : yyyy-mm-dd hh:mm — update manually
+# ─────────────────────────────────────────────────────────────────────────────
+"""Build a downloadable Elefante installer bundle."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import zipfile
+from pathlib import Path
+
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+BOOTSTRAP_SCRIPT = Path("scripts/setup/bootstrap_release_bundle.py")
+REQUIRED_PATHS = [
+    Path("README.md"),
+    Path("LICENSE"),
+    Path("requirements.txt"),
+    Path("config.yaml"),
+    Path("src"),
+    Path("src/dashboard/ui/dist/index.html"),
+    Path("scripts/setup/install.py"),
+    Path("scripts/setup/bootstrap_release_bundle.py"),
+    Path("scripts/verify/verify_health.py"),
+    Path("scripts/verify/verify_mcp_handshake.py"),
+    Path("scripts/pipeline/update_dashboard_data.py"),
+    Path(".github/copilot-instructions.md"),
+]
+TOP_LEVEL_EXCLUDED = {".git", ".venv", "dist", "data", "logs", "tmp", "lib"}
+ANYWHERE_EXCLUDED = {"__pycache__", "node_modules", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
+FILE_NAME_EXCLUDED = {
+    ".DS_Store",
+    ".elefante-install.log",
+    ".elefante-install-status.txt",
+    ".elefante-install-summary.txt",
+    "install.log",
+}
+SUFFIX_EXCLUDED = {".pyc", ".pyo"}
+PLATFORM_CHOICES = ["Linux", "macOS", "Windows"]
+
+
+def normalize_platform_name(platform_name: str | None) -> str:
+    if not platform_name:
+        if os.name == "nt":
+            return "Windows"
+        system_name = os.uname().sysname
+        return "macOS" if system_name == "Darwin" else "Linux"
+
+    if platform_name not in PLATFORM_CHOICES:
+        raise ValueError(f"Unsupported platform: {platform_name}")
+    return platform_name
+
+
+def detect_version(root_dir: Path) -> str:
+    readme_text = (root_dir / "README.md").read_text(encoding="utf-8")
+    match = re.search(r"\*\*v(\d+\.\d+\.\d+)\*\*", readme_text)
+    if match:
+        return match.group(1)
+    return "unknown"
+
+
+def validate_bundle_inputs(root_dir: Path) -> None:
+    missing = [str(path) for path in REQUIRED_PATHS if not (root_dir / path).exists()]
+    if missing:
+        raise FileNotFoundError("Installer bundle inputs missing: " + ", ".join(missing))
+
+
+def should_exclude(rel_path: Path) -> bool:
+    if not rel_path.parts:
+        return False
+
+    if rel_path.parts[0] in TOP_LEVEL_EXCLUDED:
+        return True
+
+    if rel_path.parts[:2] == ("a0-data", "demo_db"):
+        return True
+
+    if any(part in ANYWHERE_EXCLUDED for part in rel_path.parts):
+        return True
+
+    if rel_path.name in FILE_NAME_EXCLUDED:
+        return True
+
+    if rel_path.suffix in SUFFIX_EXCLUDED:
+        return True
+
+    return False
+
+
+def iter_payload_files(root_dir: Path):
+    for path in root_dir.rglob("*"):
+        if path.is_dir():
+            continue
+        rel_path = path.relative_to(root_dir)
+        if should_exclude(rel_path):
+            continue
+        yield rel_path
+
+
+def default_output_path(root_dir: Path, platform_name: str) -> Path:
+    return root_dir / "dist" / f"elefante-installer-{platform_name}.zip"
+
+
+def build_manifest(*, platform_name: str, version: str) -> dict[str, object]:
+    return {
+        "product": "Elefante",
+        "bundle_kind": "installer",
+        "platform": platform_name,
+        "version": version,
+        "payload_root": "payload/elefante",
+        "entrypoints": ["install.sh", "install.bat"],
+        "default_install_roots": {
+            "Windows": r"%LOCALAPPDATA%\\Elefante\\app\\current",
+            "macOS": "~/.elefante/app/current",
+            "Linux": "~/.elefante/app/current",
+        },
+    }
+
+
+def build_unix_wrapper() -> str:
+    return """#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"
+
+if command -v python3 >/dev/null 2>&1; then
+  PYTHON_CMD=\"python3\"
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_CMD=\"python\"
+else
+  echo \"[ERROR] Python 3.11+ is required to continue.\" >&2
+  exit 1
+fi
+
+exec \"$PYTHON_CMD\" \"$ROOT_DIR/scripts/setup/bootstrap_release_bundle.py\" --bundle-root \"$ROOT_DIR\" \"$@\"
+"""
+
+
+def build_windows_wrapper() -> str:
+    return """@echo off
+setlocal
+
+where py >nul 2>nul
+if %ERRORLEVEL% EQU 0 (
+    py -3 "%~dp0scripts\setup\bootstrap_release_bundle.py" --bundle-root "%~dp0" %*
+    set EXIT_CODE=%ERRORLEVEL%
+    pause
+    exit /b %EXIT_CODE%
+)
+
+where python >nul 2>nul
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] Python 3.11+ is required to continue.
+    pause
+    exit /b 1
+)
+
+python "%~dp0scripts\setup\bootstrap_release_bundle.py" --bundle-root "%~dp0" %*
+set EXIT_CODE=%ERRORLEVEL%
+pause
+exit /b %EXIT_CODE%
+"""
+
+
+def write_text_entry(
+    archive: zipfile.ZipFile,
+    arcname: str,
+    content: str,
+    *,
+    executable: bool = False,
+) -> None:
+    info = zipfile.ZipInfo(arcname)
+    if executable:
+        info.external_attr = 0o755 << 16
+    archive.writestr(info, content)
+
+
+def build_installer_bundle(root_dir: Path, *, platform_name: str, output_path: Path) -> Path:
+    validate_bundle_inputs(root_dir)
+    version = detect_version(root_dir)
+    bundle_dir = f"elefante-installer-{platform_name}"
+    manifest = build_manifest(platform_name=platform_name, version=version)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    if output_path.exists():
+        output_path.unlink()
+
+    with zipfile.ZipFile(output_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        write_text_entry(
+            archive,
+            f"{bundle_dir}/installer-manifest.json",
+            json.dumps(manifest, indent=2) + "\n",
+        )
+        write_text_entry(
+            archive,
+            f"{bundle_dir}/install.sh",
+            build_unix_wrapper(),
+            executable=True,
+        )
+        write_text_entry(
+            archive,
+            f"{bundle_dir}/install.bat",
+            build_windows_wrapper(),
+        )
+
+        bootstrap_bytes = (root_dir / BOOTSTRAP_SCRIPT).read_bytes()
+        archive.writestr(f"{bundle_dir}/{BOOTSTRAP_SCRIPT.as_posix()}", bootstrap_bytes)
+
+        for rel_path in iter_payload_files(root_dir):
+            source_path = root_dir / rel_path
+            archive.write(source_path, f"{bundle_dir}/payload/elefante/{rel_path.as_posix()}")
+
+    return output_path
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Build a downloadable Elefante installer bundle")
+    parser.add_argument("--platform", choices=PLATFORM_CHOICES, help="Bundle platform label")
+    parser.add_argument("--output", help="Output zip path")
+    parser.add_argument("--root-dir", help="Override the Elefante repo root to package")
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    root_dir = Path(args.root_dir).expanduser().resolve() if args.root_dir else ROOT_DIR
+    platform_name = normalize_platform_name(args.platform)
+    output_path = (
+        Path(args.output).expanduser().resolve()
+        if args.output
+        else default_output_path(root_dir, platform_name)
+    )
+
+    bundle_path = build_installer_bundle(
+        root_dir,
+        platform_name=platform_name,
+        output_path=output_path,
+    )
+    print(f"Wrote installer bundle: {bundle_path}")
+
+
+if __name__ == "__main__":
+    main()

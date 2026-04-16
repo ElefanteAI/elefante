@@ -1,10 +1,10 @@
 # Installation Debug Compendium
 
 > **Domain:** Installation, Setup & Environment  
-> **Last Updated:** 2026-04-15
-> **Total Issues Documented:** 9
+> **Last Updated:** 2026-04-16
+> **Total Issues Documented:** 10
 > **Status:** Production Reference  
-> **Applies to**: v2.7.1+
+> **Applies to**: v2.9.0+
 | #   | Law                                                  | Violation Cost       |
 | --- | ---------------------------------------------------- | -------------------- |
 | 1   | Do NOT pre-create Kuzu database directory            | 12 minutes debugging |
@@ -720,7 +720,7 @@ Select-String -Path .github/workflows/build-binaries.yml -Pattern "setup-node|np
 **Date:** 2026-04-15  
 **Duration:** ~30 minutes from public API evidence to source fix  
 **Severity:** HIGH  
-**Status:** IN PROGRESS — root cause identified, source fix + local guard added, fresh tag publish still pending
+**Status:** FIXED — v2.7.1 confirmed live on GitHub Releases with all platform assets published (v2.7.1, v2.6.0, v2.5.4 each show 4 assets)
 
 ### Problem
 
@@ -831,6 +831,73 @@ Manual: trigger `Build One-Click Binaries` on a fresh `v*` tag and confirm:
 ## Appendix: Issue Template
 
 ```markdown
+## Issue #10: DMG GUI Installer .app Broken — Corrupted Multi-Edit Merge
+
+**Date:** 2026-04-16  
+**Duration:** ~30 minutes (diagnosis + rewrite)  
+**Severity:** CRITICAL  
+**Status:** FIXED — v2.8.1
+
+### Problem
+
+The `Install Elefante.app` inside the DMG exits immediately with code 1. No GUI window appears. 100% of DMG users are blocked.
+
+### Symptom
+
+```
+$ "/Volumes/Elefante Installer/Install Elefante.app/Contents/MacOS/launcher" 2>&1
+# ... launcher finds /usr/bin/python3 (3.9.6) with tkinter, then:
+  File "installer_gui.py", line 173
+    troughcolor="#e5e7eb", background=C["accent"],
+IndentationError: unexpected indent
+```
+
+### Root Cause
+
+`scripts/ci/installer_gui.py` was patched 3+ times in a single session via string-replacement edits (chmod fix, dark→light palette swap, path display additions). The replacements overlapped or partially applied, producing a Frankenstein merge of two UI versions:
+
+- Line 171: `style.theme_use("aqua")` — `style` undefined (should be `ttk.Style()`)
+- Line 173: Orphaned `troughcolor=...` kwarg after `self._build_ui()` — **fatal SyntaxError**
+- Lines 177+: `_build_ui` uses bare `C` and `tk` instead of `self.C` and `self.tk`
+- Lines 233-310: Duplicate `# ── Install path` sections, interleaved widget constructors, references to nonexistent palette keys `C["entry"]`, `C["white"]`
+
+The file was never committed to git (untracked), so no recovery from history was possible.
+
+### Solution
+
+Rewrote the corrupted zone (`__init__` tail + `_build_ui` method, ~140 lines) from scratch as a single coherent light-mode version. All widget references use `self.C`, `self.tk`, `self.ttk`. All widgets are properly constructed and assigned. The action handlers (lines 310+) were intact and unchanged.
+
+Verification:
+1. `python3 -c "import py_compile; py_compile.compile('scripts/ci/installer_gui.py', doraise=True)"` — PASS
+2. `ast.parse()` structural check — 11 methods, 5 module functions intact
+3. DMG rebuild → mount → `diff` source vs DMG copy → FILES IDENTICAL
+4. `.app` launch → `GUI_RUNNING=YES`, `GUI_TEST=PASS`
+5. `pytest tests/ -x -q` → 137/137 passed
+
+### Why This Took So Long
+
+It didn't take long to fix once diagnosed. The real failure was **not diagnosing it when it happened**:
+
+1. The launcher returned exit code 1 during the previous session, but the session moved on to answering file-path questions instead of investigating
+2. 137/137 tests passed, creating false confidence — the test suite doesn't import `installer_gui.py`
+3. No syntax check was run after the multi-edit session
+4. The file was never committed, so there was no working checkpoint to diff against
+
+### Verification Commands
+
+```bash
+# Syntax check (primary gate for this file)
+python3 -c "import py_compile; py_compile.compile('scripts/ci/installer_gui.py', doraise=True)"
+
+# Structural check
+python3 -c "import ast; ast.parse(open('scripts/ci/installer_gui.py').read()); print('OK')"
+
+# Full test suite
+pytest tests/ -x -q
+```
+
+---
+
 ## Issue #N: [Short Descriptive Title]
 
 **Date:** YYYY-MM-DD  

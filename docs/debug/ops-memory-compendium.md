@@ -4,7 +4,7 @@
 > **Last Updated:** 2026-04-15
 > **Total Issues Documented:** 13
 > **Status:** Production Reference - All Scoring Flaws Fixed (v2.7.0)
-> **Applies to**: v2.7.1+
+> **Applies to**: v2.9.0+
 > **Maintainer:** Add new issues following Issue #N template at bottom
 >
 > **HISTORICAL NOTE:** Some issues below reference V3 concepts (layer, sublayer, classifier.py, IntentType, importance 1-10) that have since been removed. These entries document the debugging process and lessons learned; the referenced code/fields no longer exist.

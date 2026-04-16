@@ -1,6 +1,6 @@
 # Elefante Test Suite
 
-> **Version:** 2.7.1  
+> **Version:** 2.9.0  
 > **Last Updated:** 2026-04-13
 
 ## Quick Reference
@@ -52,6 +52,8 @@ Use the existing tests in this file before writing any ad hoc validation script.
 | [test_v4_concept_overlap.py](test_v4_concept_overlap.py) | Concept overlap detection in memory schema | When changing concept fields |
 | [test_dashboard_serializer.py](test_dashboard_serializer.py) | Dashboard node scoring, launch/open safeguards, refresh restart contract, and frontend retry backoff | When changing dashboard serialization, dashboard open flow, or frontend snapshot fetch behavior |
 | [test_factory_reset.py](test_factory_reset.py) | Factory reset dry-run, safety gates, backup, idempotency | When changing `scripts/lifecycle/reset_factory.py` |
+| [test_installer_bundle.py](test_installer_bundle.py) | Release-bundle bootstrap install root placement, delegated installer command wiring, and archive contents | When changing `scripts/setup/bootstrap_release_bundle.py` or `scripts/ci/build_installer_bundle.py` |
+| [test_install_setup.py](test_install_setup.py) | Bundled dashboard asset preference, install state tracking, and seed-memory guard | When changing `scripts/setup/install.py` |
 
 ### INTEGRATION (Run before release)
 
@@ -78,6 +80,8 @@ tests/
 ├── test_no_emojis.py            <- Unit test (policy)
 ├── test_v4_concept_overlap.py   <- Unit test (schema)
 ├── test_factory_reset.py        <- Unit test (lifecycle)
+├── test_installer_bundle.py     <- Unit test (installer bundle)
+├── test_install_setup.py        <- Unit test (install.py)
 ├── test_integration_smoke.py    <- Integration
 ├── test_end_to_end.py           <- Convenience shim → manual/test_end_to_end.py
 │
@@ -106,6 +110,8 @@ tests/
 | Verify developer routing references | `pytest tests/test_developer_routing.py -v` |
 | Changed scoring/retrieval logic | `pytest tests/test_scoring.py tests/test_refinery.py -v` |
 | Changed release pipeline or release-note rendering | `pytest tests/test_release_pipeline.py -v` |
+| Changed installer bundle or stable-path bootstrap logic | `pytest tests/test_installer_bundle.py -v` |
+| Changed install.py setup logic (dashboard bundling, state tracking, seed memory) | `pytest tests/test_install_setup.py -v` |
 | Validate retrieval signals plus dashboard demo coverage in isolation | `./.venv/bin/python scripts/verify/verify_scoring_sandbox.py` |
 | Changed dashboard serialization | `pytest tests/test_dashboard_serializer.py -v` |
 | Verify factory reset safety | `pytest tests/test_factory_reset.py -v` |

@@ -1,6 +1,6 @@
 # Elefante Safe Restart
 
-**Version**: 2.7.1  
+**Version**: 2.9.0  
 **Script**: `scripts/lifecycle/restart_elefante.py`  
 **Purpose**: Safely restart MCP server to pick up code changes
 
@@ -298,6 +298,6 @@ Arguments: {
 
 ---
 
-**Version**: 2.7.1
+**Version**: 2.9.0
 **Last Updated**: 2026-02-26
 **Status**: Production Ready

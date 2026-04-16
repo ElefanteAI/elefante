@@ -1,6 +1,6 @@
 # Technical Documentation
 
-**Elefante v2.7.1** · 17 docs · 3 prefixes
+**Elefante v2.9.0** · 17 docs · 3 prefixes
 
 ---
 

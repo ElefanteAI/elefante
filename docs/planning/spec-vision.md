@@ -1,6 +1,6 @@
 # Elefante Vision
 
-> Last updated: 2026-04-15 · Current version: v2.7.1
+> Last updated: 2026-04-15 · Current version: v2.9.0
 
 ---
 
@@ -149,6 +149,17 @@ Everything below emerged during development and represents where Elefante could 
 
 **Cross-IDE Support** — Currently works via MCP stdio with any MCP-compatible client. Constitution is symlinked for VS Code, Cursor, and Windsurf. Bob-IDE has no documented constitution injection path.
 *Status: MCP protocol works universally. Per-IDE setup varies.*
+
+### F. Distribution Packaging
+
+**Branded macOS DMG Installer** — A `.dmg` disk image published as a GitHub Release asset alongside the existing zip bundles. Opens to a branded Finder window with the Elefante logo as the volume icon, a README, and a link to www.elefante.ai. Contains the full installer bundle (`install.sh` + payload). No Applications symlink — Elefante is not a `.app`; the user runs `install.sh` from the mounted volume or copies the folder first. The DMG is compressed (UDZO/zlib-9). **Distribution requirement:** DMGs uploaded to GitHub Releases must be signed with a Developer ID Application certificate, notarized via `notarytool`, and stapled via `xcrun stapler`. Unsigned DMGs are blocked by macOS Gatekeeper on download and must not be published. The CI workflow gates DMG upload behind `APPLE_DEVELOPER_ID` secret presence. Requires: Apple Developer Program membership ($99/yr), Developer ID certificate, App-Specific Password for `notarytool`.
+*Status: Build script done (`scripts/ci/build_dmg.py`). CI wired with signing gate. Signing credentials not yet configured — DMG will not upload to releases until secrets are set.*
+
+**Branded Windows EXE Installer** — A self-extracting installer (NSIS or WiX) published as a GitHub Release asset. Bundles `install.bat` + payload. Branded with Elefante logo and www.elefante.ai. Runs `install.bat` post-extraction.
+*Status: Not built.*
+
+**Manual Fallback Path** — For users who prefer not to use packaged installers: clone the repo, ask your AI agent to read the README first. Elefante will handle it from there. This path must always remain functional and documented.
+*Status: Shipped. `install.sh` / `install.bat` from source.*
 
 ---
 

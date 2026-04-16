@@ -4,7 +4,9 @@ REM ========================================
 
 setlocal enabledelayedexpansion
 
-set LOG_FILE=%~dp0install.log
+set LOG_FILE=%~dp0.elefante-install.log
+set STATUS_FILE=%~dp0.elefante-install-status.txt
+set SUMMARY_FILE=%~dp0.elefante-install-summary.txt
 
 echo ============================================================ > "%LOG_FILE%"
 echo  ELEFANTE INSTALLATION LOG >> "%LOG_FILE%"
@@ -14,6 +16,11 @@ echo ============================================================ >> "%LOG_FILE%
 echo ============================================================
 echo  ELEFANTE INSTALLER
 echo ============================================================
+echo.
+echo [INFO] Log file: %LOG_FILE%
+echo [INFO] Status file: %STATUS_FILE%
+echo [INFO] Summary file: %SUMMARY_FILE%
+echo [INFO] Press Ctrl+C to request cancellation at the next safe checkpoint.
 echo.
 
 REM 1. Check for Python 3.11 - 3.13
@@ -46,7 +53,7 @@ echo [INFO] Repository virtual environment strategy will be handled by install.p
 REM 2. Run Python Installer
 echo [INFO] Starting installation wizard...
 echo [INFO] Starting installation wizard... >> "%LOG_FILE%"
-%PYTHON_CMD% scripts\setup\install.py --log-file "%LOG_FILE%"
+%PYTHON_CMD% scripts\setup\install.py --log-file "%LOG_FILE%" --status-file "%STATUS_FILE%" --summary-file "%SUMMARY_FILE%"
 
 REM Keep window open if run from explorer
 echo.

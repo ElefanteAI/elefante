@@ -5,7 +5,9 @@
 set -e
 
 # Setup Logging
-LOG_FILE="$(pwd)/install.log"
+LOG_FILE="$(pwd)/.elefante-install.log"
+STATUS_FILE="$(pwd)/.elefante-install-status.txt"
+SUMMARY_FILE="$(pwd)/.elefante-install-summary.txt"
 touch "$LOG_FILE"
 
 log() {
@@ -20,6 +22,11 @@ echo "============================================================" >> "$LOG_FIL
 log "============================================================"
 log " ELEFANTE INSTALLER"
 log "============================================================"
+log ""
+log "[INFO] Log file: $LOG_FILE"
+log "[INFO] Status file: $STATUS_FILE"
+log "[INFO] Summary file: $SUMMARY_FILE"
+log "[INFO] Press Ctrl+C to request cancellation at the next safe checkpoint."
 log ""
 
 # 1. Check for Python 3.11 - 3.13
@@ -51,4 +58,4 @@ log "[INFO] Repository virtual environment strategy will be handled by install.p
 
 # 2. Run Python Installer
 log "[INFO] Starting installation wizard..."
-"$PYTHON_CMD" scripts/setup/install.py --log-file "$LOG_FILE"
+"$PYTHON_CMD" scripts/setup/install.py --log-file "$LOG_FILE" --status-file "$STATUS_FILE" --summary-file "$SUMMARY_FILE"

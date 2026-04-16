@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : init_databases.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
+# VERSION : 2.7.2
+# CHANGED : 2026-04-16
 # PURPOSE : Initialize or re-verify ChromaDB collections and Kuzu schema without
 #           running the full installer; safe bootstrap safety check.
 # WHEN    : After a Kuzu nuclear reset or ChromaDB wipe, to re-initialize the
@@ -144,13 +144,21 @@ async def inject_seed_memory():
             logger.info("Seed memory already exists, skipping.")
             return True
             
-        await orc.add_memory(
+        memory = await orc.add_memory(
             content="The secret Elefante test passcode is 'Indigo-Echo'.",
             memory_type=MemoryType.FACT,
             tags=["seed", "test", "passcode"],
             metadata={"domain": DomainType.SYSTEM, "category": "system-test"}
         )
-        logger.info("Successfully injected seed memory.")
+        if memory is None:
+            rejection_reason = getattr(orc, "_last_rejection_reason", "Unknown rejection reason")
+            logger.error(
+                "Seed memory injection was rejected",
+                reason=rejection_reason,
+            )
+            return False
+
+        logger.info("Successfully injected seed memory.", memory_id=memory.id)
         return True
     except Exception as e:
         logger.error(f"Failed to inject seed memory: {e}", exc_info=True)

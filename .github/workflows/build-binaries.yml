@@ -42,6 +42,10 @@ jobs:
           npm ci
           npm run build
 
+      - name: Build Installer Bundle
+        run: |
+          python scripts/ci/build_installer_bundle.py --platform "${{ runner.os }}" --output dist/elefante-installer-${{ runner.os }}.zip
+
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
@@ -67,6 +71,49 @@ jobs:
         with:
           name: elefante-${{ runner.os }}-binary
           path: dist/elefante-${{ runner.os }}.zip
+          retention-days: 5
+
+      - name: Build macOS DMG
+        if: runner.os == 'macOS'
+        run: |
+          python scripts/ci/build_dmg.py --bundle dist/elefante-installer-macOS.zip --output dist/Elefante-Installer.dmg
+
+      - name: Sign and Notarize DMG
+        if: runner.os == 'macOS' && env.APPLE_DEVELOPER_ID != ''
+        env:
+          APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          # Sign
+          codesign -s "$APPLE_DEVELOPER_ID" --timestamp dist/Elefante-Installer.dmg
+          # Notarize
+          xcrun notarytool submit dist/Elefante-Installer.dmg \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --wait
+          # Staple the notarization ticket
+          xcrun stapler staple dist/Elefante-Installer.dmg
+          # Verify
+          spctl --assess --type open --context context:primary-signature -v dist/Elefante-Installer.dmg
+
+      - name: Upload Installer Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: elefante-${{ runner.os }}-installer
+          path: dist/elefante-installer-${{ runner.os }}.zip
+          retention-days: 5
+
+      - name: Upload DMG (only if signed)
+        if: runner.os == 'macOS' && env.APPLE_DEVELOPER_ID != ''
+        env:
+          APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: elefante-macOS-dmg
+          path: dist/Elefante-Installer.dmg
           retention-days: 5
 
   release:

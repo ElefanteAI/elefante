@@ -1,6 +1,6 @@
 # Installation & Configuration
 
-**Quick Start**: Run `install.bat` (Windows) or `install.sh` (Mac/Linux)
+**Quick Start**: Run `install.bat` (Windows) or `install.sh` (Mac/Linux). The installer writes `.elefante-install.log`, `.elefante-install-status.txt`, and `.elefante-install-summary.txt` in the repo root.
 **Troubleshooting**: See [`debug/ops-installation-compendium.md`](../debug/ops-installation-compendium.md) for automated protection against common failures
 
 ---
@@ -20,9 +20,30 @@ The installation scripts handle everything automatically:
 
 - Create virtual environment
 - Install dependencies
+- Reuse bundled dashboard assets when available, or build them locally when needed
 - Initialize databases (ChromaDB + Kuzu)
 - Configure IDE integration
 - Run health checks
+- Keep live installer status in terminal + state files
+
+### Release Bundle Installer
+
+Preferred product path:
+
+1. Download `elefante-installer-<OS>.zip` from GitHub Releases.
+2. Extract the archive.
+3. Run the top-level `install.sh` or `install.bat`.
+
+The bundle bootstrap first copies Elefante into a stable install root, then delegates to the installed [`scripts/setup/install.py`](../../scripts/setup/install.py).
+
+- macOS / Linux stable root: `~/.elefante/app/current`
+- Windows stable root: `%LOCALAPPDATA%\Elefante\app\current`
+
+This prevents IDE MCP configuration from pointing at a disposable unzip folder or `Downloads` path.
+
+### Source Checkout Installer
+
+If you are working from a git clone instead of a release bundle, use the existing source wrappers below.
 
 If `.venv` already exists, the installer prompts for one of four actions:
 
@@ -30,6 +51,10 @@ If `.venv` already exists, the installer prompts for one of four actions:
 - Backup existing `.venv` to `.venv.backup.<timestamp>` and install fresh
 - Reuse existing `.venv`
 - Abort installation
+
+During active work, the terminal shows a continuously rolling spinner. If the terminal cannot render the Unicode braille spinner, the installer falls back to a plain ASCII spinner and continues.
+
+At any point, press `Ctrl+C` to request cancellation. The installer records the request and exits cleanly at the next safe checkpoint.
 
 ### Windows
 
@@ -60,18 +85,24 @@ If `.venv` already exists, press Enter for a destructive fresh reinstall, choose
    - Installs all dependencies from `requirements.txt`
    - Configures Python path
 
-3. **Database Initialization**
+3. **Dashboard Assets**
+   - Reuses bundled `src/dashboard/ui/dist` assets when they are already present
+   - Falls back to local `npm install` + `npm run build` only when a bundled build is not available
+   - If Node.js is unavailable, installation continues and logs a warning instead of failing the full install
+
+4. **Database Initialization**
    - Creates `~/.elefante/data/` directory
    - Initializes ChromaDB (vector store)
    - Initializes Kuzu (graph database)
    - Creates default schema
+   - Injects the seed memory only when the write is actually accepted by the orchestrator
 
-4. **IDE Configuration**
+5. **IDE Configuration**
    - Auto-detects VS Code, Cursor, or Bob IDE
    - Configures MCP (Model Context Protocol)
    - Sets up server connection
 
-5. **Agent Behavior Bootstrap**
+6. **Agent Behavior Bootstrap**
    - Verifies `.github/copilot-instructions.md` exists
    - This file is the **entry point** that makes AI agents proactively use Elefante
    - Without it, agents can use Elefante tools but won't do so automatically
@@ -80,15 +111,21 @@ If `.venv` already exists, press Enter for a destructive fresh reinstall, choose
      - `.cursorrules` for Cursor auto-load
      - `.windsurfrules` for Windsurf auto-load
 
-6. **Health Check**
+7. **Health Check**
    - Verifies all components working
    - Tests database connections
    - Validates MCP server
 
-7. **Runtime Baseline Bootstrap**
+8. **Runtime Baseline Bootstrap**
    - Built-in system directives are available immediately on first server start
    - Required specification memories are seeded automatically on first orchestrator use
    - No manual seeding step is required for a fresh installation
+
+### Installer State Files
+
+- `.elefante-install.log`: full append-only installer log
+- `.elefante-install-status.txt`: current installer state and active stage for external monitoring
+- `.elefante-install-summary.txt`: stage-by-stage summary with final state and outcome details
 
 **Installation Time**: ~10 minutes (depending on internet speed)
 
@@ -595,7 +632,7 @@ See also: [`ops-docker.md`](ops-docker.md) for container-based deployment.
 
 ---
 
-**Version**: 2.7.1
+**Version**: 2.9.0
 **Last Updated**: 2026-04-15
 **Status**: Production Ready (Windows validated)
 

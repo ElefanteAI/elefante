@@ -5,7 +5,7 @@
 > The filename `dev-sdd.md` is retained for compatibility, but SDD is no longer a separate product surface or workflow mode. The checks below document the embedded development process already enforced through built-in directives, specification memories, compendiums, and verification scripts.  
 > See `docs/technical/spec-architecture.md` for the runtime retrieval model and `docs/debug/dev-developer-agent.md` for script routing.
 
-**Version**: 2.7.1  
+**Version**: 2.9.0  
 **Status**: Reference document — embedded process, legacy filename retained  
 **Last Updated**: 2026-04-14
 
