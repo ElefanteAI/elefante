@@ -4,7 +4,7 @@
 > **Last Updated:** 2026-04-15
 > **Total Issues Documented:** 9
 > **Status:** Production Reference  
-> **Applies to**: v2.6.0+
+> **Applies to**: v2.7.1+
 | #   | Law                                                  | Violation Cost       |
 | --- | ---------------------------------------------------- | -------------------- |
 | 1   | Do NOT pre-create Kuzu database directory            | 12 minutes debugging |
@@ -718,34 +718,44 @@ Select-String -Path .github/workflows/build-binaries.yml -Pattern "setup-node|np
 ## Issue #9: GitHub Release Publish Failure After Successful Matrix Builds
 
 **Date:** 2026-04-15  
-**Duration:** Unknown — failed log not yet captured  
+**Duration:** ~30 minutes from public API evidence to source fix  
 **Severity:** HIGH  
-**Status:** OPEN — root cause not yet evidenced
+**Status:** IN PROGRESS — root cause identified, source fix + local guard added, fresh tag publish still pending
 
 ### Problem
 
-The `Build One-Click Binaries` workflow can complete all three platform builds and still fail in the final GitHub Release publication step.
+The `Build One-Click Binaries` workflow can complete all three platform builds and still fail in the final GitHub Release publication step when one asset exceeds GitHub's per-file release limit.
 
 ### Symptom
 
-GitHub Actions warning email reports:
+GitHub Actions warning email reports and the public GitHub API confirms:
 
 - `Build on macos-latest` — succeeded
 - `Build on ubuntu-latest` — succeeded
 - `Build on windows-latest` — succeeded
 - `Create GitHub Release` — failed
 
-This proves artifacts were built, but the release was not published cleanly.
+Public release state for `v2.6.0`:
+
+- Release exists: `v2.6.0`
+- Uploaded assets: `elefante-macOS.zip`, `elefante-Windows.zip`
+- Missing asset: `elefante-Linux.zip`
+
+This proves artifacts were built, the release object was created, and the failure occurred during asset publication.
 
 ### Root Cause
 
-**UNKNOWN from currently available evidence.**
+The Linux release asset exceeded GitHub's hard per-file release limit.
 
-What is proven from the workflow source and the warning email:
+What is now evidenced:
 
 1. **BUG-014 held.** The current workflow contains `setup-node@v4`, `npm ci`, and `npm run build`, and the three platform build jobs completed successfully.
-2. **The failure boundary moved downstream.** The `release` job contains only two steps: `actions/download-artifact@v4` and `softprops/action-gh-release@v1`.
-3. **This is a separate bug class from BUG-014.** Reclassifying it as the old build-stage failure would erase the evidence that the v2.5.4 fix actually worked.
+2. **Release creation itself held.** Public release `v2.6.0` exists and contains two uploaded assets (`elefante-macOS.zip`, `elefante-Windows.zip`).
+3. **The Linux asset was oversized.** Public Actions artifacts show `elefante-Linux-binary` for run `24475129776` at `4,021,041,080` bytes.
+4. **GitHub rejects release assets at this size.** GitHub documentation states each release asset must be under `2 GiB`.
+5. **The failing boundary is exact.** The `Create GitHub Release` job succeeded at `actions/download-artifact@v4`, then failed in `softprops/action-gh-release@v1` while processing the assets.
+
+This is a separate bug class from BUG-014. Reclassifying it as the old build-stage failure would erase the evidence that the v2.5.4 fix actually worked.
 
 ### Current State Of The Workflow
 
@@ -771,27 +781,50 @@ release:
         generate_release_notes: true
 ```
 
-### Required Evidence Before Any Fix
+### Solution
 
-Capture the failed `Create GitHub Release` job log and inspect:
+Add a release-asset preflight step between artifact download and `softprops/action-gh-release@v1`:
 
-1. The `Download all artifacts` output — exact artifact directories downloaded under `artifacts/`
-2. The `Create Release` step stderr/HTTP response from `softprops/action-gh-release@v1`
-3. Whether the target tag/release already exists and whether the action attempted create vs update
+1. Measure each candidate asset size on disk.
+2. Exclude any file `>= 2 GiB` from the `files` list passed to the release action.
+3. Write uploaded vs skipped assets to the GitHub step summary so the omission is explicit.
+4. Keep the release job green when smaller assets are valid, instead of failing the entire release on one oversized binary.
 
-Without that log, any workflow change would be speculative.
+This should preserve macOS and Windows publication while preventing the Linux oversize from poisoning the entire release job, but that outcome still requires a fresh live tag run.
+
+### Source Fix
+
+`.github/workflows/build-binaries.yml` now calls `scripts/ci/select_release_assets.py`, which filters files above GitHub's `2 GiB` release cap before calling `softprops/action-gh-release@v1`. Release-note rendering is also explicit via `scripts/ci/render_release_notes.py` and `body_path: release-notes.md`.
 
 ### Verification
+
+Local regression guard:
+
+```bash
+pytest tests/test_release_pipeline.py -v
+```
+
+This proves the release-stage logic locally. It does NOT prove GitHub publication end to end.
+
+End-to-end publish proof:
 
 Manual: trigger `Build One-Click Binaries` on a fresh `v*` tag and confirm:
 
 1. All three build jobs succeed
 2. `Create GitHub Release` succeeds
-3. The release page contains all three zip assets
+3. The release page contains macOS and Windows zip assets
+4. If Linux remains oversized, it is listed as skipped in the job summary instead of failing the workflow
+
+### Why This Took So Long
+
+- The failed run log was hidden behind an invalid local `gh` token and GitHub does not expose public job logs without auth.
+- The public release page only showed that the run failed, not why.
+- The decisive evidence required correlating three public surfaces: Actions jobs, release assets, and retained workflow artifacts.
+- The bug looked like a generic "release step failed" issue until the artifact byte counts were measured.
 
 ### Lesson
 
-> **A green build matrix is not an end-to-end release proof. Separate artifact-creation failures from artifact-publication failures or you will keep reopening the wrong bug.**
+> **Actions artifact success does not imply release asset eligibility. Enforce platform upload quotas before publication or one oversized asset will poison the whole release job.**
 
 ---
 

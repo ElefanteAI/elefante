@@ -78,16 +78,25 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
+      - name: Render release notes
+        run: |
+          python3 scripts/ci/render_release_notes.py "${{ github.ref_name }}" --output release-notes.md
+
+      - name: Select releasable assets
+        id: select_release_assets
+        run: |
+          python3 scripts/ci/select_release_assets.py
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            artifacts/elefante-Linux-binary/elefante-Linux.zip
-            artifacts/elefante-macOS-binary/elefante-macOS.zip
-            artifacts/elefante-Windows-binary/elefante-Windows.zip
-          generate_release_notes: true
+          body_path: release-notes.md
+          files: ${{ steps.select_release_assets.outputs.files }}

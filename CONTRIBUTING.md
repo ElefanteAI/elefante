@@ -28,7 +28,7 @@ Thank you for your interest in contributing to Elefante!
 src/
   mcp/          # MCP Server & Tools
   core/         # Logic (Orchestrator, Vector/Graph stores, ETL, Retrieval)
-  models/       # Pydantic models (v2.6.0 schema)
+  models/       # Pydantic models (v2.7.1 schema)
   modules/      # Session Distiller
   dashboard/    # React/Vite app
   utils/        # Config, curation, logging
@@ -50,18 +50,18 @@ tests/          # Pytest suite
 
 ### Recommended workflow — smart advisor
 
-After staging your changes, run `version_counsel.py`. It analyses the diff,
-classifies the change level, and **asks before doing anything**:
+After staging your changes, run `scripts/ci/advise_version_bump.py`. It analyses the diff,
+classifies the change level, and recommends the version you should document in `CHANGELOG.md` before cutting the release:
 
 ```bash
 # 1. Stage your work
 git add <files>
 
 # 2. Ask the advisor (Windows)
-.venv\Scripts\python.exe scripts\version_counsel.py
+.venv\Scripts\python.exe scripts\ci\advise_version_bump.py
 
 # 2. Ask the advisor (macOS/Linux)
-.venv/bin/python scripts/version_counsel.py
+.venv/bin/python scripts/ci/advise_version_bump.py
 ```
 
 The advisor will print:
@@ -83,7 +83,7 @@ The advisor will print:
 ```
 
 Confirm `y`, press `N` to cancel, or type a manual version to override.
-On confirmation it calls `bump_version.py` automatically.
+If the matching `CHANGELOG.md` entry already exists, the advisor can hand off to `bump_version.py` automatically. If not, it stops after printing the exact next steps so the changelog stays the release gate.
 
 ### Manual bump (if you already know the version)
 
@@ -100,9 +100,11 @@ On confirmation it calls `bump_version.py` automatically.
 
 **Rules — MANDATORY:**
 - NEVER edit version strings by hand in individual files.
-- ALWAYS use `version_counsel.py` (interactive) or `bump_version.py X.Y.Z` (direct) — never manual file edits.
+- ALWAYS use `scripts/ci/advise_version_bump.py` (interactive) or `scripts/ci/bump_version.py X.Y.Z` (direct) — never manual file edits.
 - Run `--check` before committing to catch drift.
 - CHANGELOG.md entries must be written manually (it is a historical log, not a current-version declaration).
+- NEVER push a `v*` tag without a matching `CHANGELOG.md` entry.
+- GitHub release bodies are rendered from the matching CHANGELOG entry by `scripts/ci/render_release_notes.py`. If the changelog entry is weak, the release page will be weak.
 - If a new doc file has a version marker, ADD IT to `scripts/ci/bump_version.py` TARGETS before the next version bump.
 
 **Semantic versioning (x.y.z):**

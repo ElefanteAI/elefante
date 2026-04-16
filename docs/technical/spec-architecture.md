@@ -1,6 +1,6 @@
 # Elefante Architecture: The Second Brain
 
-**Version:** 2.6.0 | **Status:** Production Ready (Windows validated)
+**Version:** 2.7.1 | **Status:** Production Ready (Windows validated)
 
 ## 1. System Overview
 
@@ -39,20 +39,21 @@ To support multi-IDE usage without deadlocks:
 - **Lifecycle Rule**: Graph maintenance tasks that touch Kuzu must complete inside the owning tool invocation; transaction-scoped cleanup cannot race background Kuzu work.
 - **Runtime Baseline Bootstrap**: The directive and specification baseline is embedded in core code. Built-in system directives are always present in `DirectiveStore`, and `MemoryOrchestrator.ensure_system_baseline()` idempotently seeds the required specification memories on first use for every new installation.
 
-### Cognitive Multi-Signal Scoring (V4)
+### Cognitive Multi-Signal Scoring (V4 → V4.1)
 
-Instead of a static RAG formula, Elefante uses a multi-faceted 6-signal behavioral model:
+Instead of a static RAG formula, Elefante uses a multi-faceted 5-signal behavioral model (v2.7.0+):
 
-- **Vector Match** (0.30)
-- **Concept Overlap** (0.20)
-- **Domain Match** (0.15)
-- **Co-Activation** (0.15) — Passive graphing of what memories are retrieved together in the same session
-- **Authority** (0.10)
-- **Temporal Freshness** (0.10)
+- **Vector Match** (0.35) — Semantic embedding similarity
+- **Concept Overlap** (0.30) — Keyword-frequency concept extraction
+- **Co-Activation** (0.15) — Passive graphing of what memories are retrieved together in the same session. Session history persists across server restarts via `DATA_DIR/session_retrieval_history.json` (7-day expiry).
+- **Authority** (0.10) — Memory type weighting (specifications and directives = 1.0)
+- **Temporal Freshness** (0.10) — Recency bias
 
-**Smoothed Vector Baseline:** To prevent valid semantic matches from suffering a mathematical cliff when heuristics are missing, the cognitive retriever enforces a static floor: `composite_score` can never fall below `0.85 * vector_score`.
+> **Removed in v2.7.0 (BUG-016):** Domain Match was removed. The query-side inference (`None`/`"work"`/`"personal"`) and memory-side default (`DomainType.REFERENCE`) never intersected, producing only noise.
 
-**Immutable Authority:** Memory types classified as `specification` or `directive` completely bypass chronological decay, instantly receiving an absolute `1.0` authority score so durable rules and contracts dominate context retrieval when relevant.
+**Smoothed Vector Baseline:** To prevent valid semantic matches from suffering a mathematical cliff when heuristics are missing, the cognitive retriever enforces a static floor: `composite_score` can never fall below `0.70 * vector_score` (lowered from 0.85 in v2.7.0).
+
+**Intent-Gated Specification Override (BUG-017 fix):** Memory types classified as `specification` or `directive` receive a `+0.30` boost only when the query intent is `"system"` (keywords: spec, directive, rule, requirement, architecture, constraint, sdd, compliance). Previously this boost was unconditional, creating a ranking monopoly.
 
 ### Specification And Directive Retrieval Workflow
 

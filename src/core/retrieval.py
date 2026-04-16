@@ -1,6 +1,6 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/core/retrieval.py
-# VERSION : 2.5.2
+# VERSION : 2.7.0
 # CHANGED : 2026-04-15
 # PURPOSE : Cognitive retrieval engine: ranked memory results with multi-signal
 #           scoring (semantic, temporal, access reinforcement).
@@ -12,7 +12,7 @@
 Cognitive Retrieval Engine
 
 Returns ranked memory results with multi-signal scoring.
-Multi-signal scoring: vector + concepts + domain + co-activation + authority.
+Multi-signal scoring: vector + concepts + co-activation + authority + temporal.
 """
 
 from __future__ import annotations
@@ -99,19 +99,17 @@ class CognitiveRetriever:
     """
     Multi-signal retrieval engine.
     
-    Weights:
-    - vector_similarity: 0.30
-    - concept_overlap: 0.20
-    - domain_match: 0.15
+    Weights (v2.7.0 — domain removed, see CHANGELOG):
+    - vector_similarity: 0.35
+    - concept_overlap: 0.30
     - co_activation: 0.15
     - authority: 0.10
     - temporal: 0.10
     """
     
     WEIGHTS = {
-        "vector": 0.30,
-        "concept": 0.20,
-        "domain": 0.15,
+        "vector": 0.35,
+        "concept": 0.30,
         "coactivation": 0.15,
         "authority": 0.10,
         "temporal": 0.10,
@@ -147,6 +145,8 @@ class CognitiveRetriever:
         intent = "remember"  # default
         if any(w in query_lower for w in ["error", "bug", "fix", "problem", "issue"]):
             intent = "troubleshoot"
+        elif any(w in query_lower for w in ["spec", "directive", "rule", "requirement", "architecture", "constraint", "sdd", "compliance"]):
+            intent = "system"
         elif any(w in query_lower for w in ["how", "learn", "what is", "explain"]):
             intent = "learn"
         elif any(w in query_lower for w in ["decide", "choose", "should i", "which"]):
@@ -277,11 +277,10 @@ class CognitiveRetriever:
             candidate.created_at,
         )
         
-        # Base composite score
+        # Base composite score (v2.7.0: domain signal removed)
         candidate.composite_score = (
             self.WEIGHTS["vector"] * candidate.vector_score +
             self.WEIGHTS["concept"] * candidate.concept_score +
-            self.WEIGHTS["domain"] * candidate.domain_score +
             self.WEIGHTS["coactivation"] * candidate.coactivation_score +
             self.WEIGHTS["authority"] * candidate.authority_score +
             self.WEIGHTS["temporal"] * temporal_score
@@ -290,15 +289,16 @@ class CognitiveRetriever:
         # Dynamic Floor (Fixes Issue #8 Low Similarity)
         # Vector score is the semantic ground truth. Cognitive heuristics should boost 
         # semantic matches, not suppress them into oblivion if metadata is sparse.
-        # We enforce a smoothed vector baseline to ensure exact text matches survive.
-        vector_baseline = candidate.vector_score * 0.85
+        # Floor lowered from 0.85 to 0.70 in v2.7.0 (domain removal reduces noise).
+        vector_baseline = candidate.vector_score * 0.70
         if candidate.composite_score < vector_baseline:
             candidate.composite_score = vector_baseline
             
-        # Native SDD Authority Override
-        # Ensures specifications and directives mathematically dominate typical context retrieval 
-        # while preserving vector-based sorting among multiple competing specifications.
-        if candidate.memory_type in ("specification", "directive"):
+        # Intent-Gated SDD Authority Override (v2.7.0)
+        # Specifications and directives get a boost ONLY when the query intent
+        # is system/architecture related. Prevents specs from dominating
+        # unrelated queries (e.g., "what should I remember about debugging").
+        if candidate.memory_type in ("specification", "directive") and query.inferred_intent == "system":
             candidate.composite_score = min(1.0, candidate.composite_score + 0.30)
         
         # Build explanation if requested
@@ -337,14 +337,6 @@ class CognitiveRetriever:
         else:
             authority_reason = "Lower score"
         
-        # Build domain reason
-        if candidate.domain_score >= 1.0:
-            domain_reason = f"Exact domain match: {candidate.domain}"
-        elif candidate.domain_score >= 0.5:
-            domain_reason = "Neutral (no domain inferred from query)"
-        else:
-            domain_reason = f"Different domain: {candidate.domain}"
-        
         signals = [
             {
                 "name": "vector_similarity",
@@ -361,14 +353,6 @@ class CognitiveRetriever:
                 "weighted": candidate.concept_score * self.WEIGHTS["concept"],
                 "reason": f"Shared {len(matched_concepts)} concept(s)" if matched_concepts else "No concept overlap",
                 "details": {"matched": matched_concepts}
-            },
-            {
-                "name": "domain_match",
-                "score": candidate.domain_score,
-                "weight": self.WEIGHTS["domain"],
-                "weighted": candidate.domain_score * self.WEIGHTS["domain"],
-                "reason": domain_reason,
-                "details": {"domain": candidate.domain}
             },
             {
                 "name": "coactivation",

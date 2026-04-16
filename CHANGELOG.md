@@ -1,5 +1,7 @@
 # Changelog
 
+<!-- markdownlint-disable MD024 -->
+
 All notable changes to Elefante will be documented in this file.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
@@ -8,6 +10,44 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
 ## [Unreleased]
+
+---
+
+## [2.7.1] - 2026-04-15
+
+### Fixed
+
+- **BUG-015 — release-stage failure narrowed to GitHub's 2 GiB asset cap**: The `v2.6.0` release object was created and macOS/Windows assets uploaded successfully, but the Linux artifact measured `4,021,041,080` bytes and caused `Create GitHub Release` to fail. Why: GitHub Actions artifacts can exceed the GitHub Releases per-file cap. What: `.github/workflows/build-binaries.yml` now delegates asset filtering to `scripts/ci/select_release_assets.py`, only passes files under `2 GiB` to `softprops/action-gh-release@v1`, reports skipped oversized assets in the job summary, and is guarded locally by `pytest tests/test_release_pipeline.py -v`. Impact: the release-stage logic is now explicit and locally guarded; live closure still depends on a fresh tag publish.
+
+### Changed
+
+- **GitHub release bodies are now generated from CHANGELOG**: release publication now checks out the repo, renders `release-notes.md` via `scripts/ci/render_release_notes.py`, and passes that file to `softprops/action-gh-release@v1` through `body_path`. Why: generated GitHub release pages were too sparse and often failed to explain the version meaning. What: every tag now ships with curated release notes plus links to README, the full changelog, installation, and debugging docs. Impact: version bumps are documented at the release page itself instead of relying on empty shells.
+
+### Documentation
+
+- **Versioning and release docs corrected**: `CONTRIBUTING.md` now points to `scripts/ci/advise_version_bump.py` instead of the stale `version_counsel.py` name, and `README.md` now explains where release notes live. Why: current versioning docs drifted from the actual scripts and release flow. What: updated commands, rules, and links. Impact: the documented release process now matches the live repo.
+
+---
+
+## [2.7.0] - 2026-04-15
+
+### Fixed
+
+- **BUG-016 — Domain signal removed from scoring**: The domain signal (15% weight) was dysfunctional — `analyze_query()` inferred `None`/`"work"`/`"personal"` but memories default to `DomainType.REFERENCE`. Value spaces never intersected. Weight redistributed to vector (0.35) and concept (0.30).
+- **BUG-017 — Spec override intent-gated**: The `+0.30` specification/directive boost was unconditional, creating a ranking monopoly on all queries. Now gated on `query.inferred_intent == "system"` (keywords: spec, directive, rule, requirement, architecture, constraint, sdd, compliance).
+- **BUG-018 — Co-activation cold-start resolved**: `_session_retrieval_history` reset to `[]` on every server restart. Now persisted to `DATA_DIR/session_retrieval_history.json` with 7-day expiry. First query of a new session can leverage prior session context.
+
+### Changed
+
+- **Vector baseline floor lowered**: From `0.85 * vector_score` to `0.70 * vector_score`, giving the composite formula more room to differentiate.
+- **Scoring weights**: 5-signal model (domain removed): vector=0.35, concept=0.30, coactivation=0.15, authority=0.10, temporal=0.10.
+- **System intent detection**: `analyze_query()` now detects `"system"` intent for specification/architecture queries.
+
+### Documentation
+
+- Full bug post-mortems added to `ops-memory-compendium.md` (Issues #11, #12, #13).
+- `spec-architecture.md` updated for V4.1 scoring model.
+- `best_practices.md` updated with Write→Read Value-Space Verification rule.
 
 ---
 
@@ -225,43 +265,6 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [2.2.1] - 2026-03-20
-
-### Summary
-
-Native SDD Enforcement — Static markdown protocol replaced with living Elefante mechanisms. Elefante now eats its own dogfood: SDD gates are enforced through DIRECTIVES (unconditional injection), SPECIFICATION memories (authority=1.0, immutable), and a mechanical pre-commit hook.
-
-### The Problem Solved
-
-The SDD protocol (v2.2.0) was documented as a static markdown file — repeating the exact anti-pattern Elefante v1.x → v2.1.0 proved doesn't work. Rules in docs drift. Rules in memories can be outcompeted. Only mechanical enforcement and unconditional injection are reliable.
-
-### The Solution
-
-1. **6 SDD DIRECTIVES** — Injected into every MCP tool response unconditionally: Gate 0 (source-first), Critical Blocker, Gate 2 (leakage scan), Gate 3 (numeric verification), Gate 4 (simulator), Stdout Purity Law.
-2. **2 SPECIFICATION memories** — Gate 2 (full 8-surface leakage table) and Gate 3 (exact scoring formulas) stored with authority=1.0, zero decay. Always surface when relevant.
-3. **Mechanical pre-commit hook** — `.git/hooks/pre-commit` runs `health_check.py` + `verify_mcp_handshake.py` before every commit. Failure = blocked.
-4. **MCP schema fix** — Added `specification` and `directive` to `memory_type` enum in `elefante-MemoryAdd` tool schema (v2.2.0 gap: Python model had these types but MCP schema didn't expose them).
-5. **Static doc reframed** — `docs/technical/sdd-development-protocol.md` marked as human reference only. Enforcement is native.
-6. **Directive cleanup** — Removed 2 test/garbage directives (`"Filter of"`, hello-world variable name test).
-
-### Changes
-
-- **MODIFIED**: `src/mcp/server.py` — Added `specification` and `directive` to `memory_type` enum in tool schema.
-- **NEW**: `.git/hooks/pre-commit` — Mechanical Gate 4 enforcement (health check + MCP handshake).
-- **MODIFIED**: `docs/technical/sdd-development-protocol.md` — Reframed as human reference; version 2.2.1.
-- **MODIFIED**: `docs/technical/README.md` — Updated SDD doc description.
-- **MODIFIED**: `docs/README.md` — Updated SDD doc description.
-- **MODIFIED**: `CONTRIBUTING.md` — Replaced SDD blockquote with native enforcement pointer.
-- **SEEDED**: 6 new DIRECTIVES in Elefante DirectiveStore.
-- **SEEDED**: 2 new SPECIFICATION memories in ChromaDB.
-- **CLEANED**: Removed 2 garbage directives from DirectiveStore.
-
-### Impact
-
-SDD self-reporting drift eliminated. Full compliance with Law of Compliance and Native SDD pattern. The meta-irony is closed: Elefante enforces SDD on itself using its own enforcement mechanisms.
-
----
-
 ## [2.2.2] - 2026-03-28
 
 ### Summary
@@ -282,6 +285,7 @@ Dashboard scores were all stuck at 100 because two independent code paths (MCP s
 6. **Upstream merged** — GitHub origin/main merged cleanly (zero conflicts). Brought in `ELEFANTE_DEVELOPMENT_SKILLS.md` (AI agent guide) and Issue #7 (IBM Bob MCP settings path) in installation-compendium.
 
 ### Fixed
+
 - **All dashboard scores stuck at 100** (Issue #9): Root cause was two divergent inline serializers reading stale `mem.metadata.score`. Fixed by extracting `dashboard_serializer.py` as single source of truth. Verified: 74 memories, Score=100: 0, Avg: 75.3, Min: 54, Max: 94.
 - **Kuzu lock contention**: `GraphStore.close()` now calls `kuzu.Connection.close()` and `kuzu.Database.close()` APIs. Previously commented out, leaving the OS-level exclusive file lock held indefinitely.
 - **Dashboard semantic search broken**: `/api/search` response flattened to match frontend `SearchResult` interface.
@@ -290,6 +294,7 @@ Dashboard scores were all stuck at 100 because two independent code paths (MCP s
 - **No snapshot at install time**: Fresh installs showed blank dashboard. Added Step 3a to `install.py`.
 
 ### Added
+
 - `src/utils/dashboard_serializer.py` — shared serializer with `_composite_dashboard_score()`, `compute_live_score()`, `memory_to_dashboard_node()`, `is_test_artifact()`, `_redact_secrets()`.
 - `tests/test_dashboard_serializer.py` — unit tests with delta=0 cross-validation between Memory-object and raw-dict scoring paths.
 - `tmp/verify_scores.py` — quick diagnostic for score health checks.
@@ -300,6 +305,7 @@ Dashboard scores were all stuck at 100 because two independent code paths (MCP s
 - Issue #7 (IBM Bob MCP settings) in `docs/debug/ops-installation-compendium.md` (merged from upstream).
 
 ### Changed
+
 - **Dashboard score formula**: Composite metric (50% temporal vitality + 25% type weight + 25% engagement) replaces pure exponential-decay. Meaningful spread (range ~54-94) instead of 84% at 100.
 - MCP server `_refresh_dashboard_snapshot()` reduced from ~50 lines to a 3-line import loop.
 - `scripts/pipeline/update_dashboard_data.py` reduced by ~150 lines (removed all duplicate helper functions).
@@ -478,7 +484,9 @@ Passive Co-Activation (Autonomous Graph Maintenance), Smoothed Vector Baselines 
 
 ---
 
-## [2.1.1] - 2026-02-19### Part 3: Schema Simplification & Archive Cleanup
+## [2.1.1] - 2026-02-19
+
+### Part 3: Schema Simplification & Archive Cleanup
 
 A major cleanup pass removing dead model abstractions and historical archive content that was adding noise without value.
 

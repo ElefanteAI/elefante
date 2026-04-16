@@ -3,7 +3,7 @@
 > **Purpose:** Distilled reusable debugging rules for Elefante contributors
 > **Companion Docs:** [README.md](README.md) and [dev-developer-agent.md](dev-developer-agent.md)
 > **Status:** Live feedback-loop ledger
-> **Applies to**: v2.6.0+
+> **Applies to**: v2.7.1+
 
 ---
 
@@ -200,6 +200,34 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Proof:** BUG-015 — after BUG-014 was fixed, `Build on ubuntu-latest`, `Build on macos-latest`, and `Build on windows-latest` all succeeded, but `Create GitHub Release` still failed. The current workflow source proves the remaining fault is in the release stage, not frontend compilation or PyInstaller packaging. See [ops-installation-compendium.md](ops-installation-compendium.md#issue-9-github-release-publish-failure-after-successful-matrix-builds).
 - **Avoid:** Declaring a previously fixed CI build bug "back again" without first checking whether the failure moved to a later workflow stage.
 
+### A Local Guard Is Not End-To-End Closure
+
+- **Trigger:** You have identified a CI or release root cause, changed source/workflow code, and added a local regression test.
+- **Rule:** Do not upgrade the incident to "fixed" until the real external path has been rerun successfully when the failure mode depends on the host platform or remote service.
+- **Why:** A local guard proves the logic you extracted or encoded. It does not prove GitHub, runner behavior, permissions, artifact wiring, or release publication semantics end to end.
+- **Proof:** BUG-015 — the 2 GiB root cause was real, and `pytest tests/test_release_pipeline.py -v` now guards the source logic, but a fresh `v*` tag publish is still the only proof that the incident is actually closed.
+- **Avoid:** Collapsing "root cause identified" and "live incident closed" into the same status label.
+
+---
+
+### Release Asset Quotas Must Be Enforced Before Upload
+
+- **Trigger:** A CI workflow publishes built binaries to GitHub Releases or another platform with per-file upload caps.
+- **Rule:** Measure candidate asset sizes before upload and filter or split anything that exceeds the platform's hard limit.
+- **Why:** GitHub Actions artifacts and GitHub release assets have different quotas. A build can succeed, artifact upload can succeed, and release publication can still fail at the very last step.
+- **Proof:** BUG-015 — run `24475129776` created release `v2.6.0`, uploaded `elefante-macOS.zip` and `elefante-Windows.zip`, then failed because `elefante-Linux-binary` was `4,021,041,080` bytes while GitHub release assets must be under `2 GiB`. See [ops-installation-compendium.md](ops-installation-compendium.md#issue-9-github-release-publish-failure-after-successful-matrix-builds).
+- **Avoid:** Treating "artifact uploaded to Actions" as proof that the file can also be published as a release asset.
+
+---
+
+### Write→Read Value-Space Verification (BUG-016, BUG-017, BUG-018)
+
+- **Trigger:** A scoring system uses multiple signals with weights, or a feature that writes data and reads it back for ranking/filtering.
+- **Rule:** For every scored signal, trace the write path (where values are set at storage time) and the read path (where values are consumed at query time). If the value spaces don't intersect, the signal is dysfunctional regardless of its weight.
+- **Why:** A signal whose write-side enum (`DomainType.REFERENCE`) can never match its read-side inference (`None`/`"work"`/`"personal"`) produces a constant or penalty — 15% of weight budget wasted. An unconditional override (+0.30 for specs) that ignores query intent creates a ranking monopoly. Volatile state (`[]` on restart) makes a signal zero at cold start.
+- **Proof:** BUG-016 — domain signal write→read mismatch proved in `retrieval.py:138-148` vs `memory.py:128`. BUG-017 — spec override at `retrieval.py:301` dominates all queries (3 real ARAA queries returned same top 4 specs). BUG-018 — co-activation read path requires `_session_retrieval_history` which resets at `server.py:101`. See [ops-memory-compendium.md](ops-memory-compendium.md#issue-11-domain-signal-value-space-disjunction--15-of-scoring-weight-is-dysfunctional).
+- **Avoid:** Assuming a multi-signal system works because it is documented. Documentation describes the design, not the runtime behavior. Only a source trace with real queries proves intersection.
+
 ---
 
 ## Update Protocol
@@ -224,3 +252,4 @@ If a rule becomes structural, move it into source, tool schemas, directives, or 
 - **BUG-008:** The reusable lesson was not “GraphConnect broke once.” The reusable lesson was “graph and session tools must target the actual schema.” See [ops-database-compendium.md](ops-database-compendium.md#issue-8-graph-and-session-schema-contract-drift).
 - **BUG-009:** The reusable lesson was not “the self-protocol flaked.” The reusable lesson was “maintained verifiers must follow the live contract.” See [ops-ai-behavior-compendium.md](ops-ai-behavior-compendium.md#issue-8-self-protocol-verifier-drift--runtime-path-and-payload-assumptions).
 - **BUG-003:** The reusable lesson was not “dashboard health was good.” The reusable lesson was “the verifier must prove the actual failure mode.” See [ops-dashboard-compendium.md](ops-dashboard-compendium.md#issue-8-persistent-blank-dashboard-on-first-launch).
+- **BUG-016/017/018:** The reusable lesson was not “the scoring weights were wrong.” The reusable lesson was “trace write→read value spaces before trusting any scored signal.” See [ops-memory-compendium.md](ops-memory-compendium.md#issue-11-domain-signal-value-space-disjunction--15-of-scoring-weight-is-dysfunctional).

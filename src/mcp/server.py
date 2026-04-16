@@ -1,6 +1,6 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/mcp/server.py
-# VERSION : 2.5.2
+# VERSION : 2.7.0
 # CHANGED : 2026-04-15
 # PURPOSE : MCP server: exposes all Elefante operations as JSON-RPC tools and
 #           prompts over stdio transport. Entry point for all agent interactions.
@@ -98,7 +98,7 @@ class ElefanteMCPServer:
             self._reset_compliance_gate()
         
         # Session state for autonomous graph maintenance (passive co-activation)
-        self._session_retrieval_history: list[str] = []
+        self._session_retrieval_history: list[str] = self._load_session_history()
         
         # Token intelligence ledger (per server lifecycle)
         self._token_ledger = SessionTokenLedger()
@@ -190,6 +190,7 @@ class ElefanteMCPServer:
                 # Keep sliding window of recent unique ids, max 20
                 self._session_retrieval_history = list(dict.fromkeys(self._session_retrieval_history))[-20:]
                 await orchestrator.record_coactivation(self._session_retrieval_history.copy())
+                self._save_session_history()
 
             result["RELEVANT_CONTEXT"] = {
                 "note": "Auto-surfaced memories relevant to this operation. No search tool call was needed.",
@@ -258,6 +259,56 @@ class ElefanteMCPServer:
             "5. Only then edit source, rerun the same verifier, and update bug docs plus CHANGELOG if behavior changed.",
         ]
         return result
+
+    # ── Session retrieval history persistence (BUG-018 fix) ─────────────
+
+    _SESSION_HISTORY_FILE = "session_retrieval_history.json"
+    _SESSION_HISTORY_MAX_AGE_DAYS = 7
+
+    def _load_session_history(self) -> list[str]:
+        """Load persisted session retrieval history from DATA_DIR.
+
+        Prunes entries older than _SESSION_HISTORY_MAX_AGE_DAYS.
+        Returns an empty list on any failure (cold-start safe).
+        """
+        from src.utils.config import DATA_DIR
+        path = DATA_DIR / self._SESSION_HISTORY_FILE
+        if not path.exists():
+            return []
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+            if not isinstance(data, dict) or "ids" not in data:
+                return []
+            saved_at = data.get("saved_at", "")
+            if saved_at:
+                age = (datetime.now(tz=__import__("datetime").timezone.utc)
+                       - datetime.fromisoformat(saved_at))
+                if age.days > self._SESSION_HISTORY_MAX_AGE_DAYS:
+                    self.logger.info("Session history expired (%d days old), starting fresh", age.days)
+                    path.unlink(missing_ok=True)
+                    return []
+            ids = [str(i) for i in data["ids"] if isinstance(i, str)][:20]
+            if ids:
+                self.logger.info("Restored %d session retrieval IDs from disk", len(ids))
+            return ids
+        except Exception as e:
+            self.logger.warning("Could not load session history: %s", e)
+            return []
+
+    def _save_session_history(self) -> None:
+        """Persist current session retrieval history to DATA_DIR."""
+        from src.utils.config import DATA_DIR
+        path = DATA_DIR / self._SESSION_HISTORY_FILE
+        try:
+            payload = {
+                "ids": self._session_retrieval_history,
+                "saved_at": datetime.now(tz=__import__("datetime").timezone.utc).isoformat(),
+            }
+            with open(path, "w") as f:
+                json.dump(payload, f)
+        except Exception as e:
+            self.logger.warning("Could not save session history: %s", e)
 
     def _get_compliance_file(self):
         """Get path to persistent compliance state file"""
@@ -1384,6 +1435,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
             self._session_retrieval_history.extend(new_ids)
             self._session_retrieval_history = list(dict.fromkeys(self._session_retrieval_history))[-20:]
             await orchestrator.record_coactivation(self._session_retrieval_history.copy())
+            self._save_session_history()
         
         # Filter out deprecated/archived memories from results
         filtered_results = []
@@ -1639,6 +1691,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                     mid_str for mid_str in self._session_retrieval_history
                     if mid_str != memory_id
                 ]
+                self._save_session_history()
                 self.logger.info(f"Memory deleted (purposeful forgetting): {memory_id}", reason=reason)
                 return {
                     "success": True,

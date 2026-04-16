@@ -1,6 +1,6 @@
 # Elefante Test Suite
 
-> **Version:** 2.6.0  
+> **Version:** 2.7.1  
 > **Last Updated:** 2026-04-13
 
 ## Quick Reference
@@ -20,6 +20,9 @@ pytest tests/test_integration_smoke.py -v
 
 # Run the shipped self-Elefante protocol
 ./.venv/bin/python scripts/verify/verify_e2e_tests.py
+
+# Run the isolated 100-memory scoring + dashboard sandbox
+./.venv/bin/python scripts/verify/verify_scoring_sandbox.py
 ```
 
 The shipped self-protocol runs against an isolated temporary Elefante home/data directory so it validates the live MCP workflow without polluting the user's durable memory store. By default it verifies 19/20 tools plus both prompts; `--with-dashboard-open` is opt-in because that tool binds fixed port 8000 and is not fully self-contained.
@@ -102,6 +105,8 @@ tests/
 | Verify the crash regression fix | `pytest tests/test_autonomous_coactivation.py tests/test_memory_persistence.py -v` |
 | Verify developer routing references | `pytest tests/test_developer_routing.py -v` |
 | Changed scoring/retrieval logic | `pytest tests/test_scoring.py tests/test_refinery.py -v` |
+| Changed release pipeline or release-note rendering | `pytest tests/test_release_pipeline.py -v` |
+| Validate retrieval signals plus dashboard demo coverage in isolation | `./.venv/bin/python scripts/verify/verify_scoring_sandbox.py` |
 | Changed dashboard serialization | `pytest tests/test_dashboard_serializer.py -v` |
 | Verify factory reset safety | `pytest tests/test_factory_reset.py -v` |
 | Before release | `pytest tests/ -v` |

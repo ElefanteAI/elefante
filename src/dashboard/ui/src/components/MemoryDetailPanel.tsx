@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.6.0 - Memory Detail Panel
+// Elefante Dashboard v2.7.1 - Memory Detail Panel
 import { useEffect, useCallback } from 'react';
 import { X, Clock, Tag, Layers, Brain, Star, Hash, Globe, User } from 'lucide-react';
 import type { MemoryNode } from '@/types';
@@ -23,6 +23,10 @@ const typeColors: Record<string, string> = {
   decision: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
   preference: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
   insight: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+  note: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+  conversation: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
+  specification: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+  directive: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
 };
 
 const ringColors: Record<string, string> = {
@@ -44,6 +48,43 @@ const iconMap = {healthy: "✓", stale: "⏰", at_risk: "⚠", orphan: "🔗"};
 const colorMap = {healthy: "green", stale: "yellow", at_risk: "red", orphan: "gray"};
 
 const tooltipMap = {healthy: "Healthy", stale: "Stale - refresh", at_risk: "At risk - review", orphan: "Orphan - link"};
+
+function formatLabel(value: string): string {
+  return value.replace(/[_-]/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function parseListValue(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+
+  if (typeof value !== 'string') {
+    return [];
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item).trim()).filter(Boolean);
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  if (trimmed.includes(',')) {
+    return trimmed.split(',').map((item) => item.trim()).filter(Boolean);
+  }
+
+  return [trimmed];
+}
+
 export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNavigateToMemory , health_status }: MemoryDetailPanelProps) {
   // Escape to close
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -57,6 +98,14 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNav
 
   const p = memory.properties;
   const tags = p.tags ? p.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [];
+  const concepts = parseListValue(p.concepts);
+  const surfacesWhen = parseListValue(p.surfaces_when);
+  const lifecycleStatus = p.status ? formatLabel(String(p.status)) : '-';
+  const processingStatus = p.processing_status ? formatLabel(String(p.processing_status)) : '-';
+  const topic = p.topic ? formatLabel(String(p.topic)) : 'General';
+  const memoryType = p.memory_type ? formatLabel(String(p.memory_type)) : '-';
+  const ring = p.ring ? formatLabel(String(p.ring)) : '-';
+  const knowledgeType = p.knowledge_type ? formatLabel(String(p.knowledge_type)) : '-';
 
   return (
     <div className="fixed right-0 top-0 h-full w-[420px] bg-slate-900/98 backdrop-blur border-l border-slate-700/60 shadow-2xl z-50 flex flex-col overflow-hidden">
@@ -70,12 +119,17 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNav
             <div className="flex items-center gap-2 mt-2">
               {p.memory_type && (
                 <span className={`px-2 py-0.5 rounded text-xs border ${typeColors[p.memory_type] || 'bg-slate-500/20 text-slate-300 border-slate-500/30'}`}>
-                  {p.memory_type}
+                  {memoryType}
                 </span>
               )}
               {p.ring && (
                 <span className={`px-2 py-0.5 rounded text-xs ${ringColors[p.ring] || 'bg-slate-500/20 text-slate-300'}`}>
-                  {p.ring}
+                  {ring}
+                </span>
+              )}
+              {p.knowledge_type && (
+                <span className="px-2 py-0.5 rounded text-xs bg-slate-700/70 text-slate-200 border border-slate-600/70">
+                  {knowledgeType}
                 </span>
               )}
               {memory.created_at && (
@@ -123,18 +177,47 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNav
         <div className="px-5 py-3 border-b border-slate-800/60">
           <div className="text-xs uppercase tracking-wider text-slate-500 mb-2">Metadata</div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
-            <MetaRow icon={<Layers size={12} />} label="Topic" value={p.topic || 'general'} />
-            <MetaRow icon={<Brain size={12} />} label="Type" value={p.memory_type || '-'} />
+            <MetaRow icon={<Layers size={12} />} label="Topic" value={topic} />
+            <MetaRow icon={<Brain size={12} />} label="Type" value={memoryType} />
+            <MetaRow icon={<Layers size={12} />} label="Ring" value={ring} />
+            <MetaRow icon={<Brain size={12} />} label="Knowledge" value={knowledgeType} />
             <MetaRow icon={<Star size={12} />} label="Vitality" value={p.score != null ? (() => {
               const n = Number(p.score);
               const label = n >= 80 ? 'Fresh' : n >= 60 ? 'Healthy' : n >= 40 ? 'Aging' : n >= 20 ? 'Fading' : 'Dormant';
               return `${Math.round(n)} / 100 — ${label}`;
             })() : '-'} />
-            <MetaRow icon={<Hash size={12} />} label="Status" value={p.processing_status || '-'} />
+            <MetaRow icon={<Hash size={12} />} label="Lifecycle" value={lifecycleStatus} />
+            <MetaRow icon={<Hash size={12} />} label="Processing" value={processingStatus} />
             <MetaRow icon={<Globe size={12} />} label="Namespace" value={p.namespace || '-'} />
             <MetaRow icon={<User size={12} />} label="Source" value={p.source || '-'} />
           </div>
         </div>
+
+        {concepts.length > 0 && (
+          <div className="px-5 py-3 border-b border-slate-800/60">
+            <div className="text-xs uppercase tracking-wider text-slate-500 mb-2">Concepts</div>
+            <div className="flex flex-wrap gap-1.5">
+              {concepts.map((concept) => (
+                <span key={concept} className="px-2 py-0.5 bg-cyan-500/10 text-cyan-200 rounded text-xs border border-cyan-500/20">
+                  {concept}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {surfacesWhen.length > 0 && (
+          <div className="px-5 py-3 border-b border-slate-800/60">
+            <div className="text-xs uppercase tracking-wider text-slate-500 mb-2">Surfaces When</div>
+            <div className="space-y-1.5">
+              {surfacesWhen.map((surface) => (
+                <div key={surface} className="text-xs text-slate-300 bg-slate-800/40 border border-slate-700/50 rounded px-2.5 py-2">
+                  {surface}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Tags */}
         {tags.length > 0 && (
@@ -170,7 +253,7 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNav
                     {rm.properties.title || rm.properties.summary || rm.name}
                   </div>
                   <div className="text-[11px] text-slate-500 mt-0.5">
-                    {rm.properties.topic || 'general'} · {rm.properties.memory_type || 'unknown'}
+                    {formatLabel(String(rm.properties.topic || 'general'))} · {formatLabel(String(rm.properties.memory_type || 'unknown'))}
                   </div>
                 </div>
               ))}
@@ -188,6 +271,8 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNav
             <div>Created: {memory.created_at}</div>
             <div>Archived: {String(p.archived)}</div>
             <div>Deprecated: {String(p.deprecated)}</div>
+            <div>Supersedes: {p.supersedes_id || '-'}</div>
+            <div>Superseded By: {p.superseded_by_id || '-'}</div>
           </div>
         </details>
       </div>

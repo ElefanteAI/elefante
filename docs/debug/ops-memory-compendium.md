@@ -1,14 +1,10 @@
 # Memory System Debug Compendium
 
 > **Domain:** Memory Retrieval, Storage & Reinforcement
-> **Last Updated:** 2026-02-16
-> **Total Issues Documented:** 9
-> **Status:** Production Reference - All Documented Flaws Fixed
-> **Applies to**: v2.6.0+
-> **Maintainer:** Add new issues following Issue #N template at bottomcement  
-> **Last Updated:** 2026-02-16  
-> **Total Issues Documented:** 9  
-> **Status:** Production Reference - All Documented Flaws Fixed
+> **Last Updated:** 2026-04-15
+> **Total Issues Documented:** 13
+> **Status:** Production Reference - All Scoring Flaws Fixed (v2.7.0)
+> **Applies to**: v2.7.1+
 > **Maintainer:** Add new issues following Issue #N template at bottom
 >
 > **HISTORICAL NOTE:** Some issues below reference V3 concepts (layer, sublayer, classifier.py, IntentType, importance 1-10) that have since been removed. These entries document the debugging process and lessons learned; the referenced code/fields no longer exist.
@@ -28,7 +24,9 @@
 | 7   | V3 Schema: layer/sublayer must be saved in BOTH add_memory AND reconstruct    | 8 hours           |
 | 8   | **elefante-MemorySearch returns BLOATED JSON - 90% null fields waste tokens** | Context window    |
 | 9   | **Similarity scores 0.3-0.4 for exact matches = embedding quality issue**     | Poor retrieval    |
-| 10  | **MCP response lacks actionable summary - agent must parse raw JSON**         | Integration fail  |
+| 10  | **Trace write→read value spaces for every scored signal before trusting it**  | Phantom signals   |
+| 11  | **Global score overrides must be intent-gated, not unconditional**            | Ranking monopoly  |
+| 12  | **MCP response lacks actionable summary - agent must parse raw JSON**         | Integration fail  |
 
 ---
 
@@ -950,4 +948,147 @@ When any condition matches and `ELEFANTE_ALLOW_TEST_MEMORIES` is not set, the or
 
 ---
 
-_Last verified: 2026-04-15 | Issues: 10 | Status: 4 OPEN design flaws identified_
+_Last verified: 2026-04-15 | Issues: 13 | Status: All scoring flaws fixed (v2.7.0)_
+
+---
+
+## Issue #11: Domain Signal Value-Space Disjunction — 15% of Scoring Weight Is Dysfunctional
+
+**Date:** 2026-04-15  
+**Duration:** 45 minutes (discovery via source trace)  
+**Severity:** HIGH  
+**Status:** FIXED — v2.7.0
+
+### Problem
+
+The domain signal (15% of composite score) can never return 1.0 under normal use. The query-side value space and the memory-side value space do not intersect.
+
+### Symptom
+
+Three real `elefante-MemorySearch` queries ("installer environment virtual", "scoring formula behavioral relevance", "what should I remember about debugging") all returned the same top 4 specification memories with identical scores. Non-spec results were suppressed.
+
+### Root Cause
+
+**Write path:** `orchestrator.py:497` defaults domain to `"reference"`. `memory.py:128` sets `DomainType.REFERENCE` as default. Most memories stored with domain=`"reference"`.
+
+**Read path:** `retrieval.py:138-148` infers query domain from 3 hardcoded keyword groups:
+- `"elefante"` → `"project:elefante"`
+- `"work"/"job"/"meeting"/"deadline"` → `"work"`
+- `"personal"/"home"/"family"` → `"personal"`
+- Everything else → `None`
+
+**The mismatch:** `"reference"` is never inferred. `None` → `compute_domain_match` returns 0.5 (neutral). When a keyword does match → inferred domain is `"work"` or `"personal"` → memory domain is `"reference"` → returns 0.0 (penalty). The signal hurts more than it helps.
+
+**Math:** 15% weight × 0.5 = 0.075 constant offset for most queries. 15% weight × 0.0 = penalty when keywords trigger. Never 15% × 1.0 = 0.15 boost.
+
+### Solution
+
+Removed domain signal from `WEIGHTS` dict in `retrieval.py`. Redistributed 0.15 weight to vector (+0.05 → 0.35) and concept (+0.10 → 0.30). Removed domain from composite formula and explanation builder. Left `compute_domain_match()` method intact for Phase 2 re-introduction when real domain inference is built.
+
+**Files changed:** `src/core/retrieval.py` (WEIGHTS, `score_candidate()`, `_build_explanation()`)
+
+### Why This Took So Long
+
+Nobody traced the write path (`DomainType.REFERENCE` default) against the read path (`analyze_query()` keyword inference) before v2.7.0. The 6-signal design was assumed correct because it was documented. The documentation described the architecture faithfully — it just didn't note that the value spaces can't intersect.
+
+### Lesson
+
+> **For every scored signal, trace the write path (where values are set) and the read path (where they're consumed). If the value spaces don't intersect, the signal is dysfunctional regardless of its weight.**
+
+---
+
+## Issue #12: Unconditional Spec Override Dominates All Queries
+
+**Date:** 2026-04-15  
+**Duration:** 30 minutes (discovery via ARAA analysis with live queries)  
+**Severity:** HIGH  
+**Status:** FIXED — v2.7.0
+
+### Problem
+
+The `+0.30` specification/directive boost in `score_candidate()` is unconditional — applied regardless of whether the query has anything to do with system architecture, rules, or specifications. This mathematically guarantees specifications rank above non-spec memories for ANY query.
+
+### Symptom
+
+Asking "what should I remember about debugging" returns system specifications about "Temporal Memory Decay", "Cognitive Multi-Signal Scoring", and "Response Compression Contract" as the top results — none of which help with debugging. The override places specs 0.30 points above their natural composite score, making it impossible for a relevant non-spec fact to outrank an irrelevant spec.
+
+### Root Cause
+
+`retrieval.py:301-302`:
+```python
+if candidate.memory_type in ("specification", "directive"):
+    candidate.composite_score = min(1.0, candidate.composite_score + 0.30)
+```
+
+No intent check. No query analysis. Every specification gets +0.30 on every query.
+
+Combined with the vector baseline floor (0.85), a specification with vector_score=0.60 gets: `max(0.60 × 0.85, composite) + 0.30 = ~0.81`. A perfectly relevant non-spec fact with vector_score=0.95 gets: `0.95 × 0.85 = ~0.81` at best (if composite is low). The override makes specs and non-specs effectively equal even when the non-spec is a much better semantic match.
+
+### Solution
+
+Intent-gated the override. Added `"system"` intent detection to `analyze_query()` — queries containing "spec", "directive", "rule", "requirement", "architecture", "constraint", "sdd", "compliance" → `intent="system"`. The +0.30 boost now only fires when `query.inferred_intent == "system"`.
+
+```python
+# Before (unconditional):
+if candidate.memory_type in ("specification", "directive"):
+    candidate.composite_score = min(1.0, candidate.composite_score + 0.30)
+
+# After (intent-gated):
+if candidate.memory_type in ("specification", "directive") and query.inferred_intent == "system":
+    candidate.composite_score = min(1.0, candidate.composite_score + 0.30)
+```
+
+**Files changed:** `src/core/retrieval.py` (`analyze_query()` intent detection, `score_candidate()` guard)
+
+### Why This Took So Long
+
+The override was designed as a correctness guarantee for the SDD (Spec-Driven Development) workflow where specifications must always be visible. That requirement is valid — but only when the query is about the system/architecture. The override was never tested against non-system queries. The assumption was "specifications are always important" rather than "specifications are important when you're asking about the system."
+
+### Lesson
+
+> **Global score overrides must be intent-gated. An unconditional boost is a ranking monopoly, not a relevance signal.**
+
+---
+
+## Issue #13: Co-Activation Cold-Start — Session History Lost on Restart
+
+**Date:** 2026-04-15  
+**Duration:** 20 minutes (discovery via source trace)  
+**Severity:** MEDIUM  
+**Status:** FIXED — v2.7.0
+
+### Problem
+
+Co-activation scoring (15% of composite weight) requires `_session_retrieval_history` from the MCP server to populate the Kuzu query. This list resets to `[]` on every server restart. The first query of every session always gets 0.0 co-activation for all results.
+
+### Symptom
+
+After restarting the MCP server, no search result ever shows co-activation > 0.0 until at least 2 queries have been made in the same server session. For users who restart their IDE frequently (which restarts the MCP server), co-activation is effectively dead.
+
+### Root Cause
+
+`server.py:101`:
+```python
+self._session_retrieval_history: list[str] = []
+```
+
+Initialized empty on every `ElefanteMCPServer.__init__()`. The co-activation architecture is otherwise correct:
+- **Write path works:** `record_coactivation()` (`orchestrator.py:976`) validates IDs in ChromaDB, then writes `CO_ACTIVATED` edges to Kuzu via `MERGE` on Entity nodes.
+- **Read path works:** `search_memories()` (`orchestrator.py:808-820`) pre-fetches the co-activation matrix from Kuzu using the recent IDs.
+- **Schema is correct:** Memories are created as Entity nodes (`orchestrator.py:622`, `EntityType.MEMORY`), and `CO_ACTIVATED` is defined as `FROM Entity TO Entity` (`graph_store.py:392`).
+
+The only gap: `_session_retrieval_history` is the source of IDs for the read path, and it's volatile.
+
+### Solution
+
+Persist `_session_retrieval_history` to `DATA_DIR/session_retrieval_history.json` after every update (search, context injection, delete). Load on server startup with 7-day expiry pruning. Format: `{"ids": [...], "saved_at": "ISO-8601"}`.
+
+**Files changed:** `src/mcp/server.py` (`_load_session_history()`, `_save_session_history()`, `__init__`, context injection block, `_handle_search_memories`, `_handle_memory_delete`)
+
+### Why This Took So Long
+
+The co-activation system was initially diagnosed as "dead" because real queries showed 0.0 co-activation scores. The incorrect assumption was that the Kuzu schema was wrong (`CO_ACTIVATED FROM Entity TO Entity` but memories might be stored as `Memory` nodes). Source tracing proved memories ARE stored as Entity nodes (`orchestrator.py:622`). The real problem is simpler: volatile state that doesn't survive restarts.
+
+### Lesson
+
+> **Before declaring a feature "dead," trace the full write path AND read path. A system that writes correctly but reads from volatile state isn't broken — it's cold.**

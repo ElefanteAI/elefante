@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : advise_version_bump.py
-# VERSION : 2.5.2
+# VERSION : 2.7.1
 # CHANGED : 2026-04-15
 # PURPOSE : Inspect staged git diff, classify MAJOR/MINOR/PATCH, then hand off
-#           to bump_version.py after operator confirms the recommendation.
-# WHEN    : Before any version bump. Run AFTER staging changes but BEFORE writing
-#           the CHANGELOG entry — use it to determine what bump level is warranted.
+#           to bump_version.py only when the matching CHANGELOG entry already exists.
+# WHEN    : After staging changes. Usually run BEFORE writing the CHANGELOG entry
+#           to determine the right version; rerun after the entry exists if you want
+#           the advisor to hand off to bump_version.py automatically.
 # USAGE   : python scripts/ci/advise_version_bump.py
-# NOTES   : Requires staged git changes (git add first). Does not write any files
-#           itself; bump_version.py does the actual write after confirmation.
+# NOTES   : Requires staged git changes (git add first). If CHANGELOG.md does not
+#           yet contain the proposed release entry, the advisor stops after printing
+#           the recommended next steps instead of calling bump_version.py.
 # LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """
@@ -26,8 +28,8 @@ Flow:
     1. git add <your files>
     2. python scripts/ci/advise_version_bump.py   ← this script
     3. Confirm or override the proposed version
-    4. Script calls bump_version.py automatically
-    5. Write CHANGELOG.md entry
+    4. Write CHANGELOG.md entry for the chosen version
+    5. Re-run this advisor or call bump_version.py directly
     6. git commit && git push
 """
 
@@ -122,6 +124,15 @@ def validate_version(version: str) -> None:
                 f"  ERROR: version part '{label}={val}' is out of range "
                 f"[{VERSION_PART_MIN}, {VERSION_PART_MAX}]."
             )
+
+
+def changelog_has_entry(version: str) -> bool:
+    changelog = ROOT / "CHANGELOG.md"
+    if not changelog.exists():
+        return False
+    text = changelog.read_text(encoding="utf-8")
+    pattern = rf"^## \[{re.escape(version)}\] - \d{{4}}-\d{{2}}-\d{{2}}$"
+    return re.search(pattern, text, re.MULTILINE) is not None
 
 
 def bump(version: str, level: str) -> str:
@@ -249,6 +260,19 @@ def main() -> None:
         print(f"  Unrecognised input '{answer}'. Cancelled.")
         sys.exit(1)
 
+    if not changelog_has_entry(target):
+        print(f"  Recommended version locked: v{target}.")
+        print("  CHANGELOG.md does not contain that release entry yet, so no files were bumped.")
+        print("  Next steps:")
+        print(f"    1. Write '## [{target}] - YYYY-MM-DD' plus real notes in CHANGELOG.md")
+        print(f"    2. Run {Path(sys.executable).name} scripts/ci/bump_version.py {target}")
+        print(f"    3. Run {Path(sys.executable).name} scripts/ci/bump_version.py --check")
+        print("    4. git add -A")
+        print(f"    5. git commit -m \"chore: bump to v{target} <description>\"")
+        print("    6. git push")
+        print()
+        sys.exit(0)
+
     # ── Run bump_version.py ────────────────────────────────────────────────
     bump_script = ROOT / "scripts" / "ci" / "bump_version.py"
     result = subprocess.run([sys.executable, str(bump_script), target], cwd=ROOT)
@@ -259,7 +283,7 @@ def main() -> None:
     print()
     print(f"  Version bumped to v{target}.")
     print("  Next steps:")
-    print(f"    1. Write the CHANGELOG.md entry for v{target}")
+    print(f"    1. Run {Path(sys.executable).name} scripts/ci/bump_version.py --check")
     print("    2. git add -A")
     print(f"    3. git commit -m \"chore: bump to v{target} <description>\"")
     print("    4. git push")

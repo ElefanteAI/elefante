@@ -1,6 +1,6 @@
 # Elefante Vision
 
-> Last updated: 2026-04-15 · Current version: v2.6.0
+> Last updated: 2026-04-15 · Current version: v2.7.1
 
 ---
 
@@ -43,7 +43,7 @@ These are non-negotiable and define everything Elefante does:
 | 21 MCP tools | Memory CRUD, graph queries, tasks, ETL, directives, context injection |
 | Dual storage | ChromaDB (semantic vectors) + Kuzu (knowledge graph) |
 | Behavioral scoring | System-computed relevance (0-100) with type-based decay rates |
-| 6-signal cognitive retrieval | Vector similarity, concept overlap, domain match, co-activation, authority, temporal |
+| 5-signal cognitive retrieval | Vector similarity, concept overlap, co-activation, authority, temporal |
 | Compliance gate | Mechanical search-before-write enforcement |
 | Agent-driven ETL | Classification without internal LLM calls — the agent's own LLM does the work |
 | Autonomous co-activation | Passive graph wiring between memories retrieved together |
@@ -123,7 +123,7 @@ Everything below emerged during development and represents where Elefante could 
 **Proactive Memory Surfacing** — The system suggests relevant memories without the user searching. Triggers: file opened (surface memories tagged with that file), error in terminal (surface memories matching error pattern), conversation keyword match via `surfaces_when` field.
 *Status: Designed. `surfaces_when` field exists in schema. Surfacing logic not built.*
 
-**Retrieval Explanation (UI)** — Search results include WHY they were retrieved — breakdown of vector similarity, concept overlap, domain match, authority, and temporal signals. Backend returns this data. Dashboard doesn't display it yet.
+**Retrieval Explanation (UI)** — Search results include WHY they were retrieved — breakdown of vector similarity, concept overlap, co-activation, authority, and temporal signals. Backend returns this data. Dashboard doesn't display it yet.
 *Status: Backend done (v2.1). Frontend display not built.*
 
 ### C. Dashboard & Visualization

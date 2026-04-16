@@ -4,7 +4,7 @@
 > **Last Updated:** 2026-04-15  
 > **Total Issues Documented:** 9  
 > **Status:** Production Reference  
-> **Applies to**: v2.6.0+
+> **Applies to**: v2.7.1+
 | # | Law | Violation Cost |
 |---|-----|----------------|
 | 1 | VERIFY before claiming completion - never assume code works | Repeated iterations |

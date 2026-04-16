@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.6.0 - Memory Table with TanStack Table
+// Elefante Dashboard v2.7.1 - Memory Table with TanStack Table
 import { useState, useMemo } from 'react';
 import {
   useReactTable,
@@ -14,6 +14,10 @@ import { ChevronUp, ChevronDown, ChevronRight, Search, X } from 'lucide-react';
 import type { MemoryNode } from '@/types';
 
 const columnHelper = createColumnHelper<MemoryNode>();
+
+function formatLabel(value: string): string {
+  return value.replace(/[_-]/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
 
 interface MemoryTableProps {
   memories: MemoryNode[];
@@ -58,7 +62,7 @@ export function MemoryTable({ memories, onSelectMemory, selectedId }: MemoryTabl
         const topic = info.getValue();
         return topic ? (
           <span className="px-2 py-0.5 bg-violet-500/20 text-violet-300 rounded text-xs">
-            {topic}
+            {formatLabel(String(topic))}
           </span>
         ) : null;
       },
@@ -73,10 +77,14 @@ export function MemoryTable({ memories, onSelectMemory, selectedId }: MemoryTabl
           decision: 'bg-amber-500/20 text-amber-300',
           preference: 'bg-pink-500/20 text-pink-300',
           insight: 'bg-emerald-500/20 text-emerald-300',
+          note: 'bg-slate-500/20 text-slate-300',
+          conversation: 'bg-sky-500/20 text-sky-300',
+          specification: 'bg-orange-500/20 text-orange-300',
+          directive: 'bg-rose-500/20 text-rose-300',
         };
         return type ? (
           <span className={`px-2 py-0.5 rounded text-xs ${typeColors[type] || 'bg-slate-500/20 text-slate-300'}`}>
-            {type}
+            {formatLabel(String(type))}
           </span>
         ) : null;
       },

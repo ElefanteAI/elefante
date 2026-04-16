@@ -8,7 +8,7 @@
 
 AI agents start every conversation from zero. Your preferences, decisions, and discovered patterns don't carry over. Elefante gives any MCP-compatible agent a persistent, local second brain — memories are stored, scored automatically, and surfaced at the right moment without being asked.
 
-**v2.6.0** — Persistent Memory Engine
+**v2.7.1** — Persistent Memory Engine
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -22,7 +22,7 @@ AI agents start every conversation from zero. Your preferences, decisions, and d
                          │
 ┌────────────────────────▼────────────────────────────────────┐
 │ LAYER 2 · INTELLIGENCE ENGINE                               │
-│ Orchestrator · 6-signal scoring · Hybrid Memory             │
+│ Orchestrator · 5-signal scoring · Hybrid Memory             │
 │ (ChromaDB vectors + Kuzu graph)                             │
 └────────────────────────┬────────────────────────────────────┘
                          │ snapshot.json
@@ -43,7 +43,7 @@ Elefante is a local-first persistent memory engine for AI agents, connected via 
 
 - **Stores** facts, preferences, decisions, code patterns, and tasks
 - **Searches** using hybrid retrieval — semantic vectors, knowledge graph, and session context
-- **Scores** every memory automatically using 6 behavioral signals (recency, reinforcement, type, frequency, freshness, context fit) — no manual ratings
+- **Scores** every memory automatically using 5 retrieval signals (semantic match, concept overlap, co-activation, authority, temporal freshness) — no manual ratings
 - **Injects context** silently into every tool call — the agent gets relevant history without asking
 - **Connects knowledge** through an entity-relationship graph
 - **Enforces quality** via a compliance gate: search before write, no duplicates
@@ -68,7 +68,7 @@ Two storage backends working together:
 
 - **ChromaDB** — 768-dimensional semantic vectors for meaning-based retrieval across months of history.
 - **Kuzu** — a knowledge graph that tracks entities, relationships, and structural context.
-- **Behavioral Relevance** — a 6-signal scoring system that automatically surfaces the most useful memories. No manual importance ratings.
+- **Behavioral Relevance** — a 5-signal scoring system that automatically surfaces the most useful memories. No manual importance ratings.
 
 Scoring details → [docs/technical/spec-scoring.md](docs/technical/spec-scoring.md)
 Architecture → [docs/technical/spec-architecture.md](docs/technical/spec-architecture.md)
@@ -192,6 +192,18 @@ Full reference → [docs/technical/spec-tools.md](docs/technical/spec-tools.md)
 - [Dashboard](docs/technical/ops-dashboard.md) — visualization and health monitoring
 - [Docker](docs/technical/ops-docker.md) — containerized deployment
 - [Debugging](docs/debug/README.md) — known issues tracker, compendium routing, and verification commands
+
+## Release Notes
+
+Every tagged Elefante release is documented in three places:
+
+- [GitHub Releases](https://github.com/ElefanteAI/elefante/releases) — packaged binaries and release-specific notes
+- [CHANGELOG.md](CHANGELOG.md) — the full historical ledger
+- [README.md](README.md) — the current product surface, install path, and docs map
+
+Release bodies are rendered from the matching `CHANGELOG.md` entry in CI, so new tags do not ship with empty GitHub release pages. `CHANGELOG.md` is the authoritative historical record for older releases as well, including legacy GitHub release pages that predate rendered release bodies.
+
+Do not cut or push a `v*` tag until its matching `CHANGELOG.md` entry exists.
 
 ---
 
