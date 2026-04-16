@@ -101,6 +101,7 @@ Before writing any scratch reproducer or one-off validation, check whether `test
 | Did a specific code path regress? | targeted `pytest` test from `tests/README.md` | Smallest reproducible proof for the changed path |
 | Is the factory reset script safe? | `pytest tests/test_factory_reset.py -v` | Validates dry-run, safety gates, backup creation, and idempotency against isolated temp HOME |
 | Is there a severe operational failure the verify scripts cannot explain? | `scripts/debug/*` only if the compendium tells you to | Intervention tools, not routine validation |
+| Need a populated demo database for dashboard testing? | `scripts/demo/generate_100_memories.py --db ./a0-data/demo_db` | Injects 100 memories with full behavioral history: 6-month temporal spread, Zipf access patterns (hot/warm/cool/cold), session IDs on conversations, conflict cross-links on contradictions, topical clusters via related_memory_ids, authority scores, supersessions, co-activation edges, purposeful deletions. 8-point spec verification built in. Zero LLM. Spec: `scripts/demo/SPEC_behavioral_history.md` |
 
 ---
 
