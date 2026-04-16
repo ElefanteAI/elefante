@@ -43,7 +43,7 @@ def main():
         print(f"\nProcessing {tag}...")
 
         # 1. Render markdown for this version using our new CI script
-        render_cmd = f"python scripts/ci/render_release_notes.py {version}"
+        render_cmd = f"{sys.executable} scripts/ci/render_release_notes.py {version}"
         success, rendered_out = run_cmd(render_cmd)
         
         if not success:
