@@ -85,6 +85,8 @@ def _fallback_terminal(installer_dir: Path) -> None:
 # ── Entry point ──────────────────────────────────────────────────────────
 
 def main() -> None:
+    os.environ.setdefault("TK_SILENCE_DEPRECATION", "1")
+
     parser = argparse.ArgumentParser(description="Elefante Installer GUI")
     parser.add_argument("--installer-dir", required=True)
     args = parser.parse_args()
@@ -191,10 +193,10 @@ class InstallerApp:
         hdr.pack(fill=tk.X, padx=28, pady=(24, 12))
         tk.Label(hdr, text="ELEFANTE",
                  font=("Helvetica Neue", 28, "bold"),
-                 fg=C["fg"], bg=C["panel"]).pack(anchor=tk.W)
+                 fg=C["fg"]).pack(anchor=tk.W)
         tk.Label(hdr, text="Local memory for your AI. Stored on this Mac.",
                  font=("Helvetica Neue", 13),
-                 fg=C["subtle"], bg=C["panel"]).pack(anchor=tk.W, pady=(4, 0))
+                 fg=C["subtle"]).pack(anchor=tk.W, pady=(4, 0))
 
         # ── Privacy / default path panel ──
         privacy = tk.Frame(card, bg="#f0fdf4", highlightthickness=1,
@@ -203,21 +205,21 @@ class InstallerApp:
         tk.Label(
             privacy, text="Recommended default",
             font=("Helvetica Neue", 12, "bold"),
-            fg=C["ok"], bg="#f0fdf4",
+            fg=C["ok"],
         ).pack(anchor=tk.W, padx=14, pady=(12, 2))
         tk.Label(
             privacy,
             text="Install app files in a hidden folder inside your user home. Not in Documents.",
             font=("Helvetica Neue", 11),
-            fg=C["subtle"], bg="#f0fdf4",
+            fg=C["subtle"],
         ).pack(anchor=tk.W, padx=14)
         tk.Label(
             privacy, text=f"App:  {self.default_install_path}",
-            font=("Menlo", 11), fg=C["fg"], bg="#f0fdf4",
+            font=("Menlo", 11), fg=C["fg"],
         ).pack(anchor=tk.W, padx=14, pady=(8, 2))
         tk.Label(
             privacy, text=f"Data: {self.default_data_path}",
-            font=("Menlo", 11), fg=C["fg"], bg="#f0fdf4",
+            font=("Menlo", 11), fg=C["fg"],
         ).pack(anchor=tk.W, padx=14, pady=(0, 12))
 
         # ── Install path ─────────────────────────────────────────────────
@@ -225,10 +227,10 @@ class InstallerApp:
         sec.pack(fill=tk.X, padx=28, pady=(0, 6))
         tk.Label(sec, text="Install location",
                  font=("Helvetica Neue", 12, "bold"),
-                 fg=C["fg"], bg=C["panel"]).pack(anchor=tk.W)
+                 fg=C["fg"]).pack(anchor=tk.W)
         tk.Label(sec, text="Change this only if you want the app files somewhere else.",
                  font=("Helvetica Neue", 10),
-                 fg=C["muted"], bg=C["panel"]).pack(anchor=tk.W, pady=(2, 8))
+                 fg=C["muted"]).pack(anchor=tk.W, pady=(2, 8))
 
         row = tk.Frame(sec, bg=C["panel"])
         row.pack(fill=tk.X)
@@ -251,15 +253,14 @@ class InstallerApp:
 
         tk.Label(sec,
                  text="Memories stay local on this Mac. Logs are written into the chosen install folder.",
-                 font=("Helvetica Neue", 10), fg=C["muted"],
-                 bg=C["panel"]).pack(anchor=tk.W, pady=(6, 0))
+                 font=("Helvetica Neue", 10), fg=C["muted"]).pack(anchor=tk.W, pady=(6, 0))
 
         # ── Install button ───────────────────────────────────────────────
         self.install_btn = tk.Button(
             card, text="  Install Elefante  ", command=self._start_install,
             font=("Helvetica Neue", 15, "bold"),
-            bg=C["accent"], fg="#ffffff", activebackground=C["accent_h"],
-            relief=tk.FLAT, padx=28, pady=10, cursor="hand2",
+            highlightbackground=C["accent"], padx=28, pady=10,
+            cursor="hand2", default="active",
         )
         self.install_btn.pack(pady=18)
 
@@ -275,14 +276,14 @@ class InstallerApp:
 
         self.status_label = tk.Label(
             card, text="Ready to install",
-            font=("Helvetica Neue", 11), fg=C["muted"], bg=C["panel"],
+            font=("Helvetica Neue", 11), fg=C["muted"],
         )
         self.status_label.pack(pady=(2, 6))
 
         # ── Output log ───────────────────────────────────────────────────
         tk.Label(card, text="Installer output",
                  font=("Helvetica Neue", 12, "bold"),
-                 fg=C["fg"], bg=C["panel"]).pack(anchor=tk.W, padx=28)
+                 fg=C["fg"]).pack(anchor=tk.W, padx=28)
 
         border_wrap = tk.Frame(card, bg=C["border"], padx=1, pady=1)
         border_wrap.pack(fill=tk.BOTH, expand=True, padx=28, pady=(8, 24))
@@ -323,7 +324,7 @@ class InstallerApp:
         self.installing = True
         self.stages_hit = 0
         self.progress_var.set(0)
-        self.install_btn.configure(state=self.tk.DISABLED, bg="#1a2030")
+        self.install_btn.configure(state=self.tk.DISABLED)
         self.browse_btn.configure(state=self.tk.DISABLED)
         self.path_entry.configure(state=self.tk.DISABLED)
 
@@ -408,7 +409,7 @@ class InstallerApp:
             )
             self.install_btn.configure(
                 text="  Done  ", state=self.tk.NORMAL,
-                bg=self.C["ok"], command=self.root.destroy,
+                command=self.root.destroy,
             )
         else:
             self._set_status("Installation failed \u2014 check log above", self.C["err"])
@@ -416,7 +417,7 @@ class InstallerApp:
             self._append("Installation failed. Review the output above for details.", "err")
             self.install_btn.configure(
                 text="  Retry  ", state=self.tk.NORMAL,
-                bg=self.C["accent"], command=self._retry,
+                command=self._retry,
             )
             self.browse_btn.configure(state=self.tk.NORMAL)
             self.path_entry.configure(state=self.tk.NORMAL)
