@@ -42,6 +42,26 @@ import threading
 import time
 from pathlib import Path
 
+
+SUPPORTED_PYTHON_MIN = (3, 11)
+SUPPORTED_PYTHON_MAX = (3, 14)
+
+
+def ensure_supported_python() -> None:
+    version_tuple = sys.version_info[:2]
+    if SUPPORTED_PYTHON_MIN <= version_tuple < SUPPORTED_PYTHON_MAX:
+        return
+
+    detected = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    print(
+        "ERROR: Elefante requires Python 3.11, 3.12, or 3.13. "
+        f"Detected {detected}."
+    )
+    raise SystemExit(1)
+
+
+ensure_supported_python()
+
 SETUP_DIR = Path(__file__).resolve().parent
 ROOT_DIR = Path(__file__).resolve().parents[2]
 VENV_MODE_ASK = "ask"
@@ -311,6 +331,14 @@ class InstallStateTracker:
         lines.append(f"Status file: {self.status_file}")
         lines.append(f"Summary file: {self.summary_file}")
         return lines
+
+    def render_persisted_file_routing(self):
+        return [
+            "Read these persisted installer files in order:",
+            f"1. Summary file: {self.summary_file}",
+            f"2. Status file: {self.status_file}",
+            f"3. Log file: {self.log_file}",
+        ]
 
     def _write_status(self):
         lines = [
@@ -842,6 +870,22 @@ def ensure_virtual_environment(root_dir, launcher_python, requested_mode):
 def install_dependencies(root_dir, python_cmd):
     """Install requirements.txt"""
     logger.log("Installing dependencies...")
+
+    if not run_command([python_cmd, "-m", "pip", "--version"], cwd=root_dir):
+        logger.log("WARN: Pip is missing from the selected virtual environment. Bootstrapping with ensurepip...")
+        if not run_command([python_cmd, "-m", "ensurepip", "--upgrade"], cwd=root_dir):
+            logger.log(
+                "ERROR: Pip bootstrap failed. Read docs/debug/ops-installation-compendium.md Issue #13 for recovery."
+            )
+            logger.log("ERROR: Failed to install dependencies")
+            return False
+        if not run_command([python_cmd, "-m", "pip", "--version"], cwd=root_dir):
+            logger.log(
+                "ERROR: Pip is still unavailable after ensurepip. Read docs/debug/ops-installation-compendium.md Issue #13 for recovery."
+            )
+            logger.log("ERROR: Failed to install dependencies")
+            return False
+        logger.log("OK: Bootstrapped pip with ensurepip")
     
     # Upgrade pip when possible, but do not fail the installer if this optional step fails.
     if not run_command([python_cmd, "-m", "pip", "install", "--upgrade", "pip"], cwd=root_dir):
@@ -1187,6 +1231,8 @@ def main():
         generate_proof(root_dir, install_status)
         for line in state_tracker.render_console_summary():
             logger.log(line)
+        for line in state_tracker.render_persisted_file_routing():
+            logger.log(line)
         if os.name == 'nt':
             input("Press Enter to exit...")
         return
@@ -1210,7 +1256,9 @@ def main():
         print_header("INSTALLATION FAILED")
         for line in state_tracker.render_console_summary(next_action=next_action):
             logger.log(line)
-        logger.log("Please check the logs above for errors.")
+        for line in state_tracker.render_persisted_file_routing():
+            logger.log(line)
+        logger.log("If the failure happened during dependency installation, copy the last 80 log lines before retrying.")
         sys.exit(1)
     
     if os.name == 'nt':

@@ -4,7 +4,7 @@
 > **Last Updated:** 2026-04-15
 > **Total Issues Documented:** 13
 > **Status:** Production Reference - All Scoring Flaws Fixed (v2.7.0)
-> **Applies to**: v2.9.0+
+> **Applies to**: v2.9.3+
 > **Maintainer:** Add new issues following Issue #N template at bottom
 >
 > **HISTORICAL NOTE:** Some issues below reference V3 concepts (layer, sublayer, classifier.py, IntentType, importance 1-10) that have since been removed. These entries document the debugging process and lessons learned; the referenced code/fields no longer exist.
@@ -57,6 +57,10 @@ Run these BEFORE investigating. If tests pass, the documented fix is intact.
 - [Issue #8: Low Similarity Scores](#issue-8-low-similarity-scores-for-exact-matches) FIXED
 - [Issue #9: No Actionable Integration](#issue-9-no-actionable-integration-in-search-results) FIXED
 - [Issue #10: MemoryAdd Silent IGNORE](#issue-10-memoryadd-silent-ignore--opaque-test-memory-guard-rejection) OPEN
+- [Issue #11: Domain Signal Value-Space Disjunction](#issue-11-domain-signal-value-space-disjunction--15-of-scoring-weight-is-dysfunctional) FIXED
+- [Issue #12: Unconditional Spec Override Dominates All Queries](#issue-12-unconditional-spec-override-dominates-all-queries) FIXED
+- [Issue #13: Co-activation Cold Start](#issue-13-co-activation-cold-start--session-history-lost-on-restart) FIXED
+- [Issue #14: ChromaDB query() with where fails on large collection](#issue-14-chromadb-query-with-where-filter-fails-on-production-collection) FIXED
 - [Memory Export Guide](#memory-export-guide)
 - [Reinforcement Protocol](#reinforcement-protocol)
 - [Prevention Protocol](#prevention-protocol)
@@ -1092,3 +1096,74 @@ The co-activation system was initially diagnosed as "dead" because real queries 
 ### Lesson
 
 > **Before declaring a feature "dead," trace the full write path AND read path. A system that writes correctly but reads from volatile state isn't broken — it's cold.**
+
+---
+
+## Issue #14: ChromaDB query() with where filter fails on production collection
+
+**Date:** 2026-04-17
+**Duration:** Discovered during first MemoryAdd call of session
+**Severity:** CRITICAL — MemoryAdd completely broken
+**Status:** FIXED (v2.9.0)
+
+### Problem
+
+`elefante-MemoryAdd` with `memory_type="preference"` always fails with:
+```
+Error executing plan: Internal error: Error finding id
+```
+
+### Symptom
+
+`elefante-MemoryAdd` returns `success: false`. The error message cites `docs/debug/README.md -> Known Issues` but no matching BUG row exists.
+
+### Root Cause
+
+`orchestrator.py` STEP 1.75 (preference reassertion merge) calls `vector_store.search()` with `where_override={"memory_type": "preference"}`. This passes a metadata `where` filter to `chromadb.Collection.query()`.
+
+On the production collection (414+ memories), `collection.query()` with ANY `where` filter raises `chromadb.errors.InternalError: Error executing plan: Internal error: Error finding id`. The `collection.get()` path works. Fresh/small collections are unaffected.
+
+This is a ChromaDB 1.3.5 Rust-backend bug: filtered vector search fails when the collection index is in a specific state. Root traced via direct Python reproduction:
+
+```python
+col.query(query_embeddings=..., where={"memory_type": "preference"})  # FAILS
+col.query(query_embeddings=..., where={"memory_type": {"$eq": "preference"}})  # ALSO FAILS
+col.query(query_embeddings=...)  # OK
+col.get(where={"memory_type": {"$eq": "preference"}})  # OK
+```
+
+### Solution
+
+Remove `where_override={"memory_type": "preference"}` from the preference reassertion search call in `orchestrator.py:361`. The Python-side `pref_like` filter immediately after already handles `memory_type == "preference"` filtering correctly. The `where_override` was redundant and is now the failure point.
+
+**File changed:** `src/core/orchestrator.py` line ~366 — removed `where_override` argument.
+
+### Verification Command
+
+```bash
+# Add a preference memory — should succeed and show preference_reassertion_merged or NEW
+python - << 'EOF'
+import asyncio, os, sys; sys.path.insert(0, ".")
+os.environ["ELEFANTE_CONFIG_PATH"] = "config.yaml"
+async def main():
+    from src.core.orchestrator import get_orchestrator
+    r = await get_orchestrator().add_memory("test pref", memory_type="preference", tags=[], metadata={"category": "test-pref", "domain": "personal"})
+    print("OK" if r else "FAIL")
+asyncio.run(main())
+EOF
+```
+
+### Broader Risk
+
+Any `vector_store.search()` call that passes `where_override` or `filters` with a `memory_type` field will fail on this collection. `_build_where_clause` in `vector_store.py` also produces bare-dict filters without `$eq` — these will fail too if `MemorySearch` is ever called with a `memory_type` filter. Post-filter in Python is the safe pattern for this ChromaDB version.
+
+### Lesson
+
+> **ChromaDB `query()` with `where` is unreliable on large/aged production collections in v1.3.5. Use `get()` for filtered lookups or post-filter in Python after unfiltered `query()`.**
+
+### Issue 14: ChromaDB query with where filter fails on production collection
+* **ID:** BUG-022
+* **Symptom:** `elefante-MemoryAdd` fails with `ChromaDB InternalError: Error executing plan: Internal error: Error finding id` on large databases (400+ entries) when adding `memory_type="preference"`.
+* **Root Cause:** The `preference` reassertion merge (`orchestrator.py:361`) passed `where_override={"memory_type": "preference"}` to `collection.query()`. The ChromaDB 1.3.5 Rust backend fails on any where filter against larger collections.
+* **Resolution:** Removed the redundant `where_override` since the python-side `pref_like` filter applies the exact same logic.
+* **Test Guard:** Adding a `preference` memory via tool now confirms `success: true`.

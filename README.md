@@ -8,7 +8,7 @@
 
 AI agents start every conversation from zero. Your preferences, decisions, and discovered patterns don't carry over. Elefante gives any MCP-compatible agent a persistent, local second brain — memories are stored, scored automatically, and surfaced at the right moment without being asked.
 
-**v2.9.0** — Persistent Memory Engine
+**v2.9.3** — Persistent Memory Engine
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -103,12 +103,22 @@ Our installer detects your OS, manages the repository virtual environment, insta
 - macOS / Linux stable root: `~/.elefante/app/current`
 - Windows stable root: `%LOCALAPPDATA%\Elefante\app\current`
 
+On macOS builders with Swift available, the DMG ships a native AppKit installer surface. The legacy Python/Tk installer is fallback compatibility only.
+
 If `.venv` already exists, the installer offers four paths:
 
 - Delete existing `.venv` and install fresh (default)
 - Backup existing `.venv` and install fresh
 - Reuse existing `.venv`
 - Abort installation
+
+**If installation fails:** read the persisted installer files in this order:
+
+1. `.elefante-install-summary.txt`
+2. `.elefante-install-status.txt`
+3. `.elefante-install.log`
+
+For release bundles and the macOS DMG, those files live in the stable install root. For source-checkout installs, they live in the repo root. The installer prints their exact paths at startup and on failure.
 
 ```bash
 # Source checkout fallback

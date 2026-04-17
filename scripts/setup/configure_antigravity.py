@@ -18,6 +18,8 @@ Automatic Antigravity MCP Configuration Script
 Configures Antigravity IDE to use Elefante MCP server automatically
 """
 
+from __future__ import annotations
+
 import json
 import sys
 import shutil

@@ -83,6 +83,38 @@ Execute the following pattern based on the type of failure:
 
 ---
 
+## Critical Thinking Is Flow Control
+
+Use the smallest evidence path that can disprove your current assumption.
+
+1. State the concrete diagnostic question before opening more files, running scripts, or searching broadly.
+2. Choose the smallest maintained proof that can confirm or falsify it: exact source file, existing verifier, or targeted pytest.
+3. After each read or test, compress the result into decision-bearing facts only. Drop stale branches immediately.
+4. If the evidence invalidates the current line of attack, pivot. Do not keep polishing the wrong layer.
+5. Progress updates should report deltas, not re-summarize unchanged plans.
+
+Token efficiency is a development constraint, not a style preference. The target is maximum decision value per token: fewer speculative branches, fewer repeated summaries, more verified movement.
+
+## Required Progress Update Template
+
+When work is active, progress updates should stay short and decision-bearing. Use this shape unless a concrete blocker requires more detail:
+
+```text
+Question: What exact uncertainty is being resolved right now?
+Proof: What smallest maintained proof is being run or read?
+Result: What changed because of that proof?
+Next: What is the immediate next move?
+```
+
+Rules:
+
+1. Report deltas only. Do not re-summarize unchanged plans.
+2. If the active question changed, say why.
+3. If a branch died, name the pivot explicitly.
+4. If no evidence returned yet, say which proof is still running instead of padding the update.
+
+---
+
 ## The Development Loop
 
 ```text
@@ -100,7 +132,7 @@ Process details: [`dev-sdd.md`](../technical/dev-sdd.md) (legacy filename, embed
 
 ## Purposeful Script Routing
 
-Do not run scripts as a ritual. Every script call must answer a specific debugging question.
+Do not run scripts as a ritual. Every script call must answer a specific debugging question. State that question first and pick the smallest maintained proof that can answer it.
 
 Before writing any scratch reproducer or one-off validation, check whether `tests/README.md` already maps the failure mode to a maintained pytest target. If it does, run that first. If the test is stale, update the existing test instead of creating a parallel scratch path.
 

@@ -31,6 +31,8 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_ICON = ROOT_DIR / "assets" / "icons" / "Elefante.icns"
+DEFAULT_BADGE_PNG = ROOT_DIR / "assets" / "icons" / "Elefante-installer-badge.png"
+DEFAULT_SWIFT_APP = ROOT_DIR / "scripts" / "ci" / "installer_app.swift"
 DEFAULT_LOGO_PNG = ROOT_DIR / "docs" / "assets" / "Elefante Logo 1024 white.png"
 VOLUME_NAME = "Elefante Installer"
 PRODUCT_URL = "https://www.elefante.ai"
@@ -151,20 +153,47 @@ def _create_installer_app(dmg_content: Path, icon_path: Path) -> None:
     # ── Info.plist ──
     (contents / "Info.plist").write_text(_APP_INFO_PLIST, encoding="utf-8")
 
-    # ── Launcher script ──
+    # ── Header badge image for the installer window ──
+    if DEFAULT_BADGE_PNG.exists():
+        shutil.copy2(DEFAULT_BADGE_PNG, resources / "installer-badge.png")
+
+    # ── Icon ──
+    if icon_path.exists():
+        shutil.copy2(icon_path, resources / "elefante.icns")
+
+    swiftc = shutil.which("swiftc")
+    if swiftc and DEFAULT_SWIFT_APP.exists():
+        _build_native_installer_binary(swiftc, macos_dir / "launcher")
+        return
+
+    # ── Fallback launcher script ──
     launcher = macos_dir / "launcher"
     launcher.write_text(_APP_LAUNCHER_SCRIPT, encoding="utf-8")
     launcher.chmod(0o755)
 
-    # ── GUI Python script ──
+    # ── Legacy Python GUI fallback ──
     gui_src = Path(__file__).resolve().parent / "installer_gui.py"
     if not gui_src.exists():
         raise FileNotFoundError(f"installer_gui.py not found at {gui_src}")
     shutil.copy2(gui_src, resources / "installer_gui.py")
 
-    # ── Icon ──
-    if icon_path.exists():
-        shutil.copy2(icon_path, resources / "elefante.icns")
+
+def _build_native_installer_binary(swiftc: str, output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        [
+            swiftc,
+            "-parse-as-library",
+            "-O",
+            str(DEFAULT_SWIFT_APP),
+            "-o",
+            str(output_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    output_path.chmod(0o755)
 
 
 _APP_INFO_PLIST = """\
@@ -249,7 +278,7 @@ if [ ! -f "$INSTALLER_DIR/install.sh" ]; then
     exit 1
 fi
 
-exec "$PYTHON" "$GUI_SCRIPT" --installer-dir "$INSTALLER_DIR"
+exec -a "Install Elefante" "$PYTHON" "$GUI_SCRIPT" --installer-dir "$INSTALLER_DIR"
 """
 
 

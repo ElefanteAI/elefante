@@ -4,13 +4,14 @@
 # VERSION : 2.5.2
 # CHANGED : 2026-04-15
 # PURPOSE : Cascade a semver string across every tracked version declaration in
-#           the repo. Has CHANGELOG gate, downgrade guard, and pattern-miss WARNING.
+#           the repo. Has CHANGELOG gate, rebaseline guard, and pattern-miss WARNING.
 # WHEN    : After writing the CHANGELOG entry for the new version. Never run before
 #           the CHANGELOG entry exists — the script will refuse. After bumping, run
 #           --check to confirm all 48 tracked files agree.
-# USAGE   : python scripts/ci/bump_version.py X.Y.Z | --check
+# USAGE   : python scripts/ci/bump_version.py X.Y.Z [--allow-rebaseline] | --check
 # NOTES   : Mandatory sequence: (1) write CHANGELOG entry, (2) bump, (3) --check,
-#           (4) git commit. Downgrade (e.g. 2.5.2 -> 2.5.1) is blocked by design.
+#           (4) git commit. Lowering the local version requires explicit
+#           --allow-rebaseline and is only for unpublished release correction.
 # LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """
@@ -21,17 +22,20 @@ Single source of truth: src/__init__.py -> propagated everywhere.
 Protocol (MANDATORY — enforced by this script):
     1. Write a CHANGELOG.md entry for the new version FIRST.
        Format: ## [X.Y.Z] - YYYY-MM-DD
-    2. Run: python scripts/ci/bump_version.py X.Y.Z
+        2. Run: python scripts/ci/bump_version.py X.Y.Z
        The script will refuse to proceed if:
          - No CHANGELOG entry exists for the new version.
-         - The new version is <= the current version (no downgrades).
+                 - The new version is <= the current version.
+             Exception: if the local repo was advanced past the intended unpublished
+             release, pass --allow-rebaseline to correct it deliberately.
     3. Run: python scripts/ci/bump_version.py --check
        Verify every tracked file declares the new version (exit 1 if drift).
     4. git commit && git push
 
 Usage:
-    python scripts/ci/bump_version.py 2.2.0      # Set version to 2.2.0
-    python scripts/ci/bump_version.py --check     # Verify all files match (exit 1 if drift)
+        python scripts/ci/bump_version.py 2.2.0                       # Set version to 2.2.0
+        python scripts/ci/bump_version.py 2.8.0 --allow-rebaseline    # Correct an unpublished version overshoot
+        python scripts/ci/bump_version.py --check                      # Verify all files match (exit 1 if drift)
 """
 
 import re
@@ -112,6 +116,10 @@ def read_current_version() -> str:
     return m.group(1)
 
 
+def _version_parts(version: str) -> tuple[int, int, int]:
+    return tuple(int(x) for x in version.split("."))
+
+
 def check_versions() -> bool:
     """Return True if all files match src/__init__.py, False otherwise."""
     expected = read_current_version()
@@ -164,18 +172,26 @@ def _check_changelog_entry(new_version: str):
         )
 
 
-def _check_no_downgrade(new_version: str):
-    """Abort if new_version is <= the current version."""
+def _check_version_direction(new_version: str, allow_rebaseline: bool = False):
+    """Abort if new_version is invalid relative to the current version."""
     current = read_current_version()
-    def _parts(v): return tuple(int(x) for x in v.split("."))
-    if _parts(new_version) <= _parts(current):
+    new_parts = _version_parts(new_version)
+    current_parts = _version_parts(current)
+
+    if new_parts == current_parts:
         raise SystemExit(
-            f"GATE FAILED: New version {new_version} is not greater than current {current}.\n"
-            f"  Downgrades and same-version re-applies are not allowed."
+            f"GATE FAILED: New version {new_version} is the same as current {current}.\n"
+            f"  Same-version re-applies are not allowed."
+        )
+
+    if new_parts < current_parts and not allow_rebaseline:
+        raise SystemExit(
+            f"GATE FAILED: New version {new_version} is lower than current {current}.\n"
+            f"  If this is an unpublished release correction, re-run with --allow-rebaseline."
         )
 
 
-def bump(new_version: str):
+def bump(new_version: str, allow_rebaseline: bool = False):
     """Write new_version to all target files."""
     # Validate semver format
     if not re.match(r'^\d+\.\d+\.\d+$', new_version):
@@ -186,8 +202,12 @@ def bump(new_version: str):
             raise SystemExit(f"Version part '{label}={val}' is out of range [0, 99].")
 
     # Precondition gates — abort before touching any file
-    _check_no_downgrade(new_version)
+    _check_version_direction(new_version, allow_rebaseline=allow_rebaseline)
     _check_changelog_entry(new_version)
+
+    current = read_current_version()
+    if allow_rebaseline and _version_parts(new_version) < _version_parts(current):
+        print(f"  REBASELINE  Correcting unpublished local version {current} -> {new_version}")
 
     changed = []
     warned = []
@@ -236,16 +256,28 @@ def bump(new_version: str):
 
 
 def main():
-    if len(sys.argv) < 2:
+    args = sys.argv[1:]
+    if not args:
         print(__doc__)
         sys.exit(1)
 
-    arg = sys.argv[1]
+    allow_rebaseline = False
+    if "--allow-rebaseline" in args:
+        allow_rebaseline = True
+        args = [arg for arg in args if arg != "--allow-rebaseline"]
+
+    if len(args) != 1:
+        print(__doc__)
+        sys.exit(1)
+
+    arg = args[0]
     if arg == "--check":
+        if allow_rebaseline:
+            raise SystemExit("--allow-rebaseline cannot be used with --check")
         ok = check_versions()
         sys.exit(0 if ok else 1)
     else:
-        bump(arg)
+        bump(arg, allow_rebaseline=allow_rebaseline)
 
 
 if __name__ == "__main__":

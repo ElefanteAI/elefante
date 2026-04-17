@@ -2,13 +2,18 @@
 
 This directory contains the project vision, ideas backlog, and active specs for Elefante.
 
+Planning docs are for future-facing intent and product-shaping specs. They are not the active debugging journal.
+
+If the question is "what did we just learn from a failure?", route to [`../debug/best_practices.md`](../debug/best_practices.md) and the relevant `ops-*-compendium.md`, not to this directory.
+
 ## Contents
 
 | File | Purpose |
-|------|---------|
-| [`spec-vision.md`](spec-vision.md) | **Start here.** What Elefante is, the vision, and all undone ideas |
-| [`spec-token-intelligence.md`](spec-token-intelligence.md) | PRD for token intelligence — per-call cost transparency (SHIPPED v2.5.0) |
-| [`spec-usage-intelligence.md`](spec-usage-intelligence.md) | Detailed PRD for dashboard usage metrics (backend 80% done, frontend 0%) |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| [`spec-vision.md`](spec-vision.md) | **Start here.** What Elefante is, the vision, and all undone ideas                           |
+| [`spec-installer-procedure.md`](spec-installer-procedure.md) | Phase-1 installer product spec: downloadable bundle, stable-path bootstrap, and customer installer surface |
+| [`spec-token-intelligence.md`](spec-token-intelligence.md) | PRD for token intelligence — per-call cost transparency (SHIPPED v2.5.0)                |
+| [`spec-usage-intelligence.md`](spec-usage-intelligence.md) | Detailed PRD for dashboard usage metrics (backend 80% done, frontend 0%)                |
 
 ## Archived
 
@@ -24,8 +29,9 @@ These files documented work that shipped. Moved to `../archive/planning/`:
 
 - [`../technical/`](../technical/) - How things work NOW
 - [`../debug/`](../debug/) - What BROKE and why
+- [`../debug/best_practices.md`](../debug/best_practices.md) - Distilled reusable development learnings that should shape the next debugging pass
 - [`../archive/`](../archive/) - Historical records
 
 ---
 
-**Last Updated**: 2026-04-12
+**Last Updated**: 2026-04-16

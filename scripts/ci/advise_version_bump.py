@@ -11,7 +11,8 @@
 # USAGE   : python scripts/ci/advise_version_bump.py
 # NOTES   : Requires staged git changes (git add first). If CHANGELOG.md does not
 #           yet contain the proposed release entry, the advisor stops after printing
-#           the recommended next steps instead of calling bump_version.py.
+#           the recommended next steps instead of calling bump_version.py. Manual
+#           lower-version overrides are treated as unpublished rebaseline corrections.
 # LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """
@@ -30,6 +31,8 @@ Flow:
     3. Confirm or override the proposed version
     4. Write CHANGELOG.md entry for the chosen version
     5. Re-run this advisor or call bump_version.py directly
+       If your override is lower than the current local version, the advisor
+       will route through bump_version.py --allow-rebaseline.
     6. git commit && git push
 """
 
@@ -104,6 +107,10 @@ def current_version() -> str:
     if not m:
         raise SystemExit("ERROR: Cannot read __version__ from src/__init__.py")
     return m.group(1)
+
+
+def version_parts(version: str) -> tuple[int, int, int]:
+    return tuple(int(x) for x in version.split("."))
 
 
 VERSION_PART_MAX = 99
@@ -260,12 +267,18 @@ def main() -> None:
         print(f"  Unrecognised input '{answer}'. Cancelled.")
         sys.exit(1)
 
+    rebaseline = version_parts(target) < version_parts(curr)
+    bump_cmd = f"{Path(sys.executable).name} scripts/ci/bump_version.py {target}"
+    if rebaseline:
+        bump_cmd += " --allow-rebaseline"
+        print(f"  Rebaseline override: local version v{curr} -> v{target}")
+
     if not changelog_has_entry(target):
         print(f"  Recommended version locked: v{target}.")
         print("  CHANGELOG.md does not contain that release entry yet, so no files were bumped.")
         print("  Next steps:")
         print(f"    1. Write '## [{target}] - YYYY-MM-DD' plus real notes in CHANGELOG.md")
-        print(f"    2. Run {Path(sys.executable).name} scripts/ci/bump_version.py {target}")
+        print(f"    2. Run {bump_cmd}")
         print(f"    3. Run {Path(sys.executable).name} scripts/ci/bump_version.py --check")
         print("    4. git add -A")
         print(f"    5. git commit -m \"chore: bump to v{target} <description>\"")
@@ -275,7 +288,10 @@ def main() -> None:
 
     # ── Run bump_version.py ────────────────────────────────────────────────
     bump_script = ROOT / "scripts" / "ci" / "bump_version.py"
-    result = subprocess.run([sys.executable, str(bump_script), target], cwd=ROOT)
+    command = [sys.executable, str(bump_script), target]
+    if rebaseline:
+        command.append("--allow-rebaseline")
+    result = subprocess.run(command, cwd=ROOT)
     if result.returncode != 0:
         print("\n  bump_version.py failed. Version not updated.")
         sys.exit(1)

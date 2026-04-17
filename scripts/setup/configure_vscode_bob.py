@@ -26,6 +26,8 @@ Default behavior of this script is to configure **mcp.json** and remove
 settings-based duplicates for VS Code.
 """
 
+from __future__ import annotations
+
 import json
 import os
 import sys

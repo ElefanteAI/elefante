@@ -147,7 +147,7 @@ async def inject_seed_memory():
         memory = await orc.add_memory(
             content="The secret Elefante test passcode is 'Indigo-Echo'.",
             memory_type=MemoryType.FACT,
-            tags=["seed", "test", "passcode"],
+            tags=["seed", "passcode"],
             metadata={"domain": DomainType.SYSTEM, "category": "system-test"}
         )
         if memory is None:

@@ -9,13 +9,43 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.9.3] - 2026-04-17
+
+### Added
+- **Native AppKit Installer files**: Added explicit git tracking for `scripts/ci/installer_app.swift` and installer icon assets that were omitted in previous commits.
+
+### Documentation
+- **Bug Post-Mortems**: Added detail and root causes for BUG-022 (ChromaDB query filter issue) and BUG-024 (broken venv bundle traversal) to `docs/debug/ops-memory-compendium.md` and `docs/debug/ops-installation-compendium.md`.
+
+---
+
+## [2.9.2] - 2026-04-17
+
+### Fixed
+
+- **Installer bundle build crashed on local `.venv.broken.*` backups (BUG-024)**: `scripts/ci/build_installer_bundle.py` excluded only the exact `.venv` directory, so a recovered workspace with `.venv.broken.<timestamp>` tried to package broken interpreter symlinks and failed with `FileNotFoundError`, leaving stale `dist` artifacts in place. Why: the packager's top-level exclusion logic matched one directory name instead of the full local-environment family created by recovery flows. What: the packager now excludes top-level `.venv*` directories, raises a targeted runtime citation if an unexpected broken symlink still reaches the archive step, and is guarded by a broken-backup regression in `tests/test_installer_bundle.py`. Impact: installer bundles and downstream DMGs can be rebuilt again from a repaired local workspace.
+
+## [2.9.1] - 2026-04-17
+
+### Fixed
+
+- **MemoryAdd broken for preference memory type (BUG-022)**: `elefante-MemoryAdd` with `memory_type="preference"` always failed with `ChromaDB InternalError: Error executing plan: Internal error: Error finding id`. Why: the preference reassertion merge (STEP 1.75, `orchestrator.py:361`) passed `where_override={"memory_type": "preference"}` to `collection.query()`. ChromaDB 1.3.5's Rust backend fails on any `where` filter against large production collections (400+ memories). What: removed the redundant `where_override` argument — the Python-side `pref_like` filter immediately after already handles the same filtering correctly. Impact: MemoryAdd for preferences now succeeds; preference reassertion merge works against the production database. Documented as BUG-022 in `ops-memory-compendium.md #14`.
+
+### Documentation
+
+- **BUG-019/020 deeper analysis**: Extended `ops-installation-compendium.md` Issue #10 with the causal chain from BUG-019 to BUG-020 (multi-edit syntax corruption → syntax rewrite → implicit Tk/Aqua `bg=` assumption → invisible text), residual test gap documentation, and two verified guard test functions. Added `test_installer_app_class_is_importable` (BUG-019 guard) and `test_installer_app_has_no_bg_overrides_on_ttk_labels` (BUG-020 AST guard) to `tests/test_installer_gui.py`. All 4 tests pass.
+
+---
+
 ## [2.9.0] - 2026-04-16
+
 
 ### Added
 
 - **Downloadable installer bundle bootstrap path**: Elefante now ships a dedicated stable-path bootstrap surface through `scripts/setup/bootstrap_release_bundle.py` and `scripts/ci/build_installer_bundle.py`. Why: the phase-1 installer product must stop assuming `git clone` and disposable working directories. What: release packaging can now build `elefante-installer-<OS>.zip`, generate top-level installer entrypoints, place the payload into `~/.elefante/app/current` or `%LOCALAPPDATA%\Elefante\app\current`, and then delegate the real setup work to the installed `scripts/setup/install.py`. Impact: Elefante now has a real installer-bundle path without forking installer logic.
 - **Branded macOS DMG installer**: `scripts/ci/build_dmg.py` wraps the installer bundle zip into a compressed `.dmg` with the Elefante logo as volume icon, branded README, and www.elefante.ai link. Why: macOS users expect a native disk image, not a raw zip. What: CI builds the DMG on macOS after the installer bundle, uploads it as a release artifact. Optional `--sign` for notarized releases. Impact: GitHub Releases now ship a branded `.dmg` alongside the existing zip bundles. Spec: `spec-vision.md` section F.
-- **Native macOS GUI installer**: `scripts/ci/installer_gui.py` provides a tkinter-based installer window launched from the DMG `.app` bundle. Why: users expect a graphical install experience, not a Terminal session. What: the `.app` launcher probes system Python interpreters for tkinter support, opens a branded window with install path picker, real-time progress bar, and scrollable output log. Falls back to Terminal via osascript if tkinter is unavailable. Impact: double-clicking "Install Elefante" in the DMG now opens a native GUI window.
+- **Native macOS AppKit installer (primary surface)**: `scripts/ci/installer_app.swift` is a native AppKit installer compiled into the DMG `.app`. Why: Tk/Aqua failed the screenshot gate in BUG-020 — a live widget tree is not proof of a usable UI, and a polished macOS installer experience requires a native presentation layer. What: 794-line Swift installer with a branded window, install-path picker, real-time progress, scrollable output log, and — critically — recovery-file paths (summary, status, log) surfaced in the UI before installation starts with one-click open actions for each. `scripts/ci/build_dmg.py` compiles the AppKit binary when Swift is available and ships it as the primary `.app`. Impact: the DMG now opens a native AppKit window; Tk is demoted to fallback only.
+- **Tk installer retained as compatibility fallback**: `scripts/ci/installer_gui.py` now acts only as the fallback when Swift compilation is unavailable. Why: users without a Swift toolchain still need a graphical install path. What: the module now exports `build_install_artifact_paths()` and `render_failed_install_guidance()` at module level so the fallback UI surfaces the same persisted recovery files (summary → status → log) that the AppKit surface does. Impact: both surfaces route failures to the same durable evidence files; contract parity is guarded by `tests/test_installer_gui.py`.
 
 ### Changed
 
@@ -24,11 +54,13 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - **BUG-019: DMG GUI installer .app regression** — `installer_gui.py` was corrupted by overlapping multi-edit patches during a dark-to-light palette rewrite. Fatal `SyntaxError` at line 173, undefined variables, duplicate widget constructors. The `.app` exited immediately with code 1. Rewrote the corrupted UI construction zone (~140 lines) as a single coherent light-mode version. See `ops-installation-compendium.md` Issue #10.
+- **BUG-020: DMG installer customer surface broken** — the `.app` launched, `GUI_RUNNING=YES` passed, and the Tk widget tree was intact, but the rendered macOS window remained visually broken. Root cause: Tk/Aqua was an unreliable foundation for a polished macOS customer installer. Fix: pivoted the primary surface to a native AppKit installer (`scripts/ci/installer_app.swift`) compiled by `build_dmg.py` when Swift is available, with Tk retained only as fallback. Recovery-file routing (summary/status/log) is now exposed in the installer UI before failure. Contract parity and stage-marker dedup are guarded by `tests/test_installer_gui.py`; customer-visible screenshot of the packaged `.app` remains the authoritative final proof. See `ops-installation-compendium.md` Issue #11.
 
 ### Documentation
 
 - **Installer procedure PRD corrected to phase 1**: `docs/planning/spec-installer-procedure.md` now defines the correct first milestone for installer work: a downloadable Elefante installer product that removes `git clone` from the end-user flow while preserving `scripts/setup/install.py` as the single installation authority. Why: the real gap is product packaging and first-run entrypoint, not provider selection. What: the draft now centers stable install location, visible terminal UX, cancel/status/log behavior, bundled dashboard assets, and maintained Elefante verifiers, while explicitly deferring provider choices to phase 2. Impact: installer work is now scoped to the actual highest-risk surface without mixing in optional runtime-provider features too early.
 - **BUG-019 post-mortem**: Added to `ops-installation-compendium.md` Issue #10, `best_practices.md` (multi-edit syntax verification rule), and Known Issues table.
+- **BUG-020 post-mortem closed**: `ops-installation-compendium.md` Issue #11 updated to past-tense Solution + status FIXED. `best_practices.md` rules "Screenshot Beats Widget Introspection For Customer UI", "Installer Failures Must End With Persisted File Routing", and "Installer UI Must Expose Recovery Files Before Failure" guard the lessons.
 
 ---
 

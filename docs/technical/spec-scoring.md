@@ -1,6 +1,6 @@
 # Temporal Memory Decay & Reinforcement
 
-**Feature Version**: 2.9.0  
+**Feature Version**: 2.9.3  
 **Status**: Production  
 **Date**: 2026-02-26
 

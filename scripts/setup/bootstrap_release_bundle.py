@@ -34,12 +34,93 @@ INSTALL_LOG_FILE_NAME = ".elefante-install.log"
 INSTALL_STATUS_FILE_NAME = ".elefante-install-status.txt"
 INSTALL_SUMMARY_FILE_NAME = ".elefante-install-summary.txt"
 VENV_CHOICES = ["ask", "fresh", "backup", "reuse", "abort"]
+SUPPORTED_PYTHON_MIN = (3, 11)
+SUPPORTED_PYTHON_MAX = (3, 14)
 
 
 def resolve_bundle_root(provided_path: str | None) -> Path:
     if provided_path:
         return Path(provided_path).expanduser().resolve()
     return DEFAULT_BUNDLE_ROOT
+
+
+def _python_version(executable: str) -> tuple[int, int, int] | None:
+    try:
+        result = subprocess.run(
+            [
+                executable,
+                "-c",
+                "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}.{sys.version_info[2]}')",
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+    except OSError:
+        return None
+
+    if result.returncode != 0:
+        return None
+
+    raw = result.stdout.strip()
+    try:
+        major, minor, patch = (int(part) for part in raw.split(".", 2))
+    except ValueError:
+        return None
+    return major, minor, patch
+
+
+def _python_is_supported(executable: str) -> bool:
+    version = _python_version(executable)
+    if version is None:
+        return False
+    return SUPPORTED_PYTHON_MIN <= version[:2] < SUPPORTED_PYTHON_MAX
+
+
+def resolve_install_python(provided_executable: str | None) -> str:
+    candidates: list[str] = []
+    seen: set[str] = set()
+
+    def add(candidate: str | None) -> None:
+        if not candidate:
+            return
+        normalized = str(Path(candidate).expanduser()) if any(sep in candidate for sep in ("/", "\\")) else candidate
+        if normalized in seen:
+            return
+        seen.add(normalized)
+        candidates.append(normalized)
+
+    add(provided_executable)
+    add(sys.executable)
+
+    if os.name != "nt":
+        for candidate in (
+            "/opt/homebrew/bin/python3.13",
+            "/opt/homebrew/bin/python3.12",
+            "/opt/homebrew/bin/python3.11",
+            "/usr/local/bin/python3.13",
+            "/usr/local/bin/python3.12",
+            "/usr/local/bin/python3.11",
+            "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3",
+            "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+            "/Library/Frameworks/Python.framework/Versions/3.11/bin/python3",
+            "/usr/bin/python3",
+        ):
+            if Path(candidate).exists():
+                add(candidate)
+
+    for command_name in ("python3.13", "python3.12", "python3.11", "python3", "python"):
+        add(shutil.which(command_name))
+
+    for candidate in candidates:
+        if _python_is_supported(candidate):
+            return candidate
+
+    raise RuntimeError(
+        "No compatible Python found. Elefante requires Python 3.11, 3.12, or 3.13."
+    )
 
 
 def get_default_install_root(
@@ -133,6 +214,35 @@ def place_payload(payload_root: Path, install_root: Path) -> Path | None:
     return backup_root
 
 
+def build_install_artifact_paths(install_root: Path) -> dict[str, Path]:
+    install_root = Path(install_root)
+    return {
+        "log": install_root / INSTALL_LOG_FILE_NAME,
+        "status": install_root / INSTALL_STATUS_FILE_NAME,
+        "summary": install_root / INSTALL_SUMMARY_FILE_NAME,
+    }
+
+
+def render_install_artifact_paths(install_root: Path) -> list[str]:
+    paths = build_install_artifact_paths(install_root)
+    return [
+        "Persistent installer files:",
+        f"Log file: {paths['log']}",
+        f"Status file: {paths['status']}",
+        f"Summary file: {paths['summary']}",
+    ]
+
+
+def render_failed_install_guidance(install_root: Path) -> list[str]:
+    paths = build_install_artifact_paths(install_root)
+    return [
+        "Delegated installer failed. Read these persisted files in order:",
+        f"1. Summary file: {paths['summary']}",
+        f"2. Status file: {paths['status']}",
+        f"3. Log file: {paths['log']}",
+    ]
+
+
 def build_install_command(
     install_root: Path,
     *,
@@ -140,16 +250,16 @@ def build_install_command(
     venv_mode: str,
     verbose: bool = False,
 ) -> list[str]:
-    install_root = Path(install_root)
+    paths = build_install_artifact_paths(install_root)
     cmd = [
         python_executable,
-        str(install_root / INSTALL_SCRIPT_RELATIVE_PATH),
+        str(Path(install_root) / INSTALL_SCRIPT_RELATIVE_PATH),
         "--log-file",
-        str(install_root / INSTALL_LOG_FILE_NAME),
+        str(paths["log"]),
         "--status-file",
-        str(install_root / INSTALL_STATUS_FILE_NAME),
+        str(paths["status"]),
         "--summary-file",
-        str(install_root / INSTALL_SUMMARY_FILE_NAME),
+        str(paths["summary"]),
         "--venv-mode",
         venv_mode,
     ]
@@ -193,6 +303,12 @@ def main() -> None:
     bundle_root = resolve_bundle_root(args.bundle_root)
     payload_root = ensure_bundle_layout(bundle_root)
     manifest = load_manifest(bundle_root)
+    try:
+        install_python = resolve_install_python(args.python_executable)
+    except RuntimeError as exc:
+        print(f"ERROR: {exc}")
+        raise SystemExit(1) from exc
+
     install_root = (
         Path(args.install_root).expanduser().resolve()
         if args.install_root
@@ -209,15 +325,18 @@ def main() -> None:
     print(f"Bundle Root: {bundle_root}")
     print(f"Payload Root: {payload_root}")
     print(f"Install Root: {install_root}")
+    print(f"Installer Python: {install_python}")
 
     backup_root = place_payload(payload_root, install_root)
     if backup_root:
         print(f"Previous install moved to: {backup_root}")
     print(f"Payload placed at: {install_root}")
+    for line in render_install_artifact_paths(install_root):
+        print(line)
 
     install_command = build_install_command(
         install_root,
-        python_executable=args.python_executable,
+        python_executable=install_python,
         venv_mode=args.venv_mode,
         verbose=args.verbose,
     )
@@ -228,6 +347,10 @@ def main() -> None:
         return
 
     result = subprocess.run(install_command, cwd=install_root, check=False)
+    if result.returncode != 0:
+        print("")
+        for line in render_failed_install_guidance(install_root):
+            print(line)
     raise SystemExit(result.returncode)
 
 

@@ -363,7 +363,9 @@ class MemoryOrchestrator:
                 limit=5,
                 min_similarity=0.30,
                 apply_temporal_decay=False,
-                where_override={"memory_type": "preference"},
+                # where_override removed: collection.query() with where fails on ChromaDB 1.3.5
+                # when the collection index is corrupted. The Python-side pref_like filter
+                # below already handles memory_type filtering correctly. (BUG-022)
             )
 
             if preference_candidates:

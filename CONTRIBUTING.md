@@ -28,7 +28,7 @@ Thank you for your interest in contributing to Elefante!
 src/
   mcp/          # MCP Server & Tools
   core/         # Logic (Orchestrator, Vector/Graph stores, ETL, Retrieval)
-  models/       # Pydantic models (v2.9.0 schema)
+  models/       # Pydantic models (v2.9.3 schema)
   modules/      # Session Distiller
   dashboard/    # React/Vite app
   utils/        # Config, curation, logging
@@ -98,9 +98,17 @@ If the matching `CHANGELOG.md` entry already exists, the advisor can hand off to
 .venv\Scripts\python.exe scripts\ci\bump_version.py --check
 ```
 
+If the local repo version was advanced too far before anything was published, use an explicit rebaseline instead of manual edits:
+
+```bash
+# Unpublished release correction only
+.venv/bin/python scripts/ci/bump_version.py 2.8.0 --allow-rebaseline
+```
+
 **Rules — MANDATORY:**
 - NEVER edit version strings by hand in individual files.
 - ALWAYS use `scripts/ci/advise_version_bump.py` (interactive) or `scripts/ci/bump_version.py X.Y.Z` (direct) — never manual file edits.
+- If correcting an unpublished local overshoot, use `scripts/ci/bump_version.py X.Y.Z --allow-rebaseline` instead of editing files by hand.
 - Run `--check` before committing to catch drift.
 - CHANGELOG.md entries must be written manually (it is a historical log, not a current-version declaration).
 - NEVER push a `v*` tag without a matching `CHANGELOG.md` entry.

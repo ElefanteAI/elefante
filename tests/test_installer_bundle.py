@@ -1,9 +1,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_installer_bundle.py
-# VERSION : 2.7.2
-# CHANGED : 2026-04-16
+# VERSION : 2.9.2
+# CHANGED : 2026-04-17
 # PROVES  : Installer bundle bootstrap logic keeps Elefante payload placement
-#           truthful and bundle packaging emits the expected bootstrap archive.
+#           truthful, excludes local .venv backup directories, and bundle
+#           packaging emits the expected bootstrap archive.
 # RUN     : pytest tests/test_installer_bundle.py -v
 # WHEN    : After changes to scripts/setup/bootstrap_release_bundle.py or
 #           scripts/ci/build_installer_bundle.py
@@ -103,6 +104,21 @@ def test_build_install_command_targets_installed_payload(tmp_path):
     assert command[-1] == "reuse"
 
 
+def test_render_failed_install_guidance_points_to_persisted_files(tmp_path):
+    module = _load_module(
+        ROOT / "scripts/setup/bootstrap_release_bundle.py",
+        "bootstrap_release_bundle_failure_routing_module",
+    )
+
+    install_root = tmp_path / "stable" / "current"
+    lines = module.render_failed_install_guidance(install_root)
+
+    assert lines[0] == "Delegated installer failed. Read these persisted files in order:"
+    assert str(install_root / ".elefante-install-summary.txt") in lines[1]
+    assert str(install_root / ".elefante-install-status.txt") in lines[2]
+    assert str(install_root / ".elefante-install.log") in lines[3]
+
+
 def test_build_installer_bundle_writes_manifest_wrappers_and_payload(tmp_path):
     module = _load_module(
         ROOT / "scripts/ci/build_installer_bundle.py",
@@ -127,3 +143,30 @@ def test_build_installer_bundle_writes_manifest_wrappers_and_payload(tmp_path):
     assert "elefante-installer-macOS/scripts/setup/bootstrap_release_bundle.py" in names
     assert "elefante-installer-macOS/payload/elefante/scripts/setup/install.py" in names
     assert "elefante-installer-macOS/payload/elefante/src/dashboard/ui/dist/index.html" in names
+
+
+def test_build_installer_bundle_skips_top_level_venv_backups(tmp_path):
+    module = _load_module(
+        ROOT / "scripts/ci/build_installer_bundle.py",
+        "build_installer_bundle_venv_backup_module",
+    )
+
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir(parents=True, exist_ok=True)
+    _create_minimal_repo(repo_root)
+
+    broken_backup = repo_root / ".venv.broken.20260417-132309" / "bin"
+    broken_backup.mkdir(parents=True, exist_ok=True)
+    broken_entry = broken_backup / "python3"
+    try:
+        broken_entry.symlink_to("/missing/python3")
+    except OSError:
+        broken_entry.write_text("local backup env should never ship\n", encoding="utf-8")
+
+    output_path = tmp_path / "dist" / "elefante-installer-macOS.zip"
+    module.build_installer_bundle(repo_root, platform_name="macOS", output_path=output_path)
+
+    with zipfile.ZipFile(output_path) as archive:
+        names = set(archive.namelist())
+
+    assert not any(".venv.broken.20260417-132309" in name for name in names)

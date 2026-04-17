@@ -1,10 +1,10 @@
 # Installation Debug Compendium
 
 > **Domain:** Installation, Setup & Environment  
-> **Last Updated:** 2026-04-16
-> **Total Issues Documented:** 10
+> **Last Updated:** 2026-04-17
+> **Total Issues Documented:** 14
 > **Status:** Production Reference  
-> **Applies to**: v2.9.0+
+> **Applies to**: v2.9.3+
 | #   | Law                                                  | Violation Cost       |
 | --- | ---------------------------------------------------- | -------------------- |
 | 1   | Do NOT pre-create Kuzu database directory            | 12 minutes debugging |
@@ -25,6 +25,8 @@ Run these BEFORE investigating. If tests pass, the documented fix is intact.
 | MCP server starts | `python scripts/verify/verify_mcp_handshake.py` | stdio JSON-RPC handshake succeeds |
 | Factory reset | `pytest tests/test_factory_reset.py -v` | Dry-run safety, gate rejection, backup creation |
 | Full E2E | `.venv/bin/python scripts/verify/verify_e2e_tests.py` | Isolated end-to-end MCP workflow |
+| #13 Pip-less reused `.venv` | `pytest tests/test_install_setup.py -k "bootstraps_pip_when_missing" -v` | Installer bootstraps `pip` before dependency installation when the interpreter is valid but `pip` is absent |
+| #14 Bundle build walks `.venv*` backups | `pytest tests/test_installer_bundle.py -k "venv_backups" -v` | Installer bundle packaging skips top-level local virtual-environment backups, including broken symlinks |
 
 ---
 
@@ -39,6 +41,8 @@ Run these BEFORE investigating. If tests pass, the documented fix is intact.
 - [Issue #7: IBM Bob Non-Standard MCP Settings Path](#issue-7-ibm-bob-non-standard-mcp-settings-path)
 - [Issue #8: CI Binary Build](#issue-8-ci-binary-build--missing-frontend-build-step-and-wrong-vite-output-directory)
 - [Issue #9: GitHub Release Publish Failure](#issue-9-github-release-publish-failure-after-successful-matrix-builds)
+- [Issue #13: Installer Reuse Mode Fails When `pip` Is Missing From `.venv`](#issue-13-installer-reuse-mode-fails-when-pip-is-missing-from-venv)
+- [Issue #14: Installer Bundle Build Walks Local `.venv*` Backups And Broken Symlinks](#issue-14-installer-bundle-build-walks-local-venv-backups-and-broken-symlinks)
 - [Cognitive Failure Analysis](#cognitive-failure-analysis)
 - [Prevention Protocol](#prevention-protocol)
 - [Appendix: Issue Template](#appendix-issue-template)
@@ -831,7 +835,7 @@ Manual: trigger `Build One-Click Binaries` on a fresh `v*` tag and confirm:
 ## Appendix: Issue Template
 
 ```markdown
-## Issue #10: DMG GUI Installer .app Broken — Corrupted Multi-Edit Merge
+## Issue #10: DMG GUI Installer App Broken - Corrupted Multi-Edit Merge
 
 **Date:** 2026-04-16  
 **Duration:** ~30 minutes (diagnosis + rewrite)  
@@ -863,6 +867,19 @@ IndentationError: unexpected indent
 
 The file was never committed to git (untracked), so no recovery from history was possible.
 
+### How BUG-019 Seeded BUG-020
+
+The BUG-019 rewrite fixed the syntax but made a new architectural mistake: it used bare `tk.Label(parent, bg=C["panel"], ...)` throughout `_build_ui`. On macOS, the Aqua theme overrides explicit `bg=` on `tk.Label` widgets — the label background is painted by the OS, not the application. The result: labels rendered with white/transparent backgrounds, making text invisible against a white window.
+
+This means BUG-019 was not just a syntax failure. The rewrite was written without understanding macOS Tk/Aqua rendering semantics. The `py_compile` gate passed. The `.app` launch gate passed. The process-liveness gate passed. But the rendered surface was broken in a way that only a screenshot could detect.
+
+BUG-020 fixed this by:
+1. Replacing all bare `tk.Label` widgets with `ttk.Label` using named styles (`Title.TLabel`, `Body.TLabel`, etc.)
+2. Removing all explicit `bg=` arguments from labels — `ttk` delegates rendering to the native theme
+3. Limiting `self.C` to log/status accent colors only (the scroll log area legitimately needs explicit color)
+
+**Root causal chain**: Multi-edit corruption → syntax rewrite → implicit Tk/Aqua assumption → visual failure. Three distinct failure modes from one event.
+
 ### Solution
 
 Rewrote the corrupted zone (`__init__` tail + `_build_ui` method, ~140 lines) from scratch as a single coherent light-mode version. All widget references use `self.C`, `self.tk`, `self.ttk`. All widgets are properly constructed and assigned. The action handlers (lines 310+) were intact and unchanged.
@@ -883,14 +900,31 @@ It didn't take long to fix once diagnosed. The real failure was **not diagnosing
 3. No syntax check was run after the multi-edit session
 4. The file was never committed, so there was no working checkpoint to diff against
 
+### Residual Risk (Current State — v2.9.0)
+
+`installer_gui.py` is 665 lines and still live editable code. The following risks remain:
+
+**Test gap — InstallerApp class is untested**: `tests/test_installer_gui.py` tests only `build_install_artifact_paths` and `process_stage_marker` (two module-level functions). `InstallerApp.__init__` and `_build_ui` are the exact zones that were corrupted in BUG-019. A future multi-edit corruption of those methods would pass all 137+ tests without detection. `py_compile` is the only automated guard.
+
+**Tk/Aqua rendering is not validated in CI**: There is no headless render test. CI cannot verify that labels have visible text on macOS. The only authoritative proof for visual regressions is a manual screenshot of the packaged `.app`.
+
+**Future edit risk**: Any aesthetic rewrite of `_build_ui` (theme change, new sections, layout refactor) using the same multi-edit pattern that caused BUG-019 faces identical risk. The file has no intermediate commit checkpoints. The `best_practices.md` rule requires a `py_compile` check after each edit session, but there is no automated enforcement.
+
+**Guards added (v2.9.1)**: `tests/test_installer_gui.py` now includes two regression guards:
+
+- `test_installer_app_class_is_importable` — loads `installer_gui.py` via `importlib`, asserts `InstallerApp`, `_build_ui`, and `_configure_styles` are present. Catches BUG-019-class syntax corruptions that `py_compile` would also catch but integrates into the maintained test run.
+- `test_installer_app_has_no_bg_overrides_on_ttk_labels` — AST-walks the source file and fails if any `tk.Label(..., bg=...)` call exists. Catches BUG-020-class Tk/Aqua rendering regressions without requiring a live display.
+
+Both pass (`4/4`) on current source. Neither proves visual rendering — a manual packaged-artifact screenshot remains the authoritative final gate.
+
 ### Verification Commands
 
 ```bash
 # Syntax check (primary gate for this file)
 python3 -c "import py_compile; py_compile.compile('scripts/ci/installer_gui.py', doraise=True)"
 
-# Structural check
-python3 -c "import ast; ast.parse(open('scripts/ci/installer_gui.py').read()); print('OK')"
+# Maintained regression guards (BUG-019 import check + BUG-020 AST check)
+pytest tests/test_installer_gui.py -v
 
 # Full test suite
 pytest tests/ -x -q
@@ -932,7 +966,403 @@ pytest tests/ -x -q
 
 ---
 
-_Last verified: 2026-02-16 | Tested on: macOS, Python 3.11, Kuzu 0.11.3_
+## Issue #11: DMG Installer Customer Surface Broken - Tk Aqua Paint Failure
+
+**Date:** 2026-04-16  
+**Duration:** Resolved in v2.9.0 via presentation-layer pivot  
+**Severity:** CRITICAL  
+**Status:** FIXED — v2.9.0 (contract parity guarded; packaged-artifact screenshot proof remains a manual step)
+
+### Problem
+
+The `Install Elefante.app` inside the DMG launches, but the customer-facing installer surface is visually broken. The process exists, the controls exist internally, and the user still sees an unusable white window with no real installation experience.
+
+### Symptom
+
+- User report: the icon looked wrong and the installer window appeared "totally broken"
+- Live screenshot of the rebuilt DMG showed a mostly blank white installer window
+- `GUI_RUNNING=YES` and `GUI_TEST=PASS` were true, but they only proved the process stayed alive
+- Tk widget inspection later showed mapped labels, buttons, entry field, and progress bar with valid geometry while the visible screenshot remained broken
+
+### Root Cause
+
+This was initially misdiagnosed as a Tk styling problem.
+
+The first hypothesis was partially true but incomplete:
+
+- The original `.icns` asset quality was poor and needed replacement
+- The earlier Tk version had Aqua-theme conflicts around explicit widget styling
+
+But the current failure persisted after those fixes because the real problem was deeper:
+
+- `installer_gui.py` was now syntactically valid
+- The `.app` launched successfully
+- The Tk widget tree existed and laid out correctly
+- The rendered macOS customer surface was still unacceptable
+
+That means the failure mode was **not** syntax, process launch, or missing controls. It was the choice of presentation layer: Tk/Aqua was an unreliable foundation for a polished macOS installer experience.
+
+### Evidence Chain
+
+1. Syntax gate passed: `py_compile` clean
+2. Process gate passed: `.app` launch stayed alive
+3. Screenshot gate failed: visible installer window still broken
+4. Widget-tree dump passed: controls mapped with non-zero geometry
+
+This combination proved a critical protocol lesson: **a live widget tree is not proof of a usable UI**.
+
+### Question-First Verification Path
+
+For this class of installer failure, start with the narrowest customer-visible question and widen only when the prior proof fails.
+
+1. **Question:** Is the customer-facing installer surface broken, or only the process state uncertain?
+2. **First proof:** Launch the DMG app and capture a screenshot of the real rendered window.
+3. **If the screenshot is broken:** Ask whether launch failed or the presentation layer failed.
+4. **Second proof:** Check compile/import/launch liveness.
+5. **Third proof:** Inspect widget existence and geometry only as a secondary diagnostic.
+6. **Decision rule:** If the screenshot is broken while compile, launch, and widget-tree checks pass, stop polishing Tk details and reassess the presentation layer itself.
+
+This is the quality-per-token path for installer UX bugs: customer-visible proof first, internal diagnostics second.
+
+### Solution
+
+Pivoted the DMG `.app` away from Tk as the primary macOS customer surface. Shipped in v2.9.0.
+
+Implementation path (completed):
+
+1. `install.sh` kept as the single installation authority.
+2. `build_installer_bundle.py` unchanged as the payload packager.
+3. The `.app` GUI surface was replaced with a native AppKit installer — `scripts/ci/installer_app.swift` (794 lines). Recovery-file paths (summary, status, log) are surfaced in the installer UI before installation starts, with one-click open actions for each.
+4. `scripts/ci/build_dmg.py` compiles the AppKit binary when Swift is available and ships it as the primary `.app` inside the DMG.
+5. `scripts/ci/installer_gui.py` retained only as a compatibility fallback when Swift compilation is unavailable. The module now exports `build_install_artifact_paths()` and `render_failed_install_guidance()` at module level so both surfaces route failures to the same persisted recovery files.
+6. Verification is layered: automated contract-parity + stage-marker dedup guards in `tests/test_installer_gui.py`, native-compile gate via `swiftc -parse-as-library -O scripts/ci/installer_app.swift`, and a manual packaged-artifact screenshot as the authoritative customer-visible proof.
+
+### Why This Took Too Long
+
+1. BUG-019 anchored the team on "the GUI file is broken again" instead of testing whether the render path itself was the issue
+2. `GUI_RUNNING=YES` was treated as stronger evidence than it is
+3. 137/137 tests passing again created false confidence because the test suite says nothing about a rendered macOS UI
+4. The first round of fixes optimized Tk instead of questioning whether Tk should be the customer-facing installer surface at all
+
+### Current Verification Gates
+
+```bash
+# 0. Ask the customer-visible question first:
+#    Is the rendered installer usable?
+
+# 1. Screenshot the real installer surface
+open -a "/Volumes/Elefante Installer/Install Elefante.app"
+screencapture -x tmp/installer-screen.png
+
+# 2. Only if the screenshot is still broken, inspect widget existence separately
+/opt/homebrew/bin/python3.11 - <<'PY'
+import pathlib, sys, tkinter as tk
+repo = pathlib.Path('.').resolve()
+sys.path.insert(0, str(repo / 'scripts' / 'ci'))
+import installer_gui
+root = tk.Tk()
+installer_gui.InstallerApp(root, repo)
+root.update_idletasks()
+print(root.winfo_children())
+root.destroy()
+PY
+
+# 3. Automated contract-parity + stage-marker dedup guard (fast, runs in CI)
+pytest tests/test_installer_gui.py -v
+
+# 4. Native installer compile gate
+swiftc -parse-as-library -O scripts/ci/installer_app.swift -o /tmp/elefante-installer-native-test
+
+# 5. Install smoke test after the customer surface passes
+#    Run the packaged installer path, not only source-level scripts.
+```
+
+### Lesson
+
+> Customer-facing desktop UI must be verified as pixels, not as process state. If the screenshot is broken, the UI is broken.
+
+> For installer UX failures, ask the narrowest customer-visible question first and spend tokens widening the proof only when the prior check fails.
+
+---
+
+## Issue #12: Installer Seed-Memory Collision With Test-Memory Guard
+
+**Date:** 2026-04-16
+**Duration:** ~15 minutes from persisted-log read to fix + regression test
+**Severity:** CRITICAL — 100% of fresh installs failed at stage 3
+**Status:** FIXED — v2.9.1
+
+### Problem
+
+Every fresh install — and every non-idempotent re-install on machines where the seed memory had not yet landed — failed at stage 3 (Database Initialization). The install surface reported `Installer state: FAILED` with `final_note=Database initialization failed`, and the installer's own seed-memory step was the rejecter. The Aha-moment passcode prompt in the README ("What is my Elefante test passcode?") had no memory behind it on any freshly installed machine.
+
+### Symptom
+
+`.elefante-install-summary.txt` on a failed run showed every prior stage COMPLETE and only stage 3 FAILED:
+
+```text
+3|Database Initialization|FAILED|Database initialization failed|2026-04-16 18:50:26
+final_note=Database initialization failed
+```
+
+`.elefante-install.log` included the exact rejection reason from the orchestrator (the field added by BUG-011):
+
+```json
+{"event": "blocked_test_memory_submission",
+ "reason": "Test-memory guard blocked this submission. Matched conditions: tag 'test' present. Set ELEFANTE_ALLOW_TEST_MEMORIES=1 to override.",
+ "level": "warning"}
+{"event": "Seed memory injection was rejected",
+ "reason": "Test-memory guard blocked this submission. Matched conditions: tag 'test' present.",
+ "level": "error"}
+```
+
+Embedding service, vector store, graph store, and verification all passed; only `seed_memory: [FAIL] FAILED` flipped the overall init to failure.
+
+### Root Cause
+
+Two independent surfaces collided:
+
+1. **Guard (BUG-011 fix).** `src/core/orchestrator.py` `add_memory()` rejects any submission whose tags contain the exact string `"test"` (also `"e2e"`, `hybrid_test_*`, and several content prefixes). The guard exists to keep E2E/persistence test artifacts out of the production graph and returns `None` with `_last_rejection_reason` set so the caller can explain the failure.
+2. **Seed caller.** `scripts/setup/init_databases.py::inject_seed_memory` was submitting:
+
+   ```python
+   tags=["seed", "test", "passcode"]
+   metadata={"domain": DomainType.SYSTEM, "category": "system-test"}
+   content="The secret Elefante test passcode is 'Indigo-Echo'."
+   ```
+
+   The tag `"test"` triggered an exact-match with the guard's block-list. Neither `category="system-test"` nor the `" test passcode"` content substring triggered anything — only the tag. The seed memory is a production memory (it proves the MCP handshake works from the very first customer query), not a test memory; the `"test"` tag was legacy phrasing lifted from the README's "test passcode" wording.
+
+Both surfaces were individually correct. The guard was doing exactly what BUG-011 specified. The seed was submitting exactly what the original seed specification asked for. Their value spaces intersected and every install paid the cost.
+
+### Why It Shipped
+
+No maintained pytest exercised the **positive (pass)** path of `inject_seed_memory` — the existing `test_inject_seed_memory_returns_false_when_guard_blocks` only covered the negative (blocked) path. `verify_e2e_tests.py` runs in an isolated temp HOME with `ELEFANTE_ALLOW_TEST_MEMORIES=1` implicitly via its own workflow, so the guard never fired there either. The guard's warning was visible in the persisted installer log but the test suite and the CI surface both went green.
+
+### Solution
+
+One-line change. `scripts/setup/init_databases.py`:
+
+```python
+# Before
+tags=["seed", "test", "passcode"],
+
+# After
+tags=["seed", "passcode"],
+```
+
+The seed is still discoverable by the "Indigo-Echo" search (content-based), still tagged for grouping (`seed`, `passcode`), and still carries `category="system-test"` in metadata for reporting purposes. The guard no longer blocks it because exact-match on tag `"test"` is the only guard condition the payload hit.
+
+### Regression Guard
+
+`tests/test_install_setup.py::test_inject_seed_memory_payload_does_not_trip_test_memory_guard` now captures the exact kwargs that `inject_seed_memory` passes to `add_memory`, runs the same condition checks the guard uses, and asserts none of them match. If a future edit to either surface reintroduces the collision — new tag, new content prefix, new category — the test will fail before the installer ever ships.
+
+### Verification
+
+```bash
+# Positive + negative seed paths, plus the three install-state trackers
+pytest tests/test_install_setup.py -v
+
+# Full customer-path end-to-end
+./install.sh                    # interactive
+# or non-interactive:
+.venv/bin/python scripts/setup/install.py --venv-mode reuse \
+    --log-file tmp/install-e2e.log \
+    --status-file tmp/install-e2e-status.txt \
+    --summary-file tmp/install-e2e-summary.txt
+```
+
+Expected final summary: every stage `COMPLETE`, `Installer state: COMPLETED`, `MCP Handshake Verification: COMPLETE`.
+
+### Why This Took So Long
+
+Not long to fix once the log was read. It took too long to *find* — the installer reported a generic "Database initialization failed" message while the real cause was in the persisted JSON log one level deeper. The installer's summary rollup did not surface the orchestrator rejection reason, so a customer (or an agent triaging the failure) had to know to read `.elefante-install.log` and grep for `blocked_test_memory_submission`. The BUG-011 fix made the rejection reason available on the response; the installer's summary formatter should propagate it up so the failure surface names the condition, not just the stage.
+
+### Lesson
+
+> Guards that protect a data surface must be tested on *both* their positive and negative paths, at the exact call sites that use them. The install-path caller and the guard were both individually correct — their interaction was what shipped broken. A regression test that only covers the negative path leaves the positive path as a silent contract that can break without warning.
+
+> When an installer reports a generic stage failure, the generic error surface is a symptom, not a diagnosis. Propagate the specific rejection reason from the underlying operation up into the installer summary so the first file a debugger reads names the exact condition that fired.
+
+---
+
+## Issue #13: Installer Reuse Mode Fails When `pip` Is Missing From `.venv`
+
+**Date:** 2026-04-17
+**Duration:** ~20 minutes
+**Severity:** HIGH
+**Status:** FIXED (guarded)
+
+### Problem
+
+A freshly recreated repository `.venv` can contain a valid Python 3.11 interpreter but still fail the installer immediately because `pip` was never seeded into that environment.
+
+### Symptom
+
+Fresh install from a repaired environment fails at Step 2:
+
+```text
+[Step 2] Dependencies...
+Installing dependencies...
+/path/to/.venv/bin/python: No module named pip
+WARN: Pip self-upgrade failed. Continuing with the existing pip version.
+/path/to/.venv/bin/python: No module named pip
+ERROR: Failed to install dependencies
+```
+
+VS Code also shows the original interpreter picker split between a broken local `.venv` and an unsupported global Python 3.9, tempting the user toward the wrong fallback.
+
+### Root Cause
+
+The installer's reuse path only validated that `.venv/bin/python` existed. It treated that as proof that dependency installation could proceed.
+
+That assumption is false for at least one real recovery path:
+
+1. Homebrew Python 3.11 was removed, leaving the original `.venv` symlink broken.
+2. The environment was recreated with `uv venv --python 3.11 .venv`.
+3. The new interpreter was valid, but `pip` had not been seeded yet.
+4. `install_dependencies()` called `python -m pip ...` without first verifying that `pip` existed.
+
+The reused environment was healthy enough to run Python and unhealthy enough to fail installation. The installer had no guard for that middle state.
+
+### Solution
+
+`scripts/setup/install.py::install_dependencies()` now checks `python -m pip --version` before any dependency step.
+
+If `pip` is missing, the installer:
+
+1. logs a targeted warning,
+2. runs `python -m ensurepip --upgrade`,
+3. rechecks `python -m pip --version`, and
+4. only then continues to the optional pip self-upgrade and `requirements.txt` installation.
+
+If `ensurepip` cannot restore `pip`, the runtime error now cites this compendium entry directly:
+
+```text
+ERROR: Pip bootstrap failed. Read docs/debug/ops-installation-compendium.md Issue #13 for recovery.
+```
+
+### Regression Guard
+
+`tests/test_install_setup.py::test_install_dependencies_bootstraps_pip_when_missing` simulates the exact failure shape:
+
+- first `python -m pip --version` fails,
+- `python -m ensurepip --upgrade` succeeds,
+- second `python -m pip --version` succeeds,
+- dependency installation proceeds.
+
+If a future refactor removes the `ensurepip` bootstrap or changes the command order, the test fails.
+
+### Verification
+
+```bash
+pytest tests/test_install_setup.py -k "bootstraps_pip_when_missing" -v
+
+.venv/bin/python scripts/setup/install.py --venv-mode reuse
+
+.venv/bin/python scripts/verify/verify_health.py
+```
+
+Expected outcome: Step 2 completes, installer state reaches `COMPLETED`, and the health verifier reports all systems operational.
+
+### Why This Took So Long
+
+It did not take long once the persisted installer log was read. The trap was assuming that a fresh Python 3.11 environment and a pip-ready Python 3.11 environment were the same state. They are not.
+
+### Lesson
+
+> A reusable virtual environment must be validated at the tool level, not just the interpreter level. `python` existing does not prove `pip` exists.
+
+> When the installer accepts a prebuilt `.venv`, it owns the responsibility for verifying the package-management surface before it tries to install dependencies.
+
+---
+
+## Issue #14: Installer Bundle Build Walks Local `.venv*` Backups And Broken Symlinks
+
+**Date:** 2026-04-17
+**Duration:** ~10 minutes from reproduced bundle failure to root cause
+**Severity:** HIGH
+**Status:** FIXED (guarded)
+
+### Problem
+
+Local installer-bundle rebuilds can fail after environment recovery work because the bundle packager walks backup virtual-environment directories that were never meant to ship.
+
+### Symptom
+
+Running `scripts/ci/build_installer_bundle.py` in a repaired workspace fails before the archive is written:
+
+```text
+FileNotFoundError: [Errno 2] No such file or directory: '/path/to/.venv.broken.20260417-132309/bin/python3'
+```
+
+The build crashes during `archive.write(...)`, leaving the existing `dist/` installer artifacts in place. That creates a second failure surface: stale installers look fresh because the rebuild never completed.
+
+### Root Cause
+
+`scripts/ci/build_installer_bundle.py` excluded only the exact top-level `.venv` directory:
+
+```python
+TOP_LEVEL_EXCLUDED = {".git", ".venv", "dist", ...}
+```
+
+That worked only for the primary repository environment. It missed recovery leftovers like `.venv.broken.<timestamp>`.
+
+After the local environment repair, `.venv.broken.20260417-132309/bin/python3` remained as a broken symlink to a removed Homebrew interpreter. `Path.rglob("*")` surfaced that path, `should_exclude()` let it through, and `zipfile.ZipInfo.from_file()` raised `FileNotFoundError` while trying to stat the broken symlink.
+
+This was not a runtime installer bug. It was a packaging bug caused by too-narrow exclusion rules for local developer state.
+
+### Solution
+
+Two changes in `scripts/ci/build_installer_bundle.py`:
+
+1. Top-level exclusion now applies by prefix for local virtual environments:
+
+```python
+TOP_LEVEL_PREFIX_EXCLUDED = (".venv",)
+```
+
+Anything whose first path part starts with `.venv` is excluded from the payload.
+
+2. If an unexpected broken symlink or missing local artifact still reaches the archive step, the runtime failure now cites this compendium entry directly instead of surfacing a raw `FileNotFoundError` with no routing.
+
+### Regression Guard
+
+`tests/test_installer_bundle.py::test_build_installer_bundle_skips_top_level_venv_backups` creates a repo fixture containing `.venv.broken.20260417-132309/bin/python3` as a broken symlink when supported, then asserts:
+
+- bundle creation succeeds, and
+- no `.venv.broken...` paths appear in the archive.
+
+If the exclusion narrows back to exact `.venv`, the test fails before the packager ships another stale installer.
+
+### Verification
+
+```bash
+pytest tests/test_installer_bundle.py -k "venv_backups" -v
+
+python scripts/ci/build_installer_bundle.py --platform macOS --output /tmp/elefante-installer-macOS.zip
+
+unzip -q /tmp/elefante-installer-macOS.zip -d /tmp/elefante-installer-smoke
+/tmp/elefante-installer-smoke/elefante-installer-macOS/install.sh --install-root /tmp/elefante-install-root --venv-mode reuse --verbose
+```
+
+Expected outcome: bundle build succeeds from the recovered workspace and the packaged installer can run from the extracted archive.
+
+### Why This Took Too Long
+
+The guarded tests all passed because none of them modeled dirty-workspace backup environments. The failure only appears after a real recovery flow leaves `.venv.broken.<timestamp>` behind.
+
+The first visible symptom also pointed at the wrong layer: `FileNotFoundError` during zip packaging looks like a random filesystem issue until you trace which path the packager is actually walking.
+
+### Lesson
+
+> Repo packagers must exclude *families* of local environment directories, not only the primary happy-path name.
+
+> When a build step fails on local workspace state, the failure surface should name the exact recovery document instead of dumping a raw traceback and leaving stale artifacts behind.
+
+---
+
+_Last verified: 2026-04-17 | Tested on: macOS, Python 3.11, Kuzu 0.11.3_
 
 ---
 
@@ -962,3 +1392,10 @@ _Last verified: 2026-02-16 | Tested on: macOS, Python 3.11, Kuzu 0.11.3_
 2. **Pre-Installation Report**: emit a detailed system state report for debugging
 3. **Interactive Mode**: guided install flow (optional)
 4. **Remote Diagnostics**: opt-in, privacy-respecting telemetry for recurring failures
+
+### Issue 14: Installer bundle build walks local .venv backups and broken symlinks
+* **ID:** BUG-024
+* **Symptom:** `FileExistsError` or `FileNotFoundError` when packaging `/Volumes/OWC2TB/2026-M5/AI Projects/elefante` using `python3 scripts/ci/build_installer_bundle.py`
+* **Root Cause:** A recovered or messy workspace often retains `.venv.broken.<timestamp>` folders from previous restoration scripts. The builder excluded exactly `.venv`, but blindly crawled `.venv.broken...`, failing on broken `bin/python` symlinks.
+* **Resolution:** Expanded the exclusion list to block `".venv*"` using prefix matching rather than exact matching. Added a targeted runtime citation if `os.walk` hits unresolvable symlinks.
+* **Test Guard:** `tests/test_installer_bundle.py` (simulates `.venv.broken` packaging path).

@@ -1,9 +1,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_developer_routing.py
 # VERSION : 2.5.2
-# CHANGED : 2026-04-15
+# CHANGED : 2026-04-16
 # PROVES  : Self-protocol verifier routing and contract: dashboard snapshot path
-#           resolution, large-payload stream sizing, and protocol verification.
+#           resolution, large-payload stream sizing, protocol verification,
+#           and developer-process token-discipline guidance.
 # RUN     : pytest tests/test_developer_routing.py -v
 # WHEN    : After changes to server.py routing, verify_e2e_tests.py, or the
 #           self-protocol verification contract. Required before each release.
@@ -127,12 +128,84 @@ def test_debug_feedback_loop_docs_are_linked() -> None:
     debug_index = _read("docs/debug/README.md")
     developer_agent = _read("docs/debug/dev-developer-agent.md")
     best_practices = _read("docs/debug/best_practices.md")
+    docs_index = _read("docs/README.md")
+    planning_readme = _read("docs/planning/README.md")
 
     assert "best_practices.md" in debug_index
     assert "best_practices.md" in developer_agent
     assert "dev-developer-agent.md" in best_practices
     assert "README.md" in best_practices
     assert "tests/README.md" in best_practices
+    assert "best_practices.md" in docs_index
+    assert "best_practices.md" in planning_readme
+
+
+def test_readme_and_planning_docs_capture_installer_recovery_and_learning_boundaries() -> None:
+    readme = _read("README.md")
+    planning_readme = _read("docs/planning/README.md")
+    docs_index = _read("docs/README.md")
+
+    assert "native AppKit installer surface" in readme
+    assert "If installation fails:" in readme
+    assert ".elefante-install-summary.txt" in readme
+    assert ".elefante-install-status.txt" in readme
+    assert ".elefante-install.log" in readme
+
+    assert "Planning docs are for future-facing intent" in planning_readme
+    assert "what did we just learn from a failure?" in planning_readme
+    assert "spec-installer-procedure.md" in planning_readme
+
+    assert "planning/README.md" in docs_index
+
+
+def test_developer_process_docs_enforce_question_first_token_discipline() -> None:
+    developer_agent = _read("docs/debug/dev-developer-agent.md")
+    dev_sdd = _read("docs/technical/dev-sdd.md")
+    best_practices = _read("docs/debug/best_practices.md")
+    spec_vision = _read("docs/planning/spec-vision.md")
+
+    assert "State the concrete diagnostic question before opening more files" in developer_agent
+    assert "smallest maintained proof" in developer_agent
+    assert "decision-bearing facts" in developer_agent
+    assert "maximum decision value per token" in developer_agent
+    assert "Required Progress Update Template" in developer_agent
+    assert "Question: What exact uncertainty is being resolved right now?" in developer_agent
+    assert "Proof: What smallest maintained proof is being run or read?" in developer_agent
+    assert "Result: What changed because of that proof?" in developer_agent
+    assert "Next: What is the immediate next move?" in developer_agent
+
+    assert "Question-First" in dev_sdd
+    assert "smallest maintained proof" in dev_sdd
+    assert "repeated summaries are noise" in dev_sdd
+    assert "decision-bearing facts" in dev_sdd
+
+    assert "Question-First Routing Maximizes Quality Per Token" in best_practices
+    assert "smallest maintained proof" in best_practices
+    assert "quality per token" in best_practices.lower()
+
+    assert "Every token Elefante injects must earn its place" in spec_vision
+
+
+def test_installer_docs_route_bug_020_through_screenshot_first_verification() -> None:
+    debug_index = _read("docs/debug/README.md")
+    install_compendium = _read("docs/debug/ops-installation-compendium.md")
+
+    assert "Screenshot first → native compile → install smoke; widget-tree inspection only if screenshot fails" in debug_index
+    assert "Question-First Verification Path" in install_compendium
+    assert "start with the narrowest customer-visible question" in install_compendium
+    assert "Only if the screenshot is still broken, inspect widget existence separately" in install_compendium
+    assert "quality-per-token path for installer UX bugs" in install_compendium
+
+
+def test_best_practices_capture_installer_failure_file_routing() -> None:
+    best_practices = _read("docs/debug/best_practices.md")
+
+    assert "Installer Failures Must End With Persisted File Routing" in best_practices
+    assert "Installer UI Must Expose Recovery Files Before Failure" in best_practices
+    assert "summary file first, status file second, log file third" in best_practices
+    assert "Show the persisted summary, status, and log file paths directly in the installer UI" in best_practices
+    assert "persisted installer files survive" in best_practices or "persisted installer files survive a closed terminal" in best_practices
+    assert "check the logs above" in best_practices
 
 
 def test_self_protocol_docs_are_linked() -> None:

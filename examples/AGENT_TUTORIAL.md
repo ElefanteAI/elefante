@@ -1,6 +1,6 @@
 # Elefante Agent Tutorial
 
-> **Version:** 2.9.0  
+> **Version:** 2.9.3  
 > **Audience:** AI Agents using MCP tools  
 > **Tool naming:** All tools use `elefante-PascalCase` convention
 

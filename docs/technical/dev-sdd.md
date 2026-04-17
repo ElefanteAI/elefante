@@ -5,9 +5,9 @@
 > The filename `dev-sdd.md` is retained for compatibility, but SDD is no longer a separate product surface or workflow mode. The checks below document the embedded development process already enforced through built-in directives, specification memories, compendiums, and verification scripts.  
 > See `docs/technical/spec-architecture.md` for the runtime retrieval model and `docs/debug/dev-developer-agent.md` for script routing.
 
-**Version**: 2.9.0  
+**Version**: 2.9.3  
 **Status**: Reference document — embedded process, legacy filename retained  
-**Last Updated**: 2026-04-14
+**Last Updated**: 2026-04-16
 
 ---
 
@@ -24,7 +24,9 @@ The core discipline:
 2. **Gate-Ordered** — Each phase must pass before the next begins. No skipping.
 3. **Leakage-Scanned** — Every surface that could break must be explicitly checked
 4. **Simulator-Validated** — No patch is accepted without a verifiable test result
-5. **Minimal** — Surgical changes only. One fix, one CHANGELOG entry.
+5. **Question-First** — State the exact uncertainty and use the smallest maintained proof that can resolve it
+6. **Decision-Dense** — Compress findings into decision-bearing facts; repeated summaries are noise
+7. **Minimal** — Surgical changes only. One fix, one CHANGELOG entry.
 
 ---
 
@@ -41,6 +43,8 @@ Before any change:
 1. **Read the actual source file.** Not the docs about it — the file itself.
 2. **If debugging an existing failure, read `docs/debug/README.md` first** and route through the matching Known Issue, compendium, and verification command.
 3. **Name the assumption you are checking, then read only the `CHANGELOG.md` entry that could confirm or falsify it.** Do not browse the changelog as a ritual.
+4. **State the concrete question and the smallest maintained proof that can confirm or falsify it.** Start narrow; widen only if the narrow proof fails.
+5. **After each read or verifier run, compress the result into decision-bearing facts.** Drop stale branches immediately instead of narrating the whole history again.
 
 If your memory of the file contradicts what you read: **the file wins. Always.**
 
@@ -205,18 +209,23 @@ Before ANY change:
   1. Read the actual file (not memory of it)
   2. If debugging, route through docs/debug/README.md and the matching verification path
   3. Name the assumption, then read only the changelog entry that can confirm or falsify it
+  4. State the concrete question and choose the smallest maintained proof
 
 Before writing code:
-  4. Trace your change to a spec source
-  5. Scan ALL leakage surfaces (Gate 2 table)
-  6. Verify any formula with actual math
+  5. Trace your change to a spec source
+  6. Scan ALL leakage surfaces (Gate 2 table)
+  7. Verify any formula with actual math
+
+After each result:
+  8. Keep only decision-bearing facts
+  9. Drop stale branches and widen the search only if needed
 
 Before committing:
-  7. verify_health.py → exit 0
-  8. verify_mcp_handshake.py → 20 tools listed
-  9. Round-trip test if memory path touched
- 10. CHANGELOG entry written using `### Added` / `### Fixed` / `### Changed`
- 11. advise_version_bump.py consulted if needed, then bump_version.py run
+ 10. verify_health.py → exit 0
+ 11. verify_mcp_handshake.py → 20 tools listed
+ 12. Round-trip test if memory path touched
+ 13. CHANGELOG entry written using `### Added` / `### Fixed` / `### Changed`
+ 14. advise_version_bump.py consulted if needed, then bump_version.py run
 ```
 
 ---

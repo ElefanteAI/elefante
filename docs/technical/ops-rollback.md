@@ -1,6 +1,6 @@
 # Backup & Rollback Procedures
 
-**Version**: 2.9.0
+**Version**: 2.9.3
 **Goal:** If a future change goes sideways, safely return to a known-good state with minimal downtime and no permanent data loss.
 
 This runbook is operational (not a postmortem). Lessons learned belong in `docs/debug/`.

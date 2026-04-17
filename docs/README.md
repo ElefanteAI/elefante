@@ -1,18 +1,18 @@
 # Elefante Documentation
 
-> **v2.9.0** · [Product overview & install](../README.md) · [Agent constitution](../.github/copilot-instructions.md)
+> **v2.9.3** · [Product overview & install](../README.md) · [Agent constitution](../.github/copilot-instructions.md)
 
 ---
 
 ## Start Here
 
 | Goal | Go to |
-|------|-------|
-| What is Elefante and where is it going? | [`planning/spec-vision.md`](planning/spec-vision.md) |
-| Install and connect to your IDE | [`technical/ops-installation.md`](technical/ops-installation.md) → [`technical/ops-ide-configuration.md`](technical/ops-ide-configuration.md) |
-| Full tool reference (20 tools, 2 prompts) | [`technical/spec-tools.md`](technical/spec-tools.md) |
-| How behavioral scoring works | [`technical/spec-scoring.md`](technical/spec-scoring.md) |
-| System architecture | [`technical/spec-architecture.md`](technical/spec-architecture.md) |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| What is Elefante and where is it going? | [`planning/spec-vision.md`](planning/spec-vision.md)                                                          |
+| Install and connect to your IDE        | [`technical/ops-installation.md`](technical/ops-installation.md) → [`technical/ops-ide-configuration.md`](technical/ops-ide-configuration.md) |
+| Full tool reference (20 tools, 2 prompts) | [`technical/spec-tools.md`](technical/spec-tools.md)                                                       |
+| How behavioral scoring works           | [`technical/spec-scoring.md`](technical/spec-scoring.md)                                                      |
+| System architecture                    | [`technical/spec-architecture.md`](technical/spec-architecture.md)                                            |
 
 ---
 
@@ -21,7 +21,7 @@
 ### Specifications (`spec-`)
 
 | Doc | Content |
-|-----|---------|
+| ----------------------------------------------- | ---------------------------------------------------- |
 | [`technical/spec-tools.md`](technical/spec-tools.md) | Complete MCP tool reference with parameter schemas |
 | [`technical/spec-architecture.md`](technical/spec-architecture.md) | System design, triple-layer brain |
 | [`technical/spec-scoring.md`](technical/spec-scoring.md) | Scoring formula, decay rates, reinforcement mechanics |
@@ -32,35 +32,36 @@
 ### Operations (`ops-`)
 
 | Doc | Content |
-|-----|---------|
-| [`technical/ops-installation.md`](technical/ops-installation.md) | Full installation guide + Python version details |
+| ----------------------------------------------------------- | ------------------------------------------------------ |
+| [`technical/ops-installation.md`](technical/ops-installation.md) | Full installation guide + Python version details    |
 | [`technical/ops-ide-configuration.md`](technical/ops-ide-configuration.md) | IDE setup (VS Code, Cursor, Windsurf, etc.) |
-| [`technical/ops-mcp-server.md`](technical/ops-mcp-server.md) | Manual startup and handshake verification |
-| [`technical/ops-restart.md`](technical/ops-restart.md) | Graceful restart, lock cleanup, force-kill |
-| [`technical/ops-dashboard.md`](technical/ops-dashboard.md) | Dashboard launch and verification |
-| [`technical/ops-docker.md`](technical/ops-docker.md) | Docker deployment |
-| [`technical/ops-kuzu.md`](technical/ops-kuzu.md) | Kuzu reserved words, locking, troubleshooting |
-| [`technical/ops-rollback.md`](technical/ops-rollback.md) | Backup and restore |
-| [`technical/ops-agent-handoff.md`](technical/ops-agent-handoff.md) | Autonomous agent integration |
+| [`technical/ops-mcp-server.md`](technical/ops-mcp-server.md) | Manual startup and handshake verification            |
+| [`technical/ops-restart.md`](technical/ops-restart.md) | Graceful restart, lock cleanup, force-kill              |
+| [`technical/ops-dashboard.md`](technical/ops-dashboard.md) | Dashboard launch and verification                    |
+| [`technical/ops-docker.md`](technical/ops-docker.md) | Docker deployment                                         |
+| [`technical/ops-kuzu.md`](technical/ops-kuzu.md) | Kuzu reserved words, locking, troubleshooting              |
+| [`technical/ops-rollback.md`](technical/ops-rollback.md) | Backup and restore                                     |
+| [`technical/ops-agent-handoff.md`](technical/ops-agent-handoff.md) | Autonomous agent integration                    |
 
 ### Development (`dev-`)
 
 | Doc | Content |
-|-----|---------|
+| ----------------------------------------------------- | ----------------------------------------------------------- |
 | [`technical/dev-etiquette.md`](technical/dev-etiquette.md) | **SPECIFICATION**: Feature closure (clean, docs, version) |
-| [`technical/dev-sdd.md`](technical/dev-sdd.md) | Embedded development process reference (legacy filename) |
+| [`technical/dev-sdd.md`](technical/dev-sdd.md) | Embedded development process reference (legacy filename)      |
 
 ### Debugging
 
 | Doc | Content |
-|-----|---------|
-| [`debug/`](debug/README.md) | Known Issues tracker, 5 domain compendiums, [Developer Agent protocol](debug/dev-developer-agent.md), and [self-Elefante whole-system verification](debug/self-elefante-protocol.md) |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| [`debug/`](debug/README.md) | Known Issues tracker, 5 domain compendiums, [best_practices.md](debug/best_practices.md), [Developer Agent protocol](debug/dev-developer-agent.md), and [self-Elefante whole-system verification](debug/self-elefante-protocol.md) |
 | [`debug/self-elefante-protocol.md`](debug/self-elefante-protocol.md) | Authoritative isolated MCP self-protocol for proving Elefante is actually running end-to-end |
 
 ### Planning
 
 | Doc | Content |
-|-----|---------|
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| [`planning/README.md`](planning/README.md) | Directory guide for future-facing specs. Operational learnings and reusable debugging rules belong in `debug/`, not here. |
 | [`planning/spec-installer-procedure.md`](planning/spec-installer-procedure.md) | Draft phase-1 PRD for a downloadable Elefante installer product that wraps the existing installer and removes `git clone` from the end-user flow |
 | [`planning/spec-vision.md`](planning/spec-vision.md) | What Elefante is, the Four Laws, vision, ideas backlog |
 | [`planning/spec-usage-intelligence.md`](planning/spec-usage-intelligence.md) | Usage metrics PRD (backend 80%, frontend 0%) |
@@ -68,7 +69,7 @@
 ### Agent Bootstrap
 
 | Doc | Content |
-|-----|---------|
+| --------------------------------------------------------------- | -------------------------------------------------------------- |
 | [`.github/copilot-instructions.md`](../.github/copilot-instructions.md) | Constitution: Four Laws, cardinal sins, tool table, commands |
 
 ---

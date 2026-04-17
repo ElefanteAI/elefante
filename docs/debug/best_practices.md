@@ -3,7 +3,7 @@
 > **Purpose:** Distilled reusable debugging rules for Elefante contributors
 > **Companion Docs:** [README.md](README.md) and [dev-developer-agent.md](dev-developer-agent.md)
 > **Status:** Live feedback-loop ledger
-> **Applies to**: v2.9.0+
+> **Applies to**: v2.9.3+
 
 ---
 
@@ -63,6 +63,14 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Why:** Maintained proof compounds knowledge. Scratch reproducers fragment it and create parallel truth.
 - **Proof:** [dev-developer-agent.md](dev-developer-agent.md) now embeds this routing as part of the development loop.
 - **Avoid:** Creating a `tmp/` reproducer before checking the maintained test and verifier inventory.
+
+### Question-First Routing Maximizes Quality Per Token
+
+- **Trigger:** You are about to open several files, run multiple scripts, or write a long progress update on an active debugging branch.
+- **Rule:** State the concrete question first, choose the smallest maintained proof that can confirm or falsify it, and report only the delta after each result. Expand the search only when the narrow proof fails.
+- **Why:** Clean development comes from short evidence paths. Broad repo tours, speculative parallel paths, and repeated summaries spend tokens without reducing uncertainty. Quality per token is the metric.
+- **Proof:** [dev-developer-agent.md](dev-developer-agent.md), [../technical/dev-sdd.md](../technical/dev-sdd.md), and [../../tests/test_developer_routing.py](../../tests/test_developer_routing.py).
+- **Avoid:** Reading half the repo before naming the question, running both scratch scripts and maintained verifiers for the same uncertainty, or re-summarizing unchanged plans.
 
 ### Fix The Whole Live Surface, Not Only The Hurt File
 
@@ -253,8 +261,74 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Trigger:** A file is patched more than once in a single session via string-replacement edits, especially aesthetic rewrites (dark→light theme, layout restructuring).
 - **Rule:** After the final edit, run `python3 -c "import py_compile; py_compile.compile('FILE', doraise=True)"` (or the language-equivalent syntax check). If the file is not covered by the test suite, this check is the ONLY gate preventing a broken ship. Commit working intermediate states before aesthetic rewrites.
 - **Why:** Overlapping string replacements on large files produce Frankenstein merges — interleaved fragments from both versions with orphaned kwargs, undefined variables, and duplicate widget constructors. The corruption is syntactically fatal but invisible to tests that don't import the file. A process exit code 1 observed mid-session was not diagnosed because the session moved on to unrelated questions.
-- **Proof:** BUG-019 — `installer_gui.py` patched 3+ times (chmod fix, dark→light palette, path display additions). Final file had `SyntaxError` at line 173, bare `C` instead of `self.C`, `C["entry"]`/`C["white"]` keys that don't exist in the light palette, duplicate `_build_ui` sections. File was never committed (untracked), so no recovery was possible. 137/137 pytest passed because no test imports the installer GUI. See [ops-installation-compendium.md](ops-installation-compendium.md#issue-10-dmg-gui-installer-app-broken--corrupted-multi-edit-merge).
+- **Proof:** BUG-019 — `installer_gui.py` patched 3+ times (chmod fix, dark→light palette, path display additions). Final file had `SyntaxError` at line 173, bare `C` instead of `self.C`, `C["entry"]`/`C["white"]` keys that don't exist in the light palette, duplicate `_build_ui` sections. File was never committed (untracked), so no recovery was possible. 137/137 pytest passed because no test imports the installer GUI. See [ops-installation-compendium.md](ops-installation-compendium.md#issue-10-dmg-gui-installer-app-broken---corrupted-multi-edit-merge).
 - **Avoid:** Trusting a green test suite as proof that ALL files in the commit are syntactically valid. If a file is not imported by any test, the test suite is blind to it.
+
+### Screenshot Beats Widget Introspection For Customer UI (BUG-020)
+
+- **Trigger:** A desktop UI process launches successfully and internal controls appear to exist, but the user reports a blank, broken, or unusable customer-facing surface.
+- **Rule:** For customer-facing GUI work, verify the rendered window with a screenshot before declaring success. Process liveness, widget trees, and geometry dumps are secondary diagnostics, not proof of UX correctness. If the screenshot is still broken after toolkit-specific styling fixes, stop polishing the toolkit and reassess the presentation layer itself.
+- **Why:** A GUI can be syntactically valid, remain running, and still fail the customer. Toolkits can create a correct internal widget tree while painting an unacceptable surface on the target platform. A customer experiences pixels, not `winfo_ismapped()`.
+- **Proof:** BUG-020 — the DMG installer `.app` launched, `GUI_RUNNING=YES` passed, and a Tk widget-tree dump showed mapped labels, entry fields, buttons, and progress controls with valid geometry. The screenshot still showed a broken white window. The correct pivot was not another color tweak. It was replacing Tk as the primary macOS installer surface with native AppKit.
+- **Avoid:** Treating "the process is alive" or "the controls exist" as evidence that a user can actually install the product.
+
+### Installer Failures Must End With Persisted File Routing
+
+- **Trigger:** An installer run fails, stalls, or closes before the user can keep reliable terminal or GUI scrollback.
+- **Rule:** The failure surface must route immediately to the persisted installer files in order: summary file first, status file second, log file third. Treat those files as the maintained journal for the incident, not as optional diagnostics.
+- **Why:** Scrollback is transient. The persisted installer files survive a closed terminal, a failed GUI session, and a retried run. Without explicit routing, the next debugging pass starts by guessing where the evidence lives instead of reading the durable record.
+- **Proof:** [../../scripts/setup/bootstrap_release_bundle.py](../../scripts/setup/bootstrap_release_bundle.py), [../../scripts/setup/install.py](../../scripts/setup/install.py), and [../../tests/test_install_setup.py](../../tests/test_install_setup.py).
+- **Avoid:** Failure text like "check the logs above" with no exact file order or path. Treating the repo-root source installer log as proof of what happened in the packaged installer bundle.
+
+### Installer UI Must Expose Recovery Files Before Failure
+
+- **Trigger:** A packaged installer presents a GUI surface instead of a terminal-first flow.
+- **Rule:** Show the persisted summary, status, and log file paths directly in the installer UI and provide one-click open actions for them before the install fails.
+- **Why:** Backend persistence is only half the fix. If the GUI hides the durable recovery files until after failure, the user still experiences an opaque installer and the next debugging pass starts from confusion instead of evidence.
+- **Proof:** [../../scripts/ci/installer_app.swift](../../scripts/ci/installer_app.swift), [../../scripts/ci/installer_gui.py](../../scripts/ci/installer_gui.py), and [../../tests/test_installer_gui.py](../../tests/test_installer_gui.py).
+- **Avoid:** Treating persisted-file routing as a backend or terminal concern only. Making the GUI say "Retry" while the real recovery journal stays invisible.
+
+### Guards Must Be Tested On Both Positive And Negative Paths (BUG-021)
+
+- **Trigger:** A feature adds or hardens a guard that blocks certain data shapes (tag blocklist, content heuristic, schema validator, etc.), and a separate code path elsewhere in the same codebase submits to that guard.
+- **Rule:** Write or update the maintained pytest to exercise *both* paths at every caller: the negative case (the guard correctly blocks bad input) AND the positive case (legitimate callers of the protected surface pass cleanly). If the guard is centralized, the positive test captures the caller's actual payload and runs it through the real guard logic, not a mock.
+- **Why:** A guard plus a caller are two independent surfaces. They can each be correct in isolation and still intersect in a way that breaks production. In BUG-021, `add_memory`'s test-memory guard (BUG-011 fix) and the installer's `inject_seed_memory` both shipped as-written, but the seed's tags matched the guard's block-list. Every fresh install failed at stage 3 for months and no test caught it because only the negative path had coverage.
+- **Proof:** [../../src/core/orchestrator.py](../../src/core/orchestrator.py) guard body, [../../scripts/setup/init_databases.py](../../scripts/setup/init_databases.py) seed payload, and [../../tests/test_install_setup.py](../../tests/test_install_setup.py) `test_inject_seed_memory_payload_does_not_trip_test_memory_guard`. Full post-mortem: [ops-installation-compendium.md Issue #12](ops-installation-compendium.md#issue-12-installer-seed-memory-collision-with-test-memory-guard).
+- **Avoid:** Trusting that because the guard has a negative test and the caller has its own unit test, their interaction is safe. Mocking the guard in positive-path tests — that hides the exact collision this rule exists to catch.
+
+### Installer Summary Must Name The Specific Rejection, Not The Stage (BUG-021)
+
+- **Trigger:** An installer (or any multi-stage pipeline) has a stage that can fail due to a downstream operation returning a structured rejection reason.
+- **Rule:** Propagate the specific reason from the underlying operation up into the installer's summary/status file and visible error surface. A line like `Database Initialization: FAILED (Database initialization failed)` is self-referential and forces the debugger to open the deeper log. Include the real cause: `Database Initialization: FAILED (seed memory blocked by test-memory guard: tag 'test' present)`.
+- **Why:** Persisted installer files are the first place a customer or triage agent looks after failure. If the summary only names the stage, the next debugging pass starts by guessing which of N possible sub-failures happened. Every layer of indirection between symptom and cause costs tokens and time. BUG-011's `rejection_reason` field made the cause available; the installer summary formatter has to actually carry it forward.
+- **Proof:** [ops-installation-compendium.md Issue #12](ops-installation-compendium.md#issue-12-installer-seed-memory-collision-with-test-memory-guard) — the real cause was in `.elefante-install.log` as `blocked_test_memory_submission` but the summary file only said "Database initialization failed".
+- **Avoid:** Treating the stage name as sufficient error text. Collapsing downstream structured errors into a generic stage failure string.
+
+### A Reusable Venv Must Prove `pip`, Not Just `python`
+
+- **Trigger:** The installer is about to reuse an existing or freshly repaired `.venv`.
+- **Rule:** Verify `python -m pip --version` before treating the environment as reusable. If `pip` is missing, bootstrap it with `python -m ensurepip --upgrade` before any dependency install step.
+- **Why:** A virtual environment can have a working interpreter and still fail immediately on `python -m pip`. Interpreter existence alone is not enough to prove install readiness.
+- **Proof:** [ops-installation-compendium.md Issue #13](ops-installation-compendium.md#issue-13-installer-reuse-mode-fails-when-pip-is-missing-from-venv) and [../../tests/test_install_setup.py](../../tests/test_install_setup.py).
+- **Avoid:** Assuming `.venv/bin/python` existing means the environment is package-manager ready.
+
+### Installer Bundle Packagers Must Exclude Local Env Backups
+
+- **Trigger:** You are packaging a repo-like installer bundle from a live developer workspace.
+- **Rule:** Exclude top-level local environment backups by prefix, not only by one exact directory name. For Elefante, `.venv*` must never enter the bundle payload.
+- **Why:** Recovery work creates directories like `.venv.broken.<timestamp>` whose broken interpreter symlinks do not belong in a release artifact. If the packager walks them, the archive step can crash and leave stale `dist` installers looking current.
+- **Proof:** [ops-installation-compendium.md Issue #14](ops-installation-compendium.md#issue-14-installer-bundle-build-walks-local-venv-backups-and-broken-symlinks), [../../tests/test_installer_bundle.py](../../tests/test_installer_bundle.py), and [../../scripts/ci/build_installer_bundle.py](../../scripts/ci/build_installer_bundle.py).
+- **Avoid:** Excluding only exact `.venv`, or assuming broken local env backups are harmless because they are not part of the intended payload.
+
+---
+
+### ChromaDB `query(where=...)` Fails On Production Collections — Use `get(where=...)` (BUG-022)
+
+- **Trigger:** You are adding or changing a `collection.query()` call that includes a `where` metadata filter against the live Elefante collection.
+- **Rule:** Do not use `where` in `collection.query()`. Use `collection.get(where=...)` for metadata-only filtering. If you need semantic similarity AND metadata filtering, filter by metadata first via `get()`, then rank the results.
+- **Why:** ChromaDB 1.3.5's Rust backend raises `InternalError: Error finding id` on `collection.query(where=...)` when the collection has 400+ memories. Fresh/test collections work fine, so tests pass. The failure only surfaces on a production database.
+- **Proof:** BUG-022 — `orchestrator.py:361` preference reassertion merge used `where_override={"memory_type": "preference"}` in `collection.query()`. Every `elefante-MemoryAdd` with `memory_type="preference"` failed silently on the production collection. Removing the `where_override` (Python-side filter already handles it) fixed it. See [ops-memory-compendium.md Issue #14](ops-memory-compendium.md#issue-14-chromadb-query-with-where-filter-fails-on-production-collection).
+- **Avoid:** Combining vector similarity and `where` metadata filters in a single `collection.query()` call against any large or aged Elefante collection. Trusting test coverage from fresh collections to prove production behavior.
 
 ---
 
