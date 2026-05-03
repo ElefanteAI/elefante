@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.9.3 - Memory Detail Panel
+// Elefante Dashboard v3.0.0 - Memory Detail Panel
 import { useEffect, useCallback } from 'react';
 import { X, Clock, Tag, Layers, Brain, Star, Hash, Globe, User } from 'lucide-react';
 import type { MemoryNode } from '@/types';

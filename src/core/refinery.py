@@ -18,7 +18,7 @@ Design goals:
 - Quarantine test/ephemeral memories
 - Collapse duplicates (one active per (namespace, canonical_key))
 
-The MCP tool `elefante-MemoryConsolidate` can invoke this refinery.
+The MCP tool `elefante-Memory(action="consolidate")` can invoke this refinery.
 """
 
 from __future__ import annotations

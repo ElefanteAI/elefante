@@ -75,8 +75,7 @@ class ElefanteMCPServer:
     MCP Server for Elefante Memory System
     
     Exposes memory operations as MCP tools:
-    - elefante-MemoryAdd: Store new memories
-    - elefante-MemorySearch: Search with semantic/structured/hybrid modes
+    - elefante-Memory: Memory operations (action: add|search|update|delete|consolidate)
     - elefante-GraphQuery: Execute Cypher queries on knowledge graph
     - elefante-ContextGet: Retrieve session context
     - elefante-GraphConnect: Batch upsert entities and relationships
@@ -111,12 +110,11 @@ class ElefanteMCPServer:
     # Tools that should NOT get automatic context injection
     # (they already return memory data, or are system/admin tools)
     _CONTEXT_SKIP_TOOLS = {
-        "elefante-MemorySearch", "elefante-MemoryAdd",
-        "elefante-ContextGet", "elefante-MemoryConsolidate",
+        "elefante-Memory",  # all actions (add/search/update/delete/consolidate) skip context-injection
+        "elefante-ContextGet",
         "elefante-System", "elefante-SystemStatusGet",
         "elefante-DashboardOpen", "elefante-SessionsList",
         "elefante-ETLProcess", "elefante-ETLClassify",
-        "elefante-MemoryUpdate", "elefante-MemoryDelete",
         "elefante-DirectiveAdd", "elefante-DirectiveList",
         "elefante-DirectiveRemove",
     }
@@ -146,7 +144,7 @@ class ElefanteMCPServer:
         AUTOMATIC CONTEXT INJECTION:
         On every tool call, surfaces the top 3 most relevant memories from ChromaDB
         and appends them to the response. The agent gets context for free — no
-        explicit elefante-MemorySearch call required.
+        explicit elefante-Memory(action="search") call required.
 
         Skips tools that already return memory data (search, list, ETL, system).
         Budget: max 3 memories, high similarity threshold (0.5), summary only.
@@ -214,13 +212,17 @@ class ElefanteMCPServer:
             "CRITICAL PROTOCOL: Do not rely on your internal knowledge base for project specifics; use the memory system."
         ]
         
-        # Context-specific injections
-        if tool_name == "elefante-MemoryAdd":
-            pitfalls.append("WARNING - MEMORY INTEGRITY: Score is system-computed. Classify memory_type accurately — it determines the decay rate.")
-        
-        if tool_name == "elefante-MemorySearch":
-             pitfalls.append("WARNING - SEARCH BIAS: If results are empty, try broader terms. Do not assume non-existence without a semantic search.")
-             pitfalls.append("WARNING - CONTRADICTIONS: If you find contradictory memories, prioritize the most recent one but note the conflict.")
+        # Context-specific injections — for consolidated elefante-Memory, inspect action arg
+        # NOTE: _inject_pitfalls signature is (result, tool_name) — arguments not passed in.
+        # We can still inspect the result payload's compliance_stamp/action hints for action-specific pitfalls,
+        # OR (preferred) accept that consolidated tool's pitfalls are tool-level (not action-level).
+        # For atomic-swap correctness, attach BOTH MemoryAdd and MemorySearch pitfalls to elefante-Memory
+        # so the agent receives the full guidance regardless of action. Action-specific filtering can land later
+        # if measurement shows agent confusion from over-injection.
+        if tool_name == "elefante-Memory":
+            pitfalls.append("WARNING - MEMORY INTEGRITY (action=add): Score is system-computed. Classify memory_type accurately — it determines the decay rate.")
+            pitfalls.append("WARNING - SEARCH BIAS (action=search): If results are empty, try broader terms. Do not assume non-existence without a semantic search.")
+            pitfalls.append("WARNING - CONTRADICTIONS (action=search): If you find contradictory memories, prioritize the most recent one but note the conflict.")
 
         if tool_name in [
             "elefante-GraphQuery",
@@ -345,7 +347,7 @@ class ElefanteMCPServer:
         Compliance Gate: Enforce search-before-write rule.
         
         Returns None if gate passes, or an error dict if gate blocks.
-        Write operations are blocked until elefante-MemorySearch has been called.
+        Write operations are blocked until elefante-Memory(action="search") has been called.
         """
         # Tools that require prior search (write operations)
         GATED_TOOLS = {
@@ -372,10 +374,10 @@ class ElefanteMCPServer:
             "success": False,
             "error": " COMPLIANCE GATE: Search required before write operations.",
             "gate_status": "BLOCKED",
-            "action_required": "Call elefante-MemorySearch first to check for existing/related memories.",
+            "action_required": "Call elefante-Memory with action='search' first to check for existing/related memories.",
             "reason": "This prevents duplicate memories and ensures you have full context before adding new knowledge.",
             "blocked_tool": tool_name,
-            "hint": f"Try: elefante-MemorySearch with a query related to what you want to store."
+            "hint": "Try: elefante-Memory(action='search', query='...') with a query related to what you want to store."
         }
     
     def _reset_compliance_gate(self):
@@ -406,42 +408,46 @@ class ElefanteMCPServer:
             """List all available tools"""
             self.logger.info("=== list_tools() handler called by MCP client ===")
             tools = [
+                # ── elefante-Memory: consolidated memory tool (v2.10.0 atomic swap, 2026-05-02) ──
+                # Replaces 5 legacy tools: MemoryAdd, MemorySearch, MemoryUpdate, MemoryDelete, MemoryConsolidate.
+                # Compliance Gate (search-before-write) is preserved: handlers still call _check_compliance_gate
+                # with the legacy logical names ("elefante-MemoryAdd" etc.) — internal contract unchanged.
                 types.Tool(
-                    name="elefante-MemoryAdd",
-                    description="""Store a new memory in Elefante's dual-database system.
+                    name="elefante-Memory",
+                    description="""Persistent memory operations. The `action` parameter selects the operation:
 
-Score is system-computed (0-100) based on behavioral signals: recency, freshness, and reinforcement. You do NOT assign importance — it emerges from how the memory is used over time.
+- `action=add` — store a new memory. content + memory_type + domain + category + tags + entities. Score is system-computed (0-100) from behavioral signals; you do NOT assign importance. Compliance Gate enforces search-before-write.
+- `action=search` — query memory. ChromaDB (semantic) + Kuzu (structured) hybrid by default. Rewrite pronouns to specific entities before calling. Use `list_all=true` to bypass semantic relevance filtering for browsing/export.
+- `action=update` — amend an existing memory in-place. memory_id + content/tags/deprecated/archived/supersedes_id. Compliance Gate.
+- `action=delete` — permanently remove a memory. memory_id + reason (audit trail). Compliance Gate.
+- `action=consolidate` — deterministic LLM-free cleanup (canonicalize, mark redundant, decay-prune). Default dry-run; pass `force=true` to apply.
 
-Classify the memory by providing memory_type, domain, and category. The system handles the rest: duplicate detection (REDUNDANT), relation detection (RELATED), and contradiction detection (CONTRADICTORY).
+**ALWAYS** call action=search before answering questions about user preferences, past decisions, or "the usual way". **NEVER** assume you know an answer that might be in memory. **IF RESULTS ARE CONTRADICTORY:** prefer most recent timestamp; "decision"/"fact" types over "conversation".
 
-**CRITICAL PERSISTENCE RULE:** The chronological session context buffer clears magically on IDE restart! If the user makes an important decision, explicitly run `elefante-MemoryAdd` to store it permanently. Never assume recent conversation represents long-term learning.""",
+**CRITICAL PERSISTENCE RULE:** The chronological session context buffer clears on IDE restart. After important decisions, run `elefante-Memory(action=add, ...)` to make them durable.""",
                     inputSchema={
                         "type": "object",
                         "properties": {
-                            "content": {
+                            "action": {
                                 "type": "string",
-                                "description": "The memory content to store"
+                                "enum": ["add", "search", "update", "delete", "consolidate"],
+                                "description": "Operation to perform"
                             },
+                            # action=add fields
+                            "content": {"type": "string", "description": "Memory content (action=add) or replacement content (action=update)"},
                             "memory_type": {
                                 "type": "string",
                                 "enum": ["fact", "decision", "preference", "insight", "note", "conversation", "specification", "directive"],
                                 "default": "fact",
-                                "description": "Type of memory — determines decay rate. Preferences decay slowest, conversations fastest. Specifications and directives are immutable (authority=1.0, zero decay)."
+                                "description": "Memory type (action=add) — determines decay rate. Preferences decay slowest, conversations fastest. Specifications and directives are immutable."
                             },
                             "domain": {
                                 "type": "string",
                                 "enum": ["work", "personal", "learning", "project", "reference", "system"],
-                                "description": "High-level context"
+                                "description": "High-level context (action=add)"
                             },
-                            "category": {
-                                "type": "string",
-                                "description": "Topic grouping (e.g., 'elefante', 'python', 'user-preferences')"
-                            },
-                            "tags": {
-                                "type": "array",
-                                "items": {"type": "string"},
-                                "description": "Tags for categorization"
-                            },
+                            "category": {"type": "string", "description": "Topic grouping (action=add)"},
+                            "tags": {"type": "array", "items": {"type": "string"}, "description": "Tags (action=add) or replacement tags (action=update)"},
                             "entities": {
                                 "type": "array",
                                 "items": {
@@ -452,113 +458,48 @@ Classify the memory by providing memory_type, domain, and category. The system h
                                     },
                                     "required": ["name", "type"]
                                 },
-                                "description": "Entities to link in knowledge graph"
+                                "description": "Entities to link in knowledge graph (action=add)"
                             },
-                            "metadata": {
-                                "type": "object",
-                                "description": "Additional metadata"
-                            },
-                            "force_new": {
-                                "type": "boolean",
-                                "default": False,
-                                "description": "If true, always create a new memory record (bypass title-based deduplication and do not mark as REDUNDANT)."
-                            }
-                        },
-                        "required": ["content"]
-                    }
-                ),
-                types.Tool(
-                    name="elefante-MemorySearch",
-                    description="""**CRITICAL: USE THIS TOOL FOR ALL MEMORY QUERIES** - Search Elefante's memory system when user asks about their preferences, past conversations, or anything they want you to remember. DO NOT search workspace files for memory queries.
-
-**QUERY REWRITING REQUIREMENT:** Before calling this tool, you MUST rewrite the user's query to be standalone and specific. Replace ALL pronouns (it, that, this, he, she, they) and vague references with the actual entities from conversation context.
-
-**Bad Queries (will fail):**
-- "How do I install it?" → Missing: what is "it"?
-- "Fix that error" → Missing: which error?
-- "What did he say about the project?" → Missing: who is "he"?
-
-**Good Queries (will succeed):**
-- "How to install Elefante memory system on Windows"
-- "ChromaDB ImportError solution in Python"
-- "Jaime's preferences for development folder organization"
-
-This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using semantic, structured, or hybrid search modes. The database cannot infer context from pronouns - it needs explicit, searchable terms.
-                    
-**AUTOMATIC USAGE RULES:**
-1.  **ALWAYS** call this tool when the user asks an open-ended question about the project (e.g., "How does the auth system work?", "What are the coding standards?").
-2.  **ALWAYS** call this tool when the user refers to past decisions or preferences (e.g., "Do it like we discussed", "Use the usual style").
-3.  **BROWSE VS SEARCH**: If the user asks for "ALL" memories (e.g. "show me all my memories about X"), you MUST use `list_all=true` to bypass semantic relevance filtering. Standard search will only return the top N most similar memories.
-4.  **NEVER** assume you know the answer if it might be in the memory. Check first.
-5.  **IF RESULTS ARE CONTRADICTORY:** The most recent memory (by timestamp) usually takes precedence, but check for "decision" or "fact" types over "conversation".
-5.  **IF RESULTS ARE IRRELEVANT:** Try a broader query or switch to `mode="semantic"` to catch fuzzy matches.""",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "query": {
-                                "type": "string",
-                                "description": "Search query"
-                            },
+                            "metadata": {"type": "object", "description": "Additional metadata (action=add)"},
+                            "force_new": {"type": "boolean", "default": False, "description": "Bypass dedup (action=add)"},
+                            # action=search fields
+                            "query": {"type": "string", "description": "Search query (action=search). Rewrite pronouns to specific entities first."},
                             "mode": {
                                 "type": "string",
                                 "enum": ["semantic", "structured", "hybrid"],
                                 "default": "hybrid",
-                                "description": "Search mode: semantic (vector), structured (graph), or hybrid (both)"
+                                "description": "Search mode (action=search)"
                             },
-                            "limit": {
-                                "type": "integer",
-                                "default": 10,
-                                "minimum": 1,
-                                "maximum": 100,
-                                "description": "Maximum results to return"
-                            },
+                            "limit": {"type": "integer", "default": 10, "minimum": 1, "maximum": 100, "description": "Max results (action=search)"},
                             "filters": {
                                 "type": "object",
                                 "properties": {
                                     "memory_type": {"type": "string"},
                                     "domain": {"type": "string", "enum": ["work", "personal", "learning", "project", "reference", "system"]},
                                     "category": {"type": "string"},
-                                    "min_score": {"type": "integer", "minimum": 0, "maximum": 100, "description": "Minimum behavioral score (0-100)"},
+                                    "min_score": {"type": "integer", "minimum": 0, "maximum": 100},
                                     "tags": {"type": "array", "items": {"type": "string"}},
                                     "start_date": {"type": "string", "format": "date-time"},
                                     "end_date": {"type": "string", "format": "date-time"}
                                 },
-                                "description": "Optional filters"
+                                "description": "Optional search filters (action=search)"
                             },
-                            "min_similarity": {
-                                "type": "number",
-                                "default": 0.3,
-                                "minimum": 0.0,
-                                "maximum": 1.0,
-                                "description": "Minimum similarity threshold"
-                            },
-                            "include_conversation": {
-                                "type": "boolean",
-                                "default": True,
-                                "description": "Include recent conversation context in search results"
-                            },
-                            "include_stored": {
-                                "type": "boolean",
-                                "default": True,
-                                "description": "Include stored memories from vector/graph databases"
-                            },
-                            "session_id": {
-                                "type": "string",
-                                "description": "Session UUID for conversation context (required if include_conversation=true)"
-                            },
-                            "list_all": {
-                                "type": "boolean",
-                                "default": False,
-                                "description": "If true, bypass semantic search and return all memories (for inspection, export, debugging). Pagination via limit/offset."
-                            },
-                            "offset": {
-                                "type": "integer",
-                                "default": 0,
-                                "minimum": 0,
-                                "description": "Number of memories to skip (for pagination, used with list_all=true)"
-                            }
+                            "min_similarity": {"type": "number", "default": 0.3, "minimum": 0.0, "maximum": 1.0, "description": "Min similarity (action=search)"},
+                            "include_conversation": {"type": "boolean", "default": True, "description": "Include recent conversation in search (action=search)"},
+                            "include_stored": {"type": "boolean", "default": True, "description": "Include stored memories in search (action=search)"},
+                            "session_id": {"type": "string", "description": "Session UUID (action=search, required if include_conversation=true)"},
+                            "list_all": {"type": "boolean", "default": False, "description": "Bypass semantic relevance filtering — for browsing/export (action=search)"},
+                            "offset": {"type": "integer", "default": 0, "minimum": 0, "description": "Pagination offset (action=search)"},
+                            # action=update / delete fields
+                            "memory_id": {"type": "string", "description": "Target memory UUID (action=update or delete)"},
+                            "deprecated": {"type": "boolean", "description": "Mark deprecated — excluded from normal search (action=update)"},
+                            "archived": {"type": "boolean", "description": "Mark archived (action=update)"},
+                            "supersedes_id": {"type": "string", "description": "UUID of older memory this supersedes (action=update)"},
+                            "reason": {"type": "string", "description": "Audit trail (action=delete)"},
+                            # action=consolidate fields
+                            "force": {"type": "boolean", "default": False, "description": "Apply cleanup (default dry-run) (action=consolidate)"},
                         },
-                        "required": ["query"]
+                        "required": ["action"]
                     }
                 ),
                 types.Tool(
@@ -635,87 +576,10 @@ This tool queries ChromaDB (vector embeddings) and Kuzu (knowledge graph) using 
                         "properties": {}
                     }
                 ),
-                types.Tool(
-                    name="elefante-MemoryConsolidate",
-                    description="**MEMORY MAINTENANCE**: Deterministic, LLM-free memory cleanup. Use this to canonicalize memories (set stable keys), quarantine test data, and mark duplicates as redundant/superseded so exports and search stay clean. Default is dry-run (`force=false`); set `force=true` to apply changes.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "force": {
-                                "type": "boolean",
-                                "description": "Apply cleanup changes (default false = dry-run)",
-                                "default": False
-                            }
-                        }
-                    }
-                ),
-                # elefante-MemoryListAll REMOVED — use elefante-MemorySearch with list_all=true
+                # MemoryConsolidate consolidated into elefante-Memory(action=consolidate) at v2.10.0 / 2026-05-02
+                # elefante-MemoryListAll REMOVED — use elefante-Memory(action=search) with list_all=true
                 # elefante-MemoryMigrateToV3 REMOVED (one-time admin, moved to scripts/)
-                # Memory Custodial Tools (Amendment + Forgetting)
-                types.Tool(
-                    name="elefante-MemoryUpdate",
-                    description="""**MEMORY AMENDMENT**: Update an existing memory's content or metadata in-place. Use this to correct wrong facts, mark memories as deprecated/archived, or set supersession chains. This is the Amendment duty — correct the record rather than burying it under new entries.
-
-When to use:
-- A stored fact is wrong or outdated → update content
-- A decision has been superseded → set deprecated=true and/or supersedes_id
-- Tags need correction
-
-Requires prior elefante-MemorySearch (Compliance Gate).""",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "memory_id": {
-                                "type": "string",
-                                "description": "The UUID of the memory to update"
-                            },
-                            "content": {
-                                "type": "string",
-                                "description": "New content to replace the existing content (triggers re-embedding)"
-                            },
-                            "deprecated": {
-                                "type": "boolean",
-                                "description": "Mark memory as deprecated (excluded from search results)"
-                            },
-                            "archived": {
-                                "type": "boolean",
-                                "description": "Mark memory as archived (excluded from search results)"
-                            },
-                            "supersedes_id": {
-                                "type": "string",
-                                "description": "UUID of the older memory this one supersedes"
-                            },
-                            "tags": {
-                                "type": "array",
-                                "items": {"type": "string"},
-                                "description": "Replacement tags"
-                            }
-                        },
-                        "required": ["memory_id"]
-                    }
-                ),
-                types.Tool(
-                    name="elefante-MemoryDelete",
-                    description="""**PURPOSEFUL FORGETTING**: Permanently delete a memory from the vector store. Use this for: removing incorrect/harmful facts, cleaning up test data, pruning transient context that should not persist. Requires a reason for audit trail.
-
-This is the Forgetting duty — some information must be actively removed, not just deprioritized.
-
-Requires prior elefante-MemorySearch (Compliance Gate).""",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "memory_id": {
-                                "type": "string",
-                                "description": "The UUID of the memory to delete"
-                            },
-                            "reason": {
-                                "type": "string",
-                                "description": "Why this memory is being deleted (audit trail)"
-                            }
-                        },
-                        "required": ["memory_id", "reason"]
-                    }
-                ),
+                # MemoryUpdate consolidated into elefante-Memory(action=update) at v2.10.0 / 2026-05-02
                 types.Tool(
                     name="elefante-DashboardOpen",
                     description="Launch and open the Elefante Knowledge Garden Dashboard in the user's browser. Optionally refresh the dashboard snapshot data first.",
@@ -1069,7 +933,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
 - Project-specific knowledge ("how we do X")
 - "The usual way" or "like we discussed"
 
-**YOU MUST first call `elefante-MemorySearch`** with a specific query.
+**YOU MUST first call `elefante-Memory` with `action="search"`** and a specific query.
 
 ## RULE: When in doubt, SEARCH.
 - Memory search is FAST (< 100ms)
@@ -1177,22 +1041,33 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 # Mode check removed - operations auto-acquire/release locks
                 # Write operations use write_lock() context manager internally
                 
-                if name == "elefante-MemoryAdd":
-                    result = await self._handle_add_memory(arguments)
-                elif name == "elefante-MemorySearch":
-                    result = await self._handle_search_memories(arguments)
+                # ── elefante-Memory dispatch (v2.10.0 atomic swap) ──
+                # Routes Memory(action=...) to the existing _handle_* methods. The handlers retain
+                # their internal contract (incl. Compliance Gate via legacy logical names) — only
+                # the public tool surface is consolidated. 'action' is stripped before delegation.
+                if name == "elefante-Memory":
+                    action = arguments.get("action")
+                    if action is None:
+                        raise ValueError("elefante-Memory requires 'action' (add|search|update|delete|consolidate)")
+                    delegate_args = {k: v for k, v in arguments.items() if k != "action"}
+                    if action == "add":
+                        result = await self._handle_add_memory(delegate_args)
+                    elif action == "search":
+                        result = await self._handle_search_memories(delegate_args)
+                    elif action == "update":
+                        result = await self._handle_update_memory(delegate_args)
+                    elif action == "delete":
+                        result = await self._handle_delete_memory(delegate_args)
+                    elif action == "consolidate":
+                        result = await self._handle_consolidate_memories(delegate_args)
+                    else:
+                        raise ValueError(f"elefante-Memory: unknown action '{action}' (expected add|search|update|delete|consolidate)")
                 elif name == "elefante-GraphQuery":
                     result = await self._handle_query_graph(arguments)
                 elif name == "elefante-ContextGet":
                     result = await self._handle_get_context(arguments)
                 elif name == "elefante-SessionsList":
                     result = await self._handle_get_episodes(arguments)
-                elif name == "elefante-MemoryConsolidate":
-                    result = await self._handle_consolidate_memories(arguments)
-                elif name == "elefante-MemoryUpdate":
-                    result = await self._handle_update_memory(arguments)
-                elif name == "elefante-MemoryDelete":
-                    result = await self._handle_delete_memory(arguments)
                 elif name == "elefante-GraphConnect":
                     result = await self._handle_set_elefante_connection(arguments)
                 # ETL Tools (Agent-Brain Classification)

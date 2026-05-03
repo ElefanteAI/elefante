@@ -79,3 +79,11 @@ AGENT.md
 # Local ChromaDB (generated if path config misses)
 chroma_db/
 src/elefante.egg-info/
+
+# Hidden easter-egg placeholder — awaiting matrix-effect rules (see
+# memory: project_elefante_error_easter_egg.md). Unignore when the full
+# project lands and the agent is ready to ship.
+agents/_elefante-error.md
+
+# Local Claude Code IDE permissions — per-developer, not shared.
+.claude/

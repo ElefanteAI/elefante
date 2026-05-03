@@ -22,7 +22,7 @@ active anyio event loop with piped stdio on Windows + Python 3.11.
 The model MUST be pre-loaded synchronously in server.py __main__ BEFORE
 asyncio.run() is called.  _load_model() becomes a no-op during normal runtime
 because self._model is already set.  Do NOT rely on asyncio.to_thread() here.
-See docs/debug/ops-ai-behavior-compendium.md Issue #9.
+See workspace/postmortems/ai-behavior.md Issue #9.
 """
 
 import asyncio

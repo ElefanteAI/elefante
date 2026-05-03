@@ -23,8 +23,8 @@ Then follow: examples/AGENT_TUTORIAL.md
 ### Core Tools (in order of use)
 
 1. `elefante-System` (action="enable") - Enable before any operation
-2. `elefante-MemoryAdd` - Store a memory
-3. `elefante-MemorySearch` - Retrieve memories
+2. `elefante-Memory(action="add")` - Store a memory
+3. `elefante-Memory(action="search")` - Retrieve memories
 4. `elefante-ContextGet` - Get session context
 5. `elefante-System` (action="disable") - Release locks when done
 

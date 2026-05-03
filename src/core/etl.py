@@ -13,7 +13,7 @@ Elefante ETL Pipeline - Agent-Brain Architecture
 
 Two-phase memory ingestion where PHASE 2 uses the AGENT's LLM brain:
 
-1. INGEST (elefante-MemoryAdd): 
+1. INGEST (elefante-Memory action="add"):
    - Fast, non-blocking raw storage
    - Returns immediately with processing_status="raw"
    

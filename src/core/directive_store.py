@@ -36,7 +36,7 @@ DIRECTIVES_FILE = DATA_DIR / "directives.json"
 SYSTEM_DIRECTIVE_DEFINITIONS = (
     (
         "system-sdd-gate-0",
-        "SDD Gate 0: Read the actual source file first. If debugging, route through docs/debug/README.md and the matching compendium/test path. Read CHANGELOG.md only to confirm or falsify a concrete assumption before naming a root cause.",
+        "SDD Gate 0: Read the actual source file first. If debugging, route through workspace/ISSUES.md and the matching compendium/test path. Read CHANGELOG.md only to confirm or falsify a concrete assumption before naming a root cause.",
     ),
     (
         "system-sdd-critical-blocker",

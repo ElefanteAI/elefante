@@ -63,8 +63,8 @@ SYSTEM_SPECIFICATIONS = (
             "Every change must be checked against these leakage surfaces: MCP response contract, "
             "ChromaDB write and read roundtrip, Kuzu schema and DML split, stdout purity, "
             "compliance gate state machine, dashboard snapshot contract, co-activation history, "
-            "and documentation links. Reference docs: docs/technical/dev-sdd.md "
-            "for the gate definition and docs/debug/README.md for issue routing."
+            "and documentation links. Reference docs: agents/orchestrator.md "
+            "for the gate definition and workspace/ISSUES.md for issue routing."
         ),
         "tags": ["system", "sdd", "gate-2", "leakage-scan", "specification"],
     },
@@ -90,7 +90,7 @@ SYSTEM_SPECIFICATIONS = (
         "content": (
             "Elefante Developer Etiquette specification for versioning, CLEAN, and DOC_SYNC. Before claiming "
             "done: CLEAN_ENVIRONMENT removes leftovers, scratch files, and dead code. DOC_SYNC updates README.md, "
-            "docs/README.md, docs/technical/spec-architecture.md, and CHANGELOG.md. CHANGELOG.md must use the "
+            "docs/README.md, docs/reference/architecture.md, and CHANGELOG.md. CHANGELOG.md must use the "
             "current Keep a Changelog headings `### Added`, `### Fixed`, or `### Changed` and document Why, What, "
             "and Impact in the matching section. STRICT_SEMVER uses scripts/ci/advise_version_bump.py to choose a "
             "version when needed and scripts/ci/bump_version.py instead of manual version edits. The working tree "

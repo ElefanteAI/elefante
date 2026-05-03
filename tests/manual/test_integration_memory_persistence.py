@@ -68,7 +68,7 @@ async def main():
         print("\nNo memories found!")
         print("\nThis means the memory was NOT persisted to the database.")
         print("Possible causes:")
-        print("  1. The elefante-MemoryAdd tool call failed silently")
+        print("  1. The elefante-Memory tool call failed silently")
         print("  2. The MCP server is using a different database location")
         print("  3. The memory was stored in a different session's temporary context")
     

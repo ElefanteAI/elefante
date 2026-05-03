@@ -1,81 +1,85 @@
 # Elefante Documentation
 
-> **v2.9.3** · [Product overview & install](../README.md) · [Agent constitution](../.github/copilot-instructions.md)
+> **v2.10.0** · Stable contracts only. Live development state lives in [`../workspace/`](../workspace/). Loadable agent protocols live in [`../agents/`](../agents/).
+
+This folder follows [Diátaxis](https://diataxis.fr/). Every doc has exactly one type:
+
+| Folder | Type | Question it answers | When to read |
+|--------|------|---------------------|--------------|
+| [`reference/`](reference/) | **SPEC** — what the system IS | "What is the contract?" | Looking up a frozen contract |
+| [`how-to/`](how-to/) | **OPS** — what to DO | "How do I accomplish X?" | Performing a task |
+| [`explanation/`](explanation/) | **CONCEPT** — WHY | "Why does this exist?" | Understanding design |
+| [`_archive/`](_archive/) | audit trail | "What was here before 2026-05-02?" | Migration provenance only |
 
 ---
 
-## Start Here
+## Reference (`reference/`) — what the system IS
 
-| Goal | Go to |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| What is Elefante and where is it going? | [`planning/spec-vision.md`](planning/spec-vision.md)                                                          |
-| Install and connect to your IDE        | [`technical/ops-installation.md`](technical/ops-installation.md) → [`technical/ops-ide-configuration.md`](technical/ops-ide-configuration.md) |
-| Full tool reference (20 tools, 2 prompts) | [`technical/spec-tools.md`](technical/spec-tools.md)                                                       |
-| How behavioral scoring works           | [`technical/spec-scoring.md`](technical/spec-scoring.md)                                                      |
-| System architecture                    | [`technical/spec-architecture.md`](technical/spec-architecture.md)                                            |
+| Doc | Contract |
+|-----|----------|
+| [`architecture.md`](reference/architecture.md) | System design, triple-layer brain, retrieval workflow |
+| [`tools.md`](reference/tools.md) | MCP tool reference (16 tools, 2 prompts) — full schemas. v2.10.0: Memory consolidated (5→1, action-discriminated). |
+| [`scoring.md`](reference/scoring.md) | 5-signal cognitive scoring (vector / concept / co-activation / authority / temporal) |
+| [`ingestion.md`](reference/ingestion.md) | 5-step pipeline (Extract → Classify → Integrity → Write → Reinforce) |
+| [`memory-schema.md`](reference/memory-schema.md) | V4 cognitive fields + V5 knowledge topology |
+| [`memory-identity.md`](reference/memory-identity.md) | `namespace` + `canonical_key` first-class fields (DRAFT) |
+| [`dashboard-snapshot.md`](reference/dashboard-snapshot.md) | Dashboard JSON schema |
+| [`self-protocol.md`](reference/self-protocol.md) | Whole-system MCP self-protocol verification contract |
+| [`token-intelligence.md`](reference/token-intelligence.md) | Token-budget layer (TOKEN_STATS, type budgets, density warnings) — shipped v2.5.0 |
 
----
+Source-of-truth for every spec is `src/`; specs lag. When formula and spec disagree, source wins.
 
-## By Topic
+## How-to (`how-to/`) — what to DO
 
-### Specifications (`spec-`)
+| Doc | Procedure |
+|-----|-----------|
+| [`install.md`](how-to/install.md) | Full install + Python version details |
+| [`configure-ide.md`](how-to/configure-ide.md) | IDE MCP setup (VS Code, Cursor, Bob, Antigravity) |
+| [`run-mcp-server.md`](how-to/run-mcp-server.md) | Manual server startup + handshake verification |
+| [`view-dashboard.md`](how-to/view-dashboard.md) | Dashboard launch + verification |
+| [`restart.md`](how-to/restart.md) | Graceful restart, lock cleanup, force-kill |
+| [`rollback.md`](how-to/rollback.md) | Backup + restore |
+| [`docker.md`](how-to/docker.md) | Docker deployment |
+| [`kuzu-troubleshooting.md`](how-to/kuzu-troubleshooting.md) | Kuzu reserved words, locking, troubleshooting |
+| [`agent-handoff.md`](how-to/agent-handoff.md) | Autonomous agent integration |
+| [`close-a-feature.md`](how-to/close-a-feature.md) | Closure sequence (CLEAN → DOCS → VERSION → COMMIT) |
 
-| Doc | Content |
-| ----------------------------------------------- | ---------------------------------------------------- |
-| [`technical/spec-tools.md`](technical/spec-tools.md) | Complete MCP tool reference with parameter schemas |
-| [`technical/spec-architecture.md`](technical/spec-architecture.md) | System design, triple-layer brain |
-| [`technical/spec-scoring.md`](technical/spec-scoring.md) | Scoring formula, decay rates, reinforcement mechanics |
-| [`technical/spec-ingestion.md`](technical/spec-ingestion.md) | 5-step ingestion pipeline |
-| [`technical/spec-memory-schema.md`](technical/spec-memory-schema.md) | V4 cognitive retrieval + V5 knowledge topology |
-| [`technical/spec-dashboard-snapshot.md`](technical/spec-dashboard-snapshot.md) | Snapshot JSON schema |
+## Explanation (`explanation/`) — WHY
 
-### Operations (`ops-`)
-
-| Doc | Content |
-| ----------------------------------------------------------- | ------------------------------------------------------ |
-| [`technical/ops-installation.md`](technical/ops-installation.md) | Full installation guide + Python version details    |
-| [`technical/ops-ide-configuration.md`](technical/ops-ide-configuration.md) | IDE setup (VS Code, Cursor, Windsurf, etc.) |
-| [`technical/ops-mcp-server.md`](technical/ops-mcp-server.md) | Manual startup and handshake verification            |
-| [`technical/ops-restart.md`](technical/ops-restart.md) | Graceful restart, lock cleanup, force-kill              |
-| [`technical/ops-dashboard.md`](technical/ops-dashboard.md) | Dashboard launch and verification                    |
-| [`technical/ops-docker.md`](technical/ops-docker.md) | Docker deployment                                         |
-| [`technical/ops-kuzu.md`](technical/ops-kuzu.md) | Kuzu reserved words, locking, troubleshooting              |
-| [`technical/ops-rollback.md`](technical/ops-rollback.md) | Backup and restore                                     |
-| [`technical/ops-agent-handoff.md`](technical/ops-agent-handoff.md) | Autonomous agent integration                    |
-
-### Development (`dev-`)
-
-| Doc | Content |
-| ----------------------------------------------------- | ----------------------------------------------------------- |
-| [`technical/dev-etiquette.md`](technical/dev-etiquette.md) | **SPECIFICATION**: Feature closure (clean, docs, version) |
-| [`technical/dev-sdd.md`](technical/dev-sdd.md) | Embedded development process reference (legacy filename)      |
-
-### Debugging
-
-| Doc | Content |
-| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| [`debug/`](debug/README.md) | Known Issues tracker, 5 domain compendiums, [best_practices.md](debug/best_practices.md), [Developer Agent protocol](debug/dev-developer-agent.md), and [self-Elefante whole-system verification](debug/self-elefante-protocol.md) |
-| [`debug/self-elefante-protocol.md`](debug/self-elefante-protocol.md) | Authoritative isolated MCP self-protocol for proving Elefante is actually running end-to-end |
-
-### Planning
-
-| Doc | Content |
-| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| [`planning/README.md`](planning/README.md) | Directory guide for future-facing specs. Operational learnings and reusable debugging rules belong in `debug/`, not here. |
-| [`planning/spec-installer-procedure.md`](planning/spec-installer-procedure.md) | Draft phase-1 PRD for a downloadable Elefante installer product that wraps the existing installer and removes `git clone` from the end-user flow |
-| [`planning/spec-vision.md`](planning/spec-vision.md) | What Elefante is, the Four Laws, vision, ideas backlog |
-| [`planning/spec-usage-intelligence.md`](planning/spec-usage-intelligence.md) | Usage metrics PRD (backend 80%, frontend 0%) |
-
-### Agent Bootstrap
-
-| Doc | Content |
-| --------------------------------------------------------------- | -------------------------------------------------------------- |
-| [`.github/copilot-instructions.md`](../.github/copilot-instructions.md) | Constitution: Four Laws, cardinal sins, tool table, commands |
+| Doc | Concept |
+|-----|---------|
+| [`vision.md`](explanation/vision.md) | Thesis, Four Laws, Non-Goals, ideas backlog |
 
 ---
 
-## Contributing
+## Where things are NOT
 
-See [`../CONTRIBUTING.md`](../CONTRIBUTING.md). License: [BSL 1.1](../LICENSE) → Apache 2.0 on 2029-02-10.
+| You want… | Go to |
+|-----------|-------|
+| BUG/GAP tracker | [`../workspace/ISSUES.md`](../workspace/ISSUES.md) |
+| Bug postmortems | [`../workspace/postmortems/`](../workspace/postmortems/) |
+| Cross-bug lessons | [`../workspace/lessons.md`](../workspace/lessons.md) |
+| Active release plan | [`../workspace/PLANNING.md`](../workspace/PLANNING.md) |
+| Architecture decisions (ADRs) | [`../workspace/decisions/`](../workspace/decisions/) |
+| Draft proposals (pre-spec) | [`../workspace/proposals/`](../workspace/proposals/) |
+| Loadable agent protocols | [`../agents/`](../agents/) |
+| Single developer constitution | [`../agents/orchestrator.md`](../agents/orchestrator.md) |
+| Universal agent entry | [`../AGENTS.md`](../AGENTS.md) |
+| End-user agent constitution | [`../.github/copilot-instructions.md`](../.github/copilot-instructions.md) |
+| IDE integration manifest | [`../agents/manifests/ide-integration.yaml`](../agents/manifests/ide-integration.yaml) |
+| Release history | [`../CHANGELOG.md`](../CHANGELOG.md) |
 
-[Changelog](../CHANGELOG.md) · [GitHub](https://github.com/ElefanteAI/elefante)
+---
+
+## Boundaries (Diátaxis-pure)
+
+- **`reference/` is for what the system IS.** No how-to steps, no rationale paragraphs.
+- **`how-to/` is for procedures.** Goal-oriented. Numbered steps. No conceptual deep-dives.
+- **`explanation/` is for WHY.** Design rationale, philosophy, thesis. No commands, no schemas.
+- **State (BUG/GAP, ADRs, proposals, postmortems) lives in `workspace/`, not here.** This folder holds frozen contracts only.
+
+A file in the wrong folder is a structural bug. The forbidden-pattern guard (`tests/test_developer_routing.py`) catches some drift; type purity is enforced by code review.
+
+## Restructure (2026-05-02)
+
+This `docs/` was rebuilt from the ground up on 2026-05-02. The pre-restructure tree (which mixed audience / type / lifecycle / surface axes in eight subfolders) is preserved in [`_archive/`](_archive/) for audit. See [`../CHANGELOG.md`](../CHANGELOG.md) `[2.10.0]` `### Changed` for the full migration record.

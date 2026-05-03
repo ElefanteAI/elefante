@@ -172,7 +172,7 @@ class GraphStore:
                 logger.error("kuzu_database_locked", error=error_msg)
                 raise RuntimeError(
                     f"Kuzu database is locked by another process. "
-                    f"Read docs/debug/ops-database-compendium.md Issue #2 for resolution.\n"
+                    f"Read workspace/postmortems/database.md Issue #2 for resolution.\n"
                     f"Database path: {self.database_path}\n"
                     f"Solution: Stop the competing process or wait for the current transaction to release. "
                     f"Dashboard access should use snapshot mode, not live Kuzu."
@@ -244,7 +244,7 @@ class GraphStore:
             if self._closing:
                 raise RuntimeError(
                     "GraphStore is closing. "
-                    "Read docs/debug/ops-database-compendium.md Issue #7 for resolution."
+                    "Read workspace/postmortems/database.md Issue #7 for resolution."
                 )
             self._active_operations += 1
 

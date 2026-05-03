@@ -132,8 +132,8 @@ def render_release_notes(version: str) -> str:
             "",
             "- [README](README.md) — current product overview and install path",
             "- [CHANGELOG](CHANGELOG.md) — full historical ledger",
-            "- [Installation Guide](docs/technical/ops-installation.md) — operator setup",
-            "- [Debug Index](docs/debug/README.md) — known issues and verification entrypoints",
+            "- [Installation Guide](docs/how-to/install.md) — operator setup",
+            "- [Debug Index](workspace/ISSUES.md) — known issues and verification entrypoints",
         ]
     ) + "\n"
 

@@ -109,7 +109,7 @@ def test_render_release_notes_uses_matching_changelog_entry():
     assert notes.startswith("# Elefante v2.7.1")
     assert "## [2.7.1] - 2026-04-15" in notes
     assert "BUG-015" in notes
-    assert "[Installation Guide](docs/technical/ops-installation.md)" in notes
+    assert "[Installation Guide](docs/how-to/install.md)" in notes
 
 
 def test_release_documentation_audit_passes_for_repo_history():

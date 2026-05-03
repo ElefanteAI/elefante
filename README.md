@@ -8,7 +8,7 @@
 
 AI agents start every conversation from zero. Your preferences, decisions, and discovered patterns don't carry over. Elefante gives any MCP-compatible agent a persistent, local second brain — memories are stored, scored automatically, and surfaced at the right moment without being asked.
 
-**v2.9.3** — Persistent Memory Engine
+**v2.10.0** — Persistent Memory Engine
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -17,7 +17,7 @@ AI agents start every conversation from zero. Your preferences, decisions, and d
                          │ MCP stdio
 ┌────────────────────────▼────────────────────────────────────┐
 │ LAYER 1 · MCP PROTOCOL                                      │
-│ 20 tools · 2 prompts · Context Injection                    │
+│ 16 tools · 2 prompts · Context Injection                    │
 └────────────────────────┬────────────────────────────────────┘
                          │
 ┌────────────────────────▼────────────────────────────────────┐
@@ -57,10 +57,10 @@ Everything runs locally. No cloud. No telemetry. Your data stays on your machine
 
 ### Layer 1 — MCP Protocol
 
-The interface between your IDE and the memory engine. 20 tools and 2 prompts let agents store, search, connect, and manage knowledge. A **Compliance Gate** prevents duplicates before they exist. **Context Injection** attaches relevant memories to every tool response. **Directives** enforce persistent behavioral rules that survive across sessions. **Token Intelligence** measures every response and tells the agent what each tool call costs — output tokens, protocol overhead, and signal ratio — so memory never becomes invisible bloat.
+The interface between your IDE and the memory engine. 16 tools and 2 prompts let agents store, search, connect, and manage knowledge. A **Compliance Gate** prevents duplicates before they exist. **Context Injection** attaches relevant memories to every tool response. **Directives** enforce persistent behavioral rules that survive across sessions. **Token Intelligence** measures every response and tells the agent what each tool call costs — output tokens, protocol overhead, and signal ratio — so memory never becomes invisible bloat.
 
-Full tool reference → [docs/technical/spec-tools.md](docs/technical/spec-tools.md)
-IDE configuration → [docs/technical/ops-ide-configuration.md](docs/technical/ops-ide-configuration.md)
+Full tool reference → [docs/reference/tools.md](docs/reference/tools.md)
+IDE configuration → [docs/how-to/configure-ide.md](docs/how-to/configure-ide.md)
 
 ### Layer 2 — Intelligence Engine
 
@@ -70,8 +70,8 @@ Two storage backends working together:
 - **Kuzu** — a knowledge graph that tracks entities, relationships, and structural context.
 - **Behavioral Relevance** — a 5-signal scoring system that automatically surfaces the most useful memories. No manual importance ratings.
 
-Scoring details → [docs/technical/spec-scoring.md](docs/technical/spec-scoring.md)
-Architecture → [docs/technical/spec-architecture.md](docs/technical/spec-architecture.md)
+Scoring details → [docs/reference/scoring.md](docs/reference/scoring.md)
+Architecture → [docs/reference/architecture.md](docs/reference/architecture.md)
 
 ### Layer 3 — Dashboard
 
@@ -81,8 +81,8 @@ A read-only view of your knowledge system, served from a lightweight snapshot so
 - Searchable, sortable memory table
 - Topic distribution, memory insights, and a knowledge graph
 
-Dashboard details → [docs/technical/ops-dashboard.md](docs/technical/ops-dashboard.md)
-Docker deployment → [docs/technical/ops-docker.md](docs/technical/ops-docker.md)
+Dashboard details → [docs/how-to/view-dashboard.md](docs/how-to/view-dashboard.md)
+Docker deployment → [docs/how-to/docker.md](docs/how-to/docker.md)
 
 ---
 
@@ -142,17 +142,17 @@ You possess full local control. The installer automatically bridges into your ID
    `What is my Elefante test passcode?`
 4. Watch the AI hit your local memory, cure its amnesia, and return the secret code.
 
-*Looking for manual setup or deep technical details? See the [Full Installation Guide](docs/technical/ops-installation.md).*
+*Looking for manual setup or deep technical details? See the [Full Installation Guide](docs/how-to/install.md).*
 
 ---
 
 ## MCP Tools
 
-20 tools + 2 prompts. All names follow `elefante-PascalCase` convention.
+16 tools + 2 prompts. All names follow `elefante-PascalCase` convention.
 
 | Category   | Tools                                                                                                                                   |
 | ---------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Memory     | `elefante-MemoryAdd`, `elefante-MemorySearch`, `elefante-MemoryUpdate`, `elefante-MemoryDelete`, `elefante-MemoryConsolidate` |
+| Memory     | `elefante-Memory` (actions: `add` · `search` · `update` · `delete` · `consolidate`)                                                |
 | Graph      | `elefante-GraphConnect`, `elefante-GraphQuery`                                                                                      |
 | Context    | `elefante-ContextGet`, `elefante-SessionsList`                                                                                      |
 | Tasks      | `elefante-TaskCreate`, `elefante-TaskUpdate`, `elefante-TaskGraph`                                                                |
@@ -160,7 +160,7 @@ You possess full local control. The installer automatically bridges into your ID
 | Directives | `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove`                                                     |
 | System     | `elefante-System`, `elefante-SystemStatusGet`, `elefante-DashboardOpen`                                                           |
 
-Full reference with parameter schemas → [docs/technical/spec-tools.md](docs/technical/spec-tools.md)
+Full reference with parameter schemas → [docs/reference/tools.md](docs/reference/tools.md)
 
 ## Specification And Directive Retrieval
 
@@ -199,15 +199,37 @@ scripts/          Setup, deployment, and maintenance tools
 
 ## Documentation
 
-Full reference → [docs/technical/spec-tools.md](docs/technical/spec-tools.md)
+Three audiences, three surfaces (v2.10.0 split, see [workspace/PLANNING.md §2.5](workspace/PLANNING.md §2.5)):
 
-- [Tool reference](docs/technical/spec-tools.md) — parameter schemas for all 20 tools and 2 prompts
-- [Behavioral Relevance](docs/technical/spec-scoring.md) — how automatic scoring works
-- [Installation](docs/technical/ops-installation.md) — step-by-step setup
-- [Architecture](docs/technical/spec-architecture.md) — system design
-- [Dashboard](docs/technical/ops-dashboard.md) — visualization and health monitoring
-- [Docker](docs/technical/ops-docker.md) — containerized deployment
-- [Debugging](docs/debug/README.md) — known issues tracker, compendium routing, and verification commands
+| Audience | Start here |
+| -------- | ---------- |
+| **Using Elefante** as a memory engine | [docs/user/README.md](docs/user/README.md) |
+| **Building or debugging Elefante** itself | [agents/orchestrator.md](agents/orchestrator.md) → then [docs/developer/README.md](docs/developer/README.md) |
+| **Loading an agent protocol** at the moment of failure | [agents/](agents/) |
+
+### Agent dispatch (load when this happens)
+
+| Symptom | Load |
+| ------- | ---- |
+| Building a feature, debugging Elefante itself | [agents/orchestrator.md](agents/orchestrator.md) |
+| Any `MemoryAdd` / `MemoryUpdate` / `MemoryDelete` (auto) | [agents/memory-janitor.md](agents/memory-janitor.md) |
+| "What do I have stored?", export, audit | [agents/memory-inspector.md](agents/memory-inspector.md) |
+| Install failed, broken venv, repair | [agents/installer.md](agents/installer.md) |
+| MCP tools missing in IDE, server stuck | [agents/restarter.md](agents/restarter.md) |
+| Backup, restore, factory reset, restart | [agents/operator.md](agents/operator.md) |
+| Version bump, CHANGELOG, tag, release | [agents/release-manager.md](agents/release-manager.md) |
+| Line of attack is suspect (RESEARCH mode) | [agents/researcher.md](agents/researcher.md) |
+| Need to retune the rules themselves | [agents/puppeteer.md](agents/puppeteer.md) (`PRIVILEGED` only) |
+
+### Reference (current locations during v2.10.x migration)
+
+- [Tool reference](docs/reference/tools.md) — parameter schemas for all 16 tools and 2 prompts
+- [Behavioral Relevance](docs/reference/scoring.md) — how automatic scoring works
+- [Installation](docs/how-to/install.md) — step-by-step setup
+- [Architecture](docs/reference/architecture.md) — system design
+- [Dashboard](docs/how-to/view-dashboard.md) — visualization and health monitoring
+- [Docker](docs/how-to/docker.md) — containerized deployment
+- [Debugging](workspace/ISSUES.md) — known issues tracker, compendium routing, and verification commands
 
 ## Release Notes
 

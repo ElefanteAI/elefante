@@ -1,0 +1,96 @@
+# Dashboard Postmortems
+
+> **Domain:** Dashboard, visualization, snapshot pipeline.
+> **Cross-refs:** BUG/GAP rows + verification commands live in [`../ISSUES.md`](../ISSUES.md). Reusable cross-bug rules live in [`../lessons.md`](../lessons.md).
+> **Format per entry:** Trigger / Root cause / Solution / Lesson.
+> **Historical note:** Some entries reference V3 concepts (`layer`, `sublayer`, `classifier.py`, importance 1-10) that have since been removed. The lessons survive; the referenced fields don't.
+
+---
+
+## Issue #1: Kuzu Database Compatibility [FIXED]
+
+**Trigger:** `RuntimeError: Database path cannot be a directory` on first dashboard launch after Kuzu 0.11.x upgrade.
+**Root cause:** Same as database/installation #3 — Kuzu 0.11.x stopped tolerating pre-existing `kuzu_db/` directory. `config.py` was eagerly creating it.
+**Solution:** Removed `KUZU_DIR.mkdir(exist_ok=True)` from `config.py`. Added `_parse_buffer_size()` for `'512MB'` → bytes conversion in `graph_store.py`.
+**Lesson:** Version upgrades can break database formats. Always check changelogs.
+
+## Issue #2: Stats Display Showing Zero [FIXED]
+
+**Trigger:** Dashboard shows "0 MEMORIES" despite 17 memories in store.
+**Root cause:** Frontend reading the wrong API response field. API returned `{vector_store: {total_memories: 17}}`; frontend read `stats.total_memories` (undefined).
+**Solution:** `App.tsx` line 36 reads `stats.vector_store.total_memories`.
+**Lesson:** API working ≠ Dashboard working. Test the COMPLETE user experience — API in isolation passes while UI is broken.
+
+## Issue #3: Memory Labels Missing [FIXED]
+
+**Trigger:** Green dots with no labels — user can't identify memories without hovering.
+**Root cause:** Canvas only rendered labels on hover. Technical implementation worked; UX was broken.
+**Solution:** `GraphCanvas.tsx` displays truncated labels (first 3 words) below each node by default; full description in tooltip on hover.
+**Lesson:** Technical correctness ≠ user satisfaction. Ask "what does the user NEED to see?" before declaring a feature done.
+
+## Issue #4: Dashboard Shows 11 Instead of 71 [FIXED]
+
+**Trigger:** ChromaDB has 71 memories but dashboard shows 11.
+**Root cause:** `update_dashboard_data.py` queried Kuzu (entities, count 17) instead of ChromaDB (memories, count 71). Fundamental confusion between data stores. Wasted 30 min debugging `graph_service.py` (dead code, not used).
+**Solution:** Rewrote `scripts/pipeline/update_dashboard_data.py` to pull from ChromaDB: `vector_store._collection.get(include=["metadatas", "documents"])`.
+**Lesson:** ChromaDB = memories, Kuzu = entities — different purposes, different counts. Verify the DATA SOURCE before debugging the data flow. Verify a file is actually USED before debugging it.
+
+## Issue #5: API Bypassed Snapshot File [FIXED]
+
+**Trigger:** After Issue #4 fix, snapshot has 71 nodes but `/api/graph` still returns 17.
+**Root cause:** `server.py /api/graph` endpoint queried Kuzu directly instead of reading the snapshot file. Producer was fixed; consumer still bypassed it.
+**Solution:** Endpoint reads `dashboard_snapshot.json` only — no live Kuzu query in the request path.
+**Lesson:** Fix BOTH producer AND consumer when debugging data flow. Trace data path end-to-end; never assume one fix propagates.
+
+## Issue #6: V3 Metadata Display — 6-Layer Bug Chain [FIXED, historical]
+
+**Trigger:** All nodes show "FACT • General" / "5/10" importance despite varied V3 classification in DB.
+**Root cause:** Six bugs hidden behind each other. (1) `classifier.py` only had 5 regex patterns → 90% defaulted to `world/fact`. (2) `VectorStore.add_memory()` missing `layer`/`sublayer` in metadata dict — never saved. (3) `_reconstruct_memory()` missing same fields — even if saved, never read back. (4) MCP server cached old code (12h running) — migration tool reported success but used unfixed code. (5) `GraphCanvas.tsx` colors read `n.full_data.props` instead of `n.properties`. (6) Same path mismatch in sidebar code.
+**Solution:** Six sequential fixes — expanded classifier patterns; added `layer`/`sublayer` to add and reconstruct paths; standalone migration script bypassing MCP cache; fixed both color and sidebar property paths.
+**Lesson:** Data flows through 8 layers (Classifier → add_memory → ChromaDB → reconstruct → Snapshot → API → Frontend → Sidebar). Verify at EACH layer, not just endpoints. When fixing property paths, grep for ALL occurrences. Long-running servers cache imports — restart after code changes. **V3 fields no longer exist; the methodology rule survives.**
+
+## Issue #7: Phantom Dashboard — Daemon Thread Vaporized on MCP Exit [FIXED]
+
+**Trigger:** Agent reports "Dashboard opened at http://localhost:8000". User sees blank screen or `ERR_CONNECTION_REFUSED`.
+**Root cause:** Dashboard launched via `serve_dashboard_in_thread(port=port)` as a daemon thread. MCP clients (like Agent Zero) often spin up `src.mcp.server` for a single tool call and close stdio when done. Daemon threads die instantly with the parent process — the dashboard vaporized as soon as the MCP transient process exited.
+**Solution:** `_start_dashboard_and_open()` launches dashboard as detached background subprocess: `subprocess.Popen([sys.executable, "-m", "src.dashboard.server"], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)`.
+**Lesson:** Never bind long-living HTTP servers to daemon threads inside a transient/stateless worker process. Always detach into a true subprocess.
+
+## Issue #8: Persistent Blank Dashboard on First Launch [BUG-003, FIXED, guarded]
+
+**Trigger:** `elefante-DashboardOpen(refresh=true)` — agent reports correct counts, browser shows blank white page, server is running.
+**Root cause:** Two compounding bugs. (a) **Race:** `subprocess.Popen` returned before Uvicorn bound to port 8000. `webbrowser.open()` fired immediately; first request got error; React rendered blank root permanently. (b) **Stale server on refresh:** when `refresh=true`, snapshot was updated on disk but the long-running server process was NOT restarted. `is_running` check found the old server alive, skipped Popen, served stale data.
+**Solution:** (1) `_wait_for_ready(max_wait=5.0)` polls `/health` before opening browser. (2) `force_restart=True` (set when `refresh=true`) kills existing server (`lsof -ti :8000 | xargs kill`) before reopening.
+**Guard:** `tests/test_dashboard_serializer.py -k "dashboard"` verifies readiness wait + force-restart + frontend retry/backoff.
+**Lesson:** Never open the browser before the server is ready. When refreshing data, restart the server — a stale process cannot serve a new snapshot without restart.
+
+## Issue #9: All Dashboard Scores Stuck at 100 [BUG-004, FIXED structurally]
+
+**Trigger:** Almost all dashboard memory scores show 100. Average 94.6. Real computed scores should range 54-94 with avg ~75.
+**Root cause:** **Three independent code paths built dashboard nodes with different scoring logic.** (1) MCP server `_refresh_dashboard_snapshot()` read `mem.metadata.score` (stale stored value, set at creation, only updated on retrieval — most memories never retrieved → stays 100 forever). (2) Standalone `update_dashboard_data.py` had a correct `_compute_live_score()` but as a local duplicate. (3) Dashboard API just served whatever wrote the snapshot last.
+**Solution:** Single source of truth — `src/utils/dashboard_serializer.py` exports `compute_live_score(mem)`, `compute_live_score_from_raw(meta)`, and `memory_to_dashboard_node(mem)`. MCP server and standalone script both import from this module; ~50 LOC of inline serialization deleted from `server.py`. Verified: 0 memories at score 100, avg 75.3, min 54, max 94.
+**Guard:** `pytest tests/test_dashboard_serializer.py -v`.
+**Lesson:** Never trust stored scores. Scores are derived values — always compute them live from behavioral signals. Enforce this architecturally via a single shared serializer; documentation and rules are not enough when three code paths can drift.
+
+---
+
+## Cross-bug pattern (extracted to `../lessons.md`)
+
+1. **API working ≠ UI working** — test the complete user experience. Issues #2, #4, #5.
+2. **Verify data source before debugging data flow** — wrong store assumption wastes hours. Issue #4.
+3. **Fix BOTH producer AND consumer in any data pipeline** — partial fixes drift. Issues #5, #9.
+4. **Long-running servers cache imports** — restart after code changes; migration tools may report success while using stale bytecode. Issue #6.
+5. **Single source of truth for derived values** — three code paths producing the "same output" eventually drift. Issue #9.
+6. **Detach long-lived servers into subprocesses, never daemon threads** — daemon threads die with their transient parent. Issue #7.
+
+Distill any new repeating rule into `../lessons.md`.
+
+---
+
+## Full historical narrative
+
+The pre-distillation full narrative — including Cognitive Failure Analysis sections, "Why This Took So Long" reflections, Methodology Failures tables, Prevention Protocols, code-block solutions in full, and original Symptom/Problem prose — is preserved verbatim at [`_archive/dashboard-full.md`](_archive/dashboard-full.md).
+
+This file (`dashboard.md`) is the **active retrieval surface** — atomic Trigger/Root cause/Solution/Lesson chunks that Elefante surfaces at high signal-per-token. The archive is the **historical context surface** — open it when the distilled chunk is insufficient and you need the full debugging arc.
+
+Distilled here = what Elefante surfaces. Archived next to it = what informed the distillation. Neither is lost.

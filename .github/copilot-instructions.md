@@ -3,7 +3,7 @@
 <objective>
 Maximize four metrics per interaction:
 ENGAGEMENT:  Use `elefante-*` tools. Never skip available memory context.
-LEARNING:    Every interaction → smarter Elefante. Facts/decisions/patterns → `elefante-MemoryAdd`. Corrections → `elefante-MemoryUpdate`.
+LEARNING:    Every interaction → smarter Elefante. Facts/decisions/patterns → `elefante-Memory(action="add")`. Corrections → `elefante-Memory(action="update")`.
 ACCURACY:    Search before asserting. `RELEVANT_CONTEXT` > training data.
 EFFICIENCY:  Quality/token is the metric. Wasted tokens (filler, restatement, speculation, over-explanation) = learning signal → log as elimination pattern. Retrieve before generating. Not using Elefante context = measurable efficiency loss.
 Interaction ends without Elefante engagement when data could exist → failure.
@@ -37,7 +37,7 @@ Violation → "BLOCKED — rule X. Root cause: Y."
 
 <rule id="search_before_assert">
 TRIGGER: User preferences, past decisions, project conventions.
-ACTION: `elefante-MemorySearch`. Query: explicit, standalone, no pronouns.
+ACTION: `elefante-Memory(action="search")`. Query: explicit, standalone, no pronouns.
 STAMP: `[ELEFANTE] Searched: Found {N} relevant memories` | `No relevant memories found`
 </rule>
 
@@ -56,7 +56,7 @@ TOKEN_STATS AWARENESS:
 
 <rule id="sdd_closure">
 TRIGGER: Declaring "Complete" or "Done".
-ACTION: `docs/technical/dev-etiquette.md`:
+ACTION: `docs/how-to/close-a-feature.md`:
   1. CLEAN — leftovers, temp files, debug artifacts
   2. DOCS — specs, changelogs, READMEs
   3. VERSION — SemVer via `scripts/ci/bump_version.py`
@@ -89,10 +89,10 @@ Errors: graceful handling. No silent failures.
 <tools><!-- Bootstrap: agents need this to operate -->
 | Tool | Purpose | Key Rule |
 |------|---------|----------|
-| `elefante-MemorySearch` | Search memory | DO THIS FIRST. Every session. Every task. |
-| `elefante-MemoryAdd` | Store knowledge | Requires prior search. Pick `memory_type` carefully. |
-| `elefante-MemoryUpdate` | Update memory | Use `supersedes_id` when decisions change. |
-| `elefante-MemoryDelete` | Delete memory | Requires prior search. Provide `reason`. |
+| `elefante-Memory(action="search")` | Search memory | DO THIS FIRST. Every session. Every task. |
+| `elefante-Memory(action="add")` | Store knowledge | Requires prior search. Pick `memory_type` carefully. |
+| `elefante-Memory(action="update")` | Update memory | Use `supersedes_id` when decisions change. |
+| `elefante-Memory(action="delete")` | Delete memory | Requires prior search. Provide `reason`. |
 | `elefante-ContextGet` | Full context pull | Memories + graph for current task. |
 | `elefante-GraphConnect` | Link entities | Connect people, projects, technologies. |
 | `elefante-GraphQuery` | Query graph | Cypher queries for structural traversal. |
@@ -104,7 +104,7 @@ Errors: graceful handling. No silent failures.
 | `elefante-DirectiveRemove` | Remove rule | Delete a directive by ID. |
 | `elefante-ETLProcess` | Get raw memories | Returns unprocessed memories for agent enrichment. |
 | `elefante-ETLClassify` | Classify memory | Agent sends enrichment back after ETLProcess. |
-| `elefante-MemoryConsolidate` | Deduplicate | Run periodically. `force=false` for dry-run. |
+| `elefante-Memory(action="consolidate")` | Deduplicate | Run periodically. `force=false` for dry-run. |
 | `elefante-System` | Enable/disable | Toggle Elefante mode on/off. |
 | `elefante-SystemStatusGet` | Health check | Verify brain health. |
 | `elefante-SessionsList` | List sessions | See active sessions. |
@@ -135,9 +135,9 @@ Errors: graceful handling. No silent failures.
 
 <troubleshooting_trigger_map>
 IF YOU ENCOUNTER ERRORS WHILE DEVELOPING ELEFANTE, DO NOT GUESS. STOP AND READ THE RELEVANT COMPENDIUM:
-- **Dashboard / Frontend UI**: `docs/debug/ops-dashboard-compendium.md`
-- **ChromaDB / Kuzu / sqlite locks**: `docs/debug/ops-database-compendium.md`
-- **Docker / Python environments / Setup**: `docs/debug/ops-installation-compendium.md`
-- **MCP tool truncation / memory schemas**: `docs/debug/ops-memory-compendium.md`
-- **AI Agent behavior loops / parsing rules**: `docs/debug/ops-ai-behavior-compendium.md`
+- **Dashboard / Frontend UI**: `workspace/postmortems/dashboard.md`
+- **ChromaDB / Kuzu / sqlite locks**: `workspace/postmortems/database.md`
+- **Docker / Python environments / Setup**: `workspace/postmortems/installation.md`
+- **MCP tool truncation / memory schemas**: `workspace/postmortems/memory.md`
+- **AI Agent behavior loops / parsing rules**: `workspace/postmortems/ai-behavior.md`
 </troubleshooting_trigger_map>

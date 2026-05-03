@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.9.3 - Zustand Store
+// Elefante Dashboard v3.0.0 - Zustand Store
 import { create } from 'zustand';
 import type { Tab, Snapshot, StatsResponse, MemoryNode, VisualizationType } from './types';
 

@@ -249,7 +249,7 @@ def build_installer_bundle(root_dir: Path, *, platform_name: str, output_path: P
                 raise RuntimeError(
                     "Installer bundle build hit a broken symlink or missing local workspace artifact "
                     f"while packaging {rel_path}. Exclude local environment backups like .venv.*. "
-                    "Read docs/debug/ops-installation-compendium.md Issue #14 for resolution."
+                    "Read workspace/postmortems/installation.md Issue #14 for resolution."
                 ) from exc
 
     return output_path

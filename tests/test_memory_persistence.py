@@ -454,14 +454,14 @@ async def test_live_mcp_server_survives_shutdown_regression(tmp_path):
         assert "capabilities" in init
         await client.ensure_alive("post-initialize")
 
-        initial = await client.call_tool("elefante-MemorySearch", {"query": shared_phrase, "limit": 5})
+        initial = await client.call_tool("elefante-Memory", {"action": "search", "query": shared_phrase, "limit": 5})
         assert isinstance(initial, dict)
         await client.ensure_alive("after initial search")
 
         for index in range(2):
             response = await client.call_tool(
-                "elefante-MemoryAdd",
-                {
+                "elefante-Memory",
+                {"action": "add", 
                     "content": f"{shared_phrase} memory {index} with distinct suffix {uuid4().hex[:6]}",
                     "memory_type": "note",
                     "domain": "project",
@@ -476,7 +476,7 @@ async def test_live_mcp_server_survives_shutdown_regression(tmp_path):
             await client.ensure_alive(f"after add {index}")
 
         for round_index in range(3):
-            response = await client.call_tool("elefante-MemorySearch", {"query": shared_phrase, "limit": 10})
+            response = await client.call_tool("elefante-Memory", {"action": "search", "query": shared_phrase, "limit": 10})
             tagged = [
                 item for item in response.get("results", [])
                 if token in item.get("memory", {}).get("content", "")
@@ -489,8 +489,8 @@ async def test_live_mcp_server_survives_shutdown_regression(tmp_path):
 
         for memory_id in memory_ids:
             response = await client.call_tool(
-                "elefante-MemoryDelete",
-                {
+                "elefante-Memory",
+                {"action": "delete", 
                     "memory_id": memory_id,
                     "reason": f"Cleanup for live MCP crash regression probe {token}",
                 },
@@ -498,7 +498,7 @@ async def test_live_mcp_server_survives_shutdown_regression(tmp_path):
             assert response.get("success", False), f"MemoryDelete failed for {memory_id}: {response}"
             await client.ensure_alive(f"after delete {memory_id[:8]}")
 
-        final_search = await client.call_tool("elefante-MemorySearch", {"query": shared_phrase, "limit": 10})
+        final_search = await client.call_tool("elefante-Memory", {"action": "search", "query": shared_phrase, "limit": 10})
         tagged_after_delete = [
             item for item in final_search.get("results", [])
             if token in item.get("memory", {}).get("content", "")
@@ -642,7 +642,7 @@ finally:
 
         output = result.stdout.strip()
         assert "RuntimeError" in output, output
-        assert "docs/debug/ops-database-compendium.md Issue #2" in output, output
+        assert "workspace/postmortems/database.md Issue #2" in output, output
         assert "Database path:" in output, output
         assert "open-ok" not in output, output
 
@@ -676,10 +676,9 @@ finally:
         """Active docs must not send users to a stale kuzu_db/.lock recovery path."""
         repo_root = Path(__file__).resolve().parents[1]
         active_docs = [
-            repo_root / "docs" / "debug" / "ops-database-compendium.md",
-            repo_root / "docs" / "technical" / "ops-kuzu.md",
-            repo_root / "docs" / "technical" / "ops-dashboard.md",
-            repo_root / "docs" / "technical" / "ops-mcp-server.md",
+            repo_root / "docs" / "how-to" / "kuzu-troubleshooting.md",
+            repo_root / "docs" / "how-to" / "view-dashboard.md",
+            repo_root / "docs" / "how-to" / "run-mcp-server.md",
         ]
 
         for doc_path in active_docs:

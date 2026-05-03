@@ -54,8 +54,8 @@ What it verifies:
     9. Optional dashboard open/refresh runs only in explicit full-surface mode
 
 Documentation:
-    - docs/debug/dev-developer-agent.md
-    - docs/debug/self-elefante-protocol.md
+    - agents/orchestrator.md
+    - docs/reference/self-protocol.md
     - tests/README.md
     - scripts/README.md
 """
@@ -85,18 +85,15 @@ PASS = "PASS"
 FAIL = "FAIL"
 
 EXPECTED_TOOLS = {
-    "elefante-MemoryAdd",
-    "elefante-MemorySearch",
+    # Memory operations consolidated into single tool with action discriminator (v2.10.0 atomic swap, 2026-05-02)
+    "elefante-Memory",
     "elefante-GraphConnect",
     "elefante-GraphQuery",
     "elefante-ContextGet",
-    "elefante-MemoryConsolidate",
     "elefante-SessionsList",
     "elefante-SystemStatusGet",
     "elefante-System",
     "elefante-DashboardOpen",
-    "elefante-MemoryUpdate",
-    "elefante-MemoryDelete",
     "elefante-ETLProcess",
     "elefante-ETLClassify",
     "elefante-TaskCreate",
@@ -298,8 +295,8 @@ async def _store_memory(
     tags: list[str],
 ) -> tuple[bool, str, dict]:
     response = await client.call_tool(
-        "elefante-MemoryAdd",
-        {
+        "elefante-Memory",
+        {"action": "add", 
             "content": content,
             "memory_type": memory_type,
             "domain": "project",
@@ -314,8 +311,8 @@ async def _store_memory(
 
 async def _list_protocol_memories(client: MCPClient, tag: str) -> tuple[dict, list[dict]]:
     response = await client.call_tool(
-        "elefante-MemorySearch",
-        {
+        "elefante-Memory",
+        {"action": "search", 
             "query": tag,
             "list_all": True,
             "limit": 100,
@@ -421,15 +418,15 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         results.append(
             _result(
                 "Grounding prompt retrieved",
-                "elefante-MemorySearch" in grounding_text and "When in doubt, SEARCH." in grounding_text,
+                "elefante-Memory" in grounding_text and "When in doubt, SEARCH." in grounding_text,
                 "prompt contains search-first grounding contract",
             )
         )
 
         _header("PHASE 3: Baseline routing and system status")
         baseline_search = await client.call_tool(
-            "elefante-MemorySearch",
-            {
+            "elefante-Memory",
+            {"action": "search", 
                 "query": "SDD Gate 2 leakage surface scan table specification",
                 "limit": 3,
             },
@@ -447,7 +444,7 @@ async def run_e2e(with_dashboard_open: bool) -> int:
                 "DIRECTIVES" in baseline_search
                 and "ENTRYPOINT_SEQUENCE_READ_THIS_FIRST" in baseline_search
                 and any(
-                    "docs/debug/README.md" in step
+                    "workspace/ISSUES.md" in step
                     for step in baseline_search.get("ENTRYPOINT_SEQUENCE_READ_THIS_FIRST", [])
                 ),
                 "first successful tool response carries the response contract",
@@ -473,7 +470,7 @@ async def run_e2e(with_dashboard_open: bool) -> int:
                 not error_response.get("success", True)
                 and "DIRECTIVES" in error_response
                 and "ENTRYPOINT_SEQUENCE_READ_THIS_FIRST" in error_response
-                and "docs/debug/README.md" in str(error_response.get("error", "")),
+                and "workspace/ISSUES.md" in str(error_response.get("error", "")),
                 "failure path still routes to Known Issues",
             )
         )
@@ -587,8 +584,8 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         try:
             await gate_client.start()
             gate_response = await gate_client.call_tool(
-                "elefante-MemoryDelete",
-                {
+                "elefante-Memory",
+                {"action": "delete", 
                     "memory_id": "00000000-0000-0000-0000-000000000000",
                     "reason": "compliance gate self-protocol probe",
                 },
@@ -611,8 +608,8 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         await client.start()
 
         post_gate_search = await client.call_tool(
-            "elefante-MemorySearch",
-            {
+            "elefante-Memory",
+            {"action": "search", 
                 "query": "Elefante Developer Etiquette specification versioning CLEAN DOC_SYNC",
                 "limit": 3,
             },
@@ -693,8 +690,8 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         )
 
         active_search = await client.call_tool(
-            "elefante-MemorySearch",
-            {
+            "elefante-Memory",
+            {"action": "search", 
                 "query": "Active cleanup memory exists only to prove delete and read-back behavior",
                 "limit": 5,
             },
@@ -717,8 +714,8 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         )
 
         update_response = await client.call_tool(
-            "elefante-MemoryUpdate",
-            {
+            "elefante-Memory",
+            {"action": "update", 
                 "memory_id": memory_ids["mutable"],
                 "content": mutable_memory_new,
                 "tags": [test_tag, "mutable", "updated"],
@@ -743,8 +740,8 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         )
 
         delete_response = await client.call_tool(
-            "elefante-MemoryDelete",
-            {
+            "elefante-Memory",
+            {"action": "delete", 
                 "memory_id": memory_ids["active"],
                 "reason": f"self-protocol delete probe {test_tag}",
             },
@@ -975,8 +972,8 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         )
 
         consolidate_response = await client.call_tool(
-            "elefante-MemoryConsolidate",
-            {"force": False},
+            "elefante-Memory",
+            {"action": "consolidate", "force": False},
         )
         refinery_stats = consolidate_response.get("refinery", {}).get("stats", {})
         results.append(
@@ -1000,8 +997,8 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         )
 
         search_after_disable = await client.call_tool(
-            "elefante-MemorySearch",
-            {
+            "elefante-Memory",
+            {"action": "search", 
                 "query": "Graph memory for context proof synthetic harness project and session",
                 "limit": 5,
             },
@@ -1021,8 +1018,9 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         client2 = MCPClient(harness_env)
         await client2.start()
         restart_search = await client2.call_tool(
-            "elefante-MemorySearch",
+            "elefante-Memory",
             {
+                "action": "search",
                 "query": "Graph memory for context proof synthetic harness project and session",
                 "limit": 5,
             },
@@ -1092,8 +1090,9 @@ async def run_e2e(with_dashboard_open: bool) -> int:
 
         _header("PHASE 12: Cleanup")
         await client2.call_tool(
-            "elefante-MemorySearch",
+            "elefante-Memory",
             {
+                "action": "search",
                 "query": test_tag,
                 "limit": 5,
             },
@@ -1103,8 +1102,9 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         deleted_count = 0
         for memory_id in cleanup_targets:
             delete_result = await client2.call_tool(
-                "elefante-MemoryDelete",
+                "elefante-Memory",
                 {
+                    "action": "delete",
                     "memory_id": memory_id,
                     "reason": f"self-protocol cleanup {test_tag}",
                 },

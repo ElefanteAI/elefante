@@ -875,13 +875,13 @@ def install_dependencies(root_dir, python_cmd):
         logger.log("WARN: Pip is missing from the selected virtual environment. Bootstrapping with ensurepip...")
         if not run_command([python_cmd, "-m", "ensurepip", "--upgrade"], cwd=root_dir):
             logger.log(
-                "ERROR: Pip bootstrap failed. Read docs/debug/ops-installation-compendium.md Issue #13 for recovery."
+                "ERROR: Pip bootstrap failed. Read workspace/postmortems/installation.md Issue #13 for recovery."
             )
             logger.log("ERROR: Failed to install dependencies")
             return False
         if not run_command([python_cmd, "-m", "pip", "--version"], cwd=root_dir):
             logger.log(
-                "ERROR: Pip is still unavailable after ensurepip. Read docs/debug/ops-installation-compendium.md Issue #13 for recovery."
+                "ERROR: Pip is still unavailable after ensurepip. Read workspace/postmortems/installation.md Issue #13 for recovery."
             )
             logger.log("ERROR: Failed to install dependencies")
             return False
@@ -1169,7 +1169,7 @@ def main():
                 if not vscode_success and not antigravity_success:
                     logger.log("WARN: Automatic MCP configuration skipped")
                     logger.log("   Please configure your IDE manually.")
-                    logger.log("   See docs/technical/ops-installation.md and docs/technical/ops-mcp-server.md for instructions.")
+                    logger.log("   See docs/how-to/install.md and docs/how-to/run-mcp-server.md for instructions.")
                     ide_detail = "Automatic IDE configuration skipped"
                     state_tracker.warn_stage("4", "IDE Configuration", ide_detail)
                 else:
@@ -1189,7 +1189,7 @@ def main():
             logger.stop_spinner()
             if not instructions_ok:
                 logger.log("WARN: Agent behavior bootstrap missing. Agents will not proactively use Elefante.")
-                logger.log("   See docs/technical/ops-installation.md Section 4a for details.")
+                logger.log("   See docs/how-to/install.md Section 4a for details.")
                 state_tracker.warn_stage("4a", "Agent Behavior Bootstrap", "copilot-instructions.md is missing")
             else:
                 state_tracker.complete_stage("4a", "Agent Behavior Bootstrap", "Agent bootstrap instructions verified")

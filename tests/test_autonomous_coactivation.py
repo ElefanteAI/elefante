@@ -124,6 +124,6 @@ def test_mcp_server_injects_entrypoint_protocol_on_success_and_error():
     assert 'ENTRYPOINT_SEQUENCE_READ_THIS_FIRST' in source
     assert 'result = self._inject_entrypoint_protocol(result)' in source
     assert 'error_payload = self._inject_entrypoint_protocol(error_payload)' in source
-    assert 'docs/debug/README.md' in source
+    assert 'workspace/ISSUES.md' in source
     assert 'tests/README.md' in source
     assert 'ENTRYPOINT_SEQUENCE_READ_THIS_FIRST' in directive_source

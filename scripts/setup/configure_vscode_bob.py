@@ -269,11 +269,7 @@ def configure_mcp(argv: list[str] | None = None):
             },
             "disabled": False,
             "alwaysAllow": [
-                "elefante-MemoryAdd",
-                "elefante-MemorySearch",
-                "elefante-MemoryUpdate",
-                "elefante-MemoryDelete",
-                "elefante-MemoryConsolidate",
+                "elefante-Memory",  # consolidated v2.10.0: action=add|search|update|delete|consolidate
                 "elefante-GraphConnect",
                 "elefante-GraphQuery",
                 "elefante-ContextGet",

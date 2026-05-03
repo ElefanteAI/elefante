@@ -1,6 +1,6 @@
 # Elefante Agent Tutorial
 
-> **Version:** 2.9.3  
+> **Version:** 2.10.0  
 > **Audience:** AI Agents using MCP tools  
 > **Tool naming:** All tools use `elefante-PascalCase` convention
 
@@ -29,10 +29,10 @@ Use `"force": true` to force-acquire locks from another session.
 
 ## STEP 1: Search Before Writing (Compliance Gate)
 
-**You MUST search before you can write.** The compliance gate blocks `elefante-MemoryAdd`, `elefante-MemoryUpdate`, `elefante-MemoryDelete`, and `elefante-GraphConnect` until you call `elefante-MemorySearch` at least once per session.
+**You MUST search before you can write.** The compliance gate blocks `elefante-Memory(action="add")`, `elefante-Memory(action="update")`, `elefante-Memory(action="delete")`, and `elefante-GraphConnect` until you call `elefante-Memory(action="search")` at least once per session.
 
 ```json
-Tool: elefante-MemorySearch
+Tool: elefante-Memory(action="search")
 Arguments: {
   "query": "user communication preferences style",
   "limit": 5
@@ -89,7 +89,7 @@ Expected response:
 Now that you've searched (compliance gate unlocked), you can store memories.
 
 ```json
-Tool: elefante-MemoryAdd
+Tool: elefante-Memory(action="add")
 Arguments: {
   "content": "The user prefers concise communication without fluff.",
   "memory_type": "preference",
@@ -229,7 +229,7 @@ Omit `task_id` to see all root tasks.
 ### Consolidate Memories (Cleanup)
 
 ```json
-Tool: elefante-MemoryConsolidate
+Tool: elefante-Memory(action="consolidate")
 Arguments: { "force": false }
 ```
 
@@ -239,7 +239,7 @@ Arguments: { "force": false }
 ### List All Memories
 
 ```json
-Tool: elefante-MemorySearch
+Tool: elefante-Memory(action="search")
 Arguments: { "query": "", "list_all": true, "limit": 100 }
 ```
 
@@ -390,14 +390,14 @@ A preference you set 6 months ago and still use? Score stays high. An architectu
 | ----------------------------- | ------------------------------- | ------------------------------------------------- |
 | `"Elefante Mode not enabled"` | Forgot Step 0                   | Call `elefante-System` with `action: "enable"`    |
 | `"Database locked"`           | Another IDE has lock            | Use `"force": true` or disable in other IDE first |
-| `"Compliance gate"`           | Tried to write before searching | Call `elefante-MemorySearch` first                |
+| `"Compliance gate"`           | Tried to write before searching | Call `elefante-Memory(action="search")` first                |
 
 ---
 
 ## Checklist
 
 - [ ] Called `elefante-System` with `action: "enable"` first
-- [ ] Called `elefante-MemorySearch` before any write operations
+- [ ] Called `elefante-Memory(action="search")` before any write operations
 - [ ] Used correct `memory_type` (determines decay rate)
 - [ ] Used meaningful `tags` for filtering
 - [ ] Called `elefante-System` with `action: "disable"` when switching IDEs

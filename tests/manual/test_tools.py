@@ -41,11 +41,7 @@ def _run_tool_registration() -> bool:
         print(f"  {i}. {name}")
 
     expected_tools = [
-        'elefante-MemoryAdd',
-        'elefante-MemorySearch',
-        'elefante-MemoryUpdate',
-        'elefante-MemoryDelete',
-        'elefante-MemoryConsolidate',
+        'elefante-Memory',
         'elefante-GraphConnect',
         'elefante-GraphQuery',
         'elefante-ContextGet',

@@ -279,7 +279,7 @@ def _build_seed_plan() -> SeedPlan:
             },
             {
                 "title": "Start Kuzu debugging at the compendium and persistence suite",
-                "content": "A healthy Kuzu debugging pass starts at docs/debug/README.md and the persistence tests, then source.",
+                "content": "A healthy Kuzu debugging pass starts at workspace/ISSUES.md and the persistence tests, then source.",
                 "concepts": ["kuzu", "debug", "persistence", "tests", "source"],
             },
             {

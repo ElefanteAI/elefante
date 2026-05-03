@@ -168,7 +168,7 @@ class TestSessionTokenLedger:
     def test_single_record(self):
         ledger = SessionTokenLedger()
         snap = CallTokenSnapshot(
-            tool_name="elefante-MemorySearch",
+            tool_name="elefante-Memory",
             input_tokens=100, output_tokens=2000,
             overhead_tokens=1200, context_tokens=800,
         )
@@ -250,7 +250,7 @@ class TestMCPServerTokenIntegration:
         server = ElefanteMCPServer()
 
         result = {"success": True}
-        result = server._inject_pitfalls(result, "elefante-MemorySearch")
+        result = server._inject_pitfalls(result, "elefante-Memory")
         result = server._inject_entrypoint_protocol(result)
         result = server._inject_directives(result)
 

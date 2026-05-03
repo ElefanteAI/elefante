@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.9.3 - Header Bar
+// Elefante Dashboard v3.0.0 - Header Bar
 import { useDashboardStore } from '@/store';
 import { RefreshCw } from 'lucide-react';
 

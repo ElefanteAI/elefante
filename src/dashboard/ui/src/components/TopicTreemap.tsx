@@ -1,4 +1,4 @@
-// Elefante Dashboard v2.9.3 — Topic Card Grid
+// Elefante Dashboard v3.0.0 — Topic Card Grid
 import { useMemo } from 'react';
 import { useDashboardStore } from '@/store';
 import type { MemoryNode } from '@/types';

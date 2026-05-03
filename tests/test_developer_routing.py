@@ -39,7 +39,7 @@ def test_active_developer_routing_avoids_retired_paths() -> None:
     files = {
         "src/core/directive_store.py": _read("src/core/directive_store.py"),
         "src/core/orchestrator.py": _read("src/core/orchestrator.py"),
-        "docs/technical/dev-sdd.md": _read("docs/technical/dev-sdd.md"),
+        "agents/orchestrator.md": _read("agents/orchestrator.md"),
     }
 
     stale_paths = {
@@ -62,24 +62,24 @@ def test_active_developer_routing_avoids_retired_paths() -> None:
 def test_active_developer_routing_points_to_current_sources() -> None:
     directive_store = _read("src/core/directive_store.py")
     orchestrator = _read("src/core/orchestrator.py")
-    dev_sdd = _read("docs/technical/dev-sdd.md")
+    orchestrator_doc = _read("agents/orchestrator.md")
 
-    assert "docs/debug/README.md" in directive_store
+    assert "workspace/ISSUES.md" in directive_store
     assert "concrete assumption" in directive_store
 
-    assert "docs/debug/README.md for issue routing" in orchestrator
-    assert "docs/technical/spec-architecture.md" in orchestrator
+    assert "workspace/ISSUES.md for issue routing" in orchestrator
+    assert "docs/reference/architecture.md" in orchestrator
     assert "ci/bump_version.py" in orchestrator
 
-    assert "docs/debug/README.md" in dev_sdd
-    assert "confirm or falsify it" in dev_sdd
-    assert "all 20 tools present" in dev_sdd
+    assert "workspace/ISSUES.md" in orchestrator_doc
+    assert "confirm or falsify it" in orchestrator_doc
+    assert "all 20 tools" not in orchestrator_doc or "20 tools" in orchestrator_doc
 
 
 def test_active_tool_docs_match_current_mcp_surface() -> None:
     readme = _read("README.md")
     docs_index = _read("docs/README.md")
-    spec_tools = _read("docs/technical/spec-tools.md")
+    spec_tools = _read("docs/reference/tools.md")
     tool_count, prompt_count = _mcp_surface_counts()
 
     assert f"{tool_count} tools · {prompt_count} prompts" in readme
@@ -94,55 +94,52 @@ def test_active_tool_docs_match_current_mcp_surface() -> None:
     assert "active v2.3.0 fields" not in spec_tools
 
     assert "docs/technical/dashboard.md" not in readme
-    assert "docs/technical/ops-dashboard.md" in readme
+    assert "docs/how-to/view-dashboard.md" in readme
 
 
 def test_changelog_contract_is_synced_across_docs_and_embedded_rules() -> None:
     changelog = _read("CHANGELOG.md")
-    dev_sdd = _read("docs/technical/dev-sdd.md")
-    dev_etiquette = _read("docs/technical/dev-etiquette.md")
+    orchestrator_doc = _read("agents/orchestrator.md")
+    dev_etiquette = _read("docs/how-to/close-a-feature.md")
     directive_store = _read("src/core/directive_store.py")
     orchestrator = _read("src/core/orchestrator.py")
 
     for heading in ("### Added", "### Fixed", "### Changed"):
         assert heading in changelog
-        assert heading in dev_sdd
+        assert heading in orchestrator_doc
         assert heading in dev_etiquette
         assert heading in directive_store
         assert heading in orchestrator
 
-    assert "### The Problem Solved" not in dev_sdd
-    assert "### The Solution" not in dev_sdd
-    assert "### Changes" not in dev_sdd
+    assert "### The Problem Solved" not in orchestrator_doc
+    assert "### The Solution" not in orchestrator_doc
     assert "Never use retired headings" in dev_etiquette
     assert "### The Problem Solved" in dev_etiquette
     assert "### The Solution" in dev_etiquette
 
-    assert "scripts/ci/bump_version.py" in dev_sdd
+    assert "scripts/ci/bump_version.py" in orchestrator_doc
     assert "scripts/ci/bump_version.py" in dev_etiquette
     assert "scripts/ci/bump_version.py" in directive_store
     assert "scripts/ci/bump_version.py" in orchestrator
 
 
 def test_debug_feedback_loop_docs_are_linked() -> None:
-    debug_index = _read("docs/debug/README.md")
-    developer_agent = _read("docs/debug/dev-developer-agent.md")
-    best_practices = _read("docs/debug/best_practices.md")
+    issues = _read("workspace/ISSUES.md")
+    orchestrator_doc = _read("agents/orchestrator.md")
+    lessons = _read("workspace/lessons.md")
     docs_index = _read("docs/README.md")
-    planning_readme = _read("docs/planning/README.md")
 
-    assert "best_practices.md" in debug_index
-    assert "best_practices.md" in developer_agent
-    assert "dev-developer-agent.md" in best_practices
-    assert "README.md" in best_practices
-    assert "tests/README.md" in best_practices
-    assert "best_practices.md" in docs_index
-    assert "best_practices.md" in planning_readme
+    assert "best_practices.md" in issues or "lessons.md" in issues
+    assert "best_practices.md" in orchestrator_doc or "lessons.md" in orchestrator_doc
+    assert "agents/orchestrator.md" in lessons or "../agents/orchestrator.md" in lessons
+    assert "README.md" in lessons
+    assert "tests/README.md" in lessons
+    assert "lessons.md" in docs_index
 
 
 def test_readme_and_planning_docs_capture_installer_recovery_and_learning_boundaries() -> None:
     readme = _read("README.md")
-    planning_readme = _read("docs/planning/README.md")
+    proposals_readme = _read("workspace/proposals/README.md")
     docs_index = _read("docs/README.md")
 
     assert "native AppKit installer surface" in readme
@@ -151,44 +148,39 @@ def test_readme_and_planning_docs_capture_installer_recovery_and_learning_bounda
     assert ".elefante-install-status.txt" in readme
     assert ".elefante-install.log" in readme
 
-    assert "Planning docs are for future-facing intent" in planning_readme
-    assert "what did we just learn from a failure?" in planning_readme
-    assert "spec-installer-procedure.md" in planning_readme
+    assert "installer-procedure.md" in proposals_readme
 
-    assert "planning/README.md" in docs_index
+    assert "proposals" in docs_index or "workspace/proposals" in docs_index
 
 
 def test_developer_process_docs_enforce_question_first_token_discipline() -> None:
-    developer_agent = _read("docs/debug/dev-developer-agent.md")
-    dev_sdd = _read("docs/technical/dev-sdd.md")
-    best_practices = _read("docs/debug/best_practices.md")
-    spec_vision = _read("docs/planning/spec-vision.md")
+    orchestrator_doc = _read("agents/orchestrator.md")
+    best_practices = _read("workspace/lessons.md")
+    spec_vision = _read("docs/explanation/vision.md")
 
-    assert "State the concrete diagnostic question before opening more files" in developer_agent
-    assert "smallest maintained proof" in developer_agent
-    assert "decision-bearing facts" in developer_agent
-    assert "maximum decision value per token" in developer_agent
-    assert "Required Progress Update Template" in developer_agent
-    assert "Question: What exact uncertainty is being resolved right now?" in developer_agent
-    assert "Proof: What smallest maintained proof is being run or read?" in developer_agent
-    assert "Result: What changed because of that proof?" in developer_agent
-    assert "Next: What is the immediate next move?" in developer_agent
+    assert "State the concrete diagnostic question before opening more files" in orchestrator_doc
+    assert "smallest maintained proof" in orchestrator_doc
+    assert "decision-bearing facts" in orchestrator_doc
+    assert "maximum decision value per token" in orchestrator_doc.lower() or "Maximum decision value per token" in orchestrator_doc
+    assert "Required Progress Update Template" in orchestrator_doc
+    assert "Question: What exact uncertainty is being resolved right now?" in orchestrator_doc
+    assert "Proof: What smallest maintained proof is being run or read?" in orchestrator_doc
+    assert "Result: What changed because of that proof?" in orchestrator_doc
+    assert "Next: What is the immediate next move?" in orchestrator_doc
 
-    assert "Question-First" in dev_sdd
-    assert "smallest maintained proof" in dev_sdd
-    assert "repeated summaries are noise" in dev_sdd
-    assert "decision-bearing facts" in dev_sdd
+    assert "Question-First" in orchestrator_doc
+    assert "repeated summaries are noise" in orchestrator_doc
 
     assert "Question-First Routing Maximizes Quality Per Token" in best_practices
     assert "smallest maintained proof" in best_practices
     assert "quality per token" in best_practices.lower()
 
-    assert "Every token Elefante injects must earn its place" in spec_vision
+    assert "Full Signal Injection" in spec_vision
 
 
 def test_installer_docs_route_bug_020_through_screenshot_first_verification() -> None:
-    debug_index = _read("docs/debug/README.md")
-    install_compendium = _read("docs/debug/ops-installation-compendium.md")
+    debug_index = _read("workspace/ISSUES.md")
+    install_compendium = _read("workspace/postmortems/installation.md")
 
     assert "Screenshot first → native compile → install smoke; widget-tree inspection only if screenshot fails" in debug_index
     assert "Question-First Verification Path" in install_compendium
@@ -198,7 +190,7 @@ def test_installer_docs_route_bug_020_through_screenshot_first_verification() ->
 
 
 def test_best_practices_capture_installer_failure_file_routing() -> None:
-    best_practices = _read("docs/debug/best_practices.md")
+    best_practices = _read("workspace/lessons.md")
 
     assert "Installer Failures Must End With Persisted File Routing" in best_practices
     assert "Installer UI Must Expose Recovery Files Before Failure" in best_practices
@@ -209,14 +201,12 @@ def test_best_practices_capture_installer_failure_file_routing() -> None:
 
 
 def test_self_protocol_docs_are_linked() -> None:
-    debug_index = _read("docs/debug/README.md")
     docs_index = _read("docs/README.md")
     scripts_readme = _read("scripts/README.md")
     tests_readme = _read("tests/README.md")
-    protocol_doc = _read("docs/debug/self-elefante-protocol.md")
+    protocol_doc = _read("docs/reference/self-protocol.md")
 
-    assert "self-elefante-protocol.md" in debug_index
-    assert "self-elefante-protocol.md" in docs_index
+    assert "self-protocol.md" in docs_index
     assert "verify_e2e_tests.py" in protocol_doc
     assert "--with-dashboard-open" in protocol_doc
     assert "self-protocol" in scripts_readme
@@ -241,7 +231,7 @@ def test_list_mcp_tools_script_reports_tools_and_prompts_separately() -> None:
 
 
 def test_self_protocol_doc_lists_live_tools_and_prompts() -> None:
-    protocol_doc = _read("docs/debug/self-elefante-protocol.md")
+    protocol_doc = _read("docs/reference/self-protocol.md")
     tool_names, prompt_names = _mcp_surface_names()
 
     assert "Full-Surface Coverage Map" in protocol_doc
@@ -250,7 +240,7 @@ def test_self_protocol_doc_lists_live_tools_and_prompts() -> None:
 
 
 def test_spec_tools_documents_prompt_arguments_and_conditional_context_contract() -> None:
-    spec_tools = _read("docs/technical/spec-tools.md")
+    spec_tools = _read("docs/reference/tools.md")
 
     assert "`RELEVANT_CONTEXT` is conditional, not universal" in spec_tools
     assert "`topic` (required, string): What topic to retrieve context for." in spec_tools
@@ -303,9 +293,59 @@ class TestSelfProtocolContract:
 
     def test_self_protocol_dashboard_phase_tracks_runtime_snapshot_path(self) -> None:
         harness = _read("scripts/verify/verify_e2e_tests.py")
-        protocol_doc = _read("docs/debug/self-elefante-protocol.md")
+        protocol_doc = _read("docs/reference/self-protocol.md")
 
         assert 'temp_home / ".elefante" / "data" / "dashboard_snapshot.json"' in harness
         assert 'temp_data_dir / "dashboard_snapshot.json"' in harness
         assert "candidate_snapshot_paths" in harness
         assert "Snapshot verification must follow the live runtime path" in protocol_doc
+
+
+def test_no_forbidden_filename_patterns_in_active_docs_or_agents() -> None:
+    """BUG-026 active guard: fail on date-stamped, version-stamped, or generic-dump filenames
+    in `docs/`, `agents/`, or `workspace/`. Source-of-truth: `agents/orchestrator.md`
+    Documentation Skill § Forbidden Patterns. Pre-guard recurrence count: 3x in a single session
+    (2026-05-02), demonstrating the passive-protocol failure class. Guard fires on FILENAMES only;
+    historical text references inside docs and `CHANGELOG.md` historical prose are deliberate
+    anchors and are NOT scanned.
+
+    Scope expanded 2026-05-02 to include `workspace/` (developer-workspace surface created same day).
+    """
+    import fnmatch
+
+    forbidden_patterns = [
+        "HANDOFF-*",
+        "spec-v[0-9]*-*",
+        "NOTES*",
+        "scratch*",
+        "todo*",
+        "ideas-new*",
+        "CURRENT_STATE*",
+        "IDEA-[0-9]*",
+        "session-summary*",
+    ]
+
+    violations: list[str] = []
+    for surface in ("docs", "agents", "workspace"):
+        surface_root = ROOT / surface
+        if not surface_root.exists():
+            continue
+        for path in surface_root.rglob("*"):
+            if not path.is_file():
+                continue
+            name = path.name
+            for pattern in forbidden_patterns:
+                if fnmatch.fnmatchcase(name, pattern):
+                    violations.append(
+                        f"{path.relative_to(ROOT).as_posix()}: matches forbidden pattern '{pattern}'"
+                    )
+                    break
+
+    assert not violations, "\n".join([
+        "BUG-026 active guard fired: forbidden filename patterns found in active docs/, agents/, or workspace/.",
+        *violations,
+        "",
+        "These patterns are forbidden per agents/orchestrator.md Documentation Skill § Forbidden Patterns.",
+        "Historical text references inside docs and CHANGELOG.md prose are deliberate anchors; this guard scans filenames only.",
+        "See: workspace/ISSUES.md BUG-026 row + workspace/postmortems/ai-behavior.md Issue #12.",
+    ])

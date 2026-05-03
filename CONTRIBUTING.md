@@ -4,21 +4,21 @@ Thank you for your interest in contributing to Elefante!
 
 ## Development Philosophy
 
-> **SDD enforcement is now native inside Elefante (v2.2.1).** Six SDD gate directives are injected into every tool response unconditionally. Gate 4 (simulator) is mechanically enforced via `.git/hooks/pre-commit`. Human-readable reference: [`docs/technical/dev-sdd.md`](docs/technical/dev-sdd.md).
+> **SDD enforcement is now native inside Elefante (v2.2.1).** Six SDD gate directives are injected into every tool response unconditionally. Gate 4 (simulator) is mechanically enforced via `.git/hooks/pre-commit`. Human-readable reference: [`agents/orchestrator.md`](agents/orchestrator.md).
 
 **1. Cleanliness**: Leave the repo cleaner than you found it. No temp files, no dead code.
 **2. Memory First**: New features must be memory-aware. Use `elefante-grounding` prompt principles.
 **3. Behavioral Relevance**: We do not assign "importance" to memories manually. Scores (0-100) are computed by the system based on usage.
 **4. Token Efficiency**: Every token Elefante injects must earn its place. Wasted tokens — filler, redundant context, irrelevant memories — degrade the response. Quality per token is the metric.
 
-**For AI agents developing Elefante:** See [`docs/debug/README.md`](docs/debug/README.md) for the Known Issues tracker and entry flow, then [`docs/debug/dev-developer-agent.md`](docs/debug/dev-developer-agent.md) for the full developer agent protocol.
+**For AI agents developing Elefante:** Read [`agents/orchestrator.md`](agents/orchestrator.md) — the single operational authority. It points to [`workspace/ISSUES.md`](workspace/ISSUES.md) for the Known Issues tracker.
 
 ## Code Standards
 
 - **Python 3.11+**
 - **Type Hints**: Required for all new code.
 - **Naming**:
-  - Tools: `elefante-PascalCase` (e.g., `elefante-MemoryAdd`)
+  - Tools: `elefante-PascalCase` (e.g., `elefante-Memory(action="add")`)
   - Internal functions: `snake_case`
   - Classes: `PascalCase`
 
@@ -28,7 +28,7 @@ Thank you for your interest in contributing to Elefante!
 src/
   mcp/          # MCP Server & Tools
   core/         # Logic (Orchestrator, Vector/Graph stores, ETL, Retrieval)
-  models/       # Pydantic models (v2.9.3 schema)
+  models/       # Pydantic models (v2.10.0 schema)
   modules/      # Session Distiller
   dashboard/    # React/Vite app
   utils/        # Config, curation, logging
@@ -42,7 +42,7 @@ tests/          # Pytest suite
 1. **Title**: Structured (feat:, fix:, docs:, chore:).
 2. **Context**: Explain *why*, not just what.
 3. **Tests**: Must pass locally.
-4. **Docs**: Update `docs/technical/spec-tools.md` if you change tool signatures.
+4. **Docs**: Update `docs/reference/tools.md` if you change tool signatures.
 
 ## Versioning
 

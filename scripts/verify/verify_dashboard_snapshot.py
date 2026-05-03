@@ -202,7 +202,7 @@ def validate_snapshot(data: Dict[str, Any], *, require_curation: bool) -> Valida
             if pct_100 > 0.25:
                 errors.append(
                     f"Score staleness detected: {count_100}/{len(scores)} ({pct_100:.0%}) memories have score=100. "
-                    f"Scores must be live-computed via dashboard_serializer.py — see docs/debug/ops-dashboard-compendium.md Issue #9"
+                    f"Scores must be live-computed via dashboard_serializer.py — see workspace/postmortems/dashboard.md Issue #9"
                 )
             elif count_100 > 5:
                 warnings.append(f"{count_100} memories have score=100 — verify scores are live-computed")
