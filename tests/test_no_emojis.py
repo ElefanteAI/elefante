@@ -2,7 +2,7 @@
 # TEST    : tests/test_no_emojis.py
 # VERSION : 2.5.2
 # CHANGED : 2026-04-15
-# PROVES  : No-emoji policy enforcement across strict source/docs surfaces.
+# PROVES  : No-emoji policy enforcement across shipped source/docs surfaces.
 #           Mirrors the logic of verify_emoji_policy.py but as a pytest test.
 # RUN     : pytest tests/test_no_emojis.py -v
 # WHEN    : After adding LLM-generated content (high emoji-injection risk) or
@@ -30,6 +30,11 @@ EXCLUDED_DIR_NAMES = {
     "archive",  # historical docs, not production
 }
 
+# Release quality concerns shipped code and active user/developer guidance.
+# Changelogs, workspace journals, and test fixtures preserve historical output
+# and deliberately fall outside this policy's enforcement surface.
+INCLUDED_TOP_LEVEL_DIRS = {"agents", "docs", "scripts", "src"}
+
 ALLOWED_EXTENSIONS = {
     ".py",
     ".md",
@@ -56,6 +61,8 @@ def _iter_repo_files(root: Path) -> list[Path]:
         if not path.is_file():
             continue
         if _is_excluded_path(path):
+            continue
+        if not path.relative_to(root).parts or path.relative_to(root).parts[0] not in INCLUDED_TOP_LEVEL_DIRS:
             continue
         if path.suffix.lower() not in ALLOWED_EXTENSIONS:
             continue

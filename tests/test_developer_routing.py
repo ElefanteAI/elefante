@@ -59,6 +59,44 @@ def test_active_developer_routing_avoids_retired_paths() -> None:
     assert not violations, "\n".join(violations)
 
 
+def test_active_user_and_runtime_routes_do_not_reference_retired_debug_docs() -> None:
+    active_paths = (
+        "src/mcp/server.py",
+        "agents/orchestrator.md",
+        "docs/how-to/agent-handoff.md",
+        "docs/how-to/install.md",
+        "docs/how-to/rollback.md",
+        "workspace/ISSUES.md",
+        "workspace/lessons.md",
+        "workspace/proposals/README.md",
+        "workspace/proposals/ide-integration-surface.md",
+        "workspace/proposals/session-intelligence.md",
+        "workspace/proposals/tool-consolidation.md",
+    )
+
+    retired_routes = (
+        "docs/debug/",
+        "docs/technical/",
+        "ops-memory-compendium.md",
+        "spec-ide-integration-surface.md",
+        "spec-session-intelligence.md",
+    )
+    violations = [
+        f"{path}: {route}"
+        for path in active_paths
+        for route in retired_routes
+        if route in _read(path)
+    ]
+    assert not violations, "\n".join(violations)
+
+    lessons = _read("workspace/lessons.md")
+    assert "../../" not in lessons
+    assert not any(
+        f"]({domain}.md" in lessons
+        for domain in ("ai-behavior", "dashboard", "database", "installation", "memory")
+    )
+
+
 def test_active_developer_routing_points_to_current_sources() -> None:
     directive_store = _read("src/core/directive_store.py")
     orchestrator = _read("src/core/orchestrator.py")
@@ -74,6 +112,17 @@ def test_active_developer_routing_points_to_current_sources() -> None:
     assert "workspace/ISSUES.md" in orchestrator_doc
     assert "confirm or falsify it" in orchestrator_doc
     assert "all 20 tools" not in orchestrator_doc or "20 tools" in orchestrator_doc
+
+
+def test_living_plan_tracks_the_post_210_trust_release() -> None:
+    planning = _read("workspace/PLANNING.md")
+
+    assert "## §2 Active Release: v2.11.0 Trust Release" in planning
+    assert "## §2 Active Release: v2.10.0" not in planning
+    assert "P1–P6 are open" not in planning
+    assert "| OB4 |" not in planning
+    assert "| OB5 |" not in planning
+    assert "249 automated tests pass" in planning
 
 
 def test_active_tool_docs_match_current_mcp_surface() -> None:
@@ -92,6 +141,15 @@ def test_active_tool_docs_match_current_mcp_surface() -> None:
     assert "21 tools" not in docs_index
     assert "MCP Surface (v2.3.0)" not in spec_tools
     assert "active v2.3.0 fields" not in spec_tools
+
+    startup_guide = _read("docs/how-to/run-mcp-server.md")
+    self_protocol = _read("docs/reference/self-protocol.md")
+    verifier = _read("scripts/verify/verify_e2e_tests.py")
+    default_tool_count = tool_count - 1  # DashboardOpen is opt-in by design.
+    assert f"Available MCP Tools: {tool_count}" in startup_guide
+    assert "Available MCP Tools: 21" not in startup_guide
+    assert f"{default_tool_count}/{tool_count} tools" in verifier
+    assert f"{default_tool_count} of {tool_count} tools" in self_protocol
 
     assert "docs/technical/dashboard.md" not in readme
     assert "docs/how-to/view-dashboard.md" in readme

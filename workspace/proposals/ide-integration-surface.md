@@ -12,7 +12,7 @@
 
 ## Question This Spec Answers
 
-When a user has N different AI IDEs or agents on their machine — potentially running concurrently — how does Elefante reach all of them with a consistent identity/memory layer, while staying correct as each vendor changes its skill/MCP conventions underneath us?
+When a user has N different AI IDEs or agent hosts on their machine — potentially running concurrently — how does Elefante reach all of them with a consistent identity/memory layer, while staying correct as each vendor changes its skill/MCP conventions underneath us?
 
 ---
 
@@ -29,7 +29,7 @@ Elefante cannot defend Law 4 (Full Signal Injection) if the agent never reaches 
 
 ### Core Requirement
 
-A single source of truth for IDE integration knowledge, a daemonized runtime that tolerates concurrent clients, a detect-then-emit installer, and an agent-driven continuous-learning loop that keeps the system current without manual audit cadence.
+A single source of truth for host integration knowledge, a daemonized runtime that tolerates concurrent clients, native local HTTP plus a compatibility bridge for stdio-only clients, a detect-then-emit installer, and an agent-driven continuous-learning loop that keeps the system current without manual audit cadence.
 
 ---
 
@@ -68,7 +68,7 @@ Source of every row below is the official vendor doc fetched on 2026-04-18. Each
 | Codex CLI | `AGENTS.md` (root, nested) | — | `.md` | plain | `~/.codex/config.toml` |
 | Aider | `CONVENTIONS.md` (explicit `/read`) | — | `.md` | plain | `.aider.conf.yml` |
 
-Out of scope (confirmed not IDE-integrated): OpenClaw (chat gateway, not coding-agent surface).
+OpenClaw and other non-IDE agent hosts are in scope at the **compatible** tier when they can use the generic MCP transport. A host earns the **certified** tier only after its install, reconnect, concurrent-write, uninstall, and upgrade path is verified.
 
 ### Three Convergence Points
 
@@ -88,13 +88,13 @@ These three convergences are the reason this spec is feasible at a manageable im
 
 Reason: duplicated path knowledge is the #1 staleness vector.
 
-### 4.2 Singleton Daemon, Not Per-Client Subprocess
+### 4.2 Singleton Daemon, Native HTTP, and a Compatibility Bridge
 
-Elefante MCP runs as a single long-running daemon (launchd on macOS, systemd user on Linux, equivalent on Windows) exposing streamable-http on a fixed port. All IDE MCP configs point to the same endpoint. Daemon owns the DBs exclusively.
+Elefante MCP runs as a single long-running daemon (launchd on macOS, systemd user on Linux, equivalent on Windows) exposing streamable-http on a fixed loopback port. Native HTTP-capable clients connect directly. stdio-only clients connect through an Elefante bridge that forwards to that daemon; the bridge never opens the databases. Daemon owns the DBs exclusively.
 
 Reason: concurrent multi-instance writes to Kuzu corrupt the graph (see GAP-025). This is the only concurrency model that survives a user opening two IDEs at once.
 
-Hard rule: installer-emitted MCP configs MUST use http/sse transport against the local daemon. stdio is deprecated as the default client transport.
+Hard rule: installer-emitted MCP configs MUST use local HTTP against the daemon whenever the host supports it. A stdio bridge is allowed only as a compatibility path and never gets database ownership.
 
 ### 4.3 Detect Before Emit
 
@@ -150,8 +150,8 @@ Phase 3 (deferred): extension-managed surfaces (Cline, Roo, Kilo, Continue, Wind
 
 ### 6.2 Subsequent Experience
 
-- User opens any supported IDE → agent auto-connects to daemon, Elefante identity injected.
-- User opens two IDEs concurrently → both connect to the same daemon, writes carry distinct origin metadata (GAP-025 closure), no DB corruption possible.
+- User opens any certified or compatible host → agent auto-connects to daemon (directly or through the bridge), Elefante identity injected.
+- User opens two hosts concurrently → both connect to the same daemon, writes carry distinct origin metadata (GAP-025 closure), no DB corruption possible.
 - User installs a new IDE → re-runs `elefante install --add <surface>` or a full `elefante install` picks up the new surface on detection.
 - User upgrades an IDE and a path changed → `elefante doctor` / inspector flags drift, user pulls new matrix version, re-runs install for the affected surface.
 
@@ -168,7 +168,8 @@ Phase 3 (deferred): extension-managed surfaces (Cline, Roo, Kilo, Continue, Wind
 - Runs as user-scope service (launchd `~/Library/LaunchAgents/ai.elefante.daemon.plist` on macOS).
 - Owns single writer handle on `~/.elefante/data/` (ChromaDB + Kuzu).
 - Exposes MCP over streamable-http on `127.0.0.1:<port>` (port written into matrix file at install time, with collision fallback).
-- Carries identity context: which client is calling, which session, which project cwd. Injected into every write as the Source tuple (see § 9 and [`spec-session-intelligence.md`](spec-session-intelligence.md) § 6.7).
+- Provides a stdio bridge for hosts that cannot yet use local HTTP; the bridge is transport-only and has no storage handle.
+- Carries identity context: which client is calling, which session, which project cwd. Injected into every write as the Source tuple (see § 9 and [`session-intelligence.md`](session-intelligence.md) § 6.7).
 
 ### 7.2 Matrix File (`agents/manifests/ide-integration.yaml`)
 
@@ -245,12 +246,12 @@ Every memory-affecting write coming through the daemon carries:
 | ----- | ------- |
 | `source.tool` | Normalized client name from matrix id (`claude-code`, `vscode-copilot`, `cursor`, `bob`, `kiro`, ...) |
 | `source.instance_id` | UUID per IDE window/process, generated on MCP handshake |
-| `source.session_id` | Server-generated session identifier (per [`spec-session-intelligence.md`](spec-session-intelligence.md) § 6.1) |
+| `source.session_id` | Server-generated session identifier (per [`session-intelligence.md`](session-intelligence.md) § 6.1) |
 | `source.cwd` | Working directory at write time |
 | `source.matrix_version` | Version of matrix file the client was installed against |
 | `source.timestamp_utc` | Write instant |
 
-Graph schema: `(:Memory)-[:WRITTEN_BY]->(:Source)`. Source nodes deduplicated by `(tool, instance_id, session_id)` tuple. Detailed closure in [`spec-session-intelligence.md`](spec-session-intelligence.md) § 6.7.
+Graph schema: `(:Memory)-[:WRITTEN_BY]->(:Source)`. Source nodes deduplicated by `(tool, instance_id, session_id)` tuple. Detailed closure in [`session-intelligence.md`](session-intelligence.md) § 6.7.
 
 ---
 
@@ -259,7 +260,7 @@ Graph schema: `(:Memory)-[:WRITTEN_BY]->(:Source)`. Source nodes deduplicated by
 ### Phase A — Matrix + Daemon (prerequisites, blocking)
 
 - Author `agents/manifests/ide-integration.yaml` from § 3 data.
-- Implement singleton daemon over streamable-http.
+- Implement singleton daemon over streamable-http and a transport-only stdio bridge.
 - Migrate `~/.claude/mcp.json` emission path to point at daemon, not stdio subprocess.
 - Verifier: `scripts/verify/verify_mcp_handshake.py` extended to prove daemon is single-writer.
 
@@ -309,17 +310,17 @@ This feature is only done when all of the following are true:
 | Matrix file becomes another stale doc | Whole spec undone | Inspector is the continuous-enforcement mechanism; matrix without inspector is ceremony |
 | Adapters duplicate logic from matrix | Defeats single-source-of-truth | Adapters must be thin — lint/test enforces no hard-coded paths in adapter code |
 | Phase 3 extension-managed surfaces resist file-emission | Blocks "cover all players" promise | Phase 3 is explicitly a different technique — instruction emission + docs — not an installer bug |
-| OpenClaw-class non-IDE hosts re-enter scope later | Scope creep | This spec confines to IDE / agent-execution surfaces; chat-gateway integration is a separate spec if/when needed |
+| OpenClaw-class non-IDE hosts vary in transport and lifecycle maturity | Over-promising support | Use the generic bridge only when transport works; retain the compatible tier until the full host lifecycle is verified |
 
 ---
 
 ## 13. Related Specs And Bugs
 
-- Prerequisite: [`spec-installer-procedure.md`](spec-installer-procedure.md) — Phase 1 product installer
-- Blocks / extended by: [`spec-session-intelligence.md`](spec-session-intelligence.md) § 6.7 — origin tuple schema (amendment)
-- Closes: **GAP-025** — multi-instance origin tracking — post-mortem [`ops-memory-compendium.md`](../debug/ops-memory-compendium.md) Issue #15
-- Supersedes: [`spec-vision.md`](spec-vision.md) § E "Cross-IDE Support" status line
-- Governed by: [`spec-vision.md`](spec-vision.md) Four Laws — especially Law 4 (Signal Injection requires reach)
+- Prerequisite: [`installer-procedure.md`](installer-procedure.md) — Phase 1 product installer
+- Blocks / extended by: [`session-intelligence.md`](session-intelligence.md) § 6.7 — origin tuple schema
+- Closes: **GAP-025** — multi-instance origin tracking — postmortem [`../postmortems/memory.md`](../postmortems/memory.md#issue-15-multi-instance-write-origin-tracking-gap-025-in-progress)
+- Supersedes: [`../../docs/explanation/vision.md`](../../docs/explanation/vision.md) § E "Cross-IDE Support" status line
+- Governed by: [`../../docs/explanation/vision.md`](../../docs/explanation/vision.md) Four Laws — especially Law 4
 
 ---
 
@@ -341,8 +342,8 @@ The continuous inspector loop is the second half of the same argument. Law 4 doe
 
 | Version | User Story | Bundled Contents | Complexity |
 | ------- | ---------- | ---------------- | ---------- |
-| **v2.10.0** | *Foundation laid.* | Surface-split folder reorg (`agents/`, `docs/user/`, `docs/developer/`) + authoritative planning docs for IDE integration (this spec) + [`agents/integration-inspector.md`](../../agents/integration-inspector.md) (dormant — no runtime wiring yet) + GAP-025 filing + [`spec-session-intelligence.md`](spec-session-intelligence.md) §6.7 amendment + any queued small bug fixes | **Low.** Doc/organization only. Zero runtime risk. |
-| **v2.11.0** | *Your IDEs work, even two at once.* | Phase A **+** Phase B together: singleton daemon (launchd/systemd user-scope) + streamable-http transport + `(:Memory)-[:WRITTEN_BY]->(:Source)` schema + legacy backfill migration + [`agents/manifests/ide-integration.yaml`](../technical/ide-integration-matrix.yaml) as single source of truth + six verified adapters (Claude Code, VS Code Copilot, Bob, Kiro skills+steering, Cursor, universal `AGENTS.md` root-file) + detect→emit installer + uninstall manifest + `--legacy-stdio` escape hatch + any MCP-server fixes worth landing in the same breaking-config window | **High.** Large-but-coherent. Breaking MCP-config change with migration. |
+| **v2.10.0** | *Agent-legible foundation.* | Shipped documentation restructure and 16-tool MCP contract; history is in `CHANGELOG.md`. | **Released.** |
+| **v2.11.0** | *Your agents share one local brain.* | Daemon, bridge, Source schema, safe installer ownership, and compatible adapters. Legacy apply and host certification remain release gates. [`agents/manifests/ide-integration.yaml`](../../agents/manifests/ide-integration.yaml) is the integration authority. | **Active Trust Release.** |
 | **v2.12.0** | *Self-watching, wider coverage.* | Integration-inspector wired into CI (weekly drift audit) + `elefante doctor` local command + matrix versioning/pinning + Phase 3 extension-managed surfaces (Cline, Roo, Kilo, Continue, Windsurf, Trae, Aider) emitted via instruction-doc path + accumulated doc-drift corrections from the inspector's first real runs + `--legacy-stdio` flag removal | **Medium.** Additive + deprecation closure. |
 
 **Why Phase A and Phase B bundle into v2.11.** Phase A alone — daemon + schema, no adapters — ships no user-visible improvement (same three IDEs as v2.9.3, same corruption exposure). Phase B alone without Phase A triggers the concurrent-write failure Phase A is designed to prevent. They are one coherent release or nothing.
@@ -351,7 +352,7 @@ The continuous inspector loop is the second half of the same argument. Law 4 doe
 
 ### 15.2 Priority Order Within Each Release
 
-**v2.10.0:** surface-split → this spec + `agents/integration-inspector.md` → GAP-025 + `spec-session-intelligence.md` §6.7 → any queued debug/planning doc corrections.
+**v2.10.0:** shipped; see `CHANGELOG.md`.
 
 **v2.11.0:** matrix YAML authoring (one human-day, unblocks everything downstream) → daemon + streamable-http transport → Source schema + idempotent migration → **Claude Code adapter** (lowest-risk, already functional via existing config) → **VS Code Copilot adapter** (highest user-reach per public install signal) → Cursor, Bob, Kiro adapters → universal `AGENTS.md` emission → detect→emit + uninstall manifest → `--legacy-stdio` safety net.
 

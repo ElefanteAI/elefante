@@ -10,7 +10,7 @@
 # USAGE   : python scripts/setup/configure_antigravity.py
 # NOTES   : Writes to ~/.gemini/antigravity/mcp_config.json. If both this and
 #           configure_vscode_bob.py are run, each IDE gets its own config file —
-#           there is no conflict. Safe to re-run; existing config is backed up.
+#           there is no conflict. Safe to re-run; user-owned entries are preserved.
 # LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """
@@ -22,8 +22,17 @@ from __future__ import annotations
 
 import json
 import sys
-import shutil
 from pathlib import Path
+
+_SETUP_DIR = str(Path(__file__).resolve().parent)
+if _SETUP_DIR not in sys.path:
+    sys.path.insert(0, _SETUP_DIR)
+
+from install_manifest import (
+    is_unchanged_emitted_json_entry,
+    record_emitted_json_entry,
+    write_json_atomically,
+)
 
 
 def _infer_repo_python(elefante_path: Path) -> str:
@@ -54,38 +63,35 @@ def configure_mcp(argv: list[str] | None = None):
     elefante_path = Path(__file__).resolve().parents[2]
     config_path = get_antigravity_config_path()
 
+    existed_before = config_path.exists()
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    if not config_path.exists():
+    if not existed_before:
         print("Antigravity configuration file not found.")
         print(f"Creating: {config_path}")
+        settings = {}
+    else:
+        print(f"Found Antigravity config: {config_path}")
         try:
-            with open(config_path, 'w', encoding='utf-8') as f:
-                json.dump({"mcpServers": {}}, f, indent=2)
-        except Exception as e:
-            print(f"Error creating {config_path}: {e}")
+            with open(config_path, 'r', encoding='utf-8') as f:
+                settings = json.load(f)
+        except json.JSONDecodeError:
+            print(f"Error reading {config_path}. Skipping.")
             return False
-
-    print(f"Found Antigravity config: {config_path}")
-    
-    try:
-        with open(config_path, 'r', encoding='utf-8') as f:
-            settings = json.load(f)
-    except json.JSONDecodeError:
-        print(f"Error reading {config_path}. Skipping.")
-        return False
-    except Exception as e:
-        print(f"Error accessing {config_path}: {e}")
-        return False
+        except Exception as e:
+            print(f"Error accessing {config_path}: {e}")
+            return False
         
     # Prepare Elefante config
     # Use absolute path to the current python executable (in .venv)
     elefante_config = {
         "command": _infer_repo_python(elefante_path),
-        "args": ["-m", "src.mcp.server"],
+        "args": ["-m", "src.mcp.stdio_bridge"],
         "cwd": str(elefante_path),
         "env": {
             "PYTHONPATH": str(elefante_path),
             "ELEFANTE_CONFIG_PATH": str(elefante_path / "config.yaml"),
+            "ELEFANTE_DAEMON_URL": "http://127.0.0.1:8765/mcp/",
+            "ELEFANTE_CLIENT_TOOL": "antigravity",
             "ANONYMIZED_TELEMETRY": "False",
             "unbuffer": "true",
         },
@@ -109,27 +115,34 @@ def configure_mcp(argv: list[str] | None = None):
     
     # Inject config
     if not isinstance(settings, dict):
-        settings = {}
-    if "mcpServers" not in settings or not isinstance(settings.get("mcpServers"), dict):
+        print(f"Error reading {config_path}: expected a JSON object. Skipping.")
+        return False
+    if "mcpServers" not in settings:
         settings["mcpServers"] = {}
+    if not isinstance(settings.get("mcpServers"), dict):
+        print(f"Error reading {config_path}: mcpServers is not an object. Skipping.")
+        return False
+    entry_path = ("mcpServers", "elefante")
+    if "elefante" in settings["mcpServers"] and not is_unchanged_emitted_json_entry(
+        config_path, "antigravity", entry_path
+    ):
+        print("Preserved existing user-managed Antigravity Elefante registration.")
+        return False
         
     settings["mcpServers"]["elefante"] = elefante_config
     
-    # Save settings
+    # Save settings atomically. Ownership-aware writes preserve user-managed
+    # entries, so creating an untracked full-file backup would add stale data
+    # without improving recovery.
     print("Saving configuration...")
-    # 4. Create backup if exists (Versioning/Rollback)
-    if config_path.exists():
-        backup_path = config_path.with_suffix('.json.bak')
-        try:
-            shutil.copy2(config_path, backup_path)
-            print(f"Created backup at: {backup_path}")
-        except Exception as e:
-            print(f"Failed to create backup: {e}")
-
-    # 5. Write configuration
     try:
-        with open(config_path, "w", encoding='utf-8') as f:
-            json.dump(settings, f, indent=2)
+        write_json_atomically(config_path, settings)
+        record_emitted_json_entry(
+            config_path,
+            "antigravity",
+            entry_path,
+            created=not existed_before,
+        )
         print(f"Antigravity configured successfully at: {config_path}")
         return True
     except PermissionError:
@@ -144,4 +157,3 @@ def configure_mcp(argv: list[str] | None = None):
 
 if __name__ == "__main__":
     configure_mcp()
-

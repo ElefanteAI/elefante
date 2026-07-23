@@ -1,6 +1,6 @@
 ---
 status: living
-last_updated: 2026-05-02
+last_updated: 2026-07-23
 audience: developer-agents
 authority: state + roadmap + features + aspect-plans for Elefante development
 related:
@@ -51,162 +51,118 @@ Elefante is **not**:
 
 Source-of-truth: [`docs/explanation/vision.md`](../docs/explanation/vision.md) §Non-Goals.
 
+### §1.3 Product contract — universal local memory authority
+
+**Target customer:** an AI-native developer or technical founder who actively uses more than one agent host and needs continuity without surrendering private development context.
+
+Elefante competes as the local memory authority beneath the tools users already choose — Claude, Codex, Gemini, Grok, Agent Zero, OpenClaw, IDE extensions, and future MCP-capable hosts. It must not become an editor plugin collection or a new agent runtime.
+
+The non-negotiable product shape is:
+
+1. One local owner for storage, migrations, locks, and provenance.
+2. Native local HTTP for capable clients; a supported compatibility bridge for stdio-only clients.
+3. An install/uninstall/upgrade contract per host, with an explicit compatibility tier: **certified**, **compatible**, or **community**.
+4. No public-by-default data surface; local memory and graph data remain loopback-bound unless the user explicitly hardens a trusted deployment.
+
+### §1.4 Trust Release gates — no beta or commercial claim before proof
+
+| Gate | Required proof | Current state (2026-07-23) |
+|------|----------------|-----------------------------|
+| Privacy boundary | Dashboard and local APIs bind loopback by default; no wildcard CORS; documented proxy/auth responsibility | Guarded locally; dashboard and daemon boundary tests pass |
+| Write authority | Retrieval surfaces cannot mutate memory/graph state; writes use explicit, observable tools | Guarded locally; GraphQuery mutation regressions pass |
+| Data integrity | One-writer daemon, Source provenance, migration + rollback proof | In progress — two-client source proof passes; legacy graph-link apply remains intentionally pending |
+| Quality | Full suite collects cleanly; targeted regressions and frontend build are green in CI | Local release proof passes: 249 tests plus the excluded slow two-bridge proof, focused lint, dashboard build/audit, and 46/46 isolated self-protocol checks; CI workflow is authored but uncommitted |
+| Compatibility | Every advertised host has a tested install, reconnect, concurrent-use, upgrade, and uninstall path | In progress — Claude Code, Codex, Gemini CLI, OpenClaw, VS Code, Cursor, and Kiro bridge emission and safe uninstall are tested. An isolated native Codex CLI round trip proves configure, upgrade, user-replacement preservation, and installer-owned removal without touching real user configuration; a separate slow runtime proof runs two real bridge processes concurrently through one daemon with distinct Codex/Claude provenance. Agent Zero is a documented community path; actual host-driven reconnect and certification remain unproven. |
+| Supply chain | Runtime dependency contract is exact; high-severity production dependency findings are resolved or release-blocked | Python direct requirements and universal hash-checked transitive lock are verified; a pinned tag-release audit enforces the gate. Compatible updates reduce the audit to one ChromaDB advisory with no published fix. SQLite now has isolated dry-run/apply migration proof with exact backup matching and parity checks, but no live data/default was changed; Chroma remains locked, so GAP-029 still blocks release. |
+
 ---
 
-## §2 Active Release: v2.10.0
+## §2 Active Release: v2.11.0 Trust Release
 
-### §2.1 Theme
+### §2.1 Outcome
 
-**v2.10.0 = Contract release. Theme: "Elefante becomes agent-legible."**
+**One private local memory authority shared safely by every supported agent host.**
 
-Not smaller. Not simpler internally. **More legible externally.** Five legibility moves accepted; nothing shipped that changes how Elefante stores or scores memory. Architectural safety move (singleton daemon + Source schema, GAP-025 closure) explicitly held for v2.11.0.
+The release is ready only when the Trust Release gates in §1.4 are proven. It
+does not add a chat surface, cloud storage, or a new agent runtime.
 
-### §2.2 Three release tracks
+### §2.2 Delivered in the uncommitted release candidate
 
-| Version | Theme | Risk |
-|---------|-------|------|
-| **v2.10.0** | Contract release — agent-legibility surface | Low. Doc/spec + (P-gated) one minimal CLI piece. **Nothing in v2.10.0 is unconditionally committed until P1–P6 close** (§2.6). No runtime change to MCP tool surface, scoring, or storage. |
-| **v2.10.x** | Small runtime improvements implementing the v2.10.0 contract | Medium. `elefante-Remember` and explanation-object emission land here. |
-| **v2.11.0** | Daemon + Source schema + GAP-025 closure | High. Documented in §3 Roadmap. **Protected** from v2.10.0 scope creep. |
+| Surface | Evidence |
+|---------|----------|
+| Runtime authority | Loopback Streamable HTTP daemon + storage-free stdio bridge; two concurrent bridge clients retain distinct provenance without Kuzu contention |
+| Trust boundary | Loopback dashboard/daemon, explicit CORS, read-only GraphQuery, bounded transport input, snapshot-only dashboard |
+| Durable operations | Exact-entry install ownership, safe uninstall, daemon service status, read-only doctor, verified backup/restore/reset |
+| Host reach | Preserving adapters for VS Code/Bob, Antigravity, Cursor, Kiro, Claude Code, Codex, Gemini CLI, and OpenClaw; Agent Zero remains community-tier |
+| Supply chain | Exact direct pins, universal hash lock, release audit gate, zero dashboard audit findings, SQLite exit path with migration parity proof |
+| Quality | 249 automated tests pass; the separately run slow two-bridge proof, 46/46 self-protocol checks, dashboard build/audit, and focused lint pass |
 
-### §2.3 ACCEPTED into v2.10.0 (A-series)
+### §2.3 Remaining release blockers
 
-| # | Decision |
-|---|----------|
-| A1 | v2.10.0 = contract release; theme "Elefante becomes agent-legible" |
-| A2 | v2.10.0 stays additive; existing 20 MCP tools preserved |
-| A3 | v2.10.x = small runtime improvements only |
-| A4 | v2.11.0 = daemon + Source schema + GAP-025 closure; protected line |
-| A5 | Add `elefante-Remember` curated write primitive (search evidence visibly returned) |
-| A6 | Public retrieval explanation object (versioned `explanation_schema: 1`) |
-| A7 | `elefante doctor` + `elefante status` CLI; **drop** `elefante mcp` |
-| A8 | Skill index-card contract — metadata/path/score/graph links, **not** skill bodies |
-| A9 | Hermes generalized as skill-bearing agent client; no special profile |
-| A10 | Hold GAP-025 line; no facade enthusiasm distracts from daemon work |
+| Blocker | Current proof | Required close |
+|---------|---------------|----------------|
+| GAP-025 | Daemon, Source tuples, bridge concurrency, and migration dry-run pass | Explicitly authorized legacy provenance apply plus remaining host-lifecycle proof |
+| GAP-029 | SQLite CRUD/recovery/migration parity passes; lock audit still reports `chromadb 1.3.5 / PYSEC-2026-311` | Approved storage transition, removal of Chroma from the release lock, clean audit |
+| Compatibility certification | Adapter unit/isolated CLI lifecycles pass | Actual host-driven install, reconnect, upgrade, and uninstall proof before any host is called certified |
+| Release closure | Working tree is documented and test-green | Version-contract cleanup, cohesive commits, then explicit publish authorization |
 
-### §2.4 IN DEVELOPMENT (D-series, P-gated)
+### §2.4 Approval gates
 
-> Each D-item is conditionally planned. Each is blocked by its corresponding P-item in §2.6. Until those decisions close, **no D-item is unconditionally committed**.
+The agent may continue isolated implementation and tests. It must not perform
+these actions without explicit user authority:
 
-| # | Artifact | Lands in | Implementation? |
-|---|----------|----------|-----------------|
-| D1 | `elefante-Remember` spec entry tagged `STATUS: PLANNED — v2.10.x` | `docs/reference/tools.md` | No (spec only); **gated on P1=YES** |
-| D2 | Public explanation object schema `explanation_schema: 1` | `docs/reference/tools.md` | No (spec only); **gated on P1=YES** |
-| D3 | `_CONTEXT_SKIP_TOOLS` rule for `elefante-Remember` | `docs/reference/tools.md` | No (spec only) |
-| D4 | Skill index-card contract + adapter enforcement clause | `workspace/proposals/ide-integration-surface.md` | No (contract only) |
-| D5 | `ide-integration-matrix.yaml` v0 with fresh hashes | `agents/manifests/ide-integration.yaml` | **Done as scaffold 2026-05-02**; integration-inspector run pending; gated on P3 for hash refresh |
-| D6 | `elefante doctor` + `elefante status` minimal CLI | `setup.py` console_scripts + new module | Minimal CLI runtime; **gated on P2=YES** |
-| D7 | `CHANGELOG.md` v2.10.0 entry | `### Added` / `### Changed` / `### Removed` | In progress (each major change gets its `### Added` / `### Changed` / `### Removed` row at edit time) |
-| D8 | Acceptance test for "agent-legible" theme | `verify_e2e_tests.py` | Smoke assertion only; **gated on P5=YES** |
+1. Apply provenance or vector-store migrations to live user data.
+2. Change the live/default storage authority from ChromaDB to SQLite.
+3. Commit, push, tag, publish, deploy, spend money, or contact third parties.
 
-### §2.5 PARKED (X-series, rejected — do not re-litigate without new evidence)
+### §2.5 Scope guard
 
-| # | Proposal | Why rejected |
-|---|----------|--------------|
-| X1 | 3-tool facade replacing 20 MCP tools | Lossy hidden routing; doubles maintenance; breaks Compliance Gate visibility; Tasks/ETL not memory primitives |
-| X2 | lite/standard/full storage modes | v3.0.0 break (storage forbidden in v2.10.0); real cost is sentence-transformers; default-embedding swap silently corrupts retrieval |
-| X3 | Scoring profiles (per-domain weights) | Reproducibility break; weights already empirically validated by BUG-016/017/018 |
-| X4 | `confidence: 0.87` on writes | Undefined semantics; "Never (1) Guess a formula" |
-| X5 | strict/suggest/automatic write modes | Three failure surfaces; no real simplification; gate is binary by design |
-| X6 | Hermes-specific profile | Insufficient evidence; generic skill-bearing-client treatment is sufficient |
+- No cloud memory service, model hosting, editor replacement, or agent runtime.
+- No compatibility or security claim without automated or host-driven proof.
+- No facade, scoring-profile, storage-tier, or write-mode expansion while Trust Release blockers remain.
+- v2.10.0 decision history lives in `CHANGELOG.md` and §10; it is not active release state.
 
-Re-open thresholds: see [`workspace/PLANNING.md §2.5`](../workspace/PLANNING.md §2.5). **Do not re-litigate without new evidence.**
+Rejected alternatives remain closed without new evidence:
 
-### §2.6 PENDING (P-series — open, awaiting user answer)
+| ID | Rejected alternative | Reason |
+|----|----------------------|--------|
+| X1 | Three-tool facade | Lossy routing, duplicate maintenance, hidden Compliance Gate actions, and domain conflation |
+| X2 | Lite/standard/full storage modes | Silent embedding/store divergence would corrupt retrieval comparability |
+| X3 | User-tunable scoring profiles | Breaks reproducibility of the empirically guarded scoring contract |
+| X4 | Agent-supplied write confidence | Semantics are undefined and invite fabricated precision |
+| X5 | Strict/suggest/automatic write modes | Multiplies failure surfaces around a deliberately binary compliance gate |
+| X6 | Hermes-specific profile | No evidence justifies client-specific memory semantics |
 
-| # | Question | Architect recommendation | Blocks |
-|---|----------|---------------------------|--------|
-| P1 | Spec-without-code OK? Ship `STATUS: PLANNED` tag in v2.10.0; implementation in v2.10.x. | YES | D1, D2 |
-| P2 | Drop `elefante mcp` from CLI; keep only `doctor` + `status`. | YES | D6 |
-| P3 | Run integration-inspector once before v2.10.0 cuts to refresh `ide-integration-matrix.yaml` hashes. | YES | D5 hash refresh |
-| P4 | ~30 uncommitted pre-v2.10.0 files: ship as `chore: archive purge` ahead, or fold into v2.10.0? | AHEAD (one concern per commit per `dev-etiquette §4`) | Commit order |
-| P5 | Acceptance test = "explanation field present in `verify_e2e_tests`"? | YES | D8 |
-| P6 | Commit sequence: `chore: archive purge` → surface split → spec amendments → matrix → CLI → version bump? | YES | Cut-time |
-| P7 | Approve [`workspace/proposals/tool-consolidation.md`](../workspace/proposals/tool-consolidation.md) for v3.0.0 inclusion + v2.11.0 alongside-deployment? Surface 20 → 6 domain-grouped tools with action discriminator. Architecturally distinct from rejected X1 (explicit action param, per-domain tools, Tasks/ETL stay separate). Acceptance: ≥50% drop in tool-schema overhead per MCP response (measure via `TOKEN_STATS`); behavioral parity with v2.x; Hermes round-trip verified. | YES | v3.0.0 cut |
+### §2.6 Resume verdict
 
-P1–P6 are open. **The architect's recommendations are not accepted defaults; user must answer.**
-
-### §2.7 GAP-025 protection (explicit)
-
-GAP-025 (multi-instance write origin tracking, [`workspace/postmortems/memory.md`](../workspace/postmortems/memory.md) Issue #15) closure is the **architectural safety move** for v2.11.0. It is **not** a v2.10.0 work item and **must not** be diluted by:
-
-- Tool-surface cosmetics (rejected facade — see X1)
-- Storage tier changes (rejected lite/standard/full — see X2)
-- Scoring tunability work (rejected profiles — see X3)
-- Write-mode multiplication (rejected strict/suggest/automatic — see X5)
-
-The right v2.10.0 contract for any of these concerns is to **describe the right shape** in spec form and let v2.11.0 implement it on top of the daemon.
-
-### §2.8 What v2.10.0 explicitly does NOT ship
-
-- `elefante-Remember` runtime — deferred to v2.10.x
-- Public explanation object emission (runtime path) — deferred to v2.10.x
-- Singleton daemon — deferred to v2.11.0
-- `(:Memory)-[:WRITTEN_BY]->(:Source)` schema migration — deferred to v2.11.0
-- Six verified IDE adapters — deferred to v2.11.0
-- `--legacy-stdio` escape hatch — deferred to v2.11.0
-- integration-inspector CI cron — deferred to v2.12.0
-- `elefante doctor` extended to full self-protocol scope — deferred to v2.12.0
-- Phase 3 IDE surfaces (Cline, Roo, Kilo, Continue, Windsurf, Trae, Aider) — deferred to v2.12.0
-
-### §2.9 Workspace blockers (OB-series, canonical here only)
-
-P-decisions live in §2.6; BUG/GAP rows live in [`workspace/ISSUES.md`](../workspace/ISSUES.md); this table holds workspace state that is **not** captured elsewhere.
-
-| ID | Blocker | Required decision/fix |
-|----|---------|------------------------|
-| OB4 | Archive purge `### Removed` records in `CHANGELOG.md` incomplete: 3 `### Removed` sections cover 3 named scripts + 8 named archive files + 4 merged scripts; `git status` shows ~20 deletions in `docs/archive/*` and ~3 in `scripts/*`. **At least 12 archive deletions lack records.** | Audit `git status -- docs/archive/ scripts/` against existing `### Removed` entries; backfill missing entries before any commit ships archive purge. |
-| OB5 | Stale `Last verified:` dates in `workspace/ISSUES.md:145`, `workspace/postmortems/ai-behavior.md:1041`, `docs/how-to/run-mcp-server.md:469`, plus 4 untouched compendiums | Either re-run verifications and update, or accept staleness explicitly. Do not change "Last verified" without running verification. |
-
-> **Closed (history retained one cycle):**
-> - **OB1** (2026-05-02): `src/core/orchestrator.py` diff reviewed — single-line embedded-spec doc-reference update; routes to Bucket D
-> - **OB3** (2026-05-02): `spec-memory-identity.md` indexed in `docs/technical/README.md`
-> - **OB6** (2026-05-02): `docs/README.md` v2.10.0-tier entries added
-> - **OB7** (2026-05-02): `docs/technical/README.md` Last Updated current
-> - **OB8** (2026-05-02): `docs/technical/README.md` tool count `21` → `20`
-
-### §2.10 Resume verdict
-
-- **RESUME_SAFE:** YES — full state captured here in §2.3–§2.9, in [`workspace/ISSUES.md`](../workspace/ISSUES.md) for BUGs/GAPs, in [`agents/orchestrator.md`](../agents/orchestrator.md) for constitution+Documentation Skill, in [`agents/manifests/ide-integration.yaml`](../agents/manifests/ide-integration.yaml) for integrations.
-- **PRODUCTION_READY:** NO — gated on P1–P6 closure (§2.6) + BUG-026 active guard candidate selection ([`workspace/postmortems/ai-behavior.md`](../workspace/postmortems/ai-behavior.md) Issue #12 Solution candidates 2 and 3) + OB4 + OB5.
+- **RESUME_SAFE:** YES — active state is here; defects/capability gaps are in [`workspace/ISSUES.md`](../workspace/ISSUES.md); integration truth is in [`agents/manifests/ide-integration.yaml`](../agents/manifests/ide-integration.yaml).
+- **PRODUCTION_READY:** NO — blocked by GAP-025, GAP-029, host certification, version/commit closure, and explicit release authorization.
 
 ---
 
 ## §3 Roadmap (multi-release)
 
-### §3.1 v2.10.x — small runtime improvements
-
-Implement what v2.10.0 contract spec'd:
-
-- `elefante-Remember` runtime (D1)
-- Public explanation object emission (D2, D3)
-- (no breaking changes; all additive)
-
-### §3.2 v2.11.0 — Daemon + Source schema + 6 adapters (closes GAP-025)
+### §3.1 v2.11.0 — Trust Release (active)
 
 Per [`workspace/proposals/ide-integration-surface.md §15`](../workspace/proposals/ide-integration-surface.md):
 
 | Step | Work |
 |------|------|
-| 1 | Author/refresh `agents/manifests/ide-integration.yaml` (scaffolded 2026-05-02; hash refresh pending) |
-| 2 | Singleton daemon (launchd / systemd-user / Windows-equivalent) over streamable-http on `127.0.0.1:<port>` |
-| 3 | `(:Memory)-[:WRITTEN_BY]->(:Source)` schema + idempotent migration |
-| 4 | Claude Code adapter (lowest risk) |
-| 5 | VS Code Copilot adapter (highest reach) |
-| 6 | Cursor, Bob, Kiro adapters |
-| 7 | Universal `AGENTS.md` root-file emission (covers Codex, Zed, Cline, Roo, Kilo via convergence point #3) — **partially done as of 2026-05-02 with the new repo-root `AGENTS.md`** |
-| 8 | Detect→emit installer + uninstall manifest at `~/.elefante/install-manifest.json` |
-| 9 | `--legacy-stdio` escape hatch (deprecated on land; removed v2.12) |
+| 1 | Close GAP-029 with an authorized, recoverable SQLite transition and clean release lock |
+| 2 | Close GAP-025 with authorized legacy provenance apply and host-lifecycle evidence |
+| 3 | Exercise advertised compatible hosts end-to-end; certify only proven surfaces |
+| 4 | Reconcile version declarations, run all release gates, and form cohesive commits |
+| 5 | Publish only after explicit authorization |
 
 **Acceptance gates** (all required before v2.11.0 cuts):
 
 - All `scripts/verify/*` green
-- `test_memory_persistence.py` + `test_memory_guard.py` pass on fresh DB **and** on migrated legacy DB
+- Persistence/guard coverage passes on fresh and migrated fixtures
 - Two concurrent IDE instances produce distinct `source.instance_id` values with zero Kuzu lock contention
 - Per-adapter `emit_skill` / `emit_rules` / `emit_mcp` dry-run diff reviewed against the live vendor doc at ship time
 - CHANGELOG `### Removed` entries exist for every dropped path or command
 
-### §3.3 v2.12.0 — inspector CI + Phase 3 surfaces
+### §3.2 v2.12.0 — inspector CI + Phase 3 surfaces
 
 - integration-inspector CI cron (weekly drift audit)
 - `elefante doctor` extended to full self-protocol
@@ -214,7 +170,7 @@ Per [`workspace/proposals/ide-integration-surface.md §15`](../workspace/proposa
 - Phase 3 IDE surfaces (Cline, Roo, Kilo, Continue, Windsurf, Trae, Aider)
 - `--legacy-stdio` flag removal
 
-### §3.4 What does NOT justify v3.0.0
+### §3.3 What does NOT justify v3.0.0
 
 This plan stays on v2.x deliberately. v3.0.0 only justified by:
 
@@ -234,7 +190,7 @@ Source-of-truth: [`docs/explanation/vision.md §A–§F`](../docs/explanation/vi
 - **B. Proactive Retrieval** — Proactive Memory Surfacing (`surfaces_when` field exists; surfacing logic not built); Retrieval Explanation UI (backend done v2.1; frontend 0%)
 - **C. Dashboard & Visualization** — Usage Intelligence (backend 80%; snapshot pipeline +1 field; frontend 0%); Dashboard UX improvements (designed, not built)
 - **D. Session Distiller Expansion** — Live Mode (designed, not built); Team Sync API (concept)
-- **E. Multi-Modal & Platform** — Multi-Modal Memory (concept); Cross-IDE Support (MCP works universally; per-IDE setup varies — see §3.2 v2.11 plan); Agent Zero Integration (target documented; not built)
+- **E. Multi-Modal & Platform** — Multi-Modal Memory (concept); additional host certification (see §3.1); Agent Zero remains a documented community path
 - **F. Distribution Packaging** — Branded macOS DMG (build script done; CI wired; signing credentials pending); Branded Windows EXE (not built); Manual Fallback Path (shipped — `install.sh`/`install.bat`)
 
 ### §4.2 In design (status: draft PRD)
@@ -243,14 +199,14 @@ Each row links to the full PRD. **Authority:** the linked file is the source of 
 
 | Feature | PRD | Status | Target |
 |---------|-----|--------|--------|
-| Phase 1 installer (downloadable bundle, stable install root) | [`workspace/proposals/installer-procedure.md`](../workspace/proposals/installer-procedure.md) | DRAFT — Phase 1 only | Pre-v2.10.0 / v2.10.x |
-| IDE integration surface (16 IDEs, daemon, Source schema) | [`workspace/proposals/ide-integration-surface.md`](../workspace/proposals/ide-integration-surface.md) | DRAFT (docs in v2.10.0; impl v2.11+) | v2.11.0 + v2.12.0 |
+| Phase 1 installer (downloadable bundle, stable install root) | [`workspace/proposals/installer-procedure.md`](../workspace/proposals/installer-procedure.md) | Foundation implemented; release closure pending | v2.11.0 |
+| IDE integration surface (16 IDEs, daemon, Source schema) | [`workspace/proposals/ide-integration-surface.md`](../workspace/proposals/ide-integration-surface.md) | Runtime/adapters implemented; certification pending | v2.11.0 + v2.12.0 |
 | Session intelligence (privacy-respecting telemetry) | [`workspace/proposals/session-intelligence.md`](../workspace/proposals/session-intelligence.md) | DRAFT | v2.11.0 (depends on Source schema) |
 | Retrieval effectiveness (per-memory provenance + helpfulness) | [`workspace/proposals/retrieval-effectiveness.md`](../workspace/proposals/retrieval-effectiveness.md) | DRAFT (sketch only) | v2.11.x or v2.12.x |
 
 ### §4.3 Active (status: shipping)
 
-Active development = the v2.10.0 contract scope itself (see §2). No other features are in active build at this moment.
+Active development = the v2.11.0 Trust Release gates in §2.
 
 ### §4.4 Shipped (status: shipped — link to reference)
 
@@ -258,22 +214,23 @@ Active development = the v2.10.0 contract scope itself (see §2). No other featu
 |---------|------------|-----------|
 | Token Intelligence Layer (per-call TOKEN_STATS, type budgets, density warnings) | v2.5.0 | [`docs/reference/token-intelligence.md`](../docs/reference/token-intelligence.md) |
 | 5-signal scoring (vector / concept / co-activation / authority / temporal) | v2.7.0 (post BUG-016/017/018) | [`docs/reference/scoring.md`](../docs/reference/scoring.md) |
-| 20 MCP tools + 2 prompts | v2.0.0+ | [`docs/reference/tools.md`](../docs/reference/tools.md) |
+| 16 MCP tools + 2 prompts | v2.10.0+ | [`docs/reference/tools.md`](../docs/reference/tools.md) |
 | Compliance Gate (search before write) | v2.0.0+ | [`docs/reference/architecture.md`](../docs/reference/architecture.md) §Compliance Gate |
 | Dashboard with live-computed scores | v2.4.0 (BUG-004 fix) | [`docs/reference/dashboard-snapshot.md`](../docs/reference/dashboard-snapshot.md) |
 | Transaction-scoped Kuzu locking | v1.1.0 | [`docs/reference/architecture.md`](../docs/reference/architecture.md) §Transaction-Scoped Locking |
 
 ### §4.5 Rejected (status: rejected — do not re-litigate)
 
-See §2.5 for the X-series. Each carries a re-open threshold per [`workspace/PLANNING.md §2.5`](../workspace/PLANNING.md §2.5).
+The active scope guard is §2.5. Historical rejected alternatives remain in the
+v2.10.0 journal and changelog; reopen only with new user or retrieval evidence.
 
 ---
 
 ## §5 Optimization
 
-### §5.1 Active blockers (OB-series — canonical in §2.9)
+### §5.1 Active blockers
 
-See §2.9.
+See the release blockers in §2.3.
 
 ### §5.2 Performance / efficiency improvements
 
@@ -287,7 +244,7 @@ See §2.9.
 
 ### §5.3 Planned optimization work
 
-(None scheduled before v2.11.0; daemon work is architectural correctness, not performance optimization. Performance work resumes after Source schema lands.)
+(None during the Trust Release; correctness and release gates take priority.)
 
 ---
 
@@ -297,14 +254,14 @@ See §2.9.
 
 | Concern | Status | Owner |
 |---------|--------|-------|
-| Archive purge `### Removed` audit before v2.10.0 cut | OB4 (open) — see §2.9 | Pending P4 closure |
-| Stale `Last verified` dates | OB5 (open) — see §2.9 | Pending verification re-runs |
+| Live provenance backfill | Dry-run proven; apply intentionally not run | Explicit user authorization |
+| Live Chroma-to-SQLite transition | Isolated migration proof passes; live data/default untouched | Explicit user authorization + clean audit |
+| Release formation | Test-green uncommitted candidate | Version audit, cohesive commits, release authorization |
 
 ### §6.2 Operational improvements planned
 
-- `elefante doctor` + `elefante status` CLI (D6, gated on P2) — wraps existing `verify_*.py` scripts; one-command operator surface
 - `elefante doctor` extended scope (v2.12.0) — full self-protocol coverage
-- Singleton daemon launchd/systemd integration (v2.11.0)
+- Host-driven certification runs for each advertised compatible adapter
 
 ### §6.3 Operational reference (already shipped)
 
@@ -313,11 +270,11 @@ See §2.9.
 - Restart: `scripts/lifecycle/restart_elefante.py`
 - Factory reset: `scripts/lifecycle/reset_factory.py`
 
-Reference: [`docs/how-to/<name>.md`](../docs/technical/) (9 ops files).
+Reference: [`docs/how-to/`](../docs/how-to/).
 
 ### §6.4 Hermes integration (live 2026-05-02)
 
-**Status:** Wired. `hermes mcp list` reports `elefante ✓ enabled` with all 20 tools discovered.
+**Status:** Wired. The historical Hermes verification predated the 16-tool atomic surface consolidation; current inventory is source-derived by `scripts/ci/list_mcp_tools.py`.
 
 **Wiring (user-side, persistent in `~/.hermes/config.yaml`):**
 
@@ -373,10 +330,10 @@ mcp_servers:
 **User-side action to close GAP-028 (one paste, one verifier run):**
 
 State as of 2026-05-02 (already done by agent — no action needed):
-- ✓ `~/.hermes/.env` created (chmod 600) with `DEEPSEEK_API_KEY=` line ready for paste
-- ✓ `~/.hermes/config.yaml` set to `model: deepseek-v4-flash` (smaller / faster; user preference 2026-05-02)
-- ✓ `hermes status` confirms `Model: deepseek-v4-flash`, `Provider: DeepSeek`, `.env file: ✓ exists`
-- ✓ Verifier script at `/tmp/elefante-gap-028-verify.py` (Layer 0+1+2+3 round-trip test)
+- `~/.hermes/.env` created (chmod 600) with `DEEPSEEK_API_KEY=` line ready for paste
+- `~/.hermes/config.yaml` set to `model: deepseek-v4-flash` (smaller / faster; user preference 2026-05-02)
+- `hermes status` confirms `Model: deepseek-v4-flash`, `Provider: DeepSeek`, `.env file exists`
+- Verifier script at `/tmp/elefante-gap-028-verify.py` (Layer 0+1+2+3 round-trip test)
 
 What you do — single edit + single verify:
 
@@ -394,10 +351,10 @@ $EDITOR ~/.hermes/.env       # set DEEPSEEK_API_KEY=sk-... after the existing `=
 # 3. Verify the loop closes end-to-end
 cd "/Volumes/OWC2TB/2026-M5/AI Projects/hermes-agent"
 .venv/bin/python /tmp/elefante-gap-028-verify.py
-# Expected: Layer 0 PASS, Layer 1+2 PASS, Layer 3 PASS, "=== GAP-028: CLOSED ✓ ==="
+# Expected: Layer 0 PASS, Layer 1+2 PASS, Layer 3 PASS, "=== GAP-028: CLOSED ==="
 ```
 
-**Acceptance for GAP-028 closure:** Verifier reports Layer 3 PASS — Hermes called `elefante-MemorySearch` and surfaced memory id `f1fb77f5` (the Workflow Lifecycle memory). At that point the recursive Hermes ↔ Elefante loop is closed for the first time **from the Hermes side**, not just Claude Code.
+**Acceptance for GAP-028 closure:** Verifier reports Layer 3 PASS — Hermes called `elefante-MemorySearch` and surfaced memory id `f1fb77f5` (the Workflow Lifecycle memory). At that point the recursive Hermes <-> Elefante loop is closed for the first time **from the Hermes side**, not just Claude Code.
 
 **Architect recommendation:** **Path A (Direct DeepSeek)** for first close — Hermes natively supports `DEEPSEEK_API_KEY`, lowest latency, no OpenRouter detour. Add Path C (hybrid) later only if outage resilience becomes a real concern.
 
@@ -419,10 +376,6 @@ cd "/Volumes/OWC2TB/2026-M5/AI Projects/hermes-agent"
 - Active guard expansion: pre-edit hook requiring `BUG-NNN | new` classification declaration before any Edit/Write call ([`workspace/postmortems/ai-behavior.md`](../workspace/postmortems/ai-behavior.md) Issue #12 Candidate 2)
 - Maintained verifier scanning recent transcripts for missing classifications ([`workspace/postmortems/ai-behavior.md`](../workspace/postmortems/ai-behavior.md) Issue #12 Candidate 3)
 - Source-derivation tests: assert tool counts, schema field names, etc. derive from source not docs
-
-### §7.4 Open dev process decisions
-
-- Whether to merge `agents/orchestrator.md` + `agents/orchestrator.md` into a single canonical constitution (Phase B of agentic restructure; deferred to next session). (Not P-tracked yet.)
 
 ---
 
@@ -518,6 +471,47 @@ This section is the chronological record of curation events, decisions, and abso
 
 ### §10.1 Lessons logged this session
 
+- **2026-07-22 Daemon foundation:** added `src.mcp.daemon`, a loopback-only Streamable HTTP host for one Elefante MCP server instance at `/mcp`. It is the required transport boundary for the future stdio bridge and prevents each HTTP-capable client from opening its own database-owning process. Proof: Starlette lifespan health check and targeted regression suite passed. It does not close GAP-025 until provenance, migration, bridge, and concurrent-client proof land.
+- **2026-07-22 Stdio bridge:** added `src.mcp.stdio_bridge`, which forwards newline-delimited MCP JSON-RPC to the loopback daemon and rejects non-loopback targets. The bridge owns no stores. GAP-025 remains open until provenance, migration, and concurrent-client proof land.
+- **2026-07-22 Trust Release foundation:** universal-agent contract and release gates documented; dashboard moved to loopback-by-default with explicit CORS and loopback Docker publication; GraphQuery made read-only at the MCP boundary; automated suite collection repaired; GitHub quality workflow added. Proof: `pytest tests -q` 160 passed and dashboard `npm run build` passed. Remaining release blockers: singleton daemon/provenance migration, exact runtime dependency contract, and production dependency audit remediation.
+- **2026-07-22 GAP-025 implementation:** daemon writes now serialize across in-process MCP sessions; every stored memory round-trips a source tuple and gains a deduplicated `(:Entity)-[:WRITTEN_BY]->(:Source)` link. Fresh-store proof: 25 focused tests pass. Live migration dry-run reports 0 missing metadata tuples and 28 graph links pending explicit apply.
+- **2026-07-22 Distribution foundation:** added a dry-run-first user-scope daemon service manager for launchd and systemd-user. It writes only Elefante's service definition on explicit apply; Windows registration and host adapter emission remain release work.
+- **2026-07-22 First bridge adapters:** VS Code and Antigravity configuration now launch `src.mcp.stdio_bridge` with loopback daemon provenance settings, not a database-owning server. Verified by installer tests; these hosts remain compatible, not certified, until their full install/reconnect/uninstall paths are exercised.
+- **2026-07-22 Install manifest:** emitted VS Code, Antigravity, and daemon-service files are atomically recorded in `~/.elefante/install-manifest.json`. The manifest deliberately tracks only Elefante-owned outputs; safe manifest-driven uninstall is the next distribution step.
+- **2026-07-22 Safe uninstall:** central and daemon-service uninstall paths remove only manifest-recorded files whose hash still matches emission. Later user edits are reported and preserved.
+- **2026-07-22 Distribution hardening:** expanded the user-scope daemon service to Windows Task Scheduler and changed the install manifest from whole-JSON-file ownership to exact Elefante JSON-entry ownership. Proof: installer/setup tests pass, including preservation of unrelated MCP servers and modified service definitions. `pytest tests -q` passes 183 tests (one slow test deselected); the two-bridge concurrent provenance proof passes in 32.29 seconds. Dashboard `npm ci`, production build, and full `npm audit` pass with zero findings after locked Lodash, React Router, Vite, React plugin, PostCSS, and Picomatch remediation. The remaining GAP-025 data action is intentionally unperformed: legacy graph-link migration dry-run reported 28 links pending explicit user-authorized `--apply`.
+- **2026-07-22 Cursor/Kiro compatibility adapters:** added detect-then-emit global bridge configuration for existing Cursor and Kiro user directories. Both preserve unrelated MCP servers, emit distinct `source.tool` values, and unregister only the Elefante entry through the install manifest. Vendor configuration contracts were refreshed against Cursor MCP and Kiro MCP references; the matrix records these hosts as compatible, not certified. Proof: adapter plus uninstall round-trip regression passes.
+- **2026-07-22 Claude Code/Codex compatibility adapters:** added native-CLI registration for the two primary coding-agent hosts. The adapter never replaces an existing `elefante` registration; after a successful add, it fingerprints the host's own MCP configuration and removes only a matching registration on uninstall. Installer-owned registration refresh now rolls back on failure; user-managed registrations remain untouched. Codex uses its official JSON inspection output, canonicalized before hashing because object order is nondeterministic. Proof: mocked registration, preservation, refresh, rollback, and fingerprint-checked removal tests pass; Codex registration, inspection, refresh, and removal also pass against the installed CLI in an isolated `CODEX_HOME`. No host is certified until its full external lifecycle is automated.
+- **2026-07-22 Daemon endpoint hardening:** the daemon now rejects non-integer and out-of-range ports, while bridges accept only a credential-free `http://127.0.0.1[:port]/mcp/` endpoint with no URL query or fragment. This closes ambiguous local endpoint parsing before any network connection is attempted. Proof: eight focused daemon tests and the 181-test fast suite pass.
+- **2026-07-22 Service observability:** `daemon_service.py status` now reports exact service-file ownership, the read-only platform runtime state, and the loopback daemon health result without starting, stopping, or editing anything. The first local invocation correctly reported no installed service rather than implying readiness. Proof: 19 installer-focused tests, 187 fast tests, and the two-bridge daemon proof pass.
+- **2026-07-22 Safe daemon-service refresh:** rerunning the service installer now preserves untracked or modified service definitions without executing service-manager commands, returns a visible nonzero conflict result, and refreshes only manifest-owned definitions. Linux refreshes with `try-restart`; launchd tolerates a stale or absent job before bootstrap. Proof: 27 installer-focused tests and the 191-test fast suite pass.
+- **2026-07-22 Read-only doctor:** added `scripts/lifecycle/doctor.py` as the single readiness report for developers and agents. It covers repository runtime, service/health, installer ownership, and declared integration tiers without probing or modifying host configuration. The command emits JSON for agents, exits nonzero when not ready, and reported the actual current machine as not-ready because no daemon service is installed—an honest result. Proof: 30 installer-focused tests and the 194-test fast suite pass.
+- **2026-07-22 Installer daemon health gate:** the installer now requires the exact loopback daemon health payload within 15 seconds after service installation and before it writes MCP client configuration. A launched-but-broken service therefore fails closed rather than leaving users with dead host registrations. Proof: 33 installer-focused tests and the 197-test fast suite pass.
+- **2026-07-22 Provenance input hardening:** transport headers and stdio environment values are now treated as untrusted before persistence. The daemon rejects control characters, bounds tool IDs to 128 characters, instance/session IDs to 256, and workspace paths to 1024, and uses explicit safe fallbacks rather than storing malformed values. Proof: focused daemon and persistence suites pass; the 199-test fast suite, bytecode compilation, diff-whitespace check, and leaked-daemon process check pass.
+- **2026-07-22 Recoverable backup/restore:** upgraded the existing file-level recovery path rather than creating a parallel system. Backups now contain checksummed manifests and exclude nested recovery archives; restore defaults to a read-only preflight, rejects zip-slip, symlink, duplicate-member, and integrity failures, stages extraction before replacement, and preserves replaced data unless an explicitly confirmed discard is requested. JSON/CSV export is now plainly labeled analysis-only, not a recovery format. Proof: 6 new recovery-safety tests plus the 205-test fast suite pass; `git diff --check` and process-leak checks pass. Portable JSON import remains explicitly deferred.
+- **2026-07-22 Dashboard trust boundary:** removed live ChromaDB access and browser-triggered snapshot generation from the dashboard. Graph, search, and statistics now read the redacted snapshot only; search is explicitly lexical, and the browser reload control cannot mutate data. Absolute local data paths are no longer returned. Live regeneration remains MCP/CLI-only. Proof: 2 new runtime boundary tests, the 207-test fast suite, production dashboard build, `git diff --check`, and process-leak checks pass.
+- **2026-07-22 Bridge input discipline:** the stdio bridge now bounds a JSON-RPC message to 1 MiB before parsing or forwarding it, rejects non-object payloads, and resets request state per line so a malformed request cannot emit an error against the previous request ID. Proof: focused bridge runtime tests and the 209-test fast suite pass; `git diff --check` passes.
+- **2026-07-22 Direct HTTP input discipline:** the Streamable HTTP daemon now applies the same 1 MiB request-body limit before its MCP session manager receives a request. It checks declared lengths and streamed chunks, while replaying valid bodies exactly once to the official transport. Proof: runtime boundary regression covers valid replay plus declared and chunked rejections; the 210-test fast suite passes.
+- **2026-07-22 Container exposure discipline:** the standalone dashboard image no longer overrides the loopback bind default. Compose retains an internal `0.0.0.0` bind only so its host-loopback-published port can reach the container; direct network exposure is no longer offered as a copy-paste configuration path. Proof: dashboard contract tests pass and `docker compose config` was attempted, but Docker is unavailable in this workspace; the 211-test fast suite passes.
+- **2026-07-22 Python lock discipline:** every declared direct Python dependency is exactly pinned, and a generated universal `requirements.lock` carries transitive package hashes. Docker, the installer, release bundles, and CI install with `--require-hashes`; CI also verifies the lock against the `uv` generation command. The installer refuses to resolve dependencies if the lock is absent. Proof: `uv pip sync --dry-run --require-hashes` accepts the lock, `pip check` reports no broken requirements, and the 213-test fast suite passes.
+- **2026-07-22 MCP security update:** upgraded the direct MCP Python SDK from v1.23.1 to v1.28.1 after the first lockfile advisory scan reported three MCP advisories. The hash-locked sync, focused transport suite, two-client concurrent daemon proof, and 213-test fast suite pass. The post-update audit reports 18 remaining advisories across five non-MCP packages; they are GAP-029 release-blocking work, not waived findings.
+- **2026-07-22 Dependency remediation:** upgraded Black to v26.3.1, the compatible pytest pair to pytest v9.0.3 / pytest-asyncio v1.4.0, FastAPI/Starlette, and the local embedding stack to SentenceTransformers v5.6.0 / Transformers v5.14.1. The configured `thenlper/gte-base` embedding runtime loads and emits finite 768-dimensional vectors; the full 215-test fast suite and `pip check` pass under the new lock. The audit now reports one ChromaDB advisory with no published fix; it remains GAP-029 release-blocking work.
+- **2026-07-22 SQLite vector-store exit path:** added a dependency-free SQLite backend as a fresh-store opt-in, preserving full Memory JSON and float32 embeddings with deterministic exact-cosine search. CRUD, provenance round-trip, filters, pagination, update, delete, factory selection, startup environment selection, and Chroma-free runtime behavior are covered by runtime tests. It is intentionally not the default and does not inspect or alter existing ChromaDB data; migration requires explicit authorization, a verified backup, dry-run, parity evidence, and rollback. Proof: `pytest tests -q` 219 passed, 1 deselected.
+- **2026-07-22 Agent-host reach:** Gemini CLI now receives a preserving, exact-entry-owned `mcpServers.elefante` bridge only when both its binary and existing user directory are detected; it never mistakes an Antigravity directory for Gemini CLI. OpenClaw is no longer incorrectly excluded: its native MCP registry now gets the same fingerprinted, safely removable bridge lifecycle as the other CLI hosts. Agent Zero remains community-tier with container-boundary guidance; Grok is correctly described as a provider selected inside an MCP-capable host, not a host integration. Proof: 37 installer tests, 18 documentation-routing tests, and the 221-test full suite pass. Gemini and OpenClaw CLIs are not installed in this workspace, so no external-host certification is claimed.
+- **2026-07-22 Integration observability:** `doctor` now separates integrations declared compatible by the repository from host surfaces actually configured by this Elefante installation. It reports only normalized surface names from the ownership manifest—never host commands, configuration paths, or values—and includes community-tier declarations. Proof: 38 focused installer/doctor tests and the 222-test full suite pass (one slow test deselected).
+- **2026-07-22 JSON host-ownership hardening:** all active JSON configuration adapters now preserve an existing user-managed `elefante` entry, malformed JSON, and externally modified files. Reconfiguration refreshes only an unchanged exact-entry manifest record, and writes atomically. This closes the overwrite gap between JSON configuration hosts and the fingerprinted native-CLI adapters. Proof: 43 focused installer tests and the 227-test full suite pass (one slow test deselected).
+- **2026-07-22 Enforced release dependency gate:** tagged GitHub releases now require a pinned `pip-audit` action to scan the universal hash-locked requirements before publication. It intentionally fails while the outstanding ChromaDB advisory remains, preventing a release workflow from contradicting GAP-029. Pull-request quality remains runnable for remediation work. Proof: release-workflow contract regression and YAML parse pass; the current lock audit reports exactly `chromadb 1.3.5` / `PYSEC-2026-311` and exits nonzero; the 228-test full suite passes (one slow test deselected). Live tag execution is intentionally not triggered.
+- **2026-07-22 SQLite latency baseline:** added a deterministic, temporary-store benchmark that exercises the public exact-cosine search path without opening any existing Elefante or ChromaDB data. At 5,000 synthetic 768-dimensional memories, 20 queries, and `limit=10`, the local CPU measured p50 221.522 ms and p95 235.530 ms. This is evidence for a future threshold, not a portability or default-change claim. Proof: disposable benchmark regression and the 229-test full suite pass (one slow test deselected).
+- **2026-07-22 SQLite lifecycle and recovery proof:** controlled shutdown now flows from the daemon and Elefante mode through the orchestrator, closing both synchronous and asynchronous stores, including the opt-in SQLite handle. Backup/restore now has an explicit SQLite database round-trip proof that verifies both restored and preserved-current copies. Proof: 27 focused lifecycle/recovery tests, `pip check`, `git diff --check`, and the 232-test full suite pass (one slow test deselected). Existing-data migration remains deliberately unperformed and authorization-gated.
+- **2026-07-22 Direct-transport lifecycle and installer hygiene:** direct `python -m src.mcp.server` execution now releases its orchestrator in a `finally` block, matching the daemon lifecycle. Antigravity configuration no longer creates an untracked full-file `.json.bak`; its atomic manifest-owned update preserves user entries without accumulating redundant artifacts. Proof: 59 focused daemon/installer tests, `pip check`, compilation, diff-whitespace validation, and the 234-test full suite pass (one slow test deselected).
+- **2026-07-22 Live-contract and surface-truth repair:** the source-derived MCP inventory is 16 tools and 2 prompts; active startup, self-protocol, test, vision, demo, and agent-routing surfaces now state that contract and use the consolidated `elefante-Memory(action=...)` syntax. A real self-protocol run exposed stale `docs/debug` routing in both successful and error responses; the server now routes to `workspace/ISSUES.md` and linked postmortems. Proof: source inventory reports 16/2, the real isolated MCP harness passes 46/46 checks, and the full 235-test suite passes (one slow test deselected).
+- **2026-07-22 Release-bundle repair:** the Docker tarball generator referenced deleted `docs/technical` files and omitted `requirements.lock`, despite Docker requiring a hash-checked install. It now packages the current Docker/Agent Zero guides plus the lock, supports a temporary output directory for clean CI proof, and is covered by archive-content regression coverage. Active runbooks no longer route users to retired `docs/debug` paths. Proof: isolated bundle test passes without creating repository artifacts, `pip check` and diff-whitespace checks pass, and the full 236-test suite passes (one slow test deselected).
+- **2026-07-22 Native Codex lifecycle hardening:** an isolated real `CODEX_HOME` CLI round trip now proves initial registration, upgrade after relocation, preservation of a later user-owned registration during manifest-driven uninstall, restoration of the installer-owned registration, and normal installer-owned removal. The slow runtime proof also passes with two real bridge processes sharing one daemon while preserving distinct Codex/Claude provenance. This strengthens native registry and transport evidence without touching a user configuration or claiming actual in-host agent reconnect/certification. Proof: focused lifecycle test, explicit slow daemon/bridge test, and the full 236-test suite pass (one slow test deselected); `pip check` and diff-whitespace validation pass.
+- **2026-07-22 Distribution-contract repair:** `setup.py` was advertising obsolete permissive dependency ranges and packaged only child modules, which could make a built wheel fail the documented `python -m src.mcp...` import contract. It now reads exact runtime/development pins from `requirements.txt` and includes the `src` namespace. A temporary-wheel regression builds without dependencies, checks metadata against the canonical runtime list, installs into an isolated target, and imports `src.mcp.stdio_bridge` from the installed artifact. README and installation guidance now state MCP v1.28.1, SQLite's fresh-store role, the detected compatible host surface, and the daemon-plus-stdio-bridge path rather than a database-owning IDE subprocess. Proof: focused package/documentation tests and the full 238-test suite pass (one slow test deselected).
+- **2026-07-23 SQLite operator-surface repair:** JSON/CSV export used a direct ChromaDB client despite the configured SQLite backend, and factory reset ignored the default SQLite `data/vector` directory. Export now reads either configured embedded store, while reset moves both default vector locations and Kuzu into its timestamped recovery area and respects `ELEFANTE_DATA_DIR`. It now also resolves explicit vector and graph paths from the active Elefante YAML configuration, rejecting a target that would contain the recovery directory. The dashboard snapshot pipeline now reads either configured store too, and aligns its Chroma client settings with the live vector-store owner to avoid client conflicts. SQLite export, reset, and snapshot plus Chroma snapshot compatibility have real isolated round-trip tests. Proof: 87 focused storage/reset/snapshot/routing/installer tests, `pip check`, diff-whitespace validation, and the full 243-test suite pass (one slow test deselected).
+- **2026-07-23 GAP-029 migration gate:** added a dry-run-first ChromaDB-to-SQLite lifecycle command that converts only an isolated stable snapshot, verifies UUID/reconstructed-memory/float32-embedding parity and representative top-10 search overlap, and cleans up both database handles and temporary output. Apply requires `--confirm-stopped STOPPED` plus an exact checksum-manifested backup match, reserves a new destination without replacement, and leaves ChromaDB and configuration untouched. No live data was opened or migrated. Proof: 37 focused migration/backup/routing tests, 247-test full suite (one slow test deselected), dashboard production build, `ruff`, compilation, and diff-whitespace checks pass. Locked audit still reports only `chromadb 1.3.5 / PYSEC-2026-311`, so GAP-029 remains release-blocking pending explicit real-store migration/default-change authorization and a clean lock.
+- **2026-07-23 Release-truth and routing reconciliation:** the living plan now tracks the active v2.11.0 Trust Release instead of shipped v2.10 decision scaffolding; current release identifiers are synchronized at 2.10.0 without rewriting historical/version-specific documents. Active workspace routes now target `docs/`, `workspace/`, and `agents/`; the v3 proposal uses the source-derived 16 → 6 baseline; BUG-007 guards cover the affected proposal and lesson surfaces. No live data, host configuration, git index, or remote state changed. Proof: 29 focused routing/release tests and the full 249-test suite pass (one slow proof deselected and separately passed); the isolated self-protocol passes 46/46, dashboard build/audit reports zero findings, version sync and diff checks pass. Current-machine doctor remains honestly not-ready because no daemon service is installed; only Codex is available for host-driven certification.
+
 - **Never delete an uncommitted file.** Commit first, then delete with a record. Git history becomes the archive. The `### Removed` CHANGELOG line is not satisfaction of the Memory Janitor mandate if the underlying content is unrecoverable.
 - **Curation must measure both sides.** Token-cut percentage alone is not a metric — must also measure retrieval quality after the cut. Current curation work is measurement-blind on the consumer side; awaits Hermes ingestion data.
 - **Distillation is preservation, not loss — IF and only IF the original is archived.** The active surface gains atomic chunks for fast retrieval; the archive keeps full narrative for historical context. Both serve different journal purposes.
@@ -530,11 +524,11 @@ This section is the chronological record of curation events, decisions, and abso
 | Active doc LOC (post-curation) | 9,841 | `find ... -name "*.md" \| xargs wc -l` | Tracked |
 | Archived doc LOC (preservation) | 3,815 | `wc -l workspace/*/_archive/*.md` | Tracked |
 | Postmortem LOC reduction | 5,024 → 1,681 (66%) | per-file before/after | Tracked |
-| BUG count tracked | **27 (BUG-001 → BUG-027) + 3 GAPs (GAP-013, GAP-025, GAP-028)** | `workspace/ISSUES.md` | Tracked |
+| BUG count tracked | **31 (BUG-001 → BUG-031) + 4 GAPs** | `workspace/ISSUES.md` | Tracked |
 | BUG recurrence rate (pre-distillation) | known per-row in `ISSUES.md` | `workspace/ISSUES.md` Recurrence column | Tracked |
 | BUG recurrence rate (post-distillation) | unknown — needs sustained agent traffic across sessions | will derive from `ISSUES.md` Recurrence column after v2.10.x lands real workload | **NOT MEASURED YET** |
-| Hermes Elefante-tool retrieval count | **GAP-028 CLOSED 2026-05-02.** Direct ingestion (Claude-Code-as-MCP-client): 9 lessons submitted, 6+ stored unique, 3 fused via Compliance Gate dedupe; 19 directives total in store. Hermes-as-LLM-agent (deepseek-v4-flash) Layer-3 round-trip surfaced lifecycle memory `f1fb77f5` with verbatim content match + auto-injected directive on every MCP response. **Recursive Hermes ↔ Elefante loop alive on the Hermes side.** | `/tmp/elefante-gap-028-verify.py` (Layer 0/1+2/3 PASS); `/tmp/elefante-self-ingest*.py` for direct ingestion | **MEASURED** |
-| Active guard test count | 18 passing | `pytest tests/test_developer_routing.py` | Tracked |
+| Hermes Elefante-tool retrieval count | **GAP-028 CLOSED 2026-05-02.** Direct ingestion (Claude-Code-as-MCP-client): 9 lessons submitted, 6+ stored unique, 3 fused via Compliance Gate dedupe; 19 directives total in store. Hermes-as-LLM-agent (deepseek-v4-flash) Layer-3 round-trip surfaced lifecycle memory `f1fb77f5` with verbatim content match + auto-injected directive on every MCP response. **Recursive Hermes <-> Elefante loop alive on the Hermes side.** | `/tmp/elefante-gap-028-verify.py` (Layer 0/1+2/3 PASS); `/tmp/elefante-self-ingest*.py` for direct ingestion | **MEASURED** |
+| Active guard test count | 20 passing | `pytest tests/test_developer_routing.py` | Tracked |
 | Token cost per `MemorySearch` (signal_ratio) | TOKEN_STATS injected per response | `src/mcp/server.py` | Available; not aggregated yet |
 | Documentation Skill compliance % (BUG-026 derivative) | Filename-pattern guard active (`test_no_forbidden_filename_patterns_*`); broader-surface compliance metric not designed yet — deferred to v2.11+ pre-edit hook architecture per BUG-027 | filename guard runs in CI | **DEFERRED (by plan, not unmeasured)** |
 
@@ -587,4 +581,3 @@ The "not measured yet" rows are this session's open obligations to the journal. 
 **The loop closes when Hermes-driven retrieval data informs the next curation pass.** Until that loop is active, every cut is a hypothesis. The journal records each pass so future agents can audit which hypotheses paid off.
 
 ---
-

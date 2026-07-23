@@ -16,6 +16,7 @@ import importlib.util
 import os
 import subprocess
 import sys
+import tarfile
 from pathlib import Path
 
 
@@ -118,6 +119,25 @@ def test_release_documentation_audit_passes_for_repo_history():
     assert module.audit_changelog() == []
 
 
+def test_version_sync_tracks_release_identifiers_without_rewriting_history():
+    module = _load_module(ROOT / "scripts/ci/bump_version.py", "bump_version")
+    targets = {target[0] for target in module.TARGETS}
+
+    assert {
+        "src/__init__.py",
+        "setup.py",
+        "config.yaml",
+        "src/dashboard/ui/package.json",
+        "README.md",
+        "docs/README.md",
+        "docs/explanation/vision.md",
+    }.issubset(targets)
+    assert "workspace/ISSUES.md" not in targets
+    assert "workspace/lessons.md" not in targets
+    assert not any(path.startswith("workspace/postmortems/") for path in targets)
+    assert module.GLOB_TARGETS == []
+
+
 def test_build_workflow_uses_maintained_release_scripts():
     workflow = (ROOT / ".github/workflows/build-binaries.yml").read_text(encoding="utf-8")
 
@@ -128,3 +148,37 @@ def test_build_workflow_uses_maintained_release_scripts():
     assert "files: ${{ steps.select_release_assets.outputs.files }}" in workflow
     assert "name: elefante-${{ runner.os }}-installer" in workflow
     assert "python3 - <<'PY'" not in workflow
+
+
+def test_docker_bundle_uses_live_docs_and_hash_locked_dependencies(tmp_path):
+    output_dir = tmp_path / "bundle-output"
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/ci/bundle_docker_package.sh")],
+        cwd=ROOT,
+        env={**os.environ, "ELEFANTE_BUNDLE_OUTPUT_DIR": str(output_dir)},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    archive_path = output_dir / "elefante-docker-bundle.tar.gz"
+    assert result.returncode == 0, result.stderr
+    assert archive_path.is_file()
+    with tarfile.open(archive_path, "r:gz") as archive:
+        names = set(archive.getnames())
+    assert {"requirements.txt", "requirements.lock"}.issubset(names)
+    assert "docs/how-to/agent-handoff.md" in names
+    assert "docs/how-to/docker.md" in names
+    assert not any(name.startswith("docs/technical/") for name in names)
+
+
+def test_tagged_release_cannot_bypass_the_hash_locked_dependency_audit():
+    workflow = (ROOT / ".github/workflows/build-binaries.yml").read_text(encoding="utf-8")
+
+    assert "dependency-audit:" in workflow
+    assert "needs: [build, dependency-audit]" in workflow
+    assert "pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266" in workflow
+    assert "inputs: requirements.lock" in workflow
+    assert "require-hashes: true" in workflow
+    assert "disable-pip: true" in workflow
+    assert "no-deps: true" in workflow

@@ -21,9 +21,6 @@ import math
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
-from uuid import UUID
-
-import numpy as np
 
 
 @dataclass
@@ -277,11 +274,13 @@ class CognitiveRetriever:
             candidate.created_at,
         )
         
-        # Base composite score (v2.7.0: domain signal removed)
-        candidate.composite_score = (
+        # Base composite score (v2.7.0: domain signal removed).
+        # Keep the co-activation contribution separate from the vector floor
+        # below: otherwise a positive co-activation signal can be hidden when
+        # the metadata-derived score remains below that floor.
+        cognitive_score_without_coactivation = (
             self.WEIGHTS["vector"] * candidate.vector_score +
             self.WEIGHTS["concept"] * candidate.concept_score +
-            self.WEIGHTS["coactivation"] * candidate.coactivation_score +
             self.WEIGHTS["authority"] * candidate.authority_score +
             self.WEIGHTS["temporal"] * temporal_score
         )
@@ -291,8 +290,11 @@ class CognitiveRetriever:
         # semantic matches, not suppress them into oblivion if metadata is sparse.
         # Floor lowered from 0.85 to 0.70 in v2.7.0 (domain removal reduces noise).
         vector_baseline = candidate.vector_score * 0.70
-        if candidate.composite_score < vector_baseline:
-            candidate.composite_score = vector_baseline
+        candidate.composite_score = max(vector_baseline, cognitive_score_without_coactivation)
+        candidate.composite_score += (
+            self.WEIGHTS["coactivation"] * candidate.coactivation_score
+        )
+        candidate.composite_score = min(1.0, candidate.composite_score)
             
         # Intent-Gated SDD Authority Override (v2.7.0)
         # Specifications and directives get a boost ONLY when the query intent

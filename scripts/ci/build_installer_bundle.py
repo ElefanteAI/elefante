@@ -31,6 +31,7 @@ REQUIRED_PATHS = [
     Path("README.md"),
     Path("LICENSE"),
     Path("requirements.txt"),
+    Path("requirements.lock"),
     Path("config.yaml"),
     Path("src"),
     Path("src/dashboard/ui/dist/index.html"),

@@ -1,6 +1,6 @@
 # Installation & Configuration
 
-**Quick Start**: Run `install.bat` (Windows) or `install.sh` (Mac/Linux). The installer writes `.elefante-install.log`, `.elefante-install-status.txt`, and `.elefante-install-summary.txt` in the repo root.
+**Quick Start**: Run `install.bat` (Windows) or `install.sh` (Mac/Linux). The installer reports the exact paths of `.elefante-install.log`, `.elefante-install-status.txt`, and `.elefante-install-summary.txt`; source-checkout installs place them in the repo root and release bundles use their stable install root.
 **Troubleshooting**: See [`workspace/postmortems/installation.md`](../../workspace/postmortems/installation.md) for automated protection against common failures
 
 ---
@@ -21,8 +21,8 @@ The installation scripts handle everything automatically:
 - Create virtual environment
 - Install dependencies
 - Reuse bundled dashboard assets when available, or build them locally when needed
-- Initialize databases (ChromaDB + Kuzu)
-- Configure IDE integration
+- Initialize the default databases (ChromaDB + Kuzu)
+- Configure detected compatible IDE and CLI-agent integrations
 - Run health checks
 - Keep live installer status in terminal + state files
 
@@ -82,7 +82,7 @@ If `.venv` already exists, press Enter for a destructive fresh reinstall, choose
 2. **Environment Setup**
    - Creates `.venv` virtual environment
    - If `.venv` already exists, offers fresh delete, backup+fresh, reuse, or abort
-   - Installs all dependencies from `requirements.txt`
+   - Installs all dependencies from the hash-checked `requirements.lock`
    - Configures Python path
 
 3. **Dashboard Assets**
@@ -92,15 +92,15 @@ If `.venv` already exists, press Enter for a destructive fresh reinstall, choose
 
 4. **Database Initialization**
    - Creates `~/.elefante/data/` directory
-   - Initializes ChromaDB (vector store)
+   - Initializes the default ChromaDB vector store
    - Initializes Kuzu (graph database)
    - Creates default schema
    - Injects the seed memory only when the write is actually accepted by the orchestrator
 
-5. **IDE Configuration**
-   - Auto-detects VS Code, Cursor, or Bob IDE
-   - Configures MCP (Model Context Protocol)
-   - Sets up server connection
+5. **IDE and CLI-Agent Configuration**
+   - Configures the local daemon first, then emits a transport-only MCP bridge for detected compatible hosts: VS Code/Bob, Antigravity, Cursor, Kiro, Gemini CLI, and native Claude Code, Codex, or OpenClaw CLIs.
+   - Preserves existing user-managed `elefante` registrations and unrelated MCP servers; only unchanged installer-owned entries are refreshed or removed.
+   - Hosts are compatible until their host-driven lifecycle has been verified; see [IDE configuration](configure-ide.md) for current tiers and manual paths.
 
 6. **Agent Behavior Bootstrap**
    - Verifies `.github/copilot-instructions.md` exists
@@ -128,6 +128,65 @@ If `.venv` already exists, press Enter for a destructive fresh reinstall, choose
 - `.elefante-install-summary.txt`: stage-by-stage summary with final state and outcome details
 
 **Installation Time**: ~10 minutes (depending on internet speed)
+
+---
+
+## SQLite Vector Store
+
+ChromaDB remains the default vector store. Elefante also offers an opt-in,
+local SQLite vector store for a fresh, isolated data directory:
+
+```yaml
+elefante:
+  vector_store:
+    type: sqlite
+    persist_directory: ~/.elefante/data/vector
+```
+
+Alternatively, set `ELEFANTE_VECTOR_STORE_TYPE=sqlite`. SQLite stores complete
+memory JSON and float32 embeddings in `<collection_name>.sqlite3`, uses exact
+cosine search, and never starts a vector-server process.
+
+Do **not** point an existing ChromaDB installation at SQLite. Elefante never
+silently migrates or modifies vector data. To evaluate an existing store, first
+stop Elefante and create a verified backup, then run the temporary proof:
+
+```bash
+.venv/bin/python scripts/lifecycle/backup_elefante_data.py
+.venv/bin/python scripts/lifecycle/migrate_chroma_to_sqlite.py
+```
+
+The migration command reports UUID, reconstructed metadata, embedding, and
+search-overlap evidence as JSON, deletes its temporary SQLite output, and does
+not change configuration. Only after reviewing that proof, re-run it with
+`--apply --backup <archive> --confirm-stopped STOPPED`. Apply reserves the new
+`~/.elefante/data/vector` path without replacing anything already there, then
+publishes the closed SQLite database while still leaving Chroma and configuration
+untouched. Validation and rollback therefore do not depend on destructive recovery.
+See the [migration proposal](../../workspace/proposals/sqlite-vector-store-migration.md)
+for acceptance criteria and the explicit default-change gate.
+Stop the daemon before copying or restoring durable data; its controlled
+shutdown releases the SQLite file handle first.
+
+Read-only JSON/CSV export works with either configured embedded vector store.
+Factory reset moves the default `data/vector` SQLite directory and the default
+ChromaDB directory into its recovery area, along with any vector and graph
+paths explicitly configured in `config.yaml`. It refuses an unsafe configured
+path that would contain that recovery directory. Dashboard snapshot generation
+also reads the configured embedded vector store, so the same snapshot workflow
+works for fresh SQLite installations.
+
+Before approving SQLite for a larger corpus, measure the exact-search path in
+an automatically removed temporary directory:
+
+```bash
+.venv/bin/python scripts/demo/benchmark_sqlite_vector_store.py \
+  --records 5000 --queries 20 --dimension 768 --limit 10 --max-p95-ms 300
+```
+
+The final JSON line contains p50 and p95 search latency. The threshold is an
+operator decision, not a universal claim: record the hardware and corpus size
+with the result before changing the storage default.
 
 ---
 
@@ -236,7 +295,7 @@ python --version
 ### Step 3: Install Dependencies
 
 ```bash
-pip install -r requirements.txt
+pip install --require-hashes -r requirements.lock
 ```
 
 ### Step 4: Initialize Databases
@@ -255,23 +314,26 @@ Elefante integrates with AI coding assistants via the **Model Context Protocol (
 
 ### Automated Configuration
 
-Run the configuration script to auto-detect and configure your IDE:
+The full installer configures every detected compatible host. For manual,
+host-specific setup, run only the adapter that owns the relevant configuration:
 
 ```bash
-python scripts/setup/configure_vscode_bob.py
+python scripts/setup/configure_vscode_bob.py       # VS Code and Bob
+python scripts/setup/configure_cursor_kiro.py      # Cursor, Kiro, Gemini CLI
+python scripts/setup/configure_antigravity.py      # Antigravity
+python scripts/setup/configure_cli_agents.py       # Claude Code, Codex, OpenClaw
 ```
 
-Supported IDEs:
+The adapters preserve user-managed registrations and unrelated MCP servers.
+Detected compatible hosts include:
 
-- VS Code (with Roo-Cline extension)
-- Cursor
-- Bob IDE
+- VS Code, Cursor, Bob, Antigravity, Kiro, Gemini CLI, Claude Code, Codex, and OpenClaw
 
 ### Manual Configuration
 
 If automatic configuration fails, do not guess the JSON shape for your IDE. Use the authoritative reference:
 
-See [`configure-ide.md`](configure-ide.md) for the authoritative MCP configuration reference (VS Code, Cursor, Bob, Antigravity).
+See [`configure-ide.md`](configure-ide.md) for the authoritative integration reference, compatibility tiers, and manual MCP configuration paths.
 
 ---
 
@@ -493,7 +555,7 @@ Every MCP tool response from Elefante contains up to three injected sections. Th
 Critical protocols and known pitfalls. These are non-negotiable rules:
 
 - Check for existing memories before creating new ones (prevent duplication)
-- Read the relevant Neural Register in `docs/debug/` before debugging
+- Read `workspace/ISSUES.md` and the linked postmortem before debugging
 - Do not rely on internal knowledge for project specifics — use the memory system
 - Developer Etiquette v1.2 enforcement reminder
 
@@ -667,18 +729,18 @@ brew install pyenv && pyenv install 3.11.0 && pyenv local 3.11.0
 
 ### Locked Dependencies
 
-**File**: `requirements.txt` — these versions are tested against Python 3.11:
+`requirements.txt` records the reviewed, exactly pinned direct dependency set. `requirements.lock` is the generated universal transitive resolution with hashes; all installation paths use that lock:
 
 ```
 kuzu==0.11.3
 chromadb==1.3.5
-sentence-transformers==2.7.0
-mcp==1.23.1
-fastapi==0.124.0
+sentence-transformers==5.6.0
+mcp==1.28.1
+fastapi==0.139.2
 uvicorn==0.38.0
 ```
 
-Do NOT upgrade without testing on Python 3.11.
+Do not edit `requirements.lock` by hand. After an intentional direct-dependency change, regenerate it with `uv pip compile --universal --generate-hashes --python-version 3.11 requirements.txt -o requirements.lock`, review the diff, then run the complete suite. Installers and CI reject an unverified range resolution.
 
 ### Wrong Python Version?
 
@@ -689,7 +751,7 @@ deactivate
 rm -rf .venv
 python3.11 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install --require-hashes -r requirements.lock
 ```
 
 ### CI/CD Examples

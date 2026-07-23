@@ -12,8 +12,11 @@
 
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 from datetime import datetime
+
+import pytest
 
 from src.models.memory import Memory, MemoryMetadata, MemoryType
 from src.utils.dashboard_serializer import (
@@ -123,3 +126,127 @@ def test_dashboard_frontend_retries_stats_and_snapshot_fetches():
     assert store_source.count("1000 * Math.pow(2, attempt)") >= 2
     assert "fetch('/api/graph')" in store_source
     assert "fetch('/api/stats')" in store_source
+
+
+def test_dashboard_defaults_to_loopback_and_explicit_cors(monkeypatch):
+    from src.dashboard import server
+
+    monkeypatch.delenv("ELEFANTE_DASHBOARD_HOST", raising=False)
+    monkeypatch.delenv("ELEFANTE_DASHBOARD_CORS_ORIGINS", raising=False)
+
+    assert server._dashboard_host() == "127.0.0.1"
+    assert server._dashboard_cors_origins() == [
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
+    ]
+
+
+def test_dashboard_allows_only_explicit_origin_configuration(monkeypatch):
+    from src.dashboard import server
+
+    monkeypatch.setenv(
+        "ELEFANTE_DASHBOARD_CORS_ORIGINS",
+        "https://dashboard.example.test, https://admin.example.test",
+    )
+
+    assert server._dashboard_cors_origins() == [
+        "https://dashboard.example.test",
+        "https://admin.example.test",
+    ]
+
+
+def test_dashboard_container_defaults_remain_host_loopback_only():
+    repo_root = Path(__file__).resolve().parents[1]
+    dockerfile = (repo_root / "Dockerfile").read_text(encoding="utf-8")
+    compose = (repo_root / "docker-compose.yml").read_text(encoding="utf-8")
+
+    assert "ELEFANTE_DASHBOARD_HOST=0.0.0.0" not in dockerfile
+    assert '"127.0.0.1:8000:8000"' in compose
+    assert "ELEFANTE_DASHBOARD_HOST: 0.0.0.0" in compose
+
+
+@pytest.mark.asyncio
+async def test_dashboard_reads_and_searches_only_the_redacted_snapshot(monkeypatch, tmp_path):
+    from src.dashboard import server
+
+    snapshot_path = tmp_path / "dashboard_snapshot.json"
+    snapshot_path.write_text(
+        """{
+          "generated_at": "2026-07-22T12:00:00Z",
+          "stats": {"memories": 1, "entities": 0, "edges": 0, "total_nodes": 1},
+          "nodes": [
+            {"id": "memory-1", "type": "memory", "name": "Python style", "description": "Use black for Python formatting", "properties": {"content": "Use black for Python formatting", "title": "Python style", "tags": "python,formatting", "topic": "Code Style", "access_count": 4}},
+            {"id": "entity-1", "type": "entity", "name": "Python", "description": "language", "properties": {}}
+          ],
+          "edges": []
+        }""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(server, "_snapshot_path", lambda: snapshot_path)
+    monkeypatch.setattr(
+        server,
+        "get_config",
+        lambda: SimpleNamespace(elefante=SimpleNamespace(version="test-version")),
+    )
+
+    graph = await server.get_graph(limit=10)
+    search = await server.search_memories("python formatting", limit=10, min_similarity=1.0)
+    stats = await server.get_stats()
+
+    assert {node["id"] for node in graph["nodes"]} == {"memory-1", "entity-1"}
+    assert search == {
+        "success": True,
+        "count": 1,
+        "results": [
+            {
+                "id": "memory-1",
+                "content": "Use black for Python formatting",
+                "metadata": {
+                    "content": "Use black for Python formatting",
+                    "title": "Python style",
+                    "tags": "python,formatting",
+                    "topic": "Code Style",
+                    "access_count": 4,
+                },
+                "similarity": 1.0,
+            }
+        ],
+    }
+    assert "data_dir" not in stats["elefante"]
+    assert "path" not in stats["snapshot"]
+
+
+def test_dashboard_has_no_browser_triggered_snapshot_mutation_or_live_store_import():
+    from src.dashboard import server
+
+    route_paths = {route.path for route in server.app.routes}
+    source = Path(server.__file__).read_text(encoding="utf-8")
+
+    assert "/api/refresh" not in route_paths
+    assert "get_vector_store" not in source
+    assert "subprocess.run" not in source
+    assert "allow_methods=[\"GET\"]" in source
+
+
+@pytest.mark.parametrize("mutation", ["CREATE", "MERGE", "SET", "DELETE", "DROP", "REMOVE"])
+def test_graph_query_validator_rejects_mutations(mutation):
+    from src.utils.validators import ValidationError, validate_cypher_query
+
+    with pytest.raises(ValidationError, match="read-only"):
+        validate_cypher_query(f"{mutation} (n:Entity)")
+
+
+def test_graph_query_validator_accepts_read_only_match():
+    from src.utils.validators import validate_cypher_query
+
+    assert validate_cypher_query("MATCH (n:Entity) RETURN n LIMIT 10") == "MATCH (n:Entity) RETURN n LIMIT 10"
+
+
+def test_provenance_backfill_is_dry_run_by_default():
+    repo_root = Path(__file__).resolve().parents[1]
+    source = (repo_root / "scripts" / "lifecycle" / "backfill_memory_provenance.py").read_text(encoding="utf-8")
+
+    assert 'parser.add_argument("--apply", action="store_true"' in source
+    assert 'backfill(apply=args.apply)' in source
+    assert '"tool": "legacy"' in source
+    assert "REPO_ROOT = Path(__file__).resolve().parents[2]" in source

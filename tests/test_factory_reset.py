@@ -22,6 +22,7 @@ Real user data is never touched.
 """
 
 import os
+import json
 import shutil
 import sys
 import textwrap
@@ -165,3 +166,98 @@ class TestLiveReset:
 
         assert result1 is True
         assert result2 is True
+
+
+def test_reset_moves_opt_in_sqlite_and_graph_data_under_an_overridden_data_root(tmp_path):
+    data_dir = tmp_path / "sqlite-data"
+    vector_dir = data_dir / "vector"
+    sqlite_file = vector_dir / "memories.sqlite3"
+    kuzu_path = data_dir / "kuzu_db"
+    vector_dir.mkdir(parents=True)
+    sqlite_file.write_text("sqlite-vector-data", encoding="utf-8")
+    kuzu_path.write_text("kuzu-data", encoding="utf-8")
+
+    with patch.dict(
+        os.environ,
+        {"ELEFANTE_DATA_DIR": str(data_dir), "ELEFANTE_PRIVILEGED": "1"},
+        clear=False,
+    ):
+        assert factory_reset(apply=True, confirm="DELETE") is True
+
+    backups = data_dir / "backups" / "factory_reset"
+    assert not vector_dir.exists()
+    assert not kuzu_path.exists()
+    sqlite_backup = next(path for path in backups.iterdir() if path.name.startswith("vector."))
+    assert (sqlite_backup / "memories.sqlite3").read_text(encoding="utf-8") == "sqlite-vector-data"
+
+
+def test_reset_moves_custom_configured_vector_and_graph_paths(tmp_path):
+    data_dir = tmp_path / "data"
+    vector_dir = tmp_path / "custom-vector"
+    graph_path = tmp_path / "custom-kuzu"
+    vector_dir.mkdir()
+    (vector_dir / "memories.sqlite3").write_text("custom-sqlite-data", encoding="utf-8")
+    graph_path.write_text("custom-kuzu-data", encoding="utf-8")
+    config_path = tmp_path / "elefante.yaml"
+    config_path.write_text(
+        json.dumps(
+            {
+                "elefante": {
+                    "data_dir": str(data_dir),
+                    "vector_store": {"type": "sqlite", "persist_directory": str(vector_dir)},
+                    "graph_store": {"database_path": str(graph_path)},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with patch.dict(
+        os.environ,
+        {
+            "ELEFANTE_CONFIG_PATH": str(config_path),
+            "ELEFANTE_PRIVILEGED": "1",
+        },
+        clear=True,
+    ):
+        assert factory_reset(apply=True, confirm="DELETE") is True
+
+    backups = data_dir / "backups" / "factory_reset"
+    assert not vector_dir.exists()
+    assert not graph_path.exists()
+    vector_backup = next(path for path in backups.iterdir() if path.name.startswith("custom-vector."))
+    graph_backup = next(path for path in backups.iterdir() if path.name.startswith("custom-kuzu."))
+    assert (vector_backup / "memories.sqlite3").read_text(encoding="utf-8") == "custom-sqlite-data"
+    assert graph_backup.read_text(encoding="utf-8") == "custom-kuzu-data"
+
+
+def test_reset_refuses_a_configured_path_that_contains_the_recovery_directory(tmp_path):
+    data_dir = tmp_path / "data"
+    unsafe_vector_dir = data_dir / "backups" / "factory_reset"
+    unsafe_vector_dir.mkdir(parents=True)
+    marker = unsafe_vector_dir / "must-not-move.sqlite3"
+    marker.write_text("preserve", encoding="utf-8")
+    config_path = tmp_path / "unsafe-elefante.yaml"
+    config_path.write_text(
+        json.dumps(
+            {
+                "elefante": {
+                    "data_dir": str(data_dir),
+                    "vector_store": {"type": "sqlite", "persist_directory": str(unsafe_vector_dir)},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with patch.dict(
+        os.environ,
+        {
+            "ELEFANTE_CONFIG_PATH": str(config_path),
+            "ELEFANTE_PRIVILEGED": "1",
+        },
+        clear=True,
+    ):
+        assert factory_reset(apply=True, confirm="DELETE") is False
+
+    assert marker.read_text(encoding="utf-8") == "preserve"

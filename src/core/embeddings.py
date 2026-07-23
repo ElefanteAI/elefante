@@ -93,7 +93,7 @@ class EmbeddingService:
             # LAW #6: STDOUT PURITY - Redirect 3rd party library prints to stderr
             with redirect_stdout(sys.stderr):
                 self._model = SentenceTransformer(self.model_name, device=self.device)
-            self._dimension = self._model.get_sentence_embedding_dimension()
+            self._dimension = self._model.get_embedding_dimension()
             
             logger.info(
                 "sentence_transformer_loaded",
@@ -244,4 +244,3 @@ def reset_embedding_service():
     """Reset global embedding service (useful for testing)"""
     global _embedding_service
     _embedding_service = None
-

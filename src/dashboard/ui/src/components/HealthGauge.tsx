@@ -1,4 +1,3 @@
-// Elefante Dashboard v3.0.0 - Health Score Ring Gauge
 
 interface HealthGaugeProps {
   score: number;

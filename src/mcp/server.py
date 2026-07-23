@@ -21,9 +21,11 @@ for AI assistants to store and retrieve memories.
 
 import asyncio
 import json
+import os
+from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional, Sequence
 from datetime import datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -49,7 +51,7 @@ from src.core.directive_store import get_directive_store
 from src.models.query import QueryMode, SearchFilters
 from src.models.entity import EntityType, RelationshipType
 from src.utils.logger import get_logger
-from src.utils.validators import validate_memory_content, validate_uuid
+from src.utils.validators import validate_cypher_query, validate_memory_content, validate_uuid
 from src.utils.elefante_mode import get_mode_manager, is_elefante_enabled, write_lock
 from src.utils.token_counter import (
     estimate_tokens, estimate_tokens_json, token_density_score,
@@ -69,6 +71,14 @@ SAFE_TOOLS = {
     "elefante-DirectiveRemove",
 }
 
+# Provenance comes from transport headers or the local process environment, so
+# it must stay safe to persist, log, and render. These limits deliberately
+# bound each independently useful field without imposing a host-name allowlist.
+PROVENANCE_TOOL_MAX_LENGTH = 128
+PROVENANCE_INSTANCE_MAX_LENGTH = 256
+PROVENANCE_SESSION_MAX_LENGTH = 256
+PROVENANCE_CWD_MAX_LENGTH = 1024
+
 
 class ElefanteMCPServer:
     """
@@ -76,7 +86,7 @@ class ElefanteMCPServer:
     
     Exposes memory operations as MCP tools:
     - elefante-Memory: Memory operations (action: add|search|update|delete|consolidate)
-    - elefante-GraphQuery: Execute Cypher queries on knowledge graph
+    - elefante-GraphQuery: Execute read-only Cypher queries on knowledge graph
     - elefante-ContextGet: Retrieve session context
     - elefante-GraphConnect: Batch upsert entities and relationships
     - elefante-SystemStatusGet: Get system status and statistics
@@ -101,11 +111,123 @@ class ElefanteMCPServer:
         
         # Token intelligence ledger (per server lifecycle)
         self._token_ledger = SessionTokenLedger()
+        # A daemon is one async process serving many MCP sessions. Serialize
+        # mutations here before entering the cross-process file lock; otherwise
+        # a synchronous lock wait can block the event loop that must complete
+        # the current writer.
+        self._write_serialization = asyncio.Lock()
+        # Direct stdio transports do not provide an MCP session identifier. Give
+        # each server process a stable, explicit origin for its lifetime.
+        self._stdio_instance_id = self._provenance_value(
+            os.environ.get("ELEFANTE_CLIENT_INSTANCE_ID"),
+            uuid4().hex,
+            PROVENANCE_INSTANCE_MAX_LENGTH,
+        )
         
         # Register tool handlers
         self._register_handlers()
         
         self.logger.info("Elefante MCP Server initialized")
+
+    @staticmethod
+    def _provenance_value(value: Any, default: str, max_length: int) -> str:
+        """Return a bounded, printable provenance value or its safe default.
+
+        Header and environment values are untrusted input. Rejecting control
+        characters rather than silently removing them preserves a clear data
+        contract for storage, logs, and dashboard rendering.
+        """
+        try:
+            candidate = str(value or "").strip()
+        except Exception:
+            return default
+        if not candidate or not candidate.isprintable():
+            return default
+        return candidate[:max_length]
+
+    def _request_provenance(self) -> Dict[str, str]:
+        """Derive write provenance from the active MCP transport context.
+
+        Clients may enrich their identity with `X-Elefante-Client-*` headers,
+        but the daemon always owns the transport and session identifiers. This
+        prevents a caller-provided memory metadata object from becoming the
+        source of truth for provenance.
+        """
+        try:
+            context = self.server.request_context
+            request = context.request
+        except LookupError:
+            request = None
+            context = None
+
+        if request is None:
+            return {
+                "tool": self._provenance_value(
+                    os.environ.get("ELEFANTE_CLIENT_TOOL"),
+                    "unknown-stdio",
+                    PROVENANCE_TOOL_MAX_LENGTH,
+                ),
+                "instance_id": self._provenance_value(
+                    os.environ.get("ELEFANTE_CLIENT_INSTANCE_ID"),
+                    self._stdio_instance_id,
+                    PROVENANCE_INSTANCE_MAX_LENGTH,
+                ),
+                "session_id": "stdio",
+                "cwd": self._provenance_value(
+                    os.environ.get("ELEFANTE_CLIENT_CWD"),
+                    "",
+                    PROVENANCE_CWD_MAX_LENGTH,
+                ),
+                "transport": "stdio",
+            }
+
+        headers = request.headers
+        client_params = getattr(getattr(context, "session", None), "client_params", None)
+        client_info = getattr(client_params, "clientInfo", None)
+        client_name = getattr(client_info, "name", None)
+        session_id = headers.get("mcp-session-id")
+
+        return {
+            "tool": self._provenance_value(
+                headers.get("x-elefante-client-tool") or client_name,
+                "unknown-http",
+                PROVENANCE_TOOL_MAX_LENGTH,
+            ),
+            "instance_id": self._provenance_value(
+                headers.get("x-elefante-client-instance-id") or session_id,
+                "unknown-http-instance",
+                PROVENANCE_INSTANCE_MAX_LENGTH,
+            ),
+            "session_id": self._provenance_value(
+                session_id,
+                "initializing",
+                PROVENANCE_SESSION_MAX_LENGTH,
+            ),
+            "cwd": self._provenance_value(
+                headers.get("x-elefante-client-cwd"),
+                "",
+                PROVENANCE_CWD_MAX_LENGTH,
+            ),
+            "transport": "streamable-http",
+        }
+
+    def _with_request_provenance(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Return add arguments with daemon-derived provenance attached."""
+        payload = dict(arguments)
+        metadata = payload.get("metadata")
+        if metadata is None:
+            metadata = {}
+        if not isinstance(metadata, dict):
+            raise ValueError("Memory metadata must be an object")
+        payload["metadata"] = {**metadata, "elefante_source": self._request_provenance()}
+        return payload
+
+    @asynccontextmanager
+    async def _write_operation(self):
+        """Serialize daemon mutations before acquiring the process-level lock."""
+        async with self._write_serialization:
+            with write_lock() as lock:
+                yield lock
 
     # Tools that should NOT get automatic context injection
     # (they already return memory data, or are system/admin tools)
@@ -208,7 +330,7 @@ class ElefanteMCPServer:
         """
         pitfalls = [
             "CRITICAL PROTOCOL: You MUST check for existing memories before creating new ones to avoid duplication.",
-            "CRITICAL PROTOCOL: If you are debugging, read docs/debug/README.md first, match the BUG row, and run its verification command before editing source.",
+            "CRITICAL PROTOCOL: If you are debugging, read workspace/ISSUES.md first, match the BUG/GAP row, and run its verification command before editing source.",
             "CRITICAL PROTOCOL: Do not rely on your internal knowledge base for project specifics; use the memory system."
         ]
         
@@ -254,9 +376,9 @@ class ElefanteMCPServer:
         the canonical first steps and maintained verification surfaces.
         """
         result["ENTRYPOINT_SEQUENCE_READ_THIS_FIRST"] = [
-            "1. Read docs/debug/README.md and match the current failure to a BUG row before changing code.",
+            "1. Read workspace/ISSUES.md and match the current failure to a BUG/GAP row before changing code.",
             "2. Run the verification command from that BUG row first. If it passes, the documented fix still holds and the root cause is elsewhere.",
-            "3. If the verification fails, open the linked docs/debug/*-compendium.md entry and use its exact commands and constraints.",
+            "3. If the verification fails, open the linked workspace/postmortems/<domain>.md entry and use its exact commands and constraints.",
             "4. Read tests/README.md before creating any scratch reproducer. Update an existing maintained test when possible.",
             "5. Only then edit source, rerun the same verifier, and update bug docs plus CHANGELOG if behavior changed.",
         ]
@@ -399,6 +521,13 @@ class ElefanteMCPServer:
             await self.orchestrator.ensure_system_baseline()
             self.logger.info("Orchestrator initialized")
         return self.orchestrator
+
+    async def close(self) -> None:
+        """Release a lazily-created orchestrator when this transport stops."""
+        orchestrator = self.orchestrator
+        self.orchestrator = None
+        if orchestrator is not None:
+            await orchestrator.close()
     
     def _register_handlers(self):
         """Register all MCP tool handlers"""
@@ -504,13 +633,13 @@ class ElefanteMCPServer:
                 ),
                 types.Tool(
                     name="elefante-GraphQuery",
-                    description="Execute Cypher queries directly on Elefante's Kuzu knowledge graph for advanced structured data retrieval. Use this for complex relationship traversals, pattern matching, and graph analytics. Ideal for queries like 'Find all entities connected to X', 'Show the path between A and B', or 'List all relationships of type Y'.",
+                    description="Execute read-only Cypher queries directly on Elefante's Kuzu knowledge graph for advanced structured data retrieval. Use this for complex relationship traversals, pattern matching, and graph analytics. Use elefante-GraphConnect for mutations. Ideal for queries like 'Find all entities connected to X', 'Show the path between A and B', or 'List all relationships of type Y'.",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "cypher_query": {
                                 "type": "string",
-                                "description": "Cypher query to execute"
+                                "description": "Read-only Cypher query to execute"
                             },
                             "parameters": {
                                 "type": "object",
@@ -1102,8 +1231,8 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 self.logger.error(f"Tool execution failed: {name}", error=str(e), exc_info=True)
                 # Surface compendium citation for database-class errors
                 error_msg = str(e)
-                if "ops-database-compendium" not in error_msg:
-                    error_msg += "\nDebug: docs/debug/README.md -> Known Issues"
+                if "workspace/ISSUES.md" not in error_msg:
+                    error_msg += "\nDebug: workspace/ISSUES.md -> match the BUG/GAP row"
                 error_payload = {
                     "error": error_msg,
                     "tool": name,
@@ -1148,7 +1277,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         
         # Clear orchestrator reference
         if result["success"]:
-            self.orchestrator = None
+            await self.close()
         
         return result
 
@@ -1183,80 +1312,83 @@ You have access to a persistent memory system called **Elefante** - the user's s
         if gate_result is not None:
             return gate_result
         
-        # Acquire write lock for duration of operation
-        with write_lock() as lock:
+        # Keep the lock until both vector and graph writes have completed. The
+        # previous scope ended after lazy initialization and left the actual
+        # Kuzu write outside its intended single-writer boundary.
+        async with self._write_operation() as lock:
             if not lock.acquired:
                 return {
                     "success": False,
                     "error": "Could not acquire write lock - another process is writing",
                     "retry": True
                 }
-            
+
             orchestrator = await self._get_orchestrator()
-        
-        # Build metadata with domain/category if provided
-        metadata = args.get("metadata") or {}
-        if args.get("domain"):
-            metadata["domain"] = args["domain"]
-        if args.get("category"):
-            metadata["category"] = args["category"]
-        
-        # Token intelligence: stamp content token count at ingestion
-        content = args["content"]
-        memory_type = args.get("memory_type", "conversation")
-        content_tokens = estimate_tokens(content)
-        density = token_density_score(content_tokens, memory_type)
-        system_meta = metadata.get("system_metadata", {})
-        system_meta["content_tokens"] = content_tokens
-        system_meta["token_density"] = density
-        metadata["system_metadata"] = system_meta
-        
-        memory = await orchestrator.add_memory(
-            content=args["content"],
-            memory_type=args.get("memory_type", "conversation"),
-            tags=args.get("tags"),
-            entities=args.get("entities"),
-            metadata=metadata if metadata else None,
-            force_new=bool(args.get("force_new", False))
-        )
-        
-        # Handle case where memory was IGNORED by cognitive pipeline
-        if memory is None:
-            rejection_reason = getattr(orchestrator, '_last_rejection_reason', None)
+            args = self._with_request_provenance(args)
+
+            # Build metadata with domain/category if provided
+            metadata = args.get("metadata") or {}
+            if args.get("domain"):
+                metadata["domain"] = args["domain"]
+            if args.get("category"):
+                metadata["category"] = args["category"]
+
+            # Token intelligence: stamp content token count at ingestion
+            content = args["content"]
+            memory_type = args.get("memory_type", "conversation")
+            content_tokens = estimate_tokens(content)
+            density = token_density_score(content_tokens, memory_type)
+            system_meta = metadata.get("system_metadata", {})
+            system_meta["content_tokens"] = content_tokens
+            system_meta["token_density"] = density
+            metadata["system_metadata"] = system_meta
+
+            memory = await orchestrator.add_memory(
+                content=args["content"],
+                memory_type=args.get("memory_type", "conversation"),
+                tags=args.get("tags"),
+                entities=args.get("entities"),
+                metadata=metadata if metadata else None,
+                force_new=bool(args.get("force_new", False))
+            )
+
+            # Handle case where memory was IGNORED by cognitive pipeline
+            if memory is None:
+                rejection_reason = getattr(orchestrator, '_last_rejection_reason', None)
+                return {
+                    "status": "ignored",
+                    "classification": "IGNORE",
+                    "entity_count": 0,
+                    "relationship_count": 0,
+                    "embedding_id": None,
+                    "graph_ids": [],
+                    "message": "Memory filtered by Intelligence Pipeline",
+                    "rejection_reason": rejection_reason or "Unknown — orchestrator returned None without setting a reason",
+                }
+
+            # Authoritative Output Format
+            # Count entities passed in + auto-generated (approximation)
+            entity_count = len(args.get("entities", []))
+
+            # Handle status as either enum or string
+            status_value = memory.metadata.status.value if hasattr(memory.metadata.status, 'value') else str(memory.metadata.status)
+
             return {
-                "status": "ignored",
-                "classification": "IGNORE",
-                "entity_count": 0,
-                "relationship_count": 0,
-                "embedding_id": None,
-                "graph_ids": [],
-                "message": "Memory filtered by Intelligence Pipeline",
-                "rejection_reason": rejection_reason or "Unknown — orchestrator returned None without setting a reason",
+                "status": "stored",
+                "classification": status_value.upper(),  # NEW|REDUNDANT|RELATED|CONTRADICTORY
+                "entity_count": entity_count,
+                "relationship_count": entity_count,  # 1 relationship per entity
+                "embedding_id": str(memory.id),
+                "graph_ids": [str(memory.id)],  # Memory node ID
+                "score": memory.metadata.score,
+                "memory_type": memory.metadata.memory_type.value if hasattr(memory.metadata.memory_type, 'value') else str(memory.metadata.memory_type),
+                "memory_id": str(memory.id),
+                "content_tokens": content_tokens,
+                "token_density": density,
+                **({
+                    "density_warning": f"Memory is {density:.1f}x over budget for {memory_type} (budget: {TYPE_TOKEN_BUDGETS.get(memory_type, 300)} tokens). Consider trimming or splitting."
+                } if density > 2.0 else {}),
             }
-        
-        # Authoritative Output Format
-        # Count entities passed in + auto-generated (approximation)
-        entity_count = len(args.get("entities", []))
-        
-        # Handle status as either enum or string
-        status_value = memory.metadata.status.value if hasattr(memory.metadata.status, 'value') else str(memory.metadata.status)
-        
-        return {
-            "status": "stored",
-            "classification": status_value.upper(),  # NEW|REDUNDANT|RELATED|CONTRADICTORY
-            "entity_count": entity_count,
-            "relationship_count": entity_count,  # 1 relationship per entity
-            "embedding_id": str(memory.id),
-            "graph_ids": [str(memory.id)],  # Memory node ID
-            "score": memory.metadata.score,
-            "memory_type": memory.metadata.memory_type.value if hasattr(memory.metadata.memory_type, 'value') else str(memory.metadata.memory_type),
-            "memory_id": str(memory.id),
-            "content_tokens": content_tokens,
-            "token_density": density,
-            **({
-                "density_warning": f"Memory is {density:.1f}x over budget for {memory_type} (budget: {TYPE_TOKEN_BUDGETS.get(memory_type, 300)} tokens). Consider trimming or splitting."
-            } if density > 2.0 else {}),
-        }
     
     async def _handle_search_memories(self, args: Dict[str, Any]) -> Dict[str, Any]:
         args = args.copy()
@@ -1388,11 +1520,12 @@ You have access to a persistent memory system called **Elefante** - the user's s
         return response
     
     async def _handle_query_graph(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle elefante-GraphQuery tool call"""
-        from src.core.graph_store import get_graph_store
-        
-        graph_store = get_graph_store()
-        # Note: Kuzu doesn't support parameterized queries in current implementation
+        """Handle a read-only elefante-GraphQuery tool call."""
+        validate_cypher_query(args["cypher_query"])
+        # The daemon owns one graph-store instance. Opening the module-level
+        # singleton here creates a second handle to the same Kuzu file.
+        graph_store = (await self._get_orchestrator()).graph_store
+        # Note: Kuzu doesn't support parameterized queries in current implementation.
         results = await graph_store.execute_query(args["cypher_query"])
         
         return {
@@ -1492,7 +1625,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         if not memory_id:
             return {"success": False, "error": "memory_id is required"}
         
-        with write_lock() as lock:
+        async with self._write_operation() as lock:
             if not lock.acquired:
                 return {"success": False, "error": "Could not acquire write lock", "retry": True}
             
@@ -1542,7 +1675,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         if not memory_id or not reason:
             return {"success": False, "error": "Both memory_id and reason are required"}
         
-        with write_lock() as lock:
+        async with self._write_operation() as lock:
             if not lock.acquired:
                 return {"success": False, "error": "Could not acquire write lock", "retry": True}
             
@@ -1589,7 +1722,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
 
     async def _handle_consolidate_memories(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Handle elefante-MemoryConsolidate tool call (transaction-scoped)"""
-        with write_lock() as lock:
+        async with self._write_operation() as lock:
             if not lock.acquired:
                 return {
                     "success": False,
@@ -1996,7 +2129,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
         if gate_result is not None:
             return gate_result
         
-        with write_lock() as lock:
+        async with self._write_operation() as lock:
             if not lock.acquired:
                 return {
                     "success": False,
@@ -2146,7 +2279,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 "error": f"Missing required fields: {missing}"
             }
         
-        with write_lock() as lock:
+        async with self._write_operation() as lock:
             if not lock.acquired:
                 return {
                     "success": False,
@@ -2289,7 +2422,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
     async def _handle_task_create(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Handle elefante-TaskCreate — create a new task node."""
         try:
-            with write_lock() as lock:
+            async with self._write_operation() as lock:
                 if not lock.acquired:
                     return {"success": False, "error": "Could not acquire write lock", "retry": True}
                 
@@ -2330,7 +2463,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
     async def _handle_task_update(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Handle elefante-TaskUpdate - Update task status/output"""
         try:
-            with write_lock() as lock:
+            async with self._write_operation() as lock:
                 if not lock.acquired:
                     return {"success": False, "error": "Could not acquire write lock", "retry": True}
                 
@@ -2385,9 +2518,15 @@ You have access to a persistent memory system called **Elefante** - the user's s
 
 
 async def main():
-    """Main entry point for MCP server"""
+    """Main entry point for MCP server.
+
+    Developer workflow references: workspace/ISSUES.md and tests/README.md.
+    """
     server = ElefanteMCPServer()
-    await server.run()
+    try:
+        await server.run()
+    finally:
+        await server.close()
 
 
 if __name__ == "__main__":
@@ -2406,5 +2545,3 @@ if __name__ == "__main__":
     _sys.stderr.flush()
 
     asyncio.run(main())
-
-

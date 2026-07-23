@@ -76,11 +76,11 @@
 **Solution:** Two-layer fix. (1) **VS Code user-level** `settings.json` → `github.copilot.chat.codeGeneration.instructions` pointing to `elefante/.github/copilot-instructions.md`. Loads for every workspace, every subfolder, every session. (2) **BOB workspace fallback** `BOB/.github/copilot-instructions.md` as backup if user-settings injection is cleared. Cross-client fix (Cursor, Windsurf) requires client-specific bootstrap files — pending.
 **Lesson:** Instruction delivery and MCP registration are separate systems at separate layers. The correct scope for behavioral instructions is the broadest available scope — not the narrowest that works in the demo scenario. System-level = `settings.json` user injection, not workspace-level file presence.
 
-## Issue #11: JSON Export Is Not a Backup [DOCUMENTED — `import_memories.py` planned]
+## Issue #11: JSON Export Is Not a Backup [MITIGATED — portable import planned]
 
 **Trigger:** User runs `export_memories.py --format json`, factory-resets, finds no script to re-import. Brain is gone.
 **Root cause:** Three layers. (1) `export_memories.py` was built for offline analysis, not migration; no `import_memories.py` was ever written. (2) Embeddings excluded — the export calls `collection.get(include=["metadatas", "documents"])` but Elefante stores embeddings explicitly via `thenlper/gte-base`. (3) ChromaDB has no named embedding function in Elefante's collection — using its default (`all-MiniLM-L6-v2`) on upsert silently corrupts semantic search.
-**Solution:** Phase 1 — surface backup/restore (`backup_elefante_data.py`) as the primary persistence path in README; mark JSON export as read-only analysis output. Phase 2 — build `scripts/pipeline/import_memories.py` that regenerates embeddings using `thenlper/gte-base` before `collection.upsert()`. Estimated ~120 LOC.
+**Solution:** Phase 1 — surface backup/restore (`backup_elefante_data.py`) as the primary persistence path and mark JSON export as read-only analysis output. The binary backup now carries a checksum manifest, excludes nested recovery archives, and restores through a dry-run-first, safe-extraction, staged replacement flow that preserves existing data by default. Phase 2 — build `scripts/pipeline/import_memories.py` that regenerates embeddings using `thenlper/gte-base` before `collection.upsert()`.
 **Lesson:** A write-only export is not a backup. Every export format needs a documented import path or must be explicitly labeled read-only. Never infer "exportable = restorable."
 
 ## Issue #12: DOC_SYNC Protocol Bypass [MITIGATED, guard partial — parent class BUG-006]

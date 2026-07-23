@@ -11,7 +11,7 @@
 #           MCP surface end-to-end — do not substitute with unit tests.
 # USAGE   : python scripts/verify/verify_e2e_tests.py [--with-dashboard-open]
 # NOTES   : Launches a real MCP server subprocess in a temp dir. Slow (~60s)
-#           but definitive. --with-dashboard-open enables the optional 20-tool
+#           but definitive. --with-dashboard-open enables the optional 16-tool
 #           sweep including dashboard tools. Requires all dependencies installed.
 # LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
@@ -21,7 +21,7 @@ Runs the real MCP server in an isolated temporary Elefante home/data dir and
 verifies the live MCP surface one feature family at a time.
 
 Default mode is safe and self-contained:
-    - verifies 19/20 tools + 2 prompts
+    - verifies 15/16 tools + 2 prompts
     - excludes `elefante-DashboardOpen` because that tool binds fixed port 8000
       and attempts to open a browser outside the temp store
 
@@ -368,7 +368,7 @@ async def run_e2e(with_dashboard_open: bool) -> int:
 
     _header(f"Elefante Self-Protocol Harness v{ELEFANTE_VERSION}")
     print("  Purpose : whole-system MCP proof in isolated temp HOME + data")
-    print("  Surface : 19/20 tools + 2 prompts by default")
+    print("  Surface : 15/16 tools + 2 prompts by default")
     print("  Dashboard tool:", "enabled" if with_dashboard_open else "skipped by default")
     print(f"  Tag     : {test_tag}")
 
@@ -636,11 +636,11 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         )
         mutable_memory_old = (
             f"[{test_tag}] Mutable memory OLD phrase. "
-            "This content should be replaced by MemoryUpdate."
+            "This content should be replaced by elefante-Memory(action=update)."
         )
         mutable_memory_new = (
             f"[{test_tag}] Mutable memory NEW phrase. "
-            "MemoryUpdate wrote this replacement content."
+            "elefante-Memory(action=update) wrote this replacement content."
         )
         etl_memory_content = (
             f"[{test_tag}] ETL raw memory. "
@@ -672,14 +672,14 @@ async def run_e2e(with_dashboard_open: bool) -> int:
 
         results.append(
             _result(
-                "MemoryAdd stores protocol fixtures",
+                "Memory(action=add) stores protocol fixtures",
                 stored_all and all(memory_ids.values()),
                 f"stored={sum(1 for value in memory_ids.values() if value)}/{len(memory_specs)}",
             )
         )
         results.append(
             _result(
-                "MemoryAdd response includes token intelligence fields",
+                "Memory(action=add) response includes token intelligence fields",
                 isinstance(last_store_response.get("content_tokens"), int)
                 and last_store_response.get("content_tokens", 0) > 0
                 and isinstance(last_store_response.get("token_density"), (int, float))
@@ -698,7 +698,7 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         )
         results.append(
             _result(
-                "MemorySearch surfaces stored memory",
+                "Memory(action=search) surfaces stored memory",
                 _search_contains(active_search, test_tag),
                 "semantic search finds live stored test memory",
             )
@@ -707,7 +707,7 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         all_memories_response, protocol_memories = await _list_protocol_memories(client, test_tag)
         results.append(
             _result(
-                "MemorySearch list_all surfaces protocol-owned records",
+                "Memory(action=search, list_all=true) surfaces protocol-owned records",
                 len(protocol_memories) >= 4,
                 f"tagged_memories={len(protocol_memories)}",
             )
@@ -723,7 +723,7 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         )
         results.append(
             _result(
-                "MemoryUpdate amends stored content",
+                "Memory(action=update) amends stored content",
                 update_response.get("success") is True,
                 update_response.get("message", ""),
             )
@@ -733,7 +733,7 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         updated_memory = _memory_by_id(protocol_memories_after_update, memory_ids["mutable"])
         results.append(
             _result(
-                "MemoryUpdate read-back shows replacement content",
+                "Memory(action=update) read-back shows replacement content",
                 updated_memory is not None and updated_memory.get("content") == mutable_memory_new,
                 "list_all returns the updated content for the same memory id",
             )
@@ -748,7 +748,7 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         )
         results.append(
             _result(
-                "MemoryDelete removes a stored record",
+                "Memory(action=delete) removes a stored record",
                 delete_response.get("success") is True,
                 delete_response.get("message", ""),
             )
@@ -757,7 +757,7 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         _, protocol_memories_after_delete = await _list_protocol_memories(client, test_tag)
         results.append(
             _result(
-                "MemoryDelete read-back confirms removal",
+                "Memory(action=delete) read-back confirms removal",
                 _memory_by_id(protocol_memories_after_delete, memory_ids["active"]) is None,
                 f"remaining={len(protocol_memories_after_delete)} tagged memories",
             )
@@ -978,7 +978,7 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         refinery_stats = consolidate_response.get("refinery", {}).get("stats", {})
         results.append(
             _result(
-                "MemoryConsolidate dry-run returns refinery stats",
+                "Memory(action=consolidate) dry-run returns refinery stats",
                 consolidate_response.get("success") is True
                 and consolidate_response.get("refinery", {}).get("applied") is False
                 and refinery_stats.get("total_memories", 0) >= 1,

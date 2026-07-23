@@ -63,6 +63,16 @@ data/dashboard_snapshot.json (Static File)
 Dashboard (Read Only)
 ```
 
+The dashboard never opens ChromaDB or Kuzu. Its search is lexical over the
+redacted snapshot, so it may be less comprehensive than MCP semantic retrieval
+but cannot contend with the daemon's databases. The browser **Reload** button
+only reloads the existing snapshot. To regenerate one from live data, use
+`elefante-DashboardOpen(refresh=true)` through MCP or explicitly run:
+
+```bash
+python scripts/pipeline/update_dashboard_data.py
+```
+
 This prevents Kuzu single-writer lock conflicts.
 
 ---
@@ -381,23 +391,9 @@ if __name__ == "__main__":
 
 Restart dashboard to use new port.
 
-### Change Binding Address
+### Network exposure
 
-Default: `127.0.0.1` (localhost only)
-
-To allow external access:
-
-```python
-uvicorn.run(
-    app,
-    host="0.0.0.0",  # Listen on all interfaces
-    port=8000,
-    reload=False,
-    log_level="info"
-)
-```
-
-**Warning**: Makes dashboard accessible to network. Use with caution in production.
+Default: `127.0.0.1` (localhost only). Do not change the bind address to expose the dashboard directly: it can return private memory content. External access requires a separately secured, authenticated reverse proxy, an explicit `ELEFANTE_DASHBOARD_CORS_ORIGINS` allowlist, and network controls. The bundled Docker Compose configuration is still host-loopback-only; its internal `0.0.0.0` bind exists solely to let Docker's private network reach the container.
 
 ---
 

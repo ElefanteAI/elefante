@@ -1,4 +1,3 @@
-// Elefante Dashboard v3.0.0 - Type Definitions
 
 export interface MemoryNode {
   id: string;
@@ -66,12 +65,10 @@ export interface StatsResponse {
   elefante: {
     package_version: string | null;
     config_version: string | null;
-    data_dir: string;
   };
   vector_store: { total_memories: number };
   graph_store: { total_entities: number; total_relationships: number };
   snapshot: {
-    path: string;
     generated_at: string;
     total_nodes: number;
     memories: number;

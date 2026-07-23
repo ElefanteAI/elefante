@@ -164,6 +164,7 @@ def ensure_bundle_layout(bundle_root: Path) -> Path:
         payload_root,
         payload_root / INSTALL_SCRIPT_RELATIVE_PATH,
         payload_root / "requirements.txt",
+        payload_root / "requirements.lock",
         bundle_root / "scripts" / "setup" / "bootstrap_release_bundle.py",
     ]
 

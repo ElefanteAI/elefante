@@ -104,12 +104,12 @@
 **Solution:** Workaround — `collection.get(where=...)` (non-query path) instead of `collection.query(where=...)` for the duplicate check. Pin ChromaDB version until upstream fix.
 **Lesson:** Library bugs surface at scale. Test with production-size data before claiming fix. Workaround paths are cheaper than version pins when upstream is slow.
 
-## Issue #15: Multi-Instance Write Origin Tracking [GAP-025, OPEN — closure planned v2.11.0]
+## Issue #15: Multi-Instance Write Origin Tracking [GAP-025, IN PROGRESS]
 
 **Trigger:** Two concurrent IDEs (e.g. Hermes + VS Code) writing memory: no `source.*` tuple distinguishes which instance wrote which memory. Stdio-per-client transport makes Kuzu single-writer contract violation possible. Blocks session-intelligence client attribution.
-**Root cause:** No `Source` schema. Memories have `created_at` but no `source.tool`, `source.instance_id`, `source.cwd`. Stdio MCP transport is per-client by design — concurrent IDEs spawn separate Elefante subprocesses and fight for Kuzu's single-writer lock.
-**Solution (planned):** v2.11.0 daemon over streamable-http on `127.0.0.1:<port>` (singleton owner of Kuzu); `(:Memory)-[:WRITTEN_BY]->(:Source)` schema with idempotent migration; per-IDE adapter writes `Source` tuple; integration-inspector continuous drift audit.
-**Acceptance:** Two concurrent IDE instances produce distinct `source.instance_id` values with zero Kuzu lock contention.
+**Root cause:** Memories had no `source.tool`, `source.instance_id`, or `source.cwd`. Stdio MCP transport is per-client by design, so concurrent IDEs could spawn database-owning processes and fight for Kuzu's single-writer lock.
+**Solution:** A loopback Streamable HTTP daemon is the singleton database owner; stdio bridges forward provenance headers; `(:Entity)-[:WRITTEN_BY]->(:Source)` is written with each memory; and `backfill_memory_provenance.py` provides an idempotent, dry-run-first legacy migration. VS Code, Bob, and Antigravity emit bridge configuration. User-modified configuration is preserved by manifest-driven uninstall.
+**Acceptance:** Two concurrent bridge clients produce distinct `source.instance_id` values with zero Kuzu lock contention. Proof: `pytest tests/test_mcp_daemon.py -m slow -q`. Full closure still requires an authorized apply of pending legacy graph links and host-level install/reconnect/upgrade/uninstall certification.
 **Lesson (provisional):** A multi-writer contract on a single-writer database is a category error. Push concurrency to the layer above the database (daemon), not into the database's locking primitives.
 
 ---

@@ -3,12 +3,33 @@ Elefante - Local AI Memory System
 Setup configuration for package installation
 """
 
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 from pathlib import Path
 
 # Read README for long description
 readme_file = Path(__file__).parent / "README.md"
 long_description = readme_file.read_text(encoding="utf-8") if readme_file.exists() else ""
+
+
+def requirements(section: str) -> list[str]:
+    """Return exact runtime or development requirements from the canonical file.
+
+    Release bundles and the installer use the hash-checked lock. Package metadata
+    cannot carry hashes, but it must still describe the same direct versions and
+    must never silently widen a security-reviewed dependency range.
+    """
+    requested = "runtime" if section == "runtime" else "development"
+    active = "runtime"
+    values: list[str] = []
+    for raw_line in (Path(__file__).parent / "requirements.txt").read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if line.startswith("# Development Dependencies"):
+            active = "development"
+            continue
+        if not line or line.startswith("#") or active != requested:
+            continue
+        values.append(line)
+    return values
 
 setup(
     name="elefante",
@@ -19,8 +40,9 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/ElefanteAI/elefante",
-    packages=find_packages(where="src"),
-    package_dir={"": "src"},
+    # Runtime commands use ``python -m src.mcp...``. Include the namespace
+    # itself so an installed wheel has the same import contract as a checkout.
+    packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
@@ -31,26 +53,9 @@ setup(
         "Programming Language :: Python :: 3.11",
     ],
     python_requires=">=3.11",
-    install_requires=[
-        "chromadb>=0.4.22",
-        "kuzu>=0.1.0",
-        "sentence-transformers>=2.2.2",
-        "mcp>=1.0.0",
-        "aiohttp>=3.9.0",
-        "numpy>=1.24.0",
-        "pydantic>=2.5.0",
-        "pyyaml>=6.0.1",
-        "python-dotenv>=1.0.0",
-        "structlog>=23.2.0",
-    ],
+    install_requires=requirements("runtime"),
     extras_require={
-        "dev": [
-            "pytest>=7.4.0",
-            "pytest-asyncio>=0.21.0",
-            "pytest-cov>=4.1.0",
-            "black>=23.12.0",
-            "mypy>=1.7.0",
-        ],
+        "dev": requirements("development"),
     },
     include_package_data=True,
     package_data={
@@ -58,4 +63,3 @@ setup(
     },
     zip_safe=False,
 )
-

@@ -3,33 +3,33 @@ status: DRAFT
 target: v3.0.0 (breaking change — explicit semver MAJOR)
 authority: pre-implementation; supersedes nothing yet shipped
 related:
-  - workspace/PLANNING.md §2.3 (A2 preserves 20 tools in v2.10.0)
   - workspace/PLANNING.md §2.5 (X1 rejected 3-tool facade)
   - workspace/PLANNING.md §2.5 (X6 rejected Hermes-specific profile)
-  - docs/reference/tools.md (current 20-tool surface)
+  - CHANGELOG.md [2.10.0] (Memory atomic swap: 20 tools to 16)
+  - docs/reference/tools.md (current 16-tool surface)
   - src/mcp/server.py (live tool registry)
 ---
 
-# Tool Surface Consolidation — 20 → 6 Domain-Grouped Tools
+# Tool Surface Consolidation — 16 → 6 Domain-Grouped Tools
 
 ## Question this PRD answers
 
-**Can the agent-facing MCP tool surface shrink from 20 atomic tools to 6 domain-grouped tools with discriminated-action parameters — without reproducing the failure modes that killed X1?**
+**Can the agent-facing MCP tool surface shrink from 16 tools to 6 domain-grouped tools with discriminated-action parameters — without reproducing the failure modes that killed X1?**
 
 ## Problem
 
-Today's surface (verified `grep -c 'types.Tool(' src/mcp/server.py` = 20):
+Today's source-derived surface (`python scripts/ci/list_mcp_tools.py`) is 16 tools:
 
 | Domain (today) | Tools | Count |
 |----------------|-------|-------|
-| Memory primitives | `MemoryAdd`, `MemorySearch`, `MemoryUpdate`, `MemoryDelete`, `MemoryConsolidate` | 5 |
+| Memory | `Memory(action=add|search|update|delete|consolidate)` | 1 |
 | Knowledge graph + context | `GraphConnect`, `GraphQuery`, `ContextGet`, `SessionsList` | 4 |
 | Tasks | `TaskCreate`, `TaskUpdate`, `TaskGraph` | 3 |
 | ETL pipeline | `ETLProcess`, `ETLClassify` | 2 |
 | Directives | `DirectiveAdd`, `DirectiveList`, `DirectiveRemove` | 3 |
 | System / dashboard | `SystemStatusGet`, `System`, `DashboardOpen` | 3 |
 
-**The agent's cognitive load grows linearly with tool count.** Every tool adds a name to learn, a schema to read, a decision to make. Twenty tools means twenty schema descriptions auto-injected into every agent context. Discoverability + retention degrade. New features hit a hard ceiling: every new capability adds another tool, another schema, more tokens consumed before any work begins.
+**The agent's cognitive load grows linearly with tool count.** Every tool adds a name to learn, a schema to read, and a decision to make. The v2.10.0 Memory atomic swap proved explicit action discrimination can reduce the surface without hiding behavior; the remaining five domains still pay fifteen schemas.
 
 ## Why X1 was rejected (cited verbatim from PLANNING.md §2.5)
 
@@ -50,14 +50,14 @@ Four objections, each independently fatal to X1:
 
 | New tool | Replaces (today) | Action values | Notes |
 |----------|------------------|---------------|-------|
-| **`Memory`** | `MemoryAdd`, `MemorySearch`, `MemoryUpdate`, `MemoryDelete`, `MemoryConsolidate` | `add` \| `search` \| `update` \| `delete` \| `consolidate` | Primary agent surface for memory I/O |
+| **`Memory`** | Existing `Memory` tool (unchanged) | `add` \| `search` \| `update` \| `delete` \| `consolidate` | Already shipped in v2.10.0 |
 | **`Knowledge`** | `GraphConnect`, `GraphQuery`, `ContextGet`, `SessionsList` | `graph_connect` \| `graph_query` \| `context` \| `sessions` | Graph + composite-context retrieval |
 | **`Task`** | `TaskCreate`, `TaskUpdate`, `TaskGraph` | `create` \| `update` \| `read` | Task orchestration |
 | **`Process`** | `ETLProcess`, `ETLClassify` | `process` \| `classify` | ETL / pipeline (see Async Pipeline note below) |
 | **`Directive`** | `DirectiveAdd`, `DirectiveList`, `DirectiveRemove` | `add` \| `list` \| `remove` | Behavioral rules |
 | **`System`** | `SystemStatusGet`, `System`, `DashboardOpen` | `status` \| `toggle` \| `dashboard` | System control + status |
 
-**Surface reduction: 20 → 6 (70%).** Agent reads ~6 schemas instead of ~20. Action enums are short and self-documenting.
+**Surface reduction: 16 → 6 (62.5%).** The agent reads 6 schemas instead of 16. Action enums remain explicit and self-documenting.
 
 ## Per-tool action schema sketch
 
@@ -99,13 +99,13 @@ The agent sees a single tool `Memory`. The schema names exactly which fields app
 
 | Version | Tool surface | Discipline |
 |---------|--------------|------------|
-| **v2.10.x** | 20 tools (per A2) | No change. PRDs describe the future. |
-| **v2.11.0** | 20 tools | No tool-surface change. Daemon + Source schema (GAP-025 closure). |
-| **v3.0.0** | 6 tools | **Atomic swap.** Delete the 20 legacy tools in the SAME release that introduces the 6 consolidated tools. No alongside-deployment, no deprecation overlap window. Migration guide in `docs/how-to/migrate-v2-to-v3.md`. |
+| **v2.10.0** | 16 tools | Memory atomic swap shipped; no overlap window. |
+| **v2.11.0** | 16 tools | Trust Release only; no further tool-surface change. |
+| **v3.0.0** | 6 tools | **Atomic swap.** Replace the remaining 15 atomic domain tools with 5 domain tools in one release; the existing Memory tool remains. No alongside deployment. |
 
-**Why no overlap window** (lesson learned 2026-05-02 — see "Migration trap" below): an alongside-deployment that adds the consolidated tool while keeping the legacy tools INCREASES tool count + token overhead during the entire window. Tool count would go 20 → 26 (20 + 6 new), which is the opposite of the consolidation goal. Agents would have multiple ways to add a memory (legacy `MemoryAdd` AND `Memory(action=add)`), increasing decision load. The deprecation-window pattern from library migrations does not apply to agent-facing surfaces where every tool schema is paid in tokens on every response.
+**Why no overlap window** (lesson learned 2026-05-02 — see "Migration trap" below): adding the five remaining domain tools while keeping their fifteen predecessors would increase the surface from 16 to 21. The deprecation-window pattern from libraries does not fit agent-facing surfaces where every schema consumes context before work starts.
 
-**Atomic swap means**: at v3.0.0 cut, the 20 legacy tools are deleted in the same commit that introduces the 6 consolidated tools. Clients pin to v2.x or v3.x — never both. Migration guide is the only bridge. This is a normal MAJOR-version semver break, not an unusual one.
+**Atomic swap means**: at v3.0.0 cut, the remaining fifteen atomic domain tools are deleted in the same commit that introduces their five replacements. Clients pin to v2.x or v3.x, never both. This is a normal MAJOR-version contract break.
 
 ## Migration trap (learned 2026-05-02)
 
@@ -115,19 +115,18 @@ On 2026-05-02 a Phase-1 implementation was attempted: ship `elefante-Memory` (co
 
 For v3.0.0 cut:
 
-1. **Surface count.** `grep -c 'types.Tool(' src/mcp/server.py` returns exactly **6**.
+1. **Surface count.** `python scripts/ci/list_mcp_tools.py` reports exactly **6** tools.
 2. **Behavioral parity.** Every action-discriminated call in v3.0.0 produces identical results to its v2.x predecessor (same memory-add semantics, same search ranking, same directive lifecycle).
 3. **Compliance Gate parity.** Every gate that fires today on a v2.x tool fires identically on the v3.0.0 equivalent (`tool=Memory action=add` triggers the same `search-before-write` check that `MemoryAdd` triggers).
 4. **Token-density measurement.** Average tool-schema overhead per MCP response drops by ≥50% (measure `TOKEN_STATS.overhead_tokens` before/after). This is the user-visible win.
 5. **Migration test.** `tests/test_migration_v2_to_v3.py` exercises every old tool's contract via the new tool's action and asserts behavioral equivalence.
-6. **Hermes round-trip test.** `hermes -z "use Memory action=search to find lifecycle"` works the same as today's `hermes -z "use elefante-MemorySearch ..."` works.
+6. **Cross-client round trip.** A compatible host executes `Memory(action=search)` and each new domain action through the v3 surface.
 
 ## Async ingestion pipeline (related, but separable)
 
 The user's earlier proposal also mentioned splitting `MemoryAdd`'s synchronous Intelligence Pipeline into async stages. This is **architecturally adjacent** to the tool consolidation but does **not** require it:
 
-- **With consolidation (v3.0.0):** `Memory(action="add", ...)` writes fast; backend pipeline (extractor, classifier, linker, reinforcer) runs async; results land as additive fields with `schema_version`.
-- **Without consolidation:** the same async split could happen behind today's `MemoryAdd`. The agent sees no difference.
+- **With or without the remaining consolidation:** `Memory(action="add", ...)` can write fast while the backend pipeline runs asynchronously. The concerns remain separable.
 
 **Decision:** keep separable. Tool consolidation = v3.0.0 cut. Async pipeline = v3.0.x or v3.1 patch. Don't bundle.
 
@@ -137,7 +136,7 @@ The user's earlier proposal also mentioned splitting `MemoryAdd`'s synchronous I
 |---|----------------|---------------------|
 | Is v3.0.0 the right version vehicle, or should this go to v2.20.0 with old tools as alias passthroughs? | v3.0.0 — surface contract change is MAJOR per `docs/how-to/close-a-feature.md`. | Yes |
 | Should `Process` (ETL) merge into `Memory` as an `enrich` action, or stay as its own tool? | Stay separate — ETL operates on inbox queue, not on individual memory ops. Different lifecycle. | Yes |
-| Should v2.11.0 ship the new 6-tool surface alongside, or wait for v3.0.0 cutover? | Ship alongside in v2.11.0 — gives one release of soak time + migration validation. | Yes |
+| When should the remaining atomic swap occur? | Only after the v2.11.0 Trust Release, in v3.0.0. | Yes |
 | Will Hermes / cross-client tool descriptions need a re-doc pass? | Yes — `docs/reference/tools.md` rewrites for 6 tools + per-action sub-sections. | (architect, no user gate) |
 
 ## What this proposal does NOT cover (out of scope, separate PRDs)
@@ -145,14 +144,14 @@ The user's earlier proposal also mentioned splitting `MemoryAdd`'s synchronous I
 - **Async ingestion pipeline** (above — separate v3.0.x patch).
 - **Schema versioning framework** (memories with `schema_version` field, forward-only migrations) — needed for any future field additions, separable.
 - **GAP-025 daemon** (singleton owner of Kuzu) — already planned for v2.11.0; this PRD assumes it ships first.
-- **`elefante-Remember` curated write primitive** (per A5 in v2.10.0) — already planned, lands in v2.10.x as a 21st tool, then folds into `Memory(action="add", curated=true)` at v3.0.0.
+- Any curated-write behavior belongs in the existing `Memory(action="add")` contract, not a seventeenth tool.
 
 ## Status
 
 - **DRAFT** — pre-implementation. No code changes yet.
 - **Promotes to** `docs/reference/tools.md` (rewritten for 6-tool surface) when shipped.
-- **Cross-references** A2 (v2.10.0 preserves 20), A9 (Hermes generic), X1 (3-tool facade rejected — this is structurally different), X6 (no special profile per consumer — this proposal is consumer-agnostic).
+- **Cross-references** the shipped v2.10.0 Memory atomic swap plus X1 (three-tool facade rejected) and X6 (no client-specific memory semantics).
 
 ## Decision needed
 
-**P7 (proposed addition to PLANNING.md §2.6):** Approve this proposal for v3.0.0 inclusion + v2.11.0 alongside-deployment? Architect recommendation: **YES** — six tools is a measurable win on cognitive load + token overhead; the X1 objections do not apply; the migration window aligns with existing v2.11.0 daemon work.
+Approve the remaining **atomic** 16 → 6 surface reduction for v3.0.0 after the Trust Release. No alongside deployment is permitted.

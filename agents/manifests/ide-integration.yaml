@@ -10,6 +10,8 @@
 # Schema source: workspace/proposals/ide-integration-surface.md §7.2
 # Status field semantics:
 #   configured    — file present and active in this repo (or installer writes it at install time)
+#   compatible    — emitted against the documented host contract and covered by Elefante's adapter tests; not yet host-certified end-to-end
+#   community     — documented manual path; no Elefante-owned host lifecycle adapter yet
 #   planned       — surface exists per matrix but Elefante has not yet implemented integration
 #   deprecated    — was supported, now retired (kept for migration window)
 #
@@ -76,9 +78,9 @@ surfaces:
         status: planned
         installer_writes: planned-v2.11
     user_home:
-      - path: ~/.claude/mcp.json
+      - path: ~/.claude.json
         purpose: Claude Code MCP server registration
-        installer_writes: planned-v2.11
+        installer_writes: scripts/setup/configure_cli_agents.py
     skill_paths:
       project:
         - .claude/skills/{name}/SKILL.md
@@ -87,13 +89,17 @@ surfaces:
       format: anthropic-skill-v1
     documentation:
       reference: docs/how-to/configure-ide.md
-      install_authority: planned-v2.11
+      install_authority: scripts/setup/configure_cli_agents.py
     doc_urls:
       - https://code.claude.com/docs/skills
-    last_verified: 2026-04-18
+      - https://code.claude.com/docs/en/mcp
+    last_verified: 2026-07-22
     verified_doc_hash: pending
+    status: compatible
     notes: |
-      .claude/settings.local.json is currently the only configured surface for Claude Code.
+      The native Claude CLI writes and removes the user-scoped MCP registration;
+      Elefante records a fingerprint of `claude mcp get elefante` before it may
+      unregister it. Existing user registrations are preserved.
       Permission whitelist allows WebFetch to: bob.ibm.com, openclaw.ai, clawhub.ai,
       kiro.dev, code.visualstudio.com, docs.openclaw.ai, docs.cursor.com.
       Full Skill v1 surface (.claude/skills/) lands in v2.11.0 per
@@ -133,11 +139,13 @@ surfaces:
         - alwaysApply
     documentation:
       reference: docs/how-to/configure-ide.md
-      install_authority: scripts/setup/configure_vscode_bob.py
+      install_authority: scripts/setup/configure_cursor_kiro.py
     doc_urls:
       - https://docs.cursor.com/context/rules
-    last_verified: 2026-04-18
+      - https://docs.cursor.com/context/model-context-protocol
+    last_verified: 2026-07-22
     verified_doc_hash: pending
+    status: compatible
 
   - id: windsurf
     kind: ide
@@ -196,7 +204,7 @@ surfaces:
       (configure_vscode_bob.py) was extended after that bug; v2.11 daemon-mode
       adapter consolidates the path knowledge into this matrix.
 
-  - id: kiro-skills
+  - id: kiro
     kind: ide
     in_repo: []
     user_home:
@@ -205,7 +213,7 @@ surfaces:
         installer_writes: planned-v2.11
       - path: ~/.kiro/settings/mcp.json
         purpose: Kiro MCP config (global)
-        installer_writes: planned-v2.11
+        installer_writes: true
     skill_paths:
       project:
         - .kiro/skills/{name}/SKILL.md
@@ -213,12 +221,17 @@ surfaces:
         - ~/.kiro/skills/{name}/SKILL.md
       format: anthropic-skill-v1
     documentation:
-      install_authority: planned-v2.11
+      reference: docs/how-to/configure-ide.md
+      install_authority: scripts/setup/configure_cursor_kiro.py
     doc_urls:
       - https://kiro.dev/docs/skills
-    last_verified: 2026-04-18
+      - https://kiro.dev/docs/mcp/configuration/
+    last_verified: 2026-07-22
     verified_doc_hash: pending
-    status: planned-v2.11
+    status: compatible
+    notes: |
+      The installer emits only the documented global MCP bridge entry. Kiro
+      Skills and Steering remain separately planned surfaces.
 
   - id: kiro-steering
     kind: ide
@@ -337,20 +350,23 @@ surfaces:
     user_home:
       - path: ~/.gemini/settings.json
         purpose: Gemini MCP servers (mcpServers key)
-        installer_writes: configure_antigravity.py
+        installer_writes: scripts/setup/configure_cursor_kiro.py
       - path: ~/.gemini/antigravity/mcp_config.json
         purpose: Antigravity-specific MCP config
         installer_writes: scripts/setup/configure_antigravity.py
     documentation:
       reference: docs/how-to/configure-ide.md
-      install_authority: scripts/setup/configure_antigravity.py
-    last_verified: 2026-04-18
+      install_authority: scripts/setup/configure_cursor_kiro.py
+    doc_urls:
+      - https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md
+    last_verified: 2026-07-22
     verified_doc_hash: pending
-    status: partial-via-antigravity
+    status: compatible
     notes: |
-      Antigravity (Gemini-family) is partially supported via configure_antigravity.py.
-      Generic Gemini Code Assist / Gemini CLI integration via GEMINI.md root file
-      is planned for v2.11.
+      Gemini CLI receives an exact mcpServers.elefante stdio-bridge entry only
+      when ~/.gemini already exists. The installer preserves every other server
+      and records exact-entry ownership for safe uninstall. Antigravity remains
+      a separate Gemini-family configuration surface.
 
   - id: codex
     kind: cli-agent
@@ -362,15 +378,18 @@ surfaces:
     user_home:
       - path: ~/.codex/config.toml
         purpose: Codex CLI MCP config
-        installer_writes: planned-v2.11
+        installer_writes: scripts/setup/configure_cli_agents.py
     documentation:
-      install_authority: planned-v2.11
-    last_verified: 2026-04-18
-    status: planned-v2.11
+      reference: docs/how-to/configure-ide.md
+      install_authority: scripts/setup/configure_cli_agents.py
+    doc_urls:
+      - https://learn.chatgpt.com/docs/extend/mcp
+    last_verified: 2026-07-22
+    status: compatible
     notes: |
-      Codex auto-detects AGENTS.md at repo root and any nested AGENTS.md.
-      The AGENTS.md authored on 2026-05-02 makes this surface immediately
-      partially functional even before v2.11 daemon work.
+      The native Codex CLI writes and removes the user-scoped MCP registration;
+      Elefante records a fingerprint of `codex mcp get elefante` before it may
+      unregister it. Codex also auto-detects AGENTS.md at repo root and nested paths.
 
   - id: aider
     kind: cli-agent
@@ -390,14 +409,41 @@ surfaces:
       Aider requires explicit /read of CONVENTIONS.md; not auto-loaded.
       Phase 3 surface.
 
-  # ───────── Out of scope (confirmed) ─────────
+  # ───────── Community MCP hosts ─────────
 
   - id: openclaw
-    kind: chat-gateway-not-coding-agent
-    status: out-of-scope
+    kind: agent-runtime
+    user_home:
+      - path: ~/.openclaw/openclaw.json
+        purpose: OpenClaw-managed outbound MCP server registry
+        installer_writes: manual-only
+    documentation:
+      reference: docs/how-to/configure-ide.md
+      install_authority: scripts/setup/configure_cli_agents.py
+    doc_urls:
+      - https://docs.openclaw.ai/cli/mcp
+    last_verified: 2026-07-22
+    status: compatible
     notes: |
-      OpenClaw is a chat gateway, not a coding-agent surface. Confirmed as
-      out-of-scope per workspace/proposals/ide-integration-surface.md §3.
+      OpenClaw is an MCP client registry and can launch Elefante's local stdio
+      bridge. Its native CLI preserves the host-owned registry and Elefante
+      fingerprints only the exact registration it creates. It is compatible,
+      not certified, until an external host lifecycle run is available.
+
+  - id: agent-zero
+    kind: container-capable-agent-runtime
+    documentation:
+      reference: docs/how-to/configure-ide.md
+      install_authority: manual-only
+    doc_urls:
+      - https://www.agent-zero.ai/p/docs/mcp-a2a/
+    last_verified: 2026-07-22
+    status: community
+    notes: |
+      Agent Zero accepts standard MCP JSON through its MCP/A2A settings UI.
+      Its common Docker deployment changes the network and filesystem trust
+      boundary, so Elefante intentionally does not write a host configuration
+      until a container-safe lifecycle adapter is verified.
 
 # ───────── Convergence points (per spec §3) ─────────
 #

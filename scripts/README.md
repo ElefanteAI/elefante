@@ -59,8 +59,11 @@ If step 1 fails, step 2 cannot help. Do not skip steps.
 | ------ | ------------ | -------------- |
 | `install.py` | Single-entry installer: venv, deps, DB init, IDE MCP config, post-install verification. | First-time install or clean reinstall. |
 | `bootstrap_release_bundle.py` | Stable-path wrapper that places a downloadable installer payload at `~/.elefante/app/current` then delegates to `install.py`. | Running a downloadable bundle outside a source checkout. |
-| `configure_vscode_bob.py` | Writes VS Code `mcp.json` and removes duplicate `settings.json` entries. | Initial VS Code/Bob setup or after moving the repo. |
-| `configure_antigravity.py` | Writes `~/.gemini/antigravity/mcp_config.json`. | Initial Antigravity setup or after moving the repo. |
+| `configure_vscode_bob.py` | Adds the Elefante bridge entry to VS Code/Bob configuration, refreshing only installer-owned entries and preserving user configuration. | Initial VS Code/Bob setup or after moving the repo. |
+| `configure_antigravity.py` | Adds the Elefante bridge entry to `~/.gemini/antigravity/mcp_config.json`. | Initial Antigravity setup or after moving the repo. |
+| `configure_cursor_kiro.py` | Detects Cursor and Kiro user directories, then adds their Elefante bridge entries without touching absent hosts. | Initial Cursor/Kiro setup or after moving the repo. |
+| `configure_cli_agents.py` | Uses the native Claude Code and Codex MCP CLIs to register the bridge and fingerprint the host-owned registration. | Initial Claude Code/Codex setup or after moving the repo. |
+| `install_manifest.py` | Internal helper that atomically tracks whole files and owned JSON entries emitted by Elefante installers. | Imported by setup emitters; not run directly. |
 | `init_databases.py` | Initializes ChromaDB collections and Kuzu schema without re-running the full installer. | After a Kuzu nuclear reset or ChromaDB wipe. |
 
 ## `scripts/verify/` — Proofs
@@ -79,16 +82,21 @@ See the Installation Verification Ladder above for steps 1–3. Other verifiers:
 | Script | What it does | When to use it |
 | ------ | ------------ | -------------- |
 | `restart_elefante.py` | Process-level restart with stale-lock cleanup and optional post-restart verification. | After `src/` changes that the live server needs to pick up. |
-| `backup_elefante_data.py` | File-level zip backup of `~/.elefante/data` with no DB handles open. | **Always run before any destructive operation.** |
-| `restore_elefante_data.py` | File-level restore from a backup zip; existing data moved aside unless `--discard-existing`. | Undo accidental data loss or a factory reset. Stop Elefante first. |
-| `reset_factory.py` | Destructive full reset of all durable Elefante state with backup gates. | Last resort. Both ChromaDB and Kuzu unrecoverable. Never for Kuzu-only or lock-only issues. |
+| `backup_elefante_data.py` | Checksum-manifested zip backup of `~/.elefante/data`; excludes nested recovery archives. | **Stop Elefante, then run before any destructive operation.** |
+| `restore_elefante_data.py` | Dry-run-first checksum-verified restore; existing data is moved aside by default. | Undo accidental data loss or a factory reset. Stop Elefante first; inspect, then add `--apply`. |
+| `reset_factory.py` | Destructive full reset of configured/default ChromaDB, SQLite, and Kuzu durable-state locations with backup gates. | Last resort. Never for Kuzu-only or lock-only issues. It refuses a configuration that would contain its own recovery directory. |
+| `backfill_memory_provenance.py` | Adds explicit `legacy` provenance to memories created before the daemon. Dry-run by default; `--apply` persists. | After reviewing migration candidates, before treating provenance as complete. |
+| `migrate_chroma_to_sqlite.py` | Copies ChromaDB to an isolated snapshot, stages SQLite, and verifies UUID/metadata/embedding/search parity. Dry-run uses temporary storage; `--apply` requires an exact verified backup and `STOPPED` confirmation, leaves Chroma and configuration unchanged, and reserves a new destination without replacing any existing path. | Before replacing ChromaDB because of GAP-029; run dry-run first, then inspect its JSON proof before authorizing apply. |
+| `daemon_service.py` | Renders and manages a launchd, systemd-user, or Task Scheduler user daemon. Dry-run by default; `--apply` writes or removes only Elefante's unchanged service definition. | Install, inspect, or remove the shared local daemon service. |
+| `doctor.py` | Read-only report of repository runtime, daemon health, installer ownership, configured surfaces, and declared integration tiers. `--json` is agent-friendly and never exposes host-registration commands, configuration locations, or values. | Diagnose readiness before configuring an IDE or after an upgrade. |
+| `uninstall_elefante.py` | Stops an unchanged Elefante daemon service, then removes only unchanged Elefante-owned files or JSON entries from the install manifest. Dry-run by default; modified or missing configuration is preserved. | Safely remove Elefante's emitted IDE configuration. |
 
 ## `scripts/pipeline/` — Extracts & Snapshots
 
 | Script | What it does | When to use it |
 | ------ | ------------ | -------------- |
-| `update_dashboard_data.py` | Reads ChromaDB + Kuzu and emits `dashboard_snapshot.json`. | After bulk memory changes, or when the dashboard shows stale counts. Follow with `verify_dashboard_snapshot.py`. |
-| `export_memories.py` | Full memory corpus export to JSON and/or CSV via direct ChromaDB read. `--format json\|csv\|all`. | Before a surgical delete (before/after diff). For offline analysis. |
+| `update_dashboard_data.py` | Reads the configured embedded vector store (ChromaDB or opt-in SQLite) plus Kuzu and emits `dashboard_snapshot.json`. | After bulk memory changes, or when the dashboard shows stale counts. Follow with `verify_dashboard_snapshot.py`. |
+| `export_memories.py` | Read-only JSON/CSV corpus export from the configured embedded vector store (ChromaDB or opt-in SQLite). `--format json\|csv\|all`; not a backup or restore format. | Before a surgical delete (before/after diff) or for offline analysis. |
 
 ## `scripts/ci/` — Build & Release
 
@@ -111,7 +119,7 @@ Release flow: `advise_version_bump.py` → write CHANGELOG → `bump_version.py 
 
 Reach for these only when a compendium points here. They are not routine.
 
-`MemorySearch` with `list_all=true` is the routine inventory tool — these scripts exist only for the cases below.
+`elefante-Memory(action="search", list_all=true)` is the routine inventory tool — these scripts exist only for the cases below.
 
 | Script | What it does | When to use it |
 | ------ | ------------ | -------------- |
@@ -134,3 +142,4 @@ Mutations require `ELEFANTE_PRIVILEGED=1`. Always `backup_elefante_data.py` firs
 | Script | What it does | When to use it |
 | ------ | ------------ | -------------- |
 | `generate_100_memories.py` | Seeds 100 synthetic memories into a live Elefante instance. | Before a demo or benchmark when a populated store is needed. |
+| `benchmark_sqlite_vector_store.py` | Creates a deterministic, disposable SQLite store and reports exact-cosine retrieval latency as JSON. It never opens existing ChromaDB or Elefante data. | Before approving a SQLite default/migration performance envelope; use `--max-p95-ms` to enforce a measured threshold. |

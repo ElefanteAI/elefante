@@ -11,7 +11,7 @@ Live development state. Draft PRDs and design proposals that have not yet earned
 | [`session-intelligence.md`](session-intelligence.md) | DRAFT | `docs/reference/session-intelligence.md` when shipped |
 | [`retrieval-effectiveness.md`](retrieval-effectiveness.md) | DRAFT (sketch only) | `docs/reference/retrieval-effectiveness.md` when shipped |
 | [`integrations/agent-zero.md`](integrations/agent-zero.md) | Integration target draft | `docs/reference/integrations/agent-zero.md` if shipped |
-| [`tool-consolidation.md`](tool-consolidation.md) | DRAFT — v3.0.0 breaking change (20 → 6 domain-grouped tools with action discriminator); architecturally distinct from rejected X1 facade | `docs/reference/tools.md` (rewritten) when shipped |
+| [`tool-consolidation.md`](tool-consolidation.md) | DRAFT — v3.0.0 atomic 16 → 6 domain-tool reduction; architecturally distinct from rejected X1 facade | `docs/reference/tools.md` (rewritten) when shipped |
 
 ## Lifecycle
 

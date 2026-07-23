@@ -52,7 +52,7 @@ You are not a feature shop. You are a memory janitor. Every act of work must lea
 - **Create with a question.** Adding a script, doc, or memory requires recording the question it answers in the appropriate index (`scripts/README.md`, `docs/README.md`, or memory `category` + `summary`). Adding without a question is waste.
 - **Resolve, do not file.** When you notice a leak in passing — orphan file, undocumented entrypoint, stale link, duplicate memory — fix it inside the current task. Filing it for later is waste; the next agent will not find your note.
 
-Auto-loaded specialist on any `MemoryAdd` / `MemoryUpdate` / `MemoryDelete`: `agents/memory-janitor.md`.
+Auto-loaded specialist on any `elefante-Memory(action="add"|"update"|"delete")`: `agents/memory-janitor.md`.
 
 ## Documentation Skill
 
@@ -147,7 +147,7 @@ Bugs that recur are bugs whose fix was written in the wrong file.
 | Failure type | Embed where | Why |
 |--------------|-------------|-----|
 | Agent misused a tool/interface | The tool's `description` / schema / preflight error in `src/mcp/server.py` | Agents read at the point of action |
-| System constraint failed at runtime | `ops-<domain>-compendium.md` **and** the raised exception cites the compendium path | Runtime hands the next agent the doc |
+| System constraint failed at runtime | `workspace/postmortems/<domain>.md` **and** the raised exception cites that path | Runtime hands the next agent the current postmortem |
 | Loaded agent constitution exhibited bad behavior | `.github/copilot-instructions.md` (or the equivalent loaded surface) | Passive docs do not govern |
 | Lesson generalizes across bugs | `workspace/lessons.md` using `Trigger → Rule → Why → Proof → Avoid` | Keeps the feedback loop online |
 
@@ -223,7 +223,7 @@ Navigate to the source. Do not memorize.
 
 | Trigger | Load |
 |---------|------|
-| Any `MemoryAdd` / `MemoryUpdate` / `MemoryDelete` | `agents/memory-janitor.md` (auto) |
+| Any `elefante-Memory(action="add"\|"update"\|"delete")` | `agents/memory-janitor.md` (auto) |
 | Install / repair / reinstall | `agents/installer.md` |
 | MCP tools not surfacing in IDE | `agents/restarter.md` |
 | Memory inspection / export / audit | `agents/memory-inspector.md` |

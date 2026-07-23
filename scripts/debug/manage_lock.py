@@ -5,7 +5,7 @@
 # CHANGED : 2026-04-15
 # PURPOSE : Inspect and remove the Elefante write lock; optional MCP process kill.
 #           Merged from remove_lock_kuzu.py + unlock_database_transactions.py.
-# WHEN    : When write operations hang, MemoryAdd times out, or the server reports
+# WHEN    : When write operations hang, elefante-Memory(action="add") times out, or the server reports
 #           "lock held" on restart. Always dry-run first (no flags) to confirm the
 #           lock exists before applying. Use --kill if the MCP server is unresponsive.
 # USAGE   : python scripts/debug/manage_lock.py [--apply --confirm DELETE [--kill]]

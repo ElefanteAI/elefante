@@ -6,7 +6,7 @@ If you are an autonomous agent operating inside an Agent Zero / A0 project layou
 
 ## What you will get
 
-- A container running the Elefante dashboard server on port 8000.
+- A container running the Elefante dashboard server on port 8000, published to this machine's loopback interface only.
 - A persistent data folder on your host machine at `./elefante_data/`.
 
 ## Prerequisites
@@ -52,6 +52,8 @@ docker compose up --build
 1. Open the dashboard in your browser:
 
 - <http://localhost:8000>
+
+The bundled Compose configuration intentionally publishes `127.0.0.1:8000:8000`: the dashboard can return private memory content and is not a public web service. Compose sets `ELEFANTE_DASHBOARD_HOST=0.0.0.0` only inside its isolated container network so the loopback-published port can reach the process. The standalone image remains loopback-only. Do not expose this service directly; a trusted reverse proxy must provide authentication, an explicit `ELEFANTE_DASHBOARD_CORS_ORIGINS` allowlist, and network controls before any external access is considered.
 
 ## Agent Zero / A0 projects (recommended clone layout)
 

@@ -19,7 +19,7 @@ Provides singleton access to configuration throughout the application.
 import os
 import yaml
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 from pydantic import BaseModel, Field, model_validator
 from dotenv import load_dotenv
 
@@ -35,19 +35,19 @@ KUZU_DIR = DATA_DIR / "kuzu_db"  # Kuzu-owned database path (materialized lazily
 LOGS_DIR = ELEFANTE_HOME / "logs"
 
 # Ensure directories exist
-ELEFANTE_HOME.mkdir(exist_ok=True)
+ELEFANTE_HOME.mkdir(parents=True, exist_ok=True)
 
 # Ensure directories exist
-DATA_DIR.mkdir(exist_ok=True)
-CHROMA_DIR.mkdir(exist_ok=True)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+CHROMA_DIR.mkdir(parents=True, exist_ok=True)
 # Note: KUZU_DIR should NOT be created here. Kuzu owns that path and will
 # materialize it on first open.
 LOGS_DIR.mkdir(exist_ok=True)
 
 
 class VectorStoreConfig(BaseModel):
-    """Vector store (ChromaDB) configuration"""
-    type: str = "chromadb"
+    """Embedded vector-store configuration."""
+    type: Literal["chromadb", "sqlite"] = "chromadb"
     persist_directory: str = str(CHROMA_DIR)
     collection_name: str = "memories"
     embedding_model: str = "thenlper/gte-base"
@@ -246,7 +246,8 @@ class Config:
 
         vector_store = config_dict.get('vector_store') or {}
         if 'persist_directory' not in vector_store:
-            vector_store['persist_directory'] = str(data_dir_path / 'chroma')
+            vector_directory = 'vector' if vector_store.get('type') == 'sqlite' else 'chroma'
+            vector_store['persist_directory'] = str(data_dir_path / vector_directory)
         config_dict['vector_store'] = vector_store
 
         graph_store = config_dict.get('graph_store') or {}
@@ -261,13 +262,13 @@ class Config:
         if self._config is None:
             return
 
-        # Data dir and Chroma dir are safe to create. KUZU_DIR itself should
+        # Data dir and the configured vector directory are safe to create. KUZU_DIR itself should
         # not be pre-created; Kuzu manages the database path lifecycle.
         data_dir = Path(self._config.data_dir)
         data_dir.mkdir(parents=True, exist_ok=True)
 
-        chroma_dir = Path(self._config.vector_store.persist_directory)
-        chroma_dir.mkdir(parents=True, exist_ok=True)
+        vector_dir = Path(self._config.vector_store.persist_directory)
+        vector_dir.mkdir(parents=True, exist_ok=True)
     
     def _apply_env_overrides(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -297,6 +298,11 @@ class Config:
             if 'embeddings' not in config_dict:
                 config_dict['embeddings'] = {}
             config_dict['embeddings']['device'] = device
+
+        if vector_store_type := os.getenv('ELEFANTE_VECTOR_STORE_TYPE'):
+            if 'vector_store' not in config_dict:
+                config_dict['vector_store'] = {}
+            config_dict['vector_store']['type'] = vector_store_type
         
         # MCP port override
         if mcp_port := os.getenv('ELEFANTE_MCP_PORT'):
@@ -400,4 +406,3 @@ def reload_config(config_path: Optional[str] = None) -> Config:
         _config_instance = Config()
     _config_instance.reload(config_path)
     return _config_instance
-

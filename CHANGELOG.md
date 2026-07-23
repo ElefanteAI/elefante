@@ -9,19 +9,83 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- Loopback-only Streamable HTTP daemon foundation at `python -m src.mcp.daemon`; it hosts one Elefante MCP server instance at `/mcp` and rejects remote binding.
+- Transport-only stdio bridge at `python -m src.mcp.stdio_bridge` for hosts that cannot use local MCP HTTP.
+- Dry-run-first legacy provenance backfill at `scripts/lifecycle/backfill_memory_provenance.py`.
+- Durable source schema: memories retain a normalized provenance tuple and link to deduplicated `Source` nodes through `WRITTEN_BY` graph edges.
+- Dry-run-first user-scope daemon service manager for macOS launchd, Linux systemd-user, and Windows Task Scheduler.
+- Install manifest at `~/.elefante/install-manifest.json`, recording whole Elefante-owned artifacts and precise owned entries in shared JSON configuration.
+- Manifest-driven uninstall command that preserves files changed after installation.
+- Detect-then-emit Cursor and Kiro bridge adapters, each with distinct provenance and precise JSON-entry ownership for safe uninstall.
+- Native Claude Code and Codex bridge adapters, using each host's MCP CLI and a matching-configuration fingerprint before uninstall.
+- Read-only daemon-service status reporting for file ownership, platform runtime state, and loopback health.
+- Read-only `scripts/lifecycle/doctor.py` report for repository runtime, daemon health, installer ownership, configured integration surfaces, and declared compatibility tiers. It never exposes host-registration commands, configuration locations, or values.
+- Explicit SQLite vector-store support for fresh, isolated installations. It preserves full memory JSON and float32 embeddings in one local file, implements exact cosine retrieval and the public CRUD/filter/pagination contract, and does not read, modify, or migrate existing ChromaDB data.
+- Dry-run-first ChromaDB-to-SQLite migration command with stable source snapshots, exact backup matching before apply, UUID/reconstructed-metadata/embedding parity, and representative search-overlap proof. Apply reserves a new destination without replacing an existing path and leaves ChromaDB and configuration unchanged.
+- Disposable SQLite retrieval benchmark, reporting deterministic exact-cosine latency without opening user data; it establishes a measured baseline for the ChromaDB exit decision.
+- Gemini CLI and OpenClaw bridge configuration with exact-entry/command manifest ownership and safe uninstall; Agent Zero guidance now distinguishes its documented container-boundary community path from certified host integration.
+
+### Fixed
+
+- Dashboard now binds to loopback by default, uses explicit local CORS origins, and Docker Compose publishes only to loopback.
+- `elefante-GraphQuery` is read-only; graph writes stay in the explicit `elefante-GraphConnect` path.
+- The documented `pytest tests` command excludes manual observation scripts and now collects the automated suite cleanly.
+- Daemon mutations now remain inside one async serialization boundary for the full vector-and-graph write; bridge notifications correctly accept empty `202` responses.
+- Existing VS Code and Antigravity emitters now configure the storage-free stdio bridge instead of launching database-owning MCP subprocesses.
+- The unified installer now installs the user-scope daemon service before emitting bridge-based MCP configuration.
+- Installer removal now stops only an unchanged daemon service and removes only exact Elefante entries from shared IDE configuration; unrelated MCP servers and user-modified service definitions are preserved.
+- Dashboard build dependencies now resolve the current Lodash, React Router, Vite, React plugin, PostCSS, and Picomatch security fixes; the locked dashboard dependency tree reports zero audit findings.
+- The daemon now rejects invalid TCP ports, and the stdio bridge accepts only an exact `http://127.0.0.1[:port]/mcp/` endpoint without credentials or URL extras.
+- Installer-owned Claude Code and Codex registrations can now refresh after an Elefante move or upgrade, with rollback if replacement fails; user-managed registrations remain untouched.
+- JSON-based host adapters now apply the same ownership rule: they preserve an existing user-managed `elefante` entry and refresh only an unchanged manifest-owned entry. Their configuration writes are atomic.
+- Daemon-service reinstallation now preserves untracked or user-modified service definitions, while refreshing only manifest-owned launchd, systemd-user, and Task Scheduler definitions.
+- The installer now waits for the exact loopback daemon health response before it configures MCP clients or reports service installation success.
+- Daemon provenance now rejects control characters and bounds untrusted bridge-header and environment metadata before storage, logging, or dashboard rendering; invalid values fall back to explicit safe source labels.
+- File-level backup now writes a checksum manifest and excludes nested recovery archives; restore is dry-run-first, rejects unsafe zip paths, symlinks, duplicate members, and integrity failures before it mutates data, then stages a verified archive before replacing the durable data directory.
+- Dashboard data routes now read only the redacted static snapshot. Browser-triggered live snapshot generation has been removed; semantic retrieval and live refresh remain on explicit MCP or operator paths, and dashboard responses no longer expose local data-directory paths.
+- The stdio bridge now rejects malformed or oversized (over 1 MiB) JSON-RPC messages before forwarding them and does not reuse a previous request ID when parsing a later malformed line fails.
+- The direct Streamable HTTP daemon now applies the same 1 MiB request-body boundary before handing a request to the MCP session manager, including chunked requests, so direct clients cannot bypass bridge-side input limits.
+- The standalone dashboard image no longer overrides the loopback bind default. Docker Compose retains its internal-container bind while publishing only to host loopback; external dashboard exposure is now explicitly documented as a reverse-proxy security responsibility.
+- Every declared direct Python runtime and development dependency is now pinned to a tested version, and `requirements.lock` carries the universal, hash-checked transitive resolution. Installers, Docker, and CI use the lock; CI also verifies that it remains fresh.
+- Tagged releases now run a hash-checked `pip-audit` gate against `requirements.lock` before GitHub publication, so a known advisory cannot be bypassed by the artifact workflow.
+- The MCP Python SDK now uses v1.28.1, removing the three advisories reported against the prior v1.23.1 runtime while retaining the verified daemon and bridge contracts.
+- Black, pytest, pytest-asyncio, FastAPI, and Starlette now use compatible patched versions. SentenceTransformers v5.6.0 and Transformers v5.14.1 remove the remaining model-stack advisories while preserving Elefante's configured local 768-dimensional `thenlper/gte-base` output; the new loader contract has a regression test.
+- Cognitive retrieval now applies a positive co-activation contribution after its vector-similarity floor, so the floor cannot erase a proven related-memory boost.
+- The vector store now has a regression guard requiring Chroma's embedded `PersistentClient` and rejecting introduction of its network client surface; this mitigates exposure to the unresolved server-endpoint advisory but does not waive the release gate.
+- The post-update audit is reduced to one ChromaDB advisory (PYSEC-2026-311) with no published fixed version; it remains release-blocking.
+- Controlled daemon and Elefante-mode shutdown now release SQLite vector-store handles; file-level backup and restore have a regression proof for the opt-in SQLite database alongside existing ChromaDB data recovery coverage.
+- The direct stdio server now follows the same controlled shutdown path as the daemon. Antigravity configuration no longer leaves an untracked `.json.bak` copy; atomic, ownership-aware writes remain recoverable through the normal manifest and data backup paths.
+- The manual startup guide, self-protocol, demo seed, and test guide now state the current source-derived 16-tool MCP surface rather than the obsolete 20/21-tool counts.
+- Entrypoint and error routing now point agents to `workspace/ISSUES.md` and its linked postmortems, restoring the live response contract after the documentation layout migration.
+- Docker bundle generation now includes the hash-locked dependency resolution and current Docker/Agent Zero guides; its output directory is configurable for isolated automation, and it no longer references deleted `docs/technical` files.
+- The native Codex CLI lifecycle regression now proves that a later user-owned replacement of the `elefante` registration is preserved during manifest-driven uninstall; normal installer-owned removal remains covered separately in the same isolated `CODEX_HOME` round trip.
+- Package metadata now derives exact direct runtime and development versions from `requirements.txt`, and the built wheel includes the `src` namespace used by all documented `python -m src.mcp...` commands. The README and installation guides now reflect MCP v1.28.1, the optional SQLite backend, the full detected-host configuration surface, and the daemon-plus-stdio-bridge architecture rather than a database-owning IDE subprocess.
+- The read-only memory exporter and dashboard snapshot pipeline now use the configured embedded vector store, including fresh SQLite stores. Factory reset now moves configured/default ChromaDB, SQLite, and Kuzu paths into its recovery area, honors `ELEFANTE_DATA_DIR`, and refuses configurations that would contain that recovery directory.
+
+### Changed
+
+- Added pull-request and `main` quality checks for the Python suite and dashboard production build.
+- Version synchronization now targets only real release identifiers and provides a guarded `bump_version.py --sync` repair path; historical postmortem, schema, and document-version labels are no longer rewritten as product versions.
+- The living plan now tracks the active v2.11.0 Trust Release instead of retaining already-shipped v2.10.0 decision scaffolding; a routing regression prevents that stale state from returning.
+- Active routing and the v3 tool-consolidation proposal now use the source-derived 16-tool baseline and current `docs/`, `workspace/`, and `agents/` homes; obsolete 20-tool and retired-surface references were removed.
+
 ## [2.10.0] - 2026-05-02
 
 Memory MCP tool surface consolidated: 5 legacy memory tools (`elefante-MemoryAdd`, `elefante-MemorySearch`, `elefante-MemoryUpdate`, `elefante-MemoryDelete`, `elefante-MemoryConsolidate`) deleted and replaced with one `elefante-Memory` tool taking an `action` discriminator (`add` | `search` | `update` | `delete` | `consolidate`). Clients must update tool calls — see `### Changed` below for migration mapping.
 
 This is a breaking change to the Memory MCP surface, deliberately bundled as 2.10 rather than 3.0: the v3.0.0 banner is reserved for the full domain consolidation (Knowledge / Task / Process / Directive / System) shipping in one coordinated migration, alongside async ingestion and schema versioning.
 
-This release also bundles the agentic documentation restructure (Diátaxis-pure `docs/`, `workspace/` for live state, `agents/` for loadable protocols), the Hermes ↔ Elefante recursive memory loop closure (Layer 3 verified via DeepSeek-v4-flash), and the unified Workflow Lifecycle (steps 0–10 in `agents/orchestrator.md`). All non-Memory changes are additive.
+This release also bundles the agentic documentation restructure (Diátaxis-pure `docs/`, `workspace/` for live state, `agents/` for loadable protocols), the Hermes <-> Elefante recursive memory loop closure (Layer 3 verified via DeepSeek-v4-flash), and the unified Workflow Lifecycle (steps 0–10 in `agents/orchestrator.md`). All non-Memory changes are additive.
 
 Counts: tool surface 20 → 16. Doc active surface 13,184 → ~9,000 LOC. Postmortems 5,024 → 597 LOC distilled (originals preserved verbatim in `_archive/`). 76/76 active guards green.
 
 ### Fixed
 
-- **GAP-028 CLOSED — Hermes ↔ Elefante recursive memory loop ran for the first time from the Hermes side (2026-05-02).** Configuration: `~/.hermes/.env` chmod 600 with `DEEPSEEK_API_KEY` (user-provided, recommended to rotate post-session); `~/.hermes/config.yaml` `model: deepseek-v4-flash` (smaller/faster per user preference 2026-05-02). Verifier `/tmp/elefante-gap-028-verify.py` reports Layer 0 PASS (Hermes status: `Model: deepseek-v4-flash` + `Provider: DeepSeek` auto-detected) + Layer 1+2 PASS (20 elefante-* tools discoverable) + Layer 3 PASS (`hermes -z` invoked deepseek-v4-flash, which called `elefante-MemorySearch`, surfaced memory id `f1fb77f5-5863-46cf-9471-d3a3872ba5d3` with verbatim content match against the Workflow Lifecycle memory ingested earlier in this session, and synthesized an accurate answer noting the lifecycle is BOTH a memory AND an auto-injected directive). **The recursive memory loop is no longer projection** — Hermes is a real LLM-driven Elefante consumer. Verifier heuristic also tightened: closure now requires UUID match or verbatim memory-body quote (proves tool execution), not literal "elefante-MemorySearch" mention (LLMs synthesize prose without echoing tool names). Closes the "WHY HAVE YOU STOPPED?" / "NEVER SIMULATE. ALWAYS FACT DRIVEN" challenges with measurable round-trip evidence.
+- **GAP-028 CLOSED — Hermes <-> Elefante recursive memory loop ran for the first time from the Hermes side (2026-05-02).** Configuration: `~/.hermes/.env` chmod 600 with `DEEPSEEK_API_KEY` (user-provided, recommended to rotate post-session); `~/.hermes/config.yaml` `model: deepseek-v4-flash` (smaller/faster per user preference 2026-05-02). Verifier `/tmp/elefante-gap-028-verify.py` reports Layer 0 PASS (Hermes status: `Model: deepseek-v4-flash` + `Provider: DeepSeek` auto-detected) + Layer 1+2 PASS (20 elefante-* tools discoverable) + Layer 3 PASS (`hermes -z` invoked deepseek-v4-flash, which called `elefante-MemorySearch`, surfaced memory id `f1fb77f5-5863-46cf-9471-d3a3872ba5d3` with verbatim content match against the Workflow Lifecycle memory ingested earlier in this session, and synthesized an accurate answer noting the lifecycle is BOTH a memory AND an auto-injected directive). **The recursive memory loop is no longer projection** — Hermes is a real LLM-driven Elefante consumer. Verifier heuristic also tightened: closure now requires UUID match or verbatim memory-body quote (proves tool execution), not literal "elefante-MemorySearch" mention (LLMs synthesize prose without echoing tool names). Closes the "WHY HAVE YOU STOPPED?" / "NEVER SIMULATE. ALWAYS FACT DRIVEN" challenges with measurable round-trip evidence.
 
 ### Added
 
@@ -77,7 +141,7 @@ Counts: tool surface 20 → 16. Doc active surface 13,184 → ~9,000 LOC. Postmo
 
 ### Added
 
-- **Hermes ↔ Elefante MCP wiring (live 2026-05-02).** Hermes (`/Volumes/OWC2TB/2026-M5/AI Projects/hermes-agent`) registered as a stdio MCP client of Elefante via `~/.hermes/config.yaml` `mcp_servers.elefante`. Command: `<elefante>/.venv/bin/python -m src.mcp.server` with `PYTHONPATH=<elefante>` env. `hermes mcp list` reports `✓ enabled` with all 20 tools. Prerequisite: `mcp==1.27.0` installed in Hermes's uv venv (Hermes treats the SDK as optional; without it `hermes mcp test` raises `StdioServerParameters not defined`). This is Elefante's first non-IDE MCP consumer and the empirical measurement surface for the v2.10.0 → v2.11.0 restructure decisions. Stdio-per-client means Hermes and any IDE-attached Elefante session compete for the Kuzu single-writer lock (GAP-025); concurrent use is unsafe until v2.11.0 daemon ships. Source-of-truth: [`workspace/PLANNING.md §6.4`](workspace/PLANNING.md).
+- **Hermes <-> Elefante MCP wiring (live 2026-05-02).** Hermes (`/Volumes/OWC2TB/2026-M5/AI Projects/hermes-agent`) registered as a stdio MCP client of Elefante via `~/.hermes/config.yaml` `mcp_servers.elefante`. Command: `<elefante>/.venv/bin/python -m src.mcp.server` with `PYTHONPATH=<elefante>` env. `hermes mcp list` reports `✓ enabled` with all 20 tools. Prerequisite: `mcp==1.27.0` installed in Hermes's uv venv (Hermes treats the SDK as optional; without it `hermes mcp test` raises `StdioServerParameters not defined`). This is Elefante's first non-IDE MCP consumer and the empirical measurement surface for the v2.10.0 -> v2.11.0 restructure decisions. Stdio-per-client means Hermes and any IDE-attached Elefante session compete for the Kuzu single-writer lock (GAP-025); concurrent use is unsafe until v2.11.0 daemon ships. Source-of-truth: [`workspace/PLANNING.md §6.4`](workspace/PLANNING.md).
 
 - **`agents/` folder — token-disciplined specialist protocols.** Per `docs/planning/spec-v2.10.0-surface-split.md`, agents are loaded by an LLM at the moment of failure, not read by humans browsing. Each declares `PROTOCOL_VERSION`, `LOAD_WHEN`, `DIAGNOSTIC_QUESTION` in YAML frontmatter and is ≤100 lines. Eleven files ship in this release:
   - `agents/orchestrator.md` (100 lines) — distilled from `docs/elefante-orchestrator-agent.md`. Loaded when building or debugging Elefante itself (DEVELOPER mode). The old file remains in place as a forwarding source during the v2.10.x runway.

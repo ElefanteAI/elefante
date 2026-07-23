@@ -48,11 +48,11 @@ When an ADR is superseded, mark its `Status:` as `superseded by ADR-MMMM` and ad
 
 | Property | spec-*.md | compendium prose | ADR |
 |----------|-----------|------------------|-----|
-| Sequential immutable ID | ❌ | ❌ | ✓ |
-| Status field for lifecycle | partial | ❌ | ✓ |
-| Industry-standard format | ❌ | ❌ | ✓ |
-| Programmatic queryable | ❌ | ❌ | ✓ (with frontmatter) |
-| Append-only / immutable | varies | varies | ✓ (by definition) |
+| Sequential immutable ID | no | no | yes |
+| Status field for lifecycle | partial | no | yes |
+| Industry-standard format | no | no | yes |
+| Programmatic queryable | no | no | yes (with frontmatter) |
+| Append-only / immutable | varies | varies | yes (by definition) |
 | Captures Consequences | sometimes | sometimes | required |
 
 ADRs solve the "where do design decisions live?" question that currently has no canonical home in Elefante.

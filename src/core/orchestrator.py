@@ -21,6 +21,7 @@ This is the central intelligence layer that:
 
 import asyncio
 import hashlib
+import inspect
 import os
 import re
 import json
@@ -547,6 +548,17 @@ class MemoryOrchestrator:
             # Extract system_metadata before building custom_metadata
             # (ADV-001: system_metadata must reach MemoryMetadata explicitly)
             system_metadata = metadata.pop("system_metadata", {})
+            source_context = metadata.pop("elefante_source", {})
+            if not isinstance(source_context, dict):
+                source_context = {}
+            source_context = {
+                "tool": str(source_context.get("tool", "legacy")),
+                "instance_id": str(source_context.get("instance_id", "legacy")),
+                "session_id": str(source_context.get("session_id", "legacy")),
+                "cwd": str(source_context.get("cwd", "")),
+                "transport": str(source_context.get("transport", "stdio")),
+                "timestamp_utc": datetime.utcnow().isoformat(),
+            }
             
             custom_metadata = {
                 k: v for k, v in metadata.items()
@@ -567,6 +579,7 @@ class MemoryOrchestrator:
             custom_metadata["concepts"] = concepts
             custom_metadata["surfaces_when"] = surfaces_when
             custom_metadata["authority_score"] = authority_score
+            custom_metadata["elefante_source"] = source_context
             
             memory_metadata = MemoryMetadata(
                 memory_type=MemoryType(memory_type),
@@ -622,6 +635,7 @@ class MemoryOrchestrator:
                 }
             )
             await self.graph_store.create_entity(memory_entity)
+            await self.graph_store.record_memory_source(memory.id, source_context)
             
             # 5b. Link to Contradiction/Redundancy
             if related_id:
@@ -2116,11 +2130,30 @@ class MemoryOrchestrator:
             }
         }
     
-    async def close(self):
-        """Close all database connections"""
-        self.logger.info("Closing orchestrator connections")
-        # Connections are managed by singleton instances
-        # No explicit close needed for ChromaDB/Kuzu in current implementation
+    async def close(self) -> None:
+        """Release owned persistence handles during controlled shutdown.
+
+        Stores may expose either synchronous or asynchronous ``close`` methods.
+        Supporting both keeps the orchestrator compatible with the existing
+        Kuzu/Chroma stores and the opt-in SQLite vector store.
+        """
+        self.logger.info("closing_orchestrator_connections")
+        failures: list[Exception] = []
+
+        for name, resource in (("vector_store", self.vector_store), ("graph_store", self.graph_store)):
+            close = getattr(resource, "close", None)
+            if not callable(close):
+                continue
+            try:
+                result = close()
+                if inspect.isawaitable(result):
+                    await result
+            except Exception as error:
+                failures.append(error)
+                self.logger.exception("failed_to_close_store", store=name, error=str(error))
+
+        if failures:
+            raise failures[0]
 
 
 # Global singleton instance
@@ -2138,5 +2171,3 @@ def get_orchestrator() -> MemoryOrchestrator:
     if _orchestrator is None:
         _orchestrator = MemoryOrchestrator()
     return _orchestrator
-
-

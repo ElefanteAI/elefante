@@ -39,4 +39,4 @@ Removing a codename = `### Removed` line in `CHANGELOG.md` per `agents/memory-ja
 - **Layer 2** (internal-state verbs that mean nothing without source access) — grows organically; no formal table yet.
 - **Layer 3** (versioned protocol hash with cross-version load refusal) — deferred.
 
-See `workspace/PLANNING.md §2.5` §2.4 for the layered defense rationale.
+See `workspace/PLANNING.md §2.5` for the active scope guard.

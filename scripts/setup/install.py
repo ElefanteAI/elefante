@@ -2,8 +2,8 @@
 # NAME    : install.py
 # VERSION : 2.7.2
 # CHANGED : 2026-04-16
-# PURPOSE : Single-entry installer: venv, deps, DB init, MCP config (VS Code +
-#           Antigravity), status files, rolling terminal UI, and system
+# PURPOSE : Single-entry installer: venv, deps, DB init, daemon plus detected
+#           MCP host configuration, status files, rolling terminal UI, and system
 #           verification in one cross-platform script.
 # WHEN    : First-time installation on any machine, or clean reinstall after a
 #           factory reset. NOT for routine restarts (use restart_elefante.py) or
@@ -26,7 +26,7 @@ Handles:
 1. Virtual Environment creation
 2. Dependency installation
 3. Database initialization
-4. MCP Server configuration (VSCode/Bob)
+4. Local daemon and detected MCP host configuration
 5. System verification
 """
 
@@ -37,10 +37,13 @@ import platform
 import shutil
 import argparse
 import datetime
+import json
 import signal
 import threading
 import time
 from pathlib import Path
+from urllib.error import URLError
+from urllib.request import urlopen
 
 
 SUPPORTED_PYTHON_MIN = (3, 11)
@@ -72,6 +75,7 @@ VENV_MODE_ABORT = "abort"
 INSTALL_LOG_FILE_NAME = ".elefante-install.log"
 INSTALL_STATUS_FILE_NAME = ".elefante-install-status.txt"
 INSTALL_SUMMARY_FILE_NAME = ".elefante-install-summary.txt"
+DAEMON_HEALTH_URL = "http://127.0.0.1:8765/health"
 verbose_mode = False
 BRAILLE_SPINNER_FRAMES = [
     "\u280b",
@@ -92,6 +96,8 @@ sys.path.insert(0, str(SETUP_DIR))
 
 from configure_vscode_bob import configure_mcp as configure_vscode  # noqa: E402
 from configure_antigravity import configure_mcp as configure_antigravity  # noqa: E402
+from configure_cursor_kiro import configure_detected_hosts, infer_repo_python  # noqa: E402
+from configure_cli_agents import configure_detected_cli_hosts  # noqa: E402
 
 
 class InstallationCancelled(Exception):
@@ -553,9 +559,9 @@ def check_dependency_versions(root_dir):
     """
     logger.log("\nChecking dependency versions for breaking changes...")
     
-    requirements_file = root_dir / "requirements.txt"
+    requirements_file = root_dir / "requirements.lock"
     if not requirements_file.exists():
-        logger.log("WARN: requirements.txt not found")
+        logger.log("WARN: requirements.lock not found")
         return True
     
     breaking_changes = {
@@ -868,8 +874,13 @@ def ensure_virtual_environment(root_dir, launcher_python, requested_mode):
     return "failed", None
 
 def install_dependencies(root_dir, python_cmd):
-    """Install requirements.txt"""
+    """Install the checked-in, hash-verified dependency lock."""
     logger.log("Installing dependencies...")
+
+    lock_file = root_dir / "requirements.lock"
+    if not lock_file.is_file():
+        logger.log("ERROR: requirements.lock is missing; refusing an unverified dependency resolution.")
+        return False
 
     if not run_command([python_cmd, "-m", "pip", "--version"], cwd=root_dir):
         logger.log("WARN: Pip is missing from the selected virtual environment. Bootstrapping with ensurepip...")
@@ -891,8 +902,11 @@ def install_dependencies(root_dir, python_cmd):
     if not run_command([python_cmd, "-m", "pip", "install", "--upgrade", "pip"], cwd=root_dir):
         logger.log("WARN: Pip self-upgrade failed. Continuing with the existing pip version.")
     
-    # Install requirements
-    if run_command([python_cmd, "-m", "pip", "install", "-r", "requirements.txt"], cwd=root_dir):
+    # Install the complete, hash-checked lock rather than resolving ranges at install time.
+    if run_command(
+        [python_cmd, "-m", "pip", "install", "--require-hashes", "-r", "requirements.lock"],
+        cwd=root_dir,
+    ):
         logger.log("OK: Dependencies installed")
         return True
     else:
@@ -980,6 +994,48 @@ def verify_copilot_instructions(root_dir):
         logger.log("   Without it, agents will NOT proactively search memory.")
         logger.log("   Expected at: " + str(instructions_path))
         return False
+
+
+def daemon_health_check(opener=urlopen) -> bool:
+    """Confirm that the expected loopback daemon—not merely a listening port—is ready."""
+    try:
+        with opener(DAEMON_HEALTH_URL, timeout=1) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (OSError, URLError, ValueError, json.JSONDecodeError):
+        return False
+    return payload == {
+        "status": "ok",
+        "service": "elefante-daemon",
+        "transport": "streamable-http",
+    }
+
+
+def wait_for_daemon_health(
+    *,
+    timeout_seconds: float = 15,
+    poll_seconds: float = 0.25,
+    health_check=daemon_health_check,
+    clock=time.monotonic,
+    sleeper=time.sleep,
+) -> bool:
+    """Wait a bounded interval for the service manager to start the local daemon."""
+    deadline = clock() + timeout_seconds
+    while clock() <= deadline:
+        if health_check():
+            return True
+        sleeper(poll_seconds)
+    return False
+
+
+def install_daemon_service(root_dir, python_cmd, *, health_waiter=wait_for_daemon_health):
+    """Install the daemon and prove its health before configuring any MCP client."""
+    service_script = root_dir / "scripts" / "lifecycle" / "daemon_service.py"
+    if not run_command([python_cmd, str(service_script), "install", "--apply"], cwd=root_dir):
+        return False
+    if not health_waiter():
+        logger.log("ERROR: Daemon service did not report healthy loopback status within 15 seconds")
+        return False
+    return True
 
 
 def generate_proof(root_dir, status):
@@ -1149,6 +1205,17 @@ def main():
                 state_tracker.warn_stage("3a", "Dashboard Snapshot", "Snapshot generation failed; dashboard can refresh later")
 
         if success:
+            check_for_safe_cancellation("daemon service installation")
+            logger.log("")
+            logger.log("[Step 3b] Local Daemon Service...")
+            state_tracker.start_stage("3b", "Local Daemon Service", "Installing the shared local storage owner")
+            if not install_daemon_service(root_dir, python_cmd):
+                state_tracker.fail_stage("3b", "Local Daemon Service", "Daemon service installation failed")
+                success = False
+            else:
+                state_tracker.complete_stage("3b", "Local Daemon Service", "User-scope daemon service installed")
+
+        if success:
             check_for_safe_cancellation("ide configuration")
             print_step(4, "IDE Configuration")
             state_tracker.start_stage("4", "IDE Configuration", "Configuring MCP clients for supported IDEs")
@@ -1156,6 +1223,8 @@ def main():
             try:
                 vscode_success = configure_vscode([])
                 antigravity_success = configure_antigravity([])
+                additional_hosts = configure_detected_hosts(root_dir, infer_repo_python(root_dir))
+                cli_hosts = configure_detected_cli_hosts(root_dir, infer_repo_python(root_dir))
 
                 detail_parts = []
                 if vscode_success:
@@ -1166,7 +1235,30 @@ def main():
                     logger.log("OK: MCP Server configured for Antigravity")
                     detail_parts.append("Antigravity configured")
 
-                if not vscode_success and not antigravity_success:
+                for host, configured in additional_hosts.items():
+                    if configured:
+                        logger.log(f"OK: MCP Server configured for {host.title()}")
+                        detail_parts.append(f"{host.title()} configured")
+
+                for host, result in cli_hosts.items():
+                    if result == "configured":
+                        logger.log(f"OK: MCP Server configured for {host}")
+                        detail_parts.append(f"{host} configured")
+                    elif result == "updated":
+                        logger.log(f"OK: MCP Server registration refreshed for {host}")
+                        detail_parts.append(f"{host} refreshed")
+                    elif result == "already-present":
+                        logger.log(f"INFO: Existing {host} Elefante registration preserved")
+                        detail_parts.append(f"{host} preserved")
+                    else:
+                        logger.log(f"WARN: {host} MCP configuration was not changed ({result})")
+
+                if (
+                    not vscode_success
+                    and not antigravity_success
+                    and not any(additional_hosts.values())
+                    and not any(result in {"configured", "updated", "already-present"} for result in cli_hosts.values())
+                ):
                     logger.log("WARN: Automatic MCP configuration skipped")
                     logger.log("   Please configure your IDE manually.")
                     logger.log("   See docs/how-to/install.md and docs/how-to/run-mcp-server.md for instructions.")

@@ -1,16 +1,16 @@
 # Elefante Memory System Configuration
-# Version: 3.0.0
+# Version: 2.10.0
 #
 # NOTE: Paths are now automatically resolved to absolute paths by config.py
 # to prevent database "amnesia" when starting from different directories.
 # You can override these with environment variables if needed.
 
 elefante:
-  version: "3.0.0"
+  version: "2.10.0"
   # data_dir is auto-set to absolute path in config.py
   anonymized_telemetry: false
 
-  # Vector Store Configuration (ChromaDB)
+  # Vector Store Configuration (ChromaDB by default; SQLite is opt-in until migration)
   vector_store:
     type: "chromadb"
     # persist_directory is auto-set to absolute path in config.py
@@ -37,7 +37,7 @@ elefante:
   # MCP Server Configuration
   mcp_server:
     name: "elefante"
-    version: "3.0.0"
+    version: "2.10.0"
     description: "Local AI Memory System with Vector and Graph Storage"
     # Optional HTTP endpoint (leave commented for stdio only)
     # port: 3000

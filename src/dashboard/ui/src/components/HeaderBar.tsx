@@ -1,4 +1,3 @@
-// Elefante Dashboard v3.0.0 - Header Bar
 import { useDashboardStore } from '@/store';
 import { RefreshCw } from 'lucide-react';
 
@@ -55,7 +54,7 @@ export function HeaderBar() {
         <button
           onClick={() => refreshSnapshot()}
           disabled={isRefreshing}
-          title="Regenerate snapshot from live data"
+          title="Reload the current dashboard snapshot"
           className={
             'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-all ' +
             (isRefreshing
@@ -66,7 +65,7 @@ export function HeaderBar() {
           }
         >
           <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} />
-          {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          {isRefreshing ? 'Reloading...' : 'Reload'}
         </button>
       </div>
     </header>

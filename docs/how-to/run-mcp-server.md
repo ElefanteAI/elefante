@@ -6,6 +6,81 @@
 
 ## Quick Start
 
+### Local daemon (recommended for multiple agent hosts)
+
+```bash
+python -m src.mcp.daemon
+```
+
+The daemon listens only on `127.0.0.1:8765`, exposes Streamable HTTP at `http://127.0.0.1:8765/mcp/`, and has `GET /health`. Remote binding is intentionally rejected. It rejects declared or streamed MCP request bodies over 1 MiB before the transport parses them. Every supported bridge adapter uses this shared daemon; compatibility tiers and individual host coverage are documented in the [IDE configuration guide](configure-ide.md).
+
+Install the user-scope service before configuring bridge-based hosts:
+
+```bash
+python scripts/lifecycle/daemon_service.py install --apply
+```
+
+This installs a launchd user agent on macOS, a systemd user unit on Linux, or a logon-scoped Task Scheduler task on Windows. It never creates a system-wide service or opens a non-loopback listener.
+
+The installer waits up to 15 seconds for the exact loopback `/health` payload before it emits IDE configuration. If the daemon cannot become healthy, installation fails rather than configuring clients against an unproven service.
+
+On a later run, Elefante refreshes only a service definition that exactly matches its install manifest. A modified or user-managed service file is preserved and the command exits nonzero rather than pretending the shared daemon is ready.
+
+Diagnose the installed service without changing it:
+
+```bash
+python scripts/lifecycle/daemon_service.py status
+```
+
+The status output reports the service file and whether it is Elefante-owned, the platform service-manager state, and the loopback `/health` result. `status` never starts, stops, or edits a service.
+
+For one read-only product readiness report covering the runtime, daemon, installer ownership, and declared integration tiers:
+
+```bash
+python scripts/lifecycle/doctor.py
+python scripts/lifecycle/doctor.py --json
+```
+
+`doctor` exits `0` only when the repository runtime and loopback daemon are ready. It does not start services, alter host configuration, or migrate data.
+
+### Stdio compatibility bridge
+
+Start the daemon first, then configure a stdio-only MCP host to run:
+
+```bash
+python -m src.mcp.stdio_bridge
+```
+
+The bridge forwards MCP JSON-RPC to the local daemon and owns no databases. Override its endpoint only with a loopback URL through `ELEFANTE_DAEMON_URL`. It rejects malformed messages and messages larger than 1 MiB before they are parsed or forwarded.
+
+For provenance, the host installer should set `ELEFANTE_CLIENT_TOOL` and may set `ELEFANTE_CLIENT_CWD`; each bridge process creates a distinct instance ID. The daemon derives and persists the complete source tuple from the bridge headers and its MCP session. Header and environment values are untrusted: Elefante rejects control characters and bounds the persisted tool (128 characters), instance/session (256 characters), and workspace path (1024 characters) fields to safe defaults.
+
+### Legacy provenance migration
+
+Preview the legacy-memory backfill before changing data:
+
+```bash
+python scripts/lifecycle/backfill_memory_provenance.py
+```
+
+Only after reviewing the candidate count, run the explicit write operation:
+
+```bash
+python scripts/lifecycle/backfill_memory_provenance.py --apply
+```
+
+The migration is idempotent. It fills missing vector provenance and creates the corresponding `WRITTEN_BY` graph links.
+
+### Safe removal
+
+Preview removal before changing user configuration:
+
+```bash
+python scripts/lifecycle/uninstall_elefante.py
+```
+
+Re-run with `--apply` only after reviewing the output. Elefante stops and removes its unchanged daemon service, then removes only its exact, unchanged entries from shared IDE JSON files. Modified configuration is preserved.
+
 ### Starting the MCP Server (Manual)
 
 ```bash
@@ -28,7 +103,9 @@ The server will **block** and wait for JSON-RPC messages from the IDE.
 
 ### Stopping the Server
 
-Press `Ctrl+C` in the terminal.
+Press `Ctrl+C` in the terminal. The direct stdio process then closes its
+orchestrator resources before exiting, including the opt-in SQLite vector-store
+handle when that backend is selected.
 
 ---
 
@@ -39,8 +116,8 @@ Press `Ctrl+C` in the terminal.
 The MCP Server:
 
 1. Starts and waits for connections on **stdin/stdout** (stdio protocol)
-2. Receives JSON-RPC requests from the IDE (VS Code, Cursor, Bob)
-3. Exposes 20 MCP tools for memory operations
+2. Receives JSON-RPC requests for manual diagnostics or direct stdio clients
+3. Exposes 16 MCP tools for memory and knowledge operations
 4. Returns JSON-RPC responses
 5. Bootstraps the runtime directive/specification baseline on first orchestrator use so fresh installs immediately have built-in directives and searchable specification memories
 
@@ -53,19 +130,25 @@ The MCP Server:
 
 ### Stdio Protocol (Not HTTP)
 
-**Important**: MCP uses **stdio** (standard input/output), NOT HTTP.
+**Important**: direct MCP uses **stdio** (standard input/output). Installed
+compatible hosts use the same stdio protocol with Elefante's transport-only
+bridge, which forwards it to the loopback-only daemon. This keeps one daemon
+responsible for durable stores when several agents connect.
 
 ```text
-IDE (VS Code, Cursor, Bob)
+IDE or CLI agent
   ↓
   ├─ stdin: {"jsonrpc": "2.0", "method": "initialize", ...}
   ├─ stdout: {"jsonrpc": "2.0", "result": {...}}
   └─ (bidirectional messaging)
   ↓
-MCP Server (Python subprocess)
+Elefante stdio bridge (Python subprocess)
+  ↓ loopback Streamable HTTP
+Elefante daemon (one durable store owner)
 ```
 
-The IDE starts the server as a subprocess and communicates via pipes, not network sockets.
+The host starts the bridge as a subprocess and communicates through pipes; the
+bridge accepts only the local daemon endpoint and never owns a database.
 
 ---
 
@@ -134,24 +217,23 @@ This is the highest-signal startup verification because it launches the real ser
 **Expected Output**:
 
 ```text
-Available MCP Tools: 21
-  - elefante-Memory(action="add")
-  - elefante-Memory(action="search")
-  - elefante-Memory(action="update")
-  - elefante-Memory(action="delete")
-  - elefante-Memory(action="consolidate")
+Available MCP Tools: 16
+  - elefante-ContextGet
+  - elefante-DashboardOpen
+  - elefante-DirectiveAdd
+  - elefante-DirectiveList
+  - elefante-DirectiveRemove
+  - elefante-ETLClassify
+  - elefante-ETLProcess
   - elefante-GraphConnect
   - elefante-GraphQuery
-  - elefante-ContextGet
+  - elefante-Memory
   - elefante-SessionsList
-  - elefante-SystemStatusGet
-  - elefante-DashboardOpen
   - elefante-System
+  - elefante-SystemStatusGet
   - elefante-TaskCreate
-  - elefante-TaskUpdate
   - elefante-TaskGraph
-  - elefante-ETLProcess
-  - elefante-ETLClassify
+  - elefante-TaskUpdate
 ```
 
 ---
@@ -187,10 +269,10 @@ where python  # Windows - should show .venv\Scripts\python
 python --version  # Should be Python 3.11.x
 
 # 3. Verify MCP is installed
-pip list | grep mcp  # Should show mcp==1.23.1
+pip list | grep mcp  # Should show mcp==1.28.1
 
 # 4. If not installed, install it
-pip install -r requirements.txt
+pip install --require-hashes -r requirements.lock
 
 # 5. Try again
 python -m src.mcp.server
@@ -413,35 +495,17 @@ proc.terminate()
 
 ## Production Deployment
 
-### Running MCP Server as Service (Linux/macOS)
+### Running the daemon as a service
 
-**Create systemd service** (`/etc/systemd/system/elefante-mcp.service`):
-
-```ini
-[Unit]
-Description=Elefante MCP Server
-After=network.target
-
-[Service]
-Type=simple
-User=<username>
-WorkingDirectory=/path/to/Elefante
-ExecStart=/path/to/Elefante/.venv/bin/python -m src.mcp.server
-Restart=on-failure
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-**Enable and start**:
+Use Elefante's user-scope service manager rather than creating a privileged system service manually:
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable elefante-mcp
-sudo systemctl start elefante-mcp
-sudo systemctl status elefante-mcp
+python scripts/lifecycle/daemon_service.py status
+python scripts/lifecycle/daemon_service.py install --apply
+python scripts/lifecycle/daemon_service.py uninstall --apply
 ```
+
+The manager writes a manifest-tracked service definition and refuses to remove a user-modified one. It supports macOS launchd, Linux systemd-user, and Windows Task Scheduler.
 
 ---
 
@@ -450,13 +514,14 @@ sudo systemctl status elefante-mcp
 Before claiming "MCP Server is working":
 
 - [ ] Python 3.11 active in venv
-- [ ] `python -m src.mcp.server` starts without errors
+- [ ] `python -m src.mcp.daemon` starts without errors, or the user service is installed
+- [ ] `http://127.0.0.1:8765/health` reports `status: ok`
 - [ ] Handshake test passes: `python scripts/verify/verify_mcp_handshake.py`
 - [ ] Health check passes: `python scripts/verify/verify_health.py`
 - [ ] IDE config points to venv Python (absolute path)
 - [ ] IDE shows "MCP Connected" status
 - [ ] Can use memory tools in IDE (elefante-Memory(action="add"), elefante-Memory(action="search"), etc.)
-- [ ] No Kuzu lock conflicts (if dashboard running separately)
+- [ ] IDE configuration launches `src.mcp.stdio_bridge`, not a database-owning server
 
 For restarting a running server, see [`restart.md`](restart.md).
 

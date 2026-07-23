@@ -3,22 +3,27 @@
 # NAME    : export_memories.py
 # VERSION : 2.5.2
 # CHANGED : 2026-04-15
-# PURPOSE : Export the full memory corpus to JSON or CSV for offline analysis.
+# PURPOSE : Read-only export of the memory corpus for offline analysis.
 #           Merged from export_memories_json.py + export_memories_csv.py.
 # WHEN    : Before a surgical delete (--format json for before/after comparison).
 #           When you need to analyze memory quality offline or in a spreadsheet.
 #           Use --format csv for categorical analysis, --format json for precise
 #           content review or scripted processing.
 # USAGE   : python scripts/pipeline/export_memories.py --format json|csv|all
-# NOTES   : Reads directly from ChromaDB — no orchestrator filtering. Content
+# NOTES   : This is NOT a backup or restore format: it excludes embeddings and
+#           has no import path. Use backup_elefante_data.py for recovery. Content
 #           is truncated at 500 chars in CSV. --output is only valid for single-
 #           format runs; use --format all to emit both files simultaneously.
 # LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
-"""Export all Elefante memories to JSON and/or CSV.
+"""Export all Elefante memories to JSON and/or CSV for analysis only.
 
-Uses a direct ChromaDB read (no filtering) — intended for before/after
-validation, offline analysis, and spreadsheet review.
+Reads the configured local vector store without filtering — intended for
+before/after validation, offline analysis, and spreadsheet review.
+
+This output is not a backup: it does not contain the stored embeddings and has
+no restore command. Use ``scripts/lifecycle/backup_elefante_data.py`` before a
+destructive operation.
 
 Outputs land under the configured data directory unless --output is provided.
 
@@ -38,8 +43,6 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-import chromadb
-
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.utils.config import get_config  # noqa: E402
@@ -48,10 +51,35 @@ from src.utils.config import get_config  # noqa: E402
 # ── Shared fetch ─────────────────────────────────────────────────────────────
 
 def _fetch(config) -> tuple[list, list, list]:
-    """Return (ids, metadatas, documents) from the configured ChromaDB collection."""
-    chroma_dir = Path(config.elefante.vector_store.persist_directory)
-    client = chromadb.PersistentClient(path=str(chroma_dir))
-    collection = client.get_collection(config.elefante.vector_store.collection_name)
+    """Return raw export fields from the configured embedded vector store."""
+    vector_config = config.elefante.vector_store
+    if vector_config.type == "sqlite":
+        from src.core.sqlite_vector_store import SQLiteVectorStore
+
+        async def read_sqlite():
+            store = SQLiteVectorStore(
+                collection_name=vector_config.collection_name,
+                persist_directory=vector_config.persist_directory,
+            )
+            try:
+                return await store.get_all(limit=1_000_000)
+            finally:
+                store.close()
+
+        memories = __import__("asyncio").run(read_sqlite())
+        records = [memory.to_dict() for memory in memories]
+        return (
+            [record["id"] for record in records],
+            [record["metadata"] for record in records],
+            [record["content"] for record in records],
+        )
+    if vector_config.type != "chromadb":
+        raise ValueError(f"Unsupported vector store for export: {vector_config.type}")
+
+    import chromadb
+
+    client = chromadb.PersistentClient(path=str(Path(vector_config.persist_directory)))
+    collection = client.get_collection(vector_config.collection_name)
     results = collection.get(include=["metadatas", "documents"])
     return (
         results.get("ids") or [],
@@ -77,7 +105,8 @@ def export_json(config, output_path: Path | None) -> Path:
     payload = {
         "exported_at": datetime.now().isoformat(),
         "count": len(exported),
-        "chroma_dir": str(Path(config.elefante.vector_store.persist_directory)),
+        "vector_store_type": config.elefante.vector_store.type,
+        "vector_store_path": str(Path(config.elefante.vector_store.persist_directory)),
         "collection": config.elefante.vector_store.collection_name,
         "memories": exported,
     }

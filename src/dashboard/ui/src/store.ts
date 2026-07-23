@@ -1,4 +1,3 @@
-// Elefante Dashboard v3.0.0 - Zustand Store
 import { create } from 'zustand';
 import type { Tab, Snapshot, StatsResponse, MemoryNode, VisualizationType } from './types';
 
@@ -151,16 +150,12 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   refreshSnapshot: async () => {
     set({ isRefreshing: true, error: null });
     try {
-      const res = await fetch('/api/refresh', { method: 'POST' });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.detail || `HTTP ${res.status}`);
-      }
-      // Re-fetch both after refresh
+      // The dashboard is an inspection surface. Reload only the existing
+      // snapshot; live regeneration belongs to the explicit MCP or CLI path.
       await get().fetchStats();
       await get().fetchSnapshot();
     } catch (e: any) {
-      set({ error: `Refresh failed: ${e.message}` });
+      set({ error: `Snapshot reload failed: ${e.message}` });
     } finally {
       set({ isRefreshing: false });
     }

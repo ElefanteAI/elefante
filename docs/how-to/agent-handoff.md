@@ -4,7 +4,7 @@ This document is written for an autonomous agent that will receive this reposito
 
 ## Mission (what success looks like)
 
-1. **Environment Ready**: A dedicated Python 3.11 virtual environment is created and all `requirements.txt` are installed.
+1. **Environment Ready**: A dedicated Python 3.11 virtual environment is created from the hash-checked `requirements.lock`.
 2. **Dashboard Operates**: Elefante dashboard runs in Docker (or locally) and is reachable at `http://localhost:8000`.
 3. **MCP Server Integration**: Agent Zero is configured to use the Elefante MCP server using the venv's python executable.
 
@@ -36,7 +36,7 @@ cd /a0/usr/projects/elefante/elefante-repo-files
 python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install --require-hashes -r requirements.lock
 ```
 
 ## Agent Zero MCP Configuration
@@ -145,7 +145,7 @@ python scripts/verify/verify_mcp_handshake.py
 
 ## What to read first (fast orientation)
 
-- `docs/debug/*-compendium.md` — detailed post-mortems
+- `workspace/ISSUES.md` and linked `workspace/postmortems/<domain>.md` — tracked defects and detailed postmortems
 - `docs/reference/architecture.md`
 - `docs/how-to/docker.md`
 

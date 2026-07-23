@@ -16,6 +16,7 @@ Supports Cypher-like queries for deterministic fact retrieval.
 """
 
 import asyncio
+import hashlib
 from typing import List, Optional, Dict, Any, Tuple
 from uuid import UUID
 from datetime import datetime
@@ -25,7 +26,7 @@ from src.models.entity import Entity, EntityType, Relationship, RelationshipType
 from src.models.memory import Memory, MemoryMetadata, MemoryType
 from src.utils.config import get_config
 from src.utils.logger import get_logger
-from src.utils.validators import validate_entity_name, validate_cypher_query
+from src.utils.validators import validate_entity_name
 
 logger = get_logger(__name__)
 
@@ -340,6 +341,19 @@ class GraphStore:
                     PRIMARY KEY(id)
                 )
                 """,
+                """
+                CREATE NODE TABLE Source(
+                    id STRING,
+                    tool STRING,
+                    instance_id STRING,
+                    session_id STRING,
+                    cwd STRING,
+                    transport STRING,
+                    first_seen TIMESTAMP,
+                    last_seen TIMESTAMP,
+                    PRIMARY KEY(id)
+                )
+                """,
                 # Relationship tables
                 """
                 CREATE REL TABLE RELATES_TO(
@@ -395,6 +409,12 @@ class GraphStore:
                     last_coactivated STRING
                 )
                 """,
+                """
+                CREATE REL TABLE WRITTEN_BY(
+                    FROM Entity TO Source,
+                    observed_at TIMESTAMP
+                )
+                """,
                 # Task Orchestration
                 """
                 CREATE NODE TABLE Task(
@@ -442,6 +462,57 @@ class GraphStore:
         except Exception as e:
             logger.error("failed_to_initialize_schema", error=str(e))
             raise
+
+    @staticmethod
+    def _source_id(source: Dict[str, Any]) -> str:
+        """Return a stable ID for the schema's source identity tuple."""
+        identity = "\x1f".join(
+            str(source.get(field, ""))
+            for field in ("tool", "instance_id", "session_id")
+        )
+        return hashlib.sha256(identity.encode("utf-8")).hexdigest()
+
+    async def record_memory_source(self, memory_id: UUID, source: Dict[str, Any]) -> str:
+        """Idempotently link a memory entity to its provenance Source node."""
+        normalized = {
+            "tool": str(source.get("tool", "legacy")),
+            "instance_id": str(source.get("instance_id", "legacy")),
+            "session_id": str(source.get("session_id", "legacy")),
+            "cwd": str(source.get("cwd", "")),
+            "transport": str(source.get("transport", "stdio")),
+        }
+        source_id = self._source_id(normalized)
+        now = datetime.utcnow()
+        query = """
+            MERGE (s:Source {id: $source_id})
+            ON CREATE SET
+                s.tool = $tool,
+                s.instance_id = $instance_id,
+                s.session_id = $session_id,
+                s.cwd = $cwd,
+                s.transport = $transport,
+                s.first_seen = $now,
+                s.last_seen = $now
+            ON MATCH SET
+                s.cwd = $cwd,
+                s.transport = $transport,
+                s.last_seen = $now
+            WITH s
+            MATCH (m:Entity {id: $memory_id})
+            MERGE (m)-[r:WRITTEN_BY]->(s)
+            ON CREATE SET r.observed_at = $now
+            RETURN s.id
+        """
+        await self.execute_query(
+            query,
+            {
+                "source_id": source_id,
+                "memory_id": str(memory_id),
+                "now": now,
+                **normalized,
+            },
+        )
+        return source_id
     
     async def create_entity(self, entity: Entity) -> UUID:
         """
@@ -766,9 +837,6 @@ class GraphStore:
             List of result dictionaries
         """
         self._initialize_connection()
-        
-        # Validate query (basic safety check)
-        validate_cypher_query(cypher_query)
         
         try:
             column_names, rows = await self._run_query(cypher_query, params or {})
@@ -1324,4 +1392,3 @@ def close_graph_store():
     global _graph_store
     if _graph_store is not None:
         _graph_store.close()
-

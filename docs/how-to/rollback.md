@@ -2,7 +2,7 @@
 
 **Goal:** If a future change goes sideways, safely return to a known-good state with minimal downtime and no permanent data loss.
 
-This runbook is operational (not a postmortem). Lessons learned belong in `docs/debug/`.
+This runbook is operational (not a postmortem). Lessons learned belong in the relevant `workspace/postmortems/<domain>.md` entry and are indexed by `workspace/ISSUES.md`.
 
 ---
 
@@ -23,13 +23,16 @@ This runbook is operational (not a postmortem). Lessons learned belong in `docs/
 
 ## Backup (File-System Snapshot)
 
-Use the backup script (safe with Elefante Mode OFF):
+Stop Elefante first, then use the backup script. It does not open database
+handles, but a live database cannot be promised as a consistent file snapshot.
 
 ```bash
 python scripts/lifecycle/backup_elefante_data.py
 ```
 
-This creates a timestamped archive under the configured backup directory.
+This creates a timestamped zip archive under the configured backup directory.
+Each new archive carries a checksum manifest; nested recovery archives are not
+copied into future backups.
 
 ---
 
@@ -40,11 +43,17 @@ This creates a timestamped archive under the configured backup directory.
    - Dashboard server
    - Any Python process using Kuzu/ChromaDB
 
-2. **Restore data backup** (if the change touched storage formats or corrupted data):
+2. **Preflight then restore data backup** (if the change touched storage formats or corrupted data):
 
 ```bash
-python scripts/lifecycle/restore_elefante_data.py --latest --force
+python scripts/lifecycle/restore_elefante_data.py --latest
+python scripts/lifecycle/restore_elefante_data.py --latest --apply
 ```
+
+The first command validates archive paths and checksums without changing data.
+The applied restore stages the archive before replacement and moves current data
+to `data.pre_restore.<timestamp>` for recovery. `--discard-existing` is an
+exceptional destructive option and additionally requires `--confirm DISCARD`.
 
 3. **Roll back code** to the desired version:
 
@@ -71,5 +80,4 @@ When making changes beyond the current release:
 
 - Prefer **backward-compatible** changes (current version can still read the data).
 - If not possible, migrations must be **guarded** and **reversible**, and a backup must be taken first.
-- Document all schema changes in `docs/technical/`.
-
+- Document all schema changes in `docs/reference/`.

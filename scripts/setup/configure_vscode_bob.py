@@ -34,6 +34,17 @@ import sys
 import io
 from pathlib import Path
 
+_SETUP_DIR = str(Path(__file__).resolve().parent)
+if _SETUP_DIR not in sys.path:
+    sys.path.insert(0, _SETUP_DIR)
+
+from install_manifest import (
+    forget_emitted_file,
+    is_unchanged_emitted_json_entry,
+    record_emitted_json_entry,
+    write_json_atomically,
+)
+
 
 def _infer_repo_python(elefante_path: Path) -> str:
     """Prefer the repo venv Python for stability; fall back to sys.executable."""
@@ -130,38 +141,59 @@ def get_mcp_json_paths():
     return paths
 
 
-def configure_vscode_mcp_json(mcp_json_path: Path, elefante_path: Path, python_cmd: str) -> bool:
+def configure_vscode_mcp_json(
+    mcp_json_path: Path,
+    elefante_path: Path,
+    python_cmd: str,
+    *,
+    manifest_home: Path | None = None,
+) -> bool:
     """Add/update the Elefante server config in a VS Code mcp.json file."""
+    existed_before = mcp_json_path.exists()
     try:
-        mcp_json_path.parent.mkdir(parents=True, exist_ok=True)
-        if mcp_json_path.exists():
+        if existed_before:
             with open(mcp_json_path, 'r', encoding='utf-8') as f:
-                config = json.load(f) or {}
+                config = json.load(f)
         else:
             config = {}
-    except Exception:
-        config = {}
-
+    except (OSError, json.JSONDecodeError):
+        return False
     if not isinstance(config, dict):
-        config = {}
+        return False
 
-    if 'servers' not in config or not isinstance(config.get('servers'), dict):
+    if 'servers' not in config:
         config['servers'] = {}
+    if not isinstance(config.get('servers'), dict):
+        return False
+    entry_path = ("servers", "elefante")
+    if 'elefante' in config['servers'] and not is_unchanged_emitted_json_entry(
+        mcp_json_path, "vscode-copilot", entry_path, home=manifest_home
+    ):
+        return False
 
     config['servers']['elefante'] = {
         "type": "stdio",
         "command": python_cmd,
-        "args": ["-m", "src.mcp.server"],
+        "args": ["-m", "src.mcp.stdio_bridge"],
         "env": {
             "PYTHONPATH": str(elefante_path),
             "ELEFANTE_CONFIG_PATH": str(elefante_path / "config.yaml"),
+            "ELEFANTE_DAEMON_URL": "http://127.0.0.1:8765/mcp/",
+            "ELEFANTE_CLIENT_TOOL": "vscode-copilot",
             "ANONYMIZED_TELEMETRY": "False",
         },
     }
 
     try:
-        with open(mcp_json_path, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=2)
+        mcp_json_path.parent.mkdir(parents=True, exist_ok=True)
+        write_json_atomically(mcp_json_path, config)
+        record_emitted_json_entry(
+            mcp_json_path,
+            "vscode-copilot",
+            entry_path,
+            created=not existed_before,
+            home=manifest_home,
+        )
         return True
     except Exception:
         return False
@@ -260,11 +292,13 @@ def configure_mcp(argv: list[str] | None = None):
         # Prepare Elefante config
         elefante_config = {
             "command": python_cmd,
-            "args": ["-m", "src.mcp.server"],
+            "args": ["-m", "src.mcp.stdio_bridge"],
             "cwd": str(elefante_path),
             "env": {
                 "PYTHONPATH": str(elefante_path),
                 "ELEFANTE_CONFIG_PATH": str(elefante_path / "config.yaml"),
+                "ELEFANTE_DAEMON_URL": "http://127.0.0.1:8765/mcp/",
+                "ELEFANTE_CLIENT_TOOL": "ibm-bob" if is_mcp_settings else "vscode-copilot",
                 "ANONYMIZED_TELEMETRY": "False" # Disable ChromaDB telemetry
             },
             "disabled": False,
@@ -286,19 +320,46 @@ def configure_mcp(argv: list[str] | None = None):
         }
         
         # Inject config
+        changed = False
+        existed_before = settings_path.exists()
+        emitted_surface = None
+        emitted_entry_path = None
+        removed_owned_entry = False
         if is_mcp_settings:
             # Bob-IDE specific mcp_settings.json structure
             if "mcpServers" not in settings:
                 settings["mcpServers"] = {}
-            settings["mcpServers"]["elefante"] = elefante_config
+            if not isinstance(settings["mcpServers"], dict):
+                print("Warning: mcpServers is not an object. Preserving configuration.")
+                continue
+            entry_path = ("mcpServers", "elefante")
+            if "elefante" in settings["mcpServers"] and not is_unchanged_emitted_json_entry(
+                settings_path, "ibm-bob", entry_path
+            ):
+                print("Preserved existing user-managed Bob Elefante registration.")
+            else:
+                settings["mcpServers"]["elefante"] = elefante_config
+                changed = True
+                emitted_surface = "ibm-bob"
+                emitted_entry_path = entry_path
         else:
             # Standard VSCode settings.json structure
             # Default behavior: avoid duplicating built-in MCP (mcp.json). Only write
             # settings-based config if explicitly requested.
             if _is_vscode_settings_path(settings_path) and mcp_configured and clean_duplicates:
-                removed = _remove_vscode_chat_server(settings, "elefante")
-                if removed:
-                    print("Removed duplicate VS Code settings entry: chat.mcp.servers.elefante")
+                chat_servers = settings.get("chat.mcp.servers")
+                if isinstance(chat_servers, dict) and "elefante" in chat_servers:
+                    entry_path = ("chat.mcp.servers", "elefante")
+                    if is_unchanged_emitted_json_entry(
+                        settings_path, "vscode-copilot", entry_path
+                    ):
+                        removed = _remove_vscode_chat_server(settings, "elefante")
+                        if removed:
+                            print("Removed duplicate VS Code settings entry: chat.mcp.servers.elefante")
+                            changed = True
+                            removed_owned_entry = True
+                    else:
+                        print("Preserved user-managed VS Code chat Elefante registration; duplicate not removed.")
 
             if configure_vscode_chat_settings:
                 if not settings.get('chat.mcp.gallery.enabled'):
@@ -306,16 +367,34 @@ def configure_mcp(argv: list[str] | None = None):
 
                 if 'chat.mcp.servers' not in settings:
                     settings['chat.mcp.servers'] = {}
+                if not isinstance(settings['chat.mcp.servers'], dict):
+                    print("Warning: chat.mcp.servers is not an object. Preserving configuration.")
+                    continue
 
                 # VSCode uses a slightly different format for autoStart
                 vscode_config = elefante_config.copy()
                 vscode_config["autoStart"] = True
-                settings['chat.mcp.servers']['elefante'] = vscode_config
+                entry_path = ("chat.mcp.servers", "elefante")
+                if "elefante" in settings['chat.mcp.servers'] and not is_unchanged_emitted_json_entry(
+                    settings_path, "vscode-copilot", entry_path
+                ):
+                    print("Preserved existing user-managed VS Code chat Elefante registration.")
+                else:
+                    settings['chat.mcp.servers']['elefante'] = vscode_config
+                    changed = True
+                    emitted_surface = "vscode-copilot"
+                    emitted_entry_path = entry_path
             
         # Save settings
-        print("Saving configuration...")
-        with open(settings_path, 'w', encoding='utf-8') as f:
-            json.dump(settings, f, indent=4)
+        if changed:
+            print("Saving configuration...")
+            write_json_atomically(settings_path, settings, indent=4)
+            if removed_owned_entry:
+                forget_emitted_file(settings_path)
+            if emitted_surface is not None and emitted_entry_path is not None:
+                record_emitted_json_entry(
+                    settings_path, emitted_surface, emitted_entry_path, created=not existed_before
+                )
             
     print("\n" + "="*70)
     print("Configuration complete!")

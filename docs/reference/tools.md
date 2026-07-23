@@ -115,7 +115,7 @@ Elefante exposes **16 tools** and **2 prompts**. (v2.10.0 atomic swap, 2026-05-0
 - `filters` (optional, object): Filter by `memory_type`, `domain`, `category`, `min_score`, `tags`, `start_date`, or `end_date`.
 - `min_similarity` (optional, number, default `0.3`, min `0.0`, max `1.0`): Minimum semantic similarity threshold.
 - `include_conversation` (optional, boolean, default `true`): Include recent conversation context.
-- `include_stored` (optional, boolean, default `true`): Include stored memories from ChromaDB and Kuzu.
+- `include_stored` (optional, boolean, default `true`): Include stored memories from the configured local semantic store and Kuzu.
 - `session_id` (optional, string): Session UUID. Required when `include_conversation=true` and the caller needs session-scoped context.
 - `list_all` (optional, boolean, default `false`): Bypass semantic ranking and enumerate stored memories for inspection or export.
 - `offset` (optional, integer, default `0`, min `0`): Pagination offset used with `list_all=true`.
@@ -230,17 +230,18 @@ Elefante exposes **16 tools** and **2 prompts**. (v2.10.0 atomic swap, 2026-05-0
 
 #### `elefante-GraphQuery`
 
-**Purpose**: Execute raw Cypher queries on the Kuzu knowledge graph.
+**Purpose**: Execute read-only Cypher queries on the Kuzu knowledge graph.
 
 **Why this exists**: Some graph questions are too specific for fixed tools, such as path discovery, relationship analysis, or topology inspection.
 
 **Parameters**:
 
-- `cypher_query` (required, string): Cypher query text.
+- `cypher_query` (required, string): Read-only Cypher query text.
 - `parameters` (optional, object): Parameter values for the query.
 
 **Important**:
 
+- `GraphQuery` rejects graph mutations (`CREATE`, `MERGE`, `SET`, `DELETE`, and related administrative operations). Use `elefante-GraphConnect` for an explicit, compliance-gated graph write.
 - Prefer parameterized queries over string interpolation.
 - Use this when you need graph structure, not semantic memory search.
 
@@ -263,7 +264,7 @@ Elefante exposes **16 tools** and **2 prompts**. (v2.10.0 atomic swap, 2026-05-0
 **Important**:
 
 - Use `ContextGet` for broad grounding.
-- Use `MemorySearch` for targeted lookup.
+- Use `elefante-Memory(action="search")` for targeted lookup.
 
 #### `elefante-SessionsList`
 
@@ -411,6 +412,7 @@ Elefante exposes **16 tools** and **2 prompts**. (v2.10.0 atomic swap, 2026-05-0
 
 - `refresh=true` reads from live databases and requires Elefante Mode to be enabled.
 - Use `refresh=false` when you only need the latest existing snapshot.
+- The browser dashboard itself is read-only: its Reload control fetches only the existing snapshot and cannot trigger a live database refresh.
 
 ---
 
@@ -498,7 +500,7 @@ Prompts are not tools. They inject memory-aware instructions or pre-fetched cont
 2. **Choose memory type by lifespan**: Use `specification` and `directive` for permanent truths. Use `note` and `conversation` only for short-lived context.
 3. **Use `list_all` deliberately**: It is browse/export mode, not a replacement for a targeted relevance search.
 4. **Batch graph work**: Prefer one `GraphConnect` call with refs or IDs over many small graph mutations.
-5. **Parameterize Cypher**: Use `GraphQuery.parameters` instead of building queries with string interpolation.
+5. **Keep GraphQuery read-only**: Use `GraphQuery` for retrieval and `GraphConnect` for explicit mutations; parameterize Cypher rather than building queries with string interpolation.
 6. **Persist plans**: Use `TaskCreate`, `parent_id`, and `blocked_by` so work survives context loss.
 7. **Treat ETL as a pair**: `ETLProcess` fetches raw memories; `ETLClassify` is what actually improves future retrieval.
 8. **Refresh the dashboard only when mode is active**: `DashboardOpen(refresh=true)` touches live data.

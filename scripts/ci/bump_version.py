@@ -8,7 +8,7 @@
 # WHEN    : After writing the CHANGELOG entry for the new version. Never run before
 #           the CHANGELOG entry exists — the script will refuse. After bumping, run
 #           --check to confirm all 48 tracked files agree.
-# USAGE   : python scripts/ci/bump_version.py X.Y.Z [--allow-rebaseline] | --check
+# USAGE   : python scripts/ci/bump_version.py X.Y.Z [--allow-rebaseline] | --sync | --check
 # NOTES   : Mandatory sequence: (1) write CHANGELOG entry, (2) bump, (3) --check,
 #           (4) git commit. Lowering the local version requires explicit
 #           --allow-rebaseline and is only for unpublished release correction.
@@ -57,38 +57,14 @@ TARGETS = [
     ("config.yaml",                                   r'(    version:\s*")[^"]+(")',                             r'\g<1>{v}\2'),
     ("src/dashboard/ui/package.json",                 r'("version":\s*")[^"]+(")',                               r'\g<1>{v}\2'),
     ("README.md",                                     r'(\*\*v)\d+\.\d+\.\d+(\*\*\s*—)',                     r'\g<1>{v}\2'),
-    ("CONTRIBUTING.md",                               r'(Pydantic models \(v)\d+\.\d+\.\d+( schema\))',          r'\g<1>{v}\2'),
     ("docs/README.md",                                r'(> \*\*v)\d+\.\d+\.\d+',                                r'\g<1>{v}'),
-    ("workspace/ISSUES.md",                          r'(Elefante v)\d+\.\d+\.\d+',                            r'\g<1>{v}'),
-    ("docs/reference/tools.md",                  r'(API Reference \(v)\d+\.\d+\.\d+(\))',                  r'\g<1>{v}\2'),
-    ("docs/reference/architecture.md",            r'(\*\*Version:\*\* )\d+\.\d+\.\d+',                     r'\g<1>{v}'),
-    ("docs/how-to/view-dashboard.md",                r'(\*\*Document Version\*\*: )\d+\.\d+\.\d+',            r'\g<1>{v}'),
-    ("docs/how-to/close-a-feature.md",                r'(\*\*Version:\*\*\s*)\d+\.\d+\.\d+',                 r'\g<1>{v}'),
-    ("docs/how-to/run-mcp-server.md",               r'(\*\*Document Version\*\*: )\d+\.\d+\.\d+',            r'\g<1>{v}'),
-    ("docs/how-to/restart.md",                  r'(\*\*Version\*\*: )\d+\.\d+\.\d+',                     r'\g<1>{v}'),
-    ("agents/orchestrator.md",            r'(\*\*Version\*\*:\s*)\d+\.\d+\.\d+',                 r'\g<1>{v}'),
-    ("docs/reference/scoring.md",                 r'(\*\*Feature Version\*\*: )\d+\.\d+\.\d+',             r'\g<1>{v}'),
-    ("docs/how-to/kuzu-troubleshooting.md",                     r'(Applies to\*\*: v)\d+\.\d+\.\d+',                     r'\g<1>{v}'),
-    ("examples/AGENT_TUTORIAL.md",                    r'(\*\*Version:\*\*\s*)\S+',                             r'\g<1>{v}'),
-    ("tests/README.md",                               r'(\*\*Version:\*\*\s*)\S+',                             r'\g<1>{v}'),
-    ("docs/how-to/install.md",            r'(\*\*Version\*\*: )\d+\.\d+\.\d+',                    r'\g<1>{v}'),
     ("docs/explanation/vision.md",                  r'(Current version: v)\d+\.\d+\.\d+',                   r'\g<1>{v}'),
-    ("docs/how-to/rollback.md",                r'(\*\*Version\*\*: )\d+\.\d+\.\d+',                    r'\g<1>{v}'),
-    ("docs/reference/ingestion.md",              r'(\*\*Version\*\*: )\d+\.\d+\.\d+',                    r'\g<1>{v}'),
-    ("workspace/lessons.md",                  r'(\*\*Applies to\*\*: v)\d+\.\d+\.\d+\+',              r'\g<1>{v}+'),
-    ("workspace/postmortems/ai-behavior.md",      r'(\*\*Applies to\*\*: v)\d+\.\d+\.\d+\+',              r'\g<1>{v}+'),
-    ("workspace/postmortems/dashboard.md",        r'(\*\*Applies to\*\*: v)\d+\.\d+\.\d+\+',              r'\g<1>{v}+'),
-    ("workspace/postmortems/installation.md",     r'(\*\*Applies to\*\*: v)\d+\.\d+\.\d+\+',              r'\g<1>{v}+'),
-    ("workspace/postmortems/memory.md",           r'(\*\*Applies to\*\*: v)\d+\.\d+\.\d+\+',              r'\g<1>{v}+'),
 ]
 
 # Glob-based targets: matches multiple files sharing the same header pattern.
 # Format: (glob_pattern, regex_pattern, replacement_template)
 # These are expanded at runtime and processed alongside TARGETS.
-GLOB_TARGETS = [
-    ("src/dashboard/ui/src/**/*.tsx",  r'(// Elefante Dashboard v)\d+\.\d+\.\d+',  r'\g<1>{v}'),
-    ("src/dashboard/ui/src/**/*.ts",   r'(// Elefante Dashboard v)\d+\.\d+\.\d+',  r'\g<1>{v}'),
-]
+GLOB_TARGETS = []
 
 
 def _expand_glob_targets():
@@ -190,7 +166,7 @@ def _check_version_direction(new_version: str, allow_rebaseline: bool = False):
         )
 
 
-def bump(new_version: str, allow_rebaseline: bool = False):
+def bump(new_version: str, allow_rebaseline: bool = False, sync_current: bool = False):
     """Write new_version to all target files."""
     # Validate semver format
     if not re.match(r'^\d+\.\d+\.\d+$', new_version):
@@ -200,11 +176,16 @@ def bump(new_version: str, allow_rebaseline: bool = False):
         if not (0 <= val <= 99):
             raise SystemExit(f"Version part '{label}={val}' is out of range [0, 99].")
 
-    # Precondition gates — abort before touching any file
-    _check_version_direction(new_version, allow_rebaseline=allow_rebaseline)
-    _check_changelog_entry(new_version)
-
+    # Release bumps require monotonic versioning plus a changelog entry. Sync is
+    # a repair-only path and may write only the current package version.
     current = read_current_version()
+    if sync_current:
+        if new_version != current:
+            raise SystemExit("GATE FAILED: --sync may only propagate the current package version")
+    else:
+        _check_version_direction(new_version, allow_rebaseline=allow_rebaseline)
+        _check_changelog_entry(new_version)
+
     if allow_rebaseline and _version_parts(new_version) < _version_parts(current):
         print(f"  REBASELINE  Correcting unpublished local version {current} -> {new_version}")
 
@@ -275,6 +256,10 @@ def main():
             raise SystemExit("--allow-rebaseline cannot be used with --check")
         ok = check_versions()
         sys.exit(0 if ok else 1)
+    elif arg == "--sync":
+        if allow_rebaseline:
+            raise SystemExit("--allow-rebaseline cannot be used with --sync")
+        bump(read_current_version(), sync_current=True)
     else:
         bump(arg, allow_rebaseline=allow_rebaseline)
 

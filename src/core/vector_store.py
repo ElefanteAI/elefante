@@ -220,7 +220,13 @@ class VectorStore:
         if memory.metadata.custom_metadata:
             for k, v in memory.metadata.custom_metadata.items():
                 if k not in metadata: # Don't overwrite core fields
-                    metadata[k] = str(v) if not isinstance(v, (str, int, float, bool)) else v
+                    # Chroma metadata only permits primitives. Provenance is a
+                    # durable structured contract, so JSON—not Python repr—is
+                    # required for lossless round-trip and legacy recovery.
+                    if k == "elefante_source" and isinstance(v, dict):
+                        metadata[k] = json.dumps(v, sort_keys=True)
+                    else:
+                        metadata[k] = str(v) if not isinstance(v, (str, int, float, bool)) else v
         
         # Persist system_metadata as JSON string (ADV-001: token intelligence roundtrip)
         if memory.metadata.system_metadata:
@@ -480,6 +486,18 @@ class VectorStore:
             "system_metadata",
         }
         custom_metadata = {k: v for k, v in metadata.items() if k not in known_keys}
+
+        raw_source = custom_metadata.get("elefante_source")
+        if isinstance(raw_source, str) and raw_source.strip():
+            try:
+                parsed_source = json.loads(raw_source)
+            except json.JSONDecodeError:
+                try:
+                    parsed_source = ast.literal_eval(raw_source)
+                except (ValueError, SyntaxError):
+                    parsed_source = None
+            if isinstance(parsed_source, dict):
+                custom_metadata["elefante_source"] = parsed_source
 
         # Also restore nested custom_metadata if present (stored by VectorStore).
         embedded_custom = metadata.get("custom_metadata")
@@ -1008,7 +1026,15 @@ def get_vector_store() -> VectorStore:
     """
     global _vector_store
     if _vector_store is None:
-        _vector_store = VectorStore()
+        store_type = get_config().elefante.vector_store.type
+        if store_type == "sqlite":
+            from src.core.sqlite_vector_store import SQLiteVectorStore
+
+            _vector_store = SQLiteVectorStore()
+        elif store_type == "chromadb":
+            _vector_store = VectorStore()
+        else:
+            raise ValueError(f"Unsupported vector store type: {store_type}")
     return _vector_store
 
 
@@ -1016,4 +1042,3 @@ def reset_vector_store():
     """Reset global vector store (useful for testing)"""
     global _vector_store
     _vector_store = None
-

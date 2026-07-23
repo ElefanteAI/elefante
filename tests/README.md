@@ -25,7 +25,7 @@ pytest tests/test_integration_smoke.py -v
 ./.venv/bin/python scripts/verify/verify_scoring_sandbox.py
 ```
 
-The shipped self-protocol runs against an isolated temporary Elefante home/data directory so it validates the live MCP workflow without polluting the user's durable memory store. By default it verifies 19/20 tools plus both prompts; `--with-dashboard-open` is opt-in because that tool binds fixed port 8000 and is not fully self-contained.
+The shipped self-protocol runs against an isolated temporary Elefante home/data directory so it validates the live MCP workflow without polluting the user's durable memory store. By default it verifies 15/16 tools plus both prompts; `--with-dashboard-open` is opt-in because that tool binds fixed port 8000 and is not fully self-contained.
 
 Use the existing tests in this file before writing any ad hoc validation script. If a listed test no longer reflects current behavior, update that test first. Parallel scratch tests are noise unless the existing suite cannot express the failure mode.
 
@@ -50,10 +50,11 @@ Use the existing tests in this file before writing any ad hoc validation script.
 | [test_developer_routing.py](test_developer_routing.py) | Active developer-routing paths, debug feedback-loop doc links, self-protocol verifier invariants, current doc references, MCP tool-count guidance | When changing developer process docs, the shipped self-protocol, or built-in SDD/directive text |
 | [test_no_emojis.py](test_no_emojis.py) | Emoji policy enforcement across source files | When changing emoji policy |
 | [test_v4_concept_overlap.py](test_v4_concept_overlap.py) | Concept overlap detection in memory schema | When changing concept fields |
-| [test_dashboard_serializer.py](test_dashboard_serializer.py) | Dashboard node scoring, launch/open safeguards, refresh restart contract, and frontend retry backoff | When changing dashboard serialization, dashboard open flow, or frontend snapshot fetch behavior |
+| [test_dashboard_serializer.py](test_dashboard_serializer.py) | Dashboard node scoring, local-only launch/CORS safeguards, refresh restart contract, frontend retry backoff, and read-only GraphQuery validation | When changing dashboard serialization, dashboard launch/security, GraphQuery access, or frontend snapshot fetch behavior |
 | [test_factory_reset.py](test_factory_reset.py) | Factory reset dry-run, safety gates, backup, idempotency | When changing `scripts/lifecycle/reset_factory.py` |
+| [test_backup_restore.py](test_backup_restore.py) | Backup manifests, restore preflight, archive safety, integrity, and recoverable replacement | When changing `scripts/lifecycle/backup_elefante_data.py` or `restore_elefante_data.py` |
 | [test_installer_bundle.py](test_installer_bundle.py) | Release-bundle bootstrap install root placement, delegated installer command wiring, and archive contents | When changing `scripts/setup/bootstrap_release_bundle.py` or `scripts/ci/build_installer_bundle.py` |
-| [test_install_setup.py](test_install_setup.py) | Bundled dashboard asset preference, install state tracking, and seed-memory guard | When changing `scripts/setup/install.py` |
+| [test_install_setup.py](test_install_setup.py) | Installer state, daemon service, MCP host adapters, safe uninstall ownership, and seed-memory guard | When changing `scripts/setup/` or `scripts/lifecycle/` installer paths |
 
 ### INTEGRATION (Run before release)
 
@@ -80,6 +81,7 @@ tests/
 ├── test_no_emojis.py            <- Unit test (policy)
 ├── test_v4_concept_overlap.py   <- Unit test (schema)
 ├── test_factory_reset.py        <- Unit test (lifecycle)
+├── test_backup_restore.py        <- Unit test (backup and restore safety)
 ├── test_installer_bundle.py     <- Unit test (installer bundle)
 ├── test_install_setup.py        <- Unit test (install.py)
 ├── test_integration_smoke.py    <- Integration
@@ -115,6 +117,7 @@ tests/
 | Validate retrieval signals plus dashboard demo coverage in isolation | `./.venv/bin/python scripts/verify/verify_scoring_sandbox.py` |
 | Changed dashboard serialization | `pytest tests/test_dashboard_serializer.py -v` |
 | Verify factory reset safety | `pytest tests/test_factory_reset.py -v` |
+| Verify backup and restore safety | `pytest tests/test_backup_restore.py -v` |
 | Before release | `pytest tests/ -v` |
 | Debugging search issues | `python tests/manual/test_semantic_search.py` |
 | Verify MCP server works | `pytest tests/verification/test_mcp_server.py -v` |

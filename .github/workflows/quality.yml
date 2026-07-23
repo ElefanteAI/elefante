@@ -1,0 +1,46 @@
+name: Quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.11.7"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install --require-hashes -r requirements.lock
+      - name: Verify universal Python lock freshness
+        run: |
+          mkdir "$RUNNER_TEMP/elefante-lock-check"
+          cp requirements.txt "$RUNNER_TEMP/elefante-lock-check/requirements.txt"
+          (
+            cd "$RUNNER_TEMP/elefante-lock-check"
+            uv pip compile --universal --generate-hashes --python-version 3.11 requirements.txt -o requirements.lock
+          )
+          cmp requirements.lock "$RUNNER_TEMP/elefante-lock-check/requirements.lock"
+      - run: python -m pytest tests -q
+      - run: python -m pytest tests -m slow -q
+
+  dashboard:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/dashboard/ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: src/dashboard/ui/package-lock.json
+      - run: npm ci
+      - run: npm run build

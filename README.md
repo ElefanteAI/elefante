@@ -23,7 +23,7 @@ AI agents start every conversation from zero. Your preferences, decisions, and d
 ┌────────────────────────▼────────────────────────────────────┐
 │ LAYER 2 · INTELLIGENCE ENGINE                               │
 │ Orchestrator · 5-signal scoring · Hybrid Memory             │
-│ (ChromaDB vectors + Kuzu graph)                             │
+│ (ChromaDB/SQLite vectors + Kuzu graph)                      │
 └────────────────────────┬────────────────────────────────────┘
                          │ snapshot.json
 ┌────────────────────────▼────────────────────────────────────┐
@@ -64,9 +64,10 @@ IDE configuration → [docs/how-to/configure-ide.md](docs/how-to/configure-ide.m
 
 ### Layer 2 — Intelligence Engine
 
-Two storage backends working together:
+Two local storage layers work together:
 
-- **ChromaDB** — 768-dimensional semantic vectors for meaning-based retrieval across months of history.
+- **ChromaDB** — the default 768-dimensional semantic vector store for meaning-based retrieval across months of history.
+- **SQLite** — a dependency-free, opt-in vector store for fresh isolated installs; it uses exact cosine retrieval and does not silently migrate existing ChromaDB data.
 - **Kuzu** — a knowledge graph that tracks entities, relationships, and structural context.
 - **Behavioral Relevance** — a 5-signal scoring system that automatically surfaces the most useful memories. No manual importance ratings.
 
@@ -179,7 +180,7 @@ Elefante keeps durable architecture rules out of the live prompt by separating l
 | Vector store | ChromaDB 1.3.5                   |
 | Graph store  | Kuzu 0.11.3                      |
 | Embeddings   | sentence-transformers (gte-base) |
-| Protocol     | MCP 1.23.1                       |
+| Protocol     | MCP 1.28.1                       |
 | Dashboard    | React + TypeScript + Vite        |
 | Runtime      | Python 3.11                      |
 
@@ -189,7 +190,9 @@ Elefante keeps durable architecture rules out of the live prompt by separating l
 
 ```
 src/              Core engine, MCP server, dashboard
-docs/             Technical reference, guides, debug compendiums
+docs/             Stable reference, how-to, and explanation
+workspace/        Living plan, issues, postmortems, proposals
+agents/           Developer constitution and specialist protocols
 examples/         Agent tutorial and integration patterns
 tests/            Unit, integration, and verification tests
 scripts/          Setup, deployment, and maintenance tools
@@ -199,12 +202,12 @@ scripts/          Setup, deployment, and maintenance tools
 
 ## Documentation
 
-Three audiences, three surfaces (v2.10.0 split, see [workspace/PLANNING.md §2.5](workspace/PLANNING.md §2.5)):
+Three audiences, three surfaces:
 
 | Audience | Start here |
 | -------- | ---------- |
-| **Using Elefante** as a memory engine | [docs/user/README.md](docs/user/README.md) |
-| **Building or debugging Elefante** itself | [agents/orchestrator.md](agents/orchestrator.md) → then [docs/developer/README.md](docs/developer/README.md) |
+| **Using Elefante** as a memory engine | [docs/README.md](docs/README.md) |
+| **Building or debugging Elefante** itself | [AGENTS.md](AGENTS.md) → [agents/orchestrator.md](agents/orchestrator.md) |
 | **Loading an agent protocol** at the moment of failure | [agents/](agents/) |
 
 ### Agent dispatch (load when this happens)
@@ -212,7 +215,7 @@ Three audiences, three surfaces (v2.10.0 split, see [workspace/PLANNING.md §2.5
 | Symptom | Load |
 | ------- | ---- |
 | Building a feature, debugging Elefante itself | [agents/orchestrator.md](agents/orchestrator.md) |
-| Any `MemoryAdd` / `MemoryUpdate` / `MemoryDelete` (auto) | [agents/memory-janitor.md](agents/memory-janitor.md) |
+| Any `elefante-Memory(action="add"\|"update"\|"delete")` | [agents/memory-janitor.md](agents/memory-janitor.md) |
 | "What do I have stored?", export, audit | [agents/memory-inspector.md](agents/memory-inspector.md) |
 | Install failed, broken venv, repair | [agents/installer.md](agents/installer.md) |
 | MCP tools missing in IDE, server stuck | [agents/restarter.md](agents/restarter.md) |

@@ -33,6 +33,44 @@ from src.models.entity import Entity, EntityType, Relationship, RelationshipType
 from src.models.query import QueryMode
 
 
+def test_vector_store_uses_embedded_chroma_client_not_server_transport(tmp_path, monkeypatch):
+    """Elefante must not create the network Chroma client surface."""
+    import chromadb
+
+    calls = {}
+
+    class FakeCollection:
+        def count(self):
+            return 0
+
+    class FakePersistentClient:
+        def __init__(self, *, path, settings):
+            calls["path"] = path
+            calls["settings"] = settings
+
+        def get_or_create_collection(self, *, name, metadata):
+            calls["collection"] = (name, metadata)
+            return FakeCollection()
+
+    def fail_if_network_client_is_used(*_args, **_kwargs):
+        raise AssertionError("Elefante must not use Chroma's network client")
+
+    monkeypatch.setattr(chromadb, "PersistentClient", FakePersistentClient)
+    monkeypatch.setattr(chromadb, "HttpClient", fail_if_network_client_is_used)
+    store = VectorStore(
+        collection_name="embedded-only",
+        persist_directory=str(tmp_path / "chroma"),
+    )
+
+    store._initialize_client()
+
+    assert calls["path"] == str(tmp_path / "chroma")
+    assert calls["collection"] == (
+        "embedded-only",
+        {"hnsw:space": store.distance_metric},
+    )
+
+
 class TestMemoryPersistence:
     """Test that memories persist correctly in both databases"""
     
@@ -109,6 +147,39 @@ class TestMemoryPersistence:
         
         # Should have at least one entity node
         assert len(results) > 0, "No entity nodes found in graph store"
+
+    @pytest.mark.asyncio
+    async def test_source_tuple_round_trips_and_links_to_graph_source(self, orchestrator):
+        """Every new memory gets durable vector and graph provenance."""
+        source = {
+            "tool": "codex",
+            "instance_id": "window-1",
+            "session_id": "session-1",
+            "cwd": "/workspace/elefante",
+            "transport": "streamable-http",
+        }
+        memory = await orchestrator.add_memory(
+            content=f"Provenance roundtrip {uuid4()}",
+            memory_type="note",
+            metadata={"elefante_source": source},
+        )
+
+        stored = await orchestrator.vector_store.get_memory(memory.id)
+        assert stored is not None
+        persisted_source = stored.metadata.custom_metadata["elefante_source"]
+        assert persisted_source["tool"] == "codex"
+        assert persisted_source["instance_id"] == "window-1"
+        assert persisted_source["transport"] == "streamable-http"
+
+        links = await orchestrator.graph_store.execute_query(
+            """
+            MATCH (m:Entity {id: $memory_id})-[:WRITTEN_BY]->(s:Source)
+            RETURN s.tool, s.instance_id, s.session_id, s.transport
+            """,
+            {"memory_id": str(memory.id)},
+        )
+        assert len(links) == 1
+        assert links[0]["values"] == ["codex", "window-1", "session-1", "streamable-http"]
     
     @pytest.mark.asyncio
     async def test_no_temporary_scripts_generated(self, orchestrator):
@@ -221,6 +292,7 @@ class TestMemoryPersistence:
                 {"name": entity_name, "type": "concept"}
             ]
         )
+        assert memory is not None
         
         # Query graph for the entity
         graph_store = orchestrator.graph_store
@@ -744,5 +816,3 @@ class TestGraphToolContract:
         assert "session.get(\"props\")" in server_source
         assert "json.loads(props_raw)" in server_source
         assert "ORDER BY s.last_active DESC" not in server_source
-
-

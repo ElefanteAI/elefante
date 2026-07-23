@@ -262,7 +262,7 @@ def validate_date_range(start_date: Optional[datetime], end_date: Optional[datet
 
 def validate_cypher_query(query: str) -> str:
     """
-    Basic validation for Cypher queries
+    Validate a read-only Cypher query.
     
     Args:
         query: Cypher query string
@@ -281,13 +281,21 @@ def validate_cypher_query(query: str) -> str:
     if not query:
         raise ValidationError("Cypher query cannot be empty")
     
-    # Basic safety checks (prevent destructive operations in production)
-    dangerous_keywords = ['DELETE', 'DROP', 'REMOVE']
+    # GraphQuery is a retrieval surface. Mutations belong in the explicit,
+    # compliance-gated GraphConnect tool so an arbitrary client cannot bypass
+    # the graph write contract.
+    write_keywords = (
+        "CREATE", "MERGE", "SET", "DELETE", "DROP", "REMOVE", "ALTER",
+        "COPY", "LOAD", "IMPORT", "EXPORT", "ATTACH", "DETACH", "INSTALL",
+    )
     query_upper = query.upper()
     
-    for keyword in dangerous_keywords:
-        if keyword in query_upper:
-            raise ValidationError(f"Dangerous operation '{keyword}' not allowed in queries")
+    for keyword in write_keywords:
+        if re.search(rf"\b{keyword}\b", query_upper):
+            raise ValidationError(
+                f"GraphQuery is read-only; '{keyword}' is not allowed. "
+                "Use elefante-GraphConnect for graph mutations."
+            )
     
     return query
 
@@ -314,4 +322,3 @@ def sanitize_filename(filename: str) -> str:
         filename = name[:250] + ('.' + ext if ext else '')
     
     return filename or 'unnamed'
-

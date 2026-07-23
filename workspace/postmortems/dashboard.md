@@ -72,6 +72,22 @@
 **Guard:** `pytest tests/test_dashboard_serializer.py -v`.
 **Lesson:** Never trust stored scores. Scores are derived values — always compute them live from behavioral signals. Enforce this architecturally via a single shared serializer; documentation and rules are not enough when three code paths can drift.
 
+## Issue #10: Dashboard Private Data Exposure [BUG-028, FIXED, guarded]
+
+**Trigger:** Dashboard API endpoints return memory content, metadata, and graph data while the server bound `0.0.0.0` and accepted wildcard CORS; Docker published port 8000 on every host interface.
+**Root cause:** Local development defaults were treated as deployment defaults without an explicit privacy boundary.
+**Solution:** Default to `127.0.0.1`, allow only explicit local CORS origins, constrain request bounds, and publish Docker Compose to `127.0.0.1:8000`. Any reverse-proxy deployment must configure its origin allowlist and authentication explicitly.
+**Guard:** `pytest tests/test_dashboard_serializer.py -k "loopback or cors" -v`.
+**Lesson:** A dashboard that can return private memories is a private service by default, not a public API with optional hardening.
+
+## Issue #11: Dashboard Live-Store and Browser-Mutation Bypass [BUG-031, FIXED, guarded]
+
+**Trigger:** The dashboard was documented as a read-only snapshot viewer, but `/api/graph` hydrated values from ChromaDB, `/api/search` performed live semantic retrieval, and `/api/refresh` spawned the snapshot pipeline from a browser POST.
+**Root cause:** The snapshot boundary was applied to the main graph response but not to adjacent convenience features. The resulting process could contend with the singleton daemon and gave a browser surface unnecessary mutation authority.
+**Solution:** All dashboard reads now use only `dashboard_snapshot.json`; search is explicitly lexical over its redacted content. The browser refresh route was removed and its control now reloads the current snapshot. Regeneration remains an explicit MCP `DashboardOpen(refresh=true)` or operator CLI action.
+**Guard:** `tests/test_dashboard_serializer.py` executes snapshot graph/search/stats responses and verifies no live-store import or browser refresh route remains; production UI build passes.
+**Lesson:** A read-only inspection boundary applies to every convenience endpoint, not only the primary page load. Browser UI should never gain database authority merely to make refresh convenient.
+
 ---
 
 ## Cross-bug pattern (extracted to `../lessons.md`)

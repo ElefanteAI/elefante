@@ -33,6 +33,7 @@ def _create_minimal_repo(root_dir: Path) -> None:
         "README.md": "# Elefante\n\n**v9.9.9** — Test Bundle\n",
         "LICENSE": "test license\n",
         "requirements.txt": "pytest\n",
+        "requirements.lock": "pytest==7.4.4 --hash=sha256:test\n",
         "config.yaml": "storage: local\n",
         ".github/copilot-instructions.md": "Use Elefante.\n",
         "scripts/setup/install.py": "print('install')\n",
@@ -142,6 +143,7 @@ def test_build_installer_bundle_writes_manifest_wrappers_and_payload(tmp_path):
     assert "elefante-installer-macOS/install.bat" in names
     assert "elefante-installer-macOS/scripts/setup/bootstrap_release_bundle.py" in names
     assert "elefante-installer-macOS/payload/elefante/scripts/setup/install.py" in names
+    assert "elefante-installer-macOS/payload/elefante/requirements.lock" in names
     assert "elefante-installer-macOS/payload/elefante/src/dashboard/ui/dist/index.html" in names
 
 

@@ -1,6 +1,6 @@
 # Elefante Vision
 
-> Last updated: 2026-05-02 · Current version: v2.10.0
+> Last updated: 2026-07-22 · Current version: v2.10.0
 
 ---
 
@@ -31,9 +31,15 @@ Elefante fixes this. It gives your AI agent a **second brain** — a persistent,
 
 It runs locally on your machine. No cloud. No API keys for memory. Your data stays yours.
 
-### How It Works (One Paragraph)
+### Universal Agent Contract
 
-Elefante runs as an MCP server that your IDE connects to via stdio. When your agent works, Elefante intercepts tool calls and injects relevant memories from its dual storage system (ChromaDB for semantic search, Kuzu for knowledge graph). Every memory has a system-computed relevance score based on recency, freshness, and how often it's been useful. Memories that matter rise to the top. Memories that don't, decay naturally. The agent can store new knowledge, search existing knowledge, manage tasks, and build a knowledge graph — all through 20 MCP tools and 2 prompts.
+Elefante is for developers who move between Claude, Codex, Gemini, Grok, Agent Zero, OpenClaw, and the next agent host — not for one editor's captive ecosystem. The product contract is one local memory authority per user, exposed through the transport each host can actually use: native local HTTP for capable clients and a compatibility bridge for stdio-only clients. The runtime, not a collection of editor plugins, owns storage, concurrency, provenance, and upgrades.
+
+No host is marketed as supported until its installation, reconnect, concurrent-write, uninstall, and upgrade path are verified. “MCP-compatible” is compatibility evidence, not a promise of a polished integration.
+
+### How It Works (Today and Next)
+
+Today Elefante runs as an MCP server, usually connected through stdio. When an agent works, Elefante injects relevant memories from its dual storage system (ChromaDB by default for semantic search, Kuzu for the knowledge graph). A local SQLite semantic-store backend is available as an explicit fresh-store opt-in; existing ChromaDB data is never converted without a separately authorized migration. Every memory has a system-computed relevance score based on recency, freshness, and how often it's been useful. Memories that matter rise to the top. Memories that don't, decay naturally. The active product roadmap replaces per-client database ownership with one local daemon, native local HTTP, and a bridge for stdio-only hosts so multiple tools can share the same trustworthy memory authority.
 
 ### The Four Laws
 
@@ -52,8 +58,8 @@ These are non-negotiable and define everything Elefante does. Law 4 is the gover
 
 | Capability | What It Does |
 | ---------- | ------------ |
-| 20 MCP tools | Memory CRUD, graph queries, tasks, ETL, directives, context injection |
-| Dual storage | ChromaDB (semantic vectors) + Kuzu (knowledge graph) |
+| 16 MCP tools | Memory CRUD, graph queries, tasks, ETL, directives, context injection |
+| Dual storage | ChromaDB by default (semantic vectors; SQLite fresh-store opt-in) + Kuzu (knowledge graph) |
 | Behavioral scoring | System-computed relevance (0-100) with type-based decay rates |
 | 5-signal cognitive retrieval | Vector similarity, concept overlap, co-activation, authority, temporal |
 | Compliance gate | Mechanical search-before-write enforcement |
@@ -195,4 +201,4 @@ When in doubt: re-read the Thesis section and Law 4. If a proposal cannot be def
 
 ## What This Document Is Not
 
-This is not a spec, a roadmap with dates, or an implementation guide. It's the **single source of truth for what Elefante is, where it's going, and what ideas exist**. For implementation details of shipped features, see `docs/technical/`. For detailed specs of unbuilt features, see the files referenced in each idea above.
+This is not a spec, a roadmap with dates, or an implementation guide. It's the **single source of truth for what Elefante is, where it's going, and what ideas exist**. For implementation details of shipped features, see `docs/reference/` and `docs/how-to/`. For detailed specs of unbuilt features, see the files referenced in each idea above.

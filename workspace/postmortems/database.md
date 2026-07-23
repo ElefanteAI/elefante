@@ -64,6 +64,14 @@
 **Guards:** `TestGraphToolContract` creates real `CREATED_IN` and `WORKS_ON` edges + statically guards `SessionsList` query shape.
 **Lesson:** Graph tools must target the concrete node and relation-table schema that exists, not a generic mental model. Code-review plausibility is not a substitute for live-surface verification.
 
+## Issue #9: GraphQuery Write Boundary Bypass [BUG-029, FIXED, guarded]
+
+**Trigger:** A client could send `CREATE`, `MERGE`, `SET`, or other mutations through `elefante-GraphQuery`, despite its retrieval-facing contract.
+**Root cause:** Mutation filtering lived in the shared GraphStore method, which also powers trusted internal graph maintenance; its original keyword list was incomplete.
+**Solution:** Keep GraphStore available to trusted internal operations and enforce a read-only Cypher validator at the external MCP GraphQuery boundary. Mutations use explicit `elefante-GraphConnect`.
+**Guard:** `pytest tests/test_dashboard_serializer.py -k "graph_query_validator" -v`.
+**Lesson:** Enforce capability policy at the client boundary; enforcing it in a shared internal primitive silently breaks legitimate maintenance work.
+
 ---
 
 ## Cross-bug pattern (extracted to `../lessons.md`)

@@ -9,7 +9,7 @@ AUTHORITY: This file owns memory inspection. Read-only. Any write operation rout
 
 # Memory Inspector Agent
 
-> Read-only. This agent never mutates. If the task requires `MemoryAdd`, `MemoryUpdate`, or `MemoryDelete`, abort and load `agents/memory-janitor.md`.
+> Read-only. This agent never mutates. If the task requires `elefante-Memory(action="add"|"update"|"delete")`, abort and load `agents/memory-janitor.md`.
 
 ## Inspection Routes
 

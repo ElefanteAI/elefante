@@ -1,15 +1,17 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : update_dashboard_data.py
 # VERSION : 2.5.2
-# CHANGED : 2026-04-15
-# PURPOSE : Read ChromaDB + Kuzu state and emit dashboard_snapshot.json
+# CHANGED : 2026-07-23
+# PURPOSE : Read the configured embedded vector store + Kuzu state and emit
+#           dashboard_snapshot.json
 #           consumed by the dashboard server/frontend.
 # WHEN    : After bulk memory changes (import, surgical delete, factory reset +
 #           re-seed) to refresh the dashboard without restarting the full server.
 #           Also when the dashboard shows stale counts or missing nodes.
 #           Run verify_dashboard_snapshot.py after this to validate the output.
 # USAGE   : python scripts/pipeline/update_dashboard_data.py
-# NOTES   : Reads both ChromaDB (all memories) and Kuzu (entities/relationships).
+# NOTES   : Reads the configured ChromaDB or SQLite vector store plus Kuzu
+#           entities/relationships.
 #           The output file path is determined by config.yaml. Dashboard must be
 #           restarted or will auto-poll for the new snapshot depending on config.
 # LASTRUN : yyyy-mm-dd hh:mm — update manually
@@ -20,7 +22,6 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
-import chromadb
 
 # Add src to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
@@ -34,10 +35,69 @@ from src.utils.dashboard_serializer import (  # noqa: E402
     is_test_artifact as _is_test_artifact,
 )
 
+
+def _sqlite_metadata_for_snapshot(memory) -> dict:
+    """Normalize complete SQLite Memory metadata to the legacy snapshot shape."""
+    metadata = memory.to_dict()["metadata"]
+    custom = metadata.get("custom_metadata") or {}
+    if not isinstance(custom, dict):
+        custom = {}
+    normalized = {**metadata, **custom, "custom_metadata": custom}
+    tags = normalized.get("tags")
+    if isinstance(tags, list):
+        normalized["tags"] = ",".join(str(tag) for tag in tags)
+    return normalized
+
+
+async def _configured_vector_records(config, *, include_embeddings: bool, limit: int | None = None) -> dict:
+    """Read snapshot records from the selected embedded vector-store backend."""
+    vector_config = config.elefante.vector_store
+    if vector_config.type == "chromadb":
+        import chromadb
+        from chromadb.config import Settings
+
+        client = chromadb.PersistentClient(
+            path=vector_config.persist_directory,
+            settings=Settings(
+                anonymized_telemetry=getattr(config.elefante, "anonymized_telemetry", False),
+                allow_reset=True,
+            ),
+        )
+        collection = client.get_collection(vector_config.collection_name)
+        include = ["documents", "metadatas"]
+        if include_embeddings:
+            include.append("embeddings")
+        options = {"include": include}
+        if limit is not None:
+            options["limit"] = limit
+        return await asyncio.to_thread(collection.get, **options)
+
+    if vector_config.type == "sqlite":
+        from src.core.sqlite_vector_store import SQLiteVectorStore
+
+        store = SQLiteVectorStore(
+            collection_name=vector_config.collection_name,
+            persist_directory=vector_config.persist_directory,
+        )
+        try:
+            memories = await store.get_all(limit=limit or 1_000_000)
+        finally:
+            store.close()
+        records = {
+            "ids": [str(memory.id) for memory in memories],
+            "documents": [memory.content for memory in memories],
+            "metadatas": [_sqlite_metadata_for_snapshot(memory) for memory in memories],
+        }
+        if include_embeddings:
+            records["embeddings"] = [memory.embedding for memory in memories]
+        return records
+
+    raise ValueError(f"Unsupported vector store for dashboard snapshot: {vector_config.type}")
+
 async def main():
     """
-    Generate dashboard snapshot from BOTH data stores:
-    1. ChromaDB (vector store) - Contains ALL memories (primary source)
+    Generate dashboard snapshot from BOTH durable stores:
+    1. Configured embedded vector store - Contains ALL memories (primary source)
     2. Kuzu (graph store) - Contains entities and relationships
     
     This ensures all 70+ memories are visible, not just graph entities.
@@ -48,19 +108,16 @@ async def main():
     seen_ids = set()
     
     # =========================================================================
-    # STEP 1: Fetch ALL memories from ChromaDB (PRIMARY SOURCE)
+    # STEP 1: Fetch ALL memories from the configured vector store (PRIMARY SOURCE)
     # =========================================================================
-    print("[*] Step 1: Fetching memories from ChromaDB...", file=sys.stderr)
-    
-    chroma_path = config.elefante.vector_store.persist_directory
-    client = chromadb.PersistentClient(path=chroma_path)
-    collection = client.get_collection("memories")
-    
+    vector_store_type = config.elefante.vector_store.type
+    print(f"[*] Step 1: Fetching memories from {vector_store_type}...", file=sys.stderr)
+
     # Get ALL memories (no limit)
-    all_memories = collection.get(include=["documents", "metadatas"])
+    all_memories = await _configured_vector_records(config, include_embeddings=False)
     
     memory_count = len(all_memories["ids"])
-    print(f"   Found {memory_count} memories in ChromaDB", file=sys.stderr)
+    print(f"   Found {memory_count} memories in {vector_store_type}", file=sys.stderr)
     
     # DEDUPLICATION: Prefer (namespace, canonical_key) when available.
     # Fallback to title-based grouping only when no canonical identity exists.
@@ -169,7 +226,7 @@ async def main():
                 "concepts": meta.get("concepts"),
                 "surfaces_when": meta.get("surfaces_when"),
                 "authority_score": meta.get("authority_score"),
-                "source": "chromadb"
+                "source": vector_store_type
             }
         }
         
@@ -382,10 +439,9 @@ async def main():
             a, b = (src, dst) if src < dst else (dst, src)
             existing_edge_keys.add((a, b, lbl))
 
-        # Get embeddings from ChromaDB
-        all_with_embeddings = collection.get(
-            include=["embeddings"],
-            limit=500  # Keep bounded for dashboard snapshot
+        # Get embeddings from the configured embedded vector store.
+        all_with_embeddings = await _configured_vector_records(
+            config, include_embeddings=True, limit=500
         )
 
         embeddings = all_with_embeddings.get("embeddings")

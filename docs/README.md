@@ -34,7 +34,7 @@ Source-of-truth for every spec is `src/`; specs lag. When formula and spec disag
 | Doc | Procedure |
 |-----|-----------|
 | [`install.md`](how-to/install.md) | Full install + Python version details |
-| [`configure-ide.md`](how-to/configure-ide.md) | IDE MCP setup (VS Code, Cursor, Bob, Antigravity) |
+| [`configure-ide.md`](how-to/configure-ide.md) | IDE and CLI-agent MCP setup (VS Code, Cursor, Bob, Antigravity, Kiro, Gemini CLI, Claude Code, Codex, OpenClaw) |
 | [`run-mcp-server.md`](how-to/run-mcp-server.md) | Manual server startup + handshake verification |
 | [`view-dashboard.md`](how-to/view-dashboard.md) | Dashboard launch + verification |
 | [`restart.md`](how-to/restart.md) | Graceful restart, lock cleanup, force-kill |

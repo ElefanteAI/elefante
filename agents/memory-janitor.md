@@ -44,7 +44,7 @@ Filing it for later is waste; the next agent will not find your note. The except
 
 ---
 
-## Pre-Write Discipline (for `MemoryAdd`)
+## Pre-Write Discipline (for `elefante-Memory(action="add")`)
 
 Before every `elefante-Memory(action="add")`:
 
@@ -54,7 +54,7 @@ Before every `elefante-Memory(action="add")`:
 
 ---
 
-## Pre-Delete Discipline (for `MemoryDelete`)
+## Pre-Delete Discipline (for `elefante-Memory(action="delete")`)
 
 Before every `elefante-Memory(action="delete")`:
 
