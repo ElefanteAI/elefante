@@ -31,6 +31,7 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **BUG-032:** low-level VS Code adapter configuration now requires an explicit manifest home, preventing isolated tests or callers with temporary targets from writing ownership records into the user's real `~/.elefante/install-manifest.json`.
 - Dashboard now binds to loopback by default, uses explicit local CORS origins, and Docker Compose publishes only to loopback.
 - `elefante-GraphQuery` is read-only; graph writes stay in the explicit `elefante-GraphConnect` path.
 - The documented `pytest tests` command excludes manual observation scripts and now collects the automated suite cleanly.

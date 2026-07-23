@@ -38,7 +38,7 @@ _SETUP_DIR = str(Path(__file__).resolve().parent)
 if _SETUP_DIR not in sys.path:
     sys.path.insert(0, _SETUP_DIR)
 
-from install_manifest import (
+from install_manifest import (  # noqa: E402
     forget_emitted_file,
     is_unchanged_emitted_json_entry,
     record_emitted_json_entry,
@@ -146,7 +146,7 @@ def configure_vscode_mcp_json(
     elefante_path: Path,
     python_cmd: str,
     *,
-    manifest_home: Path | None = None,
+    manifest_home: Path,
 ) -> bool:
     """Add/update the Elefante server config in a VS Code mcp.json file."""
     existed_before = mcp_json_path.exists()
@@ -246,7 +246,12 @@ def configure_mcp(argv: list[str] | None = None):
         for mcp_path in mcp_paths:
             if mcp_path.parent.exists():
                 print(f"\nConfiguring VS Code MCP config: {mcp_path}")
-                if configure_vscode_mcp_json(mcp_path, elefante_path, python_cmd):
+                if configure_vscode_mcp_json(
+                    mcp_path,
+                    elefante_path,
+                    python_cmd,
+                    manifest_home=Path.home(),
+                ):
                     mcp_configured = True
                 else:
                     print(f"Warning: Failed to write {mcp_path}")

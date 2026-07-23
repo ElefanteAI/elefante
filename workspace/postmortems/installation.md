@@ -117,9 +117,17 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 
 ---
 
+## Issue #15: Test Manifest Leakage [BUG-032, FIXED, guarded]
+
+**Trigger:** Pre-migration inspection found `~/.elefante/install-manifest.json` containing only temporary `pytest-of-*` VS Code paths.
+**Root cause:** The low-level VS Code adapter accepted `manifest_home=None`; one direct test passed a temporary target but omitted the ownership root, so `Path.home()` received test records.
+**Solution:** Make `manifest_home` mandatory at the low-level helper boundary. The production caller passes `Path.home()` explicitly and every direct test supplies an isolated home. Quarantine the residual manifest before migration.
+**Guard:** `pytest tests/test_install_setup.py -k "manifest_home or transport_only_bridge" -v`.
+**Lesson:** A helper that writes ownership state must receive its state root explicitly. A temporary artifact path does not imply an isolated metadata path.
+
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
-The five most-recurring rules from the 14 issues above:
+The five most-recurring rules from the issues above:
 
 1. **Read error messages literally** — "cannot be a directory" means don't pre-create. Issue #1.
 2. **Library changelogs first** — version bumps break things. Issues #1, #4.

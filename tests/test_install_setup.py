@@ -546,6 +546,15 @@ def test_vscode_adapter_uses_transport_only_bridge(tmp_path):
     assert server["env"]["ELEFANTE_DAEMON_URL"] == "http://127.0.0.1:8765/mcp/"
 
 
+def test_vscode_adapter_requires_explicit_manifest_home(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/configure_vscode_bob.py", "vscode_manifest_scope_module")
+
+    with pytest.raises(TypeError, match="manifest_home"):
+        module.configure_vscode_mcp_json(tmp_path / "mcp.json", tmp_path, "/tmp/python")
+
+    assert not (tmp_path / "mcp.json").exists()
+
+
 def test_vscode_adapter_preserves_a_user_owned_elefante_entry(tmp_path):
     module = _load_module(ROOT / "scripts/setup/configure_vscode_bob.py", "vscode_ownership_module")
     target = tmp_path / "mcp.json"
