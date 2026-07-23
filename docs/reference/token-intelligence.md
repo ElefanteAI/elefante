@@ -146,8 +146,8 @@ Injected into every tool response:
 
 | Data | Persisted? | Where |
 |------|-----------|-------|
-| `content_tokens` | Yes | ChromaDB `system_metadata` on the memory record |
-| `token_density` | Yes | ChromaDB `system_metadata` on the memory record |
+| `content_tokens` | Yes | SQLite memory JSON (`system_metadata`) |
+| `token_density` | Yes | SQLite memory JSON (`system_metadata`) |
 | `SessionTokenLedger` totals | No | In-memory on server instance. Resets on restart. |
 | `TOKEN_STATS` per call | No | Injected into response, not stored anywhere. |
 
@@ -179,11 +179,11 @@ Performed per `agents/orchestrator.md` (Five Gates → Leakage Scan):
 | Surface | Result | Detail |
 |---------|--------|--------|
 | MCP response format | PASS | TOKEN_STATS coexists with existing contract. `_CONTEXT_SKIP_TOOLS` and `GATED_TOOLS` unchanged. |
-| ChromaDB roundtrip | PASS | `content_tokens` and `token_density` written via `system_metadata`, read via `_parse_system_metadata()`. Tests verify. |
-| Kuzu schema/DML | PASS | No graph properties added. Token data is ChromaDB-only. |
+| Vector-store roundtrip | PASS | `content_tokens` and `token_density` persist through complete SQLite memory JSON. Tests verify. |
+| Kuzu schema/DML | PASS | No graph properties added. Token data remains vector-record metadata. |
 | stdout pollution | PASS | Zero `print()` calls in `token_counter.py` or token paths in `server.py`. |
 | Compliance Gate | PASS | Orthogonal. Token measurement runs after compliance check. |
-| Dashboard snapshot | FAIL (accepted risk) | `content_tokens` and `token_density` are persisted in ChromaDB but not exported to dashboard snapshot. Accepted: token intelligence is agent-facing, not dashboard-facing. |
+| Dashboard snapshot | FAIL (accepted risk) | `content_tokens` and `token_density` are persisted in SQLite but not exported to the dashboard snapshot. Token intelligence is agent-facing, not dashboard-facing. |
 | Co-activation history | PASS | No interaction with `_session_retrieval_history` or `record_coactivation()`. |
 | Documentation links | PASS | All cross-references valid. No moved files. |
 

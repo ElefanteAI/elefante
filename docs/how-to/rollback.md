@@ -41,7 +41,7 @@ copied into future backups.
 1. **Stop all services** that hold locks:
    - MCP server(s)
    - Dashboard server
-   - Any Python process using Kuzu/ChromaDB
+   - Any Python process using SQLite, Kuzu, or a legacy ChromaDB store
 
 2. **Preflight then restore data backup** (if the change touched storage formats or corrupted data):
 

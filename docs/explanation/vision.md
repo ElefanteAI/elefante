@@ -1,6 +1,6 @@
 # Elefante Vision
 
-> Last updated: 2026-07-22 · Current version: v2.10.0
+> Last updated: 2026-07-22 · Current version: v2.11.0
 
 ---
 
@@ -39,7 +39,7 @@ No host is marketed as supported until its installation, reconnect, concurrent-w
 
 ### How It Works (Today and Next)
 
-Today Elefante runs as an MCP server, usually connected through stdio. When an agent works, Elefante injects relevant memories from its dual storage system (ChromaDB by default for semantic search, Kuzu for the knowledge graph). A local SQLite semantic-store backend is available as an explicit fresh-store opt-in; existing ChromaDB data is never converted without a separately authorized migration. Every memory has a system-computed relevance score based on recency, freshness, and how often it's been useful. Memories that matter rise to the top. Memories that don't, decay naturally. The active product roadmap replaces per-client database ownership with one local daemon, native local HTTP, and a bridge for stdio-only hosts so multiple tools can share the same trustworthy memory authority.
+Today Elefante uses SQLite for local semantic vectors and Kuzu for the knowledge graph. Existing ChromaDB stores have a stopped, backup-gated parity migration; fresh installs do not depend on ChromaDB. Every memory has a system-computed relevance score based on recency, freshness, and how often it has been useful. One local daemon owns both stores, while native local HTTP and a bridge for stdio-only hosts let multiple tools share the same memory authority.
 
 ### The Four Laws
 
@@ -59,7 +59,7 @@ These are non-negotiable and define everything Elefante does. Law 4 is the gover
 | Capability | What It Does |
 | ---------- | ------------ |
 | 16 MCP tools | Memory CRUD, graph queries, tasks, ETL, directives, context injection |
-| Dual storage | ChromaDB by default (semantic vectors; SQLite fresh-store opt-in) + Kuzu (knowledge graph) |
+| Dual storage | SQLite semantic vectors + Kuzu knowledge graph |
 | Behavioral scoring | System-computed relevance (0-100) with type-based decay rates |
 | 5-signal cognitive retrieval | Vector similarity, concept overlap, co-activation, authority, temporal |
 | Compliance gate | Mechanical search-before-write enforcement |

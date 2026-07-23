@@ -62,13 +62,13 @@ Classification (recommended, V5):
 
 **`score` MUST be computed live at snapshot generation time. NEVER read from stored `mem.metadata.score`.**
 
-The stored `mem.metadata.score` in ChromaDB is a stale birth-time value that is only updated on retrieval (`record_access()`). Most memories are never retrieved, so their stored score stays at 100 forever.
+The stored `mem.metadata.score` in the vector record is a stale birth-time value that is only updated on retrieval (`record_access()`). Most memories are never retrieved, so their stored score stays at 100 forever.
 
 **Single source of truth:** `src/utils/dashboard_serializer.py`
 
 Two entry points, both converging on `_composite_dashboard_score()`:
 - `compute_live_score(mem: Memory)` — from Memory objects (MCP server path)
-- `compute_live_score_from_raw(meta: dict)` — from raw ChromaDB metadata (standalone script path)
+- `compute_live_score_from_raw(meta: dict)` — from raw persisted metadata (standalone script path)
 
 **Formula:** `composite = vitality * 0.50 + type_weight * 0.25 + engagement * 0.25`
 

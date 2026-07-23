@@ -1293,7 +1293,7 @@ async def _worker_main(sandbox_root: Path) -> int:
     from src.core.embeddings import get_embedding_service
     from src.core.graph_store import GraphStore
     from src.core.orchestrator import MemoryOrchestrator
-    from src.core.vector_store import VectorStore
+    from src.core.vector_store import get_vector_store
     from src.models.entity import Entity, EntityType, Relationship, RelationshipType
     from src.models.memory import DomainType, Memory, MemoryMetadata, MemoryStatus, MemoryType
     from src.models.query import QueryMode
@@ -1301,7 +1301,7 @@ async def _worker_main(sandbox_root: Path) -> int:
     now = datetime.utcnow()
 
     embedding_service = get_embedding_service()
-    vector_store = VectorStore()
+    vector_store = get_vector_store()
     graph_store = GraphStore()
     orchestrator = MemoryOrchestrator(
         vector_store=vector_store,

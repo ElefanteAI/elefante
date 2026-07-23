@@ -64,7 +64,7 @@ If step 1 fails, step 2 cannot help. Do not skip steps.
 | `configure_cursor_kiro.py` | Detects Cursor and Kiro user directories, then adds their Elefante bridge entries without touching absent hosts. | Initial Cursor/Kiro setup or after moving the repo. |
 | `configure_cli_agents.py` | Uses the native Claude Code and Codex MCP CLIs to register the bridge and fingerprint the host-owned registration. | Initial Claude Code/Codex setup or after moving the repo. |
 | `install_manifest.py` | Internal helper that atomically tracks whole files and owned JSON entries emitted by Elefante installers. | Imported by setup emitters; not run directly. |
-| `init_databases.py` | Initializes ChromaDB collections and Kuzu schema without re-running the full installer. | After a Kuzu nuclear reset or ChromaDB wipe. |
+| `init_databases.py` | Initializes the configured SQLite vector store and Kuzu schema without re-running the full installer. | After a durable-store reset. |
 
 ## `scripts/verify/` — Proofs
 
@@ -95,8 +95,8 @@ See the Installation Verification Ladder above for steps 1–3. Other verifiers:
 
 | Script | What it does | When to use it |
 | ------ | ------------ | -------------- |
-| `update_dashboard_data.py` | Reads the configured embedded vector store (ChromaDB or opt-in SQLite) plus Kuzu and emits `dashboard_snapshot.json`. | After bulk memory changes, or when the dashboard shows stale counts. Follow with `verify_dashboard_snapshot.py`. |
-| `export_memories.py` | Read-only JSON/CSV corpus export from the configured embedded vector store (ChromaDB or opt-in SQLite). `--format json\|csv\|all`; not a backup or restore format. | Before a surgical delete (before/after diff) or for offline analysis. |
+| `update_dashboard_data.py` | Reads the configured embedded vector store plus Kuzu and emits `dashboard_snapshot.json`; legacy Chroma remains readable when explicitly configured. | After bulk memory changes, or when the dashboard shows stale counts. Follow with `verify_dashboard_snapshot.py`. |
+| `export_memories.py` | Read-only JSON/CSV corpus export from the configured embedded vector store. `--format json\|csv\|all`; not a backup or restore format. | Before a surgical delete (before/after diff) or for offline analysis. |
 
 ## `scripts/ci/` — Build & Release
 
@@ -124,7 +124,7 @@ Reach for these only when a compendium points here. They are not routine.
 | Script | What it does | When to use it |
 | ------ | ------------ | -------------- |
 | `manage_lock.py` | Inspect and optionally remove the Elefante write lock; `--kill` to stop the MCP process first. | Write operations hang or `lock held` errors. Always dry-run first. |
-| `reset_kuzu_nuclear.py` | Backup-and-remove the Kuzu graph path so the next init is fresh. | Kuzu corrupted but ChromaDB must be preserved. |
+| `reset_kuzu_nuclear.py` | Backup-and-remove the Kuzu graph path so the next init is fresh. | Kuzu corrupted but vector memory must be preserved. |
 
 Lock guidance: default = inspect only; `ELEFANTE_PRIVILEGED=1 manage_lock.py --apply --confirm DELETE` removes the lock; add `--kill` when the server is unresponsive.
 
@@ -134,7 +134,7 @@ Mutations require `ELEFANTE_PRIVILEGED=1`. Always `backup_elefante_data.py` firs
 
 | Script | What it does | When to use it |
 | ------ | ------------ | -------------- |
-| `delete_memories_surgical.py` | Risk-scored deletion across ChromaDB + Kuzu with impact report and JSON backup. Default dry-run. | Low-value memories degrading dashboard clarity. Backup → `--auto` dry-run → targeted `--apply`. |
+| `delete_memories_surgical.py` | Risk-scored deletion across the configured vector store + Kuzu with impact report and JSON export. Default dry-run. | Low-value memories degrading dashboard clarity. Backup → `--auto` dry-run → targeted `--apply`. |
 | `inspect_memory_graph.py` | Read-only semantic/temporal review of memory IDs or backup JSONs. No external embedding calls. | Before passing IDs to `delete_memories_surgical.py`. Audit backup JSONs after a deletion run. |
 
 ## `demo/` — Showcases

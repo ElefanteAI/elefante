@@ -11,6 +11,7 @@
 """Pytest coverage for dashboard serialization and launch safeguards."""
 
 import re
+import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -250,3 +251,54 @@ def test_provenance_backfill_is_dry_run_by_default():
     assert 'backfill(apply=args.apply)' in source
     assert '"tool": "legacy"' in source
     assert "REPO_ROOT = Path(__file__).resolve().parents[2]" in source
+
+
+def test_provenance_backfill_reports_only_missing_graph_links(monkeypatch):
+    import scripts.lifecycle.backfill_memory_provenance as migration
+    from src.core.graph_store import GraphStore
+
+    source = {
+        "tool": "legacy",
+        "instance_id": "pre-daemon",
+        "session_id": "pre-daemon",
+        "transport": "legacy-stdio",
+    }
+    memory = Memory(
+        content="legacy memory",
+        metadata=MemoryMetadata(custom_metadata={"elefante_source": source}),
+    )
+    memory.metadata.memory_type = memory.metadata.memory_type.value
+    memory.metadata.status = memory.metadata.status.value
+
+    class VectorStore:
+        async def get_all(self, **_kwargs):
+            return [memory]
+
+    class Graph:
+        def __init__(self):
+            self.entities = set()
+            self.links = set()
+
+        _source_id = staticmethod(GraphStore._source_id)
+
+        async def execute_query(self, query):
+            if "WRITTEN_BY" not in query:
+                return [{"memory_id": memory_id} for memory_id in self.entities]
+            return [
+                {"memory_id": memory_id, "source_id": source_id}
+                for memory_id, source_id in self.links
+            ]
+
+        async def create_entity(self, entity):
+            self.entities.add(str(entity.id))
+
+        async def record_memory_source(self, memory_id, provenance):
+            self.links.add((str(memory_id), self._source_id(provenance)))
+
+    graph = Graph()
+    monkeypatch.setattr(migration, "get_vector_store", VectorStore)
+    monkeypatch.setattr(migration, "get_graph_store", lambda: graph)
+
+    assert asyncio.run(migration.backfill(apply=False)) == (0, 0, 1, 1)
+    assert asyncio.run(migration.backfill(apply=True)) == (0, 0, 1, 1)
+    assert asyncio.run(migration.backfill(apply=False)) == (0, 0, 0, 0)

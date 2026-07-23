@@ -20,7 +20,7 @@ The Safe Restart utility cleanly restarts the Elefante MCP server without corrup
  **Resource Cleanup**: Clears orchestrator references  
  **Lock Management**: Removes stale locks safely  
  **Transaction Safety**: Respects v1.1.0+ transaction-scoped locking  
- **No Data Loss**: All data persists in ChromaDB/Kuzu  
+ **No Data Loss**: All data persists in SQLite/Kuzu  
  **Verification**: Optional startup verification  
  **Force Option**: Fallback SIGKILL if needed
 
@@ -128,7 +128,8 @@ If `--verify` flag set:
 
 All user data persists across restarts:
 
-- **ChromaDB**: `~/.elefante/data/chroma/` (persistent on disk)
+- **SQLite**: `~/.elefante/data/vector/memories.sqlite3` (persistent on disk)
+- **Legacy ChromaDB**: `~/.elefante/data/chroma/` remains available for rollback after migration
 - **Kuzu**: `~/.elefante/data/kuzu_db` (persistent on disk)
 - **Logs**: `~/.elefante/logs/` (append-only)
 
@@ -296,4 +297,3 @@ Arguments: {
 - [`install.md`](install.md) - Initial setup
 
 ---
-

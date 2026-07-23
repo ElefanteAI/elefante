@@ -21,7 +21,7 @@ The installation scripts handle everything automatically:
 - Create virtual environment
 - Install dependencies
 - Reuse bundled dashboard assets when available, or build them locally when needed
-- Initialize the default databases (ChromaDB + Kuzu)
+- Initialize the default databases (SQLite + Kuzu)
 - Configure detected compatible IDE and CLI-agent integrations
 - Run health checks
 - Keep live installer status in terminal + state files
@@ -92,7 +92,7 @@ If `.venv` already exists, press Enter for a destructive fresh reinstall, choose
 
 4. **Database Initialization**
    - Creates `~/.elefante/data/` directory
-   - Initializes the default ChromaDB vector store
+   - Initializes the default SQLite vector store
    - Initializes Kuzu (graph database)
    - Creates default schema
    - Injects the seed memory only when the write is actually accepted by the orchestrator
@@ -133,8 +133,7 @@ If `.venv` already exists, press Enter for a destructive fresh reinstall, choose
 
 ## SQLite Vector Store
 
-ChromaDB remains the default vector store. Elefante also offers an opt-in,
-local SQLite vector store for a fresh, isolated data directory:
+SQLite is the default local vector store:
 
 ```yaml
 elefante:
@@ -143,12 +142,11 @@ elefante:
     persist_directory: ~/.elefante/data/vector
 ```
 
-Alternatively, set `ELEFANTE_VECTOR_STORE_TYPE=sqlite`. SQLite stores complete
+The equivalent override is `ELEFANTE_VECTOR_STORE_TYPE=sqlite`. SQLite stores complete
 memory JSON and float32 embeddings in `<collection_name>.sqlite3`, uses exact
 cosine search, and never starts a vector-server process.
 
-Do **not** point an existing ChromaDB installation at SQLite. Elefante never
-silently migrates or modifies vector data. To evaluate an existing store, first
+Existing ChromaDB installations are never converted silently. To migrate one, first
 stop Elefante and create a verified backup, then run the temporary proof:
 
 ```bash
@@ -164,7 +162,7 @@ not change configuration. Only after reviewing that proof, re-run it with
 publishes the closed SQLite database while still leaving Chroma and configuration
 untouched. Validation and rollback therefore do not depend on destructive recovery.
 See the [migration proposal](../../workspace/proposals/sqlite-vector-store-migration.md)
-for acceptance criteria and the explicit default-change gate.
+for acceptance criteria and rollback evidence.
 Stop the daemon before copying or restoring durable data; its controlled
 shutdown releases the SQLite file handle first.
 
@@ -174,7 +172,7 @@ ChromaDB directory into its recovery area, along with any vector and graph
 paths explicitly configured in `config.yaml`. It refuses an unsafe configured
 path that would contain that recovery directory. Dashboard snapshot generation
 also reads the configured embedded vector store, so the same snapshot workflow
-works for fresh SQLite installations.
+works for SQLite installations.
 
 Before approving SQLite for a larger corpus, measure the exact-search path in
 an automatically removed temporary directory:
@@ -355,7 +353,7 @@ macOS/Linux:
 Expected output:
 
 ```text
- ChromaDB: Connected
+ SQLite: Connected
  Kuzu: Connected
  MCP Server: Running
  All systems operational
@@ -583,10 +581,10 @@ Directives solve the fundamental problem of behavioral rules that MUST be follow
 
 #### `RELEVANT_CONTEXT`
 
-**Source**: `_inject_context()` in `src/mcp/server.py`, querying ChromaDB
+**Source**: `_inject_context()` in `src/mcp/server.py`, querying the configured vector store
 **Present on**: Tool responses where applicable (skipped for search, system, admin, and ETL tools).
 
-Auto-surfaced memories relevant to the current operation. The server extracts a search signal from the tool arguments (description, content, query fields), runs a fast ChromaDB search (top 3, min similarity 0.5), and appends matching memories with similarity scores.
+Auto-surfaced memories relevant to the current operation. The server extracts a search signal from the tool arguments, runs a vector search (top 3, min similarity 0.5), and appends matching memories with similarity scores.
 
 This gives the agent ambient context without requiring an explicit `elefante-Memory(action="search")` call. It's supplementary — the agent should still call `elefante-Memory(action="search")` for deliberate queries, but `RELEVANT_CONTEXT` ensures relevant knowledge surfaces even on non-search operations.
 
@@ -596,7 +594,7 @@ Directives are the `DIRECTIVES` section described above. See **Tool Response Con
 
 ### Layer 3: Memories — Contextual Knowledge
 
-**Mechanism**: Stored in ChromaDB (vector) + Kuzu (graph). Retrieved by semantic similarity search.
+**Mechanism**: Stored in SQLite (vector) + Kuzu (graph). Retrieved by semantic similarity search.
 **Scope**: Global (accessible from any workspace via MCP).
 
 Memories are contextual knowledge: project facts, user preferences, past decisions, technical notes. They are retrieved in two ways:
@@ -637,7 +635,7 @@ Agent responds — following protocols + directives, informed by memories
 | Step 5b | Ingests Inception Memory (Layer 3 seed knowledge)                   |
 | Runtime | `MANDATORY_PROTOCOLS` injected by server on every call              |
 | Runtime | `DIRECTIVES` injected by server from `directives.json`              |
-| Runtime | `RELEVANT_CONTEXT` injected by server from ChromaDB                 |
+| Runtime | `RELEVANT_CONTEXT` injected by server from the SQLite vector store  |
 
 The Directive store (`~/.elefante/data/directives.json`) is created on first use — no installation step needed.
 
@@ -733,7 +731,6 @@ brew install pyenv && pyenv install 3.11.0 && pyenv local 3.11.0
 
 ```
 kuzu==0.11.3
-chromadb==1.3.5
 sentence-transformers==5.6.0
 mcp==1.28.1
 fastapi==0.139.2

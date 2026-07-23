@@ -1,6 +1,6 @@
 # Elefante Architecture: The Second Brain
 
-**Version:** 2.10.0 | **Status:** Production Ready (Windows validated)
+**Version:** 2.10.0 | **Status:** v2.11 Trust Release candidate
 
 ## 1. System Overview
 
@@ -8,9 +8,10 @@ Elefante is the **Second Brain** for AI agents. It solves the "stateless agent" 
 
 ### The Triple-Layer Brain
 
-1.  **Semantic Memory (ChromaDB):**
+1.  **Semantic Memory (SQLite):**
     - **Role:** Handles "fuzzy" queries and meaning-based retrieval.
     - **Model:** Uses `thenlper/gte-base` (Local, 768-dim) for embeddings.
+    - **Storage:** Complete memory JSON + float32 embeddings with exact cosine search.
 2.  **Structured Memory (Kuzu Graph DB):**
     - **Role:** Manages deterministic facts and relationships.
     - **Schema:** Nodes (`Memory`, `Entity`, `Session`) and Edges (`RELATES_TO`, `DEPENDS_ON`, `CREATED_IN`).
@@ -68,7 +69,7 @@ When the agent receives a task, the instruction layer forces retrieval. Elefante
 
 1.  **Ingest:** Text received via `elefante-Memory(action="add")`.
 2.  **Dual-Write:**
-    - **Vector:** Content embedded and stored in ChromaDB.
+    - **Vector:** Content embedded and stored in SQLite.
     - **Graph:** A `Memory` node is created in Kuzu.
 3.  **Link:** The memory is linked to the current `Session` node for temporal grounding.
 

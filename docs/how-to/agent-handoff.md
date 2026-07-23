@@ -56,7 +56,7 @@ If your A0 environment is already running, you can configure the MCP server in t
         "PYTHONPATH": "/a0/usr/projects/elefante/elefante-repo-files"
       },
       "cwd": "/a0/usr/projects/elefante/elefante-repo-files",
-      "description": "Elefante Local AI Memory System (ChromaDB + Kuzu)"
+      "description": "Elefante Local AI Memory System (SQLite + Kuzu)"
     }
   }
 }

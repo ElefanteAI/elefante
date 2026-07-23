@@ -19,7 +19,7 @@ Elefante bridge command (same shape for all stdio-only IDEs):
   - `ELEFANTE_DAEMON_URL=http://127.0.0.1:8765/mcp/`
   - `ELEFANTE_CLIENT_TOOL=<host-name>`
 - Recommended env:
-  - `ANONYMIZED_TELEMETRY=False` (disables ChromaDB telemetry)
+  - `ANONYMIZED_TELEMETRY=False` (retained for legacy ChromaDB compatibility)
 
 ## Agent Grounding Instructions (System Prompts)
 

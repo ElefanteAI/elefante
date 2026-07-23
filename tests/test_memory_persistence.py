@@ -28,6 +28,7 @@ from pathlib import Path
 
 from src.core.orchestrator import MemoryOrchestrator
 from src.core.vector_store import VectorStore
+from src.core.sqlite_vector_store import SQLiteVectorStore
 from src.core.graph_store import GraphStore
 from src.models.entity import Entity, EntityType, Relationship, RelationshipType
 from src.models.query import QueryMode
@@ -35,7 +36,7 @@ from src.models.query import QueryMode
 
 def test_vector_store_uses_embedded_chroma_client_not_server_transport(tmp_path, monkeypatch):
     """Elefante must not create the network Chroma client surface."""
-    import chromadb
+    chromadb = pytest.importorskip("chromadb")
 
     calls = {}
 
@@ -78,17 +79,17 @@ class TestMemoryPersistence:
     def orchestrator(self, tmp_path, monkeypatch):
         """Create an orchestrator isolated to a temp DB (no shared locks)"""
         monkeypatch.setenv("ELEFANTE_ALLOW_TEST_MEMORIES", "1")
-        chroma_dir = tmp_path / "chroma"
+        vector_dir = tmp_path / "vector"
         kuzu_dir = tmp_path / "kuzu_db"
 
-        vector_store = VectorStore(
+        vector_store = SQLiteVectorStore(
             collection_name=f"test_memory_persistence_{uuid4().hex}",
-            persist_directory=str(chroma_dir),
+            persist_directory=str(vector_dir),
         )
         graph_store = GraphStore(database_path=str(kuzu_dir))
 
         orch = MemoryOrchestrator(vector_store=vector_store, graph_store=graph_store)
-        orch._test_chroma_dir = chroma_dir
+        orch._test_vector_dir = vector_dir
         orch._test_collection_name = vector_store.collection_name
         orch._test_kuzu_dir = kuzu_dir
         return orch
@@ -225,9 +226,9 @@ class TestMemoryPersistence:
         memory_id = memory.id
         
         # Create a NEW orchestrator instance (simulates restart)
-        new_vector_store = VectorStore(
+        new_vector_store = SQLiteVectorStore(
             collection_name=orchestrator._test_collection_name,
-            persist_directory=str(orchestrator._test_chroma_dir),
+            persist_directory=str(orchestrator._test_vector_dir),
         )
         new_graph_store = GraphStore(database_path=str(orchestrator._test_kuzu_dir))
         new_orchestrator = MemoryOrchestrator(vector_store=new_vector_store, graph_store=new_graph_store)
@@ -265,10 +266,10 @@ class TestMemoryPersistence:
         assert memory.metadata.concepts, "Expected non-empty concepts"
         assert memory.metadata.surfaces_when, "Expected non-empty surfaces_when"
 
-        # New VectorStore instance simulates a restart / new process.
-        new_vector_store = VectorStore(
+        # New SQLiteVectorStore instance simulates a restart / new process.
+        new_vector_store = SQLiteVectorStore(
             collection_name=orchestrator._test_collection_name,
-            persist_directory=str(orchestrator._test_chroma_dir),
+            persist_directory=str(orchestrator._test_vector_dir),
         )
         reloaded = await new_vector_store.get_memory(memory.id)
         assert reloaded is not None

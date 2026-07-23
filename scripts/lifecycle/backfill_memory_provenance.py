@@ -12,8 +12,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src.core.graph_store import get_graph_store
-from src.core.vector_store import get_vector_store
+from src.core.graph_store import get_graph_store  # noqa: E402
+from src.core.vector_store import get_vector_store  # noqa: E402
+from src.models.entity import Entity, EntityType  # noqa: E402
 
 
 def _legacy_source() -> dict[str, str]:
@@ -27,13 +28,35 @@ def _legacy_source() -> dict[str, str]:
     }
 
 
-async def backfill(*, apply: bool) -> tuple[int, int, int]:
+def _enum_value(value: object) -> str:
+    return str(getattr(value, "value", value))
+
+
+async def backfill(*, apply: bool) -> tuple[int, int, int, int]:
     store = get_vector_store()
     graph_store = get_graph_store()
     memories = await store.get_all(limit=100_000, offset=0)
     candidates = [memory for memory in memories if "elefante_source" not in (memory.metadata.custom_metadata or {})]
+    rows = await graph_store.execute_query(
+        "MATCH (m:Entity)-[:WRITTEN_BY]->(s:Source) RETURN m.id AS memory_id, s.id AS source_id"
+    )
+    existing_links = {
+        (str(row.get("memory_id")), str(row.get("source_id")))
+        for row in rows
+    }
+    entity_rows = await graph_store.execute_query(
+        "MATCH (m:Entity) WHERE m.type = 'memory' RETURN m.id AS memory_id"
+    )
+    existing_entities = {str(row.get("memory_id")) for row in entity_rows}
+    missing_entities = [memory for memory in memories if str(memory.id) not in existing_entities]
+    pending_links = []
+    for memory in memories:
+        source = (memory.metadata.custom_metadata or {}).get("elefante_source") or _legacy_source()
+        expected = (str(memory.id), graph_store._source_id(source))
+        if expected not in existing_links:
+            pending_links.append((memory, source))
     if not apply:
-        return len(candidates), 0, len(memories)
+        return len(candidates), 0, len(missing_entities), len(pending_links)
 
     updated = 0
     for memory in candidates:
@@ -41,23 +64,47 @@ async def backfill(*, apply: bool) -> tuple[int, int, int]:
         custom_metadata["elefante_source"] = _legacy_source()
         if await store.update_memory(memory.id, {"custom_metadata": custom_metadata}):
             updated += 1
+    created = 0
+    for memory in missing_entities:
+        await graph_store.create_entity(
+            Entity(
+                id=memory.id,
+                name=f"memory_{memory.id}",
+                type=EntityType.MEMORY,
+                description=memory.metadata.summary or memory.content[:200],
+                created_at=memory.metadata.created_at,
+                properties={
+                    "content": memory.content[:200],
+                    "memory_type": _enum_value(memory.metadata.memory_type),
+                    "score": memory.metadata.score,
+                    "status": _enum_value(memory.metadata.status),
+                    "processing_status": "raw",
+                },
+            )
+        )
+        created += 1
     linked = 0
-    for memory in memories:
-        source = (memory.metadata.custom_metadata or {}).get("elefante_source") or _legacy_source()
+    for memory, source in pending_links:
         await graph_store.record_memory_source(memory.id, source)
         linked += 1
-    return len(candidates), updated, linked
+    return len(candidates), updated, created, linked
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--apply", action="store_true", help="persist the backfill; default is dry-run")
     args = parser.parse_args()
-    candidates, updated, linked = asyncio.run(backfill(apply=args.apply))
+    candidates, updated, created, linked = asyncio.run(backfill(apply=args.apply))
     if args.apply:
-        print(f"backfilled={updated} candidates={candidates} source_links={linked}")
+        print(
+            f"backfilled={updated} candidates={candidates} "
+            f"memory_entities={created} source_links={linked}"
+        )
     else:
-        print(f"dry_run candidates={candidates} source_links_pending={linked}; re-run with --apply to persist")
+        print(
+            f"dry_run candidates={candidates} memory_entities_pending={created} "
+            f"source_links_pending={linked}; re-run with --apply to persist"
+        )
 
 
 if __name__ == "__main__":

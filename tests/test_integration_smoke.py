@@ -35,16 +35,15 @@ import shutil
 import tempfile
 import time
 import os
-from datetime import datetime
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 import sys
 
 # Ensure src is in path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.core.vector_store import VectorStore
-from src.models.memory import Memory, MemoryMetadata, MemoryType, MemoryStatus
+from src.core.sqlite_vector_store import SQLiteVectorStore  # noqa: E402
+from src.models.memory import Memory, MemoryMetadata  # noqa: E402
 
 # =============================================================================
 # TEST CONFIGURATION
@@ -235,7 +234,7 @@ class ElefanteBatteryTest:
     """Test harness for Elefante battery tests"""
     
     def __init__(self):
-        self.vector_store: Optional[VectorStore] = None
+        self.vector_store: Optional[SQLiteVectorStore] = None
         self.added_memory_ids: List[str] = []
         self.results: List[BatteryResult] = []
         self._test_dir: Optional[str] = None
@@ -276,8 +275,8 @@ class ElefanteBatteryTest:
             atexit.register(self._emergency_cleanup)
             self._atexit_registered = True
 
-        # Direct VectorStore with isolated path — independent of global singleton
-        self.vector_store = VectorStore(persist_directory=self._test_dir)
+        # Direct SQLite store with isolated path — independent of global singleton
+        self.vector_store = SQLiteVectorStore(persist_directory=self._test_dir)
         print(f"  Isolated DB: {self._test_dir}\n")
         
     async def cleanup(self):

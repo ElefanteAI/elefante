@@ -31,6 +31,7 @@ USER_HOME = Path.home()
 ELEFANTE_HOME = USER_HOME / ".elefante"
 DATA_DIR = ELEFANTE_HOME / "data"
 CHROMA_DIR = DATA_DIR / "chroma"
+SQLITE_VECTOR_DIR = DATA_DIR / "vector"
 KUZU_DIR = DATA_DIR / "kuzu_db"  # Kuzu-owned database path (materialized lazily by GraphStore/Kuzu)
 LOGS_DIR = ELEFANTE_HOME / "logs"
 
@@ -39,7 +40,6 @@ ELEFANTE_HOME.mkdir(parents=True, exist_ok=True)
 
 # Ensure directories exist
 DATA_DIR.mkdir(parents=True, exist_ok=True)
-CHROMA_DIR.mkdir(parents=True, exist_ok=True)
 # Note: KUZU_DIR should NOT be created here. Kuzu owns that path and will
 # materialize it on first open.
 LOGS_DIR.mkdir(exist_ok=True)
@@ -47,8 +47,8 @@ LOGS_DIR.mkdir(exist_ok=True)
 
 class VectorStoreConfig(BaseModel):
     """Embedded vector-store configuration."""
-    type: Literal["chromadb", "sqlite"] = "chromadb"
-    persist_directory: str = str(CHROMA_DIR)
+    type: Literal["chromadb", "sqlite"] = "sqlite"
+    persist_directory: str = str(SQLITE_VECTOR_DIR)
     collection_name: str = "memories"
     embedding_model: str = "thenlper/gte-base"
     embedding_dimension: int = 768
@@ -232,21 +232,19 @@ class Config:
         # Ensure runtime directories exist for the active configuration
         self._ensure_runtime_directories()
 
-    def _normalize_storage_paths(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
+    @staticmethod
+    def _normalize_storage_paths(config_dict: Dict[str, Any]) -> Dict[str, Any]:
         """Derive vector/graph storage paths from elefante.data_dir when unset.
 
         This keeps `ELEFANTE_DATA_DIR` and/or `config.yaml` consistent with
         ChromaDB and Kuzu default locations.
         """
-        data_dir = config_dict.get('data_dir')
-        if not data_dir:
-            return config_dict
-
-        data_dir_path = Path(str(data_dir))
+        data_dir_path = Path(str(config_dict.get('data_dir') or DATA_DIR))
+        config_dict['data_dir'] = str(data_dir_path)
 
         vector_store = config_dict.get('vector_store') or {}
         if 'persist_directory' not in vector_store:
-            vector_directory = 'vector' if vector_store.get('type') == 'sqlite' else 'chroma'
+            vector_directory = 'chroma' if vector_store.get('type') == 'chromadb' else 'vector'
             vector_store['persist_directory'] = str(data_dir_path / vector_directory)
         config_dict['vector_store'] = vector_store
 

@@ -12,18 +12,18 @@ import pytest
 from uuid import uuid4
 
 from src.core.orchestrator import MemoryOrchestrator
-from src.core.vector_store import VectorStore
+from src.core.sqlite_vector_store import SQLiteVectorStore
 from src.core.graph_store import GraphStore
 
 
 @pytest.fixture
 def isolated_orchestrator(tmp_path):
-    chroma_dir = tmp_path / "chroma"
+    vector_dir = tmp_path / "vector"
     kuzu_dir = tmp_path / "kuzu_db"
 
-    vector_store = VectorStore(
+    vector_store = SQLiteVectorStore(
         collection_name=f"test_guard_{uuid4().hex}",
-        persist_directory=str(chroma_dir),
+        persist_directory=str(vector_dir),
     )
     graph_store = GraphStore(database_path=str(kuzu_dir))
 

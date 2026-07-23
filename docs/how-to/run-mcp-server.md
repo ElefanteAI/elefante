@@ -104,8 +104,7 @@ The server will **block** and wait for JSON-RPC messages from the IDE.
 ### Stopping the Server
 
 Press `Ctrl+C` in the terminal. The direct stdio process then closes its
-orchestrator resources before exiting, including the opt-in SQLite vector-store
-handle when that backend is selected.
+orchestrator resources before exiting, including the SQLite vector-store handle.
 
 ---
 

@@ -11,6 +11,8 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-07-23
+
 ### Added
 
 - Loopback-only Streamable HTTP daemon foundation at `python -m src.mcp.daemon`; it hosts one Elefante MCP server instance at `/mcp` and rejects remote binding.

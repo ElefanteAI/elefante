@@ -12,7 +12,6 @@ Pytest configuration and shared fixtures for Elefante test suite.
 """
 
 import pytest
-import os
 from uuid import uuid4
 
 
@@ -31,22 +30,22 @@ def isolated_orchestrator(tmp_path, monkeypatch):
     directory that is cleaned up after the test.
     """
     from src.core.orchestrator import MemoryOrchestrator
-    from src.core.vector_store import VectorStore
+    from src.core.sqlite_vector_store import SQLiteVectorStore
     from src.core.graph_store import GraphStore
     
-    chroma_dir = tmp_path / "chroma"
+    vector_dir = tmp_path / "vector"
     kuzu_dir = tmp_path / "kuzu_db"
     
-    vector_store = VectorStore(
+    vector_store = SQLiteVectorStore(
         collection_name=f"test_{uuid4().hex}",
-        persist_directory=str(chroma_dir),
+        persist_directory=str(vector_dir),
     )
     graph_store = GraphStore(database_path=str(kuzu_dir))
     
     orch = MemoryOrchestrator(vector_store=vector_store, graph_store=graph_store)
     
     # Store references for tests that need to recreate stores
-    orch._test_chroma_dir = chroma_dir
+    orch._test_vector_dir = vector_dir
     orch._test_collection_name = vector_store.collection_name
     orch._test_kuzu_dir = kuzu_dir
     
@@ -56,12 +55,12 @@ def isolated_orchestrator(tmp_path, monkeypatch):
 @pytest.fixture
 def isolated_vector_store(tmp_path):
     """Create an isolated vector store for unit tests"""
-    from src.core.vector_store import VectorStore
+    from src.core.sqlite_vector_store import SQLiteVectorStore
     
-    chroma_dir = tmp_path / "chroma"
-    return VectorStore(
+    vector_dir = tmp_path / "vector"
+    return SQLiteVectorStore(
         collection_name=f"test_{uuid4().hex}",
-        persist_directory=str(chroma_dir),
+        persist_directory=str(vector_dir),
     )
 
 

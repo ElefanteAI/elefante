@@ -20,6 +20,7 @@ from scripts.lifecycle.migrate_chroma_to_sqlite import _close_chroma_snapshot, m
 
 
 ROOT = __import__("pathlib").Path(__file__).resolve().parents[1]
+CHROMADB_AVAILABLE = importlib.util.find_spec("chromadb") is not None
 
 
 def _load_module(path, name):
@@ -210,6 +211,12 @@ def test_sqlite_environment_opt_in_uses_an_isolated_data_directory(tmp_path, mon
     config.reload()
 
 
+def test_sqlite_type_without_explicit_data_dir_uses_vector_directory():
+    normalized = Config._normalize_storage_paths({"vector_store": {"type": "sqlite"}})
+
+    assert normalized["vector_store"]["persist_directory"].endswith("/.elefante/data/vector")
+
+
 def test_sqlite_benchmark_uses_disposable_data_and_reports_latency(tmp_path):
     module = _load_module(
         ROOT / "scripts/demo/benchmark_sqlite_vector_store.py", "sqlite_benchmark_module"
@@ -226,6 +233,7 @@ def test_sqlite_benchmark_uses_disposable_data_and_reports_latency(tmp_path):
     assert list(tmp_path.iterdir()) == []
 
 
+@pytest.mark.skipif(not CHROMADB_AVAILABLE, reason="legacy ChromaDB migration dependency absent")
 def test_chroma_to_sqlite_migration_dry_run_is_temporary_and_proves_parity(tmp_path):
     source = tmp_path / "data" / "chroma"
     destination = tmp_path / "data" / "vector"
@@ -257,6 +265,7 @@ def test_chroma_to_sqlite_migration_dry_run_is_temporary_and_proves_parity(tmp_p
     assert not any("elefante-vector-migration" in identifier for identifier in SharedSystemClient._identifier_to_system)
 
 
+@pytest.mark.skipif(not CHROMADB_AVAILABLE, reason="legacy ChromaDB migration dependency absent")
 def test_chroma_to_sqlite_apply_requires_matching_backup_and_keeps_chroma(tmp_path):
     data_directory = tmp_path / "home" / "data"
     source = data_directory / "chroma"
@@ -396,6 +405,7 @@ def test_dashboard_snapshot_pipeline_reads_the_configured_sqlite_store(tmp_path,
     assert node["properties"]["title"] == "SQLite dashboard contract"
 
 
+@pytest.mark.skipif(not CHROMADB_AVAILABLE, reason="legacy ChromaDB migration dependency absent")
 def test_dashboard_snapshot_pipeline_preserves_the_configured_chroma_path(tmp_path, monkeypatch):
     module = _load_module(ROOT / "scripts/pipeline/update_dashboard_data.py", "chroma_dashboard_module")
     vector_directory = tmp_path / "chroma"

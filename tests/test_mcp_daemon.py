@@ -171,7 +171,7 @@ def test_configuration_creates_a_clean_home_directory(monkeypatch, tmp_path):
     config._config = None
     config.load()
 
-    assert (clean_home / ".elefante" / "data" / "chroma").is_dir()
+    assert (clean_home / ".elefante" / "data" / "vector").is_dir()
 
 
 def test_server_uses_transport_owned_http_provenance(monkeypatch):

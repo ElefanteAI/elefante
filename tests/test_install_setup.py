@@ -141,7 +141,7 @@ def test_readme_and_install_guide_match_current_runtime_and_host_contract():
 
     assert "mcp==1.28.1" in _runtime_requirements()
     assert "MCP 1.28.1" in readme
-    assert "ChromaDB/SQLite vectors" in readme
+    assert "SQLite vectors" in readme
     for document in (readme, install_guide, run_guide):
         assert "1.23.1" not in document
     for host in ("Gemini CLI", "Claude Code", "Codex", "OpenClaw"):

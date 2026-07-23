@@ -27,7 +27,7 @@ Every memory ingestion (`add_memory`) MUST pass through these five stages:
 
 4.  **WRITE (Storage)**
     - **Goal**: Persist to persistent storage.
-    - **Vector Store**: ChromaDB (Embeddings + Metadata).
+    - **Vector Store**: SQLite (complete memory JSON + float32 embeddings).
     - **Graph Store**: Kuzu (Nodes + Edges).
     - **Rule**: Atoms only. One concept per memory.
 

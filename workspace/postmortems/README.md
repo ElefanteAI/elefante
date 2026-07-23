@@ -8,7 +8,7 @@ Live development state. Postmortems for bugs grouped by domain. Migrated from `d
 |--------|------------|--------|
 | AI behavior | [`ai-behavior.md`](ai-behavior.md) | Agent skips search, fakes completion, ignores rules |
 | Dashboard | [`dashboard.md`](dashboard.md) | Dashboard blank, stale, schema mismatch |
-| Database | [`database.md`](database.md) | Kuzu / ChromaDB locks, corruption, races |
+| Database | [`database.md`](database.md) | Kuzu / vector-store locks, corruption, races |
 | Installation | [`installation.md`](installation.md) | Install fails, broken venv, IDE stale MCP |
 | Memory | [`memory.md`](memory.md) | Scoring, export, schema drift, response bloat |
 

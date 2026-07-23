@@ -8,7 +8,7 @@
 
 AI agents start every conversation from zero. Your preferences, decisions, and discovered patterns don't carry over. Elefante gives any MCP-compatible agent a persistent, local second brain — memories are stored, scored automatically, and surfaced at the right moment without being asked.
 
-**v2.10.0** — Persistent Memory Engine
+**v2.11.0** — Persistent Memory Engine
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -23,7 +23,7 @@ AI agents start every conversation from zero. Your preferences, decisions, and d
 ┌────────────────────────▼────────────────────────────────────┐
 │ LAYER 2 · INTELLIGENCE ENGINE                               │
 │ Orchestrator · 5-signal scoring · Hybrid Memory             │
-│ (ChromaDB/SQLite vectors + Kuzu graph)                      │
+│ (SQLite vectors + Kuzu graph)                               │
 └────────────────────────┬────────────────────────────────────┘
                          │ snapshot.json
 ┌────────────────────────▼────────────────────────────────────┐
@@ -66,8 +66,8 @@ IDE configuration → [docs/how-to/configure-ide.md](docs/how-to/configure-ide.m
 
 Two local storage layers work together:
 
-- **ChromaDB** — the default 768-dimensional semantic vector store for meaning-based retrieval across months of history.
-- **SQLite** — a dependency-free, opt-in vector store for fresh isolated installs; it uses exact cosine retrieval and does not silently migrate existing ChromaDB data.
+- **SQLite** — the dependency-free default vector store; it preserves complete memory JSON and float32 embeddings with deterministic exact-cosine retrieval.
+- **Legacy ChromaDB migration** — existing stores can be converted through a stopped, backup-gated parity workflow; ChromaDB is not a runtime dependency for fresh installs.
 - **Kuzu** — a knowledge graph that tracks entities, relationships, and structural context.
 - **Behavioral Relevance** — a 5-signal scoring system that automatically surfaces the most useful memories. No manual importance ratings.
 
@@ -177,7 +177,7 @@ Elefante keeps durable architecture rules out of the live prompt by separating l
 
 | Purpose      | Technology                       |
 | ------------ | -------------------------------- |
-| Vector store | ChromaDB 1.3.5                   |
+| Vector store | SQLite (exact cosine)            |
 | Graph store  | Kuzu 0.11.3                      |
 | Embeddings   | sentence-transformers (gte-base) |
 | Protocol     | MCP 1.28.1                       |
