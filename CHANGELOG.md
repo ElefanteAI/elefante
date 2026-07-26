@@ -30,6 +30,7 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Frontend relationship, connectivity, and knowledge-graph consumers now normalize both production `from` / `to` edges and legacy `source` / `target` fixtures.
 - Dashboard memory provenance now reports the configured embedded vector backend instead of hard-coding `chromadb`.
 - Removed the unused React Router dependency and its two moderate advisories; the locked dashboard dependency tree now audits cleanly.
+- Corrected the dashboard header asset from a truncated fragment to the complete canonical elephant-and-network symbol and restricted hover motion to the network region.
 
 ## [2.11.0] - 2026-07-23
 

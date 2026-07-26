@@ -78,8 +78,8 @@ textarea:focus-visible {
 
 .elefante-mark {
   position: relative;
-  width: 52px;
-  height: 40px;
+  width: 56px;
+  height: 44px;
   flex: 0 0 auto;
 }
 
@@ -93,20 +93,16 @@ textarea:focus-visible {
 }
 
 .elefante-emblem-network {
-  clip-path: polygon(30% 0, 100% 0, 100% 56%, 46% 56%);
+  clip-path: polygon(0 0, 36% 0, 36% 40%, 0 40%);
   background: #e2b06e;
   opacity: 0;
-  transform: translate3d(-1px, 1px, 0);
+  transform: translate3d(-0.4px, 0.4px, 0);
   transition: opacity 420ms ease, transform 900ms cubic-bezier(0.2, 0.75, 0.25, 1);
-}
-
-.elefante-mark:hover .elefante-emblem {
-  background: #e2b06e;
 }
 
 .elefante-mark:hover .elefante-emblem-network {
   opacity: 0.88;
-  transform: translate3d(1.5px, -1px, 0);
+  transform: translate3d(0.8px, -0.8px, 0);
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }

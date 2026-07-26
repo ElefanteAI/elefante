@@ -12,8 +12,10 @@
 
 import re
 import asyncio
+import hashlib
 import json
 import importlib.util
+import struct
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -163,10 +165,16 @@ def test_dashboard_frontend_normalizes_production_edge_endpoints():
 def test_dashboard_shell_uses_elefante_brand_assets_not_vite_defaults():
     repo_root = Path(__file__).resolve().parents[1]
     html = (repo_root / "src" / "dashboard" / "ui" / "index.html").read_text(encoding="utf-8")
+    emblem = (repo_root / "src" / "dashboard" / "ui" / "public" / "elefante-emblem.png").read_bytes()
 
     assert "<title>Elefante Memory Intelligence</title>" in html
     assert 'href="/elefante-emblem.png"' in html
     assert "vite.svg" not in html
+    assert emblem[:8] == b"\x89PNG\r\n\x1a\n"
+    assert struct.unpack(">II", emblem[16:24]) == (582, 458)
+    assert hashlib.sha256(emblem).hexdigest() == (
+        "06178da5ba2c145cb6b3516cdfc4e84c8695e0abc01d38a44cebc9a62ea46f6b"
+    )
 
 
 def test_showcase_snapshot_is_deterministic_grounded_and_contract_complete():
