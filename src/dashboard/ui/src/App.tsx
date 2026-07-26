@@ -61,7 +61,7 @@ function App() {
   };
 
   return (
-    <div className="w-full h-screen bg-slate-950 text-slate-100 overflow-hidden flex flex-col">
+    <div className="elefante-shell w-full h-screen bg-slate-950 text-slate-100 overflow-hidden flex flex-col">
       {/* Header */}
       <HeaderBar />
 
@@ -71,7 +71,7 @@ function App() {
       {/* Main Content */}
       <main className="flex-1 overflow-hidden">
         {error && (
-          <div className="p-4 m-4 bg-red-900/30 border border-red-500/50 rounded-lg text-red-200 text-sm">
+          <div className="p-4 m-4 bg-red-900/30 border border-red-500/50 text-red-200 text-sm">
             <strong>Error:</strong> {error}
           </div>
         )}
@@ -79,9 +79,9 @@ function App() {
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <div className="w-12 h-12 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-              <div className="text-slate-400">Connecting to Elefante server...</div>
-              <div className="text-slate-600 text-xs mt-2">This may take a moment on first launch</div>
+              <div className="w-10 h-10 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <div className="text-slate-300">Reading the local memory snapshot...</div>
+              <div className="text-slate-600 text-xs mt-2 elefante-mono uppercase tracking-widest">Read-only · loopback</div>
             </div>
           </div>
         ) : (
@@ -90,9 +90,9 @@ function App() {
       </main>
 
       {/* Footer */}
-      <footer className="px-4 py-2 bg-slate-900/50 border-t border-slate-800 text-center">
+      <footer className="px-4 py-2 bg-slate-900/50 border-t elefante-hairline text-center">
         <span className="text-xs text-slate-500">
-          Elefante v{version} &middot; Knowledge Workbench &middot; <span className="text-slate-600">1/2/3 to switch tabs</span>
+          Elefante v{version} &middot; Memory Intelligence &middot; <span className="text-slate-600">read-only local snapshot · 1/2/3 to switch views</span>
         </span>
       </footer>
     </div>

@@ -8,7 +8,7 @@
 
 AI agents start every conversation from zero. Your preferences, decisions, and discovered patterns don't carry over. Elefante gives any MCP-compatible agent a persistent, local second brain — memories are stored, scored automatically, and surfaced at the right moment without being asked.
 
-**v2.11.0** — Persistent Memory Engine
+**v2.12.0** — Persistent Memory Engine
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -28,7 +28,7 @@ AI agents start every conversation from zero. Your preferences, decisions, and d
                          │ snapshot.json
 ┌────────────────────────▼────────────────────────────────────┐
 │ LAYER 3 · DASHBOARD                                         │
-│ Read-only view of your second brain's health                │
+│ Read-only briefing of what should shape the next answer     │
 │ http://127.0.0.1:8000                                       │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -76,11 +76,12 @@ Architecture → [docs/reference/architecture.md](docs/reference/architecture.md
 
 ### Layer 3 — Dashboard
 
-A read-only view of your knowledge system, served from a lightweight snapshot so the agent stays fast:
+A read-only Memory Intelligence briefing, served from a redacted snapshot so the agent stays fast and the browser never owns your stores:
 
-- Health score with diagnostic panels
-- Searchable, sortable memory table
-- Topic distribution, memory insights, and a knowledge graph
+- A decision briefing that can show old assumption → evidence → decision → enforced guard
+- Searchable, sortable memory inspection with source and lifecycle context
+- Topic, distribution, and knowledge-connection views
+- A carbon, tusk, copper, brass, clay, and sage interface built around information state—not generic AI gradients
 
 Dashboard details → [docs/how-to/view-dashboard.md](docs/how-to/view-dashboard.md)
 Docker deployment → [docs/how-to/docker.md](docs/how-to/docker.md)

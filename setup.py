@@ -33,7 +33,7 @@ def requirements(section: str) -> list[str]:
 
 setup(
     name="elefante",
-    version="2.11.0",
+    version="2.12.0",
     author="Elefante Contributors",
     author_email="elefante@proton.me",
     description="Local AI Memory System with Vector and Graph Storage",

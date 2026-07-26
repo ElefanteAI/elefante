@@ -42,11 +42,20 @@ export type GraphNode = MemoryNode | EntityNode | {
 };
 
 export interface GraphEdge {
-  source: string;
-  target: string;
+  source?: string;
+  target?: string;
+  from?: string;
+  to?: string;
   type?: string;
   label?: string;
   similarity?: number;
+}
+
+export function edgeEndpoints(edge: GraphEdge): { source: string; target: string } {
+  return {
+    source: edge.source ?? edge.from ?? '',
+    target: edge.target ?? edge.to ?? '',
+  };
 }
 
 export interface Snapshot {

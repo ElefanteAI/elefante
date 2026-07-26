@@ -1,23 +1,31 @@
 import { useMemo, useState, useRef, useLayoutEffect } from 'react';
 import { useDashboardStore } from '@/store';
-import type { MemoryNode, GraphEdge } from '@/types';
+import { edgeEndpoints, type MemoryNode, type GraphEdge } from '@/types';
 
 // ── colour palette ─────────────────────────────────────────────────
 const TOPIC_COLORS: Record<string, string> = {
-  communication:      '#22d3ee',
-  workflow:           '#fbbf24',
-  'agent-behavior':   '#a78bfa',
-  debugging:          '#f87171',
-  'coding-standards': '#4ade80',
-  architecture:       '#fb923c',
-  'tools-environment':'#38bdf8',
-  'user-profile':     '#f472b6',
-  collaboration:      '#34d399',
-  general:            '#64748b',
+  'runtime authority': '#c8894d',
+  'trust boundary': '#dfbb72',
+  'retrieval intelligence': '#8ea889',
+  'memory governance': '#c96f5d',
+  storage: '#e2b06e',
+  'host continuity': '#b99473',
+  recovery: '#718d74',
+  'development process': '#a36a42',
+  communication:      '#c8894d',
+  workflow:           '#dfbb72',
+  'agent-behavior':   '#b67744',
+  debugging:          '#c96f5d',
+  'coding-standards': '#8ea889',
+  architecture:       '#e2b06e',
+  'tools-environment':'#a36a42',
+  'user-profile':     '#b99473',
+  collaboration:      '#718d74',
+  general:            '#6f675b',
 };
 
 function topicColor(t: string) {
-  return TOPIC_COLORS[t.toLowerCase()] ?? '#64748b';
+  return TOPIC_COLORS[t.toLowerCase()] ?? '#6f675b';
 }
 
 function cleanTitle(t: string) {
@@ -117,15 +125,16 @@ function buildLayout(
     for (let i = 0; i < topics.length; i++) {
       const a = nodes.find((n) => n.id === `hub:${topics[i]}`)!;
       const b = nodes.find((n) => n.id === `hub:${topics[(i + 1) % topics.length]}`)!;
-      edges.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, color: '#334155' });
+      edges.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, color: '#3d382f' });
     }
   }
 
   // Real semantic/graph edges
   const memMap = new Map(nodes.filter(n => n.kind === 'memory').map(n => [n.id, n]));
   snapshotEdges.forEach(e => {
-    const src = memMap.get(e.source);
-    const tgt = memMap.get(e.target);
+    const { source, target } = edgeEndpoints(e);
+    const src = memMap.get(source);
+    const tgt = memMap.get(target);
     if (!src || !tgt) return;
 
     // Filter out weak semantic connections to avoid hairballs
@@ -133,7 +142,7 @@ function buildLayout(
 
     // Distinguish Graph vs Semantic
     const isGraph = e.type === 'graph' || e.label === 'CO_ACTIVATED';
-    const edgeColor = isGraph ? '#a855f7' : '#10b981';
+    const edgeColor = isGraph ? '#dfbb72' : '#718d74';
 
     edges.push({
       x1: src.x, y1: src.y,
@@ -222,7 +231,7 @@ export function KnowledgeGraph() {
         {/* Edges */}
         <g>
           {edges.map((e, i) => {
-            const isHub = e.color === '#334155';
+            const isHub = e.color === '#3d382f';
             const isReal = !!e.isRealEdge;
             let strokeWidth = isHub ? 0.8 : 1.2;
             if (isReal) strokeWidth = 1.5;
@@ -340,14 +349,14 @@ export function KnowledgeGraph() {
               const type = mem?.properties?.memory_type;
               const score = mem?.properties?.score;
               const TYPE_COLORS: Record<string, string> = {
-                fact: '#3b82f6', decision: '#f59e0b',
-                preference: '#8b5cf6', insight: '#10b981',
+                fact: '#c8894d', decision: '#dfbb72',
+                preference: '#b99473', insight: '#718d74',
               };
               return (
                 <>
                   {type && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded"
-                      style={{ backgroundColor: `${TYPE_COLORS[type] ?? '#64748b'}20`, color: TYPE_COLORS[type] ?? '#94a3b8' }}>
+                      style={{ backgroundColor: `${TYPE_COLORS[type] ?? '#6f675b'}20`, color: TYPE_COLORS[type] ?? '#b5aa98' }}>
                       {type}
                     </span>
                   )}
@@ -374,11 +383,11 @@ export function KnowledgeGraph() {
           <span>Memory</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-0.5 bg-[#a855f7] opacity-80" />
+          <div className="w-3 h-0.5 bg-[#dfbb72] opacity-80" />
           <span>Graph/Co-Activation Link</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-0.5 bg-[#10b981] opacity-80" />
+          <div className="w-3 h-0.5 bg-[#718d74] opacity-80" />
           <span>Semantic Link</span>
         </div>
       </div>

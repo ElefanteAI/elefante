@@ -2,17 +2,25 @@ import { useMemo } from 'react';
 import { useDashboardStore } from '@/store';
 
 const TYPE_COLORS: Record<string, string> = {
-  fact: '#3b82f6', decision: '#f59e0b',
-  preference: '#8b5cf6', insight: '#10b981',
-  note: '#64748b', conversation: '#94a3b8',
+  fact: '#c8894d', decision: '#dfbb72',
+  preference: '#b99473', insight: '#718d74',
+  note: '#6f675b', conversation: '#b5aa98',
 };
 
 const TOPIC_COLORS: Record<string, string> = {
-  communication: '#22d3ee', workflow: '#fbbf24',
-  'agent-behavior': '#a78bfa', debugging: '#f87171',
-  'coding-standards': '#4ade80', architecture: '#fb923c',
-  'tools-environment': '#38bdf8', 'user-profile': '#f472b6',
-  collaboration: '#34d399', general: '#64748b',
+  'runtime authority': '#c8894d',
+  'trust boundary': '#dfbb72',
+  'retrieval intelligence': '#8ea889',
+  'memory governance': '#c96f5d',
+  storage: '#e2b06e',
+  'host continuity': '#b99473',
+  recovery: '#718d74',
+  'development process': '#a36a42',
+  communication: '#c8894d', workflow: '#dfbb72',
+  'agent-behavior': '#b67744', debugging: '#c96f5d',
+  'coding-standards': '#8ea889', architecture: '#e2b06e',
+  'tools-environment': '#a36a42', 'user-profile': '#b99473',
+  collaboration: '#718d74', general: '#6f675b',
 };
 
 function cleanTitle(title: string): string {
@@ -124,7 +132,7 @@ export function CalendarHeatmap() {
                 label={`Score ${score}`}
                 count={count}
                 total={total}
-                color={Number(score) >= 8 ? '#22d3ee' : Number(score) >= 6 ? '#fbbf24' : '#f87171'}
+                color={Number(score) >= 8 ? '#c8894d' : Number(score) >= 6 ? '#dfbb72' : '#c96f5d'}
               />
             ))}
           </div>

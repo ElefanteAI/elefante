@@ -21,7 +21,7 @@ function formatRelativeTime(dateStr: string): string {
 const typeColors: Record<string, string> = {
   fact: 'bg-cyan-500/20 text-cyan-300',
   decision: 'bg-amber-500/20 text-amber-300',
-  preference: 'bg-pink-500/20 text-pink-300',
+  preference: 'bg-cyan-500/15 text-cyan-300',
   insight: 'bg-emerald-500/20 text-emerald-300',
 };
 

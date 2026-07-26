@@ -114,15 +114,17 @@ def test_active_developer_routing_points_to_current_sources() -> None:
     assert "all 20 tools" not in orchestrator_doc or "20 tools" in orchestrator_doc
 
 
-def test_living_plan_tracks_the_post_210_trust_release() -> None:
+def test_living_plan_tracks_the_current_post_211_release() -> None:
     planning = _read("workspace/PLANNING.md")
 
-    assert "## §2 Active Release: v2.11.0 Trust Release" in planning
+    assert "## §2 Active Release: v2.12.0 Memory Intelligence" in planning
+    assert "### §3.1 v2.11.0 — Trust Release (shipped baseline)" in planning
     assert "## §2 Active Release: v2.10.0" not in planning
     assert "P1–P6 are open" not in planning
     assert "| OB4 |" not in planning
     assert "| OB5 |" not in planning
-    assert "249 automated tests pass" in planning
+    assert "source-grounded" in planning
+    assert "PUBLICATION_AUTHORIZED:** NO" in planning
 
 
 def test_active_tool_docs_match_current_mcp_surface() -> None:

@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_dashboard_serializer.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
+# VERSION : 2.11.0
+# CHANGED : 2026-07-26
 # PROVES  : Dashboard serialization correctness and launch safeguards; ensures
 #           Memory objects are converted to valid dashboard node/edge JSON.
 # RUN     : pytest tests/test_dashboard_serializer.py -v
@@ -12,6 +12,8 @@
 
 import re
 import asyncio
+import json
+import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -28,6 +30,16 @@ from src.utils.dashboard_serializer import (
     is_test_artifact,
     memory_to_dashboard_node,
 )
+
+
+def _load_showcase_builder():
+    repo_root = Path(__file__).resolve().parents[1]
+    script_path = repo_root / "scripts" / "demo" / "generate_showcase_snapshot.py"
+    spec = importlib.util.spec_from_file_location("generate_showcase_snapshot", script_path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.build_showcase_snapshot
 
 
 def _sample_raw_metadata() -> dict:
@@ -91,6 +103,13 @@ def test_memory_to_dashboard_node_serializes_score_and_topic():
     assert node["properties"]["topic"] == "Code Style"
 
 
+def test_memory_to_dashboard_node_uses_explicit_configured_backend_label():
+    node = memory_to_dashboard_node(_sample_memory(), vector_source="sqlite")
+
+    assert node is not None
+    assert node["properties"]["source"] == "sqlite"
+
+
 def test_raw_and_memory_scores_stay_close():
     raw_score = compute_live_score_from_raw(_sample_raw_metadata())
     memory_score = compute_live_score(_sample_memory())
@@ -127,6 +146,67 @@ def test_dashboard_frontend_retries_stats_and_snapshot_fetches():
     assert store_source.count("1000 * Math.pow(2, attempt)") >= 2
     assert "fetch('/api/graph')" in store_source
     assert "fetch('/api/stats')" in store_source
+
+
+def test_dashboard_frontend_normalizes_production_edge_endpoints():
+    repo_root = Path(__file__).resolve().parents[1]
+    types_source = (repo_root / "src" / "dashboard" / "ui" / "src" / "types.ts").read_text(encoding="utf-8")
+    graph_source = (repo_root / "src" / "dashboard" / "ui" / "src" / "components" / "KnowledgeGraph.tsx").read_text(encoding="utf-8")
+    memories_source = (repo_root / "src" / "dashboard" / "ui" / "src" / "components" / "MemoriesTab.tsx").read_text(encoding="utf-8")
+
+    assert "edge.source ?? edge.from" in types_source
+    assert "edge.target ?? edge.to" in types_source
+    assert "edgeEndpoints(e)" in graph_source
+    assert "edgeEndpoints(e)" in memories_source
+
+
+def test_dashboard_shell_uses_elefante_brand_assets_not_vite_defaults():
+    repo_root = Path(__file__).resolve().parents[1]
+    html = (repo_root / "src" / "dashboard" / "ui" / "index.html").read_text(encoding="utf-8")
+
+    assert "<title>Elefante Memory Intelligence</title>" in html
+    assert 'href="/elefante-emblem.png"' in html
+    assert "vite.svg" not in html
+
+
+def test_showcase_snapshot_is_deterministic_grounded_and_contract_complete():
+    build_showcase_snapshot = _load_showcase_builder()
+    snapshot = build_showcase_snapshot()
+    repeated = build_showcase_snapshot()
+
+    assert snapshot == repeated
+    assert snapshot["curation"] == {
+        "purpose": "Elefante Memory Intelligence dashboard showcase",
+        "product_baseline": "v2.12.0",
+        "deterministic": True,
+        "synthetic_behavioral_metadata": True,
+        "source_grounded_content": True,
+        "contains_user_data": False,
+        "disclaimer": "Counts and access history demonstrate product behavior; they are not customer or performance claims.",
+    }
+    assert snapshot["stats"] == {
+        "total_nodes": 48,
+        "memories": 37,
+        "entities": 11,
+        "edges": 95,
+    }
+
+    node_ids = {node["id"] for node in snapshot["nodes"]}
+    assert len(node_ids) == 48
+    assert all(edge["from"] in node_ids and edge["to"] in node_ids for edge in snapshot["edges"])
+    assert snapshot["featured_chain"] == [
+        "demo:daemon-assumption",
+        "demo:kuzu-evidence",
+        "demo:daemon-decision",
+        "demo:bridge-guard",
+    ]
+
+    memories = [node for node in snapshot["nodes"] if node["type"] == "memory"]
+    assert all(memory["properties"]["evidence"] for memory in memories)
+    assert all(memory["properties"]["namespace"] == "showcase" for memory in memories)
+    corpus = json.dumps(snapshot).lower()
+    assert "six signals" not in corpus
+    assert "chromadb holds semantic memories" not in corpus
 
 
 def test_dashboard_defaults_to_loopback_and_explicit_cors(monkeypatch):

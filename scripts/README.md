@@ -141,5 +141,6 @@ Mutations require `ELEFANTE_PRIVILEGED=1`. Always `backup_elefante_data.py` firs
 
 | Script | What it does | When to use it |
 | ------ | ------------ | -------------- |
-| `generate_100_memories.py` | Seeds 100 synthetic memories into a live Elefante instance. | Before a demo or benchmark when a populated store is needed. |
+| `generate_showcase_snapshot.py` | Writes a deterministic, source-grounded 37-memory dashboard snapshot with clearly declared synthetic behavioral metadata; never opens a durable store. | For product demos, screenshots, and UI acceptance without exposing or mutating user memory. |
+| `generate_100_memories.py` | Legacy Chroma + Kuzu behavioral-store benchmark. It mutates only the explicit isolated `--db` path and requires `--force` to replace one. | Only when exercising historical 100-memory store behavior; not for the current dashboard showcase. |
 | `benchmark_sqlite_vector_store.py` | Creates a deterministic, disposable SQLite store and reports exact-cosine retrieval latency as JSON. It never opens existing ChromaDB or Elefante data. | Before approving a SQLite default/migration performance envelope; use `--max-p95-ms` to enforce a measured threshold. |

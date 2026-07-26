@@ -1,6 +1,6 @@
 ---
 status: living
-last_updated: 2026-07-23
+last_updated: 2026-07-26
 audience: developer-agents
 authority: state + roadmap + features + aspect-plans for Elefante development
 related:
@@ -77,50 +77,54 @@ The non-negotiable product shape is:
 
 ---
 
-## §2 Active Release: v2.11.0 Trust Release
+## §2 Active Release: v2.12.0 Memory Intelligence
 
 ### §2.1 Outcome
 
-**One private local memory authority shared safely by every supported agent host.**
+**Make persistent memory legible as a decision advantage, not a database inventory.**
 
-The release is ready only when the Trust Release gates in §1.4 are proven. It
-does not add a chat surface, cloud storage, or a new agent runtime.
+The dashboard must answer one commercial product question in plain language:
+what durable knowledge should shape the next agent answer, and why should a
+developer trust it? The implementation remains inside the v2.11 trust boundary:
+loopback-only, redacted snapshot-only, and read-only.
 
-### §2.2 Delivered in the uncommitted release candidate
+### §2.2 Delivered on `codex/dashboard-memory-intelligence`
 
 | Surface | Evidence |
 |---------|----------|
-| Runtime authority | Loopback Streamable HTTP daemon + storage-free stdio bridge; two concurrent bridge clients retain distinct provenance without Kuzu contention |
-| Trust boundary | Loopback dashboard/daemon, explicit CORS, read-only GraphQuery, bounded transport input, snapshot-only dashboard |
-| Durable operations | Exact-entry install ownership, safe uninstall, daemon service status, read-only doctor, verified backup/restore/reset |
-| Host reach | Preserving adapters for VS Code/Bob, Antigravity, Cursor, Kiro, Claude Code, Codex, Gemini CLI, and OpenClaw; Agent Zero remains community-tier |
-| Supply chain | Exact direct pins, universal hash lock, release audit gate, zero dashboard audit findings, SQLite exit path with migration parity proof |
-| Quality | 249 automated tests pass; the separately run slow two-bridge proof, 46/46 self-protocol checks, dashboard build/audit, and focused lint pass |
+| Product story | Briefing identifies a current durable memory and explains its evolution as assumption → evidence → decision → guard when graph relationships support it |
+| Visual system | Exact repository emblem; carbon/tusk base with copper, brass, clay, and sage semantic states; no generic purple/cyan AI-gradient treatment |
+| Data truth | Production `from`/`to` edges and legacy `source`/`target` fixtures normalize at the frontend boundary; backend label derives from configured store |
+| Showcase | Deterministic 37-memory, 11-entity, 95-edge snapshot; every memory cites repository evidence; synthetic behavior is disclosed; user data is absent |
+| Trust boundary | Dashboard remains loopback-only, redacted snapshot-only, read-only, and undeployed |
+| Documentation | Snapshot reference, operator guide, script catalog, README, changelog, and this SDD/state record are synchronized |
 
-### §2.3 Remaining release blockers
+### §2.3 Remaining closure work
 
-| Blocker | Current proof | Required close |
-|---------|---------------|----------------|
-| GAP-025 | Daemon, Source tuples, bridge concurrency, and migration dry-run pass | Explicitly authorized legacy provenance apply plus remaining host-lifecycle proof |
-| GAP-029 | SQLite CRUD/recovery/migration parity passes; lock audit still reports `chromadb 1.3.5 / PYSEC-2026-311` | Approved storage transition, removal of Chroma from the release lock, clean audit |
-| Compatibility certification | Adapter unit/isolated CLI lifecycles pass | Actual host-driven install, reconnect, upgrade, and uninstall proof before any host is called certified |
-| Release closure | Working tree is documented and test-green | Version-contract cleanup, cohesive commits, then explicit publish authorization |
+| Work | Current proof |
+|------|---------------|
+| Visual acceptance | PASS — Briefing, Memories, Topics, and Graph rendered from the maintained showcase at 1600×1000; exact repository emblem, hover-layer treatment, navigation, and production edges inspected |
+| Regression proof | PASS — dashboard build and zero-finding audit; 48 focused tests; 20 routing guards; final 257-test full suite; snapshot, emoji, Ruff, package, version, and diff checks pass |
+| Durable handoff | IN PROGRESS — reusable lesson is stored and retrieved; journal is current; commit, push, and draft PR are the remaining steps |
+| Publication | NOT AUTHORIZED — no tag, release publication, deployment, or external hosting |
 
 ### §2.4 Approval gates
 
-The agent may continue isolated implementation and tests. It must not perform
-these actions without explicit user authority:
+The user explicitly authorized implementation, documentation, commit, push,
+and GitHub handoff for this dashboard cycle. The following remain outside that
+authority:
 
 1. Apply provenance or vector-store migrations to live user data.
 2. Change the live/default storage authority from ChromaDB to SQLite.
-3. Commit, push, tag, publish, deploy, spend money, or contact third parties.
+3. Tag, publish a release, deploy, spend money, or contact third parties.
 
 ### §2.5 Scope guard
 
 - No cloud memory service, model hosting, editor replacement, or agent runtime.
 - No compatibility or security claim without automated or host-driven proof.
-- No facade, scoring-profile, storage-tier, or write-mode expansion while Trust Release blockers remain.
-- v2.10.0 decision history lives in `CHANGELOG.md` and §10; it is not active release state.
+- No browser-triggered snapshot generation, live-store query, or public host bind.
+- No fabricated five-signal per-query breakdown: the snapshot does not carry it.
+- No user data in the maintained showcase and no visual alteration of the canonical logo shape.
 
 Rejected alternatives remain closed without new evidence:
 
@@ -136,34 +140,23 @@ Rejected alternatives remain closed without new evidence:
 ### §2.6 Resume verdict
 
 - **RESUME_SAFE:** YES — active state is here; defects/capability gaps are in [`workspace/ISSUES.md`](../workspace/ISSUES.md); integration truth is in [`agents/manifests/ide-integration.yaml`](../agents/manifests/ide-integration.yaml).
-- **PRODUCTION_READY:** NO — blocked by GAP-025, GAP-029, host certification, version/commit closure, and explicit release authorization.
+- **IMPLEMENTATION_COMPLETE:** YES — visual and automated acceptance pass.
+- **PUBLICATION_AUTHORIZED:** NO — this cycle ends at a draft PR.
 
 ---
 
 ## §3 Roadmap (multi-release)
 
-### §3.1 v2.11.0 — Trust Release (active)
+### §3.1 v2.11.0 — Trust Release (shipped baseline)
 
-Per [`workspace/proposals/ide-integration-surface.md §15`](../workspace/proposals/ide-integration-surface.md):
+The daemon, storage-free bridge, provenance, installer ownership, SQLite default,
+and snapshot-only dashboard form the baseline described in `CHANGELOG.md`.
+Unfinished trust obligations remain visible in §1.4 and `workspace/ISSUES.md`;
+the dashboard work does not waive them.
 
-| Step | Work |
-|------|------|
-| 1 | Close GAP-029 with an authorized, recoverable SQLite transition and clean release lock |
-| 2 | Close GAP-025 with authorized legacy provenance apply and host-lifecycle evidence |
-| 3 | Exercise advertised compatible hosts end-to-end; certify only proven surfaces |
-| 4 | Reconcile version declarations, run all release gates, and form cohesive commits |
-| 5 | Publish only after explicit authorization |
+### §3.2 v2.12.0 — Memory Intelligence + inspector CI (active)
 
-**Acceptance gates** (all required before v2.11.0 cuts):
-
-- All `scripts/verify/*` green
-- Persistence/guard coverage passes on fresh and migrated fixtures
-- Two concurrent IDE instances produce distinct `source.instance_id` values with zero Kuzu lock contention
-- Per-adapter `emit_skill` / `emit_rules` / `emit_mcp` dry-run diff reviewed against the live vendor doc at ship time
-- CHANGELOG `### Removed` entries exist for every dropped path or command
-
-### §3.2 v2.12.0 — inspector CI + Phase 3 surfaces
-
+- Memory Intelligence Briefing and source-grounded showcase
 - integration-inspector CI cron (weekly drift audit)
 - `elefante doctor` extended to full self-protocol
 - Matrix versioning + pinning
@@ -188,7 +181,7 @@ Source-of-truth: [`docs/explanation/vision.md §A–§F`](../docs/explanation/vi
 
 - **A. Memory Intelligence** — Memory Health Score (designed, not built); Potential Conflict Detection (designed, not built); Smart Update / Merge (concept only)
 - **B. Proactive Retrieval** — Proactive Memory Surfacing (`surfaces_when` field exists; surfacing logic not built); Retrieval Explanation UI (backend done v2.1; frontend 0%)
-- **C. Dashboard & Visualization** — Usage Intelligence (backend 80%; snapshot pipeline +1 field; frontend 0%); Dashboard UX improvements (designed, not built)
+- **C. Dashboard & Visualization** — Usage Intelligence aggregation remains unbuilt; the v2.12 Memory Intelligence briefing and visual-system redesign are implemented
 - **D. Session Distiller Expansion** — Live Mode (designed, not built); Team Sync API (concept)
 - **E. Multi-Modal & Platform** — Multi-Modal Memory (concept); additional host certification (see §3.1); Agent Zero remains a documented community path
 - **F. Distribution Packaging** — Branded macOS DMG (build script done; CI wired; signing credentials pending); Branded Windows EXE (not built); Manual Fallback Path (shipped — `install.sh`/`install.bat`)
@@ -206,7 +199,63 @@ Each row links to the full PRD. **Authority:** the linked file is the source of 
 
 ### §4.3 Active (status: shipping)
 
-Active development = the v2.11.0 Trust Release gates in §2.
+#### Memory Intelligence dashboard SDD — accepted implementation
+
+**Question:** How does the local dashboard sell Elefante's developer advantage
+without generic AI styling, stale product claims, fabricated telemetry, or a
+second path into private stores?
+
+**Proof:** The repository establishes the product as a local Full Signal
+Injection layer using five retrieval signals, an embedded SQLite default plus
+Kuzu graph, a one-writer loopback daemon, source provenance, and a redacted
+snapshot-only dashboard. Prior UI review found a generic gradient palette, an
+inventory-first Overview, a deformed substitute elephant, stale Chroma-first
+demo content, and frontend graph consumers that expected `source` / `target`
+while production exports `from` / `to`.
+
+**Result — visual contract:**
+
+1. Preserve the Matrix-inspired binary atmosphere but subordinate it to content.
+2. Use the canonical Elefante emblem exactly; no generative redraw, skew,
+   silhouette substitution, or anatomical interpretation.
+3. Base palette: carbon `#070604`, tusk `#eee4d3`, copper `#c8894d`;
+   state accents: brass `#dfbb72`, clay `#c96f5d`, sage `#718d74`.
+4. Prefer square, hairline, editorial panels and compact system typography over
+   rounded gradient cards, glow effects, or ornamental icon grids.
+
+**Result — information architecture:**
+
+1. **Briefing:** lead with “The decisions shaping your next answer.” Select a
+   durable current decision by type, lifecycle, live score, and access history.
+2. If edges prove an evolution, show old assumption → evidence → decision →
+   enforced guard. Otherwise label the cards honestly as current/related
+   memories; never invent causality.
+3. Show memory type, access count, normalized link count, lifecycle state, and
+   repository/source grounding beside the thread.
+4. **Memories:** retain snapshot-local search, sorting, details, and related
+   navigation under the same visual system.
+5. **Connections:** retain topics, score distribution, and graph views; colors
+   communicate state and topic, not unsupported model performance.
+
+**Result — data and trust contract:**
+
+1. The browser reads only `dashboard_snapshot.json`; Reload re-reads it and
+   cannot regenerate or mutate memory.
+2. Edge endpoint aliases normalize once at the frontend type boundary.
+3. Serialized `source` reflects the configured embedded backend.
+4. The maintained showcase is deterministic and contains 37 repository-grounded
+   memories, 11 topic/source entities, and 95 links. Its access history is
+   synthetic, disclosed, and never represented as customer telemetry.
+5. Per-query vector/concept/co-activation/authority/temporal values are not
+   shown until the snapshot contract actually carries them.
+
+**Acceptance:** production build; snapshot validator; focused serializer,
+boundary, edge, and showcase regressions; all three views rendered at a desktop
+viewport; exact emblem visually inspected; full Python/routing/emoji/diff
+checks green.
+
+**Next:** finish measured verification, ingest the reusable boundary lesson,
+record the journal/handoff, and open a draft GitHub PR. Do not deploy.
 
 ### §4.4 Shipped (status: shipped — link to reference)
 
@@ -216,7 +265,7 @@ Active development = the v2.11.0 Trust Release gates in §2.
 | 5-signal scoring (vector / concept / co-activation / authority / temporal) | v2.7.0 (post BUG-016/017/018) | [`docs/reference/scoring.md`](../docs/reference/scoring.md) |
 | 16 MCP tools + 2 prompts | v2.10.0+ | [`docs/reference/tools.md`](../docs/reference/tools.md) |
 | Compliance Gate (search before write) | v2.0.0+ | [`docs/reference/architecture.md`](../docs/reference/architecture.md) §Compliance Gate |
-| Dashboard with live-computed scores | v2.4.0 (BUG-004 fix) | [`docs/reference/dashboard-snapshot.md`](../docs/reference/dashboard-snapshot.md) |
+| Memory Intelligence dashboard with live-computed scores | v2.12.0 | [`docs/reference/dashboard-snapshot.md`](../docs/reference/dashboard-snapshot.md) |
 | Transaction-scoped Kuzu locking | v1.1.0 | [`docs/reference/architecture.md`](../docs/reference/architecture.md) §Transaction-Scoped Locking |
 
 ### §4.5 Rejected (status: rejected — do not re-litigate)
@@ -389,7 +438,6 @@ cd "/Volumes/OWC2TB/2026-M5/AI Projects/hermes-agent"
 
 ### §8.2 UX backlog (no canonical home until §4.1 backlog absorbs)
 
-- Dashboard UX color-by-memory-type (idea)
 - Health indicators on graph nodes (idea)
 - Rich tooltips on signal hubs (idea)
 - Live mode for session distiller (idea)
@@ -468,9 +516,11 @@ This section is the chronological record of curation events, decisions, and abso
 | 2026-05-02 | **Memory tool consolidation atomic swap COMPLETE.** Tool count 20 → 16. 5 legacy memory tools (`MemoryAdd` / `MemorySearch` / `MemoryUpdate` / `MemoryDelete` / `MemoryConsolidate`) deleted in same atomic change that introduced `elefante-Memory` with discriminated `action` param. Hermes audit (deepseek-v4-flash) before surgery caught 7 prep items including a silent Compliance Gate regression that I'd have shipped solo — I revised the plan based on the audit (gate stays internally name-keyed via handler-side calls; only error messages updated). Files touched: `src/mcp/server.py` (tool def + dispatcher + 5 system updates), `scripts/verify/verify_e2e_tests.py` (EXPECTED_TOOLS + 13 call sites + grounding check), `tests/test_memory_persistence.py` (2 call sites), `scripts/setup/configure_antigravity.py` + `configure_vscode_bob.py` (IDE allowlists), `README.md` + `docs/README.md` + `docs/reference/tools.md` (counts). Hermes confirms post-swap: 16 tools visible, `elefante-Memory` first listed, full discriminated description retrievable. 18/18 guards green throughout. | "i need to consolidate the tools." + "do it now end-to-end multi-step" + Hermes audit findings | **First successful tool surface consolidation in Elefante history. Lesson learned earlier same day (alongside-deployment is theater) prevented this from being another reverted attempt.** Hermes-as-auditor pattern paid for itself again — would have shipped a Compliance Gate regression solo. |
 | 2026-05-02 | **Tool consolidation PRD authored + Phase-1 implementation reverted same day** (workspace/proposals/tool-consolidation.md, revised ~165 LOC). Original proposal: v2.11.0 alongside-deployment of `Memory` consolidated tool + 5 legacy memory tools, v3.0.0 deletes legacy. Phase 1 implemented `elefante-Memory` (5→1) alongside legacy → tool count went 20 → 21. **User caught the error: alongside-deployment is theater, not migration. Cognitive load went UP, not down.** Reverted: server.py back to 20 tools, README/docs/tools.md restored, tests green. Proposal updated to **atomic-swap migration plan** (no overlap window — v3.0.0 deletes legacy and introduces consolidated in same commit). Lesson ingested as Elefante memory + directive (high-priority) so future migration proposals must specify atomic swap, not alongside-deployment. | "why bother to make this step for one tool? aint that stupid??? please think about this? elefante why am i doing this error? learn." | **Genuine self-improvement cycle.** AI implemented; user caught the error in real time; AI reverted + documented + ingested lesson. This is the AI-driven-but-human-curated pattern working: human catches blind spots AI doesn't notice, AI deposits the learning into Elefante so the next agent inherits it. P7 reframed: approve atomic-swap plan only, do not bundle alongside-deployment. |
 | 2026-05-02 | **Hermes audit pass — independence-by-different-LLM proved its keep on first run.** User asked Hermes (deepseek-v4-flash) to audit this session's docs. DeepSeek delivered 7 specific findings with file:line evidence: (HIGH×3) ISSUES.md titled "Debug Documentation Index" instead of BUG/GAP tracker; BUG-027/GAP-028 rows had no clear canonical home; memory `5179e3c8` (GAP-028) was stale OPEN status; (MED×2) memory `faeecf42` claimed Hermes never ran; §10.2 BUG count said 26 vs actual 27+3; (LOW×2) docs/debug/ referenced but doesn't exist; §10.2 unmeasurable compliance metric needed reframe. **All 7 actioned this turn:** ISSUES.md retitled "ISSUES — BUG/GAP Tracker" + Layout/postmortem sections rewritten + stale Structure/File Inventory blocks removed; stale memories `5179e3c8` + `faeecf42` marked `deprecated: True` via `elefante-MemoryUpdate` (excluded from normal search); new corrected memories ingested as id `3ed88442` (GAP-028 CLOSED) + id `e0e66320` (Layer 3 state current); §10.2 BUG count updated to 27+3 GAPs; compliance metric reframed as DEFERRED-by-plan, not unmeasured. | "let's ask hermes, self improvements" challenge — user delegated audit to a different LLM to expose Claude Code's blind spots | **Hermes-as-auditor earned its independence value on the first real task** — caught 7 inconsistencies I missed self-reviewing. Pattern proved: different LLM, different blind spots. The cost (one `hermes -z` call) is much smaller than the recurrence cost of shipping the gaps unfixed. 18/18 guards still green. |
+| 2026-07-26 | **Memory Intelligence dashboard SDD implemented and prepared for GitHub handoff.** Replaced inventory-first Overview with an evidence-aware Briefing; preserved the exact emblem with a clipped hover whisper over its original network; applied the carbon/tusk/copper/brass/clay/sage system across Memories and Connections; normalized `from`/`to` plus legacy endpoint aliases; fixed configured-backend provenance; added a deterministic source-grounded showcase; preserved the previous operator guide verbatim before retiring stale procedures; removed the unused vulnerable router dependency; advanced the contract to v2.12.0. | User rejected the generic AI visual language, deformed substitute logo, stale product screenshot/content, and abstract concept cards; then explicitly approved implementation, complete documentation, GitHub handoff, and stopping at that point. | Showcase validates at 37 memories / 11 entities / 95 edges. Browser acceptance covers Briefing, Memories, Topics, and Graph at 1600×1000 and caught two runtime-only defects (React selector loop and topic-color fallback). Dashboard build passes; npm audit reports 0 vulnerabilities; 48 focused tests, 20 routing guards, and the final 257-test full suite pass; snapshot, emoji, Ruff, `pip check`, version sync, and diff checks pass. One durable lesson was deposited and retrieved; active stale six-signal SDD search returned no mutable match. Branch: `codex/dashboard-memory-intelligence`; next action: cohesive commit → push → draft PR. No tag, deployment, or publication. |
 
 ### §10.1 Lessons logged this session
 
+- **2026-07-26 Dashboard truth is a boundary, not a skin:** a useful memory dashboard explains how knowledge evolved and why the current decision endures. Normalize transport aliases once at the UI boundary, derive labels from configured runtime truth, disclose synthetic demo behavior, and never render retrieval signals the snapshot does not carry. The real browser pass is mandatory: TypeScript compilation did not catch the React selector loop, and source inspection did not reveal the gray topic fallback.
 - **2026-07-22 Daemon foundation:** added `src.mcp.daemon`, a loopback-only Streamable HTTP host for one Elefante MCP server instance at `/mcp`. It is the required transport boundary for the future stdio bridge and prevents each HTTP-capable client from opening its own database-owning process. Proof: Starlette lifespan health check and targeted regression suite passed. It does not close GAP-025 until provenance, migration, bridge, and concurrent-client proof land.
 - **2026-07-22 Stdio bridge:** added `src.mcp.stdio_bridge`, which forwards newline-delimited MCP JSON-RPC to the loopback daemon and rejects non-loopback targets. The bridge owns no stores. GAP-025 remains open until provenance, migration, and concurrent-client proof land.
 - **2026-07-22 Trust Release foundation:** universal-agent contract and release gates documented; dashboard moved to loopback-by-default with explicit CORS and loopback Docker publication; GraphQuery made read-only at the MCP boundary; automated suite collection repaired; GitHub quality workflow added. Proof: `pytest tests -q` 160 passed and dashboard `npm run build` passed. Remaining release blockers: singleton daemon/provenance migration, exact runtime dependency contract, and production dependency audit remediation.

@@ -11,6 +11,26 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-07-26
+
+### Added
+
+- Memory Intelligence **Briefing** view that explains which durable decision should shape the next agent answer and, when graph evidence exists, shows its old assumption → evidence → decision → enforced guard evolution.
+- Deterministic, source-grounded 37-memory dashboard showcase generator with 11 topic/source entities and 95 links. Synthetic access history is explicitly disclosed, no user data is included, and no durable store is opened.
+- Exact Elefante emblem asset for the dashboard header, derived from the repository's canonical logo without redrawing or skewing the mark.
+
+### Changed
+
+- Dashboard navigation is now Briefing, Memories, and Connections. All three views share a carbon/tusk/copper palette with brass, clay, and sage reserved for semantic state.
+- The dashboard reference and operator guide now document the briefing contract, showcase workflow, trust boundary, current backend, and production edge schema.
+- The historical 100-memory Chroma/Kuzu injector is explicitly labeled as a legacy isolated benchmark, requires `--force` before replacing its target, and no longer presents stale Chroma-first product facts.
+
+### Fixed
+
+- Frontend relationship, connectivity, and knowledge-graph consumers now normalize both production `from` / `to` edges and legacy `source` / `target` fixtures.
+- Dashboard memory provenance now reports the configured embedded vector backend instead of hard-coding `chromadb`.
+- Removed the unused React Router dependency and its two moderate advisories; the locked dashboard dependency tree now audits cleanly.
+
 ## [2.11.0] - 2026-07-23
 
 ### Added
