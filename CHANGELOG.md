@@ -31,6 +31,7 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Dashboard memory provenance now reports the configured embedded vector backend instead of hard-coding `chromadb`.
 - Removed the unused React Router dependency and its two moderate advisories; the locked dashboard dependency tree now audits cleanly.
 - Corrected the dashboard header asset from a truncated fragment to the complete canonical elephant-and-network symbol and restricted hover motion to the network region.
+- Made the Python lock-freshness CI gate deterministic by seeding the checked-in lock before recompilation, preventing unrelated transitive releases from failing otherwise unchanged pull requests.
 
 ## [2.11.0] - 2026-07-23
 

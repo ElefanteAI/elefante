@@ -22,6 +22,7 @@ jobs:
         run: |
           mkdir "$RUNNER_TEMP/elefante-lock-check"
           cp requirements.txt "$RUNNER_TEMP/elefante-lock-check/requirements.txt"
+          cp requirements.lock "$RUNNER_TEMP/elefante-lock-check/requirements.lock"
           (
             cd "$RUNNER_TEMP/elefante-lock-check"
             uv pip compile --universal --generate-hashes --python-version 3.11 requirements.txt -o requirements.lock

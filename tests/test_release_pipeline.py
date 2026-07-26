@@ -182,3 +182,16 @@ def test_tagged_release_cannot_bypass_the_hash_locked_dependency_audit():
     assert "require-hashes: true" in workflow
     assert "disable-pip: true" in workflow
     assert "no-deps: true" in workflow
+
+
+def test_quality_lock_freshness_check_preserves_existing_transitive_pins():
+    workflow = (ROOT / ".github/workflows/quality.yml").read_text(encoding="utf-8")
+
+    copy_requirements = 'cp requirements.txt "$RUNNER_TEMP/elefante-lock-check/requirements.txt"'
+    copy_lock = 'cp requirements.lock "$RUNNER_TEMP/elefante-lock-check/requirements.lock"'
+    compile_lock = "uv pip compile --universal --generate-hashes --python-version 3.11"
+    compare_lock = 'cmp requirements.lock "$RUNNER_TEMP/elefante-lock-check/requirements.lock"'
+
+    assert workflow.index(copy_requirements) < workflow.index(copy_lock)
+    assert workflow.index(copy_lock) < workflow.index(compile_lock)
+    assert workflow.index(compile_lock) < workflow.index(compare_lock)

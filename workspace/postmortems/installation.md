@@ -125,6 +125,14 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 **Guard:** `pytest tests/test_install_setup.py -k "manifest_home or transport_only_bridge" -v`.
 **Lesson:** A helper that writes ownership state must receive its state root explicitly. A temporary artifact path does not imply an isolated metadata path.
 
+## Issue #16: Lock Freshness Check Floated Transitive Dependencies [BUG-034, FIXED, guarded]
+
+**Trigger:** PR #7's Python Quality job failed at `cmp requirements.lock ...` although the dashboard change did not modify Python requirements and the locked installation succeeded.
+**Root cause:** The workflow copied only `requirements.txt` into an empty temporary directory. `uv pip compile` therefore selected newly published transitive versions instead of validating the checked-in pins.
+**Solution:** Copy both `requirements.txt` and `requirements.lock` into the temporary directory before recompilation. `uv` now preserves valid transitive pins and changes the lock only when the declared requirements make that necessary.
+**Guard:** `pytest tests/test_release_pipeline.py -k "lock_freshness" -v` verifies the copy → compile → compare order; a clean temporary reproduction must compare byte-for-byte.
+**Lesson:** A lock-freshness gate must validate the existing lock, not ask the package index for today's preferred solution. Otherwise unrelated upstream releases make CI nondeterministic.
+
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
 The five most-recurring rules from the issues above:
