@@ -32,6 +32,7 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Removed the unused React Router dependency and its two moderate advisories; the locked dashboard dependency tree now audits cleanly.
 - Corrected the dashboard header asset from a truncated fragment to the complete canonical elephant-and-network symbol and restricted hover motion to the network region.
 - Made the Python lock-freshness CI gate deterministic by seeding the checked-in lock before recompilation, preventing unrelated transitive releases from failing otherwise unchanged pull requests.
+- Removed a stale fresh-install test assumption that the retired Chroma directory must exist when SQLite is the configured default; fresh-home coverage now verifies the active vector directory while preserving Kuzu's lazy path ownership.
 
 ## [2.11.0] - 2026-07-23
 
