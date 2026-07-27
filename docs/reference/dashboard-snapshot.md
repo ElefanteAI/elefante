@@ -124,8 +124,13 @@ The dashboard is a read-only memory-inspection surface with three views:
   enforced guard.
 - **Memories** provides snapshot-local search, sorting, metadata, and related
   memory inspection.
-- **Connections** presents topic, distribution, and graph views using semantic
-  state colors rather than generic AI gradients.
+- **Connections** presents topic and distribution views plus a Decision Graph.
+  The graph derives explorable reasoning trails only from explicit
+  memory-to-memory edges, names their relationships, and explains the selected
+  memory from its redacted source grounding. It must not invent topic-ring,
+  hub-spoke, or arbitrary sequential topology. Semantic links may be counted as
+  cross-topic bridges but remain secondary to grounded decision and safeguard
+  relationships.
 
 The carbon, tusk, copper, brass, clay, and sage palette communicates hierarchy
 and state. It is not a scoring model. The UI must not invent per-query

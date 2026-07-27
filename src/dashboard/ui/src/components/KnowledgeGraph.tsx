@@ -1,395 +1,517 @@
-import { useMemo, useState, useRef, useLayoutEffect } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useDashboardStore } from '@/store';
-import { edgeEndpoints, type MemoryNode, type GraphEdge } from '@/types';
+import { edgeEndpoints, type GraphEdge, type MemoryNode } from '@/types';
 
-// ── colour palette ─────────────────────────────────────────────────
-const TOPIC_COLORS: Record<string, string> = {
-  'runtime authority': '#c8894d',
-  'trust boundary': '#dfbb72',
-  'retrieval intelligence': '#8ea889',
-  'memory governance': '#c96f5d',
-  storage: '#e2b06e',
-  'host continuity': '#b99473',
-  recovery: '#718d74',
-  'development process': '#a36a42',
-  communication:      '#c8894d',
-  workflow:           '#dfbb72',
-  'agent-behavior':   '#b67744',
-  debugging:          '#c96f5d',
-  'coding-standards': '#8ea889',
-  architecture:       '#e2b06e',
-  'tools-environment':'#a36a42',
-  'user-profile':     '#b99473',
-  collaboration:      '#718d74',
-  general:            '#6f675b',
-};
+const CAUSAL_LABELS = new Set([
+  'CHALLENGED_BY',
+  'CONTRADICTS',
+  'CORRECTED_BY',
+  'SUPERSEDED_BY',
+  'LED_TO',
+  'DEPENDS_ON',
+  'ENABLES',
+  'GUARDED_BY',
+  'GUARDS',
+  'ENFORCES',
+  'ENFORCED_BY',
+  'GOVERNS',
+]);
 
-function topicColor(t: string) {
-  return TOPIC_COLORS[t.toLowerCase()] ?? '#6f675b';
-}
+const GUARD_LABELS = new Set([
+  'GUARDED_BY',
+  'GUARDS',
+  'ENFORCES',
+  'ENFORCED_BY',
+  'GOVERNS',
+]);
 
-function cleanTitle(t: string) {
-  const s = t.replace(/^\[[\w]+\]\s*/, '');
-  return s.split(' :: ').pop() || s;
-}
-
-// ── layout ─────────────────────────────────────────────────────────
-interface LayoutNode {
-  id:    string;
-  x:     number;
-  y:     number;
-  r:     number;
-  color: string;
+interface TrailEdge {
+  source: string;
+  target: string;
   label: string;
-  kind:  'hub' | 'memory';
+  type: string;
+  similarity?: number;
+}
+
+interface DecisionTrail {
+  id: string;
+  title: string;
   topic: string;
+  nodes: MemoryNode[];
+  edges: TrailEdge[];
+  decisionId: string;
 }
 
-interface LayoutEdge {
-  x1: number; y1: number;
-  x2: number; y2: number;
-  color: string;
-  isRealEdge?: boolean;
-  sourceId?: string;
-  targetId?: string;
-  label?: string;
+function cleanTitle(value: string) {
+  const withoutPrefix = value.replace(/^\[[\w]+\]\s*/, '');
+  return withoutPrefix.split(' :: ').pop() || withoutPrefix;
 }
 
-function buildLayout(
-  memories: MemoryNode[],
-  snapshotEdges: GraphEdge[],
-  W: number,
-  H: number,
-): { nodes: LayoutNode[]; edges: LayoutEdge[] } {
-  // Group memories by topic
-  const byTopic = new Map<string, MemoryNode[]>();
-  memories.forEach((m) => {
-    const t = (m.properties?.topic || 'general').toLowerCase();
-    if (!byTopic.has(t)) byTopic.set(t, []);
-    byTopic.get(t)!.push(m);
+function memoryTitle(memory: MemoryNode) {
+  return cleanTitle(memory.properties?.title || memory.name || memory.id);
+}
+
+function memoryScore(memory: MemoryNode) {
+  return Number(memory.properties?.score) || 0;
+}
+
+function relationshipText(label: string) {
+  return label.toLowerCase().replace(/_/g, ' ');
+}
+
+function relationshipForMemory(edge: TrailEdge, memoryId: string) {
+  if (edge.source === memoryId) return relationshipText(edge.label);
+  const inverse: Record<string, string> = {
+    CHALLENGED_BY: 'challenges',
+    CONTRADICTS: 'contradicts',
+    CORRECTED_BY: 'corrects',
+    SUPERSEDED_BY: 'supersedes',
+    LED_TO: 'resulted from',
+    DEPENDS_ON: 'supports',
+    ENABLES: 'enabled by',
+    GUARDED_BY: 'safeguards',
+    GUARDS: 'guarded by',
+    ENFORCES: 'enforced by',
+    ENFORCED_BY: 'enforces',
+    GOVERNS: 'governed by',
+  };
+  return inverse[edge.label] || 'connected from';
+}
+
+function roleFor(memory: MemoryNode) {
+  const status = String(memory.properties?.status || '').toLowerCase();
+  const type = String(memory.properties?.memory_type || '').toLowerCase();
+
+  if (memory.properties?.deprecated || status === 'superseded') {
+    return { label: 'Old assumption', color: '#c96f5d' };
+  }
+  if (type === 'decision') return { label: 'Decision', color: '#dfbb72' };
+  if (type === 'fact' || type === 'insight') {
+    return { label: 'Evidence', color: type === 'fact' ? '#c8894d' : '#718d74' };
+  }
+  if (type === 'directive' || type === 'specification') {
+    return { label: 'Guard', color: '#8ea889' };
+  }
+  return { label: type || 'Memory', color: '#b99473' };
+}
+
+function orderTrailNodes(nodes: MemoryNode[], edges: TrailEdge[]) {
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const indegree = new Map(nodes.map((node) => [node.id, 0]));
+  const outgoing = new Map<string, string[]>();
+
+  edges.forEach((edge) => {
+    if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) return;
+    indegree.set(edge.target, (indegree.get(edge.target) || 0) + 1);
+    outgoing.set(edge.source, [...(outgoing.get(edge.source) || []), edge.target]);
   });
 
-  const topics    = Array.from(byTopic.keys());
-  const N         = topics.length;
-  const cx        = W / 2;
-  const cy        = H / 2;
-  const hubR      = Math.min(cx, cy) * 0.48;   // hub ring radius
-  const spokLen   = Math.min(W, H) * 0.15;      // memory cluster radius
+  const queue = nodes
+    .filter((node) => (indegree.get(node.id) || 0) === 0)
+    .sort((a, b) => memoryScore(b) - memoryScore(a));
+  const ordered: MemoryNode[] = [];
+  const visited = new Set<string>();
 
-  const nodes: LayoutNode[] = [];
-  const edges: LayoutEdge[] = [];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (visited.has(current.id)) continue;
+    visited.add(current.id);
+    ordered.push(current);
 
-  topics.forEach((topic, i) => {
-    const angle = (i / N) * Math.PI * 2 - Math.PI / 2;
-    const hx    = cx + hubR * Math.cos(angle);
-    const hy    = cy + hubR * Math.sin(angle);
-    const color = topicColor(topic);
-
-    // Hub node
-    nodes.push({ id: `hub:${topic}`, x: hx, y: hy, r: 18, color, label: topic, kind: 'hub', topic });
-
-    const mems = byTopic.get(topic)!;
-    mems.forEach((m, j) => {
-      const score = Number(m.properties?.score) || 5;
-      const nr    = Math.max(5, Math.min(10, 4 + score * 0.6));
-
-      let mx: number, my: number;
-      if (mems.length === 1) {
-        mx = hx + spokLen * 0.6 * Math.cos(angle);
-        my = hy + spokLen * 0.6 * Math.sin(angle);
-      } else {
-        const spread  = Math.min(Math.PI * 0.9, (mems.length - 1) * 0.45);
-        const memAngle = angle + (j / (mems.length - 1) - 0.5) * spread;
-        mx = hx + spokLen * Math.cos(memAngle);
-        my = hy + spokLen * Math.sin(memAngle);
+    (outgoing.get(current.id) || []).forEach((targetId) => {
+      const nextIndegree = (indegree.get(targetId) || 0) - 1;
+      indegree.set(targetId, nextIndegree);
+      if (nextIndegree === 0) {
+        const target = nodes.find((node) => node.id === targetId);
+        if (target) queue.push(target);
       }
-
-      nodes.push({
-        id:    m.id,
-        x:     mx,
-        y:     my,
-        r:     nr,
-        color,
-        label: cleanTitle(m.properties?.title || m.id.slice(0, 18)),
-        kind:  'memory',
-        topic,
-      });
-
-      // Spoke edge
-      edges.push({ x1: hx, y1: hy, x2: mx, y2: my, color });
     });
-  });
-
-  // Inter-hub edges: connect adjacent hubs in the ring
-  if (topics.length > 1) {
-    for (let i = 0; i < topics.length; i++) {
-      const a = nodes.find((n) => n.id === `hub:${topics[i]}`)!;
-      const b = nodes.find((n) => n.id === `hub:${topics[(i + 1) % topics.length]}`)!;
-      edges.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, color: '#3d382f' });
-    }
   }
 
-  // Real semantic/graph edges
-  const memMap = new Map(nodes.filter(n => n.kind === 'memory').map(n => [n.id, n]));
-  snapshotEdges.forEach(e => {
-    const { source, target } = edgeEndpoints(e);
-    const src = memMap.get(source);
-    const tgt = memMap.get(target);
-    if (!src || !tgt) return;
+  nodes
+    .filter((node) => !visited.has(node.id))
+    .sort((a, b) => memoryScore(b) - memoryScore(a))
+    .forEach((node) => ordered.push(node));
 
-    // Filter out weak semantic connections to avoid hairballs
-    if (e.type === 'semantic' && (e.similarity || 0) < 0.8) return;
+  return ordered;
+}
 
-    // Distinguish Graph vs Semantic
-    const isGraph = e.type === 'graph' || e.label === 'CO_ACTIVATED';
-    const edgeColor = isGraph ? '#dfbb72' : '#718d74';
+function deriveDecisionTrails(memories: MemoryNode[], snapshotEdges: GraphEdge[]) {
+  const memoryMap = new Map(memories.map((memory) => [memory.id, memory]));
+  const trailEdges: TrailEdge[] = snapshotEdges
+    .map((edge) => {
+      const { source, target } = edgeEndpoints(edge);
+      return {
+        source,
+        target,
+        label: edge.label || edge.type || 'RELATES_TO',
+        type: edge.type || 'graph',
+        similarity: edge.similarity,
+      };
+    })
+    .filter((edge) => {
+      if (!memoryMap.has(edge.source) || !memoryMap.has(edge.target)) return false;
+      return edge.type !== 'semantic' && CAUSAL_LABELS.has(edge.label);
+    });
 
-    edges.push({
-      x1: src.x, y1: src.y,
-      x2: tgt.x, y2: tgt.y,
-      color: edgeColor,
-      isRealEdge: true,
-      sourceId: src.id,
-      targetId: tgt.id,
-      label: e.label || e.type
+  const adjacency = new Map<string, Set<string>>();
+  trailEdges.forEach((edge) => {
+    adjacency.set(edge.source, new Set([...(adjacency.get(edge.source) || []), edge.target]));
+    adjacency.set(edge.target, new Set([...(adjacency.get(edge.target) || []), edge.source]));
+  });
+
+  const visited = new Set<string>();
+  const trails: DecisionTrail[] = [];
+
+  adjacency.forEach((_neighbors, startId) => {
+    if (visited.has(startId)) return;
+    const queue = [startId];
+    const componentIds: string[] = [];
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      componentIds.push(current);
+      (adjacency.get(current) || []).forEach((neighbor) => {
+        if (!visited.has(neighbor)) queue.push(neighbor);
+      });
+    }
+
+    const componentSet = new Set(componentIds);
+    const componentEdges = trailEdges.filter(
+      (edge) => componentSet.has(edge.source) && componentSet.has(edge.target),
+    );
+    const componentNodes = componentIds
+      .map((id) => memoryMap.get(id))
+      .filter((node): node is MemoryNode => Boolean(node));
+    const orderedNodes = orderTrailNodes(componentNodes, componentEdges);
+    const decision =
+      orderedNodes
+        .filter((node) => node.properties?.memory_type === 'decision')
+        .sort((a, b) => memoryScore(b) - memoryScore(a))[0] ||
+      [...orderedNodes].sort((a, b) => memoryScore(b) - memoryScore(a))[0];
+
+    trails.push({
+      id: componentIds.sort().join('|'),
+      title: memoryTitle(decision),
+      topic: decision.properties?.topic || 'Connected memory',
+      nodes: orderedNodes,
+      edges: componentEdges,
+      decisionId: decision.id,
     });
   });
 
-  return { nodes, edges };
+  return trails.sort((a, b) => {
+    const decisionDelta =
+      Number(b.nodes.some((node) => node.properties?.memory_type === 'decision')) -
+      Number(a.nodes.some((node) => node.properties?.memory_type === 'decision'));
+    if (decisionDelta !== 0) return decisionDelta;
+    const edgeDelta = b.edges.length - a.edges.length;
+    if (edgeDelta !== 0) return edgeDelta;
+    return memoryScore(
+      b.nodes.find((node) => node.id === b.decisionId) || b.nodes[0],
+    ) - memoryScore(
+      a.nodes.find((node) => node.id === a.decisionId) || a.nodes[0],
+    );
+  });
 }
 
-// ── component ──────────────────────────────────────────────────────
 export function KnowledgeGraph() {
-  const getMemoryNodes  = useDashboardStore((s) => s.getMemoryNodes);
-  const snapshotEdges   = useDashboardStore((s) => s.snapshot?.edges || []);
-  const setInspectedMemoryId = useDashboardStore((s) => s.setInspectedMemoryId);
-  const setActiveTab    = useDashboardStore((s) => s.setActiveTab);
-  const memories        = getMemoryNodes();
+  const getMemoryNodes = useDashboardStore((state) => state.getMemoryNodes);
+  const snapshotEdges = useDashboardStore((state) => state.snapshot?.edges || []);
+  const setInspectedMemoryId = useDashboardStore((state) => state.setInspectedMemoryId);
+  const setActiveTab = useDashboardStore((state) => state.setActiveTab);
+  const memories = getMemoryNodes();
 
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ w: 600, h: 500 });
-  const [hovered, setHovered] = useState<string | null>(null);
-
-  useLayoutEffect(() => {
-    if (!containerRef.current) return;
-    const measure = () => {
-      const el = containerRef.current;
-      if (!el) return;
-      setSize({ w: el.clientWidth || 600, h: el.clientHeight || 500 });
-    };
-    measure();
-    const obs = new ResizeObserver(measure);
-    obs.observe(containerRef.current);
-    return () => obs.disconnect();
-  }, []);
-
-  const { nodes, edges } = useMemo(
-    () => buildLayout(memories, snapshotEdges, size.w, size.h),
-    [memories, snapshotEdges, size.w, size.h],
+  const trails = useMemo(
+    () => deriveDecisionTrails(memories, snapshotEdges),
+    [memories, snapshotEdges],
   );
+  const [selectedTrailId, setSelectedTrailId] = useState('');
+  const [selectedMemoryId, setSelectedMemoryId] = useState('');
 
-  const nodeMap = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
-  const hov     = hovered ? nodeMap.get(hovered) : null;
+  const selectedTrail =
+    trails.find((trail) => trail.id === selectedTrailId) || trails[0] || null;
+  const selectedMemory =
+    selectedTrail?.nodes.find((node) => node.id === selectedMemoryId) ||
+    selectedTrail?.nodes.find((node) => node.id === selectedTrail.decisionId) ||
+    selectedTrail?.nodes[0] ||
+    null;
 
-  // Connected node IDs when hovering
-  const hovConnected = useMemo(() => {
-    if (!hovered) return new Set<string>();
-    if (hovered.startsWith('hub:')) {
-      const topic = hovered.slice(4);
-      return new Set(nodes.filter((n) => n.topic === topic).map((n) => n.id));
+  useEffect(() => {
+    if (!selectedTrail) return;
+    if (!selectedTrail.nodes.some((node) => node.id === selectedMemoryId)) {
+      setSelectedMemoryId(selectedTrail.decisionId);
     }
-    const n = nodeMap.get(hovered);
-    const connected = new Set<string>();
-    if (n) {
-      connected.add(`hub:${n.topic}`);
-      connected.add(n.id);
-      edges.forEach(e => {
-        if (e.isRealEdge) {
-          if (e.sourceId === n.id && e.targetId) connected.add(e.targetId);
-          if (e.targetId === n.id && e.sourceId) connected.add(e.sourceId);
-        }
-      });
-    }
-    return connected;
-  }, [hovered, nodes, nodeMap, edges]);
+  }, [selectedMemoryId, selectedTrail]);
+
+  const semanticBridgeCount = useMemo(
+    () =>
+      snapshotEdges.filter((edge) => {
+        if (edge.type !== 'semantic') return false;
+        const { source, target } = edgeEndpoints(edge);
+        return memories.some((memory) => memory.id === source) &&
+          memories.some((memory) => memory.id === target);
+      }).length,
+    [memories, snapshotEdges],
+  );
+  const retiredCount = memories.filter(
+    (memory) =>
+      memory.properties?.deprecated ||
+      String(memory.properties?.status || '').toLowerCase() === 'superseded',
+  ).length;
+  const guardCount = trails.reduce(
+    (total, trail) =>
+      total + trail.edges.filter((edge) => GUARD_LABELS.has(edge.label)).length,
+    0,
+  );
 
   if (memories.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-slate-500 text-sm">
+      <div className="flex h-full items-center justify-center text-sm text-[#6f675b]">
         No memories to visualise
       </div>
     );
   }
 
-  const { w, h } = size;
-  const dimmed = hovered !== null;
+  if (!selectedTrail || !selectedMemory) {
+    return (
+      <div className="flex h-full items-center justify-center px-8 text-center">
+        <div className="max-w-lg">
+          <div className="elefante-mono mb-3 text-[10px] uppercase tracking-[0.24em] text-[#c8894d]">
+            No decision trails yet
+          </div>
+          <p className="text-sm leading-6 text-[#b5aa98]">
+            Connect evidence, decisions, and safeguards to preserve why the
+            current truth won.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const selectedRole = roleFor(selectedMemory);
+  const selectedRelationships = selectedTrail.edges.filter(
+    (edge) =>
+      edge.source === selectedMemory.id || edge.target === selectedMemory.id,
+  );
 
   return (
-    <div ref={containerRef} className="relative w-full h-full" style={{ minHeight: 420 }}>
-      <svg width={w} height={h} style={{ display: 'block', overflow: 'visible' }}>
+    <div className="flex h-full min-h-[460px] flex-col overflow-hidden bg-[#090805]">
+      <div className="grid grid-cols-[1fr_auto] border-b border-[#34281d] px-6 py-4">
+        <div>
+          <div className="elefante-mono mb-1 text-[10px] uppercase tracking-[0.24em] text-[#c8894d]">
+            Decision graph
+          </div>
+          <h2 className="text-lg font-medium tracking-[-0.02em] text-[#eee4d3]">
+            See why the current truth won.
+          </h2>
+        </div>
+        <div className="hidden items-end gap-7 pb-0.5 text-right md:flex">
+          <div>
+            <strong className="block text-base font-medium text-[#eee4d3]">{trails.length}</strong>
+            <span className="elefante-mono text-[9px] uppercase tracking-[0.16em] text-[#6f675b]">
+              grounded trails
+            </span>
+          </div>
+          <div>
+            <strong className="block text-base font-medium text-[#c96f5d]">{retiredCount}</strong>
+            <span className="elefante-mono text-[9px] uppercase tracking-[0.16em] text-[#6f675b]">
+              old assumptions
+            </span>
+          </div>
+          <div>
+            <strong className="block text-base font-medium text-[#8ea889]">{guardCount}</strong>
+            <span className="elefante-mono text-[9px] uppercase tracking-[0.16em] text-[#6f675b]">
+              safeguards
+            </span>
+          </div>
+          <div>
+            <strong className="block text-base font-medium text-[#b99473]">{semanticBridgeCount}</strong>
+            <span className="elefante-mono text-[9px] uppercase tracking-[0.16em] text-[#6f675b]">
+              topic bridges
+            </span>
+          </div>
+        </div>
+      </div>
 
-        {/* Edges */}
-        <g>
-          {edges.map((e, i) => {
-            const isHub = e.color === '#3d382f';
-            const isReal = !!e.isRealEdge;
-            let strokeWidth = isHub ? 0.8 : 1.2;
-            if (isReal) strokeWidth = 1.5;
-
-            let opacity = 0.35;
-            if (dimmed) {
-              if (isReal && (e.sourceId === hovered || e.targetId === hovered)) {
-                opacity = 0.9;
-                strokeWidth = 2.5;
-              } else {
-                opacity = isReal ? 0.05 : (isHub ? 0.05 : 0.08); 
-              }
-            } else if (isReal) {
-              opacity = 0.6;
-            } else if (isHub) {
-              opacity = 0.15;
-            }
-
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[286px_minmax(0,1fr)]">
+        <aside className="min-h-0 overflow-y-auto border-b border-[#34281d] lg:border-b-0 lg:border-r">
+          <div className="elefante-mono border-b border-[#241d16] px-5 py-3 text-[9px] uppercase tracking-[0.2em] text-[#6f675b]">
+            Preserved reasoning
+          </div>
+          {trails.map((trail, index) => {
+            const active = trail.id === selectedTrail.id;
             return (
-              <line
-                key={i}
-                x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
-                stroke={e.color}
-                strokeWidth={strokeWidth}
-                opacity={opacity}
-              />
+              <button
+                key={trail.id}
+                onClick={() => {
+                  setSelectedTrailId(trail.id);
+                  setSelectedMemoryId(trail.decisionId);
+                }}
+                className={`block w-full border-b border-[#241d16] px-5 py-4 text-left transition-colors ${
+                  active
+                    ? 'bg-[#c8894d0d] shadow-[inset_2px_0_0_#c8894d]'
+                    : 'hover:bg-[#eee4d308]'
+                }`}
+              >
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="elefante-mono text-[9px] uppercase tracking-[0.18em] text-[#c8894d]">
+                    {String(index + 1).padStart(2, '0')} · {trail.topic}
+                  </span>
+                  <span className="elefante-mono text-[9px] text-[#6f675b]">
+                    {trail.nodes.length}M / {trail.edges.length}L
+                  </span>
+                </div>
+                <strong className={`block text-[13px] font-medium leading-5 ${
+                  active ? 'text-[#eee4d3]' : 'text-[#b5aa98]'
+                }`}>
+                  {trail.title}
+                </strong>
+              </button>
             );
           })}
-        </g>
+        </aside>
 
-        {/* Nodes */}
-        {nodes.map((n) => {
-          const fade = dimmed && !hovConnected.has(n.id);
-          const highlighted = hovered === n.id;
-          const isHub = n.kind === 'hub';
+        <section className="min-h-0 overflow-y-auto">
+          <div className="border-b border-[#34281d] px-5 py-5 sm:px-7">
+            <div className="mb-4 flex items-start justify-between gap-6">
+              <div>
+                <div className="elefante-mono mb-1 text-[9px] uppercase tracking-[0.2em] text-[#6f675b]">
+                  {selectedTrail.topic} · {selectedTrail.edges.length} explicit relationships
+                </div>
+                <h3 className="max-w-2xl text-xl font-medium tracking-[-0.025em] text-[#eee4d3]">
+                  {selectedTrail.title}
+                </h3>
+              </div>
+              <span className="elefante-mono shrink-0 border border-[#dfbb7240] px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-[#dfbb72]">
+                source grounded
+              </span>
+            </div>
 
-          return (
-            <g
-              key={n.id}
-              onMouseEnter={() => setHovered(n.id)}
-              onMouseLeave={() => setHovered(null)}
-              onClick={() => {
-                if (n.kind === 'memory') {
-                  setInspectedMemoryId(n.id);
-                  setActiveTab('memories');
-                }
-              }}
-              style={{ cursor: n.kind === 'memory' ? 'pointer' : 'default' }}
-            >
-              {/* Hit target */}
-              <circle cx={n.x} cy={n.y} r={n.r + 8} fill="transparent" />
+            <div className="flex min-w-max items-stretch overflow-x-auto pb-2">
+              {selectedTrail.nodes.map((memory, index) => {
+                const role = roleFor(memory);
+                const active = memory.id === selectedMemory.id;
+                const nextMemory = selectedTrail.nodes[index + 1];
+                const connectingEdge = nextMemory
+                  ? selectedTrail.edges.find(
+                      (edge) =>
+                        (edge.source === memory.id && edge.target === nextMemory.id) ||
+                        (edge.target === memory.id && edge.source === nextMemory.id),
+                    )
+                  : undefined;
 
-              {/* Hub: diamond-ish ring */}
-              {isHub && (
-                <circle
-                  cx={n.x} cy={n.y} r={n.r + 4}
-                  fill="none"
-                  stroke={n.color}
-                  strokeWidth={1}
-                  opacity={fade ? 0.08 : 0.25}
-                />
-              )}
+                return (
+                  <Fragment key={memory.id}>
+                    <button
+                      onClick={() => setSelectedMemoryId(memory.id)}
+                      className={`w-[160px] shrink-0 border px-4 py-4 text-left transition-all 2xl:w-[178px] ${
+                        active
+                          ? 'border-[#eee4d3] bg-[#eee4d30a]'
+                          : 'border-[#34281d] bg-[#0e0b08] hover:border-[#6f675b]'
+                      }`}
+                    >
+                      <div className="mb-5 flex items-center justify-between">
+                        <span
+                          className="elefante-mono text-[9px] uppercase tracking-[0.17em]"
+                          style={{ color: role.color }}
+                        >
+                          {String(index + 1).padStart(2, '0')} · {role.label}
+                        </span>
+                        <span className="elefante-mono text-[10px] text-[#6f675b]">
+                          {memoryScore(memory)}
+                        </span>
+                      </div>
+                      <strong className="block text-[13px] font-medium leading-[1.45] text-[#eee4d3]">
+                        {memoryTitle(memory)}
+                      </strong>
+                    </button>
 
-              <circle
-                cx={n.x} cy={n.y}
-                r={highlighted ? n.r + 3 : n.r}
-                fill={n.color}
-                opacity={fade ? 0.08 : (isHub ? 0.9 : 0.75)}
-                stroke={highlighted ? '#fff' : 'none'}
-                strokeWidth={1.5}
-              />
+                    {nextMemory && (
+                      <div className="flex w-[68px] shrink-0 flex-col items-center justify-center 2xl:w-[92px]">
+                        <span className="elefante-mono mb-2 max-w-[64px] text-center text-[8px] uppercase tracking-[0.12em] text-[#b99473] 2xl:max-w-[84px]">
+                          {connectingEdge ? relationshipText(connectingEdge.label) : 'connected'}
+                        </span>
+                        <div className="flex w-full items-center">
+                          <span className="h-px flex-1 bg-[#6f5135]" />
+                          <span className="h-1.5 w-1.5 rotate-45 border-r border-t border-[#c8894d]" />
+                        </div>
+                      </div>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </div>
+          </div>
 
-              {/* Hub label always visible (when not faded) */}
-              {isHub && !fade && (
-                <text
-                  x={n.x} y={n.y - n.r - 6}
-                  textAnchor="middle"
-                  fontSize={9}
-                  fontWeight={700}
-                  fill={n.color}
-                  opacity={0.85}
-                  style={{ pointerEvents: 'none', textTransform: 'capitalize' }}
+          <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_280px]">
+            <div className="px-5 py-5 sm:px-7">
+              <div className="mb-3 flex items-center gap-3">
+                <span
+                  className="elefante-mono text-[9px] uppercase tracking-[0.18em]"
+                  style={{ color: selectedRole.color }}
                 >
-                  {n.label.replace(/-/g, ' ')}
-                </text>
-              )}
-            </g>
-          );
-        })}
-      </svg>
+                  {selectedRole.label}
+                </span>
+                <span className="h-px w-8 bg-[#34281d]" />
+                <span className="elefante-mono text-[9px] uppercase tracking-[0.16em] text-[#6f675b]">
+                  {selectedMemory.properties?.status || 'current'}
+                </span>
+              </div>
+              <h4 className="mb-2 text-base font-medium text-[#eee4d3]">
+                {memoryTitle(selectedMemory)}
+              </h4>
+              <p className="max-w-3xl text-[13px] leading-6 text-[#b5aa98]">
+                {selectedMemory.description || selectedMemory.properties?.summary}
+              </p>
+              <div className="mt-4 border-l border-[#c8894d66] pl-3">
+                <span className="elefante-mono block text-[8px] uppercase tracking-[0.18em] text-[#6f675b]">
+                  Grounded in
+                </span>
+                <strong className="mt-1 block text-[11px] font-medium text-[#c8894d]">
+                  {selectedMemory.properties?.evidence || selectedMemory.properties?.source}
+                </strong>
+              </div>
+            </div>
 
-      {/* Tooltip */}
-      {hov && (
-        <div
-          className="absolute pointer-events-none bg-slate-900 border border-slate-600/80 rounded-lg px-3 py-2.5 shadow-xl z-20 max-w-[240px]"
-          style={{
-            left: Math.min(hov.x + 16, w - 256),
-            top:  Math.max(hov.y - 36, 8),
-          }}
-        >
-          <div className="font-medium text-slate-200 text-xs leading-relaxed mb-1.5">
-            {hov.kind === 'hub'
-              ? hov.label.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-              : hov.label}
+            <div className="border-t border-[#34281d] px-5 py-5 xl:border-l xl:border-t-0">
+              <div className="elefante-mono mb-3 text-[9px] uppercase tracking-[0.18em] text-[#6f675b]">
+                What it changes
+              </div>
+              <div className="space-y-2">
+                {selectedRelationships.map((edge) => {
+                  const peerId = edge.source === selectedMemory.id ? edge.target : edge.source;
+                  const peer = selectedTrail.nodes.find((node) => node.id === peerId);
+                  return (
+                    <button
+                      key={`${edge.source}-${edge.target}-${edge.label}`}
+                      onClick={() => peer && setSelectedMemoryId(peer.id)}
+                      className="block w-full border-t border-[#241d16] pt-2 text-left"
+                    >
+                      <span className="elefante-mono block text-[8px] uppercase tracking-[0.16em] text-[#b99473]">
+                        {relationshipForMemory(edge, selectedMemory.id)}
+                      </span>
+                      <strong className="mt-1 block text-[11px] font-medium leading-4 text-[#b5aa98]">
+                        {peer ? memoryTitle(peer) : peerId}
+                      </strong>
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => {
+                  setInspectedMemoryId(selectedMemory.id);
+                  setActiveTab('memories');
+                }}
+                className="elefante-mono mt-5 border-b border-[#c8894d] pb-1 text-[9px] uppercase tracking-[0.16em] text-[#c8894d] hover:text-[#dfbb72]"
+              >
+                Open complete memory →
+              </button>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            <span
-              className="text-[10px] px-1.5 py-0.5 rounded font-medium capitalize"
-              style={{ backgroundColor: `${hov.color}22`, color: hov.color }}
-            >
-              {hov.kind === 'hub' ? 'topic hub' : hov.topic.replace(/-/g, ' ')}
-            </span>
-            {hov.kind === 'memory' && (() => {
-              const mem = memories.find((m) => m.id === hov.id);
-              const type = mem?.properties?.memory_type;
-              const score = mem?.properties?.score;
-              const TYPE_COLORS: Record<string, string> = {
-                fact: '#c8894d', decision: '#dfbb72',
-                preference: '#b99473', insight: '#718d74',
-              };
-              return (
-                <>
-                  {type && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded"
-                      style={{ backgroundColor: `${TYPE_COLORS[type] ?? '#6f675b'}20`, color: TYPE_COLORS[type] ?? '#b5aa98' }}>
-                      {type}
-                    </span>
-                  )}
-                  {score != null && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/60 text-cyan-400 font-bold tabular-nums">
-                      {score}
-                    </span>
-                  )}
-                </>
-              );
-            })()}
-          </div>
-        </div>
-      )}
-
-      {/* Legend */}
-      <div className="absolute bottom-3 right-4 flex gap-4 text-[10px] text-slate-500 bg-slate-900/60 p-2 rounded-md border border-slate-700/50 backdrop-blur-sm">
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-cyan-400 opacity-90" />
-          <span>Hub</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-2 h-2 rounded-full bg-slate-400 opacity-75" />
-          <span>Memory</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-0.5 bg-[#dfbb72] opacity-80" />
-          <span>Graph/Co-Activation Link</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-0.5 bg-[#718d74] opacity-80" />
-          <span>Semantic Link</span>
-        </div>
+        </section>
       </div>
     </div>
   );

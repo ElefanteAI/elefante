@@ -158,7 +158,7 @@ def test_dashboard_frontend_normalizes_production_edge_endpoints():
 
     assert "edge.source ?? edge.from" in types_source
     assert "edge.target ?? edge.to" in types_source
-    assert "edgeEndpoints(e)" in graph_source
+    assert "edgeEndpoints(" in graph_source
     assert "edgeEndpoints(e)" in memories_source
 
 
@@ -215,6 +215,68 @@ def test_showcase_snapshot_is_deterministic_grounded_and_contract_complete():
     corpus = json.dumps(snapshot).lower()
     assert "six signals" not in corpus
     assert "chromadb holds semantic memories" not in corpus
+
+    memory_relationships = {
+        (edge["from"], edge["to"], edge["label"])
+        for edge in snapshot["edges"]
+        if edge["from"].startswith("demo:") and edge["to"].startswith("demo:")
+    }
+    assert {
+        (
+            "demo:daemon-assumption",
+            "demo:kuzu-evidence",
+            "CHALLENGED_BY",
+        ),
+        ("demo:kuzu-evidence", "demo:daemon-decision", "LED_TO"),
+        ("demo:daemon-decision", "demo:bridge-guard", "GUARDED_BY"),
+        (
+            "demo:dashboard-live-assumption",
+            "demo:snapshot-evidence",
+            "CHALLENGED_BY",
+        ),
+        ("demo:snapshot-evidence", "demo:snapshot-decision", "LED_TO"),
+        ("demo:snapshot-decision", "demo:loopback-guard", "GUARDED_BY"),
+        ("demo:chroma-blocker", "demo:sqlite-default", "LED_TO"),
+        ("demo:sqlite-default", "demo:migration-parity", "GUARDED_BY"),
+        ("demo:migration-parity", "demo:no-live-migration", "ENFORCED_BY"),
+    } <= memory_relationships
+    semantic_relationships = [
+        edge
+        for edge in snapshot["edges"]
+        if edge["type"] == "semantic"
+    ]
+    assert len(semantic_relationships) == 4
+    assert all(edge["label"] == "RELATED_TO" for edge in semantic_relationships)
+
+
+def test_dashboard_graph_uses_real_decision_trails_not_invented_topic_topology():
+    repo_root = Path(__file__).resolve().parents[1]
+    graph_source = (
+        repo_root
+        / "src"
+        / "dashboard"
+        / "ui"
+        / "src"
+        / "components"
+        / "KnowledgeGraph.tsx"
+    ).read_text(encoding="utf-8")
+    explore_source = (
+        repo_root
+        / "src"
+        / "dashboard"
+        / "ui"
+        / "src"
+        / "components"
+        / "ExploreTab.tsx"
+    ).read_text(encoding="utf-8")
+
+    assert "Decision graph" in graph_source
+    assert "See why the current truth won." in graph_source
+    assert "CAUSAL_LABELS.has(edge.label)" in graph_source
+    assert "Inter-hub edges" not in graph_source
+    assert "hub:" not in graph_source
+    assert "Topic hub-spoke network" not in explore_source
+    assert "Decisions, evidence & safeguards" in explore_source
 
 
 def test_dashboard_defaults_to_loopback_and_explicit_cors(monkeypatch):

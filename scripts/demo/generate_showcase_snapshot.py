@@ -66,6 +66,45 @@ FEATURED_CHAIN = (
     "demo:bridge-guard",
 )
 
+# Explicit, repository-grounded memory relationships. These are the semantic
+# substance of the showcase graph: they preserve why a decision changed and
+# which safeguard keeps it current. Topic and provenance links are generated
+# separately below.
+DECISION_RELATIONSHIPS = (
+    # Runtime authority: assumption -> evidence -> decision -> guard.
+    ("daemon-assumption", "kuzu-evidence", "CHALLENGED_BY"),
+    ("kuzu-evidence", "daemon-decision", "LED_TO"),
+    ("daemon-decision", "bridge-guard", "GUARDED_BY"),
+    # Dashboard trust boundary: convenience -> boundary failure -> contract -> guard.
+    ("dashboard-live-assumption", "snapshot-evidence", "CHALLENGED_BY"),
+    ("snapshot-evidence", "snapshot-decision", "LED_TO"),
+    ("snapshot-decision", "loopback-guard", "GUARDED_BY"),
+    # Storage transition: blocker -> replacement -> parity proof -> operator guard.
+    ("chroma-blocker", "sqlite-default", "LED_TO"),
+    ("sqlite-default", "migration-parity", "GUARDED_BY"),
+    ("migration-parity", "no-live-migration", "ENFORCED_BY"),
+    # Memory governance: search first -> amend truth -> expose conflict -> refuse invention.
+    ("search-first", "update-over-duplicate", "ENFORCES"),
+    ("update-over-duplicate", "contradiction-policy", "GUARDED_BY"),
+    ("contradiction-policy", "unknown-law", "ENFORCES"),
+    # Host continuity: provenance, certification, and uninstall each preserve trust.
+    ("source-provenance", "one-memory-many-hosts", "ENABLES"),
+    ("host-tiers", "agent-zero-tier", "GOVERNS"),
+    ("manifest-ownership", "safe-uninstall", "GUARDS"),
+    # Recovery: portable export is not recovery; recoverable moves need safe extraction.
+    ("backup-contract", "recoverable-reset", "LED_TO"),
+    ("recoverable-reset", "safe-extraction", "GUARDED_BY"),
+)
+
+# Cross-topic semantic bridges are explicit rather than an arbitrary sequence
+# through the fixture. They show where architecture, safety, and process meet.
+SEMANTIC_RELATIONSHIPS = (
+    ("daemon-decision", "snapshot-decision", 0.91),
+    ("snapshot-decision", "signal-thesis", 0.89),
+    ("search-first", "source-first", 0.88),
+    ("no-live-migration", "backup-contract", 0.87),
+)
+
 
 def _slug(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
@@ -132,22 +171,23 @@ def build_showcase_snapshot() -> dict[str, Any]:
         edges.append({"from": memory_id, "to": SOURCE_IDS[index % len(SOURCE_IDS)], "label": "WRITTEN_BY", "type": "provenance"})
 
     edges.extend(
-        [
-            {"from": FEATURED_CHAIN[0], "to": FEATURED_CHAIN[1], "label": "CHALLENGED_BY", "type": "graph"},
-            {"from": FEATURED_CHAIN[1], "to": FEATURED_CHAIN[2], "label": "LED_TO", "type": "graph"},
-            {"from": FEATURED_CHAIN[2], "to": FEATURED_CHAIN[3], "label": "GUARDED_BY", "type": "graph"},
-        ]
+        {
+            "from": f"demo:{source}",
+            "to": f"demo:{target}",
+            "label": label,
+            "type": "graph",
+        }
+        for source, target, label in DECISION_RELATIONSHIPS
     )
-    memory_ids = [f"demo:{item[0]}" for item in MEMORIES]
     edges.extend(
         {
-            "from": memory_ids[index],
-            "to": memory_ids[index + 1],
+            "from": f"demo:{source}",
+            "to": f"demo:{target}",
             "label": "RELATED_TO",
             "type": "semantic",
-            "similarity": round(0.91 - index * 0.004, 3),
+            "similarity": similarity,
         }
-        for index in range(18)
+        for source, target, similarity in SEMANTIC_RELATIONSHIPS
     )
 
     return {

@@ -22,6 +22,7 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - Dashboard navigation is now Briefing, Memories, and Connections. All three views share a carbon/tusk/copper palette with brass, clay, and sage reserved for semantic state.
+- Connections now presents an explorable Decision Graph built only from explicit memory-to-memory relationships. It replaces the invented topic ring and arbitrary sequential demo links with readable assumption → evidence → decision → safeguard trails, directional relationship explanations, repository grounding, and honest counts for retired assumptions, safeguards, and semantic bridges.
 - The dashboard reference and operator guide now document the briefing contract, showcase workflow, trust boundary, current backend, and production edge schema.
 - The historical 100-memory Chroma/Kuzu injector is explicitly labeled as a legacy isolated benchmark, requires `--force` before replacing its target, and no longer presents stale Chroma-first product facts.
 
