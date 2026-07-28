@@ -11,6 +11,16 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.11.1] - 2026-07-28
+
+### Fixed
+
+- **BUG-033:** Resolved HTTP 500 error on dashboard graph endpoint caused by an orphaned background process listening on port 8000 from a trashed repository path (`/Users/jay/.Trash/elefante`). Hardened `src/dashboard/server.py` node property formatting against `None` values and added process CWD verification checks.
+
+### Changed
+
+- Strategic positioning documentation updated in `docs/explanation/vision.md` differentiating Elefante's universal MCP memory engine from vendor memory systems like OpenAI Codex.
+
 ## [2.11.0] - 2026-07-23
 
 ### Added

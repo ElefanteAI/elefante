@@ -1,6 +1,6 @@
 # Elefante Documentation
 
-> **v2.11.0** · Stable contracts only. Live development state lives in [`../workspace/`](../workspace/). Loadable agent protocols live in [`../agents/`](../agents/).
+> **v2.11.1** · Stable contracts only. Live development state lives in [`../workspace/`](../workspace/). Loadable agent protocols live in [`../agents/`](../agents/).
 
 This folder follows [Diátaxis](https://diataxis.fr/). Every doc has exactly one type:
 
