@@ -88,6 +88,14 @@
 **Guard:** `tests/test_dashboard_serializer.py` executes snapshot graph/search/stats responses and verifies no live-store import or browser refresh route remains; production UI build passes.
 **Lesson:** A read-only inspection boundary applies to every convenience endpoint, not only the primary page load. Browser UI should never gain database authority merely to make refresh convenient.
 
+## Issue #12: Orphaned/Stale Dashboard Process from Trashed Directory [BUG-033, FIXED, guarded]
+
+**Trigger:** Browser requests to `http://127.0.0.1:8000/api/graph` returned `HTTP 500 Internal Server Error` even though the active workspace data snapshot was valid and test suite passed.
+**Root cause:** A stale Python dashboard process (PID 7219) spawned from a previously trashed repository path (`/Users/jay/.Trash/elefante`) remained listening on port 8000. When browser or curl requests hit port 8000, the stale process handled them against its missing/trashed dependencies rather than reading the active workspace's configuration and snapshot.
+**Solution:** Terminated the stale process (`kill -9 7219`), regenerated the data snapshot (`python scripts/pipeline/update_dashboard_data.py`), and launched the active workspace server (`.venv/bin/python -m src.dashboard.server`). Hardened `src/dashboard/server.py` node property formatting against `None` values and added process CWD verification checks.
+**Guard:** `pytest tests/test_dashboard_serializer.py -k "null_name or graph" -v`.
+**Lesson:** When diagnosing port binding issues or HTTP 500 errors, verify the running process's CWD (`lsof -p <PID> | grep cwd`) to ensure port ownership belongs to the active workspace rather than an orphaned daemon from a trashed or moved folder.
+
 ---
 
 ## Cross-bug pattern (extracted to `../lessons.md`)

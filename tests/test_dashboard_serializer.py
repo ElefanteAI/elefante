@@ -302,3 +302,25 @@ def test_provenance_backfill_reports_only_missing_graph_links(monkeypatch):
     assert asyncio.run(migration.backfill(apply=False)) == (0, 0, 1, 1)
     assert asyncio.run(migration.backfill(apply=True)) == (0, 0, 1, 1)
     assert asyncio.run(migration.backfill(apply=False)) == (0, 0, 0, 0)
+
+
+def test_get_graph_handles_null_name_safely(monkeypatch):
+    from src.dashboard import server
+
+    mock_snapshot = {
+        "nodes": [
+            {"id": "node-1", "name": None, "type": "memory", "properties": None},
+            {"id": "node-2", "name": "Valid Node", "type": "concept", "properties": {}},
+        ],
+        "edges": [],
+        "stats": {"total_nodes": 2},
+    }
+
+    monkeypatch.setattr(server, "_read_snapshot", lambda: mock_snapshot)
+
+    result = asyncio.run(server.get_graph(limit=10))
+    assert len(result["nodes"]) == 2
+    assert result["nodes"][0]["label"] == ""
+    assert result["nodes"][0]["name"] == ""
+    assert result["nodes"][1]["label"] == "Valid Node"
+

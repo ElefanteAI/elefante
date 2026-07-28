@@ -119,6 +119,18 @@ This is already implemented. The vision is to make this lifecycle **visible and 
 
 No cloud dependency. No subscription for memory. The second brain runs on your machine, backed by local files. You can back it up, move it, factory reset it. It's yours.
 
+### 5. Strategic Differentiation: Becoming the Default Memory Engine for IDEs (Codex, Cursor, VS Code)
+
+Vendor-provided memory features (such as OpenAI Codex's local memories) suffer from structural limitations that define Elefante's competitive moat and business scope:
+
+| Dimension | Vendor Memory (e.g., Codex) | Elefante Memory Engine | Strategic Advantage |
+| :--- | :--- | :--- | :--- |
+| **MCP / Tool Interaction** | **Disables memory generation** when MCP or tool search is used (`disable_on_external_context = true`). | **MCP-Native**: Memory CRUD, graph connections, and directives happen *during* tool execution. | Elefante captures workflow memory *during* active agent tool usage, where vendor memory turns off. |
+| **Portability & Lock-in** | Single-vendor locked (`~/.codex/memories` or cloud). | **Universal MCP Protocol**: Works identically across Codex, VS Code, Cursor, Windsurf, Agent Zero. | Single memory authority across all IDEs and LLM models; no vendor lock-in. |
+| **API Cost & Quota** | Consumes user LLM API quota (`extract_model`, `consolidation_model`); throttles near rate limits. | **100% Local & Zero-Quota**: SQLite exact cosine + Kuzu graph DB + local `gte-base` embeddings. | Zero API token cost for memory storage, vector embeddings, or graph indexing. |
+| **Retrieval Relevancy** | Unscored text summary dumps. | **5-Signal Cognitive Relevancy System** (semantic, concept, co-activation, authority, freshness). | Full Signal Injection: Surfaces context at decision time without prompt bloat. |
+| **Governance & Quality** | Uncontrolled background extraction (duplication risk). | **Mechanical Compliance Gate**: Search-before-write, deduplication validation, memory directives. | High-precision memory garden with full visual health observability (`http://127.0.0.1:8000`). |
+
 ---
 
 ## Ideas Backlog

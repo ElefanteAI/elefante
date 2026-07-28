@@ -121,17 +121,18 @@ async def get_graph(
         for n in data.get("nodes", [])[:limit]:
             node_type = n.get("type", "memory")
             raw_props = n.get("properties", {}) if isinstance(n.get("properties"), dict) else {}
+            node_name = n.get("name") or ""
             nodes.append({
                 "id": n.get("id"),
-                "label": n.get("name", "")[:50] + ("..." if len(n.get("name", "")) > 50 else ""),
+                "label": node_name[:50] + ("..." if len(node_name) > 50 else ""),
                 "type": node_type,
                 "entityType": node_type,
-                "created_at": n.get("created_at", ""),
-                "name": n.get("name", ""),
-                "description": n.get("description", ""),
+                "created_at": n.get("created_at") or "",
+                "name": node_name,
+                "description": n.get("description") or "",
                 "properties": {
-                    "description": n.get("description", ""),
-                    "created_at": n.get("created_at", ""),
+                    "description": n.get("description") or "",
+                    "created_at": n.get("created_at") or "",
                     **raw_props,
                     "access_count": raw_props.get("access_count", 0),
                     "last_accessed": raw_props.get("last_accessed"),

@@ -341,6 +341,16 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 
 ---
 
+### Verify Process CWD and Origin Path, Not Just Port Ownership (BUG-033)
+
+- **Trigger:** A background daemon or server endpoint (e.g., dashboard on port 8000) returns `HTTP 500` or stale responses despite a clean workspace snapshot and passing tests.
+- **Rule:** Inspect the listening process's working directory (`lsof -p <PID> | grep cwd` or `ps -fp <PID>`) before assuming a code defect in the current workspace. Kill any orphaned process originating from trashed (`.Trash/`), legacy, or secondary repository checkouts.
+- **Why:** Background processes spawned from old repo checkouts or moved folders can survive directory deletion and retain port bindings. When requests arrive, the stale process responds against missing or corrupted files, producing HTTP 500 errors that mask healthy code in the active workspace.
+- **Proof:** [postmortems/dashboard.md Issue #12](postmortems/dashboard.md#issue-12-orphaned-stale-dashboard-process-from-trashed-directory-bug-033-fixed-guarded) and [ISSUES.md](ISSUES.md) BUG-033 row.
+- **Avoid:** Assuming that an active listener on port 8000 is running code from the current workspace directory.
+
+---
+
 ## Update Protocol
 
 After a significant debugging session:
