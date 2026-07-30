@@ -11,6 +11,15 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **BUG-036:** Installer bundles now expose platform-specific, customer-legible launchers and a `START HERE.txt` guide. The Windows launcher no longer contains the hidden backspace byte that corrupted its bootstrap path, and archive metadata now preserves executable Unix launchers consistently across build runners.
+- **BUG-037:** Installer bundle `--dry-run` now exits before payload placement, so validation cannot move or replace an existing installation.
+
+### Added
+
+- Native installer host selection now detects compatible agent hosts, preselects them, and forwards the exact user choice through the bundle bootstrap to the installation engine.
+
 ## [2.12.0] - 2026-07-26
 
 ### Added

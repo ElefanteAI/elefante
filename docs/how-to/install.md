@@ -99,6 +99,7 @@ If `.venv` already exists, press Enter for a destructive fresh reinstall, choose
 
 5. **IDE and CLI-Agent Configuration**
    - Configures the local daemon first, then emits a transport-only MCP bridge for detected compatible hosts: VS Code/Bob, Antigravity, Cursor, Kiro, Gemini CLI, and native Claude Code, Codex, or OpenClaw CLIs.
+   - The native installer preselects detected hosts and lets the user choose one or several. Scripted installs can repeat `--host`, for example `install.sh --host cursor --host codex`.
    - Preserves existing user-managed `elefante` registrations and unrelated MCP servers; only unchanged installer-owned entries are refreshed or removed.
    - Hosts are compatible until their host-driven lifecycle has been verified; see [IDE configuration](configure-ide.md) for current tiers and manual paths.
 
@@ -312,8 +313,16 @@ Elefante integrates with AI coding assistants via the **Model Context Protocol (
 
 ### Automated Configuration
 
-The full installer configures every detected compatible host. For manual,
-host-specific setup, run only the adapter that owns the relevant configuration:
+The full installer configures every detected compatible host unless an explicit
+host selection is supplied. Repeat `--host` to configure only the requested
+detected hosts:
+
+```bash
+./install.sh --host vscode-copilot --host codex
+```
+
+For manual, adapter-specific setup, run only the adapter that owns the relevant
+configuration:
 
 ```bash
 python scripts/setup/configure_vscode_bob.py       # VS Code and Bob

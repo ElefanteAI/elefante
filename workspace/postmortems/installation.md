@@ -133,6 +133,23 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 **Guard:** `pytest tests/test_release_pipeline.py -k "lock_freshness" -v` verifies the copy → compile → compare order; a clean temporary reproduction must compare byte-for-byte.
 **Lesson:** A lock-freshness gate must validate the existing lock, not ask the package index for today's preferred solution. Otherwise unrelated upstream releases make CI nondeterministic.
 
+## Issue #17: Release Installer Launcher And First-Run UX Failure [BUG-036, FIXED, guarded]
+
+**Trigger:** A stakeholder clicked the macOS download and received an extracted `elefante-installer-macOS` directory containing both `install.sh` and `install.bat`, with no obvious next action. Cross-platform asset inspection then found the published v2.11.1 Windows launcher contained ASCII backspace byte `0x08` in `scripts\setup\bootstrap_release_bundle.py`.
+**Root cause:** The bundle generator treated archive structure as the acceptance contract. It emitted both OS wrappers into every platform bundle, gave users implementation filenames instead of a primary action, and embedded a Windows path in a normal Python triple-quoted string, so `\b` was decoded before ZIP creation. Existing tests asserted filenames only; they never decoded launchers, rejected control bytes, or exercised the customer entrypoint.
+**Solution:** Emit platform-specific root launchers, add `START HERE.txt`, give macOS a double-clickable `Install Elefante.command`, give Windows a legible `Install Elefante.bat`, preserve Unix execute bits with explicit ZIP metadata, emit Windows CRLF, and use a raw string for the bootstrap path. Regression coverage reads the launcher bytes, rejects hidden control characters, checks exact entrypoints, and dry-runs the macOS customer launcher.
+**Guard:** `pytest tests/test_installer_bundle.py -v`; build `macOS`, `Windows`, and `Linux` bundles; inspect archive root entries; execute `Install Elefante.command ... --dry-run` from a fresh extraction.
+**Boundary:** The three published v2.11.1 installer assets were replaced under explicit storefront remediation authority on 2026-07-29. Their re-downloaded SHA-256 digests match the validated local archives; the macOS and Windows files remain launcher ZIPs, not signed native packages.
+**Lesson:** A release ZIP is a customer interface. Verification must decode and execute the exact downloaded entrypoint, not merely prove that an archive contains files with plausible names.
+
+## Issue #18: Installer Dry-Run Mutated The Live Installation [BUG-037, FIXED, guarded]
+
+**Trigger:** Destination validation executed the downloaded macOS and Linux launchers with `--dry-run`. Both invocations moved the live `~/.elefante/app/current` installation to backups and placed the v2.11.1 payload before printing the delegated command.
+**Root cause:** `bootstrap_release_bundle.py` called `place_payload()` before its `if args.dry_run` branch. The flag suppressed only the delegated installer process, not the bootstrap mutation, so the command name promised a stronger invariant than the control flow implemented.
+**Solution:** Build the delegated command first and return immediately for `--dry-run`; payload placement, backup creation, and subprocess execution now occur only after that branch. The original v2.9.2 installation was restored from the first backup, and validation payloads were quarantined without deletion.
+**Guard:** `pytest tests/test_installer_bundle.py -k "dry_run" -v` monkeypatches `place_payload` to fail if called and asserts an absent target stays absent. Artifact smoke uses an isolated `--install-root` and independently asserts it was not created.
+**Lesson:** A dry-run flag is a no-mutation transaction boundary, not a “skip the last command” option. Test the absence of every durable side effect.
+
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
 The five most-recurring rules from the issues above:

@@ -95,9 +95,21 @@ ASCII_SPINNER_FRAMES = ["-", "\\", "|", "/"]
 sys.path.insert(0, str(SETUP_DIR))
 
 from configure_vscode_bob import configure_mcp as configure_vscode  # noqa: E402
-from configure_antigravity import configure_mcp as configure_antigravity  # noqa: E402
+from configure_antigravity import (  # noqa: E402
+    configure_mcp as configure_antigravity,
+    host_is_detected as antigravity_is_detected,
+)
 from configure_cursor_kiro import configure_detected_hosts, infer_repo_python  # noqa: E402
 from configure_cli_agents import configure_detected_cli_hosts  # noqa: E402
+from host_selection import (  # noqa: E402
+    CLI_HOSTS,
+    HOST_LABELS,
+    JSON_HOSTS,
+    SUPPORTED_HOSTS,
+    VSCODE_FAMILY,
+    normalize_selected_hosts,
+    select_family,
+)
 
 
 class InstallationCancelled(Exception):
@@ -1074,9 +1086,16 @@ def main():
         action="store_true",
         help="Show full subprocess output. Default: clean progress with details in log file.",
     )
+    parser.add_argument(
+        "--host",
+        action="append",
+        choices=SUPPORTED_HOSTS,
+        help="Configure only this detected agent host. Repeat to select multiple hosts.",
+    )
     args = parser.parse_args()
 
     verbose_mode = args.verbose
+    selected_hosts = normalize_selected_hosts(args.host)
 
     root_dir = ROOT_DIR
     log_file = resolve_output_path(root_dir, args.log_file, INSTALL_LOG_FILE_NAME)
@@ -1102,6 +1121,11 @@ def main():
     logger.log(f"  Data:        {data_dir}")
     logger.log(f"  Log:         {log_file}")
     logger.log(f"  Python:      {sys.version.split()[0]}")
+    if selected_hosts is None:
+        logger.log("  Agent hosts: all detected compatible hosts")
+    else:
+        labels = ", ".join(HOST_LABELS[host] for host in SUPPORTED_HOSTS if host in selected_hosts)
+        logger.log(f"  Agent hosts: {labels}")
     if verbose_mode:
         logger.log(f"  Mode:        verbose (full subprocess output)")
     else:
@@ -1221,15 +1245,50 @@ def main():
             state_tracker.start_stage("4", "IDE Configuration", "Configuring MCP clients for supported IDEs")
             ide_detail = ""
             try:
-                vscode_success = configure_vscode([])
-                antigravity_success = configure_antigravity([])
-                additional_hosts = configure_detected_hosts(root_dir, infer_repo_python(root_dir))
-                cli_hosts = configure_detected_cli_hosts(root_dir, infer_repo_python(root_dir))
+                vscode_selection = select_family(selected_hosts, VSCODE_FAMILY)
+                json_selection = select_family(selected_hosts, JSON_HOSTS)
+                cli_selection = select_family(selected_hosts, CLI_HOSTS)
+
+                vscode_success = False
+                if vscode_selection is None or vscode_selection:
+                    vscode_args = [
+                        argument
+                        for host in sorted(vscode_selection or [])
+                        for argument in ("--host", host)
+                    ]
+                    vscode_success = configure_vscode(vscode_args)
+
+                antigravity_success = False
+                antigravity_selected = selected_hosts is not None and "antigravity" in selected_hosts
+                if antigravity_selected or (selected_hosts is None and antigravity_is_detected()):
+                    antigravity_success = configure_antigravity([])
+
+                additional_hosts = {}
+                if json_selection is None or json_selection:
+                    additional_hosts = configure_detected_hosts(
+                        root_dir,
+                        infer_repo_python(root_dir),
+                        selected=json_selection,
+                    )
+
+                cli_hosts = {}
+                if cli_selection is None or cli_selection:
+                    cli_hosts = configure_detected_cli_hosts(
+                        root_dir,
+                        infer_repo_python(root_dir),
+                        selected=cli_selection,
+                    )
 
                 detail_parts = []
                 if vscode_success:
-                    logger.log("OK: MCP Server configured for VSCode/Bob")
-                    detail_parts.append("VSCode/Bob configured")
+                    configured_labels = (
+                        [HOST_LABELS[host] for host in SUPPORTED_HOSTS if host in vscode_selection]
+                        if vscode_selection is not None
+                        else ["VS Code/Bob"]
+                    )
+                    configured_family = ", ".join(configured_labels)
+                    logger.log(f"OK: MCP Server configured for {configured_family}")
+                    detail_parts.append(f"{configured_family} configured")
 
                 if antigravity_success:
                     logger.log("OK: MCP Server configured for Antigravity")
