@@ -33,7 +33,7 @@ jobs:
       - name: Verify release contracts
         run: |
           python scripts/ci/bump_version.py --check
-          version="$(python -c 'import pathlib,re; text=pathlib.Path("src/__init__.py").read_text(); print(re.search(r"__version__\\s*=\\s*\\\"([^\\\"]+)\\\"", text).group(1))')"
+          version="$(python -c 'from src import __version__; print(__version__)')"
           python scripts/ci/render_release_notes.py "$version" --validate-only
           python -m ruff check \
             scripts/ci/generate_release_checksums.py \

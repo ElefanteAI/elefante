@@ -222,6 +222,7 @@ def test_quality_workflow_enforces_release_candidate_gates():
     workflow = (ROOT / ".github/workflows/quality.yml").read_text(encoding="utf-8")
 
     assert "python scripts/ci/bump_version.py --check" in workflow
+    assert "from src import __version__" in workflow
     assert "scripts/ci/render_release_notes.py" in workflow
     assert "python -m pytest tests -m slow -q" in workflow
     assert "python -m ruff check" in workflow
