@@ -55,22 +55,6 @@ The bridge forwards MCP JSON-RPC to the local daemon and owns no databases. Over
 
 For provenance, the host installer should set `ELEFANTE_CLIENT_TOOL` and may set `ELEFANTE_CLIENT_CWD`; each bridge process creates a distinct instance ID. The daemon derives and persists the complete source tuple from the bridge headers and its MCP session. Header and environment values are untrusted: Elefante rejects control characters and bounds the persisted tool (128 characters), instance/session (256 characters), and workspace path (1024 characters) fields to safe defaults.
 
-### Legacy provenance migration
-
-Preview the legacy-memory backfill before changing data:
-
-```bash
-python scripts/lifecycle/backfill_memory_provenance.py
-```
-
-Only after reviewing the candidate count, run the explicit write operation:
-
-```bash
-python scripts/lifecycle/backfill_memory_provenance.py --apply
-```
-
-The migration is idempotent. It fills missing vector provenance and creates the corresponding `WRITTEN_BY` graph links.
-
 ### Safe removal
 
 Preview removal before changing user configuration:

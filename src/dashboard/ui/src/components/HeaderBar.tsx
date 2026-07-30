@@ -31,24 +31,35 @@ export function HeaderBar() {
   const { label: ageLabel, stale } = formatSnapshotAge(snapshotAt);
 
   return (
-    <header className="flex items-center justify-between px-4 py-2 bg-slate-900/90 backdrop-blur border-b border-slate-700/60">
-      <div className="flex items-center gap-3">
-        <span className="text-sm font-semibold text-white">Elefante</span>
-        <span className="px-2 py-0.5 bg-slate-800 rounded text-xs text-cyan-400 font-mono">v{version}</span>
+    <header className="min-h-[72px] flex items-center justify-between px-6 md:px-8 bg-slate-950/90 backdrop-blur border-b elefante-hairline">
+      <div className="flex items-center gap-3.5">
+        <div className="elefante-mark" aria-hidden="true">
+          <div className="elefante-emblem" />
+          <div className="elefante-emblem elefante-emblem-network" />
+        </div>
+        <div>
+          <div className="flex items-center gap-2.5">
+            <span className="text-sm font-semibold text-slate-100">Elefante</span>
+            <span className="text-[10px] text-cyan-400 elefante-mono">v{version}</span>
+          </div>
+          <span className="block mt-0.5 text-[9px] text-slate-600 elefante-mono uppercase tracking-[0.18em]">
+            Memory intelligence
+          </span>
+        </div>
       </div>
 
-      <div className="flex items-center gap-3 text-xs text-slate-400">
-        <span>{memories} memories</span>
-        <span className="text-slate-600">|</span>
-        <span>{entities} entities</span>
-        <span className="text-slate-600">|</span>
-        <span>{relationships} links</span>
-        <span className="text-slate-600">|</span>
+      <div className="flex items-center gap-3 text-[10px] text-slate-500 elefante-mono uppercase tracking-[0.08em]">
+        <span className="hidden lg:inline">{memories} memories</span>
+        <span className="hidden lg:inline text-slate-700">·</span>
+        <span className="hidden lg:inline">{entities} entities</span>
+        <span className="hidden lg:inline text-slate-700">·</span>
+        <span className="hidden md:inline">{relationships} links</span>
+        <span className="hidden md:inline text-slate-700">·</span>
         <span
-          className={stale ? 'text-amber-400/80' : 'text-slate-400'}
+          className={stale ? 'text-amber-400/90' : 'text-emerald-400/90'}
           title={`Snapshot generated: ${snapshotAt}`}
         >
-          {stale ? `⚠ ${ageLabel}` : ageLabel}
+          {stale ? `stale · ${ageLabel}` : `current · ${ageLabel}`}
         </span>
 
         <button
@@ -56,12 +67,12 @@ export function HeaderBar() {
           disabled={isRefreshing}
           title="Reload the current dashboard snapshot"
           className={
-            'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-all ' +
+            'flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium border transition-colors ' +
             (isRefreshing
-              ? 'bg-slate-800/40 border-slate-700/40 text-slate-600 cursor-not-allowed'
+              ? 'bg-slate-800/40 elefante-hairline text-slate-600 cursor-not-allowed'
               : stale
               ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
-              : 'bg-slate-800/40 border-slate-700/40 text-slate-400 hover:text-slate-200 hover:border-slate-600')
+              : 'bg-slate-800/40 elefante-hairline text-slate-400 hover:text-slate-100 hover:border-cyan-500/50')
           }
         >
           <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} />

@@ -60,7 +60,7 @@ export function MemoryTable({ memories, onSelectMemory, selectedId }: MemoryTabl
       cell: (info) => {
         const topic = info.getValue();
         return topic ? (
-          <span className="px-2 py-0.5 bg-violet-500/20 text-violet-300 rounded text-xs">
+          <span className="px-2 py-0.5 bg-cyan-500/15 text-cyan-300 rounded text-xs">
             {formatLabel(String(topic))}
           </span>
         ) : null;
@@ -74,12 +74,12 @@ export function MemoryTable({ memories, onSelectMemory, selectedId }: MemoryTabl
         const typeColors: Record<string, string> = {
           fact: 'bg-cyan-500/20 text-cyan-300',
           decision: 'bg-amber-500/20 text-amber-300',
-          preference: 'bg-pink-500/20 text-pink-300',
+          preference: 'bg-cyan-500/12 text-cyan-300',
           insight: 'bg-emerald-500/20 text-emerald-300',
           note: 'bg-slate-500/20 text-slate-300',
-          conversation: 'bg-sky-500/20 text-sky-300',
-          specification: 'bg-orange-500/20 text-orange-300',
-          directive: 'bg-rose-500/20 text-rose-300',
+          conversation: 'bg-slate-500/20 text-slate-300',
+          specification: 'bg-amber-500/20 text-amber-300',
+          directive: 'bg-red-500/20 text-red-300',
         };
         return type ? (
           <span className={`px-2 py-0.5 rounded text-xs ${typeColors[type] || 'bg-slate-500/20 text-slate-300'}`}>
@@ -110,9 +110,9 @@ export function MemoryTable({ memories, onSelectMemory, selectedId }: MemoryTabl
         const n = typeof score === 'number' ? score : Number(score);
         const [label, cls] =
           n >= 80 ? ['Fresh',   'bg-emerald-500/20 text-emerald-300'] :
-          n >= 60 ? ['Healthy', 'bg-teal-500/20 text-teal-300'] :
+          n >= 60 ? ['Healthy', 'bg-emerald-500/20 text-emerald-300'] :
           n >= 40 ? ['Aging',   'bg-amber-500/20 text-amber-300'] :
-          n >= 20 ? ['Fading',  'bg-orange-500/20 text-orange-300'] :
+          n >= 20 ? ['Fading',  'bg-red-500/15 text-red-300'] :
                     ['Dormant', 'bg-red-500/20 text-red-400'];
         return (
           <span className={`px-2 py-0.5 rounded text-xs ${cls}`}>

@@ -8,7 +8,7 @@ import type { VisualizationType } from '@/types';
 const vizOptions: { id: VisualizationType; label: string; icon: React.ReactNode; desc: string }[] = [
   { id: 'treemap',  label: 'Topics',   icon: <LayoutGrid size={14} />, desc: 'Knowledge grouped by topic' },
   { id: 'calendar', label: 'Insights', icon: <BarChart2 size={14} />,  desc: 'Score & type breakdown' },
-  { id: 'network',  label: 'Graph',    icon: <Network size={14} />,    desc: 'Topic hub-spoke network' },
+  { id: 'network',  label: 'Graph',    icon: <Network size={14} />,    desc: 'Decisions, evidence & safeguards' },
 ];
 
 export function ExploreTab() {

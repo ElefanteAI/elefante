@@ -8,7 +8,7 @@
 
 ## What is Elefante?
 
-A local-first persistent memory engine for AI agents, exposed via the Model Context Protocol (MCP). Stores, scores, and retrieves facts/preferences/decisions/code patterns across sessions. ChromaDB (vectors) + Kuzu (graph). Currently at **v2.9.3**; **v2.10.0** is in design as a contract release.
+A local-first persistent memory engine for AI agents, exposed via the Model Context Protocol (MCP). Stores, scores, and retrieves facts, preferences, decisions, and code patterns across sessions. Embedded SQLite vectors and Kuzu relationships form the current storage architecture. **v2.11.1** is the latest published release; **v2.12.0** is the active release candidate.
 
 Detail: [`README.md`](README.md) for product overview, [`docs/reference/architecture.md`](docs/reference/architecture.md) for system design.
 
@@ -86,9 +86,9 @@ elefante/
 │   ├── debug/                   ← BUG/GAP tracker, compendiums, best practices
 │   ├── technical/               ← reference (spec-*) + how-to (ops-*) + dev-etiquette
 │   │   └── ide-integration-matrix.yaml  ← machine-readable integration surface (16 IDEs)
-│   ├── planning/                ← active release spec, vision, future PRDs (migrating to workspace/)
-│   ├── developer/               ← developer dispatch
-│   └── user/                    ← user dispatch (currently thin; grows as features ship)
+│   ├── explanation/             ← released product concepts
+│   ├── how-to/                  ← released user procedures
+│   └── reference/               ← released product contracts
 ├── workspace/                   ← developer workspace (consolidated planning + state)
 │   ├── README.md
 │   └── PLANNING.md              ← single living plan: vision/roadmap/features/aspects/state
@@ -124,7 +124,7 @@ For each surface, the matrix records: skill/rules path (project + global), MCP c
 
 Currently configured surfaces in this repo:
 - `.github/copilot-instructions.md` — VS Code Copilot, GitHub Copilot
-- `.claude/settings.local.json` — Claude Code (permissions only; full skills surface planned for v2.11.0)
+- `.claude/settings.local.json` — Claude Code permission whitelist
 
 Per-IDE installation: [`docs/how-to/configure-ide.md`](docs/how-to/configure-ide.md).
 
@@ -157,7 +157,7 @@ Companion canonical sources:
 
 `v{MAJOR}.{MINOR}.{PATCH}`. Strict semver per [`docs/how-to/close-a-feature.md`](docs/how-to/close-a-feature.md). Use `scripts/ci/advise_version_bump.py` then `scripts/ci/bump_version.py X.Y.Z`. Never edit version strings manually.
 
-Current: **v2.9.3** released. **v2.10.0** in design (contract release; no runtime changes; theme: "Elefante becomes agent-legible"). v2.11.0 plan: singleton daemon + Source schema + 6 IDE adapters (closes GAP-025).
+Current published release: **v2.11.1**. Active release candidate: **v2.12.0**. Future work is tracked as unversioned **Upcoming** in [`workspace/PLANNING.md`](workspace/PLANNING.md).
 
 ---
 
@@ -187,8 +187,8 @@ Every documentation change must answer **one question in one canonical place**. 
 | Event | Canonical home |
 |-------|----------------|
 | New idea | `workspace/PLANNING.md` § Backlog (or `docs/explanation/vision.md` during migration) |
-| Accepted feature design | `workspace/PLANNING.md` § Features (or relevant `spec-*.md` during migration) |
-| Current release state | `workspace/PLANNING.md` § Active Release (or `workspace/PLANNING.md §2` during migration) |
+| Accepted feature design | `workspace/PLANNING.md` § Features |
+| Current release state | `workspace/PLANNING.md` § Active Release |
 | Bug or GAP | `workspace/ISSUES.md` |
 | Bug postmortem | `workspace/postmortems/<domain>.md` |
 | Reusable lesson | `workspace/lessons.md` |

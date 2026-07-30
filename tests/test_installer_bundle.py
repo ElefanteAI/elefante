@@ -1,10 +1,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_installer_bundle.py
-# VERSION : 2.9.2
-# CHANGED : 2026-04-17
+# VERSION : 2.12.0
+# CHANGED : 2026-07-29
 # PROVES  : Installer bundle bootstrap logic keeps Elefante payload placement
-#           truthful, excludes local .venv backup directories, and bundle
-#           packaging emits the expected bootstrap archive.
+#           truthful, excludes local .venv backup directories, and emits clean,
+#           platform-specific launchers with executable metadata.
 # RUN     : pytest tests/test_installer_bundle.py -v
 # WHEN    : After changes to scripts/setup/bootstrap_release_bundle.py or
 #           scripts/ci/build_installer_bundle.py
@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 import zipfile
 from pathlib import Path
 
@@ -97,12 +98,13 @@ def test_build_install_command_targets_installed_payload(tmp_path):
         install_root,
         python_executable="/usr/bin/python3",
         venv_mode="reuse",
+        hosts=["cursor", "codex"],
     )
 
     assert command[0] == "/usr/bin/python3"
     assert command[1] == str(install_root / "scripts/setup/install.py")
     assert str(install_root / ".elefante-install-status.txt") in command
-    assert command[-1] == "reuse"
+    assert command[-4:] == ["--host", "cursor", "--host", "codex"]
 
 
 def test_render_failed_install_guidance_points_to_persisted_files(tmp_path):
@@ -120,7 +122,49 @@ def test_render_failed_install_guidance_points_to_persisted_files(tmp_path):
     assert str(install_root / ".elefante-install.log") in lines[3]
 
 
-def test_build_installer_bundle_writes_manifest_wrappers_and_payload(tmp_path):
+def test_bundle_dry_run_never_places_payload(monkeypatch, tmp_path):
+    module = _load_module(
+        ROOT / "scripts/setup/bootstrap_release_bundle.py",
+        "bootstrap_release_bundle_dry_run_module",
+    )
+    bundle_root = tmp_path / "bundle"
+    payload_root = bundle_root / "payload" / "elefante"
+    (payload_root / "scripts" / "setup").mkdir(parents=True)
+    (bundle_root / "scripts" / "setup").mkdir(parents=True)
+    (payload_root / "scripts" / "setup" / "install.py").write_text("", encoding="utf-8")
+    (payload_root / "requirements.txt").write_text("", encoding="utf-8")
+    (payload_root / "requirements.lock").write_text("", encoding="utf-8")
+    (bundle_root / "scripts" / "setup" / "bootstrap_release_bundle.py").write_text(
+        "",
+        encoding="utf-8",
+    )
+    install_root = tmp_path / "live-install"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "bootstrap_release_bundle.py",
+            "--bundle-root",
+            str(bundle_root),
+            "--install-root",
+            str(install_root),
+            "--dry-run",
+        ],
+    )
+    monkeypatch.setattr(module, "resolve_install_python", lambda _: sys.executable)
+    monkeypatch.setattr(
+        module,
+        "place_payload",
+        lambda *_: (_ for _ in ()).throw(AssertionError("dry run placed payload")),
+    )
+
+    module.main()
+
+    assert not install_root.exists()
+
+
+def test_build_installer_bundle_writes_macos_launchers_and_payload(tmp_path):
     module = _load_module(
         ROOT / "scripts/ci/build_installer_bundle.py",
         "build_installer_bundle_module",
@@ -137,14 +181,61 @@ def test_build_installer_bundle_writes_manifest_wrappers_and_payload(tmp_path):
 
     with zipfile.ZipFile(output_path) as archive:
         names = set(archive.namelist())
+        manifest = archive.read(
+            "elefante-installer-macOS/installer-manifest.json"
+        ).decode("utf-8")
+        start_here = archive.read("elefante-installer-macOS/START HERE.txt").decode(
+            "utf-8"
+        )
+        command_info = archive.getinfo(
+            "elefante-installer-macOS/Install Elefante.command"
+        )
 
     assert "elefante-installer-macOS/installer-manifest.json" in names
+    assert "elefante-installer-macOS/START HERE.txt" in names
+    assert "elefante-installer-macOS/Install Elefante.command" in names
     assert "elefante-installer-macOS/install.sh" in names
-    assert "elefante-installer-macOS/install.bat" in names
+    assert "elefante-installer-macOS/Install Elefante.bat" not in names
     assert "elefante-installer-macOS/scripts/setup/bootstrap_release_bundle.py" in names
     assert "elefante-installer-macOS/payload/elefante/scripts/setup/install.py" in names
     assert "elefante-installer-macOS/payload/elefante/requirements.lock" in names
     assert "elefante-installer-macOS/payload/elefante/src/dashboard/ui/dist/index.html" in names
+    assert '"entrypoints": [\n    "Install Elefante.command",\n    "install.sh"\n  ]' in manifest
+    assert 'Double-click "Install Elefante.command"' in start_here
+    assert (command_info.external_attr >> 16) & 0o111
+
+
+def test_build_installer_bundle_writes_clean_windows_launcher(tmp_path):
+    module = _load_module(
+        ROOT / "scripts/ci/build_installer_bundle.py",
+        "build_installer_bundle_windows_module",
+    )
+
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir(parents=True, exist_ok=True)
+    _create_minimal_repo(repo_root)
+
+    output_path = tmp_path / "dist" / "elefante-installer-Windows.zip"
+    module.build_installer_bundle(repo_root, platform_name="Windows", output_path=output_path)
+
+    with zipfile.ZipFile(output_path) as archive:
+        names = set(archive.namelist())
+        launcher = archive.read("elefante-installer-Windows/Install Elefante.bat")
+        manifest = archive.read(
+            "elefante-installer-Windows/installer-manifest.json"
+        ).decode("utf-8")
+
+    assert "elefante-installer-Windows/START HERE.txt" in names
+    assert "elefante-installer-Windows/Install Elefante.bat" in names
+    assert "elefante-installer-Windows/install.sh" not in names
+    assert b"scripts\\setup\\bootstrap_release_bundle.py" in launcher
+    assert not [
+        byte
+        for byte in launcher
+        if byte < 32 and byte not in (9, 10, 13)
+    ]
+    assert b"\r\n" in launcher
+    assert '"entrypoints": [\n    "Install Elefante.bat"\n  ]' in manifest
 
 
 def test_build_installer_bundle_skips_top_level_venv_backups(tmp_path):

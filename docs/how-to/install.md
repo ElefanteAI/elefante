@@ -98,7 +98,8 @@ If `.venv` already exists, press Enter for a destructive fresh reinstall, choose
    - Injects the seed memory only when the write is actually accepted by the orchestrator
 
 5. **IDE and CLI-Agent Configuration**
-   - Configures the local daemon first, then emits a transport-only MCP bridge for detected compatible hosts: VS Code/Bob, Antigravity, Cursor, Kiro, Gemini CLI, and native Claude Code, Codex, or OpenClaw CLIs.
+   - Configures the local daemon first, then emits a transport-only MCP bridge for detected compatible hosts: VS Code, Cursor, Kiro, Gemini CLI, and native Claude Code, Codex, or OpenClaw CLIs.
+   - The native installer preselects detected hosts and lets the user choose one or several. Scripted installs can repeat `--host`, for example `install.sh --host cursor --host codex`.
    - Preserves existing user-managed `elefante` registrations and unrelated MCP servers; only unchanged installer-owned entries are refreshed or removed.
    - Hosts are compatible until their host-driven lifecycle has been verified; see [IDE configuration](configure-ide.md) for current tiers and manual paths.
 
@@ -109,7 +110,6 @@ If `.venv` already exists, press Enter for a destructive fresh reinstall, choose
    - Also creates developer-local entry points for role adoption:
      - `AGENT.md` for manual "read AGENT.md and adopt this identity" onboarding
      - `.cursorrules` for Cursor auto-load
-     - `.windsurfrules` for Windsurf auto-load
 
 7. **Health Check**
    - Verifies all components working
@@ -146,45 +146,11 @@ The equivalent override is `ELEFANTE_VECTOR_STORE_TYPE=sqlite`. SQLite stores co
 memory JSON and float32 embeddings in `<collection_name>.sqlite3`, uses exact
 cosine search, and never starts a vector-server process.
 
-Existing ChromaDB installations are never converted silently. To migrate one, first
-stop Elefante and create a verified backup, then run the temporary proof:
-
-```bash
-.venv/bin/python scripts/lifecycle/backup_elefante_data.py
-.venv/bin/python scripts/lifecycle/migrate_chroma_to_sqlite.py
-```
-
-The migration command reports UUID, reconstructed metadata, embedding, and
-search-overlap evidence as JSON, deletes its temporary SQLite output, and does
-not change configuration. Only after reviewing that proof, re-run it with
-`--apply --backup <archive> --confirm-stopped STOPPED`. Apply reserves the new
-`~/.elefante/data/vector` path without replacing anything already there, then
-publishes the closed SQLite database while still leaving Chroma and configuration
-untouched. Validation and rollback therefore do not depend on destructive recovery.
-See the [migration proposal](../../workspace/proposals/sqlite-vector-store-migration.md)
-for acceptance criteria and rollback evidence.
 Stop the daemon before copying or restoring durable data; its controlled
 shutdown releases the SQLite file handle first.
 
-Read-only JSON/CSV export works with either configured embedded vector store.
-Factory reset moves the default `data/vector` SQLite directory and the default
-ChromaDB directory into its recovery area, along with any vector and graph
-paths explicitly configured in `config.yaml`. It refuses an unsafe configured
-path that would contain that recovery directory. Dashboard snapshot generation
-also reads the configured embedded vector store, so the same snapshot workflow
-works for SQLite installations.
-
-Before approving SQLite for a larger corpus, measure the exact-search path in
-an automatically removed temporary directory:
-
-```bash
-.venv/bin/python scripts/demo/benchmark_sqlite_vector_store.py \
-  --records 5000 --queries 20 --dimension 768 --limit 10 --max-p95-ms 300
-```
-
-The final JSON line contains p50 and p95 search latency. The threshold is an
-operator decision, not a universal claim: record the hardware and corpus size
-with the result before changing the storage default.
+Read-only JSON/CSV export, factory reset, and dashboard snapshot generation use
+the configured embedded vector store, including storage paths explicitly configured in `config.yaml`.
 
 ---
 
@@ -312,8 +278,16 @@ Elefante integrates with AI coding assistants via the **Model Context Protocol (
 
 ### Automated Configuration
 
-The full installer configures every detected compatible host. For manual,
-host-specific setup, run only the adapter that owns the relevant configuration:
+The full installer configures every detected compatible host unless an explicit
+host selection is supplied. Repeat `--host` to configure only the requested
+detected hosts:
+
+```bash
+./install.sh --host vscode-copilot --host codex
+```
+
+For manual, adapter-specific setup, run only the adapter that owns the relevant
+configuration:
 
 ```bash
 python scripts/setup/configure_vscode_bob.py       # VS Code and Bob
@@ -325,7 +299,7 @@ python scripts/setup/configure_cli_agents.py       # Claude Code, Codex, OpenCla
 The adapters preserve user-managed registrations and unrelated MCP servers.
 Detected compatible hosts include:
 
-- VS Code, Cursor, Bob, Antigravity, Kiro, Gemini CLI, Claude Code, Codex, and OpenClaw
+- VS Code, Cursor, Kiro, Gemini CLI, Claude Code, Codex, and OpenClaw
 
 ### Manual Configuration
 
@@ -567,7 +541,8 @@ Context-specific warnings are added per tool:
 #### `DIRECTIVES`
 
 **Source**: `_inject_directives()` in `src/mcp/server.py`, reading from `DirectiveStore`
-**Storage**: `~/.elefante/data/directives.json` (simple JSON file, not in ChromaDB)
+**Storage**: `~/.elefante/data/directives.json` (a dedicated JSON file, separate
+from the memory vector store)
 **Present on**: Every tool response where active directives exist.
 
 User-managed, persistent behavioral constraints. These are unconditional rules set by the user (e.g., "never claim success without user confirmation"). They are:

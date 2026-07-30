@@ -1,4 +1,4 @@
-# Usage Guide & API Reference (v2.10.0)
+# Usage Guide & API Reference (v2.12.0)
 
 ## 1. Natural Language Interaction
 
@@ -16,7 +16,8 @@ Once connected to your IDE, use natural language to interact with Elefante. The 
 
 ## 2. Current MCP Surface
 
-Elefante exposes **16 tools** and **2 prompts**. (v2.10.0 atomic swap, 2026-05-02: 5 legacy memory tools — `MemoryAdd` / `MemorySearch` / `MemoryUpdate` / `MemoryDelete` / `MemoryConsolidate` — consolidated into one `elefante-Memory` tool with an `action` discriminator. Per `workspace/proposals/tool-consolidation.md`.)
+Elefante exposes **16 tools** and **2 prompts**. Memory operations use one
+`elefante-Memory` tool with an action discriminator.
 
 - **Tools** read, write, or inspect the system.
 - **Prompts** inject grounding or pre-fetched memory context into the model. They are not tools.

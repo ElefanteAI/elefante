@@ -53,6 +53,12 @@ def get_antigravity_config_path():
     home = Path.home()
     return home / ".gemini" / "antigravity" / "mcp_config.json"
 
+
+def host_is_detected() -> bool:
+    """Return true only when Antigravity has created its user configuration root."""
+    return get_antigravity_config_path().parent.is_dir()
+
+
 def configure_mcp(argv: list[str] | None = None):
     """Configure Antigravity to use Elefante MCP server"""
     

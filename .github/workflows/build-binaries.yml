@@ -66,6 +66,149 @@ jobs:
         run: |
           Compress-Archive -Path dist/elefante/* -DestinationPath dist/elefante-Windows.zip
 
+      - name: Smoke test platform archives (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          PLATFORM: ${{ runner.os }}
+        run: |
+          set -euo pipefail
+
+          installer_archive="dist/elefante-installer-${PLATFORM}.zip"
+          binary_archive="dist/elefante-${PLATFORM}.zip"
+          smoke_root="${RUNNER_TEMP}/elefante-${PLATFORM}-archive-smoke"
+          bundle_root="${smoke_root}/installer/elefante-installer-${PLATFORM}"
+          binary_root="${smoke_root}/binary"
+          dry_run_root="${smoke_root}/must-not-be-created"
+          checksum_file="${smoke_root}/SHA256SUMS"
+
+          mkdir -p "${smoke_root}/installer" "$binary_root"
+          unzip -q "$installer_archive" -d "${smoke_root}/installer"
+          unzip -q "$binary_archive" -d "$binary_root"
+
+          test -f "${bundle_root}/installer-manifest.json"
+          test -f "${bundle_root}/START HERE.txt"
+          test -f "${bundle_root}/scripts/setup/bootstrap_release_bundle.py"
+          test -f "${bundle_root}/payload/elefante/scripts/setup/install.py"
+          test -f "${bundle_root}/payload/elefante/requirements.txt"
+          test -f "${bundle_root}/payload/elefante/requirements.lock"
+          test -x "${bundle_root}/install.sh"
+          test -x "${binary_root}/elefante"
+
+          if [[ "$PLATFORM" == "macOS" ]]; then
+            test -x "${bundle_root}/Install Elefante.command"
+          fi
+
+          dry_run_output="$(
+            python "${bundle_root}/scripts/setup/bootstrap_release_bundle.py" \
+              --bundle-root "$bundle_root" \
+              --install-root "$dry_run_root" \
+              --venv-mode abort \
+              --dry-run
+          )"
+          test ! -e "$dry_run_root"
+          grep -F "Bundle Root: ${bundle_root}" <<<"$dry_run_output"
+          grep -F "Payload Root: ${bundle_root}/payload/elefante" <<<"$dry_run_output"
+          grep -F "Install Root: ${dry_run_root}" <<<"$dry_run_output"
+          grep -F "Dry run only. No files were changed." <<<"$dry_run_output"
+
+          python scripts/ci/generate_release_checksums.py \
+            --output "$checksum_file" \
+            "$binary_archive" "$installer_archive"
+          python scripts/ci/generate_release_checksums.py \
+            --verify "$checksum_file" \
+            "$binary_archive" "$installer_archive"
+
+      - name: Smoke test platform archives (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $installerArchive = "dist/elefante-installer-Windows.zip"
+          $binaryArchive = "dist/elefante-Windows.zip"
+          $smokeRoot = Join-Path $env:RUNNER_TEMP "elefante-Windows-archive-smoke"
+          $installerRoot = Join-Path $smokeRoot "installer"
+          $bundleRoot = Join-Path $installerRoot "elefante-installer-Windows"
+          $binaryRoot = Join-Path $smokeRoot "binary"
+          $dryRunRoot = Join-Path $smokeRoot "must-not-be-created"
+          $checksumFile = Join-Path $smokeRoot "SHA256SUMS"
+
+          New-Item -ItemType Directory -Force -Path $installerRoot, $binaryRoot | Out-Null
+          Expand-Archive -LiteralPath $installerArchive -DestinationPath $installerRoot
+          Expand-Archive -LiteralPath $binaryArchive -DestinationPath $binaryRoot
+
+          @(
+            (Join-Path $bundleRoot "installer-manifest.json"),
+            (Join-Path $bundleRoot "START HERE.txt"),
+            (Join-Path $bundleRoot "Install Elefante.bat"),
+            (Join-Path $bundleRoot "scripts/setup/bootstrap_release_bundle.py"),
+            (Join-Path $bundleRoot "payload/elefante/scripts/setup/install.py"),
+            (Join-Path $bundleRoot "payload/elefante/requirements.txt"),
+            (Join-Path $bundleRoot "payload/elefante/requirements.lock"),
+            (Join-Path $binaryRoot "elefante.exe")
+          ) | ForEach-Object {
+            if (-not (Test-Path -LiteralPath $_ -PathType Leaf)) {
+              throw "Archive smoke test missing required file: $_"
+            }
+          }
+
+          $launcherPath = Join-Path $bundleRoot "Install Elefante.bat"
+          $launcherBytes = [System.IO.File]::ReadAllBytes($launcherPath)
+          $invalidControlBytes = @($launcherBytes | Where-Object {
+            $_ -lt 32 -and $_ -notin @(9, 10, 13)
+          })
+          if ($invalidControlBytes.Count -ne 0) {
+            throw "Windows launcher contains invalid control bytes"
+          }
+          for ($index = 0; $index -lt $launcherBytes.Length; $index++) {
+            if ($launcherBytes[$index] -eq 10 -and (
+              $index -eq 0 -or $launcherBytes[$index - 1] -ne 13
+            )) {
+              throw "Windows launcher contains a bare LF instead of CRLF"
+            }
+          }
+          $launcherText = [System.Text.Encoding]::UTF8.GetString($launcherBytes)
+          if (-not $launcherText.Contains("scripts\setup\bootstrap_release_bundle.py")) {
+            throw "Windows launcher does not target the bundled bootstrap path"
+          }
+
+          $dryRunOutput = & python `
+            (Join-Path $bundleRoot "scripts/setup/bootstrap_release_bundle.py") `
+            --bundle-root $bundleRoot `
+            --install-root $dryRunRoot `
+            --venv-mode abort `
+            --dry-run | Out-String
+          if ($LASTEXITCODE -ne 0) {
+            throw "Installer bundle dry-run failed"
+          }
+          if (Test-Path -LiteralPath $dryRunRoot) {
+            throw "Installer bundle dry-run mutated the install path"
+          }
+          @(
+            "Bundle Root: $bundleRoot",
+            "Payload Root: $(Join-Path $bundleRoot 'payload/elefante')",
+            "Install Root: $dryRunRoot",
+            "Dry run only. No files were changed."
+          ) | ForEach-Object {
+            if (-not $dryRunOutput.Contains($_)) {
+              throw "Installer bundle dry-run output missing: $_"
+            }
+          }
+
+          python scripts/ci/generate_release_checksums.py `
+            --output $checksumFile `
+            $binaryArchive $installerArchive
+          if ($LASTEXITCODE -ne 0) {
+            throw "Checksum generation failed"
+          }
+          python scripts/ci/generate_release_checksums.py `
+            --verify $checksumFile `
+            $binaryArchive $installerArchive
+          if ($LASTEXITCODE -ne 0) {
+            throw "Checksum verification failed"
+          }
+
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -126,9 +269,8 @@ jobs:
         uses: actions/checkout@v4
 
       # A tag can never publish while the locked production dependencies have
-      # a known advisory. This is intentionally separate from pull-request
-      # quality checks so remediation work can continue while GAP-029 remains
-      # an honest release blocker.
+      # a known advisory. Pull requests run the same production audit so the
+      # release candidate receives evidence before a tag exists.
       - name: Audit hash-locked Python dependencies
         uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
         with:
@@ -163,8 +305,31 @@ jobs:
         run: |
           python3 scripts/ci/select_release_assets.py
 
+      - name: Generate and verify SHA256SUMS
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t release_files <<'FILES'
+          ${{ steps.select_release_assets.outputs.files }}
+          FILES
+          python3 scripts/ci/generate_release_checksums.py \
+            --output SHA256SUMS \
+            "${release_files[@]}"
+          python3 scripts/ci/generate_release_checksums.py \
+            --verify SHA256SUMS \
+            "${release_files[@]}"
+
+      - name: Upload checksum manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: elefante-${{ github.ref_name }}-checksums
+          path: SHA256SUMS
+          retention-days: 5
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           body_path: release-notes.md
-          files: ${{ steps.select_release_assets.outputs.files }}
+          files: |
+            ${{ steps.select_release_assets.outputs.files }}
+            SHA256SUMS

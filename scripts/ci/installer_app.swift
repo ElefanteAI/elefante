@@ -26,6 +26,12 @@ private enum InstallState {
     case complete
 }
 
+private struct HostOption {
+    let id: String
+    let title: String
+    let detected: Bool
+}
+
 final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let accentColor = NSColor(calibratedRed: 0.09, green: 0.50, blue: 0.47, alpha: 1.0)
     private let successColor = NSColor.systemGreen
@@ -47,6 +53,7 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var openStatusButton = NSButton(title: "Open Status", target: nil, action: nil)
     private var openLogButton = NSButton(title: "Open Log", target: nil, action: nil)
     private var openInstallFolderButton = NSButton(title: "Open Install Folder", target: nil, action: nil)
+    private var hostButtons: [String: NSButton] = [:]
 
     private var process: Process?
     private var outputPipe: Pipe?
@@ -110,7 +117,7 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func buildWindow() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 920, height: 820),
+            contentRect: NSRect(x: 0, y: 0, width: 920, height: 760),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -148,9 +155,7 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         stack.addArrangedSubview(makeHeroSection())
         stack.addArrangedSubview(makeSeparator())
-        stack.addArrangedSubview(makeRecommendedCard())
-        stack.addArrangedSubview(makeLocationCard())
-        stack.addArrangedSubview(makeRecoveryCard())
+        stack.addArrangedSubview(makeHostCard())
         stack.addArrangedSubview(makeActionRow())
         stack.addArrangedSubview(makeProgressSection())
         stack.addArrangedSubview(makeOutputSection())
@@ -183,6 +188,156 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         positionWindow(window)
         window.orderFrontRegardless()
         window.makeKeyAndOrderFront(nil)
+    }
+
+    private func supportedHosts() -> [HostOption] {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let applications = [
+            URL(fileURLWithPath: "/Applications", isDirectory: true),
+            home.appendingPathComponent("Applications", isDirectory: true),
+        ]
+
+        func pathExists(_ relativePath: String) -> Bool {
+            FileManager.default.fileExists(
+                atPath: home.appendingPathComponent(relativePath).path
+            )
+        }
+
+        func appExists(_ names: [String]) -> Bool {
+            names.contains { name in
+                applications.contains {
+                    FileManager.default.fileExists(atPath: $0.appendingPathComponent(name).path)
+                }
+            }
+        }
+
+        func commandExists(_ names: [String]) -> Bool {
+            let roots = [
+                URL(fileURLWithPath: "/opt/homebrew/bin", isDirectory: true),
+                URL(fileURLWithPath: "/usr/local/bin", isDirectory: true),
+                home.appendingPathComponent(".local/bin", isDirectory: true),
+            ]
+            return names.contains { name in
+                roots.contains {
+                    FileManager.default.isExecutableFile(atPath: $0.appendingPathComponent(name).path)
+                }
+            }
+        }
+
+        return [
+            HostOption(
+                id: "vscode-copilot",
+                title: "VS Code + Copilot",
+                detected: appExists(["Visual Studio Code.app", "Visual Studio Code - Insiders.app"])
+                    || pathExists("Library/Application Support/Code")
+            ),
+            HostOption(
+                id: "cursor",
+                title: "Cursor",
+                detected: appExists(["Cursor.app"]) || pathExists(".cursor")
+            ),
+            HostOption(
+                id: "kiro",
+                title: "Kiro",
+                detected: appExists(["Kiro.app"]) || pathExists(".kiro")
+            ),
+            HostOption(
+                id: "gemini",
+                title: "Gemini CLI",
+                detected: commandExists(["gemini"])
+            ),
+            HostOption(
+                id: "claude-code",
+                title: "Claude Code",
+                detected: commandExists(["claude"]) || pathExists(".claude")
+            ),
+            HostOption(
+                id: "codex",
+                title: "Codex",
+                detected: commandExists(["codex"]) || pathExists(".codex")
+            ),
+            HostOption(
+                id: "openclaw",
+                title: "OpenClaw",
+                detected: commandExists(["openclaw"]) || pathExists(".openclaw")
+            ),
+            HostOption(
+                id: "bob",
+                title: "IBM Bob",
+                detected: appExists(["Bob-IDE.app", "Bob.app"])
+                    || pathExists("Library/Application Support/Bob-IDE")
+                    || pathExists(".bob")
+            ),
+            HostOption(
+                id: "antigravity",
+                title: "Antigravity",
+                detected: appExists(["Antigravity.app"]) || pathExists(".gemini/antigravity")
+            ),
+        ]
+    }
+
+    private func makeHostCard() -> NSView {
+        let cardStack = NSStackView()
+        cardStack.orientation = .vertical
+        cardStack.spacing = 10
+        cardStack.alignment = .leading
+
+        cardStack.addArrangedSubview(makeLabel(
+            "Connect Elefante to your agent hosts",
+            font: .systemFont(ofSize: 15, weight: .semibold),
+            color: .labelColor
+        ))
+        cardStack.addArrangedSubview(makeLabel(
+            "Detected hosts are selected automatically. Choose one or several—Elefante remains one private local memory across all of them.",
+            font: .systemFont(ofSize: 12, weight: .regular),
+            color: .secondaryLabelColor,
+            wrapping: true
+        ))
+
+        let hosts = supportedHosts()
+        let rows = stride(from: 0, to: hosts.count, by: 3).map { start -> [NSView] in
+            (0..<3).map { offset -> NSView in
+                let index = start + offset
+                guard index < hosts.count else {
+                    return NSView()
+                }
+                let host = hosts[index]
+                let button = NSButton(
+                    checkboxWithTitle: host.detected ? "\(host.title)  ·  Detected" : host.title,
+                    target: nil,
+                    action: nil
+                )
+                button.state = host.detected ? .on : .off
+                button.font = .systemFont(ofSize: 12, weight: host.detected ? .semibold : .regular)
+                button.toolTip = "Configure Elefante for \(host.title)"
+                button.translatesAutoresizingMaskIntoConstraints = false
+                button.widthAnchor.constraint(equalToConstant: 255).isActive = true
+                hostButtons[host.id] = button
+                return button
+            }
+        }
+
+        let grid = NSGridView(views: rows)
+        grid.rowSpacing = 10
+        grid.columnSpacing = 18
+        grid.xPlacement = .leading
+        grid.yPlacement = .center
+        cardStack.addArrangedSubview(grid)
+
+        cardStack.addArrangedSubview(makeLabel(
+            "One installation. No editor plug-in, copied command, or duplicate memory database.",
+            font: .systemFont(ofSize: 11, weight: .medium),
+            color: accentColor,
+            wrapping: true
+        ))
+
+        return wrapInCard(cardStack)
+    }
+
+    private func selectedHostIDs() -> [String] {
+        supportedHosts().compactMap { host in
+            hostButtons[host.id]?.state == .on ? host.id : nil
+        }
     }
 
     private func positionWindow(_ window: NSWindow) {
@@ -592,6 +747,11 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
             setStatus("Please choose an install location", color: errorColor)
             return
         }
+        let selectedHosts = selectedHostIDs()
+        guard !selectedHosts.isEmpty else {
+            setStatus("Choose at least one agent host", color: errorColor)
+            return
+        }
 
         state = .installing
         cancelRequested = false
@@ -606,18 +766,23 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         for line in renderInstallArtifactPaths() {
             appendLine(line, color: .secondaryLabelColor)
         }
+        appendLine("Agent hosts: \(selectedHosts.joined(separator: ", "))", color: .secondaryLabelColor)
         appendLine("")
 
         let scriptURL = installerDir.appendingPathComponent("install.sh")
         let pipe = Pipe()
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = [
+        var processArguments = [
             scriptURL.path,
             "--install-root", installPath,
             "--venv-mode", "fresh",
             "--verbose",
         ]
+        for host in selectedHosts {
+            processArguments.append(contentsOf: ["--host", host])
+        }
+        process.arguments = processArguments
         process.currentDirectoryURL = installerDir
         process.standardOutput = pipe
         process.standardError = pipe
@@ -724,6 +889,9 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func setControlsEnabled(_ enabled: Bool) {
         pathField.isEnabled = enabled
         browseButton.isEnabled = enabled
+        for button in hostButtons.values {
+            button.isEnabled = enabled
+        }
         installButton.isEnabled = true
     }
 

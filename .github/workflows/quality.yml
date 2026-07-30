@@ -22,6 +22,7 @@ jobs:
         run: |
           mkdir "$RUNNER_TEMP/elefante-lock-check"
           cp requirements.txt "$RUNNER_TEMP/elefante-lock-check/requirements.txt"
+          cp requirements.lock "$RUNNER_TEMP/elefante-lock-check/requirements.lock"
           (
             cd "$RUNNER_TEMP/elefante-lock-check"
             uv pip compile --universal --generate-hashes --python-version 3.11 requirements.txt -o requirements.lock
@@ -29,6 +30,17 @@ jobs:
           cmp requirements.lock "$RUNNER_TEMP/elefante-lock-check/requirements.lock"
       - run: python -m pytest tests -q
       - run: python -m pytest tests -m slow -q
+      - name: Verify release contracts
+        run: |
+          python scripts/ci/bump_version.py --check
+          version="$(python -c 'import pathlib,re; text=pathlib.Path("src/__init__.py").read_text(); print(re.search(r"__version__\\s*=\\s*\\\"([^\\\"]+)\\\"", text).group(1))')"
+          python scripts/ci/render_release_notes.py "$version" --validate-only
+          python -m ruff check \
+            scripts/ci/generate_release_checksums.py \
+            scripts/demo/generate_showcase_snapshot.py \
+            scripts/setup/host_selection.py \
+            scripts/setup/init_databases.py
+          git diff --check
 
   dashboard:
     runs-on: ubuntu-latest
@@ -44,3 +56,17 @@ jobs:
           cache-dependency-path: src/dashboard/ui/package-lock.json
       - run: npm ci
       - run: npm run build
+      - run: npm audit --audit-level=high
+
+  dependency-audit:
+    name: Production Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit hash-locked Python dependencies
+        uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
+        with:
+          inputs: requirements.lock
+          require-hashes: true
+          disable-pip: true
+          no-deps: true

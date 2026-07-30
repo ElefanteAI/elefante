@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/utils/dashboard_serializer.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
+# VERSION : 2.11.0
+# CHANGED : 2026-07-26
 # PURPOSE : Single source of truth for converting Memory objects into dashboard
 #           node/edge JSON consumed by the frontend and snapshot pipeline.
 # ROLE    : Utils — shared by update_dashboard_data.py and the live server.
@@ -165,7 +165,21 @@ def is_test_artifact(*, content: str, title: str) -> bool:
 # ---------------------------------------------------------------------------
 # Core serializer: Memory → dashboard node dict
 # ---------------------------------------------------------------------------
-def memory_to_dashboard_node(mem: Memory) -> Optional[Dict[str, Any]]:
+def _configured_vector_source() -> str:
+    """Return the active embedded vector backend without freezing a legacy label."""
+    try:
+        from src.utils.config import get_config
+
+        return str(get_config().elefante.vector_store.type)
+    except Exception:
+        return "embedded"
+
+
+def memory_to_dashboard_node(
+    mem: Memory,
+    *,
+    vector_source: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
     """
     Convert a Memory object into a dashboard-consumable node dict.
 
@@ -228,6 +242,6 @@ def memory_to_dashboard_node(mem: Memory) -> Optional[Dict[str, Any]]:
             "concepts": cm.get("concepts"),
             "surfaces_when": cm.get("surfaces_when"),
             "authority_score": cm.get("authority_score"),
-            "source": "chromadb",
+            "source": vector_source or _configured_vector_source(),
         }
     }

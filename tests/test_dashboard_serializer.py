@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_dashboard_serializer.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
+# VERSION : 2.11.0
+# CHANGED : 2026-07-26
 # PROVES  : Dashboard serialization correctness and launch safeguards; ensures
 #           Memory objects are converted to valid dashboard node/edge JSON.
 # RUN     : pytest tests/test_dashboard_serializer.py -v
@@ -12,6 +12,10 @@
 
 import re
 import asyncio
+import hashlib
+import json
+import importlib.util
+import struct
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -28,6 +32,16 @@ from src.utils.dashboard_serializer import (
     is_test_artifact,
     memory_to_dashboard_node,
 )
+
+
+def _load_showcase_builder():
+    repo_root = Path(__file__).resolve().parents[1]
+    script_path = repo_root / "scripts" / "demo" / "generate_showcase_snapshot.py"
+    spec = importlib.util.spec_from_file_location("generate_showcase_snapshot", script_path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.build_showcase_snapshot
 
 
 def _sample_raw_metadata() -> dict:
@@ -91,6 +105,13 @@ def test_memory_to_dashboard_node_serializes_score_and_topic():
     assert node["properties"]["topic"] == "Code Style"
 
 
+def test_memory_to_dashboard_node_uses_explicit_configured_backend_label():
+    node = memory_to_dashboard_node(_sample_memory(), vector_source="sqlite")
+
+    assert node is not None
+    assert node["properties"]["source"] == "sqlite"
+
+
 def test_raw_and_memory_scores_stay_close():
     raw_score = compute_live_score_from_raw(_sample_raw_metadata())
     memory_score = compute_live_score(_sample_memory())
@@ -127,6 +148,135 @@ def test_dashboard_frontend_retries_stats_and_snapshot_fetches():
     assert store_source.count("1000 * Math.pow(2, attempt)") >= 2
     assert "fetch('/api/graph')" in store_source
     assert "fetch('/api/stats')" in store_source
+
+
+def test_dashboard_frontend_normalizes_production_edge_endpoints():
+    repo_root = Path(__file__).resolve().parents[1]
+    types_source = (repo_root / "src" / "dashboard" / "ui" / "src" / "types.ts").read_text(encoding="utf-8")
+    graph_source = (repo_root / "src" / "dashboard" / "ui" / "src" / "components" / "KnowledgeGraph.tsx").read_text(encoding="utf-8")
+    memories_source = (repo_root / "src" / "dashboard" / "ui" / "src" / "components" / "MemoriesTab.tsx").read_text(encoding="utf-8")
+
+    assert "edge.source ?? edge.from" in types_source
+    assert "edge.target ?? edge.to" in types_source
+    assert "edgeEndpoints(" in graph_source
+    assert "edgeEndpoints(e)" in memories_source
+
+
+def test_dashboard_shell_uses_elefante_brand_assets_not_vite_defaults():
+    repo_root = Path(__file__).resolve().parents[1]
+    html = (repo_root / "src" / "dashboard" / "ui" / "index.html").read_text(encoding="utf-8")
+    emblem = (repo_root / "src" / "dashboard" / "ui" / "public" / "elefante-emblem.png").read_bytes()
+
+    assert "<title>Elefante Memory Intelligence</title>" in html
+    assert 'href="/elefante-emblem.png"' in html
+    assert "vite.svg" not in html
+    assert emblem[:8] == b"\x89PNG\r\n\x1a\n"
+    assert struct.unpack(">II", emblem[16:24]) == (582, 458)
+    assert hashlib.sha256(emblem).hexdigest() == (
+        "06178da5ba2c145cb6b3516cdfc4e84c8695e0abc01d38a44cebc9a62ea46f6b"
+    )
+
+
+def test_showcase_snapshot_is_deterministic_grounded_and_contract_complete():
+    build_showcase_snapshot = _load_showcase_builder()
+    snapshot = build_showcase_snapshot()
+    repeated = build_showcase_snapshot()
+
+    assert snapshot == repeated
+    assert snapshot["curation"] == {
+        "purpose": "Elefante Memory Intelligence dashboard showcase",
+        "product_baseline": "v2.12.0",
+        "deterministic": True,
+        "synthetic_behavioral_metadata": True,
+        "source_grounded_content": True,
+        "contains_user_data": False,
+        "disclaimer": "Counts and access history demonstrate product behavior; they are not customer or performance claims.",
+    }
+    assert snapshot["stats"] == {
+        "total_nodes": 48,
+        "memories": 37,
+        "entities": 11,
+        "edges": 95,
+    }
+
+    node_ids = {node["id"] for node in snapshot["nodes"]}
+    assert len(node_ids) == 48
+    assert all(edge["from"] in node_ids and edge["to"] in node_ids for edge in snapshot["edges"])
+    assert snapshot["featured_chain"] == [
+        "demo:daemon-assumption",
+        "demo:kuzu-evidence",
+        "demo:daemon-decision",
+        "demo:bridge-guard",
+    ]
+
+    memories = [node for node in snapshot["nodes"] if node["type"] == "memory"]
+    assert all(memory["properties"]["evidence"] for memory in memories)
+    assert all(memory["properties"]["namespace"] == "showcase" for memory in memories)
+    corpus = json.dumps(snapshot).lower()
+    assert "six signals" not in corpus
+    assert "chromadb holds semantic memories" not in corpus
+
+    memory_relationships = {
+        (edge["from"], edge["to"], edge["label"])
+        for edge in snapshot["edges"]
+        if edge["from"].startswith("demo:") and edge["to"].startswith("demo:")
+    }
+    assert {
+        (
+            "demo:daemon-assumption",
+            "demo:kuzu-evidence",
+            "CHALLENGED_BY",
+        ),
+        ("demo:kuzu-evidence", "demo:daemon-decision", "LED_TO"),
+        ("demo:daemon-decision", "demo:bridge-guard", "GUARDED_BY"),
+        (
+            "demo:dashboard-live-assumption",
+            "demo:snapshot-evidence",
+            "CHALLENGED_BY",
+        ),
+        ("demo:snapshot-evidence", "demo:snapshot-decision", "LED_TO"),
+        ("demo:snapshot-decision", "demo:loopback-guard", "GUARDED_BY"),
+        ("demo:chroma-blocker", "demo:sqlite-default", "LED_TO"),
+        ("demo:sqlite-default", "demo:migration-parity", "GUARDED_BY"),
+        ("demo:migration-parity", "demo:no-live-migration", "ENFORCED_BY"),
+    } <= memory_relationships
+    semantic_relationships = [
+        edge
+        for edge in snapshot["edges"]
+        if edge["type"] == "semantic"
+    ]
+    assert len(semantic_relationships) == 4
+    assert all(edge["label"] == "RELATED_TO" for edge in semantic_relationships)
+
+
+def test_dashboard_graph_uses_real_decision_trails_not_invented_topic_topology():
+    repo_root = Path(__file__).resolve().parents[1]
+    graph_source = (
+        repo_root
+        / "src"
+        / "dashboard"
+        / "ui"
+        / "src"
+        / "components"
+        / "KnowledgeGraph.tsx"
+    ).read_text(encoding="utf-8")
+    explore_source = (
+        repo_root
+        / "src"
+        / "dashboard"
+        / "ui"
+        / "src"
+        / "components"
+        / "ExploreTab.tsx"
+    ).read_text(encoding="utf-8")
+
+    assert "Decision graph" in graph_source
+    assert "See why the current truth won." in graph_source
+    assert "CAUSAL_LABELS.has(edge.label)" in graph_source
+    assert "Inter-hub edges" not in graph_source
+    assert "hub:" not in graph_source
+    assert "Topic hub-spoke network" not in explore_source
+    assert "Decisions, evidence & safeguards" in explore_source
 
 
 def test_dashboard_defaults_to_loopback_and_explicit_cors(monkeypatch):

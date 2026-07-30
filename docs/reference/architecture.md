@@ -1,6 +1,6 @@
 # Elefante Architecture: The Second Brain
 
-**Version:** 2.10.0 | **Status:** v2.11 Trust Release candidate
+**Version:** 2.12.0 | **Status:** release-candidate product contract
 
 ## 1. System Overview
 

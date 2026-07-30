@@ -1,11 +1,10 @@
 import { useDashboardStore } from '@/store';
 import type { Tab } from '@/types';
-import { LayoutDashboard, Table2, Compass } from 'lucide-react';
 
-const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: 'overview', label: 'Overview', icon: <LayoutDashboard size={16} /> },
-  { id: 'memories', label: 'Memories', icon: <Table2 size={16} /> },
-  { id: 'explore', label: 'Explore', icon: <Compass size={16} /> },
+const tabs: { id: Tab; label: string }[] = [
+  { id: 'overview', label: 'Briefing' },
+  { id: 'memories', label: 'Memories' },
+  { id: 'explore', label: 'Connections' },
 ];
 
 export function TabNav() {
@@ -13,19 +12,19 @@ export function TabNav() {
   const setActiveTab = useDashboardStore((s) => s.setActiveTab);
 
   return (
-    <nav className="flex items-center gap-1 bg-slate-900/80 backdrop-blur border-b border-slate-700/60 px-4">
+    <nav className="flex items-center justify-center gap-6 md:gap-10 bg-slate-950/75 backdrop-blur border-b elefante-hairline px-4">
       {tabs.map((tab) => (
         <button
           key={tab.id}
           onClick={() => setActiveTab(tab.id)}
+          aria-current={activeTab === tab.id ? 'page' : undefined}
           className={
-            'flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ' +
+            'px-2 py-3 text-xs font-medium tracking-wide transition-colors border-b-2 ' +
             (activeTab === tab.id
-              ? 'text-cyan-400 border-cyan-400'
-              : 'text-slate-400 border-transparent hover:text-slate-200 hover:border-slate-600')
+              ? 'text-slate-100 border-cyan-400'
+              : 'text-slate-600 border-transparent hover:text-slate-300 hover:border-slate-700')
           }
         >
-          {tab.icon}
           {tab.label}
         </button>
       ))}

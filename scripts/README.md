@@ -63,6 +63,7 @@ If step 1 fails, step 2 cannot help. Do not skip steps.
 | `configure_antigravity.py` | Adds the Elefante bridge entry to `~/.gemini/antigravity/mcp_config.json`. | Initial Antigravity setup or after moving the repo. |
 | `configure_cursor_kiro.py` | Detects Cursor and Kiro user directories, then adds their Elefante bridge entries without touching absent hosts. | Initial Cursor/Kiro setup or after moving the repo. |
 | `configure_cli_agents.py` | Uses the native Claude Code and Codex MCP CLIs to register the bridge and fingerprint the host-owned registration. | Initial Claude Code/Codex setup or after moving the repo. |
+| `host_selection.py` | Defines the canonical installer host IDs, labels, and adapter-family routing shared by CLI and native installer flows. | Imported by installer entrypoints; not run directly. |
 | `install_manifest.py` | Internal helper that atomically tracks whole files and owned JSON entries emitted by Elefante installers. | Imported by setup emitters; not run directly. |
 | `init_databases.py` | Initializes the configured SQLite vector store and Kuzu schema without re-running the full installer. | After a durable-store reset. |
 
@@ -106,12 +107,13 @@ Release flow: `advise_version_bump.py` → write CHANGELOG → `bump_version.py 
 | ------ | ------------ | -------------- |
 | `advise_version_bump.py` | Classifies staged diff as MAJOR/MINOR/PATCH. | Before writing the CHANGELOG entry. |
 | `bump_version.py` | Cascades the chosen version across all 48 tracked declarations. | After writing the CHANGELOG. Run `--check` after. |
-| `build_installer_bundle.py` | Builds the downloadable Elefante installer zip with bundled dashboard assets. | In CI after dashboard build, or locally to validate bundle contents. |
+| `build_installer_bundle.py` | Builds the downloadable platform-specific installer zip with bundled dashboard assets, a visible first-run guide, and the correct customer launcher for macOS, Windows, or Linux. | In CI after dashboard build, or locally to validate bundle contents and launcher bytes. |
 | `build_dmg.py` | Builds the branded macOS DMG. Uses Swift to compile `installer_app.swift` into `Install Elefante.app` when available; otherwise falls back to `installer_gui.py`. `--sign` for notarized releases. | In CI on a macOS runner after `build_installer_bundle.py`. |
-| `installer_app.swift` | Native AppKit installer surface. Compiled by `build_dmg.py`. Delegates to `install.sh`. | Not run directly. |
+| `installer_app.swift` | Native AppKit installer surface with detected agent-host selection. Compiled by `build_dmg.py` and forwards the selected hosts through `install.sh`. | Not run directly. |
 | `installer_gui.py` | Legacy Tk fallback installer surface bundled when Swift is unavailable. | Not run directly in the preferred path. |
 | `render_release_notes.py` | Renders GitHub release body from the matching `CHANGELOG.md` entry. | In CI before publishing a tagged release. |
 | `select_release_assets.py` | Filters artifacts against GitHub's per-file upload cap; emits workflow outputs. | In CI before `action-gh-release`. |
+| `generate_release_checksums.py` | Generates or verifies a deterministic, basename-sorted `SHA256SUMS` manifest for an exact set of release assets. | On each build runner for archive integrity smoke tests, then in the release job before publishing assets. |
 | `list_mcp_tools.py` | Reads `server.py` and prints the live MCP tool + prompt inventory. | After modifying `server.py` to verify spec-tools.md is in sync. |
 | `bundle_docker_package.sh` | Tarball of the Docker bundle for environments without full repo access. | Distribution packaging. |
 
@@ -141,5 +143,6 @@ Mutations require `ELEFANTE_PRIVILEGED=1`. Always `backup_elefante_data.py` firs
 
 | Script | What it does | When to use it |
 | ------ | ------------ | -------------- |
-| `generate_100_memories.py` | Seeds 100 synthetic memories into a live Elefante instance. | Before a demo or benchmark when a populated store is needed. |
+| `generate_showcase_snapshot.py` | Writes a deterministic, source-grounded 37-memory dashboard snapshot with clearly declared synthetic behavioral metadata; never opens a durable store. | For product demos, screenshots, and UI acceptance without exposing or mutating user memory. |
+| `generate_100_memories.py` | Legacy Chroma + Kuzu behavioral-store benchmark. It mutates only the explicit isolated `--db` path and requires `--force` to replace one. | Only when exercising historical 100-memory store behavior; not for the current dashboard showcase. |
 | `benchmark_sqlite_vector_store.py` | Creates a deterministic, disposable SQLite store and reports exact-cosine retrieval latency as JSON. It never opens existing ChromaDB or Elefante data. | Before approving a SQLite default/migration performance envelope; use `--max-p95-ms` to enforce a measured threshold. |

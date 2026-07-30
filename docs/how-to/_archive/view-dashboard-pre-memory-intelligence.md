@@ -26,8 +26,8 @@ INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 ### Accessing the Dashboard
 
 1. Open browser to: **http://127.0.0.1:8000**
-2. The **Briefing** view shows the decisions most likely to shape the next agent answer
-3. Three views are available: Briefing, Memories, Connections
+2. Should see the **Overview tab** with health score gauge and stat pills
+3. Three tabs: Overview, Memories, Explore
 
 ### Stopping the Dashboard
 
@@ -39,12 +39,11 @@ Press `Ctrl+C` in the terminal.
 
 ### Dashboard Features
 
-The dashboard has three views:
+The dashboard has three tabs:
 
-- **Briefing**: a current decision and, when the graph supports it, the
-  assumption → evidence → decision → guard chain that explains why it endures
-- **Memories**: searchable, sortable memory rows with metadata and related-memory inspection
-- **Connections**: topic, score-distribution, and graph views over the snapshot
+- **Overview**: Health score gauge, diagnostic panels, agent impact metrics
+- **Memories**: Searchable, sortable table of all memories (TanStack Table)
+- **Explore**: Topics (card grid), Insights (charts), Graph (SVG hub-spoke)
 
 All data comes from a static snapshot — no live database access.
 
@@ -53,13 +52,15 @@ All data comes from a static snapshot — no live database access.
 **Important**: Dashboard reads from **static snapshot file**, NOT live database.
 
 ```
-Configured vector store + Kuzu (live writes)
+MCP Server (Live Write)
+  ↓
+~/.elefante/data/kuzu_db (Kuzu Graph DB path)
   ↓
 scripts/pipeline/update_dashboard_data.py (Export)
   ↓
-~/.elefante/data/dashboard_snapshot.json (redacted static file)
+data/dashboard_snapshot.json (Static File)
   ↓
-Loopback dashboard (read only)
+Dashboard (Read Only)
 ```
 
 The dashboard never opens ChromaDB or Kuzu. Its search is lexical over the
@@ -197,8 +198,21 @@ python scripts/verify/verify_health.py
 
 # Look for: "total_memories: 0"
 
-# If 0, use the isolated product showcase below. Do not seed a live store
-# merely to test the dashboard.
+# If 0, add a test memory:
+python -c "
+import asyncio
+from src.core.orchestrator import MemoryOrchestrator
+
+async def add_test():
+    orch = MemoryOrchestrator()
+    await orch.add_memory(
+        content='Test memory for dashboard',
+        memory_type='note'
+    )
+    print(' Test memory added')
+
+asyncio.run(add_test())
+"
 
 # Refresh dashboard (F5)
 ```
@@ -285,9 +299,14 @@ python scripts/pipeline/update_dashboard_data.py
 # Refresh dashboard (F5)
 ```
 
-Snapshot regeneration is an explicit MCP or operator action. Do not make the
-browser a write trigger or schedule a second database-owning process beside the
-daemon.
+**Automation**: Schedule snapshot updates:
+
+```bash
+# Linux cron (every 5 minutes)
+*/5 * * * * cd /path/to/Elefante && python scripts/pipeline/update_dashboard_data.py
+
+# Or add to MCP server startup script
+```
 
 ---
 
@@ -341,24 +360,36 @@ curl http://127.0.0.1:8000/api/graph
 4. Graph updates with new memory
 ```
 
-### Source-grounded product showcase
+### Automatic Update (Production)
 
-Generate an isolated snapshot without opening user data:
-
-```bash
-python scripts/demo/generate_showcase_snapshot.py \
-  --output /tmp/elefante-showcase/dashboard_snapshot.json
-ELEFANTE_DATA_DIR=/tmp/elefante-showcase python -m src.dashboard.server
 ```
-
-The showcase contains 37 repository-grounded memories, 11 topic/source
-entities, and 95 links. Its access history is deterministic synthetic metadata,
-declared in `curation`; it is not customer telemetry. Pass `--force` only when
-you intend to replace that exact output file.
+1. Schedule snapshot updates (cron, systemd timer, etc.)
+2. Every 5-10 minutes: python scripts/pipeline/update_dashboard_data.py
+3. Dashboard always shows recent data (with slight delay)
+4. No manual updates needed
+```
 
 ---
 
 ## Configuration
+
+### Change Port (Default: 8000)
+
+Edit `src/dashboard/server.py`:
+
+```python
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        app,
+        host="127.0.0.1",
+        port=8080,  # Change this
+        reload=False,
+        log_level="info"
+    )
+```
+
+Restart dashboard to use new port.
 
 ### Network exposure
 
@@ -368,9 +399,11 @@ Default: `127.0.0.1` (localhost only). Do not change the bind address to expose 
 
 ## Performance Notes
 
-No public node-count performance claim is maintained. Use the deterministic
-showcase for visual acceptance and test representative local snapshots before
-claiming a larger operating envelope.
+### Memory Limit
+
+- Efficiently handles 500+ nodes
+- Beyond 1000 nodes, graph rendering slows
+- Use semantic zoom (planned in v1.1.0) to filter nodes
 
 ### Optimization
 
@@ -399,6 +432,40 @@ For large graphs (500+ memories):
 
 ---
 
+## Production Deployment
+
+### Running as Service (Linux/macOS)
+
+**Create systemd service** (`/etc/systemd/system/elefante-dashboard.service`):
+
+```ini
+[Unit]
+Description=Elefante Dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=<username>
+WorkingDirectory=/path/to/Elefante
+ExecStart=/path/to/Elefante/.venv/bin/python -m src.dashboard.server
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Enable and start**:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable elefante-dashboard
+sudo systemctl start elefante-dashboard
+sudo systemctl status elefante-dashboard
+```
+
+---
+
 ## Summary Checklist
 
 Before claiming "Dashboard is working":
@@ -408,14 +475,13 @@ Before claiming "Dashboard is working":
 - [ ] Terminal shows "Uvicorn running on http://127.0.0.1:8000"
 - [ ] Browser opens to http://127.0.0.1:8000 with no connection error
 - [ ] Page loads (no blank/error page)
-- [ ] Briefing shows a current memory and grounded evolution when relationships permit
+- [ ] Overview tab shows health gauge and stats
 - [ ] Memories tab shows memory table
-- [ ] Connections accepts production `from` / `to` edges
 - [ ] API endpoints respond: `curl http://127.0.0.1:8000/api/stats`
-- [ ] Memory snapshot exists under the configured Elefante data directory
-- [ ] Dashboard has not opened the vector or graph stores
+- [ ] Memory snapshot exists: `data/dashboard_snapshot.json`
+- [ ] No Kuzu lock conflicts (MCP not running simultaneously)
 - [ ] After adding memories, snapshot updates and dashboard refreshes
 
 ---
 
-**Last Validated**: 2026-07-26
+**Last Validated**: 2026-02-26

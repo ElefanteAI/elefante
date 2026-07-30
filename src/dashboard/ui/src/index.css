@@ -3,22 +3,120 @@
 @tailwind utilities;
 
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color-scheme: dark;
-  background-color: #0f172a;
-  color: #f8fafc;
+  background-color: #070604;
+  color: #eee4d3;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background:
+    radial-gradient(circle at 78% 14%, rgba(184, 113, 57, 0.11), transparent 32%),
+    radial-gradient(circle at 18% 92%, rgba(131, 163, 138, 0.055), transparent 28%),
+    linear-gradient(135deg, #080704 0%, #0b0906 52%, #070604 100%);
 }
 
-/* Custom scrollbar for dark theme */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #e2b06e;
+  outline-offset: 2px;
+}
+
+.elefante-shell {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 78% 14%, rgba(184, 113, 57, 0.11), transparent 32%),
+    radial-gradient(circle at 18% 92%, rgba(131, 163, 138, 0.055), transparent 28%),
+    linear-gradient(135deg, #080704 0%, #0b0906 52%, #070604 100%);
+}
+
+.elefante-shell::before {
+  content: "0 1 0 0 1 1 0 1 0 0 1 0 1 1 0 0 1 0 1 0 0 1 1 0 1 0 0 1";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  color: rgba(196, 137, 77, 0.035);
+  font: 11px/42px "SF Mono", Menlo, Consolas, monospace;
+  letter-spacing: 28px;
+  word-break: break-all;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(90deg, #000, transparent 48%, #000);
+  mask-image: linear-gradient(90deg, #000, transparent 48%, #000);
+}
+
+.elefante-mono {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+}
+
+.elefante-panel {
+  border: 1px solid rgba(210, 163, 103, 0.2);
+  background: rgba(16, 13, 9, 0.88);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.22);
+}
+
+.elefante-hairline {
+  border-color: rgba(210, 163, 103, 0.2);
+}
+
+.elefante-mark {
+  position: relative;
+  width: 56px;
+  height: 44px;
+  flex: 0 0 auto;
+}
+
+.elefante-emblem {
+  position: absolute;
+  inset: 0;
+  background: #c8894d;
+  -webkit-mask: url("/elefante-emblem.png") center / contain no-repeat;
+  mask: url("/elefante-emblem.png") center / contain no-repeat;
+  transition: background-color 280ms ease;
+}
+
+.elefante-emblem-network {
+  clip-path: polygon(0 0, 36% 0, 36% 40%, 0 40%);
+  background: #e2b06e;
+  opacity: 0;
+  transform: translate3d(-0.4px, 0.4px, 0);
+  transition: opacity 420ms ease, transform 900ms cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+.elefante-mark:hover .elefante-emblem-network {
+  opacity: 0.88;
+  transform: translate3d(0.8px, -0.8px, 0);
+}
+
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #475569; }
+::-webkit-scrollbar-thumb { background: #3d382f; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #6f675b; }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

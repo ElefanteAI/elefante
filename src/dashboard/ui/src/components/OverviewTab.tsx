@@ -1,413 +1,376 @@
-// Meaningful metrics that explain memory health for AI agent behavior
-import { useHealthScore, useUsageData } from '@/hooks/useVisualizationData';
-import type { HealthScore } from '@/hooks/useVisualizationData';
+import { useMemo } from 'react';
+import { useHealthScore } from '@/hooks/useVisualizationData';
 import { useDashboardStore } from '@/store';
-import { TopicTreemap } from '@/components/TopicTreemap';
-import { ActivityFeed } from '@/components/ActivityFeed';
-import { HealthGauge } from '@/components/HealthGauge';
+import { edgeEndpoints, type GraphEdge, type MemoryNode } from '@/types';
 
-function getHealthDiagnosis(health: HealthScore) {
-  const issues: string[] = [];
-  const recommendations: string[] = [];
-  let status: 'healthy' | 'warning' | 'critical' = 'healthy';
-
-  // Freshness analysis — include actual counts
-  if (health.freshness < 20) {
-    issues.push(`${health.staleCount} of ${health.totalMemories} memories are over 90 days old`);
-    recommendations.push('Archive stale memories or add fresh ones to keep knowledge current');
-    status = 'critical';
-  } else if (health.freshness < 50) {
-    issues.push(`${health.staleCount} memories are aging — freshness at ${health.freshness}%`);
-    recommendations.push('Add more recent memories to improve freshness score');
-    if (status === 'healthy') status = 'warning';
-  }
-
-  // Coverage analysis — the key issue, with real numbers
-  if (health.coverage < 15) {
-    issues.push(`${health.generalCount} of ${health.totalMemories} memories (${100 - health.coverage}%) are uncategorized "general" topic`);
-    recommendations.push('Assign specific topics (coding, debugging, architecture) when saving memories');
-    recommendations.push('Re-tag existing "general" memories with meaningful topics');
-    status = 'critical';
-  } else if (health.coverage < 40) {
-    issues.push(`${health.generalCount} memories still tagged as "general" — search will be noisy`);
-    recommendations.push('Add specific topics to memories for better retrieval precision');
-    if (status === 'healthy') status = 'warning';
-  }
-
-  // Connectivity analysis
-  if (health.connectivity < 10) {
-    issues.push(`${health.orphanCount} of ${health.totalMemories} memories have zero graph connections`);
-    recommendations.push('Link related memories with elefante-GraphConnect to build knowledge connections');
-    if (status === 'healthy') status = 'warning';
-  }
-
-  // Usage analysis
-  if (health.neverRetrievedCount > health.totalMemories * 0.5) {
-    issues.push(`${health.neverRetrievedCount} of ${health.totalMemories} memories have never been retrieved by an agent`);
-    recommendations.push('Review unused memories — archive or improve their content for better retrieval');
-    if (status === 'healthy') status = 'warning';
-  } else if (health.neverRetrievedCount > health.totalMemories * 0.3) {
-    issues.push(`${health.neverRetrievedCount} memories have never been retrieved`);
-    recommendations.push('Consider archiving unused memories to reduce noise');
-    if (status === 'healthy') status = 'warning';
-  }
-
-  return { issues, recommendations, status };
-}
-
-function getAgentImpact(health: HealthScore) {
-  const impacts: { text: string; severity: 'critical' | 'warning' }[] = [];
-
-  if (health.coverage < 15) {
-    impacts.push({ text: 'Searches return too many irrelevant memories — agent cannot filter by topic', severity: 'critical' });
-    impacts.push({ text: 'Agent may repeat past mistakes because relevant learnings are buried in noise', severity: 'critical' });
-  } else if (health.coverage < 40) {
-    impacts.push({ text: 'Topic filtering is partially effective — some searches will be noisy', severity: 'warning' });
-  }
-
-  if (health.freshness < 30) {
-    impacts.push({ text: 'Agent relies on outdated knowledge — may suggest obsolete solutions', severity: health.freshness < 15 ? 'critical' : 'warning' });
-  }
-
-  if (health.connectivity < 10) {
-    impacts.push({ text: 'Cannot traverse related concepts — misses connections between ideas', severity: 'warning' });
-  }
-
-  if (health.usage < 50) {
-    impacts.push({ text: `${health.neverRetrievedCount} memories are never surfaced — potential dead weight in search`, severity: 'warning' });
-  }
-
-  return impacts;
-}
-
-// ── Stat Pill ────────────────────────────────────────────
-function StatPill({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
-  return (
-    <div className="flex flex-col items-center gap-0.5 px-3 py-2">
-      <span className="text-lg font-semibold text-slate-200 tabular-nums">{value}</span>
-      <span className="text-[10px] uppercase tracking-wider text-slate-500">{label}</span>
-      {sub && <span className="text-[10px] text-slate-600">{sub}</span>}
-    </div>
-  );
-}
-
-// ── Metric Card ──────────────────────────────────────────
-function MetricCard({ label, weight, value, detail, bar }: {
+type BriefingStep = {
+  node: MemoryNode;
   label: string;
-  weight: string;
-  value: number;
-  detail: string;
-  bar: { color: string; hint: string };
+  tone: 'clay' | 'copper' | 'brass' | 'sage';
+};
+
+const EDGE_LABELS = {
+  evidence: new Set(['LED_TO', 'SUPERSEDED_BY', 'CORRECTED_BY']),
+  assumption: new Set(['CHALLENGED_BY', 'CONTRADICTS']),
+  guard: new Set(['GUARDED_BY', 'GUARDS', 'ENFORCED_BY']),
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  directive: 'Constraint',
+  specification: 'Architecture',
+  decision: 'Decision',
+  insight: 'Insight',
+  preference: 'Preference',
+  fact: 'Fact',
+  note: 'Note',
+  conversation: 'Conversation',
+};
+
+function asMemory(node: unknown): node is MemoryNode {
+  return Boolean(node && typeof node === 'object' && (node as MemoryNode).type === 'memory');
+}
+
+function scoreOf(node: MemoryNode): number {
+  return Number(node.properties?.score) || 0;
+}
+
+function accessCountOf(node: MemoryNode): number {
+  return Number(node.properties?.access_count) || 0;
+}
+
+function isCurrent(node: MemoryNode): boolean {
+  const status = String(node.properties?.status || '').toLowerCase();
+  return !node.properties?.archived
+    && !node.properties?.deprecated
+    && !['redundant', 'contradictory', 'superseded'].includes(status);
+}
+
+function chooseFeatured(memories: MemoryNode[]): MemoryNode | null {
+  const ranked = [...memories].sort((a, b) => {
+    const typeA = a.properties?.memory_type === 'decision' ? 1 : 0;
+    const typeB = b.properties?.memory_type === 'decision' ? 1 : 0;
+    if (typeA !== typeB) return typeB - typeA;
+    if (isCurrent(a) !== isCurrent(b)) return isCurrent(b) ? 1 : -1;
+    if (scoreOf(a) !== scoreOf(b)) return scoreOf(b) - scoreOf(a);
+    return accessCountOf(b) - accessCountOf(a);
+  });
+  return ranked[0] ?? null;
+}
+
+function normalizedLabel(edge: GraphEdge): string {
+  return String(edge.label || edge.type || '').trim().toUpperCase();
+}
+
+function deriveBriefingSteps(
+  featured: MemoryNode,
+  memories: MemoryNode[],
+  edges: GraphEdge[],
+): { steps: BriefingStep[]; isEvolution: boolean } {
+  const byId = new Map(memories.map((memory) => [memory.id, memory]));
+  const normalized = edges.map((edge) => ({ edge, ...edgeEndpoints(edge) }));
+
+  const evidenceEdge = normalized.find(({ target, edge }) =>
+    target === featured.id && EDGE_LABELS.evidence.has(normalizedLabel(edge)),
+  );
+  const evidence = evidenceEdge ? byId.get(evidenceEdge.source) : undefined;
+
+  const assumptionEdge = evidence
+    ? normalized.find(({ target, edge }) =>
+        target === evidence.id && EDGE_LABELS.assumption.has(normalizedLabel(edge)),
+      )
+    : undefined;
+  const assumption = assumptionEdge ? byId.get(assumptionEdge.source) : undefined;
+
+  const guardEdge = normalized.find(({ source, edge }) =>
+    source === featured.id && EDGE_LABELS.guard.has(normalizedLabel(edge)),
+  );
+  const guard = guardEdge ? byId.get(guardEdge.target) : undefined;
+
+  if (assumption && evidence && guard) {
+    return {
+      isEvolution: true,
+      steps: [
+        { node: assumption, label: 'Old assumption', tone: 'clay' },
+        { node: evidence, label: 'Evidence', tone: 'copper' },
+        { node: featured, label: 'Decision', tone: 'brass' },
+        { node: guard, label: 'Enforced guard', tone: 'sage' },
+      ],
+    };
+  }
+
+  const relatedIds = new Set<string>();
+  normalized.forEach(({ source, target }) => {
+    if (source === featured.id && byId.has(target)) relatedIds.add(target);
+    if (target === featured.id && byId.has(source)) relatedIds.add(source);
+  });
+
+  const related = [...relatedIds]
+    .map((id) => byId.get(id))
+    .filter(asMemory)
+    .sort((a, b) => scoreOf(b) - scoreOf(a))
+    .slice(0, 3);
+
+  const fallback = related.length >= 2
+    ? related
+    : memories
+        .filter((memory) => memory.id !== featured.id && isCurrent(memory))
+        .sort((a, b) => scoreOf(b) - scoreOf(a))
+        .slice(0, 3);
+
+  const nodes = [featured, ...fallback].slice(0, 4);
+  const tones: BriefingStep['tone'][] = ['brass', 'copper', 'sage', 'copper'];
+  return {
+    isEvolution: false,
+    steps: nodes.map((node, index) => ({
+      node,
+      label: index === 0 ? 'Current decision' : TYPE_LABELS[node.properties?.memory_type] || 'Related memory',
+      tone: tones[index],
+    })),
+  };
+}
+
+function countLinks(memoryId: string, edges: GraphEdge[]): number {
+  return edges.reduce((count, edge) => {
+    const { source, target } = edgeEndpoints(edge);
+    return count + (source === memoryId || target === memoryId ? 1 : 0);
+  }, 0);
+}
+
+function supportingMemories(memories: MemoryNode[], featuredId: string): MemoryNode[] {
+  const preferredTypes = ['directive', 'specification', 'decision'];
+  const selected: MemoryNode[] = [];
+  preferredTypes.forEach((type) => {
+    const match = memories
+      .filter((memory) =>
+        memory.id !== featuredId
+        && memory.properties?.memory_type === type
+        && isCurrent(memory),
+      )
+      .sort((a, b) => scoreOf(b) - scoreOf(a))[0];
+    if (match) selected.push(match);
+  });
+  return selected;
+}
+
+function MemoryStep({
+  step,
+  index,
+  onInspect,
+}: {
+  step: BriefingStep;
+  index: number;
+  onInspect: (id: string) => void;
 }) {
+  const toneClasses = {
+    clay: 'border-red-400 text-red-300',
+    copper: 'border-cyan-500 text-cyan-400',
+    brass: 'border-amber-300 text-amber-300',
+    sage: 'border-emerald-400 text-emerald-300',
+  };
+
   return (
-    <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4">
-      <div className="flex items-center justify-between mb-1">
-        <div className="text-xs uppercase tracking-wider text-slate-400">{label}</div>
-        <div className="text-[10px] text-slate-600">{weight}</div>
+    <button
+      type="button"
+      onClick={() => onInspect(step.node.id)}
+      className={`group min-w-0 text-left bg-slate-900/80 border-t-2 border-b border-b-slate-800 px-4 py-4 transition-colors hover:bg-slate-800/70 ${toneClasses[step.tone]}`}
+    >
+      <div className="flex justify-between gap-3 text-[9px] elefante-mono uppercase tracking-[0.12em]">
+        <span>{String(index + 1).padStart(2, '0')} · {step.label}</span>
+        <span>{scoreOf(step.node)}</span>
       </div>
-      <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-semibold text-slate-200 tabular-nums">{value}%</span>
-        <span className="text-xs text-slate-500">{detail}</span>
-      </div>
-      <div className="mt-2.5 h-1.5 bg-slate-700/80 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-700 ${bar.color}`}
-          style={{ width: `${Math.max(2, value)}%` }}
-        />
-      </div>
-      <div className="mt-1.5 text-[11px] text-slate-500">{bar.hint}</div>
-    </div>
+      <h3 className="min-h-[44px] mt-3 text-[15px] leading-snug font-semibold text-slate-100 group-hover:text-white">
+        {step.node.name}
+      </h3>
+      <p className="mt-2 text-[11px] leading-relaxed text-slate-600 max-h-[49px] overflow-hidden">
+        {step.node.description}
+      </p>
+    </button>
   );
 }
 
 export function OverviewTab() {
+  const snapshot = useDashboardStore((state) => state.snapshot);
+  const getMemoryNodes = useDashboardStore((state) => state.getMemoryNodes);
+  const memories = getMemoryNodes();
+  const setInspectedMemoryId = useDashboardStore((state) => state.setInspectedMemoryId);
+  const setActiveTab = useDashboardStore((state) => state.setActiveTab);
   const health = useHealthScore();
-  const usageData = useUsageData();
-  const isLoading = useDashboardStore((s) => s.isLoading);
-  const getTopics = useDashboardStore((s) => s.getTopics);
-  const topics = getTopics();
+  const inspectMemory = (id: string) => {
+    setInspectedMemoryId(id);
+    setActiveTab('memories');
+  };
 
-  if (isLoading) {
-    return (
-      <div className="p-6 space-y-6">
-        <div className="grid grid-cols-4 gap-4">
-          {[1,2,3,4].map(i => (
-            <div key={i} className="bg-slate-800/60 rounded-xl p-6 animate-pulse">
-              <div className="h-4 bg-slate-700 rounded w-20 mb-2" />
-              <div className="h-8 bg-slate-700 rounded w-16" />
-            </div>
-          ))}
-        </div>
-        <div className="h-64 bg-slate-800/60 rounded-xl animate-pulse" />
-      </div>
-    );
-  }
+  const featured = useMemo(() => chooseFeatured(memories), [memories]);
+  const briefing = useMemo(
+    () => featured && snapshot
+      ? deriveBriefingSteps(featured, memories, snapshot.edges)
+      : { steps: [], isEvolution: false },
+    [featured, memories, snapshot],
+  );
+  const carry = useMemo(
+    () => featured ? supportingMemories(memories, featured.id) : [],
+    [featured, memories],
+  );
 
-  if (health.totalMemories === 0) {
+  if (!snapshot || !featured) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center max-w-md">
-          <div className="text-6xl mb-4">🧠</div>
-          <h2 className="text-xl font-semibold text-slate-200 mb-2">No memories yet</h2>
-          <p className="text-slate-400 text-sm">
-            Add your first memory via your IDE or MCP tool.
-            Memories will appear here once created.
+      <div className="h-full flex items-center justify-center p-8">
+        <div className="max-w-lg border-t border-cyan-500/60 pt-5">
+          <div className="text-[10px] text-cyan-400 elefante-mono uppercase tracking-[0.18em]">Continuity briefing</div>
+          <h2 className="mt-3 text-2xl font-medium text-slate-100">No durable memory is available yet.</h2>
+          <p className="mt-3 text-sm leading-relaxed text-slate-500">
+            Add a decision, preference, constraint, or insight through an Elefante-connected agent. The briefing will show what deserves to shape the next answer.
           </p>
         </div>
       </div>
     );
   }
 
-  const diagnosis = getHealthDiagnosis(health);
-  const agentImpact = getAgentImpact(health);
-  const typeEntries = Object.entries(health.typeBreakdown).sort((a, b) => b[1] - a[1]);
+  const status = isCurrent(featured) ? 'Current' : String(featured.properties?.status || 'Review');
+  const evidence = featured.properties?.evidence
+    || featured.properties?.source
+    || 'redacted snapshot';
+  const reviewCount = memories.filter((memory) => {
+    const memoryStatus = String(memory.properties?.status || '').toLowerCase();
+    return memory.properties?.deprecated
+      || memory.properties?.archived
+      || ['contradictory', 'redundant', 'superseded'].includes(memoryStatus);
+  }).length;
+  const sourceLabel = evidence === 'sqlite' ? 'Configured SQLite vector store' : String(evidence);
 
   return (
-    <div className="p-6 overflow-auto h-full">
-      <div className="max-w-6xl mx-auto space-y-5">
-
-        {/* ── Row 1: Health Gauge + Diagnosis ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-
-          {/* Health Gauge */}
-          <div className={`lg:col-span-4 bg-slate-800/60 border rounded-xl p-5 flex flex-col items-center justify-center gap-3 ${
-            diagnosis.status === 'healthy' ? 'border-emerald-500/20' :
-            diagnosis.status === 'warning' ? 'border-amber-500/20' : 'border-red-500/20'
-          }`}>
-            <div className="text-xs uppercase tracking-wider text-slate-500">Memory Health</div>
-            <HealthGauge score={health.overall} status={diagnosis.status} />
-            {/* Score breakdown */}
-            <div className="w-full border-t border-slate-700/40 pt-3 mt-1">
-              <div className="text-[10px] uppercase tracking-wider text-slate-600 mb-2 text-center">Score Breakdown</div>
-              <div className="space-y-1.5">
-                {[
-                  { label: 'Freshness', val: health.freshness, w: 30 },
-                  { label: 'Coverage', val: health.coverage, w: 30 },
-                  { label: 'Usage', val: health.usage, w: 20 },
-                  { label: 'Connectivity', val: health.connectivity, w: 20 },
-                ].map((m) => (
-                  <div key={m.label} className="flex items-center gap-2 text-[11px]">
-                    <span className="w-20 text-slate-500">{m.label}</span>
-                    <div className="flex-1 h-1 bg-slate-700/60 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${
-                          m.val >= 50 ? 'bg-emerald-500/70' : m.val >= 25 ? 'bg-amber-500/70' : 'bg-red-500/70'
-                        }`}
-                        style={{ width: `${Math.max(2, m.val)}%` }}
-                      />
-                    </div>
-                    <span className="w-14 text-right text-slate-500 tabular-nums">
-                      {m.val}% × .{m.w}
-                    </span>
-                  </div>
-                ))}
-              </div>
+    <div className="h-full overflow-auto px-5 py-5 md:px-8 md:py-6">
+      <div className="max-w-[1540px] mx-auto min-h-full flex flex-col gap-5">
+        <section className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+          <div>
+            <div className="text-[10px] text-cyan-400 elefante-mono uppercase tracking-[0.2em]">
+              Continuity briefing / 01
             </div>
+            <h1 className="mt-2 text-[clamp(2rem,3.2vw,3.35rem)] leading-[1.02] font-medium tracking-[-0.045em] text-slate-100">
+              The decisions shaping<br className="hidden sm:block" /> your next answer.
+            </h1>
           </div>
+          <p className="max-w-[430px] text-sm leading-relaxed text-slate-500 lg:text-right">
+            Elefante shows what changed, why the current truth won, and which guard keeps compatible agents aligned.
+          </p>
+        </section>
 
-          {/* Diagnosis + Agent Impact */}
-          <div className="lg:col-span-8 flex flex-col gap-4">
-            {/* Diagnosis Panel */}
-            <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 flex-1">
-              <h3 className="text-sm font-semibold text-slate-300 mb-3">
-                {diagnosis.status === 'critical' ? '⚠️ Issues Detected' : 
-                 diagnosis.status === 'warning' ? '⚡ Areas for Improvement' : '✅ Memory System Status'}
-              </h3>
-              {diagnosis.issues.length > 0 ? (
-                <ul className="space-y-1.5 mb-3">
-                  {diagnosis.issues.map((issue, i) => (
-                    <li key={i} className="text-sm text-slate-300 flex items-start gap-2">
-                      <span className={`mt-0.5 ${diagnosis.status === 'critical' ? 'text-red-400' : 'text-amber-400'}`}>•</span>
-                      {issue}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-emerald-400/90 mb-3">All memory health metrics are within healthy ranges.</p>
-              )}
-              
-              {diagnosis.recommendations.length > 0 && (
-                <div className="border-t border-slate-700/40 pt-3">
-                  <h4 className="text-[10px] uppercase tracking-wider text-slate-600 mb-1.5">Recommended Actions</h4>
-                  <ul className="space-y-1">
-                    {diagnosis.recommendations.map((rec, i) => (
-                      <li key={i} className="text-xs text-cyan-400/90 flex items-start gap-2">
-                        <span className="text-cyan-600 mt-0.5">→</span>
-                        {rec}
-                      </li>
-                    ))}
-                  </ul>
+        <section className="elefante-panel grid grid-cols-1 xl:grid-cols-[minmax(0,1.95fr)_minmax(320px,0.72fr)]">
+          <article className="min-w-0 px-5 py-5 md:px-7 md:py-6 xl:border-r elefante-hairline">
+            <div className="flex items-start justify-between gap-6">
+              <div className="min-w-0">
+                <div className="text-[10px] text-cyan-400 elefante-mono uppercase tracking-[0.14em]">
+                  {briefing.isEvolution ? 'Featured decision thread' : 'Current memory briefing'}
                 </div>
-              )}
-            </div>
-
-            {/* Agent Impact — only when issues exist */}
-            {agentImpact.length > 0 && (
-              <div className="bg-slate-900/40 border border-slate-700/30 rounded-xl p-4">
-                <h3 className="text-xs font-semibold text-slate-400 mb-2.5 uppercase tracking-wider">Impact on Agent Behavior</h3>
-                <ul className="space-y-1.5">
-                  {agentImpact.map((impact, i) => (
-                    <li key={i} className="text-sm text-slate-400 flex items-start gap-2">
-                      <span className={impact.severity === 'critical' ? 'text-red-400' : 'text-amber-400'}>•</span>
-                      {impact.text}
-                    </li>
-                  ))}
-                </ul>
+                <h2 className="mt-3 text-2xl md:text-[32px] leading-tight font-medium tracking-[-0.035em] text-slate-100">
+                  {featured.name}
+                </h2>
+                <p className="max-w-4xl mt-2 text-sm leading-relaxed text-slate-500">
+                  {featured.description}
+                </p>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── Row 2: Quick Stats Bar ── */}
-        <div className="bg-slate-800/40 border border-slate-700/40 rounded-xl flex items-center justify-around divide-x divide-slate-700/30 overflow-x-auto">
-          <StatPill label="Memories" value={health.totalMemories} />
-          <StatPill label="Topics" value={health.topicCount} />
-          <StatPill label="Edges" value={health.totalEdges} />
-          <StatPill label="Fresh" value={health.freshCount} sub={`of ${health.totalMemories}`} />
-          <StatPill label="Retrieved" value={health.retrievedCount} sub={`of ${health.totalMemories}`} />
-          <StatPill label="Connected" value={health.connectedCount} sub={`of ${health.totalMemories}`} />
-          {typeEntries.length > 0 && typeEntries.slice(0, 3).map(([type, count]) => (
-            <StatPill key={type} label={type} value={count} />
-          ))}
-        </div>
-
-        {/* ── Row 3: Metric Cards ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard
-            label="Freshness"
-            weight="30% weight"
-            value={health.freshness}
-            detail={`${health.freshCount} fresh · ${health.staleCount} stale`}
-            bar={{
-              color: health.freshness >= 50 ? 'bg-emerald-400' : health.freshness >= 25 ? 'bg-amber-400' : 'bg-red-400',
-              hint: health.freshness >= 50 ? 'Recent memories available for context' :
-                    health.freshness >= 25 ? 'Mix of old and new — consider archiving stale' : 'Most memories are over 90 days old',
-            }}
-          />
-          <MetricCard
-            label="Topic Coverage"
-            weight="30% weight"
-            value={health.coverage}
-            detail={`${health.generalCount} general · ${health.topicCount} topics`}
-            bar={{
-              color: health.coverage >= 40 ? 'bg-emerald-400' : health.coverage >= 15 ? 'bg-amber-400' : 'bg-red-400',
-              hint: health.coverage >= 40 ? 'Well-categorized for precise retrieval' :
-                    health.coverage >= 15 ? 'Many memories lack specific topics' : `${health.generalCount} uncategorized — agent cannot filter`,
-            }}
-          />
-          <MetricCard
-            label="Usage"
-            weight="20% weight"
-            value={health.usage}
-            detail={`${health.retrievedCount} used · ${health.neverRetrievedCount} unused`}
-            bar={{
-              color: health.usage >= 60 ? 'bg-emerald-400' : health.usage >= 30 ? 'bg-amber-400' : 'bg-red-400',
-              hint: health.usage >= 60 ? 'Most memories are actively retrieved by agents' :
-                    health.usage >= 30 ? 'Many memories never retrieved — potential dead weight' : 'Most memories are unused by agents',
-            }}
-          />
-          <MetricCard
-            label="Connectivity"
-            weight="20% weight"
-            value={health.connectivity}
-            detail={`${health.connectedCount} linked · ${health.orphanCount} orphans`}
-            bar={{
-              color: health.connectivity >= 30 ? 'bg-emerald-400' : health.connectivity >= 10 ? 'bg-amber-400' : 'bg-red-400',
-              hint: health.connectivity >= 30 ? 'Rich knowledge graph for traversal' :
-                    health.connectivity >= 10 ? 'Some connections — room to grow' : 'Memories are isolated nodes',
-            }}
-          />
-        </div>
-
-        {/* ── Row 4: Usage Intelligence ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          {/* Most Retrieved */}
-          <div className="lg:col-span-6 bg-slate-800/60 border border-slate-700/60 rounded-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-700/60 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-300">Most Retrieved</h3>
-              <span className="text-xs text-slate-500">by agents</span>
+              <div className="flex-none text-right">
+                <strong className="block text-3xl text-slate-100 elefante-mono tracking-[-0.06em]">
+                  {scoreOf(featured)}
+                </strong>
+                <span className="text-[8px] text-slate-600 elefante-mono uppercase tracking-[0.13em]">
+                  live memory score
+                </span>
+              </div>
             </div>
-            <div className="divide-y divide-slate-700/30">
-              {usageData.mostRetrieved.map((m) => (
-                <div key={m.id} className="px-4 py-2.5 flex items-center justify-between">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-lg font-semibold text-emerald-400 tabular-nums w-8 text-right shrink-0">
-                      {m.properties?.access_count ?? 0}
-                    </span>
-                    <span className="text-sm text-slate-300 truncate">
-                      {m.properties?.title || m.properties?.content?.slice(0, 50) || 'Untitled'}
-                    </span>
-                  </div>
-                  <span className="px-2 py-0.5 bg-slate-700/50 text-slate-400 rounded text-[10px] shrink-0 ml-2">
-                    {m.properties?.topic || 'general'}
+
+            <div className="relative grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mt-8 xl:mt-24">
+              {briefing.steps.map((step, index) => (
+                <MemoryStep
+                  key={step.node.id}
+                  step={step}
+                  index={index}
+                  onInspect={inspectMemory}
+                />
+              ))}
+            </div>
+          </article>
+
+          <aside className="px-5 py-5 md:px-6 md:py-6 bg-slate-950/55">
+            <h3 className="text-[10px] text-slate-500 elefante-mono uppercase tracking-[0.16em]">
+              Why this memory endures
+            </h3>
+            <div className="grid grid-cols-2 mt-5 border-t border-l elefante-hairline">
+              {[
+                [TYPE_LABELS[featured.properties?.memory_type] || featured.properties?.memory_type || 'Memory', 'durable memory type'],
+                [`${accessCountOf(featured)}×`, 'retrieved by agents'],
+                [countLinks(featured.id, snapshot.edges), 'knowledge links'],
+                [status, 'memory state'],
+              ].map(([value, label]) => (
+                <div key={label} className="min-h-[82px] p-3 border-r border-b elefante-hairline">
+                  <strong className="block text-xl font-medium text-slate-100">{value}</strong>
+                  <span className="block mt-2 text-[8px] leading-relaxed text-slate-600 elefante-mono uppercase tracking-[0.09em]">
+                    {label}
                   </span>
                 </div>
               ))}
-              {usageData.mostRetrieved.length === 0 && (
-                <div className="px-4 py-6 text-center text-sm text-slate-500">No usage data yet</div>
-              )}
+            </div>
+
+            <div className="mt-5 pt-4 border-t elefante-hairline">
+              <span className="block text-[9px] text-slate-600 elefante-mono uppercase tracking-[0.1em]">Grounded in</span>
+              <strong className="block mt-2 text-xs leading-relaxed font-normal text-slate-400">{sourceLabel}</strong>
+            </div>
+
+            <p className="mt-5 pl-4 py-1 border-l-2 border-cyan-500 text-[13px] leading-relaxed text-slate-200">
+              This briefing preserves the decision and the evidence that made it current.
+            </p>
+          </aside>
+        </section>
+
+        <section className="grid grid-cols-1 xl:grid-cols-[1.65fr_1fr] gap-5 pb-2">
+          <div className="border-t elefante-hairline pt-4">
+            <h3 className="text-[9px] text-slate-500 elefante-mono uppercase tracking-[0.16em]">
+              What compatible agents carry forward
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-8 mt-4">
+              {carry.map((memory) => (
+                <button
+                  key={memory.id}
+                  type="button"
+                  onClick={() => inspectMemory(memory.id)}
+                  className="min-w-0 text-left group"
+                >
+                  <span className="text-[9px] text-cyan-400 elefante-mono uppercase tracking-[0.11em]">
+                    {TYPE_LABELS[memory.properties?.memory_type] || memory.properties?.memory_type}
+                  </span>
+                  <strong className="block mt-1.5 text-sm font-medium text-slate-200 group-hover:text-white">
+                    {memory.name}
+                  </strong>
+                  <span className="block mt-1 text-[11px] leading-relaxed text-slate-600 max-h-[32px] overflow-hidden">
+                    {memory.description}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Never Retrieved */}
-          <div className="lg:col-span-6 bg-slate-800/60 border border-slate-700/60 rounded-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-700/60 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-300">Never Retrieved</h3>
-              <span className="text-xs text-slate-500">
-                {usageData.neverRetrieved.length} memories
-              </span>
-            </div>
-            <div className="divide-y divide-slate-700/30">
-              {usageData.neverRetrieved.slice(0, 5).map((m) => (
-                <div key={m.id} className="px-4 py-2.5 flex items-center justify-between">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-lg font-semibold text-red-400/70 tabular-nums w-8 text-right shrink-0">0</span>
-                    <span className="text-sm text-slate-400 truncate">
-                      {m.properties?.title || m.properties?.content?.slice(0, 50) || 'Untitled'}
-                    </span>
-                  </div>
-                  <span className="px-2 py-0.5 bg-slate-700/50 text-slate-500 rounded text-[10px] shrink-0 ml-2">
-                    {m.properties?.topic || 'general'}
-                  </span>
+          <div className="border-t elefante-hairline pt-4">
+            <h3 className="text-[9px] text-slate-500 elefante-mono uppercase tracking-[0.16em]">
+              Knowledge pulse
+            </h3>
+            <div className="grid grid-cols-4 mt-4">
+              {[
+                [health.totalMemories, 'memories'],
+                [`${health.usage}%`, 'used'],
+                [`${health.connectivity}%`, 'connected'],
+                [String(reviewCount).padStart(2, '0'), 'need review'],
+              ].map(([value, label], index) => (
+                <div key={label} className={`px-3 ${index === 0 ? 'pl-0' : 'border-l elefante-hairline'}`}>
+                  <strong className="block text-2xl text-slate-100 elefante-mono tracking-[-0.06em]">{value}</strong>
+                  <span className="text-[8px] text-slate-600 elefante-mono uppercase tracking-[0.08em]">{label}</span>
                 </div>
               ))}
-              {usageData.neverRetrieved.length === 0 && (
-                <div className="px-4 py-6 text-center text-sm text-emerald-400/70">All memories have been retrieved at least once</div>
-              )}
-              {usageData.neverRetrieved.length > 5 && (
-                <div className="px-4 py-2 text-center text-xs text-slate-600">
-                  +{usageData.neverRetrieved.length - 5} more unused memories
-                </div>
-              )}
             </div>
+            <p className="mt-4 text-[11px] leading-relaxed text-slate-500">
+              Snapshot metrics describe this local memory system. They are not performance or customer claims.
+            </p>
           </div>
-        </div>
-
-        {/* ── Row 5: Treemap + Activity Feed ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-          <div className="lg:col-span-3 bg-slate-800/60 border border-slate-700/60 rounded-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-700/60 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-300">
-                Topic Distribution
-              </h3>
-              <span className="text-xs text-slate-500">
-                {health.totalMemories} memories · {topics.length} topics
-              </span>
-            </div>
-            <div className="h-80">
-              <TopicTreemap />
-            </div>
-          </div>
-
-          <div className="lg:col-span-2 bg-slate-800/60 border border-slate-700/60 rounded-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-700/60">
-              <h3 className="text-sm font-semibold text-slate-300">Recent Activity</h3>
-            </div>
-            <div className="h-80 overflow-y-auto">
-              <ActivityFeed />
-            </div>
-          </div>
-        </div>
+        </section>
       </div>
     </div>
   );

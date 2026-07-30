@@ -11,15 +11,45 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-07-30
+
+### Added
+
+- **Memory Intelligence Briefing:** the dashboard now opens with an evidence-first view of freshness, source and status counts, confidence, conflicts, decision paths, topic signal, current memory, and recent activity.
+- **Decision Graph:** Connections now shows explicit assumption, evidence, decision, and safeguard trails instead of inferred or decorative relationships.
+- **Deterministic showcase:** `python scripts/demo/generate_showcase_snapshot.py --output <path>` creates a disclosed, reproducible product tour without reading or mutating the live memory store.
+- **Host-aware installation:** installers detect compatible agent hosts, preselect them, and configure only the integrations the user chooses.
+
+### Changed
+
+- The dashboard uses the canonical Elefante mark and a restrained carbon, tusk, copper, brass, clay, and sage visual system.
+- Platform archives now present one clear launcher and a `START HERE.txt` guide, with executable permissions preserved on macOS and Linux.
+- Dashboard reference and operator guidance now document the briefing contract, showcase workflow, trust boundary, configured backend, and production relationship schema.
+
+### Removed
+
+- User documentation now contains only released product procedures, reference,
+  and explanation; draft contracts and development operations no longer appear
+  in customer navigation.
+
+### Fixed
+
+- Dashboard relationships display correctly across current and older snapshot field names.
+- Memory provenance reports the configured embedded vector backend instead of a hard-coded provider.
+- The dashboard header now renders the complete canonical elephant-and-network symbol.
+- The unused frontend router dependency was removed and the production dashboard dependency audit is clean.
+- Windows bootstrap paths no longer contain a hidden control byte, and all platform archives reject malformed launchers during validation.
+- Installer `--dry-run` now exits before payload placement, so validation cannot move or replace an existing installation.
+
 ## [2.11.1] - 2026-07-28
 
 ### Fixed
 
-- **BUG-033:** Resolved HTTP 500 error on dashboard graph endpoint caused by an orphaned background process listening on port 8000 from a trashed repository path (`/Users/jay/.Trash/elefante`). Hardened `src/dashboard/server.py` node property formatting against `None` values and added process CWD verification checks.
+- Resolved an HTTP 500 error on the dashboard graph endpoint caused by an orphaned background process and hardened node-property formatting against missing values.
 
 ### Changed
 
-- Strategic positioning documentation updated in `docs/explanation/vision.md` differentiating Elefante's universal MCP memory engine from vendor memory systems like OpenAI Codex.
+- Clarified how Elefante's local, provider-independent MCP memory differs from provider-specific memory systems.
 
 ## [2.11.0] - 2026-07-23
 

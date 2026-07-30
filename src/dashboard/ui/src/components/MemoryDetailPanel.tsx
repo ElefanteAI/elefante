@@ -20,18 +20,18 @@ function formatRelativeTime(dateStr: string): string {
 const typeColors: Record<string, string> = {
   fact: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
   decision: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-  preference: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
+  preference: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/25',
   insight: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
   note: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
-  conversation: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
-  specification: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-  directive: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+  conversation: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+  specification: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+  directive: 'bg-red-500/20 text-red-300 border-red-500/30',
 };
 
 const ringColors: Record<string, string> = {
   core: 'bg-amber-500/20 text-amber-300',
   domain: 'bg-cyan-500/20 text-cyan-300',
-  topic: 'bg-violet-500/20 text-violet-300',
+  topic: 'bg-cyan-500/15 text-cyan-300',
   leaf: 'bg-slate-500/20 text-slate-300',
 };
 
@@ -43,10 +43,13 @@ interface MemoryDetailPanelProps {
   health_status?: 'healthy'|'stale'|'at_risk'|'orphan';
 }
 
-const iconMap = {healthy: "✓", stale: "⏰", at_risk: "⚠", orphan: "🔗"};
-const colorMap = {healthy: "green", stale: "yellow", at_risk: "red", orphan: "gray"};
-
 const tooltipMap = {healthy: "Healthy", stale: "Stale - refresh", at_risk: "At risk - review", orphan: "Orphan - link"};
+const healthClasses = {
+  healthy: 'text-emerald-300',
+  stale: 'text-amber-300',
+  at_risk: 'text-red-300',
+  orphan: 'text-slate-400',
+};
 
 function formatLabel(value: string): string {
   return value.replace(/[_-]/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
@@ -139,8 +142,8 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNav
               )}
             </div>
               {health_status && (
-                <div className={`health-status ${health_status}`} style={{color: colorMap[health_status]}} title={tooltipMap[health_status]}>
-                  {iconMap[health_status]}
+                <div className={`health-status text-[10px] elefante-mono uppercase tracking-wider ${healthClasses[health_status]}`} title={tooltipMap[health_status]}>
+                  {tooltipMap[health_status]}
                 </div>
               )}
           </div>
