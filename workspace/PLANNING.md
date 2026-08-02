@@ -106,10 +106,10 @@ loopback-only, redacted snapshot-only, and read-only.
 
 | Work | Current proof |
 |------|---------------|
-| Visual acceptance | Previous dashboard acceptance passed; a fresh disclosed-data release screenshot and exact-candidate browser proof remain required before publication |
-| Regression proof | Local proof is green on `release/v2.12.0`: 267 fast tests passed with 4 legacy-backend skips; the isolated slow test passed; all three platform archives passed extracted-root, launcher, permission/byte, dry-run, and checksum smoke tests; dashboard build and audits passed; the strict hash-locked Python audit found no known vulnerabilities; version, changelog, lock freshness, routing, package, scoped Ruff, and whitespace gates passed. Exact-SHA GitHub checks remain required. |
-| Durable handoff | PR #7 history is preserved in a no-rewrite merge on `release/v2.12.0`; commit, push, and reviewed GitHub handoff follow this local proof |
-| Publication | NOT AUTHORIZED — no tag, release publication, deployment, or external hosting |
+| Visual acceptance | The source-grounded dashboard showcase and canonical branding are complete; the website candidate supplies desktop/mobile dark/light, reduced-motion, and full Matrix-state browser evidence. Final live browser acceptance remains a post-deployment step. |
+| Regression proof | Exact core candidate SHA `2c84a68` is green in PR #8 Quality (Python, dashboard, and production dependency audit). The manually dispatched exact-SHA cross-platform installer build is green on macOS, Windows, and Linux. Local proof remains 267 fast tests passed (4 legacy-backend skips), one isolated slow test passed, extracted archives and checksums passed, dashboard build/audits passed, and the strict hash-locked Python audit found no known vulnerabilities. |
+| Durable handoff | PR #7 history is preserved in the no-rewrite merge on `release/v2.12.0`; [draft PR #8](https://github.com/ElefanteAI/elefante/pull/8) is the exact core review and release handoff. The dependent website handoff is [draft PR #2](https://github.com/ElefanteAI/ElefanteUI/pull/2). |
+| Publication | NOT AUTHORIZED — no merge, tag, release publication, deployment, external Contact test, or live-store action. Core release must publish first; only then may the website manifest advance from v2.11.1. |
 
 ### §2.4 Approval gates
 
@@ -275,8 +275,11 @@ boundary, edge, and showcase regressions; all three views rendered at a desktop
 viewport; Decision Graph trails and relationship labels visually inspected;
 exact emblem visually inspected; full Python/routing/emoji/diff checks green.
 
-**Next:** finish verification on `release/v2.12.0`, obtain green checks for the
-exact candidate SHA, and publish only with explicit authorization.
+**Next:** keep both draft PRs unmerged until the owner has reconciled the
+Vercel deployment source, prepared the Contact mail/CAPTCHA configuration, and
+explicitly authorized the core release. Publish the core tag and installers
+first; verify downloaded assets; then advance, merge, and deploy the exact
+green website candidate.
 
 ### §4.4 Shipped (status: shipped — link to reference)
 
@@ -519,6 +522,7 @@ This section is the chronological record of curation events, decisions, and abso
 
 | Date | Event | Driver | Measurement |
 |------|-------|--------|-------------|
+| 2026-08-01 | **Remote-source reconciliation and release handoff completed.** GitHub, not a stale local checkout, was treated as source authority: core `main` is v2.11.1 (`d370b4d`), core candidate `2c84a68` is draft PR #8, website `main` is `94c32b8`, and website candidate `7a93681` is draft PR #2. The live Vercel response is an older divergent source, not proof that either candidate is deployed. The website candidate records the source-authority rule, production routes, Contact boundary, release manifest, canonical asset digests, visual/accessibility coverage, and non-production release order. An initial website CI failure exposed two portability defects: a logo verifier incorrectly depended on Git history absent from a shallow runner, and strict screenshot pixels differed under macOS/Linux font rasterization. The verifier now uses fixed canonical SHA-256 values and the visual assertion keeps a narrow platform tolerance; the replacement GitHub workflow is green. | Owner required current GitHub and live-site truth after development across multiple machines, plus a durable handoff for another agent. | Core PR #8: Quality green (Python, dashboard, production dependency audit) and exact-SHA macOS/Windows/Linux installer build green. Website PR #2: validation green and all 27 Chromium checks green. Both candidate worktrees matched their pushed remote heads and were clean. No merge, tag, GitHub Release, Vercel deployment, Vercel credential login, or Contact submission occurred. |
 | 2026-07-30 | **v2.12.0 release candidate integrated without rewriting PR #7 history.** Current v2.11.1 fixes were retained while the Memory Intelligence dashboard, Decision Graph, canonical branding, deterministic disclosed showcase, host-aware installers, platform launchers, and non-mutating dry run were merged. Customer documentation was separated from proposals, migration/support history, defects, and release operations; the public changelog was rewritten in customer language; active stale version promises were regression-guarded; the configured SQLite-vector/Kuzu initializer replaced a retired Chroma path; strict production dependency evidence closed stale GAP-029; and deterministic `SHA256SUMS` became a release asset contract. The release advisor was run after the changelog was complete and its automated 3.0.0 proposal was explicitly overridden by the owner-approved minor release, then every declaration was advanced together to 2.12.0. No live memory store, legacy migration, tag, release, or deployment was changed. | Owner-approved v2.12.0 fix-and-release plan, with core publication required before website publication | Local proof: 267 fast tests passed (4 legacy-backend skips, 1 isolated slow test deselected); the isolated slow two-bridge test passed; dashboard build and both npm audit gates passed with zero known vulnerabilities; strict hash-locked Python audit found no known vulnerabilities; the lock reproduced byte-for-byte; macOS, Windows, and Linux archives passed extracted-root, launcher, permission/byte, non-mutating dry-run, and generated-checksum verification; release-note validation, version sync, routing, package, scoped Ruff, workflow YAML, and whitespace checks passed. The first exact-SHA Quality run then exposed an over-escaped inline version regex that local component checks did not execute; the workflow now imports the canonical `src.__version__` directly and a release-pipeline regression locks that command. Replacement exact-SHA checks remain required before publication. |
 | 2026-05-01/02 | v2.10.0 contract release scoped (A1–A10 accepted, X1–X6 rejected, P1–P6 pending) | Architect design session | Decisions ledgered §2.3–§2.6 |
 | 2026-05-02 | BUG-026 filed (passive-protocol failure mode in direct-repo agent); 3 same-session recurrences | DOC_SYNC violation analysis | Active filename guard `test_no_forbidden_filename_patterns_*` lands; 18/18 tests green |

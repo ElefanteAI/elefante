@@ -1,6 +1,7 @@
 # Elefante Vision
 
-> Released product explanation · Current version: v2.12.0
+> Product explanation · Current version: v2.12.0 release candidate; current
+> published version: v2.11.1
 
 ## The Thesis
 
