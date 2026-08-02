@@ -129,7 +129,6 @@ If `--verify` flag set:
 All user data persists across restarts:
 
 - **SQLite**: `~/.elefante/data/vector/memories.sqlite3` (persistent on disk)
-- **Legacy ChromaDB**: `~/.elefante/data/chroma/` remains available for rollback after migration
 - **Kuzu**: `~/.elefante/data/kuzu_db` (persistent on disk)
 - **Logs**: `~/.elefante/logs/` (append-only)
 

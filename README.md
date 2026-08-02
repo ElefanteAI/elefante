@@ -8,11 +8,11 @@
 
 AI agents start every conversation from zero. Your preferences, decisions, and discovered patterns don't carry over. Elefante gives any MCP-compatible agent a persistent, local second brain — memories are stored, scored automatically, and surfaced at the right moment without being asked.
 
-**v2.11.1** — Persistent Memory Engine
+**v2.12.0** — Release candidate; current published release: v2.11.1
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ YOUR IDE (VS Code · Cursor · Windsurf · any MCP client)     │
+│ YOUR HOST (VS Code · Cursor · Codex · compatible MCP host)  │
 └────────────────────────┬────────────────────────────────────┘
                          │ MCP stdio
 ┌────────────────────────▼────────────────────────────────────┐
@@ -28,7 +28,7 @@ AI agents start every conversation from zero. Your preferences, decisions, and d
                          │ snapshot.json
 ┌────────────────────────▼────────────────────────────────────┐
 │ LAYER 3 · DASHBOARD                                         │
-│ Read-only view of your second brain's health                │
+│ Read-only briefing of what should shape the next answer     │
 │ http://127.0.0.1:8000                                       │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -49,7 +49,9 @@ Elefante is a local-first persistent memory engine for AI agents, connected via 
 - **Enforces quality** via a compliance gate: search before write, no duplicates
 - **Visualizes** brain health through a snapshot-driven dashboard
 
-Everything runs locally. No cloud. No telemetry. Your data stays on your machine.
+The Elefante store runs locally with no Elefante product telemetry. Context you
+intentionally send to a connected AI client is governed by that provider's data
+policy.
 
 ---
 
@@ -67,7 +69,6 @@ IDE configuration → [docs/how-to/configure-ide.md](docs/how-to/configure-ide.m
 Two local storage layers work together:
 
 - **SQLite** — the dependency-free default vector store; it preserves complete memory JSON and float32 embeddings with deterministic exact-cosine retrieval.
-- **Legacy ChromaDB migration** — existing stores can be converted through a stopped, backup-gated parity workflow; ChromaDB is not a runtime dependency for fresh installs.
 - **Kuzu** — a knowledge graph that tracks entities, relationships, and structural context.
 - **Behavioral Relevance** — a 5-signal scoring system that automatically surfaces the most useful memories. No manual importance ratings.
 
@@ -76,11 +77,12 @@ Architecture → [docs/reference/architecture.md](docs/reference/architecture.md
 
 ### Layer 3 — Dashboard
 
-A read-only view of your knowledge system, served from a lightweight snapshot so the agent stays fast:
+A read-only Memory Intelligence briefing, served from a redacted snapshot so the agent stays fast and the browser never owns your stores:
 
-- Health score with diagnostic panels
-- Searchable, sortable memory table
-- Topic distribution, memory insights, and a knowledge graph
+- A decision briefing that can show old assumption → evidence → decision → enforced guard
+- Searchable, sortable memory inspection with source and lifecycle context
+- Topic, distribution, and knowledge-connection views
+- A carbon, tusk, copper, brass, clay, and sage interface built around information state—not generic AI gradients
 
 Dashboard details → [docs/how-to/view-dashboard.md](docs/how-to/view-dashboard.md)
 Docker deployment → [docs/how-to/docker.md](docs/how-to/docker.md)
@@ -89,7 +91,9 @@ Docker deployment → [docs/how-to/docker.md](docs/how-to/docker.md)
 
 ## Designed For
 
-Elefante works with any MCP-compatible client today — VS Code, Cursor, Windsurf, and others. It is built to scale into fully autonomous agent frameworks (Docker-sandboxed, multi-agent, long-running) where persistent memory across sessions is not optional.
+Verified installer adapters currently cover VS Code, Cursor, Kiro, Gemini CLI,
+Claude Code, Codex, and OpenClaw. Other MCP-compatible clients can use the
+standard bridge contract, but are not marketed as verified integrations.
 
 ---
 
@@ -97,7 +101,9 @@ Elefante works with any MCP-compatible client today — VS Code, Cursor, Windsur
 
 **Requirements:** Python 3.11+ (tested up to 3.13). Git is only required for the source-checkout fallback path.
 
-Our installer detects your OS, manages the repository virtual environment, installs all deps, initializes local graph and vector databases, and **automatically configures VS Code, Cursor, and Bob-IDE** to connect to Elefante via MCP.
+Our installer detects your OS, manages the repository virtual environment,
+installs the locked dependencies, initializes local graph and vector databases,
+and lets you select from the compatible hosts detected on the machine.
 
 **Release bundle (preferred):** Download `elefante-installer-<OS>.zip` from GitHub Releases, extract it, then run the top-level `install.sh` or `install.bat`. The bootstrap places Elefante in a stable install root first, then delegates the real setup work to `scripts/setup/install.py`.
 
@@ -224,7 +230,7 @@ Three audiences, three surfaces:
 | Line of attack is suspect (RESEARCH mode) | [agents/researcher.md](agents/researcher.md) |
 | Need to retune the rules themselves | [agents/puppeteer.md](agents/puppeteer.md) (`PRIVILEGED` only) |
 
-### Reference (current locations during v2.10.x migration)
+### Product reference
 
 - [Tool reference](docs/reference/tools.md) — parameter schemas for all 16 tools and 2 prompts
 - [Behavioral Relevance](docs/reference/scoring.md) — how automatic scoring works

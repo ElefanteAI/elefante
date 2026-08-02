@@ -227,6 +227,26 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 
 ---
 
+### Release Archives Must Be Tested As Customer Interfaces
+
+- **Trigger:** A release pipeline packages platform download archives or launcher scripts.
+- **Rule:** Extract each platform artifact, decode its launcher bytes, reject hidden control characters, inspect the root-level choices a customer sees, and execute the primary entrypoint through a non-destructive smoke path.
+- **Why:** Archive membership proves only that files exist. It does not prove that a launcher path survived string escaping, that executable metadata survived ZIP creation, or that a stakeholder can identify the next action.
+- **Proof:** BUG-037 — v2.11.1 contained the expected Windows `install.bat`, but `\bootstrap_release_bundle.py` had already become ASCII backspace plus `ootstrap_release_bundle.py`; the macOS bundle also presented both Windows and Unix wrappers with no first-run guide.
+- **Avoid:** Tests that assert only `archive.namelist()`, or platform packages that expose internal cross-platform implementation choices as the customer UX.
+
+---
+
+### Dry Run Means No Durable Mutation
+
+- **Trigger:** A command exposes `--dry-run`, preview, plan, or check-only behavior.
+- **Rule:** Branch before every filesystem, service, database, network, or backup mutation, then assert the intended target remains absent or byte-identical.
+- **Why:** Skipping the final subprocess is not a dry run when preparation has already moved or replaced live state.
+- **Proof:** BUG-038 — bundle validation moved the live installation twice because payload placement preceded the dry-run branch.
+- **Avoid:** Tests that inspect printed output without also proving durable state did not change.
+
+---
+
 ### Write→Read Value-Space Verification (BUG-016, BUG-017, BUG-018)
 
 - **Trigger:** A scoring system uses multiple signals with weights, or a feature that writes data and reads it back for ranking/filtering.

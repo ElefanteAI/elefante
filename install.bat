@@ -53,7 +53,7 @@ echo [INFO] Repository virtual environment strategy will be handled by install.p
 REM 2. Run Python Installer
 echo [INFO] Starting installation wizard...
 echo [INFO] Starting installation wizard... >> "%LOG_FILE%"
-%PYTHON_CMD% scripts\setup\install.py --log-file "%LOG_FILE%" --status-file "%STATUS_FILE%" --summary-file "%SUMMARY_FILE%"
+%PYTHON_CMD% scripts\setup\install.py --log-file "%LOG_FILE%" --status-file "%STATUS_FILE%" --summary-file "%SUMMARY_FILE%" %*
 
 REM Keep window open if run from explorer
 echo.

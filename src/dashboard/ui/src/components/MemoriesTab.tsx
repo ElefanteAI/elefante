@@ -4,7 +4,7 @@ import { useSearch } from '@/hooks/useSearch';
 import { MemoryTable } from '@/components/MemoryTable';
 import { MemoryDetailPanel } from '@/components/MemoryDetailPanel';
 import { Sparkles, X } from 'lucide-react';
-import type { MemoryNode, SearchResult } from '@/types';
+import { edgeEndpoints, type MemoryNode, type SearchResult } from '@/types';
 
 export function MemoriesTab() {
   const [query, setQuery] = useState('');
@@ -148,8 +148,9 @@ export function MemoriesTab() {
           // Find related memories via edges
           const relatedIds = new Set<string>();
           snapshot?.edges.forEach((e) => {
-            if (e.source === selectedId) relatedIds.add(e.target);
-            if (e.target === selectedId) relatedIds.add(e.source);
+            const { source, target } = edgeEndpoints(e);
+            if (source === selectedId && target) relatedIds.add(target);
+            if (target === selectedId && source) relatedIds.add(source);
           });
           const related = memories.filter((m) => relatedIds.has(m.id));
 

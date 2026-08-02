@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useDashboardStore } from '@/store';
-import type { MemoryNode } from '@/types';
+import { edgeEndpoints, type MemoryNode } from '@/types';
 
 // ── Treemap ──────────────────────────────────────────────
 export interface TreemapDatum {
@@ -9,7 +9,8 @@ export interface TreemapDatum {
 }
 
 export function useTreemapData(): TreemapDatum[] {
-  const memories = useDashboardStore((s) => s.getMemoryNodes());
+  const getMemoryNodes = useDashboardStore((s) => s.getMemoryNodes);
+  const memories = getMemoryNodes();
   return useMemo(() => {
     const counts = new Map<string, number>();
     memories.forEach((m) => {
@@ -29,7 +30,8 @@ export interface CalendarDatum {
 }
 
 export function useCalendarData(): CalendarDatum[] {
-  const memories = useDashboardStore((s) => s.getMemoryNodes());
+  const getMemoryNodes = useDashboardStore((s) => s.getMemoryNodes);
+  const memories = getMemoryNodes();
   return useMemo(() => {
     const counts = new Map<string, number>();
     memories.forEach((m) => {
@@ -126,8 +128,9 @@ export function useHealthScore(): HealthScore {
     const memoryIds = new Set(memories.map((m) => m.id));
     const connectedIds = new Set<string>();
     snapshot.edges.forEach((e) => {
-      if (memoryIds.has(e.source)) connectedIds.add(e.source);
-      if (memoryIds.has(e.target)) connectedIds.add(e.target);
+      const { source, target } = edgeEndpoints(e);
+      if (memoryIds.has(source)) connectedIds.add(source);
+      if (memoryIds.has(target)) connectedIds.add(target);
     });
     const connectivity = Math.round((connectedIds.size / total) * 100);
     const orphanCount = total - connectedIds.size;

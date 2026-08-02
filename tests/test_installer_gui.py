@@ -84,3 +84,15 @@ def test_installer_app_has_no_bg_overrides_on_ttk_labels():
                     if kw.arg == "bg":
                         violations.append(f"line {node.lineno}: tk.Label with bg=")
     assert violations == [], f"BUG-020 risk: {violations}"
+
+
+def test_native_installer_and_python_engine_share_host_ids():
+    host_module = _load_module(
+        ROOT / "scripts/setup/host_selection.py",
+        "installer_host_selection_module",
+    )
+    swift_source = (ROOT / "scripts/ci/installer_app.swift").read_text(encoding="utf-8")
+
+    for host in host_module.SUPPORTED_HOSTS:
+        assert f'id: "{host}"' in swift_source
+    assert '"--host", host' in swift_source

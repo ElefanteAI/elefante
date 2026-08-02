@@ -3,22 +3,30 @@ import { useDashboardStore } from '@/store';
 import type { MemoryNode } from '@/types';
 
 const TOPIC_PALETTE: Record<string, { bg: string; border: string; text: string }> = {
-  communication:      { bg: 'rgba(34,211,238,0.07)',  border: '#22d3ee', text: '#22d3ee' },
-  workflow:           { bg: 'rgba(251,191,36,0.07)',   border: '#fbbf24', text: '#fbbf24' },
-  'agent-behavior':   { bg: 'rgba(167,139,250,0.07)',  border: '#a78bfa', text: '#a78bfa' },
-  debugging:          { bg: 'rgba(248,113,113,0.07)',  border: '#f87171', text: '#f87171' },
-  'coding-standards': { bg: 'rgba(74,222,128,0.07)',   border: '#4ade80', text: '#4ade80' },
-  architecture:       { bg: 'rgba(251,146,60,0.07)',   border: '#fb923c', text: '#fb923c' },
-  'tools-environment':{ bg: 'rgba(56,189,248,0.07)',   border: '#38bdf8', text: '#38bdf8' },
-  'user-profile':     { bg: 'rgba(244,114,182,0.07)',  border: '#f472b6', text: '#f472b6' },
-  collaboration:      { bg: 'rgba(52,211,153,0.07)',   border: '#34d399', text: '#34d399' },
-  general:            { bg: 'rgba(100,116,139,0.07)',  border: '#64748b', text: '#94a3b8' },
+  'runtime authority':      { bg: 'rgba(200,137,77,0.08)', border: '#c8894d', text: '#d9a66e' },
+  'trust boundary':         { bg: 'rgba(223,187,114,0.08)', border: '#dfbb72', text: '#dfbb72' },
+  'retrieval intelligence': { bg: 'rgba(142,168,137,0.08)', border: '#8ea889', text: '#9db599' },
+  'memory governance':      { bg: 'rgba(201,111,93,0.08)', border: '#c96f5d', text: '#d88a78' },
+  storage:                   { bg: 'rgba(226,176,110,0.08)', border: '#e2b06e', text: '#e2b06e' },
+  'host continuity':        { bg: 'rgba(185,148,115,0.08)', border: '#b99473', text: '#c8a381' },
+  recovery:                 { bg: 'rgba(113,141,116,0.08)', border: '#718d74', text: '#8ea889' },
+  'development process':    { bg: 'rgba(163,106,66,0.08)', border: '#a36a42', text: '#bd8050' },
+  communication:      { bg: 'rgba(200,137,77,0.08)', border: '#c8894d', text: '#d9a66e' },
+  workflow:           { bg: 'rgba(223,187,114,0.08)', border: '#dfbb72', text: '#dfbb72' },
+  'agent-behavior':   { bg: 'rgba(182,119,68,0.08)', border: '#b67744', text: '#c98d59' },
+  debugging:          { bg: 'rgba(201,111,93,0.08)', border: '#c96f5d', text: '#d88a78' },
+  'coding-standards': { bg: 'rgba(142,168,137,0.08)', border: '#8ea889', text: '#9db599' },
+  architecture:       { bg: 'rgba(226,176,110,0.08)', border: '#e2b06e', text: '#e2b06e' },
+  'tools-environment':{ bg: 'rgba(163,106,66,0.08)', border: '#a36a42', text: '#bd8050' },
+  'user-profile':     { bg: 'rgba(185,148,115,0.08)', border: '#b99473', text: '#c8a381' },
+  collaboration:      { bg: 'rgba(113,141,116,0.08)', border: '#718d74', text: '#8ea889' },
+  general:            { bg: 'rgba(111,103,91,0.08)', border: '#6f675b', text: '#b5aa98' },
 };
 
 const TYPE_COLORS: Record<string, string> = {
-  fact: '#3b82f6', decision: '#f59e0b',
-  preference: '#8b5cf6', insight: '#10b981',
-  note: '#64748b', conversation: '#94a3b8',
+  fact: '#c8894d', decision: '#dfbb72',
+  preference: '#b99473', insight: '#718d74',
+  note: '#6f675b', conversation: '#b5aa98',
 };
 
 function cleanTitle(title: string): string {

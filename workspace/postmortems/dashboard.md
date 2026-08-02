@@ -96,6 +96,14 @@
 **Guard:** `pytest tests/test_dashboard_serializer.py -k "null_name or graph" -v`.
 **Lesson:** When diagnosing port binding issues or HTTP 500 errors, verify the running process's CWD (`lsof -p <PID> | grep cwd`) to ensure port ownership belongs to the active workspace rather than an orphaned daemon from a trashed or moved folder.
 
+## Issue #13: Dashboard Header Emblem Was Clipped [BUG-034, FIXED, guarded]
+
+**Trigger:** The live header showed a copper block-like fragment instead of the complete Elefante symbol.
+**Root cause:** The exported mask asset contained only the left portion of the elephant. Source-shape review was mistaken for final-size composition review.
+**Solution:** Replaced it with the complete elephant-and-network crop from the repository's canonical logo, corrected the network-only hover clip, and locked the PNG dimensions and digest in the dashboard regression test.
+**Guard:** `pytest tests/test_dashboard_serializer.py -k "brand_assets" -v`, dashboard production build, and live-header inspection.
+**Lesson:** Brand-asset acceptance happens in the final rendered composition. Inspect the actual pixels at shipping size; source provenance alone does not prove an export is complete.
+
 ---
 
 ## Cross-bug pattern (extracted to `../lessons.md`)

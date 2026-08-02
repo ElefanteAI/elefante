@@ -24,6 +24,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CHANGELOG = ROOT / "CHANGELOG.md"
 RELEASE_HEADING_RE = re.compile(r"^## \[(\d+\.\d+\.\d+)\] - (\d{4}-\d{2}-\d{2})$", re.MULTILINE)
+CANDIDATE_HEADING_RE = re.compile(r"^## \[(\d+\.\d+\.\d+)\] — Release candidate$", re.MULTILINE)
 POTENTIAL_HEADING_RE = re.compile(r"^## \[[^\]]+\].*$", re.MULTILINE)
 
 
@@ -57,6 +58,11 @@ def parse_release_entries(text: str) -> list[dict[str, str | int]]:
     return entries
 
 
+def release_candidate_versions(text: str) -> set[str]:
+    """Return versions that are intentionally not published yet."""
+    return {match.group(1) for match in CANDIDATE_HEADING_RE.finditer(text)}
+
+
 def audit_changelog(text: str | None = None) -> list[str]:
     source = text if text is not None else CHANGELOG.read_text(encoding="utf-8")
     errors: list[str] = []
@@ -65,7 +71,7 @@ def audit_changelog(text: str | None = None) -> list[str]:
         line = match.group(0)
         if line == "## [Unreleased]":
             continue
-        if not RELEASE_HEADING_RE.fullmatch(line):
+        if not RELEASE_HEADING_RE.fullmatch(line) and not CANDIDATE_HEADING_RE.fullmatch(line):
             line_number = source.count("\n", 0, match.start()) + 1
             errors.append(f"Line {line_number}: malformed release heading '{line}'")
 
@@ -103,7 +109,7 @@ def extract_changelog_entry(version: str, text: str | None = None) -> str:
     return entry
 
 
-def validate_release_documentation(version: str) -> None:
+def validate_release_documentation(version: str, *, allow_candidate: bool = False) -> None:
     text = CHANGELOG.read_text(encoding="utf-8")
     errors = audit_changelog(text)
     if errors:
@@ -114,6 +120,10 @@ def validate_release_documentation(version: str) -> None:
     if "### " not in entry or len(entry.splitlines()) < 4:
         raise SystemExit(
             f"CHANGELOG entry for [{version}] is too thin to publish. Add real subsections and details first."
+        )
+    if version in release_candidate_versions(text) and not allow_candidate:
+        raise SystemExit(
+            f"v{version} is a release candidate. Assign the actual publication date in CHANGELOG.md before rendering release notes."
         )
 
 
@@ -132,8 +142,8 @@ def render_release_notes(version: str) -> str:
             "",
             "- [README](README.md) — current product overview and install path",
             "- [CHANGELOG](CHANGELOG.md) — full historical ledger",
+            "- [User Documentation](docs/README.md) — released procedures and reference",
             "- [Installation Guide](docs/how-to/install.md) — operator setup",
-            "- [Debug Index](workspace/ISSUES.md) — known issues and verification entrypoints",
         ]
     ) + "\n"
 
@@ -150,10 +160,11 @@ def main() -> None:
     args = parser.parse_args()
 
     version = normalize_version(args.version)
-    validate_release_documentation(version)
+    validate_release_documentation(version, allow_candidate=args.validate_only)
 
     if args.validate_only:
-        print(f"Release documentation OK for v{version}.")
+        state = "release candidate" if version in release_candidate_versions(CHANGELOG.read_text(encoding="utf-8")) else "published release"
+        print(f"Release documentation OK for v{version} ({state}).")
         return
 
     notes = render_release_notes(version)

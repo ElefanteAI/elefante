@@ -2,15 +2,15 @@
 # TEST    : tests/test_memory_persistence.py
 # VERSION : 2.5.2
 # CHANGED : 2026-04-15
-# PROVES  : Memories are durably stored in ChromaDB and Kuzu without generating
-#           temporary scripts; graph/session schema contract and relationship
-#           property constraints.
+# PROVES  : Memories are durably stored in the configured vector store and Kuzu
+#           without temporary scripts; graph/session schema contract and
+#           relationship property constraints.
 # RUN     : pytest tests/test_memory_persistence.py -v
 # WHEN    : After changes to vector_store.py, graph_store.py, or memory.py schema.
 # ─────────────────────────────────────────────────────────────────────────────
 """
 Tests for memory persistence - verifies that memories are stored directly
-in ChromaDB and Kuzu without generating temporary scripts.
+in the configured vector store and Kuzu without generating temporary scripts.
 
 This test suite ensures the write-path architecture is correct.
 """
@@ -621,21 +621,67 @@ class TestAbsolutePathResolution:
         assert DATA_DIR.is_absolute(), "DATA_DIR is not absolute"
     
     def test_config_paths_exist(self):
-        """Verify the configured runtime directories reflect the current lazy-Kuzu contract."""
-        from src.utils.config import CHROMA_DIR, KUZU_DIR, DATA_DIR, LOGS_DIR
+        """Verify eager runtime roots and the configured store-path contract."""
+        from src.utils.config import DATA_DIR, LOGS_DIR, get_config
         
         # Safe runtime directories are created eagerly.
         assert DATA_DIR.exists(), f"DATA_DIR does not exist: {DATA_DIR}"
-        assert CHROMA_DIR.exists(), f"CHROMA_DIR does not exist: {CHROMA_DIR}"
         assert LOGS_DIR.exists(), f"LOGS_DIR does not exist: {LOGS_DIR}"
 
-        # Kuzu manages its own database path lifecycle and config import should
-        # not assume a directory layout.
-        assert KUZU_DIR.parent == DATA_DIR, f"KUZU_DIR is not rooted under DATA_DIR: {KUZU_DIR}"
-        if KUZU_DIR.exists():
-            assert KUZU_DIR.is_file() or KUZU_DIR.is_dir(), (
-                f"KUZU_DIR exists but is not a regular filesystem node: {KUZU_DIR}"
+        # Config owns the active vector directory; the graph store owns its
+        # database path and materializes it lazily.
+        config = get_config().elefante
+        configured_data_dir = Path(config.data_dir)
+        vector_dir = Path(config.vector_store.persist_directory)
+        graph_path = Path(config.graph_store.database_path)
+        assert configured_data_dir.is_dir(), f"Configured data directory does not exist: {configured_data_dir}"
+        assert vector_dir.parent == configured_data_dir, (
+            f"Vector path is not rooted under configured data directory: {vector_dir}"
+        )
+        assert vector_dir.is_dir(), f"Configured vector directory does not exist: {vector_dir}"
+        assert graph_path.parent == configured_data_dir, (
+            f"Graph path is not rooted under configured data directory: {graph_path}"
+        )
+        if graph_path.exists():
+            assert graph_path.is_file() or graph_path.is_dir(), (
+                f"Graph path exists but is not a regular filesystem node: {graph_path}"
             )
+
+    def test_config_uses_active_vector_path_without_legacy_chroma_in_a_fresh_home(self, tmp_path):
+        """A clean SQLite install creates its active path, not retired Chroma state."""
+        repo_root = Path(__file__).resolve().parents[1]
+        script = """
+from pathlib import Path
+from src.utils.config import CHROMA_DIR, DATA_DIR, KUZU_DIR, LOGS_DIR, get_config
+config = get_config()
+vector_dir = Path(config.elefante.vector_store.persist_directory)
+assert DATA_DIR.is_dir()
+assert LOGS_DIR.is_dir()
+assert vector_dir == DATA_DIR / "vector"
+assert vector_dir.is_dir()
+assert not CHROMA_DIR.exists()
+assert not KUZU_DIR.exists()
+"""
+        env = {
+            **os.environ,
+            "HOME": str(tmp_path),
+            "USERPROFILE": str(tmp_path),
+            "PYTHONPATH": str(repo_root),
+            "ELEFANTE_CONFIG_PATH": str(repo_root / "config.yaml"),
+        }
+        env.pop("ELEFANTE_DATA_DIR", None)
+        env.pop("ELEFANTE_VECTOR_STORE_TYPE", None)
+
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=repo_root,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert result.returncode == 0, result.stderr
     
     def test_vector_store_config_uses_absolute_path(self):
         """Verify VectorStoreConfig has absolute path"""

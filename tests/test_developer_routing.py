@@ -114,15 +114,17 @@ def test_active_developer_routing_points_to_current_sources() -> None:
     assert "all 20 tools" not in orchestrator_doc or "20 tools" in orchestrator_doc
 
 
-def test_living_plan_tracks_the_post_210_trust_release() -> None:
+def test_living_plan_tracks_the_current_post_211_release() -> None:
     planning = _read("workspace/PLANNING.md")
 
-    assert "## §2 Active Release: v2.11.0 Trust Release" in planning
+    assert "## §2 Active Release: v2.12.0 Memory Intelligence" in planning
+    assert "### §3.1 v2.11.1 — Shipped baseline" in planning
     assert "## §2 Active Release: v2.10.0" not in planning
     assert "P1–P6 are open" not in planning
     assert "| OB4 |" not in planning
     assert "| OB5 |" not in planning
-    assert "249 automated tests pass" in planning
+    assert "source-grounded" in planning
+    assert "PUBLICATION_AUTHORIZED:** NO" in planning
 
 
 def test_active_tool_docs_match_current_mcp_surface() -> None:
@@ -192,7 +194,8 @@ def test_debug_feedback_loop_docs_are_linked() -> None:
     assert "agents/orchestrator.md" in lessons or "../agents/orchestrator.md" in lessons
     assert "README.md" in lessons
     assert "tests/README.md" in lessons
-    assert "lessons.md" in docs_index
+    assert "workspace/" not in docs_index
+    assert "postmortems/" not in docs_index
 
 
 def test_readme_and_planning_docs_capture_installer_recovery_and_learning_boundaries() -> None:
@@ -208,7 +211,39 @@ def test_readme_and_planning_docs_capture_installer_recovery_and_learning_bounda
 
     assert "installer-procedure.md" in proposals_readme
 
-    assert "proposals" in docs_index or "workspace/proposals" in docs_index
+    assert "workspace/proposals" not in docs_index
+    assert "memory-identity.md" not in docs_index
+    assert "close-a-feature.md" not in docs_index
+
+
+def test_active_release_claims_avoid_stale_version_promises() -> None:
+    """Active entrypoints must not present completed release targets as future."""
+    active_paths = (
+        "AGENTS.md",
+        "README.md",
+        "docs/README.md",
+        "docs/explanation/vision.md",
+        "docs/reference/architecture.md",
+        "docs/reference/tools.md",
+        "agents/manifests/ide-integration.yaml",
+    )
+    stale_patterns = (
+        r"currently at \*\*v2\.(?:9|10)",
+        r"current:\s*\*\*v2\.(?:9|10)",
+        r"v2\.10(?:\.0)? is in design",
+        r"v2\.11\.0 plan",
+        r"planned-v2\.(?:11|12)",
+        r"planned for v2\.(?:11|12)",
+    )
+
+    violations = []
+    for path in active_paths:
+        text = _read(path)
+        for pattern in stale_patterns:
+            if re.search(pattern, text, re.IGNORECASE):
+                violations.append(f"{path}: {pattern}")
+
+    assert not violations, "\n".join(violations)
 
 
 def test_developer_process_docs_enforce_question_first_token_discipline() -> None:

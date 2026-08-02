@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import os
 import subprocess
@@ -19,6 +20,7 @@ import sys
 import tarfile
 from pathlib import Path
 
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -111,12 +113,24 @@ def test_render_release_notes_uses_matching_changelog_entry():
     assert "## [2.7.1] - 2026-04-15" in notes
     assert "BUG-015" in notes
     assert "[Installation Guide](docs/how-to/install.md)" in notes
+    assert "[User Documentation](docs/README.md)" in notes
+    assert "workspace/" not in notes
 
 
 def test_release_documentation_audit_passes_for_repo_history():
     module = _load_module(ROOT / "scripts/ci/render_release_notes.py", "render_release_notes")
 
     assert module.audit_changelog() == []
+
+
+def test_published_release_can_render_public_notes():
+    module = _load_module(ROOT / "scripts/ci/render_release_notes.py", "render_published_notes")
+
+    assert "2.12.0" not in module.release_candidate_versions(
+        (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    )
+    module.validate_release_documentation("2.12.0")
+    assert "## [2.12.0] - 2026-08-01" in module.render_release_notes("2.12.0")
 
 
 def test_version_sync_tracks_release_identifiers_without_rewriting_history():
@@ -142,12 +156,104 @@ def test_build_workflow_uses_maintained_release_scripts():
     workflow = (ROOT / ".github/workflows/build-binaries.yml").read_text(encoding="utf-8")
 
     assert "python scripts/ci/build_installer_bundle.py" in workflow
+    assert "python scripts/ci/generate_release_checksums.py" in workflow
     assert "python3 scripts/ci/render_release_notes.py" in workflow
     assert "python3 scripts/ci/select_release_assets.py" in workflow
+    assert "python3 scripts/ci/generate_release_checksums.py" in workflow
     assert "body_path: release-notes.md" in workflow
-    assert "files: ${{ steps.select_release_assets.outputs.files }}" in workflow
+    assert "${{ steps.select_release_assets.outputs.files }}" in workflow
+    assert "SHA256SUMS" in workflow
     assert "name: elefante-${{ runner.os }}-installer" in workflow
     assert "python3 - <<'PY'" not in workflow
+
+
+def test_release_checksums_are_deterministic_and_detect_tampering(tmp_path):
+    module = _load_module(
+        ROOT / "scripts/ci/generate_release_checksums.py",
+        "generate_release_checksums",
+    )
+    alpha = tmp_path / "alpha.zip"
+    zeta = tmp_path / "zeta.zip"
+    alpha.write_bytes(b"alpha release asset\n")
+    zeta.write_bytes(b"zeta release asset\n")
+    manifest = tmp_path / "SHA256SUMS"
+
+    module.write_checksums([zeta, alpha], manifest)
+
+    expected = (
+        f"{hashlib.sha256(alpha.read_bytes()).hexdigest()}  alpha.zip\n"
+        f"{hashlib.sha256(zeta.read_bytes()).hexdigest()}  zeta.zip\n"
+    )
+    assert manifest.read_bytes() == expected.encode("utf-8")
+    assert module.verify_checksums(manifest, [zeta, alpha]) == ["alpha.zip", "zeta.zip"]
+
+    alpha.write_bytes(b"tampered release asset\n")
+    with pytest.raises(ValueError, match="SHA-256 mismatch"):
+        module.verify_checksums(manifest, [alpha, zeta])
+
+
+def test_release_checksums_reject_ambiguous_asset_basenames(tmp_path):
+    module = _load_module(
+        ROOT / "scripts/ci/generate_release_checksums.py",
+        "generate_release_checksums_duplicate_names",
+    )
+    first = tmp_path / "first" / "elefante.zip"
+    second = tmp_path / "second" / "elefante.zip"
+    first.parent.mkdir()
+    second.parent.mkdir()
+    first.write_bytes(b"one")
+    second.write_bytes(b"two")
+
+    with pytest.raises(ValueError, match="Duplicate release asset basename"):
+        module.render_checksums([first, second])
+
+
+def test_build_workflow_smokes_platform_archives_before_upload():
+    workflow = (ROOT / ".github/workflows/build-binaries.yml").read_text(encoding="utf-8")
+
+    unix_smoke = workflow.index("name: Smoke test platform archives (Unix)")
+    windows_smoke = workflow.index("name: Smoke test platform archives (Windows)")
+    upload = workflow.index("name: Upload Build Artifacts")
+
+    assert unix_smoke < upload
+    assert windows_smoke < upload
+    assert 'test -x "${bundle_root}/install.sh"' in workflow
+    assert 'test -x "${bundle_root}/Install Elefante.command"' in workflow
+    assert "Windows launcher contains invalid control bytes" in workflow
+    assert "Windows launcher contains a bare LF instead of CRLF" in workflow
+    assert "--dry-run" in workflow
+    assert "test ! -e \"$dry_run_root\"" in workflow
+    assert "Installer bundle dry-run mutated the install path" in workflow
+    assert "--verify \"$checksum_file\"" in workflow
+    assert "--verify $checksumFile" in workflow
+
+
+def test_quality_workflow_enforces_release_candidate_gates():
+    workflow = (ROOT / ".github/workflows/quality.yml").read_text(encoding="utf-8")
+
+    assert "python scripts/ci/bump_version.py --check" in workflow
+    assert "from src import __version__" in workflow
+    assert "scripts/ci/render_release_notes.py" in workflow
+    assert "python -m pytest tests -m slow -q" in workflow
+    assert "python -m ruff check" in workflow
+    assert "npm audit --audit-level=high" in workflow
+    assert "Production Dependency Audit" in workflow
+    assert "pypa/gh-action-pip-audit@" in workflow
+
+
+def test_release_workflow_publishes_verified_sha256sums():
+    workflow = (ROOT / ".github/workflows/build-binaries.yml").read_text(encoding="utf-8")
+
+    select = workflow.index("name: Select releasable assets")
+    generate = workflow.index("name: Generate and verify SHA256SUMS")
+    upload = workflow.index("name: Upload checksum manifest")
+    release = workflow.index("name: Create Release")
+
+    assert select < generate < upload < release
+    assert "--output SHA256SUMS" in workflow
+    assert "--verify SHA256SUMS" in workflow
+    assert "name: elefante-${{ github.ref_name }}-checksums" in workflow
+    assert "files: |\n            ${{ steps.select_release_assets.outputs.files }}\n            SHA256SUMS" in workflow
 
 
 def test_docker_bundle_uses_live_docs_and_hash_locked_dependencies(tmp_path):
@@ -182,3 +288,16 @@ def test_tagged_release_cannot_bypass_the_hash_locked_dependency_audit():
     assert "require-hashes: true" in workflow
     assert "disable-pip: true" in workflow
     assert "no-deps: true" in workflow
+
+
+def test_quality_lock_freshness_check_preserves_existing_transitive_pins():
+    workflow = (ROOT / ".github/workflows/quality.yml").read_text(encoding="utf-8")
+
+    copy_requirements = 'cp requirements.txt "$RUNNER_TEMP/elefante-lock-check/requirements.txt"'
+    copy_lock = 'cp requirements.lock "$RUNNER_TEMP/elefante-lock-check/requirements.lock"'
+    compile_lock = "uv pip compile --universal --generate-hashes --python-version 3.11"
+    compare_lock = 'cmp requirements.lock "$RUNNER_TEMP/elefante-lock-check/requirements.lock"'
+
+    assert workflow.index(copy_requirements) < workflow.index(copy_lock)
+    assert workflow.index(copy_lock) < workflow.index(compile_lock)
+    assert workflow.index(compile_lock) < workflow.index(compare_lock)

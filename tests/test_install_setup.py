@@ -19,6 +19,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import zipfile
 
 import pytest
@@ -567,6 +568,32 @@ def test_vscode_adapter_preserves_a_user_owned_elefante_entry(tmp_path):
     assert not (home / ".elefante" / "install-manifest.json").exists()
 
 
+def test_host_selection_keeps_adapter_families_isolated():
+    module = _load_module(ROOT / "scripts/setup/host_selection.py", "host_selection_module")
+
+    selected = module.normalize_selected_hosts(["cursor", "codex"])
+
+    assert module.select_family(selected, module.JSON_HOSTS) == {"cursor"}
+    assert module.select_family(selected, module.CLI_HOSTS) == {"codex"}
+    assert module.select_family(selected, module.VSCODE_FAMILY) == set()
+    assert module.select_family(None, module.JSON_HOSTS) is None
+
+
+def test_vscode_adapter_filters_paths_to_selected_host(monkeypatch, tmp_path):
+    module = _load_module(ROOT / "scripts/setup/configure_vscode_bob.py", "vscode_selection_module")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(module.os, "name", "posix")
+    monkeypatch.setattr(module.os, "uname", lambda: type("Uname", (), {"sysname": "Darwin"})())
+
+    vscode_paths = module.get_settings_paths({"vscode-copilot"})
+    bob_paths = module.get_settings_paths({"bob"})
+
+    assert vscode_paths
+    assert all(module._host_for_path(path) == "vscode-copilot" for path in vscode_paths)
+    assert bob_paths
+    assert all(module._host_for_path(path) == "bob" for path in bob_paths)
+
+
 def test_antigravity_adapter_preserves_a_user_owned_elefante_entry(monkeypatch, tmp_path):
     module = _load_module(ROOT / "scripts/setup/configure_antigravity.py", "antigravity_ownership_module")
     target = tmp_path / "mcp_config.json"
@@ -595,8 +622,8 @@ def test_bob_adapter_preserves_a_user_owned_elefante_entry(monkeypatch, tmp_path
     target = tmp_path / "mcp_settings.json"
     original = {"mcpServers": {"elefante": {"command": "user"}}}
     target.write_text(__import__("json").dumps(original), encoding="utf-8")
-    monkeypatch.setattr(module, "get_mcp_json_paths", lambda: [])
-    monkeypatch.setattr(module, "get_settings_paths", lambda: [target])
+    monkeypatch.setattr(module, "get_mcp_json_paths", lambda *_: [])
+    monkeypatch.setattr(module, "get_settings_paths", lambda *_: [target])
 
     assert module.configure_mcp(["--vscode", "chat-settings"])
     assert __import__("json").loads(target.read_text(encoding="utf-8")) == original
@@ -1099,6 +1126,33 @@ async def test_inject_seed_memory_returns_false_when_guard_blocks(monkeypatch):
     result = await module.inject_seed_memory()
 
     assert result is False
+
+
+@pytest.mark.asyncio
+async def test_database_verification_uses_configured_storage_paths(monkeypatch, tmp_path):
+    """BUG-039: fresh SQLite installs must not report a retired Chroma path."""
+    module = _load_module(ROOT / "scripts/setup/init_databases.py", "init_databases_paths_module")
+    data_dir = tmp_path / "data"
+    vector_dir = data_dir / "vector"
+    graph_dir = data_dir / "kuzu_db"
+
+    config = SimpleNamespace(
+        elefante=SimpleNamespace(
+            data_dir=str(data_dir),
+            vector_store=SimpleNamespace(type="sqlite", persist_directory=str(vector_dir)),
+            graph_store=SimpleNamespace(database_path=str(graph_dir)),
+        )
+    )
+
+    events = []
+    monkeypatch.setattr(module, "get_config", lambda: config)
+    monkeypatch.setattr(module.logger, "info", lambda event, **values: events.append((event, values)))
+
+    assert await module.verify_setup() is True
+    paths_event = next(values for event, values in events if event == "Data directories")
+    assert paths_event["vector_dir"] == str(vector_dir)
+    assert paths_event["graph_dir"] == str(graph_dir)
+    assert "chroma" not in paths_event["vector_dir"].lower()
 
 
 @pytest.mark.asyncio

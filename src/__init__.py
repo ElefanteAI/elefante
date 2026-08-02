@@ -1,11 +1,11 @@
 """
 Elefante - Local AI Memory System
 
-A dual-database memory system combining semantic search (ChromaDB)
+A dual-database memory system combining embedded semantic search
 with structured knowledge graphs (Kuzu) for comprehensive AI memory.
 """
 
-__version__ = "2.11.1"
+__version__ = "2.12.0"
 __author__ = "Elefante Contributors"
 
 # LAW #1 ENFORCEMENT: Do NOT import orchestrator at package level
@@ -28,4 +28,3 @@ __all__ = [
     "Entity",
     "Relationship",
 ]
-

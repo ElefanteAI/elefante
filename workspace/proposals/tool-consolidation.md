@@ -143,7 +143,7 @@ The user's earlier proposal also mentioned splitting `MemoryAdd`'s synchronous I
 
 - **Async ingestion pipeline** (above — separate v3.0.x patch).
 - **Schema versioning framework** (memories with `schema_version` field, forward-only migrations) — needed for any future field additions, separable.
-- **GAP-025 daemon** (singleton owner of Kuzu) — already planned for v2.11.0; this PRD assumes it ships first.
+- **GAP-025 daemon** (singleton owner of Kuzu) — shipped baseline; this PRD assumes it remains the storage authority.
 - Any curated-write behavior belongs in the existing `Memory(action="add")` contract, not a seventeenth tool.
 
 ## Status

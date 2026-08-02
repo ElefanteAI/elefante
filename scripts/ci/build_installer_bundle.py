@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : build_installer_bundle.py
-# VERSION : 2.9.2
-# CHANGED : 2026-04-17
+# VERSION : 2.12.0
+# CHANGED : 2026-07-29
 # PURPOSE : Build a downloadable Elefante installer bundle that carries a full
-#           payload plus a bootstrap entrypoint for stable-path installation.
+#           payload plus a platform-specific, customer-legible entrypoint.
 # WHEN    : In CI after dashboard assets are built, or locally when validating
 #           installer bundle contents before release publication.
 # USAGE   : python scripts/ci/build_installer_bundle.py --platform macOS
@@ -124,13 +124,18 @@ def default_output_path(root_dir: Path, platform_name: str) -> Path:
 
 
 def build_manifest(*, platform_name: str, version: str) -> dict[str, object]:
+    entrypoints = {
+        "Windows": ["Install Elefante.bat"],
+        "macOS": ["Install Elefante.command", "install.sh"],
+        "Linux": ["install.sh"],
+    }
     return {
         "product": "Elefante",
         "bundle_kind": "installer",
         "platform": platform_name,
         "version": version,
         "payload_root": "payload/elefante",
-        "entrypoints": ["install.sh", "install.bat"],
+        "entrypoints": entrypoints[platform_name],
         "default_install_roots": {
             "Windows": r"%LOCALAPPDATA%\\Elefante\\app\\current",
             "macOS": "~/.elefante/app/current",
@@ -169,7 +174,7 @@ exec \"$PYTHON_CMD\" \"$ROOT_DIR/scripts/setup/bootstrap_release_bundle.py\" --b
 
 
 def build_windows_wrapper() -> str:
-        return """@echo off
+    wrapper = r"""@echo off
 setlocal EnableDelayedExpansion
 
 set "PYTHON_CMD="
@@ -196,6 +201,45 @@ set EXIT_CODE=%ERRORLEVEL%
 pause
 exit /b %EXIT_CODE%
 """
+    return wrapper.replace("\n", "\r\n")
+
+
+def build_macos_launcher() -> str:
+    return """#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec /bin/bash "$ROOT_DIR/install.sh" "$@"
+"""
+
+
+def build_start_here(*, platform_name: str) -> str:
+    instructions = {
+        "macOS": (
+            "1. Double-click \"Install Elefante.command\".\n"
+            "2. Keep the Terminal window open while Elefante installs.\n"
+            "3. Restart your supported agent host when the installer reports SUCCESS.\n\n"
+            "If macOS blocks the launcher, open Terminal in this folder and run:\n"
+            "chmod +x \"Install Elefante.command\" install.sh && ./\"Install Elefante.command\"\n"
+        ),
+        "Windows": (
+            "1. Double-click \"Install Elefante.bat\".\n"
+            "2. Keep the installer window open while Elefante installs.\n"
+            "3. Restart your supported agent host when the installer reports SUCCESS.\n"
+        ),
+        "Linux": (
+            "1. Open a terminal in this folder.\n"
+            "2. Run: chmod +x install.sh && ./install.sh\n"
+            "3. Restart your supported agent host when the installer reports SUCCESS.\n"
+        ),
+    }
+    return (
+        f"ELEFANTE {platform_name.upper()} INSTALLER\n"
+        f"{'=' * (20 + len(platform_name))}\n\n"
+        f"{instructions[platform_name]}\n"
+        "Requires Python 3.11, 3.12, or 3.13 and an internet connection.\n"
+        "Elefante installs into your user account; administrator access is not required.\n"
+    )
 
 
 def write_text_entry(
@@ -206,8 +250,9 @@ def write_text_entry(
     executable: bool = False,
 ) -> None:
     info = zipfile.ZipInfo(arcname)
-    if executable:
-        info.external_attr = 0o755 << 16
+    info.create_system = 3
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.external_attr = (0o755 if executable else 0o644) << 16
     archive.writestr(info, content)
 
 
@@ -229,15 +274,29 @@ def build_installer_bundle(root_dir: Path, *, platform_name: str, output_path: P
         )
         write_text_entry(
             archive,
-            f"{bundle_dir}/install.sh",
-            build_unix_wrapper(),
-            executable=True,
+            f"{bundle_dir}/START HERE.txt",
+            build_start_here(platform_name=platform_name),
         )
-        write_text_entry(
-            archive,
-            f"{bundle_dir}/install.bat",
-            build_windows_wrapper(),
-        )
+        if platform_name == "Windows":
+            write_text_entry(
+                archive,
+                f"{bundle_dir}/Install Elefante.bat",
+                build_windows_wrapper(),
+            )
+        else:
+            write_text_entry(
+                archive,
+                f"{bundle_dir}/install.sh",
+                build_unix_wrapper(),
+                executable=True,
+            )
+            if platform_name == "macOS":
+                write_text_entry(
+                    archive,
+                    f"{bundle_dir}/Install Elefante.command",
+                    build_macos_launcher(),
+                    executable=True,
+                )
 
         bootstrap_bytes = (root_dir / BOOTSTRAP_SCRIPT).read_bytes()
         archive.writestr(f"{bundle_dir}/{BOOTSTRAP_SCRIPT.as_posix()}", bootstrap_bytes)

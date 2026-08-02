@@ -72,6 +72,14 @@
 **Guard:** `pytest tests/test_dashboard_serializer.py -k "graph_query_validator" -v`.
 **Lesson:** Enforce capability policy at the client boundary; enforcing it in a shared internal primitive silently breaks legitimate maintenance work.
 
+## Issue #10: Fresh Runner Test Required a Retired Chroma Directory [BUG-036, FIXED, guarded]
+
+**Trigger:** PR #7 passed locally but failed on GitHub's clean runner because `~/.elefante/data/chroma` did not exist.
+**Root cause:** A legacy path test asserted eager creation of `CHROMA_DIR`. SQLite is now the default, config creates the active vector directory while Kuzu owns its database path lazily, and the local machine's historical Chroma directory concealed the stale assertion.
+**Solution:** Compare active vector and graph paths with the data root from the same configuration instance so test order cannot mix reloaded and module-default homes. Separately, run config loading in a subprocess with an isolated fresh home to prove the active SQLite directory is created without recreating retired Chroma state or pre-creating Kuzu.
+**Guard:** `pytest tests/test_memory_persistence.py -k "config_paths_exist or fresh_home" -v`.
+**Lesson:** Filesystem tests must include a clean-home proof. Persistent developer state can make obsolete path assumptions look valid indefinitely.
+
 ---
 
 ## Cross-bug pattern (extracted to `../lessons.md`)

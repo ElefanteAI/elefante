@@ -1,14 +1,16 @@
-"""
-generate_100_memories.py - Self-Contained Elefante History Demo Dataset Injector
+"""Legacy behavioral-store benchmark for Elefante.
 
 PURPOSE : Populate an isolated Elefante database with 100 deterministic memories
           drawn from Elefante's actual development history, plus realistic
           behavioral history for dashboard completeness.
-INJECTION: Direct VectorStore + GraphStore writes. Zero LLM. Instant.
+INJECTION: Direct legacy Chroma VectorStore + Kuzu GraphStore writes. Zero LLM.
+CURRENT : This is a store-mutation benchmark, not the current dashboard demo.
+          Prefer generate_showcase_snapshot.py for a safe, source-grounded,
+          read-only product showcase using the current snapshot contract.
 SPEC    : scripts/demo/SPEC_behavioral_history.md
 
 RUN:
-    .venv/bin/python scripts/demo/generate_100_memories.py --db ./a0-data/demo_db
+    .venv/bin/python scripts/demo/generate_100_memories.py --db ./a0-data/demo_db --force
 CLEAN:
     rm -rf ./a0-data/demo_db
 """
@@ -24,11 +26,11 @@ from datetime import datetime, timedelta
 
 sys.path.insert(0, os.getcwd())
 
-from src.core.orchestrator import MemoryOrchestrator
-from src.core.vector_store import VectorStore
-from src.core.graph_store import GraphStore
-from src.models.memory import Memory, MemoryMetadata, MemoryType, MemoryStatus, TYPE_DECAY_RATES
-from src.models.entity import Entity, EntityType
+from src.core.orchestrator import MemoryOrchestrator  # noqa: E402
+from src.core.vector_store import VectorStore  # noqa: E402
+from src.core.graph_store import GraphStore  # noqa: E402
+from src.models.memory import Memory, MemoryMetadata, MemoryType, MemoryStatus, TYPE_DECAY_RATES  # noqa: E402
+from src.models.entity import Entity, EntityType  # noqa: E402
 
 random.seed(42)
 
@@ -46,21 +48,21 @@ def _memory_item(content, memory_type, category, tags=None, **extra):
 
 def _foundation_memories():
     return [
-        _memory_item("Elefante splits storage by purpose: ChromaDB holds semantic memories and Kuzu holds entities and relationships. Confusing the two caused dashboard data bugs early in the project.", "fact", "architecture", ["chroma", "kuzu", "architecture"], cluster="architecture"),
+        _memory_item("Elefante splits storage by purpose: embedded SQLite is the default semantic memory store and Kuzu holds entities and relationships. Legacy Chroma stores remain readable only when explicitly configured.", "fact", "architecture", ["sqlite", "kuzu", "architecture"], cluster="architecture"),
         _memory_item("The retrieval model in v2.7.0 uses five signals: vector 0.35, concept 0.30, coactivation 0.15, authority 0.10, temporal 0.10. Domain signal was removed after proving it contributed nothing.", "fact", "retrieval", ["v2.7.0", "scoring", "retrieval"], cluster="architecture"),
         _memory_item("Memory type half-lives are intentional product behavior: conversation about 28 days, note 46, insight 87, fact and decision 139, preference 347, specification and directive infinite.", "fact", "memory-model", ["decay", "memory-types", "product-behavior"], cluster="architecture"),
         _memory_item("Elefante exposes 16 MCP tools and 2 prompts across memory, directives, graph, tasks, ETL, context, sessions, dashboard, and system control.", "fact", "mcp", ["tools", "mcp", "surface-area"], cluster="architecture"),
         _memory_item("The tool response contract injects MANDATORY_PROTOCOLS, DIRECTIVES, RELEVANT_CONTEXT when available, and TOKEN_STATS.", "fact", "protocol", ["response-contract", "protocol", "mcp"]),
         _memory_item("Memory metadata is wide by design: 40 plus flattened fields covering classification, lifecycle, relationships, temporal state, and extensibility.", "fact", "memory-model", ["metadata", "schema", "memory-model"]),
         _memory_item("Token intelligence landed in v2.5.0. Every tool response reports output_tokens, overhead_tokens, and signal_ratio.", "fact", "token-intelligence", ["v2.5.0", "tokens", "telemetry"]),
-        _memory_item("The runtime stack is Python 3.11, ChromaDB, Kuzu, sentence-transformers, FastAPI, and a React/Vite dashboard.", "fact", "stack", ["python", "dashboard", "stack"]),
+        _memory_item("The runtime stack is Python 3.11, embedded SQLite vectors, Kuzu, sentence-transformers, FastAPI, and a React/Vite dashboard.", "fact", "stack", ["python", "dashboard", "stack"]),
         _memory_item("Co-activation is generated automatically from retrieval history. The server records memories retrieved together and writes CO_ACTIVATED edges to Kuzu.", "fact", "retrieval", ["coactivation", "graph", "retrieval"]),
         _memory_item("The dashboard must read dashboard_snapshot.json, not live database queries. Direct Kuzu calls caused the 11-nodes-vs-71-memories confusion.", "fact", "dashboard", ["dashboard", "snapshot", "known-issue"]),
         _memory_item("Dashboard composite score is weighted 50 percent temporal vitality, 25 percent memory-type weight, and 25 percent engagement.", "fact", "dashboard", ["dashboard", "scoring", "composite-score"]),
         _memory_item("Compliance is mechanical: search before write. elefante-Memory(action=add) must not bypass duplicate and contradiction checks.", "fact", "compliance", ["compliance", "memory-add", "search-first"]),
         _memory_item("ETL classification is agent-driven, not handled by an internal Elefante LLM. The agent enriches memories through ETLProcess and ETLClassify.", "fact", "etl", ["etl", "agent-driven", "classification"]),
         _memory_item("A pre-commit hook blocks commits by running health_check.py and verify_mcp_handshake.py.", "fact", "quality-gates", ["pre-commit", "health-check", "handshake"]),
-        _memory_item("The project moved from v1.0.0 in December 2025 to v2.7.1 in April 2026, with major changes around directives, SDD support, token intelligence, and scoring.", "fact", "project-history", ["versions", "timeline", "release-history"]),
+        _memory_item("The project moved from v1.0.0 in December 2025 to v2.11.0 in July 2026, adding directives, token intelligence, five-signal retrieval, a shared loopback daemon, provenance, and an embedded SQLite default.", "fact", "project-history", ["versions", "timeline", "release-history"]),
         _memory_item("No emojis in source code or docs. The codebase treats decoration as signal loss and enforces that preference with tests.", "preference", "communication", ["no-emojis", "style", "tests"]),
         _memory_item("Use structured logging for normal diagnostics. Reserve raw stderr writes for probe-level debugging in threaded or async startup paths.", "preference", "debugging", ["logging", "stderr", "debugging"]),
         _memory_item("Keep Elefante local-first. Memory, backups, and reset paths must work on the user's machine without cloud dependency.", "preference", "product-direction", ["local-first", "privacy", "product"]),
@@ -192,10 +194,12 @@ def build_corpus():
     return corpus
 
 
-async def run_injection(db_path):
+async def run_injection(db_path, *, force=False):
     abs_db = os.path.abspath(db_path)
     print(f"Target DB: {abs_db}")
 
+    if os.path.exists(abs_db) and not force:
+        raise FileExistsError(f"{abs_db} already exists; pass --force to replace this isolated demo path")
     if os.path.exists(abs_db):
         shutil.rmtree(abs_db)
     os.makedirs(abs_db, exist_ok=True)
@@ -342,8 +346,8 @@ async def run_injection(db_path):
     surviving = await asyncio.to_thread(orchestrator.vector_store._collection.get)
     total = len(surviving["ids"])
     print(f"\nDone. {total} memories in DB.")
-    print(f"Launch dashboard:")
-    print(f"  ELEFANTE_DB_PATH={abs_db} python -m src.dashboard")
+    print("This legacy benchmark does not directly drive the snapshot-only dashboard.")
+    print("Use generate_showcase_snapshot.py for the current product showcase.")
 
 
 async def _behavioral_history_pass(orchestrator, surviving_ids, conversation_groups,
@@ -551,7 +555,8 @@ async def _verify(orchestrator, surviving_ids, now):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate 100-memory demo dataset")
-    parser.add_argument("--db", default="./a0-data/demo_db", help="Isolated DB path (will be wiped)")
+    parser = argparse.ArgumentParser(description="Generate a legacy 100-memory behavioral store benchmark")
+    parser.add_argument("--db", default="./a0-data/demo_db", help="Isolated legacy database path")
+    parser.add_argument("--force", action="store_true", help="Replace only the explicit isolated database path")
     args = parser.parse_args()
-    asyncio.run(run_injection(args.db))
+    asyncio.run(run_injection(args.db, force=args.force))

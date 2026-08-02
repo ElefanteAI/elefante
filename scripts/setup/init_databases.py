@@ -3,9 +3,9 @@
 # NAME    : init_databases.py
 # VERSION : 2.7.2
 # CHANGED : 2026-04-16
-# PURPOSE : Initialize or re-verify ChromaDB collections and Kuzu schema without
+# PURPOSE : Initialize or re-verify the configured vector store and Kuzu schema without
 #           running the full installer; safe bootstrap safety check.
-# WHEN    : After a Kuzu nuclear reset or ChromaDB wipe, to re-initialize the
+# WHEN    : After a Kuzu reset or vector-store recovery, to re-initialize the
 #           data stores without reinstalling everything. Also run if you see
 #           'collection not found' or 'schema mismatch' errors on server start.
 # USAGE   : python scripts/setup/init_databases.py
@@ -17,7 +17,7 @@
 """
 Database initialization script for Elefante
 
-This script initializes both ChromaDB and Kuzu databases,
+This script initializes the configured embedded vector store and Kuzu database,
 creates necessary directories, and verifies the setup.
 """
 
@@ -40,8 +40,9 @@ logger = get_logger(__name__)
 
 
 async def init_vector_store():
-    """Initialize ChromaDB vector store"""
-    logger.info("Initializing ChromaDB vector store...")
+    """Initialize the configured embedded vector store."""
+    store_type = get_config().elefante.vector_store.type
+    logger.info("Initializing vector store...", backend=store_type)
     
     try:
         vector_store = get_vector_store()
@@ -110,8 +111,8 @@ async def verify_setup():
     
     # Check data directories
     data_dir = Path(config.elefante.data_dir)
-    vector_dir = data_dir / "chroma"
-    graph_dir = data_dir / "kuzu_db"
+    vector_dir = Path(config.elefante.vector_store.persist_directory)
+    graph_dir = Path(config.elefante.graph_store.database_path)
     
     logger.info(
         "Data directories",
@@ -120,7 +121,8 @@ async def verify_setup():
         graph_dir=str(graph_dir)
     )
     
-    # Verify directories exist
+    # The active vector directory is owned by the configured backend. Kuzu
+    # materializes its database path lazily when the graph store opens.
     if not data_dir.exists():
         logger.warning(f"Data directory does not exist: {data_dir}")
         data_dir.mkdir(parents=True, exist_ok=True)
@@ -239,5 +241,4 @@ async def main():
 if __name__ == "__main__":
     exit_code = asyncio.run(main())
     sys.exit(exit_code)
-
 

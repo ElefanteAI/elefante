@@ -44,6 +44,7 @@ from install_manifest import (  # noqa: E402
     record_emitted_json_entry,
     write_json_atomically,
 )
+from host_selection import VSCODE_FAMILY  # noqa: E402
 
 
 def _infer_repo_python(elefante_path: Path) -> str:
@@ -86,8 +87,17 @@ if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
-def get_settings_paths():
-    """Get potential settings.json paths for VS Code, Cursor, and Bob-IDE."""
+def _host_for_path(path: Path) -> str | None:
+    normalized = str(path).replace("\\", "/")
+    if "/Bob-IDE/" in normalized or "/.bob/" in normalized:
+        return "bob"
+    if "/Code/User/" in normalized or "/Code - Insiders/User/" in normalized:
+        return "vscode-copilot"
+    return None
+
+
+def get_settings_paths(selected: set[str] | None = None):
+    """Get potential settings paths for the selected VS Code-family hosts."""
     paths = []
     
     if os.name == 'nt':  # Windows
@@ -97,8 +107,6 @@ def get_settings_paths():
             paths.append(Path(appdata) / "Code" / "User" / "settings.json")
             # VS Code Insiders
             paths.append(Path(appdata) / "Code - Insiders" / "User" / "settings.json")
-            # Cursor
-            paths.append(Path(appdata) / "Cursor" / "User" / "settings.json")
             # Bob-IDE (User provided path)
             paths.append(Path(appdata) / "Bob-IDE" / "User" / "globalStorage" / "ibm.bob-code" / "settings" / "mcp_settings.json")
             # Bob-IDE (Standard User settings)
@@ -109,19 +117,20 @@ def get_settings_paths():
         if os.uname().sysname == 'Darwin':  # macOS
             paths.append(home / "Library" / "Application Support" / "Code" / "User" / "settings.json")
             paths.append(home / "Library" / "Application Support" / "Code - Insiders" / "User" / "settings.json")
-            paths.append(home / "Library" / "Application Support" / "Cursor" / "User" / "settings.json")
             paths.append(home / "Library" / "Application Support" / "Bob-IDE" / "User" / "settings.json")
         else:  # Linux
             paths.append(home / ".config" / "Code" / "User" / "settings.json")
             paths.append(home / ".config" / "Code - Insiders" / "User" / "settings.json")
-            paths.append(home / ".config" / "Cursor" / "User" / "settings.json")
             paths.append(home / ".config" / "Bob-IDE" / "User" / "settings.json")
-            
-    return paths
+
+    selected_hosts = selected or set(VSCODE_FAMILY)
+    return [path for path in paths if _host_for_path(path) in selected_hosts]
 
 
-def get_mcp_json_paths():
+def get_mcp_json_paths(selected: set[str] | None = None):
     """Get potential VS Code MCP configuration file paths (mcp.json)."""
+    if selected is not None and "vscode-copilot" not in selected:
+        return []
     paths = []
 
     if os.name == 'nt':
@@ -233,14 +242,21 @@ def configure_mcp(argv: list[str] | None = None):
             "Compatibility flag (no longer required). The script always writes VS Code user-level mcp.json for global enablement."
         ),
     )
+    parser.add_argument(
+        "--host",
+        choices=tuple(sorted(VSCODE_FAMILY)),
+        action="append",
+        help="Configure only this detected host. Repeat to select both.",
+    )
     args = parser.parse_args(argv)
+    selected_hosts = set(args.host or VSCODE_FAMILY)
 
     configure_vscode_mcp = args.vscode in {"mcp.json", "both"}
     configure_vscode_chat_settings = args.vscode in {"chat-settings", "both"}
     clean_duplicates = not bool(args.no_clean_duplicates)
 
     # Configure VS Code MCP (mcp.json) when available
-    mcp_paths = get_mcp_json_paths()
+    mcp_paths = get_mcp_json_paths(selected_hosts)
     mcp_configured = False
     if configure_vscode_mcp:
         for mcp_path in mcp_paths:
@@ -265,7 +281,7 @@ def configure_mcp(argv: list[str] | None = None):
             print("Recommendation: keep workspace mcp.json empty and use .vscode/mcp.example.jsonc as a template.")
     
     # Find valid settings files
-    potential_paths = get_settings_paths()
+    potential_paths = get_settings_paths(selected_hosts)
     found_paths = [p for p in potential_paths if p.exists()]
     
     if not found_paths and not mcp_configured:

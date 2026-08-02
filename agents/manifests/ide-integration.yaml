@@ -16,7 +16,7 @@
 #   deprecated    — was supported, now retired (kept for migration window)
 #
 # Last full re-verification: 2026-04-18 (snapshot from spec-ide-integration-surface.md §3).
-# Active integration-inspector run before v2.11.0 cut will refresh verified_doc_hash for every row.
+# Active integration-inspector run before a release cut will refresh verified_doc_hash for every row.
 
 schema_version: 1
 
@@ -64,7 +64,7 @@ surfaces:
       - https://docs.github.com/en/copilot/customizing-copilot/about-customizing-github-copilot-chat-responses
       - https://code.visualstudio.com/docs/copilot/copilot-chat
     last_verified: 2026-04-18
-    verified_doc_hash: pending  # Refreshed by integration-inspector before v2.11.0 cut
+    verified_doc_hash: pending  # Refreshed by integration-inspector before a release cut
 
   - id: claude-code
     kind: cli-agent
@@ -76,7 +76,7 @@ surfaces:
       - path: .claude/skills/
         purpose: Anthropic Skill v1 SKILL.md files
         status: planned
-        installer_writes: planned-v2.11
+        installer_writes: planned
     user_home:
       - path: ~/.claude.json
         purpose: Claude Code MCP server registration
@@ -102,7 +102,7 @@ surfaces:
       unregister it. Existing user registrations are preserved.
       Permission whitelist allows WebFetch to: bob.ibm.com, openclaw.ai, clawhub.ai,
       kiro.dev, code.visualstudio.com, docs.openclaw.ai, docs.cursor.com.
-      Full Skill v1 surface (.claude/skills/) lands in v2.11.0 per
+      Full Skill v1 surface (.claude/skills/) is tracked in
       workspace/proposals/ide-integration-surface.md §15.2.
 
   # ───────── Local (gitignored) installer-emitted files ─────────
@@ -118,11 +118,11 @@ surfaces:
           Created by scripts/setup/install.py during installation.
           Listed in .gitignore — visible at install time but not in repo.
           Cursor has deprecated this format in favor of .cursor/rules/*.mdc;
-          v2.11.0 plan migrates to the new format.
+          the current plan migrates to the new format.
       - path: .cursor/rules/*.mdc
         purpose: Cursor rules (new format)
         status: planned
-        installer_writes: planned-v2.11
+        installer_writes: planned
     user_home:
       - path: ~/.cursor/mcp.json
         purpose: Cursor MCP server registration
@@ -158,11 +158,11 @@ surfaces:
       - path: .windsurf/rules/*.md
         purpose: Windsurf rules (frontmatter format)
         status: planned
-        installer_writes: planned-v2.11
+        installer_writes: planned
     user_home:
       - path: ~/.codeium/windsurf/memories/global_rules.md
         purpose: Global Windsurf memories
-        installer_writes: planned-v2.11
+        installer_writes: planned
     skill_paths:
       project:
         - .windsurf/rules/*.md
@@ -173,11 +173,11 @@ surfaces:
         - trigger
     documentation:
       reference: docs/how-to/configure-ide.md
-      install_authority: planned-v2.11
+      install_authority: planned
     last_verified: 2026-04-18
     verified_doc_hash: pending
 
-  # ───────── Planned (v2.11 detect-then-emit installer) ─────────
+  # ───────── Planned integrations ─────────
 
   - id: bob
     kind: ide
@@ -185,7 +185,7 @@ surfaces:
     user_home:
       - path: ~/.bob/settings/mcp_settings.json
         purpose: IBM Bob MCP server registration (canonical path)
-        installer_writes: planned-v2.11
+        installer_writes: planned
     skill_paths:
       project:
         - .bob/skills/{name}/SKILL.md
@@ -197,7 +197,7 @@ surfaces:
       install_authority: scripts/setup/configure_vscode_bob.py  # also handles Bob detection
     last_verified: 2026-04-18
     verified_doc_hash: pending
-    status: planned-v2.11
+    status: planned
     notes: |
       Bob uses a non-standard config path (~/.bob/settings/mcp_settings.json) per
       ops-installation-compendium.md Issue #7. The current installer script
@@ -210,7 +210,7 @@ surfaces:
     user_home:
       - path: .kiro/settings/mcp.json
         purpose: Kiro MCP config (project-level)
-        installer_writes: planned-v2.11
+        installer_writes: planned
       - path: ~/.kiro/settings/mcp.json
         purpose: Kiro MCP config (global)
         installer_writes: true
@@ -246,7 +246,7 @@ surfaces:
         - inclusion
     last_verified: 2026-04-18
     verified_doc_hash: pending
-    status: planned-v2.11
+    status: planned
     notes: Kiro Steering is distinct from Kiro Skills (added 2026-Q1).
 
   - id: cline
@@ -259,9 +259,9 @@ surfaces:
         - ~/Documents/Cline/Rules/
       format: plain-md-or-txt
     documentation:
-      install_authority: planned-v2.12
+      install_authority: planned
     last_verified: 2026-04-18
-    status: planned-v2.12
+    status: planned
     notes: Phase 3 surface (extension-managed; instruction-doc emission rather than file emission).
 
   - id: roo
@@ -274,9 +274,9 @@ surfaces:
         - ~/.roo/rules/
       format: plain-md-or-txt
     documentation:
-      install_authority: planned-v2.12
+      install_authority: planned
     last_verified: 2026-04-18
-    status: planned-v2.12
+    status: planned
     notes: Phase 3 surface.
 
   - id: kilo
@@ -289,9 +289,9 @@ surfaces:
         - ~/.kilocode/rules/
       format: plain-md-or-txt
     documentation:
-      install_authority: planned-v2.12
+      install_authority: planned
     last_verified: 2026-04-18
-    status: planned-v2.12
+    status: planned
     notes: Phase 3 surface.
 
   - id: continue
@@ -307,9 +307,9 @@ surfaces:
         - globs
         - alwaysApply
     documentation:
-      install_authority: planned-v2.12
+      install_authority: planned
     last_verified: 2026-04-18
-    status: planned-v2.12
+    status: planned
 
   - id: zed
     kind: ide
@@ -329,11 +329,11 @@ surfaces:
     user_home:
       - path: ~/.config/zed/settings.json
         purpose: Zed MCP server registration
-        installer_writes: planned-v2.11
+        installer_writes: planned
     documentation:
-      install_authority: planned-v2.11
+      install_authority: planned
     last_verified: 2026-04-18
-    status: planned-v2.11
+    status: planned
     notes: |
       Zed auto-detects from a precedence list. The universal AGENTS.md (this repo's
       new root-level file as of 2026-05-02) is the second item in the list; the
@@ -400,11 +400,11 @@ surfaces:
     user_home:
       - path: .aider.conf.yml
         purpose: Aider config
-        installer_writes: planned-v2.12
+        installer_writes: planned
     documentation:
-      install_authority: planned-v2.12
+      install_authority: planned
     last_verified: 2026-04-18
-    status: planned-v2.12
+    status: planned
     notes: |
       Aider requires explicit /read of CONVENTIONS.md; not auto-loaded.
       Phase 3 surface.

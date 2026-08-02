@@ -250,6 +250,7 @@ def build_install_command(
     python_executable: str,
     venv_mode: str,
     verbose: bool = False,
+    hosts: list[str] | None = None,
 ) -> list[str]:
     paths = build_install_artifact_paths(install_root)
     cmd = [
@@ -266,6 +267,8 @@ def build_install_command(
     ]
     if verbose:
         cmd.append("--verbose")
+    for host in hosts or []:
+        cmd.extend(["--host", host])
     return cmd
 
 
@@ -295,6 +298,11 @@ def parse_args() -> argparse.Namespace:
         "--verbose",
         action="store_true",
         help="Show full subprocess output during installation (passed through to install.py)",
+    )
+    parser.add_argument(
+        "--host",
+        action="append",
+        help="Configure only this agent host. Repeat to select multiple hosts.",
     )
     return parser.parse_args()
 
@@ -328,24 +336,26 @@ def main() -> None:
     print(f"Install Root: {install_root}")
     print(f"Installer Python: {install_python}")
 
+    install_command = build_install_command(
+        install_root,
+        python_executable=install_python,
+        venv_mode=args.venv_mode,
+        verbose=args.verbose,
+        hosts=args.host,
+    )
+
+    if args.dry_run:
+        print("Dry run only. No files were changed.")
+        print("Delegated installer command:")
+        print(" ".join(install_command))
+        return
+
     backup_root = place_payload(payload_root, install_root)
     if backup_root:
         print(f"Previous install moved to: {backup_root}")
     print(f"Payload placed at: {install_root}")
     for line in render_install_artifact_paths(install_root):
         print(line)
-
-    install_command = build_install_command(
-        install_root,
-        python_executable=install_python,
-        venv_mode=args.venv_mode,
-        verbose=args.verbose,
-    )
-
-    if args.dry_run:
-        print("Dry run only. Delegated installer command:")
-        print(" ".join(install_command))
-        return
 
     result = subprocess.run(install_command, cwd=install_root, check=False)
     if result.returncode != 0:

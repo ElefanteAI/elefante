@@ -58,4 +58,4 @@ log "[INFO] Repository virtual environment strategy will be handled by install.p
 
 # 2. Run Python Installer
 log "[INFO] Starting installation wizard..."
-"$PYTHON_CMD" scripts/setup/install.py --log-file "$LOG_FILE" --status-file "$STATUS_FILE" --summary-file "$SUMMARY_FILE"
+"$PYTHON_CMD" scripts/setup/install.py --log-file "$LOG_FILE" --status-file "$STATUS_FILE" --summary-file "$SUMMARY_FILE" "$@"
