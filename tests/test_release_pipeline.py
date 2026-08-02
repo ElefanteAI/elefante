@@ -123,15 +123,14 @@ def test_release_documentation_audit_passes_for_repo_history():
     assert module.audit_changelog() == []
 
 
-def test_release_candidate_can_be_checked_but_cannot_render_public_notes():
-    module = _load_module(ROOT / "scripts/ci/render_release_notes.py", "render_candidate_notes")
+def test_published_release_can_render_public_notes():
+    module = _load_module(ROOT / "scripts/ci/render_release_notes.py", "render_published_notes")
 
-    assert "2.12.0" in module.release_candidate_versions(
+    assert "2.12.0" not in module.release_candidate_versions(
         (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     )
-    module.validate_release_documentation("2.12.0", allow_candidate=True)
-    with pytest.raises(SystemExit, match="release candidate"):
-        module.validate_release_documentation("2.12.0")
+    module.validate_release_documentation("2.12.0")
+    assert "## [2.12.0] - 2026-08-01" in module.render_release_notes("2.12.0")
 
 
 def test_version_sync_tracks_release_identifiers_without_rewriting_history():
