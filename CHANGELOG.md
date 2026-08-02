@@ -11,7 +11,10 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [2.12.0] - 2026-07-30
+## [2.12.0] — Release candidate
+
+> The public release date is assigned only when the tag and installer assets
+> are published. This candidate must not be presented as released before then.
 
 ### Added
 
