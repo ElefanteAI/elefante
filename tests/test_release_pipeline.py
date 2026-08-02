@@ -164,6 +164,10 @@ def test_build_workflow_uses_maintained_release_scripts():
     assert "${{ steps.select_release_assets.outputs.files }}" in workflow
     assert "SHA256SUMS" in workflow
     assert "name: elefante-${{ runner.os }}-installer" in workflow
+    assert "name: Download releasable installer artifacts" in workflow
+    assert "pattern: elefante-*-installer" in workflow
+    assert "merge-multiple: false" in workflow
+    assert "name: Download all artifacts" not in workflow
     assert "python3 - <<'PY'" not in workflow
 
 

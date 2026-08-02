@@ -291,10 +291,14 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Download all artifacts
+      - name: Download releasable installer artifacts
         uses: actions/download-artifact@v4
         with:
+          # Binary archives are retained for CI diagnostics, not published.
+          # Avoid downloading them into the release job.
+          pattern: elefante-*-installer
           path: artifacts
+          merge-multiple: false
 
       - name: Render release notes
         run: |
