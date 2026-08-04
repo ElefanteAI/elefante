@@ -83,7 +83,12 @@ jobs:
           checksum_file="${smoke_root}/SHA256SUMS"
 
           mkdir -p "${smoke_root}/installer" "$binary_root"
-          unzip -q "$installer_archive" -d "${smoke_root}/installer"
+          if [[ "$PLATFORM" == "macOS" ]]; then
+            # Match the Finder/Archive Utility extraction path used by customers.
+            ditto -x -k "$installer_archive" "${smoke_root}/installer"
+          else
+            unzip -q "$installer_archive" -d "${smoke_root}/installer"
+          fi
           unzip -q "$binary_archive" -d "$binary_root"
 
           test -f "${bundle_root}/installer-manifest.json"
@@ -99,13 +104,23 @@ jobs:
             test -x "${bundle_root}/Install Elefante.command"
           fi
 
-          dry_run_output="$(
-            python "${bundle_root}/scripts/setup/bootstrap_release_bundle.py" \
-              --bundle-root "$bundle_root" \
-              --install-root "$dry_run_root" \
-              --venv-mode abort \
-              --dry-run
-          )"
+          if [[ "$PLATFORM" == "macOS" ]]; then
+            # Run the exact launcher the customer double-clicks.
+            dry_run_output="$(
+              "${bundle_root}/Install Elefante.command" \
+                --install-root "$dry_run_root" \
+                --venv-mode abort \
+                --dry-run
+            )"
+          else
+            dry_run_output="$(
+              python "${bundle_root}/scripts/setup/bootstrap_release_bundle.py" \
+                --bundle-root "$bundle_root" \
+                --install-root "$dry_run_root" \
+                --venv-mode abort \
+                --dry-run
+            )"
+          fi
           test ! -e "$dry_run_root"
           grep -F "Bundle Root: ${bundle_root}" <<<"$dry_run_output"
           grep -F "Payload Root: ${bundle_root}/payload/elefante" <<<"$dry_run_output"
