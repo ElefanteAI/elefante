@@ -127,11 +127,11 @@ def test_release_documentation_audit_passes_for_repo_history():
 def test_published_release_can_render_public_notes():
     module = _load_module(ROOT / "scripts/ci/render_release_notes.py", "render_published_notes")
 
-    assert "2.12.0" not in module.release_candidate_versions(
+    assert "2.12.1" not in module.release_candidate_versions(
         (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     )
-    module.validate_release_documentation("2.12.0")
-    assert "## [2.12.0] - 2026-08-01" in module.render_release_notes("2.12.0")
+    module.validate_release_documentation("2.12.1")
+    assert "## [2.12.1] - 2026-08-04" in module.render_release_notes("2.12.1")
 
 
 def test_version_sync_tracks_release_identifiers_without_rewriting_history():
