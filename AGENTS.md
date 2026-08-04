@@ -8,7 +8,7 @@
 
 ## What is Elefante?
 
-A local-first persistent memory engine for AI agents, exposed via the Model Context Protocol (MCP). Stores, scores, and retrieves facts, preferences, decisions, and code patterns across sessions. Embedded SQLite vectors and Kuzu relationships form the current storage architecture. **v2.11.1** is the latest published release; **v2.12.0** is the active release candidate.
+A local-first persistent memory engine for AI agents, exposed via the Model Context Protocol (MCP). Stores, scores, and retrieves facts, preferences, decisions, and code patterns across sessions. Embedded SQLite vectors and Kuzu relationships form the current storage architecture. **v2.12.0** is the latest published release.
 
 Detail: [`README.md`](README.md) for product overview, [`docs/reference/architecture.md`](docs/reference/architecture.md) for system design.
 
@@ -157,7 +157,7 @@ Companion canonical sources:
 
 `v{MAJOR}.{MINOR}.{PATCH}`. Strict semver per [`docs/how-to/close-a-feature.md`](docs/how-to/close-a-feature.md). Use `scripts/ci/advise_version_bump.py` then `scripts/ci/bump_version.py X.Y.Z`. Never edit version strings manually.
 
-Current published release: **v2.11.1**. Active release candidate: **v2.12.0**. Future work is tracked as unversioned **Upcoming** in [`workspace/PLANNING.md`](workspace/PLANNING.md).
+Current published release: **v2.12.0**. Future work is tracked as unversioned **Upcoming** in [`workspace/PLANNING.md`](workspace/PLANNING.md).
 
 ---
 

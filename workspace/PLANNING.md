@@ -79,7 +79,7 @@ The non-negotiable product shape is:
 
 ---
 
-## §2 Active Release: v2.12.0 Memory Intelligence
+## §2 Released Product: v2.12.0 Memory Intelligence
 
 ### §2.1 Outcome
 
@@ -90,7 +90,7 @@ what durable knowledge should shape the next agent answer, and why should a
 developer trust it? The implementation remains inside the v2.11 trust boundary:
 loopback-only, redacted snapshot-only, and read-only.
 
-### §2.2 Included in the v2.12 release candidate
+### §2.2 Included in the v2.12 release
 
 | Surface | Evidence |
 |---------|----------|
@@ -106,19 +106,19 @@ loopback-only, redacted snapshot-only, and read-only.
 
 | Work | Current proof |
 |------|---------------|
-| Visual acceptance | The source-grounded dashboard showcase and canonical branding are complete; the website candidate supplies desktop/mobile dark/light, reduced-motion, and full Matrix-state browser evidence. Final live browser acceptance remains a post-deployment step. |
-| Regression proof | The current PR #8 candidate head is green in Quality (Python, dashboard, and production dependency audit). The manually dispatched cross-platform installer build is green on macOS, Windows, and Linux. Local proof remains 267 fast tests passed (4 legacy-backend skips), one isolated slow test passed, extracted archives and checksums passed, dashboard build/audits passed, and the strict hash-locked Python audit found no known vulnerabilities. Record the exact reviewed SHA in the release record, not this living plan. |
-| Durable handoff | PR #7 history is preserved in the no-rewrite merge on `release/v2.12.0`; [draft PR #8](https://github.com/ElefanteAI/elefante/pull/8) is the exact core review and release handoff. The dependent website handoff is [draft PR #2](https://github.com/ElefanteAI/ElefanteUI/pull/2). |
-| Publication | NOT AUTHORIZED — no merge, tag, release publication, deployment, external Contact test, or live-store action. Core release must publish first; only then may the website manifest advance from v2.11.1. |
+| Visual acceptance | The source-grounded dashboard showcase and canonical branding are complete. The website received desktop/mobile dark/light, reduced-motion, and Matrix-state browser evidence before production deployment. |
+| Regression proof | v2.12.0 was released after green core Quality and cross-platform installer-build checks. Its public macOS, Windows, and Linux archives each include a launcher, and `SHA256SUMS` is published with the release assets. |
+| Durable handoff | PR #7 history was preserved in the no-rewrite merge on `release/v2.12.0`. The released product is maintained on `main`; detailed historic review evidence remains available on GitHub. |
+| Publication | **PUBLISHED 2026-08-02** — GitHub release `v2.12.0` and its installers are public. Website release claims and download links must remain pinned to this published release until a later version is published. |
 
 ### §2.4 Approval gates
 
-The user explicitly authorized implementation, documentation, commit, push,
-and GitHub handoff for this dashboard cycle. The following remain outside that
-authority:
+The v2.12.0 release is published. The following production operations remain
+intentionally controlled:
 
 1. Apply provenance or vector-store migrations to live user data.
-2. Tag, publish a release, deploy, spend money, or contact third parties.
+2. Tag or publish a later release, deploy unrelated changes, spend money, or
+   contact third parties.
 
 ### §2.5 Scope guard
 
@@ -142,8 +142,8 @@ Rejected alternatives remain closed without new evidence:
 ### §2.6 Resume verdict
 
 - **RESUME_SAFE:** YES — active state is here; defects/capability gaps are in [`workspace/ISSUES.md`](../workspace/ISSUES.md); integration truth is in [`agents/manifests/ide-integration.yaml`](../agents/manifests/ide-integration.yaml).
-- **IMPLEMENTATION_COMPLETE:** YES LOCALLY — release-candidate content and local gates are complete; exact-SHA GitHub checks and the fresh browser screenshot remain release gates.
-- **PUBLICATION_AUTHORIZED:** NO — no tag, GitHub release, or deployment.
+- **IMPLEMENTATION_COMPLETE:** YES — v2.12.0 is released.
+- **PUBLICATION:** PUBLISHED — the tag, GitHub release, installers, and checksums are public. Future work remains unversioned until separately released.
 
 ---
 
@@ -156,7 +156,7 @@ and snapshot-only dashboard form the baseline described in `CHANGELOG.md`.
 Unfinished trust obligations remain visible in §1.4 and `workspace/ISSUES.md`;
 the dashboard work does not waive them.
 
-### §3.2 v2.12.0 — Active release candidate
+### §3.2 v2.12.0 — Released
 
 - Memory Intelligence Briefing and source-grounded showcase
 - Decision Graph built from explicit memory relationships
@@ -289,7 +289,7 @@ green website candidate.
 | 5-signal scoring (vector / concept / co-activation / authority / temporal) | v2.7.0 (post BUG-016/017/018) | [`docs/reference/scoring.md`](../docs/reference/scoring.md) |
 | 16 MCP tools + 2 prompts | v2.10.0+ | [`docs/reference/tools.md`](../docs/reference/tools.md) |
 | Compliance Gate (search before write) | v2.0.0+ | [`docs/reference/architecture.md`](../docs/reference/architecture.md) §Compliance Gate |
-| Memory Intelligence dashboard with live-computed scores | v2.12.0 candidate | [`docs/reference/dashboard-snapshot.md`](../docs/reference/dashboard-snapshot.md) |
+| Memory Intelligence dashboard with live-computed scores | v2.12.0 | [`docs/reference/dashboard-snapshot.md`](../docs/reference/dashboard-snapshot.md) |
 | Transaction-scoped Kuzu locking | v1.1.0 | [`docs/reference/architecture.md`](../docs/reference/architecture.md) §Transaction-Scoped Locking |
 
 ### §4.5 Rejected (status: rejected — do not re-litigate)

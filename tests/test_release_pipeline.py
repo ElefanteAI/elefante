@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import os
+import re
 import subprocess
 import sys
 import tarfile
@@ -150,6 +151,10 @@ def test_version_sync_tracks_release_identifiers_without_rewriting_history():
     assert "workspace/lessons.md" not in targets
     assert not any(path.startswith("workspace/postmortems/") for path in targets)
     assert module.GLOB_TARGETS == []
+
+    vision_target = next(target for target in module.TARGETS if target[0] == "docs/explanation/vision.md")
+    vision = (ROOT / "docs/explanation/vision.md").read_text(encoding="utf-8")
+    assert re.search(vision_target[1], vision)
 
 
 def test_build_workflow_uses_maintained_release_scripts():
