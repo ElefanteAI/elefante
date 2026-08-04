@@ -105,12 +105,18 @@ Our installer detects your OS, manages the repository virtual environment,
 installs the locked dependencies, initializes local graph and vector databases,
 and lets you select from the compatible hosts detected on the machine.
 
-**Release bundle (preferred):** Download `elefante-installer-<OS>.zip` from GitHub Releases, extract it, then run the top-level `install.sh` or `install.bat`. The bootstrap places Elefante in a stable install root first, then delegates the real setup work to `scripts/setup/install.py`.
+**Release bundle (preferred):** Download `elefante-installer-<OS>.zip` from GitHub Releases and extract it, then:
 
-- macOS / Linux stable root: `~/.elefante/app/current`
-- Windows stable root: `%LOCALAPPDATA%\Elefante\app\current`
+- **macOS:** double-click `Install Elefante.command`. If macOS asks for confirmation, Control-click the file, choose **Open**, then choose **Open** again. Administrator access and Terminal commands are not required.
+- **Windows:** double-click `Install Elefante.bat`.
+- **Linux:** run `chmod +x install.sh && ./install.sh`.
 
-On macOS builders with Swift available, the DMG ships a native AppKit installer surface. The legacy Python/Tk installer is fallback compatibility only.
+The bootstrap places Elefante in a stable install root before it starts setup:
+
+- macOS / Linux: `~/.elefante/app/current`
+- Windows: `%LOCALAPPDATA%\Elefante\app\current`
+
+Signed and notarized native macOS packaging is Upcoming. The verified v2.12.1 customer path is the macOS ZIP launcher above.
 
 If `.venv` already exists, the installer offers four paths:
 
@@ -130,12 +136,12 @@ For release bundles and the macOS DMG, those files live in the stable install ro
 ```bash
 # Source checkout fallback
 # macOS / Linux
-git clone https://github.com/elefante/elefante.git
+git clone https://github.com/ElefanteAI/elefante.git
 cd elefante
 chmod +x install.sh && ./install.sh
 
 # Windows
-git clone https://github.com/elefante/elefante.git
+git clone https://github.com/ElefanteAI/elefante.git
 cd elefante
 install.bat
 ```
