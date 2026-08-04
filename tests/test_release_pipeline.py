@@ -180,6 +180,19 @@ def test_build_workflow_uses_maintained_release_scripts():
     assert "python3 - <<'PY'" not in workflow
 
 
+def test_readme_uses_the_verified_macos_customer_launcher():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    release_section = readme.split("**Release bundle (preferred):**", 1)[1].split(
+        "If `.venv` already exists", 1
+    )[0]
+
+    assert "Install Elefante.command" in release_section
+    assert "Control-click" in release_section
+    assert "Administrator access and Terminal commands are not required." in release_section
+    assert "run the top-level `install.sh` or `install.bat`" not in release_section
+    assert "https://github.com/ElefanteAI/elefante.git" in readme
+
+
 def test_release_checksums_are_deterministic_and_detect_tampering(tmp_path):
     module = _load_module(
         ROOT / "scripts/ci/generate_release_checksums.py",
