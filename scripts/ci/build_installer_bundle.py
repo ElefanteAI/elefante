@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : build_installer_bundle.py
-# VERSION : 2.12.0
-# CHANGED : 2026-07-29
+# VERSION : 2.12.1
+# CHANGED : 2026-08-04
 # PURPOSE : Build a downloadable Elefante installer bundle that carries a full
 #           payload plus a platform-specific, customer-legible entrypoint.
 # WHEN    : In CI after dashboard assets are built, or locally when validating
