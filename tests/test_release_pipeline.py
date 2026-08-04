@@ -160,6 +160,8 @@ def test_version_sync_tracks_release_identifiers_without_rewriting_history():
 def test_build_workflow_uses_maintained_release_scripts():
     workflow = (ROOT / ".github/workflows/build-binaries.yml").read_text(encoding="utf-8")
 
+    assert "pull_request:" in workflow
+    assert '"scripts/ci/build_installer_bundle.py"' in workflow
     assert "python scripts/ci/build_installer_bundle.py" in workflow
     assert "python scripts/ci/generate_release_checksums.py" in workflow
     assert "python3 scripts/ci/render_release_notes.py" in workflow
