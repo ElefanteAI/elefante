@@ -28,6 +28,16 @@ jobs:
             uv pip compile --universal --generate-hashes --python-version 3.11 requirements.txt -o requirements.lock
           )
           cmp requirements.lock "$RUNNER_TEMP/elefante-lock-check/requirements.lock"
+      - name: Verify client runtime lock freshness
+        run: |
+          mkdir "$RUNNER_TEMP/elefante-client-lock-check"
+          cp requirements.client.txt "$RUNNER_TEMP/elefante-client-lock-check/requirements.client.txt"
+          cp requirements.client.lock "$RUNNER_TEMP/elefante-client-lock-check/requirements.client.lock"
+          (
+            cd "$RUNNER_TEMP/elefante-client-lock-check"
+            uv pip compile --universal --generate-hashes --python-version 3.11 requirements.client.txt -o requirements.client.lock
+          )
+          cmp requirements.client.lock "$RUNNER_TEMP/elefante-client-lock-check/requirements.client.lock"
       - run: python -m pytest tests -q
       - run: python -m pytest tests -m slow -q
       - name: Verify release contracts
@@ -57,6 +67,11 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm audit --audit-level=high
+      - name: Build and verify the clean macOS client candidate
+        working-directory: .
+        run: |
+          python scripts/ci/build_release_client.py --output "$RUNNER_TEMP/elefante-release-client-candidate-1.0-macOS.zip"
+          python scripts/ci/verify_release_client.py --archive "$RUNNER_TEMP/elefante-release-client-candidate-1.0-macOS.zip"
 
   dependency-audit:
     name: Production Dependency Audit
@@ -67,6 +82,13 @@ jobs:
         uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
         with:
           inputs: requirements.lock
+          require-hashes: true
+          disable-pip: true
+          no-deps: true
+      - name: Audit client runtime dependencies
+        uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
+        with:
+          inputs: requirements.client.lock
           require-hashes: true
           disable-pip: true
           no-deps: true

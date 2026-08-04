@@ -1,7 +1,7 @@
 # Elefante User Documentation
 
-> **v2.12.0** release candidate · Published user documentation remains pinned to
-> v2.11.1 until the v2.12.0 GitHub tag and installers are public.
+> **v2.12.0** is the current released product. This documentation describes the
+> supported product; development plans and release candidates remain separate.
 
 Use this index to install, configure, operate, and understand the released
 Elefante product. Development plans, bugs, postmortems, release procedures, and

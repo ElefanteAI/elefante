@@ -158,6 +158,15 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 **Guard:** `pytest tests/test_install_setup.py -k "configured_storage_paths" -v`.
 **Lesson:** Backend selection and operator diagnostics must read the same configuration contract; a correct factory with stale initialization messages is still a broken install experience.
 
+## Issue #20: Customer Installer Leaked Developer Repository Material [BUG-040, FIXED locally, guarded]
+
+**Trigger:** A first-customer macOS installation of the public v2.12 archive exposed the repository workspace, tests, migration and developer-only utilities, internal instructions, and the full development lock. The installed environment also carried test and lint packages that a customer never needs.
+**Root cause:** `build_installer_bundle.py` recursively copied nearly the whole repository, with only broad exclusion rules. Its installer always consumed `requirements.lock`, which combines runtime and development dependencies. The archive had a customer launcher but did not have a customer payload boundary.
+**Solution:** Elefante Release Client Candidate 1.0 has its own `requirements.client.txt` and hash-locked `requirements.client.lock`. Its macOS builder copies only explicit runtime source, installer/health scripts, prebuilt dashboard assets, and customer files. Its manifest selects the `client` installer profile, so `install.py` uses the runtime lock and skips repository-only agent-bootstrap validation. A separate verifier rejects unexpected archive paths, developer directories, development dependencies, and invalid client metadata. The normal developer installer remains unchanged.
+**Guard:** `pytest tests/test_release_client_bundle.py tests/test_installer_bundle.py tests/test_install_setup.py -q`; generate the dashboard; run `python scripts/ci/build_release_client.py --output <zip>` then `python scripts/ci/verify_release_client.py --archive <zip>`; CI re-compiles and audits the client lock and builds/verifies the archive.
+**Boundary:** This is a local client candidate only. It does not replace the published v2.12.0 installers, change the website download, or authorize a release.
+**Lesson:** A friendly launcher cannot make a repository snapshot into a customer product. The customer artifact must be allowlisted, profile-specific, and rejected automatically when any development surface leaks in.
+
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
 The five most-recurring rules from the issues above:

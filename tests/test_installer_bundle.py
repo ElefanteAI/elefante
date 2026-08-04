@@ -107,6 +107,41 @@ def test_build_install_command_targets_installed_payload(tmp_path):
     assert command[-4:] == ["--host", "cursor", "--host", "codex"]
 
 
+def test_client_bundle_command_selects_the_client_runtime_profile(tmp_path):
+    module = _load_module(
+        ROOT / "scripts/setup/bootstrap_release_bundle.py",
+        "bootstrap_release_bundle_client_profile_module",
+    )
+
+    command = module.build_install_command(
+        tmp_path / "current",
+        python_executable="/usr/bin/python3",
+        venv_mode="reuse",
+        release_profile="client",
+    )
+
+    assert command[-2:] == ["--release-profile", "client"]
+
+
+def test_client_bundle_layout_requires_the_client_lock(tmp_path):
+    module = _load_module(
+        ROOT / "scripts/setup/bootstrap_release_bundle.py",
+        "bootstrap_release_bundle_client_layout_module",
+    )
+    bundle_root = tmp_path / "bundle"
+    payload_root = bundle_root / "payload" / "elefante"
+    (payload_root / "scripts" / "setup").mkdir(parents=True)
+    (bundle_root / "scripts" / "setup").mkdir(parents=True)
+    (payload_root / "scripts" / "setup" / "install.py").write_text("", encoding="utf-8")
+    (payload_root / "requirements.client.txt").write_text("", encoding="utf-8")
+    (payload_root / "requirements.client.lock").write_text("", encoding="utf-8")
+    (bundle_root / "scripts" / "setup" / "bootstrap_release_bundle.py").write_text(
+        "", encoding="utf-8"
+    )
+
+    assert module.ensure_bundle_layout(bundle_root, release_profile="client") == payload_root
+
+
 def test_render_failed_install_guidance_points_to_persisted_files(tmp_path):
     module = _load_module(
         ROOT / "scripts/setup/bootstrap_release_bundle.py",
