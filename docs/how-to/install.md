@@ -1,7 +1,7 @@
 # Installation & Configuration
 
-**Quick Start**: Run `install.bat` (Windows) or `install.sh` (Mac/Linux). The installer reports the exact paths of `.elefante-install.log`, `.elefante-install-status.txt`, and `.elefante-install-summary.txt`; source-checkout installs place them in the repo root and release bundles use their stable install root.
-**Troubleshooting**: See [`workspace/postmortems/installation.md`](../../workspace/postmortems/installation.md) for automated protection against common failures
+**Quick Start**: From a release bundle, double-click `Install Elefante.command` on macOS, `Install Elefante.bat` on Windows, or run `./install.sh` on Linux. The installer reports the exact paths of `.elefante-install.log`, `.elefante-install-status.txt`, and `.elefante-install-summary.txt`.
+**Troubleshooting**: See [Troubleshooting](#5-troubleshooting).
 
 ---
 
@@ -32,7 +32,12 @@ Preferred product path:
 
 1. Download `elefante-installer-<OS>.zip` from GitHub Releases.
 2. Extract the archive.
-3. Run the top-level `install.sh` or `install.bat`.
+3. Start the platform launcher:
+   - **macOS:** double-click `Install Elefante.command`.
+   - **Windows:** double-click `Install Elefante.bat`.
+   - **Linux:** run `chmod +x install.sh && ./install.sh`.
+
+If macOS asks for confirmation, Control-click `Install Elefante.command`, choose **Open**, then choose **Open** again. Administrator access and Terminal commands are not required.
 
 The bundle bootstrap first copies Elefante into a stable install root, then delegates to the installed [`scripts/setup/install.py`](../../scripts/setup/install.py).
 
@@ -190,7 +195,7 @@ Open: http://127.0.0.1:8000
 
 ---
 
-## Golden Path (macOS + VS Code)
+## Golden Path (macOS + VS Code, source checkout)
 
 1. Run the installer from the repo root:
 
