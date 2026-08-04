@@ -206,7 +206,9 @@ def test_readme_and_planning_docs_capture_installer_recovery_and_learning_bounda
     proposals_readme = _read("workspace/proposals/README.md")
     docs_index = _read("docs/README.md")
 
-    assert "native AppKit installer surface" in readme
+    assert "Install Elefante.command" in readme
+    assert "Signed and notarized native macOS packaging is Upcoming." in readme
+    assert "native AppKit installer surface" not in readme
     assert "If installation fails:" in readme
     assert ".elefante-install-summary.txt" in readme
     assert ".elefante-install-status.txt" in readme
