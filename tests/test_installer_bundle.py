@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_installer_bundle.py
-# VERSION : 2.12.0
-# CHANGED : 2026-07-29
+# VERSION : 2.12.1
+# CHANGED : 2026-08-04
 # PROVES  : Installer bundle bootstrap logic keeps Elefante payload placement
 #           truthful, excludes local .venv backup directories, and emits clean,
 #           platform-specific launchers with executable metadata.
@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import importlib.util
+import stat
 import sys
 import zipfile
 from pathlib import Path
@@ -190,6 +191,7 @@ def test_build_installer_bundle_writes_macos_launchers_and_payload(tmp_path):
         command_info = archive.getinfo(
             "elefante-installer-macOS/Install Elefante.command"
         )
+        shell_info = archive.getinfo("elefante-installer-macOS/install.sh")
 
     assert "elefante-installer-macOS/installer-manifest.json" in names
     assert "elefante-installer-macOS/START HERE.txt" in names
@@ -202,7 +204,16 @@ def test_build_installer_bundle_writes_macos_launchers_and_payload(tmp_path):
     assert "elefante-installer-macOS/payload/elefante/src/dashboard/ui/dist/index.html" in names
     assert '"entrypoints": [\n    "Install Elefante.command",\n    "install.sh"\n  ]' in manifest
     assert 'Double-click "Install Elefante.command"' in start_here
-    assert (command_info.external_attr >> 16) & 0o111
+    assert "Administrator access and Terminal commands are not required." in start_here
+    assert "chmod +x" not in start_here
+
+    command_mode = command_info.external_attr >> 16
+    shell_mode = shell_info.external_attr >> 16
+    assert stat.S_ISREG(command_mode)
+    assert stat.S_IMODE(command_mode) == 0o755
+    assert stat.S_ISREG(shell_mode)
+    assert stat.S_IMODE(shell_mode) == 0o755
+    assert command_info.date_time[0] >= 2026
 
 
 def test_build_installer_bundle_writes_clean_windows_launcher(tmp_path):
