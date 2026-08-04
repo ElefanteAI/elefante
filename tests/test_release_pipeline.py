@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_release_pipeline.py
-# VERSION : 2.7.1
-# CHANGED : 2026-04-15
+# VERSION : 2.12.1
+# CHANGED : 2026-08-04
 # PROVES  : GitHub release publication logic stays local-testable: release notes
 #           render from CHANGELOG, oversize assets are filtered before publish,
 #           and the workflow calls the maintained scripts instead of inline code.
@@ -127,11 +127,11 @@ def test_release_documentation_audit_passes_for_repo_history():
 def test_published_release_can_render_public_notes():
     module = _load_module(ROOT / "scripts/ci/render_release_notes.py", "render_published_notes")
 
-    assert "2.12.0" not in module.release_candidate_versions(
+    assert "2.12.1" not in module.release_candidate_versions(
         (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     )
-    module.validate_release_documentation("2.12.0")
-    assert "## [2.12.0] - 2026-08-01" in module.render_release_notes("2.12.0")
+    module.validate_release_documentation("2.12.1")
+    assert "## [2.12.1] - 2026-08-04" in module.render_release_notes("2.12.1")
 
 
 def test_version_sync_tracks_release_identifiers_without_rewriting_history():
@@ -160,6 +160,8 @@ def test_version_sync_tracks_release_identifiers_without_rewriting_history():
 def test_build_workflow_uses_maintained_release_scripts():
     workflow = (ROOT / ".github/workflows/build-binaries.yml").read_text(encoding="utf-8")
 
+    assert "pull_request:" in workflow
+    assert '"scripts/ci/build_installer_bundle.py"' in workflow
     assert "python scripts/ci/build_installer_bundle.py" in workflow
     assert "python scripts/ci/generate_release_checksums.py" in workflow
     assert "python3 scripts/ci/render_release_notes.py" in workflow
@@ -173,6 +175,8 @@ def test_build_workflow_uses_maintained_release_scripts():
     assert "pattern: elefante-*-installer" in workflow
     assert "merge-multiple: false" in workflow
     assert "name: Download all artifacts" not in workflow
+    assert 'ditto -x -k "$installer_archive"' in workflow
+    assert '"${bundle_root}/Install Elefante.command"' in workflow
     assert "python3 - <<'PY'" not in workflow
 
 

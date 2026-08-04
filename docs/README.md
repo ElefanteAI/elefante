@@ -1,6 +1,6 @@
 # Elefante User Documentation
 
-> **v2.12.0** · Published user documentation. The GitHub release and installers
+> **v2.12.1** · Published user documentation. The GitHub release and installers
 > are public.
 
 Use this index to install, configure, operate, and understand the released
