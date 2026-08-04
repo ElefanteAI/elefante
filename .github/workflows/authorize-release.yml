@@ -1,0 +1,83 @@
+name: Authorize Release Request
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/release-requests/v*.*.*"
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: authorized-release
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    name: Validate, tag, and dispatch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate the authorized release
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t requests < <(
+            find .github/release-requests -maxdepth 1 -type f -name 'v*.*.*' -printf '%f\n' |
+              sort -V
+          )
+          if (( ${#requests[@]} == 0 )); then
+            echo "No release request marker found." >&2
+            exit 1
+          fi
+
+          tag="${requests[${#requests[@]}-1]}"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release request: $tag" >&2
+            exit 1
+          fi
+
+          version="${tag#v}"
+          package_version="$(python -c 'import ast; from pathlib import Path; tree = ast.parse(Path("src/__init__.py").read_text(encoding="utf-8")); print(next(node.value.value for node in tree.body if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "__version__" for target in node.targets)))')"
+          if [[ "$version" != "$package_version" ]]; then
+            echo "Release request $tag does not match package version $package_version." >&2
+            exit 1
+          fi
+
+          python scripts/ci/bump_version.py --check
+          python scripts/ci/render_release_notes.py "$tag" --output /tmp/release-notes.md
+
+          if git cat-file -e "${tag}^{commit}" 2>/dev/null; then
+            tag_sha="$(git rev-parse "${tag}^{commit}")"
+            if [[ "$tag_sha" != "$GITHUB_SHA" ]]; then
+              echo "Tag $tag already points to $tag_sha, not $GITHUB_SHA." >&2
+              exit 1
+            fi
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$tag" "$GITHUB_SHA" -m "Elefante $tag"
+            git push origin "refs/tags/$tag"
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch the verified release pipeline
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: gh workflow run build-binaries.yml --ref "$RELEASE_TAG"
