@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_release_pipeline.py
-# VERSION : 2.7.1
-# CHANGED : 2026-04-15
+# VERSION : 2.12.1
+# CHANGED : 2026-08-04
 # PROVES  : GitHub release publication logic stays local-testable: release notes
 #           render from CHANGELOG, oversize assets are filtered before publish,
 #           and the workflow calls the maintained scripts instead of inline code.
@@ -173,6 +173,8 @@ def test_build_workflow_uses_maintained_release_scripts():
     assert "pattern: elefante-*-installer" in workflow
     assert "merge-multiple: false" in workflow
     assert "name: Download all artifacts" not in workflow
+    assert 'ditto -x -k "$installer_archive"' in workflow
+    assert '"${bundle_root}/Install Elefante.command"' in workflow
     assert "python3 - <<'PY'" not in workflow
 
 
