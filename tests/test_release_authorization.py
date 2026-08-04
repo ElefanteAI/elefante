@@ -31,6 +31,8 @@ def test_authorized_release_request_is_validated_and_dispatched() -> None:
     assert '".github/release-requests/v*.*.*"' in workflow
     assert "contents: write" in workflow
     assert "actions: write" in workflow
+    assert 'Path("src/__init__.py")' in workflow
+    assert "from src import __version__" not in workflow
     assert "python scripts/ci/bump_version.py --check" in workflow
     assert 'python scripts/ci/render_release_notes.py "$tag"' in workflow
     assert 'git tag -a "$tag" "$GITHUB_SHA"' in workflow
