@@ -58,7 +58,7 @@ TARGETS = [
     ("src/dashboard/ui/package.json",                 r'("version":\s*")[^"]+(")',                               r'\g<1>{v}\2'),
     ("README.md",                                     r'(\*\*v)\d+\.\d+\.\d+(\*\*\s*—)',                     r'\g<1>{v}\2'),
     ("docs/README.md",                                r'(> \*\*v)\d+\.\d+\.\d+',                                r'\g<1>{v}'),
-    ("docs/explanation/vision.md",                  r'(Current version: v)\d+\.\d+\.\d+',                   r'\g<1>{v}'),
+    ("docs/explanation/vision.md",                  r'(Current(?: published)? version: v)\d+\.\d+\.\d+',     r'\g<1>{v}'),
 ]
 
 # Glob-based targets: matches multiple files sharing the same header pattern.
