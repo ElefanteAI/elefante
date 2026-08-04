@@ -21,7 +21,9 @@ import argparse
 import json
 import os
 import re
+import stat
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -219,8 +221,9 @@ def build_start_here(*, platform_name: str) -> str:
             "1. Double-click \"Install Elefante.command\".\n"
             "2. Keep the Terminal window open while Elefante installs.\n"
             "3. Restart your supported agent host when the installer reports SUCCESS.\n\n"
-            "If macOS blocks the launcher, open Terminal in this folder and run:\n"
-            "chmod +x \"Install Elefante.command\" install.sh && ./\"Install Elefante.command\"\n"
+            "If macOS asks for confirmation, Control-click \"Install Elefante.command\", "
+            "choose Open, then choose Open again.\n"
+            "Administrator access and Terminal commands are not required.\n"
         ),
         "Windows": (
             "1. Double-click \"Install Elefante.bat\".\n"
@@ -251,8 +254,15 @@ def write_text_entry(
 ) -> None:
     info = zipfile.ZipInfo(arcname)
     info.create_system = 3
+    info.create_version = 30
     info.compress_type = zipfile.ZIP_DEFLATED
-    info.external_attr = (0o755 if executable else 0o644) << 16
+    now = datetime.now(timezone.utc)
+    info.date_time = (now.year, now.month, now.day, now.hour, now.minute, now.second)
+    mode = 0o755 if executable else 0o644
+    # Finder/Archive Utility requires the Unix regular-file type as well as
+    # permission bits. Permission-only metadata survives command-line unzip but
+    # can be discarded by the macOS customer extraction path.
+    info.external_attr = (stat.S_IFREG | mode) << 16
     archive.writestr(info, content)
 
 
