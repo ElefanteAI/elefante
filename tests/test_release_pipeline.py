@@ -243,6 +243,26 @@ def test_quality_workflow_enforces_release_candidate_gates():
     assert "npm audit --audit-level=high" in workflow
     assert "Production Dependency Audit" in workflow
     assert "pypa/gh-action-pip-audit@" in workflow
+    assert "requirements.client.txt" in workflow
+    assert "requirements.client.lock" in workflow
+    assert "scripts/ci/build_release_client.py" in workflow
+    assert "scripts/ci/verify_release_client.py" in workflow
+    assert "requirements.client.lock" in workflow
+    assert "pypa/gh-action-pip-audit@" in workflow
+
+
+def test_release_client_candidate_workflow_is_validation_only():
+    workflow = (ROOT / ".github/workflows/build-release-client.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert '"release-client/**"' in workflow
+    assert "macos-latest" in workflow
+    assert "scripts/ci/build_release_client.py" in workflow
+    assert "scripts/ci/verify_release_client.py" in workflow
+    assert "actions/upload-artifact@v4" in workflow
+    assert "softprops/action-gh-release" not in workflow
+    assert "candidate-not-for-public-download" not in workflow
 
 
 def test_release_workflow_publishes_verified_sha256sums():

@@ -1,0 +1,75 @@
+name: Build Release Client Candidate
+
+on:
+  push:
+    branches:
+      - "release-client/**"
+  pull_request:
+    paths:
+      - ".github/workflows/build-release-client.yml"
+      - ".github/workflows/quality.yml"
+      - "requirements.client.txt"
+      - "requirements.client.lock"
+      - "scripts/ci/build_release_client.py"
+      - "scripts/ci/verify_release_client.py"
+      - "scripts/setup/bootstrap_release_bundle.py"
+      - "scripts/setup/install.py"
+      - "src/**"
+  workflow_dispatch:
+
+jobs:
+  macos-client-candidate:
+    name: Build clean macOS client candidate
+    runs-on: macos-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.11.7"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: src/dashboard/ui/package-lock.json
+      - name: Build dashboard assets
+        working-directory: src/dashboard/ui
+        run: |
+          npm ci
+          npm run build
+          npm audit --audit-level=high
+      - name: Verify client runtime lock freshness
+        run: |
+          mkdir "$RUNNER_TEMP/elefante-client-lock-check"
+          cp requirements.client.txt "$RUNNER_TEMP/elefante-client-lock-check/requirements.client.txt"
+          cp requirements.client.lock "$RUNNER_TEMP/elefante-client-lock-check/requirements.client.lock"
+          (
+            cd "$RUNNER_TEMP/elefante-client-lock-check"
+            uv pip compile --universal --generate-hashes --python-version 3.11 requirements.client.txt -o requirements.client.lock
+          )
+          cmp requirements.client.lock "$RUNNER_TEMP/elefante-client-lock-check/requirements.client.lock"
+      - name: Audit client runtime dependencies
+        uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
+        with:
+          inputs: requirements.client.lock
+          require-hashes: true
+          disable-pip: true
+          no-deps: true
+      - name: Build and verify client candidate
+        run: |
+          python scripts/ci/build_release_client.py --output dist/elefante-release-client-candidate-1.0-macOS.zip
+          python scripts/ci/verify_release_client.py --archive dist/elefante-release-client-candidate-1.0-macOS.zip
+          shasum -a 256 dist/elefante-release-client-candidate-1.0-macOS.zip > dist/SHA256SUMS
+      - name: Upload validation artifact only
+        uses: actions/upload-artifact@v4
+        with:
+          name: elefante-release-client-candidate-1.0-macOS
+          path: |
+            dist/elefante-release-client-candidate-1.0-macOS.zip
+            dist/SHA256SUMS
+          retention-days: 14

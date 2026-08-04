@@ -34,6 +34,9 @@ INSTALL_LOG_FILE_NAME = ".elefante-install.log"
 INSTALL_STATUS_FILE_NAME = ".elefante-install-status.txt"
 INSTALL_SUMMARY_FILE_NAME = ".elefante-install-summary.txt"
 VENV_CHOICES = ["ask", "fresh", "backup", "reuse", "abort"]
+RELEASE_PROFILE_DEVELOPER = "developer"
+RELEASE_PROFILE_CLIENT = "client"
+RELEASE_PROFILES = {RELEASE_PROFILE_DEVELOPER, RELEASE_PROFILE_CLIENT}
 SUPPORTED_PYTHON_MIN = (3, 11)
 SUPPORTED_PYTHON_MAX = (3, 14)
 
@@ -158,13 +161,25 @@ def get_payload_root(bundle_root: Path) -> Path:
     return bundle_root / PAYLOAD_RELATIVE_ROOT
 
 
-def ensure_bundle_layout(bundle_root: Path) -> Path:
+def get_release_profile(manifest: dict[str, object]) -> str:
+    """Return the declared installer profile, rejecting unknown bundle contracts."""
+    profile = manifest.get("release_profile", RELEASE_PROFILE_DEVELOPER)
+    if profile not in RELEASE_PROFILES:
+        raise ValueError(f"Installer bundle has an unsupported release profile: {profile!r}")
+    return str(profile)
+
+
+def ensure_bundle_layout(bundle_root: Path, *, release_profile: str) -> Path:
     payload_root = get_payload_root(bundle_root)
+    dependency_files = (
+        [payload_root / "requirements.client.txt", payload_root / "requirements.client.lock"]
+        if release_profile == RELEASE_PROFILE_CLIENT
+        else [payload_root / "requirements.txt", payload_root / "requirements.lock"]
+    )
     required_paths = [
         payload_root,
         payload_root / INSTALL_SCRIPT_RELATIVE_PATH,
-        payload_root / "requirements.txt",
-        payload_root / "requirements.lock",
+        *dependency_files,
         bundle_root / "scripts" / "setup" / "bootstrap_release_bundle.py",
     ]
 
@@ -249,6 +264,7 @@ def build_install_command(
     *,
     python_executable: str,
     venv_mode: str,
+    release_profile: str = RELEASE_PROFILE_DEVELOPER,
     verbose: bool = False,
     hosts: list[str] | None = None,
 ) -> list[str]:
@@ -265,6 +281,8 @@ def build_install_command(
         "--venv-mode",
         venv_mode,
     ]
+    if release_profile == RELEASE_PROFILE_CLIENT:
+        cmd.extend(["--release-profile", RELEASE_PROFILE_CLIENT])
     if verbose:
         cmd.append("--verbose")
     for host in hosts or []:
@@ -310,8 +328,13 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     bundle_root = resolve_bundle_root(args.bundle_root)
-    payload_root = ensure_bundle_layout(bundle_root)
     manifest = load_manifest(bundle_root)
+    try:
+        release_profile = get_release_profile(manifest)
+        payload_root = ensure_bundle_layout(bundle_root, release_profile=release_profile)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"ERROR: {exc}")
+        raise SystemExit(1) from exc
     try:
         install_python = resolve_install_python(args.python_executable)
     except RuntimeError as exc:
@@ -331,6 +354,8 @@ def main() -> None:
         print(f"Version: {manifest['version']}")
     if manifest.get("platform"):
         print(f"Bundle Platform: {manifest['platform']}")
+    if release_profile == RELEASE_PROFILE_CLIENT:
+        print("Release Profile: Client (runtime-only payload)")
     print(f"Bundle Root: {bundle_root}")
     print(f"Payload Root: {payload_root}")
     print(f"Install Root: {install_root}")
@@ -340,6 +365,7 @@ def main() -> None:
         install_root,
         python_executable=install_python,
         venv_mode=args.venv_mode,
+        release_profile=release_profile,
         verbose=args.verbose,
         hosts=args.host,
     )
