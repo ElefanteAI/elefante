@@ -52,7 +52,9 @@ jobs:
           fi
 
           version="${tag#v}"
-          package_version="$(python -c 'from src import __version__; print(__version__)')"
+          package_version="$(
+            python -c 'import re; from pathlib import Path; text = Path("src/__init__.py").read_text(encoding="utf-8"); print(re.search(r"__version__\\s*=\\s*[\"'\'' ]([^\"'\'' ]+)[\"'\'' ]", text).group(1))'
+          )"
           if [[ "$version" != "$package_version" ]]; then
             echo "Release request $tag does not match package version $package_version." >&2
             exit 1
