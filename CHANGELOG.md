@@ -11,6 +11,20 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.12.1] - 2026-08-04
+
+### Fixed
+
+- The macOS installer ZIP now preserves the executable file type and permission required by Finder, so customers can open `Install Elefante.command` after extracting the download.
+- Release validation now extracts the macOS installer with the native `ditto` path and runs the same launcher customers use in a non-mutating dry run.
+- Installer files now carry the real build date instead of the ZIP-format default date shown as December 1979 in some time zones.
+- macOS instructions now use the normal Finder flow; administrator access and Terminal permission commands are not required.
+
+### Upgrade
+
+macOS customers should download the v2.12.1 installer. Do not use the v2.12.0 macOS installer ZIP.
+
+
 ## [2.12.0] - 2026-08-01
 
 ### Added
