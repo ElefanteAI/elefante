@@ -298,7 +298,7 @@ def test_release_client_candidate_workflow_is_validation_only():
     assert "macos-latest" in workflow
     assert "scripts/ci/build_release_client.py" in workflow
     assert "scripts/ci/verify_release_client.py" in workflow
-    assert "actions/upload-artifact@v4" in workflow
+    assert "actions/upload-artifact@v7" in workflow
     assert "--require-clean-source" in workflow
     assert "--publication-status candidate" in workflow
     assert "--expected-publication-status candidate" in workflow
@@ -309,6 +309,7 @@ def test_release_client_candidate_workflow_is_validation_only():
     assert 'report["customer_ready"] is True' in workflow
     assert 'report["installation"]["version"] == "2.12.2"' in workflow
     assert '"$install_root/scripts/lifecycle/uninstall_elefante.py" --apply' in workflow
+    assert "if manifest_path.exists():" in workflow
     assert "softprops/action-gh-release" not in workflow
     assert "candidate-not-for-public-download" not in workflow
 
@@ -358,7 +359,7 @@ def test_tagged_release_cannot_bypass_the_hash_locked_dependency_audit():
     assert "pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266" in workflow
     assert "inputs: requirements.client.lock" in workflow
     assert "require-hashes: true" in workflow
-    assert "disable-pip: true" in workflow
+    assert "internal-be-careful-extra-flags: --disable-pip" in workflow
     assert "no-deps: true" in workflow
 
 

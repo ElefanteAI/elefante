@@ -107,7 +107,7 @@ loopback-only, redacted snapshot-only, and read-only.
 | Work | Current proof |
 |------|---------------|
 | Visual acceptance | The source-grounded dashboard showcase and canonical branding are complete. The website received desktop/mobile dark/light, reduced-motion, and Matrix-state browser evidence before production deployment. |
-| Regression proof | v2.12.1 is the published release. BUG-040 and BUG-041 fixes are integrated only in the upcoming v2.12.2 client candidate and require exact-SHA CI plus isolated customer-install proof before release. |
+| Regression proof | v2.12.1 is the published release. The upcoming v2.12.2 client candidate now completes a real isolated macOS install, health check, daemon startup, MCP handshake, and runtime registration. Its first cleanup assertion incorrectly required a manifest that a successful uninstall may delete; the gate now accepts either a removed manifest or one without runtime registration. Exact-SHA CI must rerun before release. |
 | Durable handoff | PR #7 history was preserved in the no-rewrite merge on `release/v2.12.0`. The released product is maintained on `main`; detailed historic review evidence remains available on GitHub. |
 | Publication | **PUBLISHED 2026-08-04** — GitHub release `v2.12.1` and its installers remain public. The v2.12.2 candidate is not a public download and has no release or website authority. |
 

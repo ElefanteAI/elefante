@@ -27,14 +27,14 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           version: "0.11.7"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
           cache: npm
@@ -60,7 +60,7 @@ jobs:
         with:
           inputs: requirements.client.lock
           require-hashes: true
-          disable-pip: true
+          internal-be-careful-extra-flags: --disable-pip
           no-deps: true
       - name: Build and verify client candidate
         run: |
@@ -113,11 +113,13 @@ jobs:
           import sys
           from pathlib import Path
 
-          manifest = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-          assert "runtime" not in manifest, manifest
+          manifest_path = Path(sys.argv[1])
+          if manifest_path.exists():
+              manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+              assert "runtime" not in manifest, manifest
           PY
       - name: Upload validation artifact only
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: elefante-v2.12.2-rc.1-macOS
           path: |

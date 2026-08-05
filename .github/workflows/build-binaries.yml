@@ -36,10 +36,10 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: "pip"
@@ -51,7 +51,7 @@ jobs:
           sudo apt-get install -y python3-tk tk-dev
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "20"
 
@@ -251,7 +251,7 @@ jobs:
           }
 
       - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: elefante-${{ runner.os }}-binary
           path: dist/elefante-${{ runner.os }}.zip
@@ -284,7 +284,7 @@ jobs:
           spctl --assess --type open --context context:primary-signature -v dist/Elefante-Installer.dmg
 
       - name: Upload Installer Bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: elefante-${{ runner.os }}-installer
           path: dist/elefante-installer-${{ runner.os }}.zip
@@ -294,7 +294,7 @@ jobs:
         if: runner.os == 'macOS' && env.APPLE_DEVELOPER_ID != ''
         env:
           APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: elefante-macOS-dmg
           path: dist/Elefante-Installer.dmg
@@ -307,7 +307,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # A tag can never publish while the locked production dependencies have
       # a known advisory. Pull requests run the same production audit so the
@@ -317,7 +317,7 @@ jobs:
         with:
           inputs: requirements.client.lock
           require-hashes: true
-          disable-pip: true
+          internal-be-careful-extra-flags: --disable-pip
           no-deps: true
 
   release:
@@ -330,10 +330,10 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download releasable installer artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           # Binary archives are retained for CI diagnostics, not published.
           # Avoid downloading them into the release job.
@@ -365,7 +365,7 @@ jobs:
             "${release_files[@]}"
 
       - name: Upload checksum manifest
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: elefante-${{ github.ref_name }}-checksums
           path: SHA256SUMS
