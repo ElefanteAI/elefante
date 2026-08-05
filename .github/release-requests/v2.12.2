@@ -1,0 +1,13 @@
+# Elefante v2.12.2 release authorization
+
+Authorized: 2026-08-05
+Purpose: Publish the clean customer-only runtime and customer-global installation contract.
+Source changes: PR #17
+
+Publication requirements satisfied before authorization:
+- Every maintained version declaration and the dated changelog entry resolve to 2.12.2.
+- PR #17 quality, dashboard, Python/npm dependency audits, and the isolated slow proof are green.
+- macOS, Windows, and Linux customer archives build and pass extracted-package smoke tests.
+- A fresh hosted Mac runs the exact customer launcher without dry-run, starts the daemon, passes product health and an MCP handshake, reports customer-global readiness, and uninstalls cleanly.
+- The public website remains on the previous release until the immutable tag, GitHub Release, assets, and checksums are verified.
+- Published v2.12.0 and v2.12.1 tags remain immutable.
