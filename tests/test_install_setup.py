@@ -29,6 +29,21 @@ from packaging.requirements import Requirement
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_installer_entrypoint_starts_without_product_dependencies():
+    """A clean machine must reach installer setup before dependencies exist."""
+    result = subprocess.run(
+        [sys.executable, "-S", str(ROOT / "scripts/setup/install.py"), "--help"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "--release-profile" in result.stdout
+    assert "ModuleNotFoundError" not in result.stderr
+
+
 def test_requirements_pin_every_declared_direct_dependency():
     requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
     declared = [line.strip() for line in requirements if line.strip() and not line.lstrip().startswith("#")]

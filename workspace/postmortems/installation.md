@@ -175,6 +175,14 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 **Boundary:** This is a local validation lane for the upcoming v2.12.2 customer artifact. It does not replace the published v2.12.1 installers, change the website download, or authorize a release.
 **Lesson:** A friendly launcher cannot make a repository snapshot into a customer product. The customer artifact must be allowlisted, profile-specific, and rejected automatically when any development surface leaks in.
 
+## Issue #22: Clean-Machine Installer Imported Product Dependencies Before Setup [BUG-042, FIXED locally, guarded]
+
+**Trigger:** The exact customer launcher on a fresh macOS runner placed the v2.12.2 payload, then crashed immediately with `ModuleNotFoundError: No module named 'pydantic'`.
+**Root cause:** `install.py` imported `src.__version__` at process startup. Importing `src` also imported Elefante models and `pydantic`, but the installer's dependency stage had not yet created the virtual environment or installed the client lock.
+**Solution:** Installer startup reads the strict semantic version assignment from `src/__init__.py` with the standard library. It does not import product code until after dependencies exist.
+**Guard:** `pytest tests/test_install_setup.py -k "entrypoint_starts_without_product_dependencies" -v` launches the installer help path with `python -S`, which disables site packages. The isolated macOS workflow then executes the full customer launcher and requires customer-ready `doctor` output.
+**Lesson:** An installer must bootstrap using only the standard library until it has installed its own dependency contract.
+
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
 The five most-recurring rules from the issues above:

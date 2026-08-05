@@ -34,6 +34,7 @@ import os
 import sys
 import subprocess
 import platform
+import re
 import shutil
 import argparse
 import datetime
@@ -102,6 +103,22 @@ ASCII_SPINNER_FRAMES = ["-", "\\", "|", "/"]
 sys.path.insert(0, str(SETUP_DIR))
 sys.path.insert(0, str(ROOT_DIR))
 
+
+def read_source_version(root_dir: Path) -> str:
+    """Read the release version without importing dependency-backed product code."""
+    version_file = root_dir / "src" / "__init__.py"
+    match = re.search(
+        r'^__version__\s*=\s*"(\d+\.\d+\.\d+)"\s*$',
+        version_file.read_text(encoding="utf-8"),
+        flags=re.MULTILINE,
+    )
+    if not match:
+        raise RuntimeError(f"Could not read Elefante version from {version_file}")
+    return match.group(1)
+
+
+ELEFANTE_VERSION = read_source_version(ROOT_DIR)
+
 from configure_vscode_bob import configure_mcp as configure_vscode  # noqa: E402
 from configure_antigravity import (  # noqa: E402
     configure_mcp as configure_antigravity,
@@ -125,7 +142,6 @@ from host_selection import (  # noqa: E402
     normalize_manifest_surfaces,
     select_family,
 )
-from src import __version__ as ELEFANTE_VERSION  # noqa: E402
 
 
 class InstallationCancelled(Exception):

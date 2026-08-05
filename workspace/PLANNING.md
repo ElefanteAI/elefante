@@ -170,6 +170,7 @@ the dashboard work does not waive them.
 
 - Separate customer-only macOS, Windows, and Linux archives sourced from current `main`
 - Separate hash-locked runtime dependency set; no test, lint, or build tooling
+- Standard-library-only installer bootstrap until the client dependency lock is installed
 - Explicit archive allowlist plus verifier that rejects developer material
 - Branch-only macOS workflow uploads a private validation artifact and checksum;
   it cannot create a GitHub Release or alter the public website

@@ -38,6 +38,9 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   uses this clean client builder on macOS, Windows, and Linux.
 - `doctor` now works from the runtime-only customer package without requiring
   the developer integration manifest.
+- A genuinely clean machine can now start the installer before Elefante's
+  Python dependencies exist. The bootstrap reads the release version directly
+  instead of importing dependency-backed product modules before setup.
 
 ## [2.12.1] - 2026-08-04
 
