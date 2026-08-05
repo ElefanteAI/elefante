@@ -138,7 +138,10 @@ def changelog_has_entry(version: str) -> bool:
     if not changelog.exists():
         return False
     text = changelog.read_text(encoding="utf-8")
-    pattern = rf"^## \[{re.escape(version)}\] - \d{{4}}-\d{{2}}-\d{{2}}$"
+    pattern = (
+        rf"^## \[{re.escape(version)}\] "
+        r"(?:- \d{4}-\d{2}-\d{2}|— Release candidate)$"
+    )
     return re.search(pattern, text, re.MULTILINE) is not None
 
 
@@ -277,7 +280,10 @@ def main() -> None:
         print(f"  Recommended version locked: v{target}.")
         print("  CHANGELOG.md does not contain that release entry yet, so no files were bumped.")
         print("  Next steps:")
-        print(f"    1. Write '## [{target}] - YYYY-MM-DD' plus real notes in CHANGELOG.md")
+        print(
+            f"    1. Write '## [{target}] — Release candidate' plus real notes; "
+            "replace it with the publication date only when releasing"
+        )
         print(f"    2. Run {bump_cmd}")
         print(f"    3. Run {Path(sys.executable).name} scripts/ci/bump_version.py --check")
         print("    4. git add -A")

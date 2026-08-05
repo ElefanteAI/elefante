@@ -58,6 +58,23 @@ def _runtime_requirements() -> list[str]:
     return values
 
 
+def test_client_runtime_requirements_match_the_product_runtime_contract():
+    client_requirements = [
+        line.strip()
+        for line in (ROOT / "requirements.client.txt").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+
+    assert set(client_requirements) == set(_runtime_requirements())
+    assert not {
+        "black==26.3.1",
+        "mypy==1.20.2",
+        "pytest==9.0.3",
+        "pytest-asyncio==1.4.0",
+        "ruff==0.1.15",
+    } & set(client_requirements)
+
+
 def test_isolated_package_wheel_preserves_src_runtime_contract(tmp_path):
     """The installable wheel must match the checkout's `python -m src...` contract."""
     package_root = tmp_path / "package"
@@ -286,6 +303,27 @@ def test_install_dependencies_refuses_to_resolve_without_the_checked_in_lock(mon
     assert calls == []
 
 
+def test_client_install_dependencies_use_the_runtime_only_lock(monkeypatch, tmp_path):
+    module = _load_module(ROOT / "scripts/setup/install.py", "install_setup_client_lock_module")
+    module.logger = module.Logger(spinner_enabled=False)
+    calls: list[list[str]] = []
+    monkeypatch.setattr(module, "run_command", lambda command, **_: calls.append(command) or True)
+    (tmp_path / "requirements.client.lock").write_text(
+        "example==1.0 --hash=sha256:example", encoding="utf-8"
+    )
+
+    assert module.install_dependencies(tmp_path, "/tmp/venv/bin/python", "client") is True
+    assert calls[-1] == [
+        "/tmp/venv/bin/python",
+        "-m",
+        "pip",
+        "install",
+        "--require-hashes",
+        "-r",
+        "requirements.client.lock",
+    ]
+
+
 def test_daemon_service_renders_user_scope_macos_and_linux_units(tmp_path):
     module = _load_module(ROOT / "scripts/lifecycle/daemon_service.py", "daemon_service_module")
     mac_path = module.service_path(tmp_path, "Darwin")
@@ -481,6 +519,50 @@ def test_doctor_reports_ready_only_when_runtime_and_daemon_are_healthy(tmp_path)
         "preview": ["preview-host"],
         "community": ["generic-mcp-client", "openclaw"],
     }
+
+
+def test_client_doctor_uses_runtime_host_contract_without_developer_manifest(tmp_path):
+    module = _load_module(ROOT / "scripts/lifecycle/doctor.py", "doctor_client_report_module")
+    repo = tmp_path / "repo"
+    (repo / ".venv" / "bin").mkdir(parents=True)
+    (repo / ".venv" / "bin" / "python").write_text("", encoding="utf-8")
+    (repo / "config.yaml").write_text("app_name: elefante\n", encoding="utf-8")
+    home = tmp_path / "home"
+    manifest = home / ".elefante" / "install-manifest.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "files": {},
+                "commands": {},
+                "runtime": {
+                    "app_root": str(repo),
+                    "data_root": str(home / ".elefante" / "data"),
+                    "scope": "customer",
+                    "version": "2.12.2",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    report = module.build_report(
+        repo_root=repo,
+        home=home,
+        service_inspector=lambda _: {
+            "daemon_health": True,
+            "service_runtime": "active",
+            "service_file_ownership": "owned",
+        },
+        host_detector=lambda **_: set(),
+        surface_inspector=lambda _: set(),
+    )
+
+    assert report["ready"] is True
+    assert report["customer_ready"] is True
+    assert report["diagnostics"] == []
+    assert report["integrations"]["compatible"] == sorted(module.SUPPORTED_HOSTS)
 
 
 def test_doctor_reports_missing_runtime_and_invalid_manifest_without_mutating_it(tmp_path):

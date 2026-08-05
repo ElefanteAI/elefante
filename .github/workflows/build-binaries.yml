@@ -4,7 +4,8 @@ on:
   pull_request:
     paths:
       - ".github/workflows/build-binaries.yml"
-      - "scripts/ci/build_installer_bundle.py"
+      - "scripts/ci/build_release_client.py"
+      - "scripts/ci/verify_release_client.py"
       - "scripts/setup/bootstrap_release_bundle.py"
       - "tests/test_installer_bundle.py"
       - "tests/test_release_pipeline.py"
@@ -12,6 +13,8 @@ on:
       - "config.yaml"
       - "requirements.txt"
       - "requirements.lock"
+      - "requirements.client.txt"
+      - "requirements.client.lock"
       - "src/dashboard/ui/**"
   push:
     tags:
@@ -54,9 +57,10 @@ jobs:
           npm ci
           npm run build
 
-      - name: Build Installer Bundle
+      - name: Build clean customer installer
         run: |
-          python scripts/ci/build_installer_bundle.py --platform "${{ runner.os }}" --output dist/elefante-installer-${{ runner.os }}.zip
+          python scripts/ci/build_release_client.py --platform "${{ runner.os }}" --publication-status release --output dist/elefante-installer-${{ runner.os }}.zip
+          python scripts/ci/verify_release_client.py --archive dist/elefante-installer-${{ runner.os }}.zip --require-clean-source --expected-publication-status release --expected-platform "${{ runner.os }}"
 
       - name: Install Python Dependencies
         run: |
@@ -107,8 +111,9 @@ jobs:
           test -f "${bundle_root}/START HERE.txt"
           test -f "${bundle_root}/scripts/setup/bootstrap_release_bundle.py"
           test -f "${bundle_root}/payload/elefante/scripts/setup/install.py"
-          test -f "${bundle_root}/payload/elefante/requirements.txt"
-          test -f "${bundle_root}/payload/elefante/requirements.lock"
+          test -f "${bundle_root}/payload/elefante/requirements.client.txt"
+          test -f "${bundle_root}/payload/elefante/requirements.client.lock"
+          test ! -e "${bundle_root}/payload/elefante/requirements.lock"
           test -x "${bundle_root}/install.sh"
           test -x "${binary_root}/elefante"
 
@@ -137,6 +142,7 @@ jobs:
           grep -F "Bundle Root: ${bundle_root}" <<<"$dry_run_output"
           grep -F "Payload Root: ${bundle_root}/payload/elefante" <<<"$dry_run_output"
           grep -F "Install Root: ${dry_run_root}" <<<"$dry_run_output"
+          grep -F "Release Profile: Client (runtime-only payload)" <<<"$dry_run_output"
           grep -F "Dry run only. No files were changed." <<<"$dry_run_output"
 
           python scripts/ci/generate_release_checksums.py \
@@ -171,8 +177,8 @@ jobs:
             (Join-Path $bundleRoot "Install Elefante.bat"),
             (Join-Path $bundleRoot "scripts/setup/bootstrap_release_bundle.py"),
             (Join-Path $bundleRoot "payload/elefante/scripts/setup/install.py"),
-            (Join-Path $bundleRoot "payload/elefante/requirements.txt"),
-            (Join-Path $bundleRoot "payload/elefante/requirements.lock"),
+            (Join-Path $bundleRoot "payload/elefante/requirements.client.txt"),
+            (Join-Path $bundleRoot "payload/elefante/requirements.client.lock"),
             (Join-Path $binaryRoot "elefante.exe")
           ) | ForEach-Object {
             if (-not (Test-Path -LiteralPath $_ -PathType Leaf)) {
@@ -212,10 +218,14 @@ jobs:
           if (Test-Path -LiteralPath $dryRunRoot) {
             throw "Installer bundle dry-run mutated the install path"
           }
+          if (Test-Path -LiteralPath (Join-Path $bundleRoot "payload/elefante/requirements.lock")) {
+            throw "Developer dependency lock leaked into customer installer"
+          }
           @(
             "Bundle Root: $bundleRoot",
             "Payload Root: $(Join-Path $bundleRoot 'payload/elefante')",
             "Install Root: $dryRunRoot",
+            "Release Profile: Client (runtime-only payload)",
             "Dry run only. No files were changed."
           ) | ForEach-Object {
             if (-not $dryRunOutput.Contains($_)) {
@@ -301,7 +311,7 @@ jobs:
       - name: Audit hash-locked Python dependencies
         uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
         with:
-          inputs: requirements.lock
+          inputs: requirements.client.lock
           require-hashes: true
           disable-pip: true
           no-deps: true

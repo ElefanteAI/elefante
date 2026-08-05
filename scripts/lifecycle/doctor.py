@@ -16,7 +16,11 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.lifecycle.daemon_service import service_status  # noqa: E402
-from scripts.setup.host_selection import detect_supported_hosts, normalize_manifest_surfaces  # noqa: E402
+from scripts.setup.host_selection import (  # noqa: E402
+    SUPPORTED_HOSTS,
+    detect_supported_hosts,
+    normalize_manifest_surfaces,
+)
 from scripts.setup.install_manifest import (  # noqa: E402
     configured_surfaces,
     manifest_path,
@@ -100,9 +104,16 @@ def build_report(
     detected_hosts = host_detector(home=home)
     verified_surfaces = normalize_manifest_surfaces(surface_inspector(home))
     uncovered_hosts = sorted(detected_hosts.difference(verified_surfaces))
-    integrations, integration_diagnostics = _integration_summary(
-        repo_root / "agents/manifests/ide-integration.yaml"
-    )
+    integration_matrix = repo_root / "agents/manifests/ide-integration.yaml"
+    if integration_matrix.is_file():
+        integrations, integration_diagnostics = _integration_summary(integration_matrix)
+    else:
+        integrations = {
+            "compatible": sorted(SUPPORTED_HOSTS),
+            "preview": [],
+            "community": ["generic-mcp-client"],
+        }
+        integration_diagnostics = []
     diagnostics.extend(manifest_diagnostics)
     diagnostics.extend(integration_diagnostics)
     if not venv_python.exists():

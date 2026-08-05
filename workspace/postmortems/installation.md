@@ -166,6 +166,15 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 **Guard:** `pytest tests/test_installer_bundle.py tests/test_install_setup.py tests/test_installer_gui.py -q` covers release scope, stable host planning, runtime identity, exact JSON-entry verification, uncovered-host diagnostics, and the non-selectable global macOS host surface.
 **Lesson:** “Global” is a verifiable customer invariant, not an install-path adjective: one stable user runtime must be the source for every detected compatible client, or installation is incomplete.
 
+## Issue #21: Customer Installer Leaked Developer Repository Material [BUG-041, FIXED locally, guarded]
+
+**Trigger:** A first-customer macOS installation of the public v2.12 archive exposed the repository workspace, tests, migration and developer-only utilities, internal instructions, and the full development lock. The installed environment also carried test and lint packages that a customer never needs.
+**Root cause:** `build_installer_bundle.py` recursively copied nearly the whole repository, with only broad exclusion rules. Its installer always consumed `requirements.lock`, which combines runtime and development dependencies. The archive had a customer launcher but did not have a customer payload boundary.
+**Solution:** Release Client Candidate 1.0 has its own `requirements.client.txt` and hash-locked `requirements.client.lock`. Its cross-platform customer builder copies only explicit runtime source, installer/health scripts, prebuilt dashboard assets, and customer files. Its manifest selects the `client` installer profile, so `install.py` uses the runtime lock and skips repository-only agent-bootstrap validation. A separate verifier rejects unexpected archive paths, developer directories, development dependencies, invalid launchers, misleading timestamps, and invalid client metadata. The tagged-release workflow uses this builder on macOS, Windows, and Linux. The full developer installer remains available for diagnostics but cannot be published as the customer asset.
+**Guard:** `pytest tests/test_release_client_bundle.py tests/test_installer_bundle.py tests/test_install_setup.py -q`; generate the dashboard; run `python scripts/ci/build_release_client.py --output <zip>` then `python scripts/ci/verify_release_client.py --archive <zip>`; CI re-compiles and audits the client lock and builds/verifies the archive.
+**Boundary:** This is a local validation lane for the upcoming v2.12.2 customer artifact. It does not replace the published v2.12.1 installers, change the website download, or authorize a release.
+**Lesson:** A friendly launcher cannot make a repository snapshot into a customer product. The customer artifact must be allowlisted, profile-specific, and rejected automatically when any development surface leaks in.
+
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
 The five most-recurring rules from the issues above:

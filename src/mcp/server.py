@@ -53,6 +53,7 @@ from src.models.entity import EntityType, RelationshipType
 from src.utils.logger import get_logger
 from src.utils.validators import validate_cypher_query, validate_memory_content, validate_uuid
 from src.utils.elefante_mode import get_mode_manager, is_elefante_enabled, write_lock
+from src.utils.runtime_profile import is_client_runtime
 from src.utils.token_counter import (
     estimate_tokens, estimate_tokens_json, token_density_score,
     TYPE_TOKEN_BUDGETS, CallTokenSnapshot, SessionTokenLedger,
@@ -330,9 +331,13 @@ class ElefanteMCPServer:
         """
         pitfalls = [
             "CRITICAL PROTOCOL: You MUST check for existing memories before creating new ones to avoid duplication.",
-            "CRITICAL PROTOCOL: If you are debugging, read workspace/ISSUES.md first, match the BUG/GAP row, and run its verification command before editing source.",
-            "CRITICAL PROTOCOL: Do not rely on your internal knowledge base for project specifics; use the memory system."
+            "CRITICAL PROTOCOL: Do not rely on your internal knowledge base for project specifics; use the memory system.",
         ]
+        if not is_client_runtime():
+            pitfalls.append(
+                "CRITICAL PROTOCOL: If you are debugging, read workspace/ISSUES.md first, "
+                "match the BUG/GAP row, and run its verification command before editing source."
+            )
         
         # Context-specific injections — for consolidated elefante-Memory, inspect action arg
         # NOTE: _inject_pitfalls signature is (result, tool_name) — arguments not passed in.
@@ -375,13 +380,21 @@ class ElefanteMCPServer:
         This is more specific than generic pitfalls: it gives the agent
         the canonical first steps and maintained verification surfaces.
         """
-        result["ENTRYPOINT_SEQUENCE_READ_THIS_FIRST"] = [
-            "1. Read workspace/ISSUES.md and match the current failure to a BUG/GAP row before changing code.",
-            "2. Run the verification command from that BUG row first. If it passes, the documented fix still holds and the root cause is elsewhere.",
-            "3. If the verification fails, open the linked workspace/postmortems/<domain>.md entry and use its exact commands and constraints.",
-            "4. Read tests/README.md before creating any scratch reproducer. Update an existing maintained test when possible.",
-            "5. Only then edit source, rerun the same verifier, and update bug docs plus CHANGELOG if behavior changed.",
-        ]
+        if is_client_runtime():
+            result["ENTRYPOINT_SEQUENCE_READ_THIS_FIRST"] = [
+                "1. Search Elefante memory before asserting project preferences, decisions, or prior context.",
+                "2. Use retrieved memories as evidence; surface material conflicts instead of silently choosing one.",
+                "3. Ask for missing context when it can change the result, and never store passwords, API keys, or secrets.",
+                "4. Keep the response focused on the current task and the smallest useful context set.",
+            ]
+        else:
+            result["ENTRYPOINT_SEQUENCE_READ_THIS_FIRST"] = [
+                "1. Read workspace/ISSUES.md and match the current failure to a BUG/GAP row before changing code.",
+                "2. Run the verification command from that BUG row first. If it passes, the documented fix still holds and the root cause is elsewhere.",
+                "3. If the verification fails, open the linked workspace/postmortems/<domain>.md entry and use its exact commands and constraints.",
+                "4. Read tests/README.md before creating any scratch reproducer. Update an existing maintained test when possible.",
+                "5. Only then edit source, rerun the same verifier, and update bug docs plus CHANGELOG if behavior changed.",
+            ]
         return result
 
     # ── Session retrieval history persistence (BUG-018 fix) ─────────────
@@ -1231,7 +1244,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 self.logger.error(f"Tool execution failed: {name}", error=str(e), exc_info=True)
                 # Surface compendium citation for database-class errors
                 error_msg = str(e)
-                if "workspace/ISSUES.md" not in error_msg:
+                if not is_client_runtime() and "workspace/ISSUES.md" not in error_msg:
                     error_msg += "\nDebug: workspace/ISSUES.md -> match the BUG/GAP row"
                 error_payload = {
                     "error": error_msg,

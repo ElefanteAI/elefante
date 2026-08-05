@@ -8,7 +8,7 @@
 
 ## What is Elefante?
 
-A local-first persistent memory engine for AI agents, exposed via the Model Context Protocol (MCP). Stores, scores, and retrieves facts, preferences, decisions, and code patterns across sessions. Embedded SQLite vectors and Kuzu relationships form the current storage architecture. **v2.12.0** is the latest published release.
+A local-first persistent memory engine for AI agents, exposed via the Model Context Protocol (MCP). Stores, scores, and retrieves facts, preferences, decisions, and code patterns across sessions. Embedded SQLite vectors and Kuzu relationships form the current storage architecture. **v2.12.1** is the latest published release. Release Client Candidate 1.0 is the validation lane for the upcoming v2.12.2 customer runtime; it is not a separate product version or public download.
 
 Detail: [`README.md`](README.md) for product overview, [`docs/reference/architecture.md`](docs/reference/architecture.md) for system design.
 
@@ -157,7 +157,7 @@ Companion canonical sources:
 
 `v{MAJOR}.{MINOR}.{PATCH}`. Strict semver per [`docs/how-to/close-a-feature.md`](docs/how-to/close-a-feature.md). Use `scripts/ci/advise_version_bump.py` then `scripts/ci/bump_version.py X.Y.Z`. Never edit version strings manually.
 
-Current published release: **v2.12.0**. Future work is tracked as unversioned **Upcoming** in [`workspace/PLANNING.md`](workspace/PLANNING.md).
+Current published release: **v2.12.1**. Release Client Candidate 1.0 validates the upcoming v2.12.2 customer artifact without creating a second public version system. Future work is tracked as unversioned **Upcoming** in [`workspace/PLANNING.md`](workspace/PLANNING.md).
 
 ---
 
@@ -188,7 +188,7 @@ Every documentation change must answer **one question in one canonical place**. 
 |-------|----------------|
 | New idea | `workspace/PLANNING.md` § Backlog (or `docs/explanation/vision.md` during migration) |
 | Accepted feature design | `workspace/PLANNING.md` § Features |
-| Current release state | `workspace/PLANNING.md` § Active Release |
+| Current release state | `workspace/PLANNING.md` §2 Released Product |
 | Bug or GAP | `workspace/ISSUES.md` |
 | Bug postmortem | `workspace/postmortems/<domain>.md` |
 | Reusable lesson | `workspace/lessons.md` |

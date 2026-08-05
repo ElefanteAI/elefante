@@ -43,6 +43,7 @@ from src.core.retrieval import CognitiveRetriever, MemoryCandidate, QueryAnalysi
 from src.utils.logger import get_logger
 from src.utils.config import get_config
 from src.utils.validators import validate_memory_content, validate_uuid
+from src.utils.runtime_profile import is_client_runtime
 from src.core.etl import ProcessingStatus  # Only need status, classification is agent-driven
 from src.models.task import Task, TaskStatus
 
@@ -142,6 +143,9 @@ class MemoryOrchestrator:
 
     async def ensure_system_baseline(self) -> Dict[str, Any]:
         """Ensure the runtime SDD specification baseline exists for every install."""
+        if is_client_runtime():
+            self._system_baseline_ready = True
+            return {"success": True, "created": 0, "existing": 0, "titles": []}
         if self._system_baseline_ready:
             return {
                 "success": True,

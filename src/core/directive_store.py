@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Optional
 
 from src.utils.config import DATA_DIR
 from src.utils.logger import get_logger
+from src.utils.runtime_profile import CLIENT_PROFILE, runtime_profile
 
 logger = get_logger(__name__)
 
@@ -88,6 +89,25 @@ SYSTEM_DIRECTIVE_DEFINITIONS = (
     ),
 )
 
+CLIENT_SYSTEM_DIRECTIVE_DEFINITIONS = (
+    (
+        "system-client-grounding",
+        "ELEFANTE Grounding: Use stored memory and current task evidence for project-specific claims; identify material uncertainty instead of guessing.",
+    ),
+    (
+        "system-client-search-first",
+        "ELEFANTE Search-First: Search memory before asserting preferences, conventions, decisions, or prior context.",
+    ),
+    (
+        "system-client-conflicts",
+        "ELEFANTE Conflict Safety: Surface conflicting or stale memories and prefer verified current evidence over silent assumptions.",
+    ),
+    (
+        "system-client-secrets",
+        "ELEFANTE Secret Safety: Never store passwords, API keys, access tokens, or other secrets in memory.",
+    ),
+)
+
 
 class Directive:
     """A single behavioral constraint."""
@@ -140,8 +160,9 @@ class DirectiveStore:
     Thread-safe for the single-process MCP server model (no concurrent writes).
     """
 
-    def __init__(self, path: Optional[Path] = None):
+    def __init__(self, path: Optional[Path] = None, *, profile: Optional[str] = None):
         self._path = path or DIRECTIVES_FILE
+        self._profile = profile or runtime_profile()
         self._directives: List[Directive] = []
         self._system_directives: List[Directive] = self._build_system_directives()
         self._load()
@@ -225,7 +246,12 @@ class DirectiveStore:
 
     def _build_system_directives(self) -> List[Directive]:
         directives = []
-        for directive_id, content in SYSTEM_DIRECTIVE_DEFINITIONS:
+        definitions = (
+            CLIENT_SYSTEM_DIRECTIVE_DEFINITIONS
+            if self._profile == CLIENT_PROFILE
+            else SYSTEM_DIRECTIVE_DEFINITIONS
+        )
+        for directive_id, content in definitions:
             directives.append(
                 Directive(
                     content=content,

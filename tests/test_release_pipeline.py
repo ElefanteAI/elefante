@@ -143,26 +143,37 @@ def test_version_sync_tracks_release_identifiers_without_rewriting_history():
         "setup.py",
         "config.yaml",
         "src/dashboard/ui/package.json",
-        "README.md",
-        "docs/README.md",
-        "docs/explanation/vision.md",
     }.issubset(targets)
+    assert "README.md" not in targets
+    assert "docs/README.md" not in targets
+    assert "docs/explanation/vision.md" not in targets
     assert "workspace/ISSUES.md" not in targets
     assert "workspace/lessons.md" not in targets
     assert not any(path.startswith("workspace/postmortems/") for path in targets)
     assert module.GLOB_TARGETS == []
 
-    vision_target = next(target for target in module.TARGETS if target[0] == "docs/explanation/vision.md")
-    vision = (ROOT / "docs/explanation/vision.md").read_text(encoding="utf-8")
-    assert re.search(vision_target[1], vision)
+    assert "v2.12.1" in (ROOT / "README.md").read_text(encoding="utf-8")
+
+
+def test_version_advisor_accepts_candidate_changelog_entries():
+    module = _load_module(
+        ROOT / "scripts/ci/advise_version_bump.py", "advise_version_candidate"
+    )
+
+    assert module.changelog_has_entry("2.12.2") is True
 
 
 def test_build_workflow_uses_maintained_release_scripts():
     workflow = (ROOT / ".github/workflows/build-binaries.yml").read_text(encoding="utf-8")
 
     assert "pull_request:" in workflow
-    assert '"scripts/ci/build_installer_bundle.py"' in workflow
-    assert "python scripts/ci/build_installer_bundle.py" in workflow
+    assert '"scripts/ci/build_release_client.py"' in workflow
+    assert '"scripts/ci/verify_release_client.py"' in workflow
+    assert "python scripts/ci/build_release_client.py" in workflow
+    assert "python scripts/ci/verify_release_client.py" in workflow
+    assert "--publication-status release" in workflow
+    assert "--expected-publication-status release" in workflow
+    assert "requirements.client.lock" in workflow
     assert "python scripts/ci/generate_release_checksums.py" in workflow
     assert "python3 scripts/ci/render_release_notes.py" in workflow
     assert "python3 scripts/ci/select_release_assets.py" in workflow
@@ -250,6 +261,8 @@ def test_build_workflow_smokes_platform_archives_before_upload():
     assert "--dry-run" in workflow
     assert "test ! -e \"$dry_run_root\"" in workflow
     assert "Installer bundle dry-run mutated the install path" in workflow
+    assert "Developer dependency lock leaked into customer installer" in workflow
+    assert "Release Profile: Client (runtime-only payload)" in workflow
     assert "--verify \"$checksum_file\"" in workflow
     assert "--verify $checksumFile" in workflow
 
@@ -265,6 +278,29 @@ def test_quality_workflow_enforces_release_candidate_gates():
     assert "npm audit --audit-level=high" in workflow
     assert "Production Dependency Audit" in workflow
     assert "pypa/gh-action-pip-audit@" in workflow
+    assert "requirements.client.txt" in workflow
+    assert "requirements.client.lock" in workflow
+    assert "scripts/ci/build_release_client.py" in workflow
+    assert "scripts/ci/verify_release_client.py" in workflow
+    assert "requirements.client.lock" in workflow
+    assert "pypa/gh-action-pip-audit@" in workflow
+
+
+def test_release_client_candidate_workflow_is_validation_only():
+    workflow = (ROOT / ".github/workflows/build-release-client.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert '"release/**"' in workflow
+    assert "macos-latest" in workflow
+    assert "scripts/ci/build_release_client.py" in workflow
+    assert "scripts/ci/verify_release_client.py" in workflow
+    assert "actions/upload-artifact@v4" in workflow
+    assert "--require-clean-source" in workflow
+    assert "--publication-status candidate" in workflow
+    assert "--expected-publication-status candidate" in workflow
+    assert "softprops/action-gh-release" not in workflow
+    assert "candidate-not-for-public-download" not in workflow
 
 
 def test_release_workflow_publishes_verified_sha256sums():
@@ -310,7 +346,7 @@ def test_tagged_release_cannot_bypass_the_hash_locked_dependency_audit():
     assert "dependency-audit:" in workflow
     assert "needs: [build, dependency-audit]" in workflow
     assert "pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266" in workflow
-    assert "inputs: requirements.lock" in workflow
+    assert "inputs: requirements.client.lock" in workflow
     assert "require-hashes: true" in workflow
     assert "disable-pip: true" in workflow
     assert "no-deps: true" in workflow
