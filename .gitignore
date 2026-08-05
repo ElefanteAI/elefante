@@ -62,6 +62,11 @@ dist/
 # Local demo/data directories
 a0-data/
 
+# Task Intelligence evaluation outputs stay local and metadata-only
+benchmarks/task_intelligence/outcomes/
+benchmarks/task_intelligence/worktrees/
+benchmarks/task_intelligence/*.memory-export.json
+
 # Cleanup and planning artifacts
 CLEANUP_PLAN.md
 RELEASE_V1.1.0_PREPARATION.md

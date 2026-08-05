@@ -23,6 +23,9 @@ pytest tests/test_integration_smoke.py -v
 
 # Run the isolated 100-memory scoring + dashboard sandbox
 ./.venv/bin/python scripts/verify/verify_scoring_sandbox.py
+
+# Verify the frozen Task Intelligence benchmark contract
+./.venv/bin/python scripts/ci/verify_task_intelligence_benchmark.py
 ```
 
 The shipped self-protocol runs against an isolated temporary Elefante home/data directory so it validates the live MCP workflow without polluting the user's durable memory store. By default it verifies 15/16 tools plus both prompts; `--with-dashboard-open` is opt-in because that tool binds fixed port 8000 and is not fully self-contained.
@@ -55,6 +58,7 @@ Use the existing tests in this file before writing any ad hoc validation script.
 | [test_backup_restore.py](test_backup_restore.py) | Backup manifests, restore preflight, archive safety, integrity, and recoverable replacement | When changing `scripts/lifecycle/backup_elefante_data.py` or `restore_elefante_data.py` |
 | [test_installer_bundle.py](test_installer_bundle.py) | Release-bundle bootstrap install root placement, delegated installer command wiring, and archive contents | When changing `scripts/setup/bootstrap_release_bundle.py` or `scripts/ci/build_installer_bundle.py` |
 | [test_install_setup.py](test_install_setup.py) | Installer state, daemon service, MCP host adapters, safe uninstall ownership, and seed-memory guard | When changing `scripts/setup/` or `scripts/lifecycle/` installer paths |
+| [test_task_intelligence_benchmark.py](test_task_intelligence_benchmark.py) | Historical task provenance, acceptance nodes, split isolation, leakage scanning, and metadata-only outcomes | When changing the Task Intelligence SDD, benchmark manifest, or evaluator |
 
 ### INTEGRATION (Run before release)
 
