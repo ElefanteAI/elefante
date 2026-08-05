@@ -173,6 +173,9 @@ the dashboard work does not waive them.
 - Explicit archive allowlist plus verifier that rejects developer material
 - Branch-only macOS workflow uploads a private validation artifact and checksum;
   it cannot create a GitHub Release or alter the public website
+- The same fresh macOS runner must extract the ZIP through `ditto`, execute the
+  customer launcher without `--dry-run`, pass `doctor` with customer readiness
+  and v2.12.2 runtime identity, then safely unregister the daemon and runtime
 - No claim of public availability until a clean download, installer, release asset,
   checksum, and customer-flow verification all pass
 

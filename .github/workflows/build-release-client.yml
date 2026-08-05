@@ -67,6 +67,55 @@ jobs:
           python scripts/ci/build_release_client.py --platform macOS --publication-status candidate --output dist/elefante-v2.12.2-rc.1-macOS.zip
           python scripts/ci/verify_release_client.py --archive dist/elefante-v2.12.2-rc.1-macOS.zip --require-clean-source --expected-publication-status candidate --expected-platform macOS
           shasum -a 256 dist/elefante-v2.12.2-rc.1-macOS.zip > dist/SHA256SUMS
+      - name: Prove a fresh macOS customer installation
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          package_root="$RUNNER_TEMP/elefante-client-package"
+          bundle_root="$package_root/elefante-installer-macOS"
+          install_root="$HOME/.elefante/app/current"
+          doctor_report="$RUNNER_TEMP/elefante-doctor.json"
+
+          mkdir -p "$package_root"
+          ditto -x -k dist/elefante-v2.12.2-rc.1-macOS.zip "$package_root"
+          test -x "$bundle_root/Install Elefante.command"
+          test ! -e "$install_root"
+
+          "$bundle_root/Install Elefante.command" --venv-mode fresh --verbose
+
+          test -x "$install_root/.venv/bin/python"
+          "$install_root/.venv/bin/python" \
+            "$install_root/scripts/lifecycle/doctor.py" --json > "$doctor_report"
+          python - "$doctor_report" "$install_root" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          report = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          expected_root = str(Path(sys.argv[2]).resolve())
+          assert report["ready"] is True, report
+          assert report["customer_ready"] is True, report
+          assert report["installation"]["scope"] == "customer", report
+          assert report["installation"]["version"] == "2.12.2", report
+          assert report["installation"]["app_root"] == expected_root, report
+          assert report["host_coverage"]["uncovered"] == [], report
+          PY
+
+          "$install_root/.venv/bin/python" \
+            "$install_root/scripts/lifecycle/uninstall_elefante.py" --apply
+          if launchctl print "gui/$(id -u)/ai.elefante.daemon" >/dev/null 2>&1; then
+            echo "Elefante daemon remained registered after uninstall" >&2
+            exit 1
+          fi
+          python - "$HOME/.elefante/install-manifest.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          manifest = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          assert "runtime" not in manifest, manifest
+          PY
       - name: Upload validation artifact only
         uses: actions/upload-artifact@v4
         with:

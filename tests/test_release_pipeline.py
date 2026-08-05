@@ -299,6 +299,13 @@ def test_release_client_candidate_workflow_is_validation_only():
     assert "--require-clean-source" in workflow
     assert "--publication-status candidate" in workflow
     assert "--expected-publication-status candidate" in workflow
+    assert "name: Prove a fresh macOS customer installation" in workflow
+    assert 'ditto -x -k dist/elefante-v2.12.2-rc.1-macOS.zip' in workflow
+    assert '"$bundle_root/Install Elefante.command" --venv-mode fresh --verbose' in workflow
+    assert '"$install_root/scripts/lifecycle/doctor.py" --json' in workflow
+    assert 'report["customer_ready"] is True' in workflow
+    assert 'report["installation"]["version"] == "2.12.2"' in workflow
+    assert '"$install_root/scripts/lifecycle/uninstall_elefante.py" --apply' in workflow
     assert "softprops/action-gh-release" not in workflow
     assert "candidate-not-for-public-download" not in workflow
 
