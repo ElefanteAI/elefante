@@ -11,6 +11,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import json
 import os
@@ -42,6 +43,34 @@ def test_installer_entrypoint_starts_without_product_dependencies():
     assert result.returncode == 0, result.stderr
     assert "--release-profile" in result.stdout
     assert "ModuleNotFoundError" not in result.stderr
+
+
+def test_client_health_checks_customer_baseline_without_developer_sdd(monkeypatch):
+    from scripts.verify import verify_health
+    from src.core.directive_store import CLIENT_SYSTEM_DIRECTIVE_DEFINITIONS
+
+    class Orchestrator:
+        async def ensure_system_baseline(self):
+            return {"success": True}
+
+    class DirectiveStore:
+        def list_all(self):
+            return [
+                {"id": directive_id, "content": content}
+                for directive_id, content in CLIENT_SYSTEM_DIRECTIVE_DEFINITIONS
+            ]
+
+    monkeypatch.setattr(verify_health, "get_orchestrator", Orchestrator)
+    monkeypatch.setattr(verify_health, "get_directive_store", DirectiveStore)
+    monkeypatch.setattr(verify_health, "is_client_runtime", lambda: True)
+
+    result = asyncio.run(verify_health.check_system_baseline())
+
+    assert result["status"] == "healthy"
+    assert result["profile"] == "client"
+    assert result["missing_directives"] == []
+    assert result["developer_directives"] == []
+    assert result["specifications"] == "not-applicable"
 
 
 def test_requirements_pin_every_declared_direct_dependency():

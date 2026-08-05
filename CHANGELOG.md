@@ -41,6 +41,9 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A genuinely clean machine can now start the installer before Elefante's
   Python dependencies exist. The bootstrap reads the release version directly
   instead of importing dependency-backed product modules before setup.
+- Customer health verification now checks the task-focused client directive
+  baseline instead of requiring Elefante's internal developer SDD directives
+  and repository specification memories.
 
 ## [2.12.1] - 2026-08-04
 

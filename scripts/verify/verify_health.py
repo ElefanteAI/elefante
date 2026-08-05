@@ -28,9 +28,15 @@ from datetime import datetime
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.core.orchestrator import get_orchestrator  # noqa: E402
+from src.core.directive_store import (  # noqa: E402
+    CLIENT_SYSTEM_DIRECTIVE_DEFINITIONS,
+    SYSTEM_DIRECTIVE_DEFINITIONS,
+    get_directive_store,
+)
+from src.core.orchestrator import SYSTEM_SPECIFICATIONS, get_orchestrator  # noqa: E402
 from src.utils.logger import get_logger  # noqa: E402
 from src.utils.config import get_config  # noqa: E402
+from src.utils.runtime_profile import is_client_runtime  # noqa: E402
 
 logger = get_logger(__name__)
 
@@ -149,16 +155,42 @@ async def check_configuration():
 
 
 async def check_system_baseline():
-    """Verify that runtime directives and specification memories are present."""
+    """Verify the customer or developer baseline selected by the runtime profile."""
     try:
-        from src.core.directive_store import get_directive_store, SYSTEM_DIRECTIVE_DEFINITIONS
-        from src.core.orchestrator import SYSTEM_SPECIFICATIONS
-
         orchestrator = get_orchestrator()
         await orchestrator.ensure_system_baseline()
 
         directive_store = get_directive_store()
         directives = directive_store.list_all()
+        client_runtime = is_client_runtime()
+        expected_definitions = (
+            CLIENT_SYSTEM_DIRECTIVE_DEFINITIONS
+            if client_runtime
+            else SYSTEM_DIRECTIVE_DEFINITIONS
+        )
+        expected_ids = {directive_id for directive_id, _ in expected_definitions}
+        present_ids = {directive.get("id") for directive in directives}
+        missing_directives = sorted(expected_ids.difference(present_ids))
+
+        if client_runtime:
+            leaked_developer_directives = sorted(
+                directive_id
+                for directive_id in present_ids
+                if isinstance(directive_id, str) and directive_id.startswith("system-sdd-")
+            )
+            healthy = not missing_directives and not leaked_developer_directives
+            result = {
+                "status": "healthy" if healthy else "unhealthy",
+                "profile": "client",
+                "system_directives": len(expected_ids) - len(missing_directives),
+                "missing_directives": missing_directives,
+                "developer_directives": leaked_developer_directives,
+                "specifications": "not-applicable",
+            }
+            if not healthy:
+                result["error"] = "Customer runtime baseline is incomplete or contains developer directives"
+            return result
+
         sdd_gate_count = sum(1 for directive in directives if directive.get("content", "").startswith("SDD "))
         stdout_purity_present = any("STDOUT" in directive.get("content", "") for directive in directives)
 
@@ -176,20 +208,25 @@ async def check_system_baseline():
                 missing_specifications.append(specification["title"])
 
         healthy = (
-            directive_store.count() >= len(SYSTEM_DIRECTIVE_DEFINITIONS)
+            not missing_directives
             and sdd_gate_count >= 5
             and stdout_purity_present
             and not missing_specifications
         )
 
-        return {
+        result = {
             "status": "healthy" if healthy else "unhealthy",
+            "profile": "developer",
             "total_directives": directive_store.count(),
+            "missing_directives": missing_directives,
             "sdd_directives": sdd_gate_count,
             "stdout_purity_present": stdout_purity_present,
             "specifications": len(SYSTEM_SPECIFICATIONS) - len(missing_specifications),
             "missing_specifications": missing_specifications,
         }
+        if not healthy:
+            result["error"] = "Developer runtime baseline is incomplete"
+        return result
     except Exception as e:
         return {
             "status": "unhealthy",
@@ -271,5 +308,4 @@ async def main():
 if __name__ == "__main__":
     exit_code = asyncio.run(main())
     sys.exit(exit_code)
-
 

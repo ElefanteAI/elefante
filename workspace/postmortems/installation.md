@@ -183,6 +183,14 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 **Guard:** `pytest tests/test_install_setup.py -k "entrypoint_starts_without_product_dependencies" -v` launches the installer help path with `python -S`, which disables site packages. The isolated macOS workflow then executes the full customer launcher and requires customer-ready `doctor` output.
 **Lesson:** An installer must bootstrap using only the standard library until it has installed its own dependency contract.
 
+## Issue #23: Client Health Required Developer SDD Baseline [BUG-043, FIXED locally, guarded]
+
+**Trigger:** After the clean customer install successfully created its environment, installed dependencies, initialized storage, generated the dashboard, started the daemon, and completed host detection, final health verification reported `System Baseline: UNHEALTHY`.
+**Root cause:** `verify_health.py` always required Elefante's internal developer SDD directives and developer specification memories. The client runtime intentionally excludes those instructions and seeds only task-focused grounding, continuity, conflict, and secret-safety directives.
+**Solution:** Health verification selects its baseline from the runtime profile. A client runtime must contain every client directive, no developer SDD directive, and does not require developer specification memories. Developer checks retain the full SDD contract.
+**Guard:** `pytest tests/test_install_setup.py -k "client_health_checks_customer_baseline" -v`; the isolated macOS workflow requires the entire customer launcher and `doctor` readiness path to pass.
+**Lesson:** Product health must verify the product contract for the active runtime profile, not the development environment that produced it.
+
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
 The five most-recurring rules from the issues above:
