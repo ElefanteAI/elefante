@@ -93,6 +93,7 @@ ASCII_SPINNER_FRAMES = ["-", "\\", "|", "/"]
 
 # Ensure sibling setup modules are importable when running as a script.
 sys.path.insert(0, str(SETUP_DIR))
+sys.path.insert(0, str(ROOT_DIR))
 
 from configure_vscode_bob import configure_mcp as configure_vscode  # noqa: E402
 from configure_antigravity import (  # noqa: E402
@@ -101,19 +102,63 @@ from configure_antigravity import (  # noqa: E402
 )
 from configure_cursor_kiro import configure_detected_hosts, infer_repo_python  # noqa: E402
 from configure_cli_agents import configure_detected_cli_hosts  # noqa: E402
+from install_manifest import (  # noqa: E402
+    configured_surfaces,
+    read_runtime_installation,
+    record_runtime_installation,
+)
 from host_selection import (  # noqa: E402
     CLI_HOSTS,
     HOST_LABELS,
     JSON_HOSTS,
     SUPPORTED_HOSTS,
     VSCODE_FAMILY,
+    detect_supported_hosts,
     normalize_selected_hosts,
+    normalize_manifest_surfaces,
     select_family,
 )
+from src import __version__ as ELEFANTE_VERSION  # noqa: E402
 
 
 class InstallationCancelled(Exception):
     """Raised when the operator cancels at a safe checkpoint."""
+
+
+def developer_runtime_conflicts_with_customer(
+    *,
+    installation_scope: str,
+    root_dir: Path,
+    existing_runtime: dict[str, str] | None,
+) -> bool:
+    """Prevent a movable checkout from replacing an installed customer runtime."""
+    return bool(
+        installation_scope == "developer"
+        and existing_runtime is not None
+        and existing_runtime.get("scope") == "customer"
+        and Path(existing_runtime["app_root"]).resolve() != root_dir.resolve()
+    )
+
+
+def uncovered_required_hosts(
+    required_hosts: set[str],
+    verified_surfaces: set[str],
+) -> list[str]:
+    """Return canonical detected hosts that the install did not prove reachable."""
+    return sorted(required_hosts.difference(normalize_manifest_surfaces(verified_surfaces)))
+
+
+def installation_host_plan(
+    *,
+    installation_scope: str,
+    requested_hosts: set[str] | None,
+    detected_hosts: set[str],
+) -> tuple[set[str] | None, set[str]]:
+    """Select adapters and readiness requirements for one installation scope."""
+    if installation_scope == "customer":
+        return None, set(detected_hosts)
+    selected = None if requested_hosts is None else set(requested_hosts)
+    return selected, set(requested_hosts or detected_hosts)
 
 
 class Logger:
@@ -1092,10 +1137,19 @@ def main():
         choices=SUPPORTED_HOSTS,
         help="Configure only this detected agent host. Repeat to select multiple hosts.",
     )
+    parser.add_argument(
+        "--installation-scope",
+        choices=("customer", "developer"),
+        default="developer",
+        help=(
+            "Customer is reserved for a release payload placed by the bundle bootstrap; "
+            "direct source-checkout installs are developer runtimes."
+        ),
+    )
     args = parser.parse_args()
 
     verbose_mode = args.verbose
-    selected_hosts = normalize_selected_hosts(args.host)
+    requested_hosts = normalize_selected_hosts(args.host)
 
     root_dir = ROOT_DIR
     log_file = resolve_output_path(root_dir, args.log_file, INSTALL_LOG_FILE_NAME)
@@ -1115,13 +1169,38 @@ def main():
     os.chdir(root_dir)
     
     data_dir = os.environ.get("ELEFANTE_DATA_DIR") or str(Path.home() / ".elefante" / "data")
+    detected_hosts = detect_supported_hosts()
+    # A customer installation is account-global: every compatible host that is
+    # present must share the same runtime and memory store. Host filters remain
+    # useful for developer checkouts and targeted adapter testing only.
+    selected_hosts, required_hosts = installation_host_plan(
+        installation_scope=args.installation_scope,
+        requested_hosts=requested_hosts,
+        detected_hosts=detected_hosts,
+    )
+    existing_runtime = read_runtime_installation()
+
+    if developer_runtime_conflicts_with_customer(
+        installation_scope=args.installation_scope,
+        root_dir=root_dir,
+        existing_runtime=existing_runtime,
+    ):
+        print(
+            "ERROR: A customer-global Elefante runtime already owns this user account. "
+            "Run the released installer to repair or upgrade it; a developer checkout "
+            "cannot replace that runtime."
+        )
+        raise SystemExit(1)
 
     print_header("ELEFANTE INSTALLATION WIZARD")
     logger.log(f"  Install to:  {root_dir}")
     logger.log(f"  Data:        {data_dir}")
+    logger.log(f"  Scope:       {args.installation_scope}")
     logger.log(f"  Log:         {log_file}")
     logger.log(f"  Python:      {sys.version.split()[0]}")
-    if selected_hosts is None:
+    if args.installation_scope == "customer":
+        logger.log("  Agent hosts: every detected compatible host (customer-global)")
+    elif selected_hosts is None:
         logger.log("  Agent hosts: all detected compatible hosts")
     else:
         labels = ", ".join(HOST_LABELS[host] for host in SUPPORTED_HOSTS if host in selected_hosts)
@@ -1316,23 +1395,32 @@ def main():
                     else:
                         logger.log(f"WARN: {host} MCP configuration was not changed ({result})")
 
-                if (
-                    not vscode_success
-                    and not antigravity_success
-                    and not any(additional_hosts.values())
-                    and not any(result in {"configured", "updated", "already-present"} for result in cli_hosts.values())
-                ):
-                    logger.log("WARN: Automatic MCP configuration skipped")
-                    logger.log("   Please configure your IDE manually.")
-                    logger.log("   See docs/how-to/install.md and docs/how-to/run-mcp-server.md for instructions.")
-                    ide_detail = "Automatic IDE configuration skipped"
-                    state_tracker.warn_stage("4", "IDE Configuration", ide_detail)
+                verified_surfaces = configured_surfaces(Path.home())
+                uncovered_hosts = uncovered_required_hosts(required_hosts, verified_surfaces)
+                if uncovered_hosts:
+                    labels = ", ".join(HOST_LABELS[host] for host in uncovered_hosts)
+                    ide_detail = f"Detected hosts not verified: {labels}"
+                    logger.log(f"ERROR: {ide_detail}")
+                    logger.log("   Elefante will not claim customer readiness while a detected host is uncovered.")
+                    logger.log("   Re-run the released installer after resolving the reported host configuration.")
+                    if args.installation_scope == "customer":
+                        state_tracker.fail_stage("4", "IDE Configuration", ide_detail)
+                        success = False
+                    else:
+                        state_tracker.warn_stage("4", "IDE Configuration", ide_detail)
+                elif not required_hosts:
+                    ide_detail = "0 compatible hosts detected; generic MCP bridge remains available"
+                    state_tracker.complete_stage("4", "IDE Configuration", ide_detail)
                 else:
-                    ide_detail = "; ".join(detail_parts)
+                    ide_detail = "; ".join(detail_parts) or "All detected hosts verified"
                     state_tracker.complete_stage("4", "IDE Configuration", ide_detail)
             except Exception as e:
                 logger.log(f"ERROR: Error configuring MCP: {e}")
-                state_tracker.warn_stage("4", "IDE Configuration", f"IDE configuration error: {e}")
+                if args.installation_scope == "customer":
+                    state_tracker.fail_stage("4", "IDE Configuration", f"IDE configuration error: {e}")
+                    success = False
+                else:
+                    state_tracker.warn_stage("4", "IDE Configuration", f"IDE configuration error: {e}")
 
         if success:
             check_for_safe_cancellation("agent behavior bootstrap verification")
@@ -1378,6 +1466,27 @@ def main():
                 logger.log("ERROR: MCP handshake failed. Server is not responding to protocol.")
                 state_tracker.fail_stage("5a", "MCP Handshake Verification", "MCP server did not respond to protocol handshake")
                 success = False
+
+        if success:
+            state_tracker.start_stage("5b", "Runtime Registration", "Recording the installed runtime identity")
+            try:
+                record_runtime_installation(
+                    app_root=root_dir,
+                    data_root=Path(data_dir),
+                    version=ELEFANTE_VERSION,
+                    scope=args.installation_scope,
+                )
+            except (OSError, RuntimeError, ValueError) as error:
+                logger.log(f"ERROR: Could not record runtime installation: {error}")
+                state_tracker.fail_stage("5b", "Runtime Registration", "Runtime identity was not recorded")
+                success = False
+            else:
+                detail = (
+                    "Customer-global user runtime recorded"
+                    if args.installation_scope == "customer"
+                    else "Developer runtime recorded"
+                )
+                state_tracker.complete_stage("5b", "Runtime Registration", detail)
 
     except InstallationCancelled:
         logger.stop_spinner()

@@ -16,6 +16,31 @@
 
 ## 1. Automated Installation (Recommended)
 
+### One customer installation for all agent hosts
+
+The release installer creates one stable, account-wide Elefante installation:
+
+- Runtime: `~/.elefante/app/current` on macOS/Linux, or
+  `%LOCALAPPDATA%\Elefante\app\current` on Windows.
+- Memory: `~/.elefante/data` by default.
+- Service: one user-level, loopback-only daemon shared by every connected host.
+- Integrations: every detected compatible IDE and CLI agent is connected to
+  that same runtime automatically.
+
+The installer does not create separate memories per editor or per project. It
+does not report success when a detected compatible host remains unconfigured.
+An IDE installed later is connected by running the same release installer
+again; existing memory remains in place.
+
+Run the bundled doctor from the stable runtime to verify the contract:
+
+```bash
+~/.elefante/app/current/.venv/bin/python ~/.elefante/app/current/scripts/lifecycle/doctor.py
+```
+
+A source checkout is a developer runtime. It is intentionally separate and
+cannot replace an existing customer installation.
+
 The installation scripts handle everything automatically:
 
 - Create virtual environment
@@ -104,7 +129,7 @@ If `.venv` already exists, press Enter for a destructive fresh reinstall, choose
 
 5. **IDE and CLI-Agent Configuration**
    - Configures the local daemon first, then emits a transport-only MCP bridge for detected compatible hosts: VS Code, Cursor, Kiro, Gemini CLI, and native Claude Code, Codex, or OpenClaw CLIs.
-   - The native installer preselects detected hosts and lets the user choose one or several. Scripted installs can repeat `--host`, for example `install.sh --host cursor --host codex`.
+   - The customer installer connects every detected compatible host. Developer source installs may use repeatable `--host` filters for targeted adapter work.
    - Preserves existing user-managed `elefante` registrations and unrelated MCP servers; only unchanged installer-owned entries are refreshed or removed.
    - Hosts are compatible until their host-driven lifecycle has been verified; see [IDE configuration](configure-ide.md) for current tiers and manual paths.
 
@@ -283,9 +308,9 @@ Elefante integrates with AI coding assistants via the **Model Context Protocol (
 
 ### Automated Configuration
 
-The full installer configures every detected compatible host unless an explicit
-host selection is supplied. Repeat `--host` to configure only the requested
-detected hosts:
+The release installer always configures every detected compatible host. When
+running directly from a developer source checkout, repeat `--host` to limit an
+adapter test to requested detected hosts:
 
 ```bash
 ./install.sh --host vscode-copilot --host codex

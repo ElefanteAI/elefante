@@ -4,7 +4,7 @@
 
 > **Cross-refs:** Domain postmortems = [`postmortems/`](postmortems/). Cross-bug rules = [`lessons.md`](lessons.md). Active release state + journal = [`PLANNING.md`](PLANNING.md). Constitution = [`../agents/orchestrator.md`](../agents/orchestrator.md).
 >
-> **Last Updated:** 2026-07-30 (BUG-039 stale Chroma installer initialization contract; 39 BUGs + 4 GAPs)
+> **Last Updated:** 2026-08-05 (BUG-040 customer-global installation and host-coverage contract; 40 BUGs + 4 GAPs)
 
 ---
 
@@ -25,6 +25,7 @@ Active bugs and recurring failure classes. Each links to its compendium post-mor
 
 | ID | Issue | Status | Compendium | Verification Command | Recurrence |
 | -- | ----- | ------ | ---------- | -------------------- | ---------- |
+| BUG-040 | A developer checkout could own the user daemon, customer install success did not prove every detected compatible host was connected, and `doctor` could not distinguish a stable customer runtime from a movable checkout. | FIXED (guarded) — release bundles declare customer scope, configure all detected hosts, record stable runtime identity, and fail closed on uncovered hosts | [installation #20](postmortems/installation.md#issue-20-customer-global-installation-and-host-coverage-bug-040-fixed-guarded) | `pytest tests/test_installer_bundle.py tests/test_install_setup.py tests/test_installer_gui.py -q` | 1x — customer journey audit 2026-08-05 |
 | BUG-028 | Dashboard served private memory data with wildcard CORS and a public bind default; Compose also published port 8000 on all interfaces. | FIXED (guarded) — loopback bind, explicit origins, loopback Compose publication | [dashboard #10](postmortems/dashboard.md#issue-10-dashboard-private-data-exposure) | `pytest tests/test_dashboard_serializer.py -k "loopback or cors" -v` | 0x — audit discovery 2026-07-22 |
 | BUG-029 | `elefante-GraphQuery` was described as retrieval but permitted graph writes through Cypher, bypassing the explicit GraphConnect path. | FIXED (guarded) — validator enforced at the MCP boundary | [database #9](postmortems/database.md#issue-9-graphquery-write-boundary-bypass) | `pytest tests/test_dashboard_serializer.py -k "graph_query_validator" -v` | 0x — audit discovery 2026-07-22 |
 | BUG-030 | Default `pytest` invocation collected manual tests and failed on duplicate module names, so the automated suite could not be used as a release gate. | FIXED (guarded) — documented `pytest tests` command collects only automated coverage | [ai behavior](postmortems/ai-behavior.md) | `pytest tests -q` | 0x — audit discovery 2026-07-22 |
