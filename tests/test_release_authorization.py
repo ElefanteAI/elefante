@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_release_authorization.py
-# VERSION : 2.12.1
-# CHANGED : 2026-08-04
+# VERSION : 2.12.2
+# CHANGED : 2026-08-05
 # PROVES  : A reviewed release-request marker validates the package version,
 #           creates an immutable tag, and explicitly dispatches publication.
 # RUN     : pytest tests/test_release_authorization.py -v
@@ -20,7 +20,7 @@ def test_authorized_release_request_is_validated_and_dispatched() -> None:
     workflow = (ROOT / ".github/workflows/authorize-release.yml").read_text(
         encoding="utf-8"
     )
-    marker = ROOT / ".github/release-requests/v2.12.1"
+    historical_marker = ROOT / ".github/release-requests/v2.12.1"
     markers = sorted(
         path.name
         for path in (ROOT / ".github/release-requests").glob("v*.*.*")
@@ -29,10 +29,11 @@ def test_authorized_release_request_is_validated_and_dispatched() -> None:
     package = (ROOT / "src/__init__.py").read_text(encoding="utf-8")
     version_match = re.search(r'__version__\s*=\s*"([^"]+)"', package)
 
-    assert marker.is_file()
     assert version_match is not None
-    assert marker.name in markers
-    assert f"v{version_match.group(1)}" not in markers
+    marker = ROOT / ".github/release-requests" / f"v{version_match.group(1)}"
+    assert historical_marker.is_file()
+    assert marker.is_file()
+    assert markers[-1] == marker.name
     assert "branches:\n      - main" in workflow
     assert '".github/release-requests/v*.*.*"' in workflow
     assert "contents: write" in workflow

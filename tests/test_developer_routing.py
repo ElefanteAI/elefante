@@ -129,7 +129,7 @@ def test_living_plan_tracks_the_released_product_and_separate_client_candidate()
     assert "| OB5 |" not in planning
     assert "source-grounded" in planning
     assert "**PUBLISHED_PRODUCT:** v2.12.1 remains live and unchanged." in planning
-    assert "**PUBLICATION_AUTHORIZED:** NO" in planning
+    assert "**PUBLICATION_AUTHORIZED:** YES" in planning
 
 
 def test_active_tool_docs_match_current_mcp_surface() -> None:

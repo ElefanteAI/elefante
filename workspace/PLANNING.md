@@ -108,16 +108,16 @@ loopback-only, redacted snapshot-only, and read-only.
 |------|---------------|
 | Visual acceptance | The source-grounded dashboard showcase and canonical branding are complete. The website received desktop/mobile dark/light, reduced-motion, and Matrix-state browser evidence before production deployment. |
 | Regression proof | v2.12.1 is the published release. The upcoming v2.12.2 client candidate completed a real isolated macOS install, health check, daemon startup, MCP handshake, runtime registration, and clean uninstall. Full quality and dependency checks plus macOS, Windows, and Linux package builds are green on exact candidate SHA `d5f8a99`. |
-| Durable handoff | PR #7 history was preserved in the no-rewrite merge on `release/v2.12.0`. The released product is maintained on `main`; detailed historic review evidence remains available on GitHub. |
-| Publication | **PUBLISHED 2026-08-04** — GitHub release `v2.12.1` and its installers remain public. The v2.12.2 candidate is not a public download and has no release or website authority. |
+| Durable handoff | PR #17 merged the clean v2.12.2 customer product into `main` at `e0489f0`; detailed candidate evidence remains available on GitHub. |
+| Publication | **AUTHORIZED 2026-08-05** — GitHub release `v2.12.1` and its installers remain public while the reviewed `v2.12.2` authorization marker performs immutable tag and release publication. The website cannot promote v2.12.2 until its published assets and checksums are independently verified. |
 
 ### §2.4 Approval gates
 
-The v2.12.1 release is published. The following production operations remain
-intentionally controlled:
+The v2.12.2 release is explicitly authorized through the reviewed marker. The
+following production operations remain intentionally controlled:
 
 1. Apply provenance or vector-store migrations to live user data.
-2. Tag or publish a later release, deploy unrelated changes, spend money, or
+2. Tag or publish any other release, deploy unrelated changes, spend money, or
    contact third parties.
 
 ### §2.5 Scope guard
@@ -143,8 +143,8 @@ Rejected alternatives remain closed without new evidence:
 
 - **RESUME_SAFE:** YES — active state is here; defects/capability gaps are in [`workspace/ISSUES.md`](../workspace/ISSUES.md); integration truth is in [`agents/manifests/ide-integration.yaml`](../agents/manifests/ide-integration.yaml).
 - **PUBLISHED_PRODUCT:** v2.12.1 remains live and unchanged.
-- **CANDIDATE:** v2.12.2 implementation and exact-SHA GitHub proof are complete on PR #17 at `d5f8a99`; merge, immutable authorization, publication, and website promotion remain.
-- **PUBLICATION_AUTHORIZED:** NO — the candidate has no tag, GitHub Release, website change, deployment, or live-install authority.
+- **CANDIDATE:** v2.12.2 is merged to `main` at `e0489f0`; immutable publication and website promotion remain.
+- **PUBLICATION_AUTHORIZED:** YES — the owner authorized v2.12.2 after PR #17's exact-SHA gates passed; `.github/release-requests/v2.12.2` is the auditable trigger. This authorization does not cover unrelated deployment or live-data mutation.
 
 ---
 
