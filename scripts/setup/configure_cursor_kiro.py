@@ -19,7 +19,8 @@ _SETUP_DIR = str(Path(__file__).resolve().parent)
 if _SETUP_DIR not in sys.path:
     sys.path.insert(0, _SETUP_DIR)
 
-from install_manifest import (
+from install_manifest import (  # noqa: E402
+    is_elefante_runtime_entry,
     is_unchanged_emitted_json_entry,
     record_emitted_json_entry,
     write_json_atomically,
@@ -71,6 +72,7 @@ def configure_json_mcp(
     *,
     manifest_home: Path | None = None,
     include_disabled: bool = True,
+    adopt_legacy: bool = False,
 ) -> bool:
     """Add/update one bridge entry while preserving every other MCP server."""
     existed_before = config_path.exists()
@@ -84,10 +86,13 @@ def configure_json_mcp(
     if not isinstance(servers, dict):
         return False
     entry_path = ("mcpServers", "elefante")
-    if "elefante" in servers and not is_unchanged_emitted_json_entry(
-        config_path, tool, entry_path, home=manifest_home
-    ):
-        return False
+    if "elefante" in servers:
+        installer_owned = is_unchanged_emitted_json_entry(
+            config_path, tool, entry_path, home=manifest_home
+        )
+        legacy_elefante = is_elefante_runtime_entry(servers["elefante"])
+        if not installer_owned and not (adopt_legacy and legacy_elefante):
+            return False
     servers["elefante"] = bridge_server_config(
         elefante_path, python_cmd, tool, include_disabled=include_disabled
     )
@@ -128,6 +133,7 @@ def configure_detected_hosts(
     home: Path | None = None,
     selected: set[str] | None = None,
     which: Callable[[str], str | None] = shutil.which,
+    adopt_legacy: bool = False,
 ) -> dict[str, bool]:
     """Configure only installed hosts, leaving absent host directories alone."""
     home = home or Path.home()
@@ -148,6 +154,7 @@ def configure_detected_hosts(
             host,
             manifest_home=home,
             include_disabled=host != "gemini",
+            adopt_legacy=adopt_legacy,
         )
     return results
 

@@ -1381,6 +1381,8 @@ def main():
                         for host in sorted(vscode_selection or [])
                         for argument in ("--host", host)
                     ]
+                    if args.installation_scope == "customer":
+                        vscode_args.append("--adopt-legacy-elefante")
                     vscode_success = configure_vscode(vscode_args)
 
                 antigravity_success = False
@@ -1394,6 +1396,7 @@ def main():
                         root_dir,
                         infer_repo_python(root_dir),
                         selected=json_selection,
+                        adopt_legacy=args.installation_scope == "customer",
                     )
 
                 cli_hosts = {}
@@ -1402,6 +1405,7 @@ def main():
                         root_dir,
                         infer_repo_python(root_dir),
                         selected=cli_selection,
+                        adopt_legacy=args.installation_scope == "customer",
                     )
 
                 detail_parts = []

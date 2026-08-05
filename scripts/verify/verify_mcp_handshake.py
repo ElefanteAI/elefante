@@ -1,9 +1,9 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : verify_mcp_handshake.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
-# PURPOSE : Minimal JSON-RPC initialize probe that proves the MCP server can
-#           answer a real handshake; narrower than the full self-protocol.
+# VERSION : 2.12.2
+# CHANGED : 2026-08-05
+# PURPOSE : Minimal JSON-RPC initialize probe that proves the customer stdio
+#           bridge and local daemon can answer a real MCP handshake.
 # WHEN    : After restart_elefante.py, to quickly confirm the server came back
 #           and is accepting connections before running the full self-protocol.
 #           Use this as the second check in the verification ladder:
@@ -28,7 +28,11 @@ from src.utils.logger import get_logger  # noqa: E402
 
 logger = get_logger("verification")
 
-async def verify_handshake():
+MCP_MODULE = "src.mcp.stdio_bridge"
+HANDSHAKE_TIMEOUT_SECONDS = 30.0
+
+
+async def verify_handshake(timeout_seconds: float = HANDSHAKE_TIMEOUT_SECONDS):
     """
     Simulates a real MCP connection handshake.
     1. Starts the server process.
@@ -39,7 +43,8 @@ async def verify_handshake():
     """
     logger.info("Testing MCP Server Handshake...")
     
-    cmd = [sys.executable, "-m", "src.mcp.server"]
+    cmd = [sys.executable, "-m", MCP_MODULE]
+    process = None
     
     try:
         # Start Server Process
@@ -70,10 +75,16 @@ async def verify_handshake():
         
         # 2. Read Response (with timeout)
         try:
-            line = await asyncio.wait_for(process.stdout.readline(), timeout=10.0)
+            line = await asyncio.wait_for(process.stdout.readline(), timeout=timeout_seconds)
         except asyncio.TimeoutError:
-            logger.error("Timeout waiting for 'initialize' response")
+            logger.error(
+                f"Timeout waiting {timeout_seconds:g}s for 'initialize' response"
+            )
             process.kill()
+            await process.wait()
+            stderr = await process.stderr.read()
+            if stderr:
+                logger.error(f"Bridge diagnostics: {stderr.decode(errors='replace')[-2000:]}")
             return False
             
         if not line:
@@ -105,19 +116,20 @@ async def verify_handshake():
         process.stdin.write(json.dumps(notify_msg).encode() + b"\n")
         await process.stdin.drain()
         
-        # Clean shutdown
-        process.terminate()
-        try:
-            await asyncio.wait_for(process.wait(), timeout=5.0)
-        except asyncio.TimeoutError:
-            process.kill()
-            
         logger.info("Verification complete: MCP Server is speaking protocol.")
         return True
         
     except Exception as e:
         logger.error(f"Verification failed: {e}")
         return False
+    finally:
+        if process is not None and process.returncode is None:
+            process.terminate()
+            try:
+                await asyncio.wait_for(process.wait(), timeout=5.0)
+            except asyncio.TimeoutError:
+                process.kill()
+                await process.wait()
 
 if __name__ == "__main__":
     success = asyncio.run(verify_handshake())

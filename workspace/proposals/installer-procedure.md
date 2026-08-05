@@ -1,6 +1,6 @@
 # PRD: Elefante Installer Procedure
 
-> **Status**: IMPLEMENTED — v2.12.1; global customer-readiness hardening tracked by BUG-040
+> **Status**: IMPLEMENTED — v2.12.2; customer-upgrade hardening tracked by BUG-040
 >
 > **Author**: Agent
 >
@@ -51,7 +51,7 @@ It must not require `git clone` in the end-user flow.
 | `scripts/setup/configure_vscode_bob.py` | Writes IDE MCP config using absolute paths to the installed Elefante tree |
 | `scripts/setup/configure_antigravity.py` | Same absolute-path pattern for Antigravity |
 | `scripts/verify/verify_health.py` | Core install verification |
-| `scripts/verify/verify_mcp_handshake.py` | MCP liveness verification |
+| `scripts/verify/verify_mcp_handshake.py` | Customer stdio-bridge and daemon liveness verification |
 | `scripts/verify/verify_e2e_tests.py` | Only maintained whole-surface live proof |
 | `elefante.spec` | Packages `src/main.py`, which is the app/runtime entrypoint, not the end-user installer |
 | `.github/workflows/build-binaries.yml` | Builds application binaries, not a first-run installer product |
@@ -324,7 +324,7 @@ So phase-1 validation must stay attached to maintained Elefante verifiers.
 | Verifier | Responsibility |
 | -------- | -------------- |
 | `scripts/verify/verify_health.py` | Core install health |
-| `scripts/verify/verify_mcp_handshake.py` | MCP liveness |
+| `scripts/verify/verify_mcp_handshake.py` | Actual customer stdio-bridge and daemon liveness |
 | `scripts/verify/verify_e2e_tests.py` | Release-level live surface proof |
 
 ### 8.3 Seed Passcode Limitation

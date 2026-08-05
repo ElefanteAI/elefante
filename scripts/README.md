@@ -27,7 +27,7 @@ Run top-down. Each step is faster but narrower. `install.py` already runs steps 
 | Step | Script | Proves |
 | ---- | ------ | ------ |
 | 1    | `verify/verify_health.py` | Paths, imports, config load. No DB, no server. |
-| 2    | `verify/verify_mcp_handshake.py` | MCP server answers a real JSON-RPC initialize. |
+| 2    | `verify/verify_mcp_handshake.py` | The customer stdio bridge reaches the local daemon and answers a real JSON-RPC initialize. |
 | 3    | `verify/verify_e2e_tests.py` | Full live tool/prompt surface in an isolated temp install — the **self-protocol** (see [`docs/reference/self-protocol.md`](../docs/reference/self-protocol.md)). |
 
 If step 1 fails, step 2 cannot help. Do not skip steps.

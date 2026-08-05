@@ -40,6 +40,7 @@ if _SETUP_DIR not in sys.path:
 
 from install_manifest import (  # noqa: E402
     forget_emitted_file,
+    is_elefante_runtime_entry,
     is_unchanged_emitted_json_entry,
     record_emitted_json_entry,
     write_json_atomically,
@@ -159,6 +160,7 @@ def configure_vscode_mcp_json(
     python_cmd: str,
     *,
     manifest_home: Path,
+    adopt_legacy: bool = False,
 ) -> bool:
     """Add/update the Elefante server config in a VS Code mcp.json file."""
     existed_before = mcp_json_path.exists()
@@ -178,10 +180,13 @@ def configure_vscode_mcp_json(
     if not isinstance(config.get('servers'), dict):
         return False
     entry_path = ("servers", "elefante")
-    if 'elefante' in config['servers'] and not is_unchanged_emitted_json_entry(
-        mcp_json_path, "vscode-copilot", entry_path, home=manifest_home
-    ):
-        return False
+    if 'elefante' in config['servers']:
+        installer_owned = is_unchanged_emitted_json_entry(
+            mcp_json_path, "vscode-copilot", entry_path, home=manifest_home
+        )
+        legacy_elefante = is_elefante_runtime_entry(config['servers']['elefante'])
+        if not installer_owned and not (adopt_legacy and legacy_elefante):
+            return False
 
     config['servers']['elefante'] = {
         "type": "stdio",
@@ -251,6 +256,11 @@ def configure_mcp(argv: list[str] | None = None):
         action="append",
         help="Configure only this detected host. Repeat to select both.",
     )
+    parser.add_argument(
+        "--adopt-legacy-elefante",
+        action="store_true",
+        help="Replace only registrations that structurally identify an older Elefante runtime.",
+    )
     args = parser.parse_args(argv)
     selected_hosts = set(args.host or VSCODE_FAMILY)
 
@@ -270,6 +280,7 @@ def configure_mcp(argv: list[str] | None = None):
                     elefante_path,
                     python_cmd,
                     manifest_home=Path.home(),
+                    adopt_legacy=args.adopt_legacy_elefante,
                 ):
                     mcp_configured = True
                 else:

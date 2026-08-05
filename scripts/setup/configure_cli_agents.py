@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import subprocess
 import sys
@@ -15,7 +16,11 @@ _SETUP_DIR = str(Path(__file__).resolve().parent)
 if _SETUP_DIR not in sys.path:
     sys.path.insert(0, _SETUP_DIR)
 
-from install_manifest import matching_host_add_command, record_host_command
+from install_manifest import (  # noqa: E402
+    is_elefante_runtime_entry,
+    matching_host_add_command,
+    record_host_command,
+)
 
 
 DAEMON_URL = "http://127.0.0.1:8765/mcp/"
@@ -96,6 +101,7 @@ def configure_cli_host(
     *,
     home: Path | None = None,
     runner: Runner = subprocess.run,
+    adopt_legacy: bool = False,
 ) -> str:
     """Add or safely refresh one host registration without overwriting user entries."""
     get, add, remove = host_commands(host, executable, elefante_path, python_cmd)
@@ -107,6 +113,27 @@ def configure_cli_host(
     old_add: list[str] | None = None
     if existing.returncode == 0:
         old_add = matching_host_add_command(key, existing.stdout, home=home)
+        if old_add is None and adopt_legacy and host == "codex":
+            try:
+                existing_document = json.loads(existing.stdout)
+            except json.JSONDecodeError:
+                existing_document = None
+            if is_elefante_runtime_entry(existing_document):
+                transport = existing_document["transport"]
+                command = transport.get("command")
+                args = transport.get("args")
+                environment = transport.get("env", {})
+                if (
+                    isinstance(command, str)
+                    and isinstance(args, list)
+                    and all(isinstance(part, str) for part in args)
+                    and isinstance(environment, dict)
+                    and all(isinstance(key, str) and isinstance(value, str) for key, value in environment.items())
+                ):
+                    old_add = [executable, "mcp", "add"]
+                    for name, value in environment.items():
+                        old_add.extend(["--env", f"{name}={value}"])
+                    old_add.extend(["elefante", "--", command, *args])
         if old_add is None:
             return "already-present"
         try:
@@ -148,6 +175,7 @@ def configure_detected_cli_hosts(
     which: Callable[[str], str | None] = shutil.which,
     runner: Runner = subprocess.run,
     selected: set[str] | None = None,
+    adopt_legacy: bool = False,
 ) -> dict[str, str]:
     """Use native CLIs only when installed; no raw host config is edited."""
     results: dict[str, str] = {}
@@ -158,7 +186,13 @@ def configure_detected_cli_hosts(
         executable = which(binary)
         if executable:
             results[host] = configure_cli_host(
-                host, executable, elefante_path, python_cmd, home=home, runner=runner
+                host,
+                executable,
+                elefante_path,
+                python_cmd,
+                home=home,
+                runner=runner,
+                adopt_legacy=adopt_legacy,
             )
     return results
 
