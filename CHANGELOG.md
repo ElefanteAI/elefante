@@ -11,7 +11,7 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [2.12.2] — Release candidate
+## [2.12.2] - 2026-08-05
 
 ### Changed
 
