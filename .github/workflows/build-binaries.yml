@@ -6,8 +6,12 @@ on:
       - ".github/workflows/build-binaries.yml"
       - "scripts/ci/build_release_client.py"
       - "scripts/ci/verify_release_client.py"
-      - "scripts/setup/bootstrap_release_bundle.py"
+      - "scripts/setup/**"
+      - "scripts/lifecycle/**"
+      - "scripts/pipeline/**"
+      - "scripts/verify/**"
       - "tests/test_installer_bundle.py"
+      - "tests/test_release_client_bundle.py"
       - "tests/test_release_pipeline.py"
       - "README.md"
       - "config.yaml"
@@ -15,7 +19,7 @@ on:
       - "requirements.lock"
       - "requirements.client.txt"
       - "requirements.client.lock"
-      - "src/dashboard/ui/**"
+      - "src/**"
   push:
     tags:
       - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10

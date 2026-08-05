@@ -169,6 +169,9 @@ def test_build_workflow_uses_maintained_release_scripts():
     assert "pull_request:" in workflow
     assert '"scripts/ci/build_release_client.py"' in workflow
     assert '"scripts/ci/verify_release_client.py"' in workflow
+    assert '"scripts/setup/**"' in workflow
+    assert '"scripts/lifecycle/**"' in workflow
+    assert '"src/**"' in workflow
     assert "python scripts/ci/build_release_client.py" in workflow
     assert "python scripts/ci/verify_release_client.py" in workflow
     assert "--publication-status release" in workflow
