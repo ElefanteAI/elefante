@@ -39,6 +39,24 @@ def json_value_hash(value: object) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def is_elefante_runtime_entry(value: object) -> bool:
+    """Identify an existing Elefante stdio registration without trusting its path.
+
+    Customer upgrades may adopt an older Elefante registration that predates
+    installer ownership metadata.  The MCP module is the stable product
+    fingerprint; a shared server name or a path containing ``elefante`` is not.
+    """
+    if not isinstance(value, dict):
+        return False
+    transport = value.get("transport", value)
+    if not isinstance(transport, dict):
+        return False
+    args = transport.get("args")
+    if not isinstance(args, list) or not all(isinstance(part, str) for part in args):
+        return False
+    return any(module in {"src.mcp.server", "src.mcp.stdio_bridge"} for module in args)
+
+
 def _json_entry(document: object, entry_path: list[str]) -> object | None:
     current = document
     for part in entry_path:

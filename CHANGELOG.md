@@ -11,6 +11,14 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Customer repairs now replace pre-manifest Elefante host registrations only
+  when their command structurally identifies an older Elefante MCP runtime.
+  Unrelated user-owned servers with the same name remain untouched.
+- Installation now proves the same stdio bridge and local daemon path used by
+  customer IDEs, with enough startup time for a cold local runtime.
+
 ## [2.12.2] - 2026-08-05
 
 ### Changed

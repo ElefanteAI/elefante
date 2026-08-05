@@ -775,6 +775,43 @@ def test_vscode_adapter_preserves_a_user_owned_elefante_entry(tmp_path):
     assert not (home / ".elefante" / "install-manifest.json").exists()
 
 
+def test_customer_vscode_adapter_adopts_a_legacy_elefante_runtime(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/configure_vscode_bob.py", "vscode_legacy_module")
+    target = tmp_path / "mcp.json"
+    home = tmp_path / "home"
+    target.write_text(
+        '{"servers":{"elefante":{"command":"/old/python","args":["-m","src.mcp.server"]}}}',
+        encoding="utf-8",
+    )
+
+    assert module.configure_vscode_mcp_json(
+        target,
+        tmp_path / "stable",
+        "/stable/python",
+        manifest_home=home,
+        adopt_legacy=True,
+    )
+    entry = __import__("json").loads(target.read_text(encoding="utf-8"))["servers"]["elefante"]
+    assert entry["command"] == "/stable/python"
+    assert entry["args"] == ["-m", "src.mcp.stdio_bridge"]
+
+
+def test_customer_vscode_adapter_does_not_adopt_a_foreign_named_server(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/configure_vscode_bob.py", "vscode_foreign_module")
+    target = tmp_path / "mcp.json"
+    original = {"servers": {"elefante": {"command": "user", "args": ["serve"]}}}
+    target.write_text(__import__("json").dumps(original), encoding="utf-8")
+
+    assert not module.configure_vscode_mcp_json(
+        target,
+        tmp_path / "stable",
+        "/stable/python",
+        manifest_home=tmp_path / "home",
+        adopt_legacy=True,
+    )
+    assert __import__("json").loads(target.read_text(encoding="utf-8")) == original
+
+
 def test_host_selection_keeps_adapter_families_isolated():
     module = _load_module(ROOT / "scripts/setup/host_selection.py", "host_selection_module")
 
@@ -900,6 +937,28 @@ def test_json_host_adapter_never_replaces_a_user_owned_elefante_entry(tmp_path):
     assert not module.configure_json_mcp(config, tmp_path, "/tmp/python", "cursor", manifest_home=home)
     assert __import__("json").loads(config.read_text(encoding="utf-8")) == original
     assert not (home / ".elefante" / "install-manifest.json").exists()
+
+
+def test_customer_json_host_adapter_adopts_a_legacy_elefante_runtime(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/configure_cursor_kiro.py", "json_host_legacy_module")
+    config = tmp_path / "mcp.json"
+    home = tmp_path / "home"
+    config.write_text(
+        '{"mcpServers":{"elefante":{"command":"/old/python","args":["-m","src.mcp.server"]}}}',
+        encoding="utf-8",
+    )
+
+    assert module.configure_json_mcp(
+        config,
+        tmp_path / "stable",
+        "/stable/python",
+        "cursor",
+        manifest_home=home,
+        adopt_legacy=True,
+    )
+    entry = __import__("json").loads(config.read_text(encoding="utf-8"))["mcpServers"]["elefante"]
+    assert entry["command"] == "/stable/python"
+    assert entry["args"] == ["-m", "src.mcp.stdio_bridge"]
 
 
 def test_json_host_adapter_refreshes_only_its_unchanged_entry(tmp_path):
@@ -1034,6 +1093,53 @@ def test_cli_agent_does_not_replace_an_existing_user_registration(tmp_path):
 
     assert result == "already-present"
     assert calls == [["claude", "mcp", "get", "elefante"]]
+
+
+def test_customer_codex_adapter_adopts_a_legacy_elefante_runtime(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/configure_cli_agents.py", "cli_agents_legacy_module")
+    state = {
+        "name": "elefante",
+        "transport": {
+            "command": "/old/python",
+            "args": ["-m", "src.mcp.server"],
+            "env": {"PYTHONPATH": "/old/elefante"},
+        },
+    }
+    calls = []
+
+    def runner(command, **_):
+        nonlocal state
+        calls.append(command)
+        if command[2:4] == ["get", "elefante"]:
+            return subprocess.CompletedProcess(command, 0 if state else 1, stdout=json.dumps(state) if state else "")
+        if command[2:4] == ["remove", "elefante"]:
+            state = {}
+            return subprocess.CompletedProcess(command, 0, stdout="")
+        if command[2] == "add":
+            state = {
+                "name": "elefante",
+                "transport": {
+                    "command": command[-3],
+                    "args": command[-2:],
+                    "env": module.bridge_environment(tmp_path / "stable", "codex"),
+                },
+            }
+            return subprocess.CompletedProcess(command, 0, stdout="")
+        raise AssertionError(command)
+
+    result = module.configure_cli_host(
+        "codex",
+        "codex",
+        tmp_path / "stable",
+        "/stable/python",
+        home=tmp_path / "home",
+        runner=runner,
+        adopt_legacy=True,
+    )
+
+    assert result == "updated"
+    assert state["transport"]["command"] == "/stable/python"
+    assert any(command[2:4] == ["remove", "elefante"] for command in calls)
 
 
 def test_cli_agent_refreshes_only_an_unchanged_installer_owned_registration(tmp_path):
