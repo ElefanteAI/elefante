@@ -1,6 +1,6 @@
 # PRD: IDE Integration Surface — Skill, Rules, MCP Distribution
 
-> **Status**: DRAFT — pre-implementation
+> **Status**: PARTIALLY IMPLEMENTED — shared daemon and compatible adapters shipped; certification and remaining host surfaces are Upcoming
 >
 > **Owner**: Elefante dev team
 >
@@ -105,6 +105,16 @@ Installer never writes a config for an unverified surface. The flow is:
 3. **Emit** — write per-detected-surface only, track every file in an uninstall manifest.
 
 Reason: the user's repo and home are user state. Elefante does not mutate paths for IDEs the user doesn't have.
+
+Detection is also a release truth boundary. A customer installation may report
+SUCCESS only when every detected compatible host has a
+working user-level registration. Hosts that are absent are untouched. Hosts
+whose configuration is user-managed or cannot be verified are reported as
+uncovered instead of being silently counted as configured.
+
+The shared daemon and store remain available to any standards-compliant MCP
+client through the generic loopback/bridge contract. Automatic configuration is
+claimed only for adapters that Elefante actually verifies.
 
 ### 4.4 Continuous Doc-Drift Audit
 
@@ -297,6 +307,9 @@ This feature is only done when all of the following are true:
 7. `elefante uninstall` removes every emitted file from the manifest and no others.
 8. The universe of supported surfaces is grounded in verified `doc_url` citations — no path is in production without a dated fetch log.
 9. GAP-025 is closed: every memory in the store carries a `source.*` tuple.
+10. Every adapter emitted by a customer install points to the recorded stable per-user app root, never a source checkout.
+11. Customer readiness fails when any detected compatible host lacks a verified registration.
+12. Doctor reports the difference between declared compatibility, detected hosts, and configured hosts without exposing private configuration values.
 
 ---
 

@@ -158,6 +158,14 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 **Guard:** `pytest tests/test_install_setup.py -k "configured_storage_paths" -v`.
 **Lesson:** Backend selection and operator diagnostics must read the same configuration contract; a correct factory with stale initialization messages is still a broken install experience.
 
+## Issue #20: Customer-Global Installation and Host Coverage [BUG-040, FIXED, guarded]
+
+**Trigger:** The customer journey on macOS found Elefante running from a developer checkout, with only one IDE registered and no global CLI identity, even though the product promise is shared memory across agent hosts.
+**Root cause:** The stable release bundle root existed, but delegated installs did not identify themselves as customer installations. Install success described adapter attempts rather than proving all detected compatible hosts were currently connected, and `doctor` checked runtime health without checking installation scope, root identity, or host coverage.
+**Solution:** Release bundles now pass explicit customer scope. Customer installs always configure every detected compatible host against one stable per-user runtime, one data root, and one loopback daemon. The manifest records runtime identity; exact host registrations are reverified; uncovered detected hosts fail installation; `doctor` reports separate runtime and customer readiness; developer checkouts cannot replace a recorded customer runtime.
+**Guard:** `pytest tests/test_installer_bundle.py tests/test_install_setup.py tests/test_installer_gui.py -q` covers release scope, stable host planning, runtime identity, exact JSON-entry verification, uncovered-host diagnostics, and the non-selectable global macOS host surface.
+**Lesson:** “Global” is a verifiable customer invariant, not an install-path adjective: one stable user runtime must be the source for every detected compatible client, or installation is incomplete.
+
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
 The five most-recurring rules from the issues above:

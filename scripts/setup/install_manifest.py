@@ -11,6 +11,7 @@ from tempfile import NamedTemporaryFile
 
 
 MANIFEST_NAME = "install-manifest.json"
+MANIFEST_SCHEMA_VERSION = 2
 
 
 def file_hash(path: Path) -> str:
@@ -32,6 +33,21 @@ def configuration_hash(configuration_output: str) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def json_value_hash(value: object) -> str:
+    """Hash one JSON value independently from unrelated settings in its file."""
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _json_entry(document: object, entry_path: list[str]) -> object | None:
+    current = document
+    for part in entry_path:
+        if not isinstance(current, dict) or part not in current:
+            return None
+        current = current[part]
+    return current
+
+
 def _load_manifest(target: Path) -> dict:
     try:
         data = json.loads(target.read_text(encoding="utf-8")) if target.exists() else {}
@@ -42,7 +58,7 @@ def _load_manifest(target: Path) -> dict:
     files = data.setdefault("files", {})
     if not isinstance(files, dict):
         raise RuntimeError(f"Refusing to overwrite invalid install manifest: {target}")
-    data["schema_version"] = 1
+    data["schema_version"] = MANIFEST_SCHEMA_VERSION
     return data
 
 
@@ -68,6 +84,101 @@ def record_emitted_file(path: Path, surface: str, home: Path | None = None) -> P
     return target
 
 
+def record_runtime_installation(
+    *,
+    app_root: Path,
+    data_root: Path,
+    version: str,
+    scope: str,
+    home: Path | None = None,
+) -> Path:
+    """Record the runtime identity that customer readiness must verify."""
+    if scope not in {"customer", "developer"}:
+        raise ValueError("runtime installation scope must be customer or developer")
+    target = manifest_path(home)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    data = _load_manifest(target)
+    data["runtime"] = {
+        "app_root": str(Path(app_root).expanduser().resolve()),
+        "data_root": str(Path(data_root).expanduser().resolve()),
+        "scope": scope,
+        "version": version,
+    }
+    _write_manifest(target, data)
+    return target
+
+
+def read_runtime_installation(home: Path | None = None) -> dict[str, str] | None:
+    """Read a valid runtime identity without adopting malformed state."""
+    target = manifest_path(home)
+    if not target.exists():
+        return None
+    try:
+        runtime = _load_manifest(target).get("runtime")
+    except (OSError, RuntimeError):
+        return None
+    required = {"app_root", "data_root", "scope", "version"}
+    if not isinstance(runtime, dict) or not required <= runtime.keys():
+        return None
+    if not all(isinstance(runtime[key], str) and runtime[key] for key in required):
+        return None
+    if runtime["scope"] not in {"customer", "developer"}:
+        return None
+    return {key: runtime[key] for key in required}
+
+
+def configured_surfaces(
+    home: Path | None = None,
+    *,
+    runner=subprocess.run,
+) -> set[str]:
+    """Return only installer-owned surfaces whose current state still verifies."""
+    target = manifest_path(home)
+    if not target.exists():
+        return set()
+    try:
+        data = _load_manifest(target)
+    except (OSError, RuntimeError):
+        return set()
+    verified: set[str] = set()
+    for raw_path, details in data.get("files", {}).items():
+        if not isinstance(details, dict) or not isinstance(details.get("surface"), str):
+            continue
+        path = Path(raw_path)
+        expected = details.get("sha256")
+        try:
+            if details.get("kind") == "json-entry":
+                entry_path = details.get("entry_path")
+                entry_hash = details.get("entry_sha256")
+                document = json.loads(path.read_text(encoding="utf-8"))
+                current_entry = _json_entry(document, entry_path) if isinstance(entry_path, list) else None
+                matches = isinstance(entry_hash, str) and json_value_hash(current_entry) == entry_hash
+            else:
+                matches = path.exists() and isinstance(expected, str) and file_hash(path) == expected
+        except (OSError, json.JSONDecodeError):
+            matches = False
+        if matches:
+            verified.add(details["surface"])
+    for details in data.get("commands", {}).values():
+        if not isinstance(details, dict) or not isinstance(details.get("surface"), str):
+            continue
+        command = details.get("get")
+        expected = details.get("sha256")
+        if not (
+            isinstance(command, list)
+            and all(isinstance(part, str) for part in command)
+            and isinstance(expected, str)
+        ):
+            continue
+        try:
+            current = runner(command, capture_output=True, text=True, check=False)
+        except OSError:
+            continue
+        if current.returncode == 0 and configuration_hash(current.stdout) == expected:
+            verified.add(details["surface"])
+    return verified
+
+
 def record_emitted_json_entry(
     path: Path,
     surface: str,
@@ -87,9 +198,14 @@ def record_emitted_json_entry(
     target = manifest_path(home)
     target.parent.mkdir(parents=True, exist_ok=True)
     data = _load_manifest(target)
+    document = json.loads(path.read_text(encoding="utf-8"))
+    entry_value = _json_entry(document, list(entry_path))
+    if entry_value is None:
+        raise RuntimeError(f"Cannot record missing JSON entry {'.'.join(entry_path)} in {path}")
     data["files"][str(path.resolve())] = {
         "created": created,
         "entry_path": list(entry_path),
+        "entry_sha256": json_value_hash(entry_value),
         "kind": "json-entry",
         "surface": surface,
         "sha256": file_hash(path),
@@ -216,6 +332,19 @@ def forget_emitted_file(path: Path, home: Path | None = None) -> None:
         return
     data = _load_manifest(target)
     data["files"].pop(str(path.resolve()), None)
+    if data["files"] or data.get("commands") or data.get("runtime"):
+        _write_manifest(target, data)
+    else:
+        target.unlink(missing_ok=True)
+
+
+def clear_runtime_installation(home: Path | None = None) -> None:
+    """Forget runtime identity after a complete manifest-owned uninstall."""
+    target = manifest_path(home)
+    if not target.exists():
+        return
+    data = _load_manifest(target)
+    data.pop("runtime", None)
     if data["files"] or data.get("commands"):
         _write_manifest(target, data)
     else:
@@ -274,7 +403,7 @@ def remove_unchanged_host_commands(
             commands.pop(key, None)
         removed.append(key)
     if apply:
-        if not data["files"] and not commands:
+        if not data["files"] and not commands and not data.get("runtime"):
             target.unlink(missing_ok=True)
         else:
             _write_manifest(target, data)
@@ -354,7 +483,7 @@ def remove_unchanged_files(home: Path | None = None, apply: bool = False) -> tup
         removed.append(path)
         if apply:
             files.pop(raw_path, None)
-    if apply and not preserved:
+    if apply and not preserved and not data.get("commands") and not data.get("runtime"):
         target.unlink(missing_ok=True)
     elif apply:
         _write_manifest(target, data)

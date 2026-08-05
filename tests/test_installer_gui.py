@@ -95,4 +95,5 @@ def test_native_installer_and_python_engine_share_host_ids():
 
     for host in host_module.SUPPORTED_HOSTS:
         assert f'id: "{host}"' in swift_source
-    assert '"--host", host' in swift_source
+    assert 'button.isEnabled = false' in swift_source
+    assert 'processArguments.append(contentsOf: ["--host", host])' not in swift_source

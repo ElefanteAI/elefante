@@ -264,11 +264,11 @@ def build_install_command(
         str(paths["summary"]),
         "--venv-mode",
         venv_mode,
+        "--installation-scope",
+        "customer",
     ]
     if verbose:
         cmd.append("--verbose")
-    for host in hosts or []:
-        cmd.extend(["--host", host])
     return cmd
 
 
@@ -302,7 +302,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--host",
         action="append",
-        help="Configure only this agent host. Repeat to select multiple hosts.",
+        help="Deprecated compatibility option; customer installs configure every detected host.",
     )
     return parser.parse_args()
 

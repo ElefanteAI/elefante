@@ -10,8 +10,12 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.lifecycle.daemon_service import uninstall as uninstall_daemon_service
-from scripts.setup.install_manifest import remove_unchanged_files, remove_unchanged_host_commands
+from scripts.lifecycle.daemon_service import uninstall as uninstall_daemon_service  # noqa: E402
+from scripts.setup.install_manifest import (  # noqa: E402
+    clear_runtime_installation,
+    remove_unchanged_files,
+    remove_unchanged_host_commands,
+)
 
 
 def main() -> None:
@@ -31,6 +35,9 @@ def main() -> None:
         print(f"{'remove' if args.apply else 'would_remove'} {path}")
     for path in preserved:
         print(f"preserve {path} (missing or modified)")
+    if args.apply and not preserved_commands and not preserved:
+        clear_runtime_installation()
+        print("remove customer runtime registration")
     if not args.apply:
         print("dry_run; re-run with --apply to remove only unchanged files")
 
