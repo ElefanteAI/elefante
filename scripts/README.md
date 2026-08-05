@@ -106,10 +106,12 @@ Release flow: `advise_version_bump.py` → write CHANGELOG → `bump_version.py 
 | Script | What it does | When to use it |
 | ------ | ------------ | -------------- |
 | `advise_version_bump.py` | Classifies staged diff as MAJOR/MINOR/PATCH. | Before writing the CHANGELOG entry. |
-| `bump_version.py` | Cascades the chosen version across all 48 tracked declarations. | After writing the CHANGELOG. Run `--check` after. |
-| `build_installer_bundle.py` | Builds the downloadable platform-specific installer zip with bundled dashboard assets, a visible first-run guide, and the correct customer launcher for macOS, Windows, or Linux. | In CI after dashboard build, or locally to validate bundle contents and launcher bytes. |
-| `build_dmg.py` | Builds the branded macOS DMG. Uses Swift to compile `installer_app.swift` into `Install Elefante.app` when available; otherwise falls back to `installer_gui.py`. `--sign` for notarized releases. | In CI on a macOS runner after `build_installer_bundle.py`. |
-| `installer_app.swift` | Native AppKit installer surface with detected agent-host selection. Compiled by `build_dmg.py` and forwards the selected hosts through `install.sh`. | Not run directly. |
+| `bump_version.py` | Cascades the chosen version across runtime/package declarations. Published-release claims remain pinned until publication is verified. | After writing the CHANGELOG. Run `--check` after. |
+| `build_installer_bundle.py` | Builds the full developer/diagnostic installer bundle, including repository support material. | Developer validation only; never use this archive as a customer release asset. |
+| `build_release_client.py` | Builds the macOS, Windows, or Linux customer installer from a strict runtime allowlist: product source, required runtime scripts, prebuilt dashboard, and the client lock only. | This is the sole builder for customer candidates and tagged release installers. |
+| `verify_release_client.py` | Rejects a customer installer with developer workspace, tests, migration/support utilities, development tools, unexpected files, broken launcher permissions/bytes, misleading timestamps, or invalid platform/publication metadata. | Immediately after every customer installer build and before artifact upload. |
+| `build_dmg.py` | Builds the branded macOS DMG. Uses Swift to compile `installer_app.swift` into `Install Elefante.app` when available; otherwise falls back to `installer_gui.py`. `--sign` for notarized releases. | In CI on a macOS runner after `build_release_client.py`. |
+| `installer_app.swift` | Native AppKit installer surface showing the compatible agent hosts connected automatically to the shared customer runtime. | Compiled by `build_dmg.py`; not run directly. |
 | `installer_gui.py` | Legacy Tk fallback installer surface bundled when Swift is unavailable. | Not run directly in the preferred path. |
 | `render_release_notes.py` | Renders GitHub release body from the matching `CHANGELOG.md` entry. | In CI before publishing a tagged release. |
 | `select_release_assets.py` | Filters artifacts against GitHub's per-file upload cap; emits workflow outputs. | In CI before `action-gh-release`. |

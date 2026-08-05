@@ -34,6 +34,7 @@ import os
 import sys
 import subprocess
 import platform
+import re
 import shutil
 import argparse
 import datetime
@@ -72,6 +73,13 @@ VENV_MODE_FRESH = "fresh"
 VENV_MODE_BACKUP = "backup"
 VENV_MODE_REUSE = "reuse"
 VENV_MODE_ABORT = "abort"
+RELEASE_PROFILE_DEVELOPER = "developer"
+RELEASE_PROFILE_CLIENT = "client"
+RELEASE_PROFILES = (RELEASE_PROFILE_DEVELOPER, RELEASE_PROFILE_CLIENT)
+DEPENDENCY_LOCKS = {
+    RELEASE_PROFILE_DEVELOPER: "requirements.lock",
+    RELEASE_PROFILE_CLIENT: "requirements.client.lock",
+}
 INSTALL_LOG_FILE_NAME = ".elefante-install.log"
 INSTALL_STATUS_FILE_NAME = ".elefante-install-status.txt"
 INSTALL_SUMMARY_FILE_NAME = ".elefante-install-summary.txt"
@@ -93,6 +101,23 @@ ASCII_SPINNER_FRAMES = ["-", "\\", "|", "/"]
 
 # Ensure sibling setup modules are importable when running as a script.
 sys.path.insert(0, str(SETUP_DIR))
+sys.path.insert(0, str(ROOT_DIR))
+
+
+def read_source_version(root_dir: Path) -> str:
+    """Read the release version without importing dependency-backed product code."""
+    version_file = root_dir / "src" / "__init__.py"
+    match = re.search(
+        r'^__version__\s*=\s*"(\d+\.\d+\.\d+)"\s*$',
+        version_file.read_text(encoding="utf-8"),
+        flags=re.MULTILINE,
+    )
+    if not match:
+        raise RuntimeError(f"Could not read Elefante version from {version_file}")
+    return match.group(1)
+
+
+ELEFANTE_VERSION = read_source_version(ROOT_DIR)
 
 from configure_vscode_bob import configure_mcp as configure_vscode  # noqa: E402
 from configure_antigravity import (  # noqa: E402
@@ -101,19 +126,62 @@ from configure_antigravity import (  # noqa: E402
 )
 from configure_cursor_kiro import configure_detected_hosts, infer_repo_python  # noqa: E402
 from configure_cli_agents import configure_detected_cli_hosts  # noqa: E402
+from install_manifest import (  # noqa: E402
+    configured_surfaces,
+    read_runtime_installation,
+    record_runtime_installation,
+)
 from host_selection import (  # noqa: E402
     CLI_HOSTS,
     HOST_LABELS,
     JSON_HOSTS,
     SUPPORTED_HOSTS,
     VSCODE_FAMILY,
+    detect_supported_hosts,
     normalize_selected_hosts,
+    normalize_manifest_surfaces,
     select_family,
 )
 
 
 class InstallationCancelled(Exception):
     """Raised when the operator cancels at a safe checkpoint."""
+
+
+def developer_runtime_conflicts_with_customer(
+    *,
+    installation_scope: str,
+    root_dir: Path,
+    existing_runtime: dict[str, str] | None,
+) -> bool:
+    """Prevent a movable checkout from replacing an installed customer runtime."""
+    return bool(
+        installation_scope == "developer"
+        and existing_runtime is not None
+        and existing_runtime.get("scope") == "customer"
+        and Path(existing_runtime["app_root"]).resolve() != root_dir.resolve()
+    )
+
+
+def uncovered_required_hosts(
+    required_hosts: set[str],
+    verified_surfaces: set[str],
+) -> list[str]:
+    """Return canonical detected hosts that the install did not prove reachable."""
+    return sorted(required_hosts.difference(normalize_manifest_surfaces(verified_surfaces)))
+
+
+def installation_host_plan(
+    *,
+    installation_scope: str,
+    requested_hosts: set[str] | None,
+    detected_hosts: set[str],
+) -> tuple[set[str] | None, set[str]]:
+    """Select adapters and readiness requirements for one installation scope."""
+    if installation_scope == "customer":
+        return None, set(detected_hosts)
+    selected = None if requested_hosts is None else set(requested_hosts)
+    return selected, set(requested_hosts or detected_hosts)
 
 
 class Logger:
@@ -565,15 +633,24 @@ def check_kuzu_compatibility(root_dir):
         logger.log("OK: No Kuzu compatibility issues detected")
         return True
 
-def check_dependency_versions(root_dir):
+def dependency_lock_for_profile(root_dir, release_profile):
+    """Select the immutable dependency lock for the declared installation profile."""
+    try:
+        lock_name = DEPENDENCY_LOCKS[release_profile]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported release profile: {release_profile}") from exc
+    return Path(root_dir) / lock_name
+
+
+def check_dependency_versions(root_dir, release_profile=RELEASE_PROFILE_DEVELOPER):
     """
     Check for known breaking changes in dependencies
     """
     logger.log("\nChecking dependency versions for breaking changes...")
     
-    requirements_file = root_dir / "requirements.lock"
+    requirements_file = dependency_lock_for_profile(root_dir, release_profile)
     if not requirements_file.exists():
-        logger.log("WARN: requirements.lock not found")
+        logger.log(f"WARN: {requirements_file.name} not found")
         return True
     
     breaking_changes = {
@@ -639,7 +716,7 @@ def check_disk_space(root_dir):
         logger.log(f"OK: Sufficient disk space: {available_gb:.2f} GB available")
         return True
 
-def run_preflight_checks(root_dir):
+def run_preflight_checks(root_dir, release_profile=RELEASE_PROFILE_DEVELOPER):
     """
     Run all pre-flight checks before installation
     """
@@ -648,7 +725,7 @@ def run_preflight_checks(root_dir):
     
     checks = [
         ("Disk Space", lambda: check_disk_space(root_dir)),
-        ("Dependency Versions", lambda: check_dependency_versions(root_dir)),
+        ("Dependency Versions", lambda: check_dependency_versions(root_dir, release_profile)),
         ("Kuzu Compatibility", lambda: check_kuzu_compatibility(root_dir)),
     ]
     
@@ -885,26 +962,28 @@ def ensure_virtual_environment(root_dir, launcher_python, requested_mode):
         return "ready", repo_python
     return "failed", None
 
-def install_dependencies(root_dir, python_cmd):
+def install_dependencies(root_dir, python_cmd, release_profile=RELEASE_PROFILE_DEVELOPER):
     """Install the checked-in, hash-verified dependency lock."""
     logger.log("Installing dependencies...")
 
-    lock_file = root_dir / "requirements.lock"
+    lock_file = dependency_lock_for_profile(root_dir, release_profile)
     if not lock_file.is_file():
-        logger.log("ERROR: requirements.lock is missing; refusing an unverified dependency resolution.")
+        logger.log(
+            f"ERROR: {lock_file.name} is missing; refusing an unverified dependency resolution."
+        )
         return False
 
     if not run_command([python_cmd, "-m", "pip", "--version"], cwd=root_dir):
         logger.log("WARN: Pip is missing from the selected virtual environment. Bootstrapping with ensurepip...")
         if not run_command([python_cmd, "-m", "ensurepip", "--upgrade"], cwd=root_dir):
             logger.log(
-                "ERROR: Pip bootstrap failed. Read workspace/postmortems/installation.md Issue #13 for recovery."
+                "ERROR: Pip bootstrap failed. Review the persisted installer log, then retry."
             )
             logger.log("ERROR: Failed to install dependencies")
             return False
         if not run_command([python_cmd, "-m", "pip", "--version"], cwd=root_dir):
             logger.log(
-                "ERROR: Pip is still unavailable after ensurepip. Read workspace/postmortems/installation.md Issue #13 for recovery."
+                "ERROR: Pip is still unavailable after ensurepip. Review the persisted installer log, then retry."
             )
             logger.log("ERROR: Failed to install dependencies")
             return False
@@ -916,7 +995,7 @@ def install_dependencies(root_dir, python_cmd):
     
     # Install the complete, hash-checked lock rather than resolving ranges at install time.
     if run_command(
-        [python_cmd, "-m", "pip", "install", "--require-hashes", "-r", "requirements.lock"],
+        [python_cmd, "-m", "pip", "install", "--require-hashes", "-r", lock_file.name],
         cwd=root_dir,
     ):
         logger.log("OK: Dependencies installed")
@@ -1082,6 +1161,12 @@ def main():
         help="How to handle an existing repository .venv: ask, fresh, backup, reuse, or abort.",
     )
     parser.add_argument(
+        "--release-profile",
+        choices=RELEASE_PROFILES,
+        default=RELEASE_PROFILE_DEVELOPER,
+        help="Select the checked-in dependency and payload contract for developer or client installation.",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Show full subprocess output. Default: clean progress with details in log file.",
@@ -1092,10 +1177,20 @@ def main():
         choices=SUPPORTED_HOSTS,
         help="Configure only this detected agent host. Repeat to select multiple hosts.",
     )
+    parser.add_argument(
+        "--installation-scope",
+        choices=("customer", "developer"),
+        default="developer",
+        help=(
+            "Customer is reserved for a release payload placed by the bundle bootstrap; "
+            "direct source-checkout installs are developer runtimes."
+        ),
+    )
     args = parser.parse_args()
 
     verbose_mode = args.verbose
-    selected_hosts = normalize_selected_hosts(args.host)
+    requested_hosts = normalize_selected_hosts(args.host)
+    release_profile = args.release_profile
 
     root_dir = ROOT_DIR
     log_file = resolve_output_path(root_dir, args.log_file, INSTALL_LOG_FILE_NAME)
@@ -1115,13 +1210,39 @@ def main():
     os.chdir(root_dir)
     
     data_dir = os.environ.get("ELEFANTE_DATA_DIR") or str(Path.home() / ".elefante" / "data")
+    detected_hosts = detect_supported_hosts()
+    # A customer installation is account-global: every compatible host that is
+    # present must share the same runtime and memory store. Host filters remain
+    # useful for developer checkouts and targeted adapter testing only.
+    selected_hosts, required_hosts = installation_host_plan(
+        installation_scope=args.installation_scope,
+        requested_hosts=requested_hosts,
+        detected_hosts=detected_hosts,
+    )
+    existing_runtime = read_runtime_installation()
+
+    if developer_runtime_conflicts_with_customer(
+        installation_scope=args.installation_scope,
+        root_dir=root_dir,
+        existing_runtime=existing_runtime,
+    ):
+        print(
+            "ERROR: A customer-global Elefante runtime already owns this user account. "
+            "Run the released installer to repair or upgrade it; a developer checkout "
+            "cannot replace that runtime."
+        )
+        raise SystemExit(1)
 
     print_header("ELEFANTE INSTALLATION WIZARD")
     logger.log(f"  Install to:  {root_dir}")
     logger.log(f"  Data:        {data_dir}")
+    logger.log(f"  Scope:       {args.installation_scope}")
     logger.log(f"  Log:         {log_file}")
     logger.log(f"  Python:      {sys.version.split()[0]}")
-    if selected_hosts is None:
+    logger.log(f"  Profile:     {release_profile}")
+    if args.installation_scope == "customer":
+        logger.log("  Agent hosts: every detected compatible host (customer-global)")
+    elif selected_hosts is None:
         logger.log("  Agent hosts: all detected compatible hosts")
     else:
         labels = ", ".join(HOST_LABELS[host] for host in SUPPORTED_HOSTS if host in selected_hosts)
@@ -1152,7 +1273,7 @@ def main():
         check_for_safe_cancellation("pre-flight checks")
         state_tracker.start_stage("0b", "Pre-Flight Checks", "Running automated compatibility checks")
         logger.start_spinner("Running pre-flight checks")
-        preflight_ok = run_preflight_checks(root_dir)
+        preflight_ok = run_preflight_checks(root_dir, release_profile)
         logger.stop_spinner()
         if not preflight_ok:
             state_tracker.fail_stage("0b", "Pre-Flight Checks", "Resolve the reported pre-flight issues and retry")
@@ -1180,7 +1301,7 @@ def main():
             print_step(2, "Dependencies")
             state_tracker.start_stage("2", "Dependencies", "Installing Python requirements")
             logger.start_spinner("Installing Python dependencies")
-            deps_ok = install_dependencies(root_dir, python_cmd)
+            deps_ok = install_dependencies(root_dir, python_cmd, release_profile)
             logger.stop_spinner()
             if not deps_ok:
                 state_tracker.fail_stage("2", "Dependencies", "Python dependency installation failed")
@@ -1316,25 +1437,34 @@ def main():
                     else:
                         logger.log(f"WARN: {host} MCP configuration was not changed ({result})")
 
-                if (
-                    not vscode_success
-                    and not antigravity_success
-                    and not any(additional_hosts.values())
-                    and not any(result in {"configured", "updated", "already-present"} for result in cli_hosts.values())
-                ):
-                    logger.log("WARN: Automatic MCP configuration skipped")
-                    logger.log("   Please configure your IDE manually.")
-                    logger.log("   See docs/how-to/install.md and docs/how-to/run-mcp-server.md for instructions.")
-                    ide_detail = "Automatic IDE configuration skipped"
-                    state_tracker.warn_stage("4", "IDE Configuration", ide_detail)
+                verified_surfaces = configured_surfaces(Path.home())
+                uncovered_hosts = uncovered_required_hosts(required_hosts, verified_surfaces)
+                if uncovered_hosts:
+                    labels = ", ".join(HOST_LABELS[host] for host in uncovered_hosts)
+                    ide_detail = f"Detected hosts not verified: {labels}"
+                    logger.log(f"ERROR: {ide_detail}")
+                    logger.log("   Elefante will not claim customer readiness while a detected host is uncovered.")
+                    logger.log("   Re-run the released installer after resolving the reported host configuration.")
+                    if args.installation_scope == "customer":
+                        state_tracker.fail_stage("4", "IDE Configuration", ide_detail)
+                        success = False
+                    else:
+                        state_tracker.warn_stage("4", "IDE Configuration", ide_detail)
+                elif not required_hosts:
+                    ide_detail = "0 compatible hosts detected; generic MCP bridge remains available"
+                    state_tracker.complete_stage("4", "IDE Configuration", ide_detail)
                 else:
-                    ide_detail = "; ".join(detail_parts)
+                    ide_detail = "; ".join(detail_parts) or "All detected hosts verified"
                     state_tracker.complete_stage("4", "IDE Configuration", ide_detail)
             except Exception as e:
                 logger.log(f"ERROR: Error configuring MCP: {e}")
-                state_tracker.warn_stage("4", "IDE Configuration", f"IDE configuration error: {e}")
+                if args.installation_scope == "customer":
+                    state_tracker.fail_stage("4", "IDE Configuration", f"IDE configuration error: {e}")
+                    success = False
+                else:
+                    state_tracker.warn_stage("4", "IDE Configuration", f"IDE configuration error: {e}")
 
-        if success:
+        if success and release_profile == RELEASE_PROFILE_DEVELOPER:
             check_for_safe_cancellation("agent behavior bootstrap verification")
             logger.log("")
             logger.log("[Step 4a] Agent Behavior Bootstrap...")
@@ -1344,7 +1474,7 @@ def main():
             logger.stop_spinner()
             if not instructions_ok:
                 logger.log("WARN: Agent behavior bootstrap missing. Agents will not proactively use Elefante.")
-                logger.log("   See docs/how-to/install.md Section 4a for details.")
+                logger.log("   See https://elefante.ai/docs for setup instructions.")
                 state_tracker.warn_stage("4a", "Agent Behavior Bootstrap", "copilot-instructions.md is missing")
             else:
                 state_tracker.complete_stage("4a", "Agent Behavior Bootstrap", "Agent bootstrap instructions verified")
@@ -1378,6 +1508,27 @@ def main():
                 logger.log("ERROR: MCP handshake failed. Server is not responding to protocol.")
                 state_tracker.fail_stage("5a", "MCP Handshake Verification", "MCP server did not respond to protocol handshake")
                 success = False
+
+        if success:
+            state_tracker.start_stage("5b", "Runtime Registration", "Recording the installed runtime identity")
+            try:
+                record_runtime_installation(
+                    app_root=root_dir,
+                    data_root=Path(data_dir),
+                    version=ELEFANTE_VERSION,
+                    scope=args.installation_scope,
+                )
+            except (OSError, RuntimeError, ValueError) as error:
+                logger.log(f"ERROR: Could not record runtime installation: {error}")
+                state_tracker.fail_stage("5b", "Runtime Registration", "Runtime identity was not recorded")
+                success = False
+            else:
+                detail = (
+                    "Customer-global user runtime recorded"
+                    if args.installation_scope == "customer"
+                    else "Developer runtime recorded"
+                )
+                state_tracker.complete_stage("5b", "Runtime Registration", detail)
 
     except InstallationCancelled:
         logger.stop_spinner()

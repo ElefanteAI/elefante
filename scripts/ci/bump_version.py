@@ -3,8 +3,8 @@
 # NAME    : bump_version.py
 # VERSION : 2.5.2
 # CHANGED : 2026-04-15
-# PURPOSE : Cascade a semver string across every tracked version declaration in
-#           the repo. Has CHANGELOG gate, rebaseline guard, and pattern-miss WARNING.
+# PURPOSE : Cascade a semver string across runtime/package declarations. Public
+#           release claims remain pinned until publication is verified.
 # WHEN    : After writing the CHANGELOG entry for the new version. Never run before
 #           the CHANGELOG entry exists — the script will refuse. After bumping, run
 #           --check to confirm all 48 tracked files agree.
@@ -46,7 +46,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 VERSION_FILE = ROOT / "src" / "__init__.py"
 
-# Every file that declares the current version and how to find/replace it.
+# Every file that declares the runtime/package version and how to replace it.
+# Public-facing "current published release" claims are intentionally excluded:
+# a release branch may carry the next package version before it is published.
 # Format: (relative_path, regex_pattern, replacement_template)
 # The regex must have exactly one capture group around the version string.
 TARGETS = [
@@ -56,9 +58,6 @@ TARGETS = [
     ("config.yaml",                                   r'(  version:\s*")[^"]+(")',                               r'\g<1>{v}\2'),
     ("config.yaml",                                   r'(    version:\s*")[^"]+(")',                             r'\g<1>{v}\2'),
     ("src/dashboard/ui/package.json",                 r'("version":\s*")[^"]+(")',                               r'\g<1>{v}\2'),
-    ("README.md",                                     r'(\*\*v)\d+\.\d+\.\d+(\*\*\s*—)',                     r'\g<1>{v}\2'),
-    ("docs/README.md",                                r'(> \*\*v)\d+\.\d+\.\d+',                                r'\g<1>{v}'),
-    ("docs/explanation/vision.md",                  r'(Current(?: published)? version: v)\d+\.\d+\.\d+',     r'\g<1>{v}'),
 ]
 
 # Glob-based targets: matches multiple files sharing the same header pattern.

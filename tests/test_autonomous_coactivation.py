@@ -15,7 +15,11 @@ from pathlib import Path
 
 import pytest
 from src.core.orchestrator import MemoryOrchestrator
-from src.core.directive_store import DirectiveStore, SYSTEM_DIRECTIVE_DEFINITIONS
+from src.core.directive_store import (
+    CLIENT_SYSTEM_DIRECTIVE_DEFINITIONS,
+    DirectiveStore,
+    SYSTEM_DIRECTIVE_DEFINITIONS,
+)
 from src.core.orchestrator import SYSTEM_SPECIFICATIONS
 from src.models.query import QueryMode
 
@@ -92,6 +96,18 @@ def test_directive_store_includes_system_sdd_baseline(tmp_path):
     assert any("STDOUT" in directive["content"] for directive in directives)
 
 
+def test_client_directive_store_excludes_developer_protocols(tmp_path):
+    store = DirectiveStore(path=tmp_path / "directives.json", profile="client")
+
+    directives = store.list_all()
+    contents = "\n".join(directive["content"] for directive in directives)
+
+    assert store.system_count() == len(CLIENT_SYSTEM_DIRECTIVE_DEFINITIONS)
+    assert "workspace/ISSUES.md" not in contents
+    assert "scripts/ci" not in contents
+    assert "API keys" in contents
+
+
 @pytest.mark.asyncio
 async def test_orchestrator_bootstraps_system_specifications(isolated_orchestrator: MemoryOrchestrator):
     first = await isolated_orchestrator.ensure_system_baseline()
@@ -106,6 +122,19 @@ async def test_orchestrator_bootstraps_system_specifications(isolated_orchestrat
         assert memory is not None, f"Missing specification memory: {specification['title']}"
         memory_type = memory.metadata.memory_type.value if hasattr(memory.metadata.memory_type, "value") else str(memory.metadata.memory_type)
         assert memory_type == "specification"
+
+
+@pytest.mark.asyncio
+async def test_client_orchestrator_does_not_seed_developer_specifications(
+    isolated_orchestrator: MemoryOrchestrator, monkeypatch
+):
+    from src.core import orchestrator as orchestrator_module
+
+    monkeypatch.setattr(orchestrator_module, "is_client_runtime", lambda: True)
+
+    result = await isolated_orchestrator.ensure_system_baseline()
+
+    assert result == {"success": True, "created": 0, "existing": 0, "titles": []}
 
 
 def test_mcp_server_does_not_fire_and_forget_coactivation():

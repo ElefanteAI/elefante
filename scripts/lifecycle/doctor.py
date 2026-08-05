@@ -15,8 +15,17 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.lifecycle.daemon_service import service_status
-from scripts.setup.install_manifest import manifest_path
+from scripts.lifecycle.daemon_service import service_status  # noqa: E402
+from scripts.setup.host_selection import (  # noqa: E402
+    SUPPORTED_HOSTS,
+    detect_supported_hosts,
+    normalize_manifest_surfaces,
+)
+from scripts.setup.install_manifest import (  # noqa: E402
+    configured_surfaces,
+    manifest_path,
+    read_runtime_installation,
+)
 
 
 def _read_manifest(home: Path) -> tuple[dict[str, Any], list[str]]:
@@ -78,6 +87,8 @@ def build_report(
     repo_root: Path = REPO_ROOT,
     home: Path | None = None,
     service_inspector: Callable[[Path], dict[str, str | bool]] = service_status,
+    host_detector: Callable[..., set[str]] = detect_supported_hosts,
+    surface_inspector: Callable[[Path], set[str]] = configured_surfaces,
 ) -> dict:
     """Build a complete read-only readiness report suitable for people and agents."""
     home = home or Path.home()
@@ -89,9 +100,20 @@ def build_report(
         daemon = {"daemon_health": False, "service_runtime": "unavailable"}
         diagnostics.append("daemon_service_unavailable")
     manifest, manifest_diagnostics = _read_manifest(home)
-    integrations, integration_diagnostics = _integration_summary(
-        repo_root / "agents/manifests/ide-integration.yaml"
-    )
+    runtime_installation = read_runtime_installation(home)
+    detected_hosts = host_detector(home=home)
+    verified_surfaces = normalize_manifest_surfaces(surface_inspector(home))
+    uncovered_hosts = sorted(detected_hosts.difference(verified_surfaces))
+    integration_matrix = repo_root / "agents/manifests/ide-integration.yaml"
+    if integration_matrix.is_file():
+        integrations, integration_diagnostics = _integration_summary(integration_matrix)
+    else:
+        integrations = {
+            "compatible": sorted(SUPPORTED_HOSTS),
+            "preview": [],
+            "community": ["generic-mcp-client"],
+        }
+        integration_diagnostics = []
     diagnostics.extend(manifest_diagnostics)
     diagnostics.extend(integration_diagnostics)
     if not venv_python.exists():
@@ -102,9 +124,21 @@ def build_report(
         diagnostics.append("daemon_unreachable")
     if daemon.get("service_file_ownership") == "modified_or_untracked":
         diagnostics.append("daemon_service_user_managed")
+    customer_diagnostics: list[str] = []
+    if runtime_installation is None:
+        customer_diagnostics.append("runtime_installation_unrecorded")
+    else:
+        if runtime_installation["scope"] != "customer":
+            customer_diagnostics.append("runtime_scope_not_customer")
+        if Path(runtime_installation["app_root"]).resolve() != repo_root.resolve():
+            customer_diagnostics.append("runtime_root_mismatch")
+    if uncovered_hosts:
+        customer_diagnostics.append("detected_hosts_unconfigured")
+    runtime_ready = not diagnostics
     return {
-        "schema_version": 1,
-        "ready": not diagnostics,
+        "schema_version": 2,
+        "ready": runtime_ready,
+        "customer_ready": runtime_ready and not customer_diagnostics,
         "repository": str(repo_root),
         "runtime": {
             "venv_python": str(venv_python),
@@ -113,13 +147,24 @@ def build_report(
         },
         "daemon": daemon,
         "installer_ownership": manifest,
+        "installation": runtime_installation,
+        "host_coverage": {
+            "detected": sorted(detected_hosts),
+            "verified": sorted(detected_hosts.intersection(verified_surfaces)),
+            "uncovered": uncovered_hosts,
+        },
         "integrations": integrations,
         "diagnostics": diagnostics,
+        "customer_diagnostics": customer_diagnostics,
     }
 
 
 def _render_text(report: dict) -> str:
-    lines = [f"ready={report['ready']}", f"repository={report['repository']}"]
+    lines = [
+        f"ready={report['ready']}",
+        f"customer_ready={report['customer_ready']}",
+        f"repository={report['repository']}",
+    ]
     runtime = report["runtime"]
     lines.extend(
         [
@@ -130,9 +175,12 @@ def _render_text(report: dict) -> str:
             f"owned_files={report['installer_ownership']['files']}",
             f"owned_host_registrations={report['installer_ownership']['host_registrations']}",
             "configured_surfaces=" + ",".join(report["installer_ownership"].get("configured_surfaces", [])),
+            "detected_hosts=" + ",".join(report["host_coverage"]["detected"]),
+            "uncovered_hosts=" + ",".join(report["host_coverage"]["uncovered"]),
             "compatible_hosts=" + ",".join(report["integrations"]["compatible"]),
             "community_hosts=" + ",".join(report["integrations"]["community"]),
             "diagnostics=" + ",".join(report["diagnostics"] or ["none"]),
+            "customer_diagnostics=" + ",".join(report["customer_diagnostics"] or ["none"]),
         ]
     )
     return "\n".join(lines)
@@ -144,7 +192,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     report = build_report()
     print(json.dumps(report, indent=2, sort_keys=True) if args.json else _render_text(report))
-    return 0 if report["ready"] else 1
+    return 0 if report["customer_ready"] else 1
 
 
 if __name__ == "__main__":

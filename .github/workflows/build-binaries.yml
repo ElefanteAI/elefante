@@ -4,15 +4,22 @@ on:
   pull_request:
     paths:
       - ".github/workflows/build-binaries.yml"
-      - "scripts/ci/build_installer_bundle.py"
-      - "scripts/setup/bootstrap_release_bundle.py"
+      - "scripts/ci/build_release_client.py"
+      - "scripts/ci/verify_release_client.py"
+      - "scripts/setup/**"
+      - "scripts/lifecycle/**"
+      - "scripts/pipeline/**"
+      - "scripts/verify/**"
       - "tests/test_installer_bundle.py"
+      - "tests/test_release_client_bundle.py"
       - "tests/test_release_pipeline.py"
       - "README.md"
       - "config.yaml"
       - "requirements.txt"
       - "requirements.lock"
-      - "src/dashboard/ui/**"
+      - "requirements.client.txt"
+      - "requirements.client.lock"
+      - "src/**"
   push:
     tags:
       - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
@@ -29,10 +36,10 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: "pip"
@@ -44,7 +51,7 @@ jobs:
           sudo apt-get install -y python3-tk tk-dev
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "20"
 
@@ -54,9 +61,10 @@ jobs:
           npm ci
           npm run build
 
-      - name: Build Installer Bundle
+      - name: Build clean customer installer
         run: |
-          python scripts/ci/build_installer_bundle.py --platform "${{ runner.os }}" --output dist/elefante-installer-${{ runner.os }}.zip
+          python scripts/ci/build_release_client.py --platform "${{ runner.os }}" --publication-status release --output dist/elefante-installer-${{ runner.os }}.zip
+          python scripts/ci/verify_release_client.py --archive dist/elefante-installer-${{ runner.os }}.zip --require-clean-source --expected-publication-status release --expected-platform "${{ runner.os }}"
 
       - name: Install Python Dependencies
         run: |
@@ -107,8 +115,9 @@ jobs:
           test -f "${bundle_root}/START HERE.txt"
           test -f "${bundle_root}/scripts/setup/bootstrap_release_bundle.py"
           test -f "${bundle_root}/payload/elefante/scripts/setup/install.py"
-          test -f "${bundle_root}/payload/elefante/requirements.txt"
-          test -f "${bundle_root}/payload/elefante/requirements.lock"
+          test -f "${bundle_root}/payload/elefante/requirements.client.txt"
+          test -f "${bundle_root}/payload/elefante/requirements.client.lock"
+          test ! -e "${bundle_root}/payload/elefante/requirements.lock"
           test -x "${bundle_root}/install.sh"
           test -x "${binary_root}/elefante"
 
@@ -137,6 +146,7 @@ jobs:
           grep -F "Bundle Root: ${bundle_root}" <<<"$dry_run_output"
           grep -F "Payload Root: ${bundle_root}/payload/elefante" <<<"$dry_run_output"
           grep -F "Install Root: ${dry_run_root}" <<<"$dry_run_output"
+          grep -F "Release Profile: Client (runtime-only payload)" <<<"$dry_run_output"
           grep -F "Dry run only. No files were changed." <<<"$dry_run_output"
 
           python scripts/ci/generate_release_checksums.py \
@@ -171,8 +181,8 @@ jobs:
             (Join-Path $bundleRoot "Install Elefante.bat"),
             (Join-Path $bundleRoot "scripts/setup/bootstrap_release_bundle.py"),
             (Join-Path $bundleRoot "payload/elefante/scripts/setup/install.py"),
-            (Join-Path $bundleRoot "payload/elefante/requirements.txt"),
-            (Join-Path $bundleRoot "payload/elefante/requirements.lock"),
+            (Join-Path $bundleRoot "payload/elefante/requirements.client.txt"),
+            (Join-Path $bundleRoot "payload/elefante/requirements.client.lock"),
             (Join-Path $binaryRoot "elefante.exe")
           ) | ForEach-Object {
             if (-not (Test-Path -LiteralPath $_ -PathType Leaf)) {
@@ -212,10 +222,14 @@ jobs:
           if (Test-Path -LiteralPath $dryRunRoot) {
             throw "Installer bundle dry-run mutated the install path"
           }
+          if (Test-Path -LiteralPath (Join-Path $bundleRoot "payload/elefante/requirements.lock")) {
+            throw "Developer dependency lock leaked into customer installer"
+          }
           @(
             "Bundle Root: $bundleRoot",
             "Payload Root: $(Join-Path $bundleRoot 'payload/elefante')",
             "Install Root: $dryRunRoot",
+            "Release Profile: Client (runtime-only payload)",
             "Dry run only. No files were changed."
           ) | ForEach-Object {
             if (-not $dryRunOutput.Contains($_)) {
@@ -237,7 +251,7 @@ jobs:
           }
 
       - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: elefante-${{ runner.os }}-binary
           path: dist/elefante-${{ runner.os }}.zip
@@ -270,7 +284,7 @@ jobs:
           spctl --assess --type open --context context:primary-signature -v dist/Elefante-Installer.dmg
 
       - name: Upload Installer Bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: elefante-${{ runner.os }}-installer
           path: dist/elefante-installer-${{ runner.os }}.zip
@@ -280,7 +294,7 @@ jobs:
         if: runner.os == 'macOS' && env.APPLE_DEVELOPER_ID != ''
         env:
           APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: elefante-macOS-dmg
           path: dist/Elefante-Installer.dmg
@@ -293,7 +307,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # A tag can never publish while the locked production dependencies have
       # a known advisory. Pull requests run the same production audit so the
@@ -301,9 +315,9 @@ jobs:
       - name: Audit hash-locked Python dependencies
         uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
         with:
-          inputs: requirements.lock
+          inputs: requirements.client.lock
           require-hashes: true
-          disable-pip: true
+          internal-be-careful-extra-flags: --disable-pip
           no-deps: true
 
   release:
@@ -316,10 +330,10 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download releasable installer artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           # Binary archives are retained for CI diagnostics, not published.
           # Avoid downloading them into the release job.
@@ -351,7 +365,7 @@ jobs:
             "${release_files[@]}"
 
       - name: Upload checksum manifest
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: elefante-${{ github.ref_name }}-checksums
           path: SHA256SUMS

@@ -11,6 +11,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import json
 import os
@@ -27,6 +28,49 @@ from packaging.requirements import Requirement
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_installer_entrypoint_starts_without_product_dependencies():
+    """A clean machine must reach installer setup before dependencies exist."""
+    result = subprocess.run(
+        [sys.executable, "-S", str(ROOT / "scripts/setup/install.py"), "--help"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "--release-profile" in result.stdout
+    assert "ModuleNotFoundError" not in result.stderr
+
+
+def test_client_health_checks_customer_baseline_without_developer_sdd(monkeypatch):
+    from scripts.verify import verify_health
+    from src.core.directive_store import CLIENT_SYSTEM_DIRECTIVE_DEFINITIONS
+
+    class Orchestrator:
+        async def ensure_system_baseline(self):
+            return {"success": True}
+
+    class DirectiveStore:
+        def list_all(self):
+            return [
+                {"id": directive_id, "content": content}
+                for directive_id, content in CLIENT_SYSTEM_DIRECTIVE_DEFINITIONS
+            ]
+
+    monkeypatch.setattr(verify_health, "get_orchestrator", Orchestrator)
+    monkeypatch.setattr(verify_health, "get_directive_store", DirectiveStore)
+    monkeypatch.setattr(verify_health, "is_client_runtime", lambda: True)
+
+    result = asyncio.run(verify_health.check_system_baseline())
+
+    assert result["status"] == "healthy"
+    assert result["profile"] == "client"
+    assert result["missing_directives"] == []
+    assert result["developer_directives"] == []
+    assert result["specifications"] == "not-applicable"
 
 
 def test_requirements_pin_every_declared_direct_dependency():
@@ -56,6 +100,23 @@ def _runtime_requirements() -> list[str]:
         if active == "runtime" and line and not line.startswith("#"):
             values.append(line)
     return values
+
+
+def test_client_runtime_requirements_match_the_product_runtime_contract():
+    client_requirements = [
+        line.strip()
+        for line in (ROOT / "requirements.client.txt").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+
+    assert set(client_requirements) == set(_runtime_requirements())
+    assert not {
+        "black==26.3.1",
+        "mypy==1.20.2",
+        "pytest==9.0.3",
+        "pytest-asyncio==1.4.0",
+        "ruff==0.1.15",
+    } & set(client_requirements)
 
 
 def test_isolated_package_wheel_preserves_src_runtime_contract(tmp_path):
@@ -286,6 +347,27 @@ def test_install_dependencies_refuses_to_resolve_without_the_checked_in_lock(mon
     assert calls == []
 
 
+def test_client_install_dependencies_use_the_runtime_only_lock(monkeypatch, tmp_path):
+    module = _load_module(ROOT / "scripts/setup/install.py", "install_setup_client_lock_module")
+    module.logger = module.Logger(spinner_enabled=False)
+    calls: list[list[str]] = []
+    monkeypatch.setattr(module, "run_command", lambda command, **_: calls.append(command) or True)
+    (tmp_path / "requirements.client.lock").write_text(
+        "example==1.0 --hash=sha256:example", encoding="utf-8"
+    )
+
+    assert module.install_dependencies(tmp_path, "/tmp/venv/bin/python", "client") is True
+    assert calls[-1] == [
+        "/tmp/venv/bin/python",
+        "-m",
+        "pip",
+        "install",
+        "--require-hashes",
+        "-r",
+        "requirements.client.lock",
+    ]
+
+
 def test_daemon_service_renders_user_scope_macos_and_linux_units(tmp_path):
     module = _load_module(ROOT / "scripts/lifecycle/daemon_service.py", "daemon_service_module")
     mac_path = module.service_path(tmp_path, "Darwin")
@@ -441,23 +523,90 @@ def test_doctor_reports_ready_only_when_runtime_and_daemon_are_healthy(tmp_path)
         encoding="utf-8",
     )
 
+    home = tmp_path / "home"
+    manifest = home / ".elefante" / "install-manifest.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "files": {},
+                "commands": {},
+                "runtime": {
+                    "app_root": str(repo),
+                    "data_root": str(home / ".elefante" / "data"),
+                    "scope": "customer",
+                    "version": "9.9.9",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
     report = module.build_report(
         repo_root=repo,
-        home=tmp_path / "home",
+        home=home,
         service_inspector=lambda _: {
             "daemon_health": True,
             "service_runtime": "active",
             "service_file_ownership": "owned",
         },
+        host_detector=lambda **_: set(),
+        surface_inspector=lambda _: set(),
     )
 
     assert report["ready"] is True
+    assert report["customer_ready"] is True
     assert report["diagnostics"] == []
     assert report["integrations"] == {
         "compatible": ["codex"],
         "preview": ["preview-host"],
         "community": ["generic-mcp-client", "openclaw"],
     }
+
+
+def test_client_doctor_uses_runtime_host_contract_without_developer_manifest(tmp_path):
+    module = _load_module(ROOT / "scripts/lifecycle/doctor.py", "doctor_client_report_module")
+    repo = tmp_path / "repo"
+    (repo / ".venv" / "bin").mkdir(parents=True)
+    (repo / ".venv" / "bin" / "python").write_text("", encoding="utf-8")
+    (repo / "config.yaml").write_text("app_name: elefante\n", encoding="utf-8")
+    home = tmp_path / "home"
+    manifest = home / ".elefante" / "install-manifest.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "files": {},
+                "commands": {},
+                "runtime": {
+                    "app_root": str(repo),
+                    "data_root": str(home / ".elefante" / "data"),
+                    "scope": "customer",
+                    "version": "2.12.2",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    report = module.build_report(
+        repo_root=repo,
+        home=home,
+        service_inspector=lambda _: {
+            "daemon_health": True,
+            "service_runtime": "active",
+            "service_file_ownership": "owned",
+        },
+        host_detector=lambda **_: set(),
+        surface_inspector=lambda _: set(),
+    )
+
+    assert report["ready"] is True
+    assert report["customer_ready"] is True
+    assert report["diagnostics"] == []
+    assert report["integrations"]["compatible"] == sorted(module.SUPPORTED_HOSTS)
 
 
 def test_doctor_reports_missing_runtime_and_invalid_manifest_without_mutating_it(tmp_path):
@@ -474,6 +623,8 @@ def test_doctor_reports_missing_runtime_and_invalid_manifest_without_mutating_it
         repo_root=repo,
         home=home,
         service_inspector=lambda _: {"daemon_health": False, "service_runtime": "inactive"},
+        host_detector=lambda **_: set(),
+        surface_inspector=lambda _: set(),
     )
 
     assert report["ready"] is False
@@ -509,6 +660,8 @@ def test_doctor_reports_owned_surfaces_without_exposing_host_commands(tmp_path):
         repo_root=repo,
         home=home,
         service_inspector=lambda _: {"daemon_health": True, "service_runtime": "active"},
+        host_detector=lambda **_: set(),
+        surface_inspector=lambda _: set(),
     )
     rendered = module._render_text(report)
 
@@ -522,17 +675,71 @@ def test_doctor_cli_uses_readiness_for_its_exit_code_and_json_output(monkeypatch
     module = _load_module(ROOT / "scripts/lifecycle/doctor.py", "doctor_cli_module")
     report = {
         "ready": False,
+        "customer_ready": False,
         "repository": "/repo",
         "runtime": {"venv_python_exists": True, "config_exists": True},
         "daemon": {"daemon_health": False, "service_runtime": "inactive"},
         "installer_ownership": {"files": 0, "host_registrations": 0, "configured_surfaces": []},
+        "host_coverage": {"detected": [], "verified": [], "uncovered": []},
         "integrations": {"compatible": [], "preview": [], "community": []},
         "diagnostics": ["daemon_unreachable"],
+        "customer_diagnostics": ["runtime_installation_unrecorded"],
     }
     monkeypatch.setattr(module, "build_report", lambda: report)
 
     assert module.main(["--json"]) == 1
     assert __import__("json").loads(capsys.readouterr().out)["diagnostics"] == ["daemon_unreachable"]
+
+
+def test_doctor_reports_detected_but_unconfigured_customer_hosts(tmp_path):
+    module = _load_module(ROOT / "scripts/lifecycle/doctor.py", "doctor_host_coverage_module")
+    repo = tmp_path / "repo"
+    (repo / ".venv" / "bin").mkdir(parents=True)
+    (repo / ".venv" / "bin" / "python").write_text("", encoding="utf-8")
+    (repo / "config.yaml").write_text("app_name: elefante\n", encoding="utf-8")
+    matrix = repo / "agents" / "manifests"
+    matrix.mkdir(parents=True)
+    (matrix / "ide-integration.yaml").write_text("surfaces: []\n", encoding="utf-8")
+    home = tmp_path / "home"
+    manifest = home / ".elefante" / "install-manifest.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "files": {},
+                "commands": {},
+                "runtime": {
+                    "app_root": str(repo),
+                    "data_root": str(home / ".elefante" / "data"),
+                    "scope": "customer",
+                    "version": "9.9.9",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    report = module.build_report(
+        repo_root=repo,
+        home=home,
+        service_inspector=lambda _: {
+            "daemon_health": True,
+            "service_runtime": "active",
+            "service_file_ownership": "owned",
+        },
+        host_detector=lambda **_: {"codex", "cursor"},
+        surface_inspector=lambda _: {"codex"},
+    )
+
+    assert report["ready"] is True
+    assert report["customer_ready"] is False
+    assert report["host_coverage"] == {
+        "detected": ["codex", "cursor"],
+        "verified": ["codex"],
+        "uncovered": ["cursor"],
+    }
+    assert report["customer_diagnostics"] == ["detected_hosts_unconfigured"]
 
 
 def test_vscode_adapter_uses_transport_only_bridge(tmp_path):
@@ -627,6 +834,21 @@ def test_bob_adapter_preserves_a_user_owned_elefante_entry(monkeypatch, tmp_path
 
     assert module.configure_mcp(["--vscode", "chat-settings"])
     assert __import__("json").loads(target.read_text(encoding="utf-8")) == original
+
+
+def test_bob_adapter_creates_the_user_global_registry_for_a_detected_host(monkeypatch, tmp_path):
+    module = _load_module(ROOT / "scripts/setup/configure_vscode_bob.py", "bob_global_module")
+    home = tmp_path / "home"
+    (home / ".bob").mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(home))
+
+    assert module.configure_mcp(["--host", "bob"])
+
+    target = home / ".bob" / "settings" / "mcp_settings.json"
+    entry = json.loads(target.read_text(encoding="utf-8"))["mcpServers"]["elefante"]
+    assert entry["env"]["ELEFANTE_CLIENT_TOOL"] == "ibm-bob"
+    manifest = _load_module(ROOT / "scripts/setup/install_manifest.py", "bob_global_manifest")
+    assert manifest.configured_surfaces(home) == {"ibm-bob"}
 
 
 def test_cursor_kiro_and_gemini_adapters_preserve_other_servers_and_emit_provenance(tmp_path):
@@ -1049,6 +1271,97 @@ def test_install_manifest_records_only_emitted_files(tmp_path):
     assert preserved == [emitted]
 
 
+def test_install_manifest_records_customer_runtime_without_losing_owned_surfaces(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/install_manifest.py", "runtime_manifest_module")
+    home = tmp_path / "home"
+    emitted = tmp_path / "mcp.json"
+    emitted.write_text("{}", encoding="utf-8")
+    module.record_emitted_file(emitted, "vscode-copilot", home=home)
+
+    target = module.record_runtime_installation(
+        app_root=tmp_path / "app" / "current",
+        data_root=home / ".elefante" / "data",
+        version="9.9.9",
+        scope="customer",
+        home=home,
+    )
+    payload = json.loads(target.read_text(encoding="utf-8"))
+
+    assert payload["schema_version"] == 2
+    assert payload["runtime"]["scope"] == "customer"
+    assert module.read_runtime_installation(home)["version"] == "9.9.9"
+    assert module.configured_surfaces(home) == {"vscode-copilot"}
+
+
+def test_json_surface_verification_ignores_unrelated_user_settings(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/install_manifest.py", "surface_verification_module")
+    home = tmp_path / "home"
+    config = tmp_path / "mcp.json"
+    config.write_text('{"servers":{"elefante":{"command":"bridge"}}}', encoding="utf-8")
+    module.record_emitted_json_entry(
+        config,
+        "vscode-copilot",
+        ("servers", "elefante"),
+        created=True,
+        home=home,
+    )
+
+    config.write_text(
+        '{"servers":{"elefante":{"command":"bridge"},"other":{"command":"other"}}}',
+        encoding="utf-8",
+    )
+
+    assert module.configured_surfaces(home) == {"vscode-copilot"}
+    removed, preserved = module.remove_unchanged_files(home=home, apply=True)
+    assert removed == []
+    assert preserved == [config]
+
+
+def test_host_detection_and_customer_runtime_conflict_are_explicit(tmp_path):
+    hosts = _load_module(ROOT / "scripts/setup/host_selection.py", "host_detection_module")
+    install = _load_module(ROOT / "scripts/setup/install.py", "install_scope_module")
+    home = tmp_path / "home"
+    (home / ".cursor").mkdir(parents=True)
+    (home / ".gemini" / "antigravity").mkdir(parents=True)
+    (home / "Library" / "Application Support" / "Code" / "User").mkdir(parents=True)
+    binaries = {"codex": "/usr/local/bin/codex"}
+
+    detected = hosts.detect_supported_hosts(
+        home=home,
+        system="Darwin",
+        which=lambda command: binaries.get(command),
+    )
+
+    assert detected == {"antigravity", "codex", "cursor", "vscode-copilot"}
+    selected, required = install.installation_host_plan(
+        installation_scope="customer",
+        requested_hosts={"codex"},
+        detected_hosts=detected,
+    )
+    assert selected is None
+    assert required == detected
+    selected, required = install.installation_host_plan(
+        installation_scope="developer",
+        requested_hosts={"codex"},
+        detected_hosts=detected,
+    )
+    assert selected == {"codex"}
+    assert required == {"codex"}
+    assert install.uncovered_required_hosts(detected, {"antigravity", "codex", "vscode-copilot"}) == [
+        "cursor"
+    ]
+    assert install.developer_runtime_conflicts_with_customer(
+        installation_scope="developer",
+        root_dir=tmp_path / "developer-checkout",
+        existing_runtime={
+            "app_root": str(tmp_path / "app" / "current"),
+            "data_root": str(home / ".elefante" / "data"),
+            "scope": "customer",
+            "version": "9.9.9",
+        },
+    )
+
+
 def test_uninstall_removes_only_owned_json_entry_from_shared_config(tmp_path):
     module = _load_module(ROOT / "scripts/setup/install_manifest.py", "install_manifest_json_entry_module")
     config = tmp_path / "mcp.json"
@@ -1084,6 +1397,23 @@ def test_uninstall_deletes_empty_installer_created_json_config(tmp_path):
     assert removed == [config]
     assert preserved == []
     assert not config.exists()
+
+
+def test_complete_uninstall_can_clear_customer_runtime_identity(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/install_manifest.py", "clear_runtime_module")
+    home = tmp_path / "home"
+    module.record_runtime_installation(
+        app_root=tmp_path / "app" / "current",
+        data_root=home / ".elefante" / "data",
+        version="9.9.9",
+        scope="customer",
+        home=home,
+    )
+
+    module.clear_runtime_installation(home)
+
+    assert module.read_runtime_installation(home) is None
+    assert not module.manifest_path(home).exists()
 
 
 def test_daemon_uninstall_preserves_modified_service_without_stopping_it(monkeypatch, tmp_path):

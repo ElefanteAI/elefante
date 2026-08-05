@@ -255,6 +255,19 @@ def test_entrypoint_protocol_routes_to_the_current_issue_tracker():
     assert any("workspace/ISSUES.md" in item for item in pitfalls["MANDATORY_PROTOCOLS_READ_THIS_FIRST"])
 
 
+def test_client_protocol_excludes_developer_workspace_routing(monkeypatch):
+    from src.mcp import server as server_module
+
+    monkeypatch.setattr(server_module, "is_client_runtime", lambda: True)
+    result = ElefanteMCPServer._inject_entrypoint_protocol(object(), {})
+    pitfalls = ElefanteMCPServer._inject_pitfalls(object(), {}, "elefante-Memory")
+    rendered = json.dumps({"result": result, "pitfalls": pitfalls})
+
+    assert "workspace/" not in rendered
+    assert "tests/" not in rendered
+    assert "API keys" in rendered
+
+
 @pytest.mark.asyncio
 async def test_memory_write_lock_encloses_the_actual_store_operation(monkeypatch):
     from src.mcp import server as server_module
@@ -342,6 +355,9 @@ def test_two_bridge_clients_share_one_daemon_with_distinct_sources():
 
     with tempfile.TemporaryDirectory(prefix="elefante-daemon-") as temp_dir:
         temp_root = Path(temp_dir)
+        host_huggingface_cache = Path(
+            os.environ.get("HF_HOME", Path.home() / ".cache" / "huggingface")
+        )
         env = {
             **os.environ,
             "PYTHONPATH": str(repo),
@@ -350,6 +366,9 @@ def test_two_bridge_clients_share_one_daemon_with_distinct_sources():
             "ELEFANTE_DATA_DIR": str(temp_root / "data"),
             "ELEFANTE_DAEMON_PORT": str(port),
             "ELEFANTE_ALLOW_TEST_MEMORIES": "1",
+            # Isolate Elefante data without forcing a second model download.
+            # The fast suite warms this cache before the slow runtime proof.
+            "HF_HOME": str(host_huggingface_cache),
         }
         daemon = subprocess.Popen(
             [sys.executable, "-m", "src.mcp.daemon"],

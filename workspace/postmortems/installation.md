@@ -158,6 +158,39 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 **Guard:** `pytest tests/test_install_setup.py -k "configured_storage_paths" -v`.
 **Lesson:** Backend selection and operator diagnostics must read the same configuration contract; a correct factory with stale initialization messages is still a broken install experience.
 
+## Issue #20: Customer-Global Installation and Host Coverage [BUG-040, FIXED, guarded]
+
+**Trigger:** The customer journey on macOS found Elefante running from a developer checkout, with only one IDE registered and no global CLI identity, even though the product promise is shared memory across agent hosts.
+**Root cause:** The stable release bundle root existed, but delegated installs did not identify themselves as customer installations. Install success described adapter attempts rather than proving all detected compatible hosts were currently connected, and `doctor` checked runtime health without checking installation scope, root identity, or host coverage.
+**Solution:** Release bundles now pass explicit customer scope. Customer installs always configure every detected compatible host against one stable per-user runtime, one data root, and one loopback daemon. The manifest records runtime identity; exact host registrations are reverified; uncovered detected hosts fail installation; `doctor` reports separate runtime and customer readiness; developer checkouts cannot replace a recorded customer runtime.
+**Guard:** `pytest tests/test_installer_bundle.py tests/test_install_setup.py tests/test_installer_gui.py -q` covers release scope, stable host planning, runtime identity, exact JSON-entry verification, uncovered-host diagnostics, and the non-selectable global macOS host surface.
+**Lesson:** “Global” is a verifiable customer invariant, not an install-path adjective: one stable user runtime must be the source for every detected compatible client, or installation is incomplete.
+
+## Issue #21: Customer Installer Leaked Developer Repository Material [BUG-041, FIXED locally, guarded]
+
+**Trigger:** A first-customer macOS installation of the public v2.12 archive exposed the repository workspace, tests, migration and developer-only utilities, internal instructions, and the full development lock. The installed environment also carried test and lint packages that a customer never needs.
+**Root cause:** `build_installer_bundle.py` recursively copied nearly the whole repository, with only broad exclusion rules. Its installer always consumed `requirements.lock`, which combines runtime and development dependencies. The archive had a customer launcher but did not have a customer payload boundary.
+**Solution:** Release Client Candidate 1.0 has its own `requirements.client.txt` and hash-locked `requirements.client.lock`. Its cross-platform customer builder copies only explicit runtime source, installer/health scripts, prebuilt dashboard assets, and customer files. Its manifest selects the `client` installer profile, so `install.py` uses the runtime lock and skips repository-only agent-bootstrap validation. A separate verifier rejects unexpected archive paths, developer directories, development dependencies, invalid launchers, misleading timestamps, and invalid client metadata. The tagged-release workflow uses this builder on macOS, Windows, and Linux. The full developer installer remains available for diagnostics but cannot be published as the customer asset.
+**Guard:** `pytest tests/test_release_client_bundle.py tests/test_installer_bundle.py tests/test_install_setup.py -q`; generate the dashboard; run `python scripts/ci/build_release_client.py --output <zip>` then `python scripts/ci/verify_release_client.py --archive <zip>`; CI re-compiles and audits the client lock, builds/verifies the archive, performs a real fresh macOS install through the exact Finder launcher, requires customer-ready `doctor` output, and proves safe daemon/runtime unregistration.
+**Boundary:** This is a local validation lane for the upcoming v2.12.2 customer artifact. It does not replace the published v2.12.1 installers, change the website download, or authorize a release.
+**Lesson:** A friendly launcher cannot make a repository snapshot into a customer product. The customer artifact must be allowlisted, profile-specific, and rejected automatically when any development surface leaks in.
+
+## Issue #22: Clean-Machine Installer Imported Product Dependencies Before Setup [BUG-042, FIXED locally, guarded]
+
+**Trigger:** The exact customer launcher on a fresh macOS runner placed the v2.12.2 payload, then crashed immediately with `ModuleNotFoundError: No module named 'pydantic'`.
+**Root cause:** `install.py` imported `src.__version__` at process startup. Importing `src` also imported Elefante models and `pydantic`, but the installer's dependency stage had not yet created the virtual environment or installed the client lock.
+**Solution:** Installer startup reads the strict semantic version assignment from `src/__init__.py` with the standard library. It does not import product code until after dependencies exist.
+**Guard:** `pytest tests/test_install_setup.py -k "entrypoint_starts_without_product_dependencies" -v` launches the installer help path with `python -S`, which disables site packages. The isolated macOS workflow then executes the full customer launcher and requires customer-ready `doctor` output.
+**Lesson:** An installer must bootstrap using only the standard library until it has installed its own dependency contract.
+
+## Issue #23: Client Health Required Developer SDD Baseline [BUG-043, FIXED locally, guarded]
+
+**Trigger:** After the clean customer install successfully created its environment, installed dependencies, initialized storage, generated the dashboard, started the daemon, and completed host detection, final health verification reported `System Baseline: UNHEALTHY`.
+**Root cause:** `verify_health.py` always required Elefante's internal developer SDD directives and developer specification memories. The client runtime intentionally excludes those instructions and seeds only task-focused grounding, continuity, conflict, and secret-safety directives.
+**Solution:** Health verification selects its baseline from the runtime profile. A client runtime must contain every client directive, no developer SDD directive, and does not require developer specification memories. Developer checks retain the full SDD contract.
+**Guard:** `pytest tests/test_install_setup.py -k "client_health_checks_customer_baseline" -v`; the isolated macOS workflow requires the entire customer launcher and `doctor` readiness path to pass.
+**Lesson:** Product health must verify the product contract for the active runtime profile, not the development environment that produced it.
+
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
 The five most-recurring rules from the issues above:

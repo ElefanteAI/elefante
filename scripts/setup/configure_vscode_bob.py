@@ -123,6 +123,9 @@ def get_settings_paths(selected: set[str] | None = None):
             paths.append(home / ".config" / "Code - Insiders" / "User" / "settings.json")
             paths.append(home / ".config" / "Bob-IDE" / "User" / "settings.json")
 
+    # IBM Bob's user-global MCP registry is independent from VS Code settings.
+    paths.append(Path.home() / ".bob" / "settings" / "mcp_settings.json")
+
     selected_hosts = selected or set(VSCODE_FAMILY)
     return [path for path in paths if _host_for_path(path) in selected_hosts]
 
@@ -282,7 +285,16 @@ def configure_mcp(argv: list[str] | None = None):
     
     # Find valid settings files
     potential_paths = get_settings_paths(selected_hosts)
-    found_paths = [p for p in potential_paths if p.exists()]
+    found_paths = [
+        path
+        for path in potential_paths
+        if path.exists()
+        or (
+            _host_for_path(path) == "bob"
+            and ".bob" in path.parts
+            and (Path.home() / ".bob").is_dir()
+        )
+    ]
     
     if not found_paths and not mcp_configured:
         print("No compatible IDE settings found!")
@@ -301,8 +313,11 @@ def configure_mcp(argv: list[str] | None = None):
         print(f"\nConfiguring: {settings_path}")
         
         try:
-            with open(settings_path, 'r', encoding='utf-8') as f:
-                settings = json.load(f)
+            if settings_path.exists():
+                with open(settings_path, 'r', encoding='utf-8') as f:
+                    settings = json.load(f)
+            else:
+                settings = {}
         except json.JSONDecodeError:
             print(f"Warning: Error reading {settings_path}. Skipping.")
             continue
@@ -409,6 +424,7 @@ def configure_mcp(argv: list[str] | None = None):
         # Save settings
         if changed:
             print("Saving configuration...")
+            settings_path.parent.mkdir(parents=True, exist_ok=True)
             write_json_atomically(settings_path, settings, indent=4)
             if removed_owned_entry:
                 forget_emitted_file(settings_path)

@@ -21,12 +21,18 @@ def test_authorized_release_request_is_validated_and_dispatched() -> None:
         encoding="utf-8"
     )
     marker = ROOT / ".github/release-requests/v2.12.1"
+    markers = sorted(
+        path.name
+        for path in (ROOT / ".github/release-requests").glob("v*.*.*")
+        if path.is_file()
+    )
     package = (ROOT / "src/__init__.py").read_text(encoding="utf-8")
     version_match = re.search(r'__version__\s*=\s*"([^"]+)"', package)
 
     assert marker.is_file()
     assert version_match is not None
-    assert marker.name == f"v{version_match.group(1)}"
+    assert marker.name in markers
+    assert f"v{version_match.group(1)}" not in markers
     assert "branches:\n      - main" in workflow
     assert '".github/release-requests/v*.*.*"' in workflow
     assert "contents: write" in workflow

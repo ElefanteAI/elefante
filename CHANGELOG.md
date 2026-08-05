@@ -11,6 +11,40 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.12.2] - 2026-08-05
+
+### Changed
+
+- The customer download now contains only the Elefante runtime, the built
+  dashboard, customer lifecycle tools, and a separate hash-locked runtime
+  dependency set. Tests, development plans, migration utilities, and internal
+  build tools remain in the developer repository.
+- Customer installations receive task-focused memory, grounding, conflict, and
+  secret-safety guidance. Elefante's own developer workflow instructions are no
+  longer injected into customer agent sessions.
+
+### Fixed
+
+- Customer installers now register one stable per-user Elefante runtime and one
+  local memory store for every detected compatible IDE and agent host. Install
+  success fails closed if any detected host is not verifiably connected.
+- `doctor` now distinguishes a customer-global release installation from a
+  developer checkout and reports any detected host that is not connected.
+- A developer checkout can no longer replace an existing customer runtime.
+- Customer archives now preserve executable Unix/macOS launchers and valid
+  Windows launcher bytes, use customer-visible build timestamps, verify the
+  exact source commit, reject developer-material leakage, and build
+  reproducibly from an explicit payload allowlist. The tagged-release pipeline
+  uses this clean client builder on macOS, Windows, and Linux.
+- `doctor` now works from the runtime-only customer package without requiring
+  the developer integration manifest.
+- A genuinely clean machine can now start the installer before Elefante's
+  Python dependencies exist. The bootstrap reads the release version directly
+  instead of importing dependency-backed product modules before setup.
+- Customer health verification now checks the task-focused client directive
+  baseline instead of requiring Elefante's internal developer SDD directives
+  and repository specification memories.
+
 ## [2.12.1] - 2026-08-04
 
 ### Fixed

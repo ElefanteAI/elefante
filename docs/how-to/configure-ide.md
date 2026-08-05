@@ -9,6 +9,13 @@ entry unless the entry and its containing JSON file exactly match the prior
 installer manifest. User-managed entries, malformed JSON, and externally
 modified files are preserved. Configuration writes are atomic.
 
+The release installer is the normal customer path. It connects every detected
+compatible host to the single runtime in `~/.elefante/app/current` (or
+`%LOCALAPPDATA%\Elefante\app\current` on Windows) and fails rather than claiming
+success when a detected host cannot be verified. The manual examples below are
+fallback and developer-reference paths; they must all target the same stable
+runtime and loopback daemon when used for a customer installation.
+
 Elefante bridge command (same shape for all stdio-only IDEs):
 
 - Command: `.../.venv/bin/python`

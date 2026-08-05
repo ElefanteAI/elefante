@@ -1,6 +1,6 @@
 ---
 status: living
-last_updated: 2026-07-30
+last_updated: 2026-08-05
 audience: developer-agents
 authority: state + roadmap + features + aspect-plans for Elefante development
 related:
@@ -79,7 +79,7 @@ The non-negotiable product shape is:
 
 ---
 
-## §2 Released Product: v2.12.0 Memory Intelligence
+## §2 Released Product: v2.12.1 Memory Intelligence
 
 ### §2.1 Outcome
 
@@ -107,13 +107,13 @@ loopback-only, redacted snapshot-only, and read-only.
 | Work | Current proof |
 |------|---------------|
 | Visual acceptance | The source-grounded dashboard showcase and canonical branding are complete. The website received desktop/mobile dark/light, reduced-motion, and Matrix-state browser evidence before production deployment. |
-| Regression proof | v2.12.0 was released after green core Quality and cross-platform installer-build checks. Its public macOS, Windows, and Linux archives each include a launcher, and `SHA256SUMS` is published with the release assets. |
+| Regression proof | v2.12.1 is the published release. The upcoming v2.12.2 client candidate completed a real isolated macOS install, health check, daemon startup, MCP handshake, runtime registration, and clean uninstall. Full quality and dependency checks plus macOS, Windows, and Linux package builds are green on exact candidate SHA `d5f8a99`. |
 | Durable handoff | PR #7 history was preserved in the no-rewrite merge on `release/v2.12.0`. The released product is maintained on `main`; detailed historic review evidence remains available on GitHub. |
-| Publication | **PUBLISHED 2026-08-02** — GitHub release `v2.12.0` and its installers are public. Website release claims and download links must remain pinned to this published release until a later version is published. |
+| Publication | **PUBLISHED 2026-08-04** — GitHub release `v2.12.1` and its installers remain public. The v2.12.2 candidate is not a public download and has no release or website authority. |
 
 ### §2.4 Approval gates
 
-The v2.12.0 release is published. The following production operations remain
+The v2.12.1 release is published. The following production operations remain
 intentionally controlled:
 
 1. Apply provenance or vector-store migrations to live user data.
@@ -142,8 +142,9 @@ Rejected alternatives remain closed without new evidence:
 ### §2.6 Resume verdict
 
 - **RESUME_SAFE:** YES — active state is here; defects/capability gaps are in [`workspace/ISSUES.md`](../workspace/ISSUES.md); integration truth is in [`agents/manifests/ide-integration.yaml`](../agents/manifests/ide-integration.yaml).
-- **IMPLEMENTATION_COMPLETE:** YES — v2.12.0 is released.
-- **PUBLICATION:** PUBLISHED — the tag, GitHub release, installers, and checksums are public. Future work remains unversioned until separately released.
+- **PUBLISHED_PRODUCT:** v2.12.1 remains live and unchanged.
+- **CANDIDATE:** v2.12.2 implementation and exact-SHA GitHub proof are complete on PR #17 at `d5f8a99`; merge, immutable authorization, publication, and website promotion remain.
+- **PUBLICATION_AUTHORIZED:** NO — the candidate has no tag, GitHub Release, website change, deployment, or live-install authority.
 
 ---
 
@@ -165,7 +166,21 @@ the dashboard work does not waive them.
 - Platform-specific launchers and non-mutating dry-run behavior
 - SQLite-vector/Kuzu default architecture with a clean production lock
 
-### §3.3 Upcoming (no release or date commitment)
+### §3.3 Release Client Candidate 1.0 — upcoming v2.12.2 validation lane
+
+- Separate customer-only macOS, Windows, and Linux archives sourced from current `main`
+- Separate hash-locked runtime dependency set; no test, lint, or build tooling
+- Standard-library-only installer bootstrap until the client dependency lock is installed
+- Explicit archive allowlist plus verifier that rejects developer material
+- Branch-only macOS workflow uploads a private validation artifact and checksum;
+  it cannot create a GitHub Release or alter the public website
+- The same fresh macOS runner must extract the ZIP through `ditto`, execute the
+  customer launcher without `--dry-run`, pass `doctor` with customer readiness
+  and v2.12.2 runtime identity, then safely unregister the daemon and runtime
+- No claim of public availability until a clean download, installer, release asset,
+  checksum, and customer-flow verification all pass
+
+### §3.4 Upcoming (no release or date commitment)
 
 - Expanded `elefante doctor` verification
 - Automated integration-manifest drift checks
@@ -205,8 +220,8 @@ Each row links to the full PRD. **Authority:** the linked file is the source of 
 
 | Feature | PRD | Status |
 |---------|-----|--------|
-| Phase 1 installer (downloadable bundle, stable install root) | [`workspace/proposals/installer-procedure.md`](../workspace/proposals/installer-procedure.md) | Foundation implemented; release closure pending |
-| IDE integration surface (16 IDEs, daemon, Source schema) | [`workspace/proposals/ide-integration-surface.md`](../workspace/proposals/ide-integration-surface.md) | Runtime/adapters implemented; additional certification upcoming |
+| Phase 1 installer (downloadable bundle, stable install root) | [`workspace/proposals/installer-procedure.md`](../workspace/proposals/installer-procedure.md) | Implemented; BUG-040 customer-global hardening awaiting release |
+| IDE integration surface (16 IDEs, daemon, Source schema) | [`workspace/proposals/ide-integration-surface.md`](../workspace/proposals/ide-integration-surface.md) | Shared runtime and verified detected-host coverage implemented; additional adapters and certification upcoming |
 | Session intelligence (privacy-respecting telemetry) | [`workspace/proposals/session-intelligence.md`](../workspace/proposals/session-intelligence.md) | DRAFT |
 | Task Intelligence Pipeline (bounded Task Briefs + controlled outcome evaluation) | [`workspace/proposals/retrieval-effectiveness.md`](../workspace/proposals/retrieval-effectiveness.md) | SDD approved for benchmark design; implementation not started |
 | Memory identity | [`workspace/proposals/memory-identity.md`](../workspace/proposals/memory-identity.md) | DRAFT |
@@ -522,7 +537,11 @@ This section is the chronological record of curation events, decisions, and abso
 
 | Date | Event | Driver | Measurement |
 |------|-------|--------|-------------|
+| 2026-08-05 | **v2.12.2 client candidate passed the real customer gate.** A fresh hosted Mac extracted the customer ZIP with `ditto`, ran the exact Finder launcher without dry-run, created the isolated runtime, initialized storage, started the user daemon, passed product health and an MCP handshake, reported customer-global readiness, then unregistered and removed the runtime cleanly. The gate exposed and guarded two product defects before release: dependency-backed imports before bootstrap and developer-only SDD requirements in client health. CI cleanup now accepts the uninstaller's valid removal of an empty manifest, and maintained actions no longer emit the observed obsolete-runtime or invalid-input warnings. | Owner required a clean, reliable client product and proof based on the actual first-customer journey rather than repository tests alone. | PR #17 exact SHA `d5f8a99`: fresh macOS install green; 294 fast tests plus isolated slow proof green; dashboard build and Python/npm dependency audits green; macOS, Windows, and Linux customer packages built and smoke-tested. No tag, public release, website change, or live user installation occurred. |
+| 2026-08-05 | **BUG-041 runtime-only customer artifact integrated with BUG-040.** Release Client Candidate 1.0 is the validation lane for the upcoming v2.12.2 patch, not a second public version. It adds a separate hash-locked runtime dependency contract, strict customer payload allowlist, independent cross-platform archive verifier, and client installer profile on top of the global per-user runtime and all-detected-host coverage contract. The tagged-release workflow now consumes this customer builder on macOS, Windows, and Linux instead of the repository-like developer bundle. | The public installer exposed development material and an earlier client branch conflicted with current main/global-install work. | Fresh integration branch from current `origin/main`; no merge, tag, release, website change, deployment, or live-install mutation. Exact artifact evidence is recorded only after the integrated candidate completes QA. |
+| 2026-08-05 | **BUG-040 customer-global installation contract implemented.** Release bundles explicitly install one stable per-user runtime; customer installs configure every detected compatible host against one data root and daemon; manifest schema records runtime identity and verifies exact registrations; uncovered hosts fail closed; `doctor` separates customer readiness from basic runtime health; developer checkouts cannot replace customer runtime. The macOS installer no longer presents host coverage as optional checkboxes. | Owner identified that a one-IDE or checkout-bound install defeats cross-tool memory continuity and made this the priority defect. | Focused installer, manifest, doctor, bundle, and native-installer regression gates are the release guard. Publication and migration of the current developer installation remain separate operator steps after the exact release candidate passes full CI. |
 | 2026-08-05 | **Task Intelligence Pipeline SDD approved for benchmark design; implementation not started.** The existing retrieval-effectiveness proposal now defines a deterministic, token-bounded Task Brief; source-grounded selection and conflict handling; metadata-only local outcome records; a randomized paired benchmark; explicit promotion thresholds; shadow mode; rollback; and a prohibition on public performance claims before maintained evidence exists. The design reuses the current five-signal retriever, retrieval explanations, memory provenance/lifecycle fields, Kuzu relationships, and task graph instead of inventing a second memory engine. | Owner clarified that Elefante must improve effective intelligence per task by ingesting only information that measurably changes task outcomes, and requested spec-driven development. | Source contracts reviewed in retrieval.py, orchestrator.py, and memory.py. Existing access count and co-activation were explicitly rejected as causal proof. No runtime, MCP surface, release, or product claim changed. Next gate: identify at least 30 reproducible tasks and freeze acceptance criteria before implementation. |
+| 2026-08-04 | **Elefante Release Client Candidate 1.0 implemented as a separate customer lane.** Started from authoritative `origin/main` at `e5b192a` (v2.12.0 plus the installer-download repair). Added a hash-locked runtime-only dependency contract, a strict macOS client archive builder, an independent archive verifier, and a `client` installer profile. The customer payload now contains only product runtime, prebuilt dashboard assets, selected install/health/backup/restore/uninstall operations, and no repository workspace, tests, migration or developer-only utilities, internal instructions, or lint/test tooling. A branch-only macOS workflow uploads a validation artifact and checksum only; it cannot publish a GitHub Release or change the website. Active product docs now state v2.12.0 is released, while RCC 1.0 is explicitly not public. | First-customer macOS install exposed a repository snapshot and development dependencies as the shipped product. Owner required a clean release-client boundary without stopping normal development. | Built and independently verified `elefante-release-client-candidate-1.0-macOS.zip` (SHA-256 `834a5926f84c12ec4cb84ec08d7197d712a7391129e2144e9e6a365a247df6f8`); extracted launcher dry-run selected `--release-profile client` and left its target absent. Client lock recompiled byte-for-byte; strict audit found no known vulnerabilities; dashboard build and high-severity npm audit gate passed. 50 release/client/routing regressions and 4 focused installer-profile regressions passed; version sync and whitespace checks passed. No push, tag, GitHub Release, website change, deployment, or live installation occurred. |
 | 2026-08-01 | **Remote-source reconciliation and release handoff completed.** GitHub, not a stale local checkout, was treated as source authority: core `main` is v2.11.1 (`d370b4d`), core candidate `2c84a68` is draft PR #8, website `main` is `94c32b8`, and website candidate `7a93681` is draft PR #2. The live Vercel response is an older divergent source, not proof that either candidate is deployed. The website candidate records the source-authority rule, production routes, Contact boundary, release manifest, canonical asset digests, visual/accessibility coverage, and non-production release order. An initial website CI failure exposed two portability defects: a logo verifier incorrectly depended on Git history absent from a shallow runner, and strict screenshot pixels differed under macOS/Linux font rasterization. The verifier now uses fixed canonical SHA-256 values and the visual assertion keeps a narrow platform tolerance; the replacement GitHub workflow is green. | Owner required current GitHub and live-site truth after development across multiple machines, plus a durable handoff for another agent. | Core PR #8: Quality green (Python, dashboard, production dependency audit) and exact-SHA macOS/Windows/Linux installer build green. Website PR #2: validation green and all 27 Chromium checks green. Both candidate worktrees matched their pushed remote heads and were clean. No merge, tag, GitHub Release, Vercel deployment, Vercel credential login, or Contact submission occurred. |
 | 2026-07-30 | **v2.12.0 release candidate integrated without rewriting PR #7 history.** Current v2.11.1 fixes were retained while the Memory Intelligence dashboard, Decision Graph, canonical branding, deterministic disclosed showcase, host-aware installers, platform launchers, and non-mutating dry run were merged. Customer documentation was separated from proposals, migration/support history, defects, and release operations; the public changelog was rewritten in customer language; active stale version promises were regression-guarded; the configured SQLite-vector/Kuzu initializer replaced a retired Chroma path; strict production dependency evidence closed stale GAP-029; and deterministic `SHA256SUMS` became a release asset contract. The release advisor was run after the changelog was complete and its automated 3.0.0 proposal was explicitly overridden by the owner-approved minor release, then every declaration was advanced together to 2.12.0. No live memory store, legacy migration, tag, release, or deployment was changed. | Owner-approved v2.12.0 fix-and-release plan, with core publication required before website publication | Local proof: 267 fast tests passed (4 legacy-backend skips, 1 isolated slow test deselected); the isolated slow two-bridge test passed; dashboard build and both npm audit gates passed with zero known vulnerabilities; strict hash-locked Python audit found no known vulnerabilities; the lock reproduced byte-for-byte; macOS, Windows, and Linux archives passed extracted-root, launcher, permission/byte, non-mutating dry-run, and generated-checksum verification; release-note validation, version sync, routing, package, scoped Ruff, workflow YAML, and whitespace checks passed. The first exact-SHA Quality run then exposed an over-escaped inline version regex that local component checks did not execute; the workflow now imports the canonical `src.__version__` directly and a release-pipeline regression locks that command. Replacement exact-SHA checks remain required before publication. |
 | 2026-05-01/02 | v2.10.0 contract release scoped (A1–A10 accepted, X1–X6 rejected, P1–P6 pending) | Architect design session | Decisions ledgered §2.3–§2.6 |
