@@ -105,7 +105,8 @@ def test_build_install_command_targets_installed_payload(tmp_path):
     assert command[0] == "/usr/bin/python3"
     assert command[1] == str(install_root / "scripts/setup/install.py")
     assert str(install_root / ".elefante-install-status.txt") in command
-    assert command[-4:] == ["--host", "cursor", "--host", "codex"]
+    assert command[command.index("--installation-scope") + 1] == "customer"
+    assert "--host" not in command
 
 
 def test_render_failed_install_guidance_points_to_persisted_files(tmp_path):

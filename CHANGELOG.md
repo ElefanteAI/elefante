@@ -11,6 +11,15 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Customer installers now register one stable per-user Elefante runtime and one
+  local memory store for every detected compatible IDE and agent host. Install
+  success fails closed if any detected host is not verifiably connected.
+- `doctor` now distinguishes a customer-global release installation from a
+  developer checkout and reports any detected host that is not connected.
+- A developer checkout can no longer replace an existing customer runtime.
+
 ## [2.12.1] - 2026-08-04
 
 ### Fixed

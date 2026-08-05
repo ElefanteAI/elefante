@@ -1,6 +1,6 @@
 # PRD: Elefante Installer Procedure
 
-> **Status**: DRAFT — Phase 1 only
+> **Status**: IMPLEMENTED — v2.12.1; global customer-readiness hardening tracked by BUG-040
 >
 > **Author**: Agent
 >
@@ -111,6 +111,32 @@ This matters because Elefante's IDE configuration writes absolute paths.
 If the user runs the installer from `Downloads`, a temp unzip folder, or a moved release directory, MCP configuration will later point to a path that no longer exists.
 
 So the product installer must place Elefante in a stable install location before delegating into `install.py`.
+
+### 3.5 Global Means One Stable Per-User Runtime
+
+"Global" does not mean a root-owned, machine-wide service. It means one stable
+installation for the signed-in user that every supported local agent host can
+reach without depending on a repository checkout or workspace path.
+
+The customer contract is:
+
+- one app root: `~/.elefante/app/current` on macOS/Linux or
+  `%LOCALAPPDATA%\\Elefante\\app\\current` on Windows
+- one private data root for the user
+- one user-scope loopback daemon that owns the stores
+- user-level MCP registration for every detected compatible host
+- one transport-only bridge for stdio-only or generic MCP clients
+- no host configuration that points into Downloads, a temporary directory, or
+  a developer checkout
+
+The customer installer must fail closed if a detected compatible
+host cannot be configured. A warning followed by an overall SUCCESS result is
+not sufficient because the installed memory would be unreachable from that
+workflow.
+
+Absent hosts are not modified. Unverified hosts remain documented as manual or
+Upcoming rather than being counted as configured. A source-checkout install is
+a developer runtime and must never be reported as a customer-global install.
 
 ---
 
@@ -367,6 +393,9 @@ No vague success banner without stage truth.
 | 7 | Dashboard assets are available without requiring Node.js on the user machine when bundled output exists |
 | 8 | Installer success is backed by maintained Elefante verifiers |
 | 9 | No provider-selection or cloud credential prompts appear in phase 1 |
+| 10 | A successful customer install records and verifies the stable per-user app root and data root |
+| 11 | Every detected compatible host is configured before customer SUCCESS is reported; host filters remain developer-only |
+| 12 | Doctor distinguishes a customer-global install from a developer checkout and reports uncovered detected hosts |
 
 ---
 

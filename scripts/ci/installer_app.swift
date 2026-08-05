@@ -288,7 +288,7 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
             color: .labelColor
         ))
         cardStack.addArrangedSubview(makeLabel(
-            "Detected hosts are selected automatically. Choose one or several—Elefante remains one private local memory across all of them.",
+            "Every compatible host detected on this Mac is connected automatically to one private local memory.",
             font: .systemFont(ofSize: 12, weight: .regular),
             color: .secondaryLabelColor,
             wrapping: true
@@ -308,8 +308,11 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     action: nil
                 )
                 button.state = host.detected ? .on : .off
+                button.isEnabled = false
                 button.font = .systemFont(ofSize: 12, weight: host.detected ? .semibold : .regular)
-                button.toolTip = "Configure Elefante for \(host.title)"
+                button.toolTip = host.detected
+                    ? "Elefante will configure this detected host automatically"
+                    : "Install this host first, then run Elefante again"
                 button.translatesAutoresizingMaskIntoConstraints = false
                 button.widthAnchor.constraint(equalToConstant: 255).isActive = true
                 hostButtons[host.id] = button
@@ -748,10 +751,6 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
         let selectedHosts = selectedHostIDs()
-        guard !selectedHosts.isEmpty else {
-            setStatus("Choose at least one agent host", color: errorColor)
-            return
-        }
 
         state = .installing
         cancelRequested = false
@@ -766,22 +765,24 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         for line in renderInstallArtifactPaths() {
             appendLine(line, color: .secondaryLabelColor)
         }
-        appendLine("Agent hosts: \(selectedHosts.joined(separator: ", "))", color: .secondaryLabelColor)
+        appendLine(
+            selectedHosts.isEmpty
+                ? "Agent hosts: none detected; generic MCP bridge installed"
+                : "Agent hosts: all detected (\(selectedHosts.joined(separator: ", ")))",
+            color: .secondaryLabelColor
+        )
         appendLine("")
 
         let scriptURL = installerDir.appendingPathComponent("install.sh")
         let pipe = Pipe()
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        var processArguments = [
+        let processArguments = [
             scriptURL.path,
             "--install-root", installPath,
             "--venv-mode", "fresh",
             "--verbose",
         ]
-        for host in selectedHosts {
-            processArguments.append(contentsOf: ["--host", host])
-        }
         process.arguments = processArguments
         process.currentDirectoryURL = installerDir
         process.standardOutput = pipe
