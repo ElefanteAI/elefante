@@ -9,7 +9,7 @@ Live development state. Draft PRDs and approved-but-unshipped design specificati
 | [`installer-procedure.md`](installer-procedure.md) | DRAFT — Phase 1 only | `docs/reference/installer.md` when shipped |
 | [`ide-integration-surface.md`](ide-integration-surface.md) | DRAFT (docs in v2.10.0; impl v2.11+) | `docs/reference/ide-integration.md` when shipped |
 | [`session-intelligence.md`](session-intelligence.md) | DRAFT | `docs/reference/session-intelligence.md` when shipped |
-| [`retrieval-effectiveness.md`](retrieval-effectiveness.md) | SDD approved for benchmark design; implementation not started | `docs/reference/task-intelligence.md` when shipped |
+| [`retrieval-effectiveness.md`](retrieval-effectiveness.md) | Phase 0 in progress; 30 candidate fixtures frozen; baseline not run | `docs/reference/task-intelligence.md` when shipped |
 | [`memory-identity.md`](memory-identity.md) | DRAFT | `docs/reference/memory-identity.md` when shipped |
 | [`integrations/agent-zero.md`](integrations/agent-zero.md) | Integration target draft | `docs/reference/integrations/agent-zero.md` if shipped |
 | [`tool-consolidation.md`](tool-consolidation.md) | DRAFT — v3.0.0 atomic 16 → 6 domain-tool reduction; architecturally distinct from rejected X1 facade | `docs/reference/tools.md` (rewritten) when shipped |

@@ -1,6 +1,6 @@
 # PRD / SDD: Task Intelligence Pipeline
 
-> Status: SDD APPROVED FOR BENCHMARK DESIGN; implementation has not started
+> Status: PHASE 0 IN PROGRESS; 30 candidate fixtures frozen; model baseline not run
 >
 > Owner: planning
 >
@@ -229,6 +229,30 @@ result remains exploratory.
 - Produce a baseline report before changing retrieval.
 
 Exit: benchmark is reproducible and baseline results are stored.
+
+Current Phase 0 evidence (2026-08-05):
+
+- `benchmarks/task_intelligence/tasks.json` freezes 30 real historical tasks:
+  ten installation/distribution, ten dashboard-data-integrity, and ten
+  runtime-safety/trust tasks.
+- Each task pins its pre-fix commit, fix commit, exact pytest acceptance node,
+  success criterion, and answer-isolated context paths from the pre-fix tree.
+- Calibration contains 18 tasks and holdout contains 12. Tasks from the same
+  fix commit cannot cross the split boundary.
+- The first budget is 1,500 estimated tokens total: 450 planning, 750
+  execution, and 300 validation; at most eight evidence items and one graph
+  hop. This is a benchmark limit, not a product default.
+- `scripts/ci/verify_task_intelligence_benchmark.py` verifies commit ancestry,
+  executable acceptance nodes, context availability, split isolation, the SDD
+  thresholds, memory-export answer leakage, and metadata-only outcome records.
+- Local outcome files and temporary benchmark worktrees are gitignored. Raw
+  prompts, responses, memory bodies, and transcripts are not valid outcome
+  fields.
+
+Phase 0 is not complete. The model/version/tool configuration and evaluation
+compute budget are not yet frozen, and the no-Brief agent baseline has not run.
+No Task Brief generator, automatic injection, public MCP change, or product
+performance claim is authorized by this fixture work.
 
 ### Phase 1: Deterministic Task Brief generator
 
