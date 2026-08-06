@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import io
 import json
 import os
@@ -21,7 +22,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MANIFEST = ROOT / "benchmarks/task_intelligence/tasks.json"
 DEFAULT_OUTCOMES = ROOT / "benchmarks/task_intelligence/outcomes"
-DEFAULT_WORKSPACES = ROOT / "benchmarks/task_intelligence/worktrees"
+DEFAULT_WORKSPACES = Path(tempfile.gettempdir()) / "elefante-ti"
 BASELINE_CONDITION = "baseline"
 DEFAULT_ESTIMATED_INPUT_TOKENS = 600_000
 DEFAULT_ESTIMATED_UNCACHED_INPUT_TOKENS = 100_000
@@ -30,6 +31,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.ci.verify_task_intelligence_benchmark import (  # noqa: E402
+    acceptance_test_source,
     validate_manifest,
     validate_outcome_record,
 )
@@ -176,7 +178,7 @@ def run_codex_baseline(
     reasoning: str,
     timeout_seconds: int,
     prompt: str | None = None,
-) -> tuple[int, dict[str, int], int, str]:
+) -> tuple[int, dict[str, int], int, str, str]:
     executable = shutil.which("codex")
     if not executable:
         raise RuntimeError("codex executable is unavailable")
@@ -186,6 +188,16 @@ def run_codex_baseline(
         "--ephemeral",
         "--ignore-user-config",
         "--ignore-rules",
+        "--disable",
+        "apps",
+        "--disable",
+        "memories",
+        "--disable",
+        "multi_agent",
+        "--disable",
+        "plugins",
+        "--disable",
+        "skill_search",
         "--json",
         "--sandbox",
         "workspace-write",
@@ -193,6 +205,8 @@ def run_codex_baseline(
         model,
         "-c",
         f'model_reasoning_effort="{reasoning}"',
+        "-c",
+        "project_doc_max_bytes=0",
         "-C",
         str(workspace),
         prompt or build_baseline_prompt(task),
@@ -205,7 +219,7 @@ def run_codex_baseline(
     result = subprocess.run(
         command,
         cwd=workspace,
-        stdin=subprocess.DEVNULL,
+        input="",
         capture_output=True,
         text=True,
         check=False,
@@ -213,7 +227,29 @@ def run_codex_baseline(
         env=environment,
     )
     duration_ms = round((time.monotonic() - started) * 1000)
-    return result.returncode, parse_codex_usage(result.stdout), duration_ms, _codex_version(executable)
+    stderr_tail = "\n".join(result.stderr.splitlines()[-5:])
+    stdout_tail = "\n".join(result.stdout.splitlines()[-5:]) if result.returncode else ""
+    diagnostic = "\n".join(part for part in (stderr_tail, stdout_tail) if part)[-2000:]
+    return (
+        result.returncode,
+        parse_codex_usage(result.stdout),
+        duration_ms,
+        _codex_version(executable),
+        diagnostic,
+    )
+
+
+def require_successful_agent_invocation(
+    *, exit_code: int, usage: dict[str, int], diagnostic: str
+) -> None:
+    """Reject infrastructure failures before they can become task outcomes."""
+    if exit_code == 0 and usage.get("input_tokens", 0) > 0:
+        return
+    detail = diagnostic.strip() or "no CLI diagnostic"
+    raise RuntimeError(
+        "Codex evaluator failed before a measurable task attempt: "
+        f"exit={exit_code}, input_tokens={usage.get('input_tokens', 0)}; {detail}"
+    )
 
 
 def evaluate_hidden_acceptance(
@@ -229,7 +265,10 @@ def evaluate_hidden_acceptance(
     existed = test_path.exists()
     original = test_path.read_bytes() if existed else None
     original_mode = test_path.stat().st_mode if existed else None
-    hidden_source = _git_bytes(repo_root, "show", f"{task['acceptance_ref']}:{test_path_text}")
+    hidden_text = acceptance_test_source(task, repo_root)
+    if hidden_text is None:
+        raise RuntimeError(f"hidden acceptance artifact is unavailable: {test_path_text}")
+    hidden_source = hidden_text.encode("utf-8")
     test_path.parent.mkdir(parents=True, exist_ok=True)
     test_path.write_bytes(hidden_source)
     try:
@@ -276,6 +315,12 @@ def _outcome_path(
     return output_dir / f"baseline__{profile}__{task_id}__r{repeat}.json"
 
 
+def _workspace_name(*parts: str) -> str:
+    """Keep temporary paths below tool and platform path-length limits."""
+    digest = hashlib.sha256("\x00".join(parts).encode("utf-8")).hexdigest()[:16]
+    return f"trial-{digest}"
+
+
 def _safe_remove_workspace(workspace: Path, workspace_root: Path) -> None:
     resolved = workspace.resolve()
     root = workspace_root.resolve()
@@ -298,7 +343,9 @@ def execute_trial(
     task = plan_item["task"]
     repeat = plan_item["repeat"]
     profile = configuration_id(model, reasoning)
-    workspace = workspace_root / f"baseline__{profile}__{task['id']}__r{repeat}"
+    workspace = workspace_root / _workspace_name(
+        "baseline", profile, task["id"], str(repeat)
+    )
     outcome_path = _outcome_path(
         output_dir,
         task["id"],
@@ -317,12 +364,17 @@ def execute_trial(
     acceptance_passed = False
     failure_category = "harness"
     try:
-        agent_exit, usage, duration_ms, cli_version = run_codex_baseline(
+        agent_exit, usage, duration_ms, cli_version, agent_diagnostic = run_codex_baseline(
             workspace,
             task,
             model=model,
             reasoning=reasoning,
             timeout_seconds=timeout_seconds,
+        )
+        require_successful_agent_invocation(
+            exit_code=agent_exit,
+            usage=usage,
+            diagnostic=agent_diagnostic,
         )
         acceptance_passed = evaluate_hidden_acceptance(
             repo_root,
@@ -346,8 +398,11 @@ def execute_trial(
             "run_seed": None,
             "memory_ids": [],
             "acceptance_passed": acceptance_passed,
-            "retries": 0,
-            "human_corrections": 0,
+            # The single-turn Codex runner does not expose recovery-turn or
+            # human-correction counts. Null is deliberate: zero would pretend
+            # that an unmeasured secondary outcome was observed.
+            "retries": None,
+            "human_corrections": None,
             "input_tokens": usage["input_tokens"],
             "cached_input_tokens": usage["cached_input_tokens"],
             "output_tokens": usage["output_tokens"],

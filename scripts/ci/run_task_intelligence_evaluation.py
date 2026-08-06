@@ -8,10 +8,13 @@ import asyncio
 import hashlib
 import io
 import json
+import math
 import os
 import re
 import sys
 import tarfile
+import tempfile
+from collections import Counter
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -23,7 +26,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MANIFEST = ROOT / "benchmarks/task_intelligence/tasks.json"
 DEFAULT_OUTCOMES = ROOT / "benchmarks/task_intelligence/outcomes"
-DEFAULT_WORKSPACES = ROOT / "benchmarks/task_intelligence/worktrees"
+DEFAULT_WORKSPACES = Path(tempfile.gettempdir()) / "elefante-ti"
 DEFAULT_ESTIMATED_INPUT_TOKENS = 600_000
 DEFAULT_ESTIMATED_UNCACHED_INPUT_TOKENS = 100_000
 CONDITIONS = ("baseline", "task-brief")
@@ -91,6 +94,7 @@ V2_EXCLUDED_NAMES = frozenset(
 )
 V2_MAX_FILE_BYTES = 200_000
 V2_MAX_CANDIDATE_CHUNKS = 32
+V2_MAX_CHUNKS_PER_PATH = 5
 _SYMBOL_PATTERN = re.compile(
     r"^\s*(?:async\s+def|def|class|function|export\s+(?:async\s+)?function|"
     r"export\s+class|const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)"
@@ -152,6 +156,10 @@ def _overlap(query_terms: set[str], evidence_terms: set[str]) -> float:
 
 def _focused_overlap(query_terms: set[str], evidence_terms: set[str]) -> float:
     return TaskBriefCompiler._focused_overlap(query_terms, evidence_terms)
+
+
+def _canonical_terms(value: str) -> set[str]:
+    return TaskBriefCompiler._canonical_terms(value)
 
 
 def _heading_aware_chunks(
@@ -261,36 +269,67 @@ def source_grounded_candidates(
 ) -> list[dict[str, Any]]:
     """Rank pre-fix repository chunks without reading any future ref."""
     query = "\n".join([task["task_statement"], *task["success_criteria"]])
-    query_terms = _terms(query)
+    query_terms = _canonical_terms(query)
     candidates: list[dict[str, Any]] = []
+    document_frequency: Counter[str] = Counter()
+    chunk_count = 0
+    chunk_sequences: dict[str, list[dict[str, Any]]] = {}
     for path, raw in _repository_files(repo_root, task["base_ref"]):
         if len(raw) > V2_MAX_FILE_BYTES or b"\x00" in raw:
             continue
         text = raw.decode("utf-8", errors="replace")
-        path_score = _focused_overlap(query_terms, _terms(path))
-        for chunk in _heading_aware_chunks(text, path=path):
-            lexical_score = _overlap(query_terms, _terms(chunk["content"]))
-            symbol_score = _focused_overlap(query_terms, _terms(chunk["symbol"]))
-            if max(path_score, lexical_score, symbol_score) == 0:
+        path_terms = _canonical_terms(path)
+        chunks = _heading_aware_chunks(text, path=path)
+        chunk_sequences[path] = chunks
+        for chunk_index, chunk in enumerate(chunks):
+            chunk_count += 1
+            content_terms = _canonical_terms(chunk["content"])
+            symbol_terms = _canonical_terms(chunk["symbol"])
+            evidence_terms = path_terms | content_terms | symbol_terms
+            matched_terms = query_terms & evidence_terms
+            document_frequency.update(matched_terms)
+            minimum_matches = 1 if len(query_terms) <= 4 else 2
+            if len(matched_terms) < minimum_matches:
                 continue
             source_code = PurePosixPath(path).suffix.casefold() != ".md"
-            pre_score = (
-                0.5 * lexical_score
-                + 0.25 * path_score
-                + 0.15 * symbol_score
-                + 0.10 * float(source_code)
-            )
             candidates.append(
                 {
                     **chunk,
                     "path": path,
-                    "path_score": path_score,
-                    "lexical_score": lexical_score,
-                    "symbol_score": symbol_score,
-                    "pre_score": pre_score,
+                    "matched_terms": len(matched_terms),
+                    "_chunk_index": chunk_index,
+                    "_path_terms": path_terms,
+                    "_content_terms": content_terms,
+                    "_symbol_terms": symbol_terms,
                     "source_code": source_code,
                 }
             )
+    weights = {
+        term: math.log((chunk_count + 1) / (document_frequency[term] + 1)) + 1.0
+        for term in query_terms
+    }
+    weight_total = sum(weights.values()) or 1.0
+
+    def weighted_overlap(evidence_terms: set[str]) -> float:
+        return sum(weights[term] for term in query_terms & evidence_terms) / weight_total
+
+    for candidate in candidates:
+        path_score = weighted_overlap(candidate.pop("_path_terms"))
+        lexical_score = weighted_overlap(candidate.pop("_content_terms"))
+        symbol_score = weighted_overlap(candidate.pop("_symbol_terms"))
+        candidate.update(
+            {
+                "path_score": path_score,
+                "lexical_score": lexical_score,
+                "symbol_score": symbol_score,
+                "pre_score": (
+                    0.62 * lexical_score
+                    + 0.23 * path_score
+                    + 0.10 * symbol_score
+                    + 0.05 * float(candidate["source_code"])
+                ),
+            }
+        )
     ranked = sorted(
         candidates,
         key=lambda item: (
@@ -302,12 +341,82 @@ def source_grounded_candidates(
     )
     diversified: list[dict[str, Any]] = []
     chunks_per_path: dict[str, int] = {}
+    primary_limit = max(1, limit - min(4, limit // 4))
     for candidate in ranked:
         path = candidate["path"]
-        if chunks_per_path.get(path, 0) >= 3:
+        if chunks_per_path.get(path, 0) >= V2_MAX_CHUNKS_PER_PATH:
             continue
         diversified.append(candidate)
         chunks_per_path[path] = chunks_per_path.get(path, 0) + 1
+        if len(diversified) == primary_limit:
+            break
+    selected_keys = {
+        (candidate["path"], candidate["line_number"]) for candidate in diversified
+    }
+    ordered_paths = list(dict.fromkeys(candidate["path"] for candidate in diversified))
+    for path in ordered_paths:
+        path_candidates = sorted(
+            (
+                candidate
+                for candidate in diversified
+                if candidate["path"] == path
+                and candidate["source_code"]
+                and candidate["symbol"]
+            ),
+            key=lambda candidate: int(candidate["_chunk_index"]),
+            reverse=True,
+        )
+        candidate = None
+        neighbor = None
+        next_index = -1
+        for possible in path_candidates:
+            possible_index = int(possible["_chunk_index"]) + 1
+            sequence = chunk_sequences[path]
+            if possible_index >= len(sequence):
+                continue
+            possible_neighbor = sequence[possible_index]
+            key = (path, possible_neighbor["line_number"])
+            if (
+                key not in selected_keys
+                and possible_neighbor["symbol"] == possible["symbol"]
+            ):
+                candidate = possible
+                neighbor = possible_neighbor
+                next_index = possible_index
+                break
+        if candidate is None or neighbor is None:
+            continue
+        continuation = [neighbor["content"]]
+        sequence = chunk_sequences[path]
+        for following in sequence[next_index + 1 :]:
+            if following["symbol"] != candidate["symbol"]:
+                break
+            proposed = "\n".join([*continuation, following["content"]])
+            if estimate_tokens(proposed) > 220:
+                break
+            continuation.append(following["content"])
+        neighbor = {**neighbor, "content": "\n".join(continuation)}
+        key = (path, neighbor["line_number"])
+        neighbor_content_terms = _canonical_terms(neighbor["content"])
+        neighbor_symbol_terms = _canonical_terms(neighbor["symbol"])
+        neighbor_matches = query_terms & (
+            _canonical_terms(path) | neighbor_content_terms | neighbor_symbol_terms
+        )
+        diversified.append(
+            {
+                **neighbor,
+                "path": path,
+                "path_score": weighted_overlap(_canonical_terms(path)),
+                "lexical_score": weighted_overlap(neighbor_content_terms),
+                "symbol_score": weighted_overlap(neighbor_symbol_terms),
+                "matched_terms": len(neighbor_matches),
+                "pre_score": candidate["pre_score"] * 0.9,
+                "source_code": True,
+                "structural_dependency": True,
+                "_chunk_index": next_index,
+            }
+        )
+        selected_keys.add(key)
         if len(diversified) == limit:
             break
     return diversified
@@ -358,7 +467,12 @@ def snapshot_memories(repo_root: Path, task: dict[str, Any]) -> list[Memory]:
 def source_snapshot_memories(repo_root: Path, task: dict[str, Any]) -> list[Memory]:
     """Build v2 memories only from task-relevant pre-fix source evidence."""
     memories: list[Memory] = []
-    for candidate in source_grounded_candidates(repo_root, task):
+    candidates = source_grounded_candidates(repo_root, task)
+    maximum_pre_score = max(
+        (float(candidate.get("pre_score", 0.0)) for candidate in candidates),
+        default=1.0,
+    )
+    for candidate in candidates:
         path = candidate["path"]
         line_number = candidate["line_number"]
         content = candidate["content"]
@@ -393,10 +507,51 @@ def source_snapshot_memories(repo_root: Path, task: dict[str, Any]) -> list[Memo
                         "lexical_score": candidate["lexical_score"],
                         "path_score": candidate["path_score"],
                         "symbol_score": candidate["symbol_score"],
+                        "retrieval_specificity": (
+                            float(candidate.get("pre_score", 0.0)) / maximum_pre_score
+                            if maximum_pre_score
+                            else 0.0
+                        ),
+                        "structural_dependency": bool(
+                            candidate.get("structural_dependency", False)
+                        ),
                         "source_kind": (
                             "implementation" if source_code else "documentation"
                         ),
                         "observed_at_ref": task["base_ref"],
+                    },
+                    created_at=datetime.utcnow(),
+                    last_accessed=datetime.utcnow(),
+                ),
+            )
+        )
+    for disclosed in task.get("disclosed_memories", []):
+        content = disclosed["content"]
+        memory_id = uuid5(
+            NAMESPACE_URL,
+            f"disclosed:{task['id']}:{disclosed['id']}:{content}",
+        )
+        memories.append(
+            Memory(
+                id=memory_id,
+                content=content,
+                metadata=MemoryMetadata(
+                    domain=DomainType.PROJECT,
+                    memory_type=MemoryType(disclosed["memory_type"]),
+                    score=90,
+                    confidence=0.95,
+                    concepts=extract_concepts(content, max_concepts=8),
+                    authority_score=0.9,
+                    source=SourceType.USER_INPUT,
+                    source_detail=f"disclosed:{disclosed['id']}",
+                    source_reliability=SOURCE_RELIABILITY_SCORES[SourceType.USER_INPUT],
+                    verified=True,
+                    project="elefante",
+                    workspace="historical-snapshot",
+                    custom_metadata={
+                        "evidence_role": "constraint",
+                        "retrieval_specificity": 1.0,
+                        "provenance": disclosed["provenance"],
                     },
                     created_at=datetime.utcnow(),
                     last_accessed=datetime.utcnow(),
@@ -585,9 +740,13 @@ def execute_trial(
     condition = item["condition"]
     repeat = item["repeat"]
     profile = baseline.configuration_id(model, reasoning)
-    workspace = workspace_root / (
-        f"{condition}__{profile}__brief-{brief_profile.value}__seed-{run_seed}__"
-        f"{task['id']}__r{repeat}"
+    workspace = workspace_root / baseline._workspace_name(
+        condition,
+        profile,
+        brief_profile.value,
+        str(run_seed),
+        task["id"],
+        str(repeat),
     )
     outcome_path = _outcome_path(
         output_dir,
@@ -605,13 +764,24 @@ def execute_trial(
             if condition == "baseline"
             else build_treatment_prompt(task, brief, profile=brief_profile)
         )
-        agent_exit, usage, duration_ms, cli_version = baseline.run_codex_baseline(
+        (
+            agent_exit,
+            usage,
+            duration_ms,
+            cli_version,
+            agent_diagnostic,
+        ) = baseline.run_codex_baseline(
             workspace,
             task,
             model=model,
             reasoning=reasoning,
             timeout_seconds=timeout_seconds,
             prompt=prompt,
+        )
+        baseline.require_successful_agent_invocation(
+            exit_code=agent_exit,
+            usage=usage,
+            diagnostic=agent_diagnostic,
         )
         acceptance_passed = baseline.evaluate_hidden_acceptance(
             ROOT,
@@ -633,8 +803,10 @@ def execute_trial(
             "run_seed": run_seed,
             "memory_ids": brief.selected_memory_ids if brief else [],
             "acceptance_passed": acceptance_passed,
-            "retries": 0,
-            "human_corrections": 0,
+            # Not exposed by this single-turn runner. Preserve UNKNOWN instead
+            # of manufacturing a zero that could influence promotion.
+            "retries": None,
+            "human_corrections": None,
             "input_tokens": usage["input_tokens"],
             "cached_input_tokens": usage["cached_input_tokens"],
             "output_tokens": usage["output_tokens"],
@@ -699,6 +871,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model", default="gpt-5.6-terra")
     parser.add_argument("--reasoning", default="low")
     parser.add_argument(
+        "--condition",
+        choices=CONDITIONS,
+        help="Run one diagnostic condition; omit for a paired evaluation.",
+    )
+    parser.add_argument(
         "--brief-profile",
         choices=tuple(profile.value for profile in TaskBriefProfile),
         default=TaskBriefProfile.V1.value,
@@ -738,6 +915,8 @@ def main(argv: list[str] | None = None) -> int:
         repetitions=args.repetitions,
         run_seed=args.run_seed,
     )
+    if args.condition:
+        plan = [item for item in plan if item["condition"] == args.condition]
     pending = [
         item
         for item in plan

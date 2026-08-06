@@ -95,10 +95,10 @@
 
 ## Issue #13: Task Intelligence Judge Encoded Hidden Implementation Shape [BUG-044, MITIGATED, guarded]
 
-**Trigger:** Source-grounded v2 retrieval reached relevant repair files and reduced one pilot's token/time cost, but both conditions failed a hidden acceptance test.
-**Root cause:** The task described observable host isolation while the judge required undisclosed exact module, function, and constant names. Audit found the same private-shape coupling class across the historical set, so failure could mean “different implementation” rather than “wrong behavior.”
-**Solution:** Preserve historical outcomes as diagnostic-only; make promotion fail closed unless each task declares behavioral assertions and exact base/known-good refs; stop model runs until a fresh black-box CLI/API/filesystem/browser benchmark is independently reviewed.
-**Lesson:** An evaluation cannot prove intelligence improvement when its judge rewards one hidden patch shape. Retrieval quality, task quality, and judge validity are separate gates.
+**Trigger:** Source-grounded v2 retrieval reached relevant repair files and reduced one pilot's token/time cost, but both conditions failed an implementation-coupled hidden test. After three valid black-box canaries replaced that judge class, CORS tied 3/3 and restore still failed after the disclosed treatment memory was confirmed delivered.
+**Root cause:** The first judge required undisclosed patch shape. The repaired experiment then exposed separate failures: retrieval hit-rate is only navigation, delivery does not prove use, a broad memory directive may not supply the task-specific facts needed for execution, and the runner falsely encoded unmeasured retries/corrections as zero. Long workspace paths and inherited agent configuration also caused zero-token infrastructure failures that could be mistaken for task failures.
+**Solution:** Preserve historical outcomes as diagnostic-only; bind behavioral canaries to exact base/known-good refs and fixture digests; isolate evaluator configuration; abort non-measurable CLI invocations; use short temp workspaces; represent unmeasured retry data as unknown; keep disclosed memories treatment-only; and block promotion until enough independently reviewed black-box tasks show causal outcome improvement.
+**Lesson:** A valid judge, relevant retrieval, memory selection, memory delivery, agent use, correct execution, and acceptance are distinct gates. Do not promote on a proxy, a single favorable run, or a memory that was merely present.
 
 ---
 

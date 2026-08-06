@@ -141,8 +141,42 @@ def summarize(
     treatment_input = total("task-brief", "input_tokens")
     baseline_duration = total("baseline", "duration_ms")
     treatment_duration = total("task-brief", "duration_ms")
-    baseline_retries = total("baseline", "retries")
-    baseline_corrections = total("baseline", "human_corrections")
+    retry_measurement_available = bool(complete_pairs) and all(
+        isinstance(record.get(field), int)
+        and not isinstance(record.get(field), bool)
+        for pair in complete_pairs.values()
+        for record in pair.values()
+        for field in ("retries", "human_corrections")
+    )
+    baseline_retry_total = 0
+    treatment_retry_total = 0
+    retry_differences: dict[str, list[int]] = defaultdict(list)
+    if retry_measurement_available:
+        for (task_id, _repeat), pair in complete_pairs.items():
+            baseline_count = sum(
+                pair["baseline"][field]
+                for field in ("retries", "human_corrections")
+            )
+            treatment_count = sum(
+                pair["task-brief"][field]
+                for field in ("retries", "human_corrections")
+            )
+            baseline_retry_total += baseline_count
+            treatment_retry_total += treatment_count
+            retry_differences[task_id].append(baseline_count - treatment_count)
+    retry_reduction_percent = (
+        100 * (baseline_retry_total - treatment_retry_total) / baseline_retry_total
+        if retry_measurement_available and baseline_retry_total > 0
+        else None
+    )
+    retry_ci_low, retry_ci_high = (
+        _clustered_interval(
+            retry_differences,
+            seed=manifest["measurement"]["run_seed"],
+        )
+        if retry_reduction_percent is not None
+        else (0.0, 0.0)
+    )
     input_increase = (
         0.0
         if baseline_input == 0
@@ -157,9 +191,17 @@ def summarize(
     readiness = manifest_promotion_readiness(
         {**manifest, "tasks": list(tasks.values())}
     )
-    effectiveness_gate = (
+    pass_rate_gate = (
         lift * 100 >= measurement["minimum_pass_rate_lift_points"] and ci_low > 0
     )
+    retry_correction_gate = (
+        retry_reduction_percent is not None
+        and retry_reduction_percent
+        >= measurement["minimum_retry_reduction_percent"]
+        and retry_ci_low > 0
+        and treatment_passes >= baseline_passes
+    )
+    effectiveness_gate = pass_rate_gate or retry_correction_gate
     cost_gate = (
         input_increase <= measurement["maximum_treatment_input_increase_percent"]
         and duration_increase
@@ -182,14 +224,22 @@ def summarize(
         ],
         "input_token_increase_percent": round(input_increase, 6),
         "duration_increase_percent": round(duration_increase, 6),
-        "retry_correction_measurement_available": bool(
-            baseline_retries or baseline_corrections
+        "retry_correction_measurement_available": retry_measurement_available,
+        "retry_correction_reduction_percent": (
+            round(retry_reduction_percent, 6)
+            if retry_reduction_percent is not None
+            else None
         ),
-        "retry_correction_gate": False,
+        "retry_correction_95_percent_ci_counts": [
+            round(retry_ci_low, 6),
+            round(retry_ci_high, 6),
+        ],
+        "retry_correction_gate": retry_correction_gate,
         "class_lift_points": {
             task_class: round(100 * sum(values) / len(values), 6)
             for task_class, values in sorted(by_class.items())
         },
+        "pass_rate_gate": pass_rate_gate,
         "effectiveness_gate": effectiveness_gate,
         "cost_gate": cost_gate,
         "benchmark_promotion_ready": readiness["promotion_ready"],

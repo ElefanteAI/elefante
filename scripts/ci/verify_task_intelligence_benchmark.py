@@ -87,6 +87,40 @@ def _acceptance_target(task: dict[str, Any]) -> tuple[str, str] | None:
     return test_path, node
 
 
+def _benchmark_fixture_path(task: dict[str, Any], repo_root: Path) -> Path | None:
+    artifact = task.get("acceptance_artifact")
+    target = _acceptance_target(task)
+    if not isinstance(artifact, dict) or artifact.get("source") != "benchmark-fixture":
+        return None
+    path = artifact.get("path")
+    if (
+        target is None
+        or not isinstance(path, str)
+        or path != target[0]
+        or not path.startswith("benchmarks/task_intelligence/acceptance/")
+    ):
+        return None
+    candidate = (repo_root / path).resolve()
+    root = repo_root.resolve()
+    if root not in candidate.parents:
+        return None
+    return candidate
+
+
+def acceptance_test_source(task: dict[str, Any], repo_root: Path = ROOT) -> str | None:
+    fixture = _benchmark_fixture_path(task, repo_root)
+    if fixture is not None:
+        try:
+            return fixture.read_text(encoding="utf-8")
+        except OSError:
+            return None
+    target = _acceptance_target(task)
+    acceptance_ref = task.get("acceptance_ref")
+    if target is None or not isinstance(acceptance_ref, str):
+        return None
+    return _git_text(repo_root, "show", f"{acceptance_ref}:{target[0]}")
+
+
 def scan_memory_payload(
     payload: Any, tasks: list[dict[str, Any]]
 ) -> list[dict[str, str]]:
@@ -121,8 +155,6 @@ def validate_outcome_record(record: dict[str, Any]) -> list[str]:
     if not isinstance(record.get("acceptance_passed"), bool):
         errors.append("acceptance_passed must be boolean")
     for field in (
-        "retries",
-        "human_corrections",
         "input_tokens",
         "cached_input_tokens",
         "output_tokens",
@@ -133,16 +165,18 @@ def validate_outcome_record(record: dict[str, Any]) -> list[str]:
             continue
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:
             errors.append(f"{field} must be a non-negative integer")
+    for field in ("retries", "human_corrections"):
+        value = record.get(field)
+        if value is not None and (
+            not isinstance(value, int) or isinstance(value, bool) or value < 0
+        ):
+            errors.append(f"{field} must be null or a non-negative integer")
     return errors
 
 
 def acceptance_test_sha256(task: dict[str, Any], repo_root: Path = ROOT) -> str | None:
     """Digest the exact hidden test artifact that received adversarial review."""
-    target = _acceptance_target(task)
-    acceptance_ref = task.get("acceptance_ref")
-    if target is None or not isinstance(acceptance_ref, str):
-        return None
-    source = _git_text(repo_root, "show", f"{acceptance_ref}:{target[0]}")
+    source = acceptance_test_source(task, repo_root)
     if source is None:
         return None
     return hashlib.sha256(source.encode("utf-8")).hexdigest()
@@ -367,6 +401,30 @@ def validate_manifest(manifest_path: Path, repo_root: Path = ROOT) -> dict[str, 
         ):
             errors.append(f"{prefix}: success_criteria must be a non-empty string list")
 
+        disclosed_memories = task.get("disclosed_memories", [])
+        if not isinstance(disclosed_memories, list):
+            errors.append(f"{prefix}: disclosed_memories must be a list")
+        else:
+            for memory_index, memory in enumerate(disclosed_memories):
+                memory_prefix = f"{prefix}: disclosed_memories[{memory_index}]"
+                if not isinstance(memory, dict):
+                    errors.append(f"{memory_prefix} must be an object")
+                    continue
+                if memory.get("provenance") != "disclosed-golden-path":
+                    errors.append(f"{memory_prefix} has invalid provenance")
+                if memory.get("memory_type") not in {
+                    "decision",
+                    "directive",
+                    "fact",
+                    "specification",
+                }:
+                    errors.append(f"{memory_prefix} has invalid memory_type")
+                if not isinstance(memory.get("id"), str) or not memory["id"]:
+                    errors.append(f"{memory_prefix} has no id")
+                content = memory.get("content")
+                if not isinstance(content, str) or not 40 <= len(content) <= 1200:
+                    errors.append(f"{memory_prefix} content must be 40-1200 characters")
+
         base_ref = task.get("base_ref")
         acceptance_ref = task.get("acceptance_ref")
         if not all(
@@ -387,9 +445,17 @@ def validate_manifest(manifest_path: Path, repo_root: Path = ROOT) -> dict[str, 
             errors.append(f"{prefix}: acceptance_command must be one exact pytest node")
             continue
         test_path, test_node = target
-        test_source = _git_text(repo_root, "show", f"{acceptance_ref}:{test_path}")
+        fixture = _benchmark_fixture_path(task, repo_root)
+        artifact = task.get("acceptance_artifact")
+        if isinstance(artifact, dict) and artifact.get("source") == "benchmark-fixture":
+            if fixture is None:
+                errors.append(f"{prefix}: invalid benchmark acceptance fixture")
+            expected_digest = acceptance_test_sha256(task, repo_root)
+            if artifact.get("sha256") != expected_digest:
+                errors.append(f"{prefix}: acceptance fixture digest mismatch")
+        test_source = acceptance_test_source(task, repo_root)
         if test_source is None:
-            errors.append(f"{prefix}: acceptance test file is absent at acceptance_ref")
+            errors.append(f"{prefix}: acceptance test artifact is absent")
         else:
             try:
                 names = {
@@ -404,10 +470,18 @@ def validate_manifest(manifest_path: Path, repo_root: Path = ROOT) -> dict[str, 
                     f"{prefix}: acceptance test node is absent at acceptance_ref"
                 )
         changed = _git_text(repo_root, "diff", "--name-only", base_ref, acceptance_ref)
-        if changed is None or test_path not in changed.splitlines():
+        if fixture is None and (changed is None or test_path not in changed.splitlines()):
             errors.append(
                 f"{prefix}: acceptance test was not changed by the source task"
             )
+        if fixture is not None and (
+            changed is None
+            or not any(
+                path and not path.startswith(("tests/", "benchmarks/"))
+                for path in changed.splitlines()
+            )
+        ):
+            errors.append(f"{prefix}: source task has no production change")
 
         context_paths = task.get("context_paths")
         if not isinstance(context_paths, list) or not context_paths:

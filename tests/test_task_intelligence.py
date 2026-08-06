@@ -219,7 +219,7 @@ def test_v2_prefers_actionable_source_and_exposes_selection_contract() -> None:
         file_path="docs/reference/architecture.md",
     )
     implementation = _result(
-        "def memory_to_dashboard_node(memory, vector_source): return vector_source",
+        "def memory_to_dashboard_node(memory, vector_backend): return backend_label",
         score=0.62,
         vector_score=0.62,
         file_path="src/utils/dashboard_serializer.py",
@@ -245,6 +245,35 @@ def test_v2_prefers_actionable_source_and_exposes_selection_contract() -> None:
     assert evidence.stage == TaskStage.EXECUTION
     assert "source_code" in evidence.reason_selected
     assert evidence.retrieval_signals["actionability"] >= 0.3
+
+
+def test_v2_rejects_generic_anchor_noise_when_specific_evidence_exists() -> None:
+    noise = _result(
+        "Dashboard memory access remains private.",
+        score=0.99,
+        vector_score=0.99,
+        file_path="src/utils/dashboard_serializer.py",
+    )
+    cors_boundary = _result(
+        'CORSMiddleware allow_origins=["*"] exposes the dashboard origin boundary.',
+        score=0.60,
+        vector_score=0.60,
+        file_path="src/dashboard/server.py",
+    )
+    request = TaskBriefRequest(
+        task="Restrict dashboard CORS access to explicit local origins.",
+        success_criteria=["Dashboard CORS accepts only configured origins."],
+        profile=TaskBriefProfile.V2,
+    )
+
+    brief = TaskBriefCompiler().compile(request, [noise, cors_boundary])
+
+    assert brief.selected_memory_ids == [str(cors_boundary.memory.id)]
+    assert any(
+        omission.memory_id == str(noise.memory.id)
+        and omission.reason == "insufficient-independent-relevance"
+        for omission in brief.omissions
+    )
 
 
 def test_v2_abstains_when_evidence_is_only_generic_semantic_context() -> None:

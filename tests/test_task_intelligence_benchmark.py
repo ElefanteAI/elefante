@@ -20,8 +20,14 @@ def test_task_intelligence_manifest_is_reproducible_and_leak_free() -> None:
     assert report["holdout_count"] > 0
     assert report["diagnostic_only"] is True
     assert report["promotion_ready"] is False
-    assert report["promotion_eligible_tasks"] == 0
-    assert len(report["invalid_tasks"]) == report["task_count"]
+    assert report["promotion_eligible_tasks"] == 3
+    assert len(report["invalid_tasks"]) == report["task_count"] - 3
+    invalid_ids = {item["task_id"] for item in report["invalid_tasks"]}
+    assert {
+        "install-dry-run-005",
+        "runtime-dashboard-cors-022",
+        "runtime-restore-integrity-025",
+    }.isdisjoint(invalid_ids)
 
 
 def test_promotion_ready_mode_fails_closed_for_historical_benchmark(capsys) -> None:
@@ -138,6 +144,12 @@ def test_outcome_records_are_metadata_only() -> None:
     assert benchmark.validate_outcome_record(valid) == []
     assert (
         benchmark.validate_outcome_record({**valid, "cached_input_tokens": None}) == []
+    )
+    assert (
+        benchmark.validate_outcome_record(
+            {**valid, "retries": None, "human_corrections": None}
+        )
+        == []
     )
 
     leaked = {**valid, "raw_response": "private model output"}

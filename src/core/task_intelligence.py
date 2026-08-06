@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePosixPath
@@ -170,29 +171,55 @@ class TaskBriefCompiler:
     _TOKEN_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9_-]{1,}")
     _STOP_WORDS = frozenset(
         {
+            "all",
+            "and",
+            "any",
             "about",
             "after",
             "against",
             "also",
+            "are",
             "before",
+            "been",
             "being",
+            "can",
+            "does",
+            "each",
+            "for",
             "from",
+            "had",
+            "has",
             "have",
+            "instead",
             "into",
+            "its",
             "make",
+            "most",
             "must",
+            "not",
             "only",
+            "other",
+            "our",
+            "over",
             "should",
             "that",
+            "than",
+            "the",
             "their",
             "then",
             "this",
             "through",
+            "under",
             "using",
+            "was",
             "when",
             "where",
             "while",
+            "will",
+            "without",
             "with",
+            "within",
+            "were",
         }
     )
     _SOURCE_SUFFIXES = frozenset(
@@ -392,26 +419,36 @@ class TaskBriefCompiler:
         candidates: Sequence[SearchResult],
     ) -> list[_RankedEvidence]:
         unique: dict[str, _RankedEvidence] = {}
-        query_terms = self._terms(" ".join([request.task, *request.success_criteria]))
+        query_text = " ".join([request.task, *request.success_criteria])
+        query_counts = self._canonical_term_counts(query_text)
+        query_terms = set(query_counts)
+        anchor_terms = {term for term, count in query_counts.items() if count >= 2}
         for result in candidates:
             memory = result.memory
             memory_id = str(memory.id)
-            content_terms = self._terms(
+            content_terms = self._canonical_terms(
                 " ".join([memory.content, memory.metadata.summary or ""])
             )
-            path_terms = self._terms(memory.metadata.file_path or "")
+            path_terms = self._canonical_terms(memory.metadata.file_path or "")
             custom = memory.metadata.custom_metadata or {}
-            symbol_terms = self._terms(str(custom.get("symbol", "")))
+            symbol_terms = self._canonical_terms(str(custom.get("symbol", "")))
             lexical = self._overlap(query_terms, content_terms)
-            path = self._focused_overlap(query_terms, path_terms)
-            symbol = self._focused_overlap(query_terms, symbol_terms)
+            path = self._overlap(query_terms, path_terms)
+            symbol = self._overlap(query_terms, symbol_terms)
+            matched_terms = query_terms & (content_terms | path_terms | symbol_terms)
+            matched_anchors = anchor_terms & matched_terms
             relationships = [
                 str(item).upper() for item in result.relationship_path or []
             ]
             dependency = float(
                 any(item in self._ALLOWED_GRAPH_RELATIONSHIPS for item in relationships)
+                or bool(custom.get("structural_dependency", False))
             )
             source_code = float(self._is_source_code(memory.metadata.file_path))
+            specificity = max(
+                0.0,
+                min(1.0, float(custom.get("retrieval_specificity", 0.0))),
+            )
             semantic = float(
                 result.vector_score if result.vector_score is not None else result.score
             )
@@ -420,11 +457,12 @@ class TaskBriefCompiler:
             role_value = 1.0 if role != EvidenceRole.CONTEXT else 0.0
             actionability = min(
                 1.0,
-                0.35 * semantic
-                + 0.25 * lexical
+                0.25 * semantic
+                + 0.15 * lexical
                 + 0.15 * max(path, symbol)
-                + 0.15 * max(source_code, dependency)
-                + 0.10 * role_value,
+                + 0.10 * max(source_code, dependency)
+                + 0.10 * role_value
+                + 0.25 * specificity,
             )
             signals = {
                 "semantic": round(semantic, 6),
@@ -433,6 +471,15 @@ class TaskBriefCompiler:
                 "symbol": round(symbol, 6),
                 "dependency": dependency,
                 "source_code": source_code,
+                "specificity": round(specificity, 6),
+                "matched_terms": len(matched_terms),
+                "query_terms": len(query_terms),
+                "matched_anchors": len(matched_anchors),
+                "query_anchors": len(anchor_terms),
+                "query_coverage": round(
+                    len(matched_terms) / len(query_terms) if query_terms else 0.0,
+                    6,
+                ),
                 "actionability": round(actionability, 6),
             }
             positive_signals = [
@@ -471,6 +518,21 @@ class TaskBriefCompiler:
 
     def _is_actionable(self, item: _RankedEvidence) -> bool:
         signals = item.retrieval_signals or {}
+        query_term_count = int(signals.get("query_terms", 0))
+        minimum_matches = 1 if query_term_count <= 4 else 2
+        if (
+            int(signals.get("matched_terms", 0)) < minimum_matches
+            and float(signals.get("dependency", 0.0)) == 0.0
+        ):
+            return False
+        if float(signals.get("specificity", 0.0)) == 0.0:
+            anchor_count = int(signals.get("query_anchors", 0))
+            minimum_anchors = min(2, anchor_count)
+            if (
+                minimum_anchors
+                and int(signals.get("matched_anchors", 0)) < minimum_anchors
+            ):
+                return False
         independent = sum(
             (
                 float(signals.get("semantic", 0.0)) >= 0.55,
@@ -520,6 +582,32 @@ class TaskBriefCompiler:
                     ):
                         terms.add(term[:-1])
         return terms
+
+    @classmethod
+    def _canonical_terms(cls, value: str) -> set[str]:
+        """Collapse simple inflections so one concept cannot count twice."""
+        return set(cls._canonical_term_counts(value))
+
+    @classmethod
+    def _canonical_term_counts(cls, value: str) -> Counter[str]:
+        counts: Counter[str] = Counter()
+        for raw in cls._TOKEN_PATTERN.findall(value):
+            for part in re.sub(
+                r"([a-z0-9])([A-Z])", r"\1 \2", raw
+            ).replace("-", "_").split("_"):
+                term = part.casefold()
+                if len(term) < 3 or term in cls._STOP_WORDS:
+                    continue
+                if term.endswith("ies") and len(term) > 4:
+                    term = term[:-3] + "y"
+                elif (
+                    term.endswith("s")
+                    and len(term) > 4
+                    and not term.endswith(("ss", "us"))
+                ):
+                    term = term[:-1]
+                counts[term] += 1
+        return counts
 
     @staticmethod
     def _overlap(query_terms: set[str], evidence_terms: set[str]) -> float:

@@ -9,10 +9,21 @@ product claim.
 - Those tasks are **diagnostic-only** because many hidden tests require an
   undisclosed historical implementation shape. A behaviorally correct repair
   can therefore fail.
+- Three tasks now have reviewed black-box canaries. Each canary fails at its
+  exact base ref and passes at its exact known-good ref. The other 27 tasks
+  remain ineligible, so the benchmark as a whole is not promotion-ready.
+- Current causal result: **no correctness improvement has been demonstrated**.
+  CORS tied at 3/3 passes per condition; restore still failed after its
+  disclosed golden-path memory was confirmed in the treatment Brief.
+- The current retrieval diagnostic reaches a historical repair path in 16/18
+  calibration tasks. This measures navigation only, not task success.
 - `--require-promotion-ready` fails closed until every selected task has an
   explicit behavioral acceptance contract and rollback refs.
 - v2 Task Briefs are opt-in. v1 remains the default and its outcomes are stored
   under different filenames.
+- Runner failures with no measurable model attempt abort instead of becoming
+  task failures. Unobserved retry/correction counts are stored as `null`, never
+  fabricated as zero.
 
 ## Golden path
 
@@ -28,6 +39,12 @@ product claim.
 6. Promote only after the manifest is promotion-ready, all paired runs are
    complete, correctness improves with a confidence interval excluding zero,
    and cost/privacy gates pass.
+
+The frozen seed randomizes pair order; it does not make model output
+deterministic. Use all required repetitions and never select a favorable run.
+Disposable workspaces default to the short system-temp path
+`elefante-ti/trial-<digest>` because longer repository paths caused the Codex
+CLI to fail before a measurable attempt.
 
 Every promotable task requires `acceptance_contract`:
 
@@ -73,6 +90,10 @@ python scripts/ci/audit_task_intelligence_retrieval.py --split calibration
 # Plan an isolated paired v2 run; no model runs without --execute and exact caps.
 python scripts/ci/run_task_intelligence_evaluation.py \
   --task TASK_ID --brief-profile v2 --repetitions 1
+
+# Diagnose one side only. This cannot support a causal or promotion claim.
+python scripts/ci/run_task_intelligence_evaluation.py \
+  --task TASK_ID --brief-profile v2 --condition task-brief --repetitions 1
 ```
 
 ## Rollback

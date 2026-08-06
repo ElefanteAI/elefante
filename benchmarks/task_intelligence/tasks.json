@@ -148,7 +148,35 @@
       "success_criteria": ["Dry-run never places the payload or creates the target installation path."],
       "base_ref": "85b8c50056f7ae5056543c436bd2ca3dcc3331bc",
       "acceptance_ref": "8166259764656b40696acc584692452854e12c51",
-      "acceptance_command": ["python", "-m", "pytest", "tests/test_installer_bundle.py::test_bundle_dry_run_never_places_payload", "-q"],
+      "acceptance_command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_installer_dry_run_black_box.py::test_installer_dry_run_does_not_create_install_destination", "-q"],
+      "acceptance_artifact": {
+        "source": "benchmark-fixture",
+        "path": "benchmarks/task_intelligence/acceptance/test_installer_dry_run_black_box.py",
+        "sha256": "1a7164c410bdbe66875719f61f189f4dbc65340254fe89a25c1b7f993759b13a"
+      },
+      "acceptance_contract": {
+        "kind": "behavioral",
+        "promotion_eligible": true,
+        "observable_surface": ["documented installer command", "filesystem mutation boundary"],
+        "acceptance": {
+          "command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_installer_dry_run_black_box.py::test_installer_dry_run_does_not_create_install_destination", "-q"],
+          "assertions": [
+            "The dry-run command exits successfully.",
+            "The requested global install destination and its parent remain absent."
+          ]
+        },
+        "rollback": {
+          "base_ref": "85b8c50056f7ae5056543c436bd2ca3dcc3331bc",
+          "restore_ref": "8166259764656b40696acc584692452854e12c51"
+        },
+        "adversarial_review": {
+          "status": "approved",
+          "implementation_coupling_found": false,
+          "reviewer": "ARAA primary review",
+          "reviewed_at": "2026-08-06",
+          "test_sha256": "1a7164c410bdbe66875719f61f189f4dbc65340254fe89a25c1b7f993759b13a"
+        }
+      },
       "context_paths": ["workspace/proposals/installer-procedure.md", "docs/how-to/install.md", "scripts/README.md"],
       "forbidden_leakage_terms": []
     },
@@ -352,7 +380,35 @@
       "success_criteria": ["Only explicitly configured origins are accepted by dashboard CORS handling."],
       "base_ref": "9e81833adb0eafd15e93a637bc8b88c21fef8bf1",
       "acceptance_ref": "188a39b3543784412b5154258d6b55b9595264bc",
-      "acceptance_command": ["python", "-m", "pytest", "tests/test_dashboard_serializer.py::test_dashboard_allows_only_explicit_origin_configuration", "-q"],
+      "acceptance_command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_dashboard_cors_black_box.py::test_dashboard_rejects_untrusted_origin_and_keeps_local_origin", "-q"],
+      "acceptance_artifact": {
+        "source": "benchmark-fixture",
+        "path": "benchmarks/task_intelligence/acceptance/test_dashboard_cors_black_box.py",
+        "sha256": "76bc88726aefa02a039207aebe9c7ab01f15d6b9fc1b7201788eed889a9b41e7"
+      },
+      "acceptance_contract": {
+        "kind": "behavioral",
+        "promotion_eligible": true,
+        "observable_surface": ["dashboard HTTP preflight response"],
+        "acceptance": {
+          "command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_dashboard_cors_black_box.py::test_dashboard_rejects_untrusted_origin_and_keeps_local_origin", "-q"],
+          "assertions": [
+            "An untrusted browser origin receives no CORS authorization.",
+            "The documented local dashboard origin remains authorized."
+          ]
+        },
+        "rollback": {
+          "base_ref": "9e81833adb0eafd15e93a637bc8b88c21fef8bf1",
+          "restore_ref": "188a39b3543784412b5154258d6b55b9595264bc"
+        },
+        "adversarial_review": {
+          "status": "approved",
+          "implementation_coupling_found": false,
+          "reviewer": "ARAA primary review",
+          "reviewed_at": "2026-08-06",
+          "test_sha256": "76bc88726aefa02a039207aebe9c7ab01f15d6b9fc1b7201788eed889a9b41e7"
+        }
+      },
       "context_paths": ["docs/reference/architecture.md", "docs/reference/tools.md", "agents/orchestrator.md"],
       "forbidden_leakage_terms": []
     },
@@ -388,7 +444,43 @@
       "success_criteria": ["Tampered checksums and symlink entries are rejected before mutation."],
       "base_ref": "9e81833adb0eafd15e93a637bc8b88c21fef8bf1",
       "acceptance_ref": "188a39b3543784412b5154258d6b55b9595264bc",
-      "acceptance_command": ["python", "-m", "pytest", "tests/test_backup_restore.py::test_restore_rejects_symlinks_and_checksum_tampering_before_mutation", "-q"],
+      "acceptance_command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_restore_integrity_black_box.py::test_restore_rejects_symlink_and_checksum_tampering_before_mutation", "-q"],
+      "acceptance_artifact": {
+        "source": "benchmark-fixture",
+        "path": "benchmarks/task_intelligence/acceptance/test_restore_integrity_black_box.py",
+        "sha256": "8d466f8e72cf100922e4e302a10ae27981183247be21b9020fce257e0adc4b6c"
+      },
+      "acceptance_contract": {
+        "kind": "behavioral",
+        "promotion_eligible": true,
+        "observable_surface": ["restore command exit status", "customer data filesystem"],
+        "acceptance": {
+          "command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_restore_integrity_black_box.py::test_restore_rejects_symlink_and_checksum_tampering_before_mutation", "-q"],
+          "assertions": [
+            "Symlink archive entries are rejected before customer data changes.",
+            "Checksum tampering is rejected before customer data changes."
+          ]
+        },
+        "rollback": {
+          "base_ref": "9e81833adb0eafd15e93a637bc8b88c21fef8bf1",
+          "restore_ref": "188a39b3543784412b5154258d6b55b9595264bc"
+        },
+        "adversarial_review": {
+          "status": "approved",
+          "implementation_coupling_found": false,
+          "reviewer": "ARAA primary review",
+          "reviewed_at": "2026-08-06",
+          "test_sha256": "8d466f8e72cf100922e4e302a10ae27981183247be21b9020fce257e0adc4b6c"
+        }
+      },
+      "disclosed_memories": [
+        {
+          "id": "archive-restore-preflight-safety",
+          "provenance": "disclosed-golden-path",
+          "memory_type": "directive",
+          "content": "For any destructive archive restore, finish a read-only preflight before changing durable data. Reject absolute or traversal paths, symlinks, and duplicate members; verify the declared size and SHA-256 digest of every file; extract only into sibling staging; replace the live directory only after all checks pass; preserve the previous directory as the rollback path."
+        }
+      ],
       "context_paths": ["docs/reference/architecture.md", "docs/reference/tools.md", "agents/orchestrator.md"],
       "forbidden_leakage_terms": []
     },

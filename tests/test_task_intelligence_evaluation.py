@@ -153,7 +153,29 @@ def test_source_candidates_diversify_files(monkeypatch, tmp_path) -> None:
         "src/alpha.py",
         "src/beta.py",
     }
-    assert sum(candidate["path"] == "src/alpha.py" for candidate in candidates) <= 3
+    assert (
+        sum(candidate["path"] == "src/alpha.py" for candidate in candidates)
+        <= evaluation.V2_MAX_CHUNKS_PER_PATH + 1
+    )
+
+
+def test_cors_retrieval_surfaces_boundary_not_single_word_memory_noise() -> None:
+    task = next(
+        task
+        for task in _manifest()["tasks"]
+        if task["id"] == "runtime-dashboard-cors-022"
+    )
+
+    candidates = evaluation.source_grounded_candidates(ROOT, task)
+
+    assert any(
+        candidate["path"] == "src/dashboard/server.py"
+        and candidate["line_number"] == 20
+        for candidate in candidates[:8]
+    )
+    assert not any(
+        candidate["path"] == "src/models/memory.py" for candidate in candidates[:8]
+    )
 
 
 def test_retrieval_audit_scores_only_after_prefixed_retrieval(
@@ -232,6 +254,49 @@ def test_v2_snapshot_observation_is_not_mislabelled_verified(monkeypatch) -> Non
     assert memories[0].metadata.custom_metadata["observed_at_ref"] == task["base_ref"]
 
 
+def test_disclosed_golden_memory_is_treatment_only_verified_evidence() -> None:
+    task = next(
+        task
+        for task in _manifest()["tasks"]
+        if task["id"] == "runtime-restore-integrity-025"
+    )
+
+    memories = evaluation.source_snapshot_memories(ROOT, task)
+    disclosed = [
+        memory
+        for memory in memories
+        if memory.metadata.source_detail.startswith("disclosed:")
+    ]
+
+    assert len(disclosed) == 1
+    assert disclosed[0].metadata.verified is True
+    assert str(disclosed[0].metadata.memory_type) == "directive"
+    assert task["disclosed_memories"][0]["content"] == disclosed[0].content
+
+    results = [
+        evaluation.SearchResult(
+            memory=memory,
+            score=0.7,
+            source="vector",
+            vector_score=0.8,
+        )
+        for memory in memories
+    ]
+    brief = evaluation.TaskBriefCompiler().compile(
+        evaluation.TaskBriefRequest(
+            task_id=task["id"],
+            task=task["task_statement"],
+            success_criteria=task["success_criteria"],
+            project="elefante",
+            workspace="historical-snapshot",
+            profile=TaskBriefProfile.V2,
+        ),
+        results,
+    )
+
+    assert str(disclosed[0].id) in brief.selected_memory_ids
+
+
 def test_paired_plan_is_seeded_balanced_and_repeatable() -> None:
     manifest = _manifest()
     first = evaluation.paired_plan(
@@ -261,6 +326,26 @@ def test_paired_plan_is_seeded_balanced_and_repeatable() -> None:
             "baseline",
             "task-brief",
         }
+
+
+def test_diagnostic_condition_runs_only_one_side(capsys) -> None:
+    result = evaluation.main(
+        [
+            "--task",
+            "runtime-restore-integrity-025",
+            "--repetitions",
+            "1",
+            "--condition",
+            "task-brief",
+            "--brief-profile",
+            "v2",
+        ]
+    )
+    report = json.loads(capsys.readouterr().out)
+
+    assert result == 0
+    assert report["planned_runs"] == 1
+    assert report["pending_runs"] == 1
 
 
 def test_treatment_prompt_keeps_hidden_acceptance_out() -> None:

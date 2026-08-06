@@ -22,8 +22,8 @@ def _record(task_id: str, condition: str, repeat: int, passed: bool) -> dict:
         "run_seed": 20260805,
         "memory_ids": [] if condition == "baseline" else ["memory"],
         "acceptance_passed": passed,
-        "retries": 0,
-        "human_corrections": 0,
+        "retries": None,
+        "human_corrections": None,
         "input_tokens": 1000 if condition == "baseline" else 1100,
         "cached_input_tokens": 800,
         "output_tokens": 100,
@@ -74,6 +74,28 @@ def test_complete_strong_holdout_passes_promotion_gate() -> None:
     assert result["retry_correction_measurement_available"] is False
     assert result["retry_correction_gate"] is False
     assert result["promotion_gate"] is True
+
+
+def test_measured_retry_reduction_is_an_effectiveness_path() -> None:
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    task = next(task for task in manifest["tasks"] if task["split"] == "holdout")
+    records = []
+    for repeat in range(1, 4):
+        control = _record(task["id"], "baseline", repeat, True)
+        treatment = _record(task["id"], "task-brief", repeat, True)
+        control.update({"retries": 2, "human_corrections": 0})
+        treatment.update({"retries": 0, "human_corrections": 0})
+        records.extend((control, treatment))
+
+    result = report.summarize(manifest, records, split="holdout")
+
+    assert result["pass_rate_gate"] is False
+    assert result["retry_correction_measurement_available"] is True
+    assert result["retry_correction_reduction_percent"] == 100
+    assert result["retry_correction_95_percent_ci_counts"] == [2, 2]
+    assert result["retry_correction_gate"] is True
+    assert result["effectiveness_gate"] is True
+    assert result["promotion_gate"] is False
 
 
 def test_historical_manifest_blocks_promotion_even_with_perfect_results() -> None:

@@ -1,6 +1,6 @@
 # PRD / SDD: Task Intelligence Pipeline
 
-> Status: V2 SHADOW REVISION IMPLEMENTED; HISTORICAL BENCHMARK IS DIAGNOSTIC-ONLY
+> Status: V2 SHADOW + 3 BLACK-BOX CANARIES IMPLEMENTED; NO EFFECTIVENESS LIFT PROVEN
 >
 > Owner: planning
 >
@@ -352,6 +352,31 @@ independent adversarial review bound to the hidden-test SHA-256. It also needs
 enough validated tasks for credible confidence. `--require-promotion-ready`
 fails closed until those contracts exist. No additional holdout or model runs
 are justified before that repair.
+
+### Black-box causal canaries (2026-08-06)
+
+Three replacement fixtures now test observable installer dry-run containment,
+dashboard CORS boundaries, and restore archive integrity. Each fixture fails at
+its pinned base ref and passes at its pinned known-good ref; its reviewed digest
+is bound into the manifest. The remaining 27 historical tasks are still
+ineligible, so the benchmark remains diagnostic-only.
+
+The repaired canaries did not prove Task Intelligence effectiveness. CORS tied
+at 3/3 passes in both conditions. Restore still failed after the disclosed
+golden-path memory ID was confirmed in the treatment Brief. The current source
+retrieval diagnostic reaches a historical repair path in 16/18 calibration
+tasks, but this is navigation evidence only.
+
+The evaluator now fails closed when the Codex CLI exits without a measurable
+attempt, isolates inherited configuration, uses short temporary workspaces,
+and records unavailable retry/correction measurements as `null`. The frozen
+seed controls pair order only; it does not seed model generation.
+
+No further paired run is justified until the benchmark can distinguish the
+causal stages: valid task and judge, relevant retrieval, selection, delivery,
+agent use, correct execution, and acceptance. The next iteration adds this
+failure observability and enough independently reviewed black-box tasks before
+opening a fresh holdout.
 
 ### Phase 3: Opt-in workflow pilot
 
