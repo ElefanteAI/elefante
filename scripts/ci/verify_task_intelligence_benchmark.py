@@ -176,6 +176,27 @@ def validate_manifest(manifest_path: Path, repo_root: Path = ROOT) -> dict[str, 
     if evidence.get("promotion_evidence") is not False:
         errors.append("calibration baseline must not be labelled promotion evidence")
 
+    preliminary = manifest.get("preliminary_holdout_evidence", {})
+    if preliminary:
+        if preliminary.get("completed_pairs") != 12 or preliminary.get("runs") != 24:
+            errors.append("preliminary holdout evidence must remain 12 pairs and 24 runs")
+        if preliminary.get("baseline_passes") != 1 or preliminary.get("task_brief_passes") != 1:
+            errors.append("preliminary holdout result must remain tied at 1 pass per condition")
+        if preliminary.get("pass_rate_lift_points") != 0.0:
+            errors.append("preliminary holdout lift must remain zero")
+        if preliminary.get("paired_95_percent_ci_points") != [0.0, 0.0]:
+            errors.append("preliminary holdout confidence interval must remain [0, 0]")
+        if preliminary.get("effectiveness_gate") is not False or preliminary.get("promotion_gate") is not False:
+            errors.append("preliminary holdout must remain non-promotable")
+        if preliminary.get("protocol_complete") is not False:
+            errors.append("preliminary holdout protocol must remain incomplete")
+        if preliminary.get("holdout_reusable_for_promotion") is not False:
+            errors.append("inspected holdout must not be reused as fresh promotion evidence")
+        if preliminary.get("raw_transcripts_stored") is not False:
+            errors.append("preliminary holdout must remain metadata-only")
+        if preliminary.get("decision") != "return-to-phase-1":
+            errors.append("preliminary holdout decision must return to Phase 1")
+
     ids: set[str] = set()
     classes: Counter[str] = Counter()
     splits: Counter[str] = Counter()

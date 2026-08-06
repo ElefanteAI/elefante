@@ -20,6 +20,17 @@ def test_task_intelligence_manifest_is_reproducible_and_leak_free() -> None:
     assert report["holdout_count"] > 0
 
 
+def test_failed_preliminary_holdout_cannot_be_relabelled_for_promotion(tmp_path) -> None:
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    manifest["preliminary_holdout_evidence"]["promotion_gate"] = True
+    changed = tmp_path / "tasks.json"
+    changed.write_text(json.dumps(manifest), encoding="utf-8")
+
+    report = benchmark.validate_manifest(changed, ROOT)
+
+    assert "preliminary holdout must remain non-promotable" in report["errors"]
+
+
 def test_memory_export_leakage_scan_rejects_expected_answer_markers() -> None:
     tasks = json.loads(MANIFEST.read_text(encoding="utf-8"))["tasks"]
     leaked = {"memories": [{"content": f"Apply fix {tasks[0]['acceptance_ref']}"}]}

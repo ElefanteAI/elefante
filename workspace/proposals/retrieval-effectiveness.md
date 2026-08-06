@@ -1,6 +1,6 @@
 # PRD / SDD: Task Intelligence Pipeline
 
-> Status: PHASE 1 COMPLETE IN SHADOW; HOLDOUT EVALUATION NOT RUN
+> Status: PRELIMINARY HOLDOUT SHOWED NO LIFT; RETURNED TO PHASE 1
 >
 > Owner: planning
 >
@@ -291,13 +291,31 @@ resulting corpus for acceptance-answer markers before generating a Brief.
 
 Exit: promotion gate passes, or the design returns to Phase 1.
 
-Phase 2 is ready but has not run against holdout tasks. The protocol freezes
-seed `20260805`, three paired repetitions, randomized within-pair order, the
-same model/tool limits in both conditions, a maximum 20 percent treatment input
-increase, and a maximum 25 percent treatment duration increase. The report uses
-a task-clustered 95 percent bootstrap interval and cannot promote an incomplete
-protocol. Holdout outcomes must be produced from the committed evaluator, not
-from an uncommitted worktree.
+Phase 2 stopped after the first paired repetition on all 12 holdout tasks. The
+committed evaluator at `fa04f2b` ran 24 model trials with seed `20260805`.
+Baseline and Task Brief each passed 1 of 12 tasks (8.3 percent): zero pass-rate
+lift with a paired 95 percent interval of `[0, 0]`. Treatment used 16.3 percent
+fewer total input tokens and finished 1.9 percent faster, but uncached input
+rose 2.9 percent. The cost gate passed; the effectiveness and promotion gates
+failed.
+
+The remaining 24 pairs (48 model trials) were not run because the preliminary
+result showed no correctness signal. The inspected holdout is now diagnostic
+evidence and must not be reused as fresh promotion evidence after tuning.
+Iteration returns to Phase 1 and calibration tasks only. Before another final
+evaluation, freeze a new answer-isolated holdout.
+
+Observed Briefs frequently surfaced broad documentation instead of precise
+task-local implementation evidence. The next revision must:
+
+1. retrieve source-grounded implementation evidence, not documentation alone;
+2. retain heading and file-path context so fragments remain meaningful;
+3. require lexical, path, or dependency relevance and abstain when evidence is
+   too weak;
+4. prove lift on calibration before consuming a new holdout.
+
+No public MCP method, automatic injection, client pilot, website claim, or
+performance claim is authorized by this result.
 
 ### Phase 3: Opt-in workflow pilot
 
