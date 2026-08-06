@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_install_setup.py
-# VERSION : 2.7.2
-# CHANGED : 2026-04-17
 # PROVES  : Installer lifecycle contracts: state tracking, daemon service,
 #           host registration ownership/refresh/rollback, safe uninstall,
 #           dependency bootstrap, and seed-memory guard behavior.
@@ -223,6 +221,23 @@ def test_readme_and_install_guide_match_current_runtime_and_host_contract():
     assert "configured embedded vector store" in install_guide
     assert "explicitly configured in `config.yaml`" in install_guide
     assert "would contain its own recovery directory" in scripts_index
+
+
+def test_python_runtime_range_matches_installer_and_package_metadata():
+    from src.utils.version import get_supported_python_message, is_supported_python
+
+    installer = (ROOT / "scripts/setup/install.py").read_text(encoding="utf-8")
+    setup_metadata = (ROOT / "setup.py").read_text(encoding="utf-8")
+
+    assert not is_supported_python((3, 10))
+    assert is_supported_python((3, 11))
+    assert is_supported_python((3, 12))
+    assert is_supported_python((3, 13))
+    assert not is_supported_python((3, 14))
+    assert "3.11, 3.12, or 3.13" in get_supported_python_message((3, 14))
+    assert "Python 3.11, 3.12, or 3.13" in installer
+    for version in ("3.11", "3.12", "3.13"):
+        assert f"Programming Language :: Python :: {version}" in setup_metadata
 
 
 def _load_module(path: Path, name: str):

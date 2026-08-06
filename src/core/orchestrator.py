@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/core/orchestrator.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Central intelligence layer: routes queries to vector/graph stores,
 #           applies intelligence-pipeline filters, enforces memory guards.
 # ROLE    : Core — highest-traffic module; every MCP tool call passes through here.
@@ -63,7 +61,7 @@ SYSTEM_SPECIFICATIONS = (
         "content": (
             "SDD Gate 2 leakage surface scan table specification for Elefante contributors. "
             "Every change must be checked against these leakage surfaces: MCP response contract, "
-            "ChromaDB write and read roundtrip, Kuzu schema and DML split, stdout purity, "
+            "configured vector-store write/read roundtrip, Kuzu schema and DML split, stdout purity, "
             "compliance gate state machine, dashboard snapshot contract, co-activation history, "
             "and documentation links. Reference docs: agents/orchestrator.md "
             "for the gate definition and workspace/ISSUES.md for issue routing."
@@ -78,9 +76,11 @@ SYSTEM_SPECIFICATIONS = (
         "content": (
             "SDD Gate 3 scoring formulas specification for Elefante contributors. Verify the behavioral "
             "relevance formula and the cognitive retrieval composite from source code, not from remembered "
-            "docs. Behavioral relevance: relevance = 0.5 * recency * freshness * reinforcement. Cognitive "
-            "retrieval composite: composite_score = 0.30 * vector_score + 0.20 * concept_score + 0.15 * "
-            "domain_score + 0.15 * coactivation_score + 0.10 * authority_score + 0.10 * temporal_score."
+            "docs. Temporal vitality = exp(-effective_decay_rate * days_created) * "
+            "exp(-0.005 * days_since_access), where effective_decay_rate = decay_rate / "
+            "(1 + 0.25 * ln(access_count + 1)). Cognitive retrieval composite = 0.35 * "
+            "vector_score + 0.30 * concept_score + 0.15 * coactivation_score + 0.10 * "
+            "authority_score + 0.10 * temporal_score. Retrieval exposure is not verified task utility."
         ),
         "tags": ["system", "sdd", "gate-3", "scoring", "specification"],
     },
@@ -124,7 +124,7 @@ class MemoryOrchestrator:
         Initialize orchestrator with database connections
         
         Args:
-            vector_store: ChromaDB vector store instance
+            vector_store: configured vector-store instance
             graph_store: Kuzu graph store instance
             embedding_service: Embedding generation service
         """
@@ -206,7 +206,7 @@ class MemoryOrchestrator:
         force_new: bool = False
     ) -> Optional[Memory]:
         """
-        Add a new memory via the 5-Step Pipeline.
+        Validate, enrich, deduplicate, persist, and graph-link a memory.
         
         Score is system-computed (starts at 100, decays with age).
         Decay rate is set automatically from memory_type.
@@ -214,7 +214,7 @@ class MemoryOrchestrator:
 
 
         # ==================================================================================
-        # STEP 1: PARSE & CLASSIFY
+        # STEP 1: VALIDATE INPUT
         # ==================================================================================
         validate_memory_content(content)
         
@@ -575,8 +575,8 @@ class MemoryOrchestrator:
             # ==================================================================================
             custom_metadata["processing_status"] = ProcessingStatus.RAW
             custom_metadata["ingested_at"] = datetime.utcnow().isoformat()
-            # Persist curated fields into custom_metadata so they become top-level Chroma fields
-            # in VectorStore.add_memory (title/summary are used by dashboard + dedup).
+            # Persist curated fields into custom_metadata for the configured vector
+            # backend; title and summary are also used by the dashboard and deduplication.
             custom_metadata["title"] = title
             custom_metadata["summary"] = summary_text
             # Cognitive Retrieval Fields
@@ -931,17 +931,10 @@ class MemoryOrchestrator:
         co_activation_matrix: Optional[dict] = None
     ) -> List[SearchResult]:
         """
-        Apply V4 cognitive multi-signal scoring to search results.
-        
-        V5: Now attaches RetrievalExplanation to each result.
-        
-        Transforms raw vector scores into composite scores using:
-        - vector_similarity (0.30): Original ChromaDB score
-        - concept_overlap (0.20): Jaccard overlap with query concepts
-        - domain_match (0.15): Domain alignment
-        - co_activation (0.15): Retrieved-together history
-        - authority (0.10): Score + access patterns
-        - temporal (0.10): Recency and freshness
+        Apply current cognitive multi-signal scoring and attach its explanation.
+
+        Formula authority is src/core/retrieval.py; the human contract is
+        docs/reference/scoring.md. Do not duplicate weights here.
         """
         if not results:
             return results
@@ -1020,7 +1013,8 @@ class MemoryOrchestrator:
             return
             
         try:
-            # Validate that IDs still exist in ChromaDB before burning O(n^2)
+            # Validate that IDs still exist in the configured vector store before
+            # burning O(n^2) graph co-activation work.
             # graph queries.  Deleted/stale IDs are silently dropped.
             valid_ids = []
             for mid in set(memory_ids):
@@ -2158,7 +2152,7 @@ class MemoryOrchestrator:
 
         Stores may expose either synchronous or asynchronous ``close`` methods.
         Supporting both keeps the orchestrator compatible with the existing
-        Kuzu/Chroma stores and the opt-in SQLite vector store.
+        Kuzu and the configured vector store (SQLite by default).
         """
         self.logger.info("closing_orchestrator_connections")
         failures: list[Exception] = []

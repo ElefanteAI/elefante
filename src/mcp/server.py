@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/mcp/server.py
-# VERSION : 2.7.0
-# CHANGED : 2026-04-15
 # PURPOSE : MCP server: exposes all Elefante operations as JSON-RPC tools and
 #           prompts over stdio transport. Entry point for all agent interactions.
 # ROLE    : MCP surface layer — this is what agents talk to. Every tool call,
@@ -265,9 +263,9 @@ class ElefanteMCPServer:
     async def _inject_context(self, result: Dict[str, Any], tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
         AUTOMATIC CONTEXT INJECTION:
-        On every tool call, surfaces the top 3 most relevant memories from ChromaDB
-        and appends them to the response. The agent gets context for free — no
-        explicit elefante-Memory(action="search") call required.
+        On eligible tool calls, surfaces up to 3 relevant memories from the
+        configured vector store and appends them to the response. No explicit
+        elefante-Memory(action="search") call is required for this supplementary path.
 
         Skips tools that already return memory data (search, list, ETL, system).
         Budget: max 3 memories, high similarity threshold (0.5), summary only.
@@ -325,13 +323,12 @@ class ElefanteMCPServer:
 
     def _inject_pitfalls(self, result: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
         """
-        SURGICAL INJECTION: 
-        Injects mandatory protocols and known pitfalls directly into the tool response.
-        This ensures the agent CANNOT ignore them, as they are part of the data payload.
+        Inject concise protocols and known pitfalls into eligible responses so
+        the client can apply them beside the requested payload.
         """
         pitfalls = [
             "CRITICAL PROTOCOL: You MUST check for existing memories before creating new ones to avoid duplication.",
-            "CRITICAL PROTOCOL: Do not rely on your internal knowledge base for project specifics; use the memory system.",
+            "CRITICAL PROTOCOL: For project specifics, compare retrieved memory with current project files and source evidence.",
         ]
         if not is_client_runtime():
             pitfalls.append(
@@ -349,7 +346,7 @@ class ElefanteMCPServer:
         if tool_name == "elefante-Memory":
             pitfalls.append("WARNING - MEMORY INTEGRITY (action=add): Score is system-computed. Classify memory_type accurately — it determines the decay rate.")
             pitfalls.append("WARNING - SEARCH BIAS (action=search): If results are empty, try broader terms. Do not assume non-existence without a semantic search.")
-            pitfalls.append("WARNING - CONTRADICTIONS (action=search): If you find contradictory memories, prioritize the most recent one but note the conflict.")
+            pitfalls.append("WARNING - CONTRADICTIONS (action=search): Compare recency, provenance, lifecycle, and current source; surface material conflicts rather than applying an automatic winner.")
 
         if tool_name in [
             "elefante-GraphQuery",
@@ -367,15 +364,16 @@ class ElefanteMCPServer:
         # Developer Etiquette V1.2 (canonical) — concise enforcement reminder.
         pitfalls.append(
             "STRICT ENFORCEMENT: 1. Keep all responses SHORT, SIMPLE, and DIRECT. "
-            "2. NO GUESSING. If the exact information is not found in memory, your final response MUST BE EXACTLY 'UNKNOWN.' with no apologies or filler. "
-            "3. Ask context questions ONLY if you are hard-blocked from proceeding."
+            "2. NO GUESSING. Mark unresolved facts UNKNOWN and state the missing evidence when it matters. "
+            "3. Ask context questions only when blocked or when the answer would materially change the result."
         )
         result["MANDATORY_PROTOCOLS_READ_THIS_FIRST"] = pitfalls
         return result
 
     def _inject_entrypoint_protocol(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Inject the exact debug entry sequence into every tool response.
+        Inject the environment-appropriate entry sequence into eligible normal
+        responses and errors.
 
         This is more specific than generic pitfalls: it gives the agent
         the canonical first steps and maintained verification surfaces.
@@ -559,12 +557,12 @@ class ElefanteMCPServer:
                     description="""Persistent memory operations. The `action` parameter selects the operation:
 
 - `action=add` — store a new memory. content + memory_type + domain + category + tags + entities. Score is system-computed (0-100) from behavioral signals; you do NOT assign importance. Compliance Gate enforces search-before-write.
-- `action=search` — query memory. ChromaDB (semantic) + Kuzu (structured) hybrid by default. Rewrite pronouns to specific entities before calling. Use `list_all=true` to bypass semantic relevance filtering for browsing/export.
+- `action=search` — query memory. SQLite vectors (semantic) + Kuzu (structured) are the default; explicitly configured legacy ChromaDB stores remain supported. Rewrite pronouns to specific entities before calling. Use `list_all=true` to bypass semantic relevance filtering for browsing/export.
 - `action=update` — amend an existing memory in-place. memory_id + content/tags/deprecated/archived/supersedes_id. Compliance Gate.
 - `action=delete` — permanently remove a memory. memory_id + reason (audit trail). Compliance Gate.
-- `action=consolidate` — deterministic LLM-free cleanup (canonicalize, mark redundant, decay-prune). Default dry-run; pass `force=true` to apply.
+- `action=consolidate` — deterministic LLM-free duplicate cleanup (canonicalize groups and recoverably archive redundant records). Default dry-run; pass `force=true` to apply. It is not a general age-based pruning job.
 
-**ALWAYS** call action=search before answering questions about user preferences, past decisions, or "the usual way". **NEVER** assume you know an answer that might be in memory. **IF RESULTS ARE CONTRADICTORY:** prefer most recent timestamp; "decision"/"fact" types over "conversation".
+Call action=search before answering when user preferences, past decisions, or prior project context may materially change the result. Treat matches as evidence candidates: compare recency, provenance, lifecycle, and current source; surface material conflicts instead of applying a fixed type or timestamp winner.
 
 **CRITICAL PERSISTENCE RULE:** The chronological session context buffer clears on IDE restart. After important decisions, run `elefante-Memory(action=add, ...)` to make them durable.""",
                     inputSchema={
@@ -581,7 +579,7 @@ class ElefanteMCPServer:
                                 "type": "string",
                                 "enum": ["fact", "decision", "preference", "insight", "note", "conversation", "specification", "directive"],
                                 "default": "fact",
-                                "description": "Memory type (action=add) — determines decay rate. Preferences decay slowest, conversations fastest. Specifications and directives are immutable."
+                                "description": "Memory type (action=add) — determines type decay. Preferences decay slowest, conversations fastest. Specifications and directives have zero type decay, but freshness still affects vitality."
                             },
                             "domain": {
                                 "type": "string",
@@ -626,7 +624,7 @@ class ElefanteMCPServer:
                                 },
                                 "description": "Optional search filters (action=search)"
                             },
-                            "min_similarity": {"type": "number", "default": 0.3, "minimum": 0.0, "maximum": 1.0, "description": "Min similarity (action=search)"},
+                            "min_similarity": {"type": "number", "default": 0.1, "minimum": 0.0, "maximum": 1.0, "description": "Min similarity (action=search)"},
                             "include_conversation": {"type": "boolean", "default": True, "description": "Include recent conversation in search (action=search)"},
                             "include_stored": {"type": "boolean", "default": True, "description": "Include stored memories in search (action=search)"},
                             "session_id": {"type": "string", "description": "Session UUID (action=search, required if include_conversation=true)"},
@@ -664,7 +662,7 @@ class ElefanteMCPServer:
                 ),
                 types.Tool(
                     name="elefante-ContextGet",
-                    description="**CONTEXTUAL GROUNDING**: Retrieve comprehensive context from Elefante's memory system for a specific session or task. Returns related memories from ChromaDB, connected entities and relationships from Kuzu graph, with configurable traversal depth. Use this to gather full context before making decisions or generating responses.",
+                    description="**CONTEXTUAL GROUNDING**: Retrieve context from Elefante's configured vector store and connected Kuzu entities for a specific session or task, with configurable traversal depth. Use it to gather evidence before decisions; completeness is not guaranteed.",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -786,12 +784,12 @@ class ElefanteMCPServer:
                 ),
                 types.Tool(
                     name="elefante-System",
-                    description="""Enable or disable Elefante Mode. Controls the memory system's on/off state and database locks.
+                    description="""Enable or disable Elefante Mode. Controls the logical mode state and eager runtime initialization.
 
-action="enable" (default): Acquires exclusive locks on ChromaDB and Kuzu databases, activates memory operations. Required first step.
-action="disable": Releases all locks for multi-IDE safety.
+action="enable" (default): Marks the mode enabled and preloads the runtime.
+action="disable": Marks the mode disabled and closes this transport's runtime reference.
 
-If another IDE is using Elefante, enable will fail gracefully with lock information.""",
+Normal operations use transaction-scoped storage ownership; callers do not need to hold a session-wide database lock.""",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -975,14 +973,14 @@ Optional fields (improve retrieval quality):
                 # =====================================================================
                 types.Tool(
                     name="elefante-DirectiveAdd",
-                    description="""Add a persistent behavioral directive. Directives are NOT memories — they are unconditional constraints injected into EVERY MCP tool response, ensuring the agent sees them at the decision boundary.
+                    description="""Add a persistent behavioral directive. Directives are NOT semantic memories. They are injected into normal product-operation and error responses; minimal system, dashboard, and directive-management responses omit recursive injection.
 
 Use this for rules that must always be active regardless of context:
 - "Never claim success without user confirmation"
 - "Always verify a server is alive before opening it"
 - "Do not use emojis in code comments"
 
-Directives are stored separately from the memory system (not in ChromaDB, not in Kuzu). They cannot be outcompeted by similarity scores.""",
+Directives are stored in a dedicated local JSON store, not in the configured vector store or Kuzu. They cannot be outcompeted by similarity scores.""",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -996,7 +994,7 @@ Directives are stored separately from the memory system (not in ChromaDB, not in
                 ),
                 types.Tool(
                     name="elefante-DirectiveList",
-                    description="List all active directives. These are the unconditional behavioral constraints injected into every tool response.",
+                    description="List all active directives. They are injected into normal product-operation and error responses.",
                     inputSchema={
                         "type": "object",
                         "properties": {}
@@ -1033,7 +1031,7 @@ Directives are stored separately from the memory system (not in ChromaDB, not in
                 Prompt(
                     name="elefante-grounding",
                     title="Elefante Memory Grounding",
-                    description="ALWAYS use this prompt at the start of conversations. It injects memory-aware behavior so the AI automatically checks memories before answering.",
+                    description="Use when persistent user or project context may affect the conversation. It supplies memory-aware grounding instructions.",
                     arguments=[]
                 ),
                 Prompt(
@@ -1063,34 +1061,19 @@ Directives are stored separately from the memory system (not in ChromaDB, not in
                             role="user",
                             content=TextContent(
                                 type="text",
-                                text="""# ELEFANTE MEMORY SYSTEM - ACTIVE
+                                text="""# ELEFANTE MEMORY SYSTEM
 
-You have access to a persistent memory system called **Elefante** - the user's second brain.
+Elefante is the user's local persistent memory.
 
-## AUTOMATIC BEHAVIOR REQUIRED
+Search `elefante-Memory` with `action="search"` when the request may depend on
+the user's preferences, earlier decisions, prior project context, or phrases
+such as "remember", "the usual way", or "like we discussed". Use a concrete
+query with named projects, files, people, and concepts.
 
-**BEFORE answering ANY question about:**
-- User preferences (coding style, tools, formatting)
-- Past decisions or discussions
-- Project-specific knowledge ("how we do X")
-- "The usual way" or "like we discussed"
-
-**YOU MUST first call `elefante-Memory` with `action="search"`** and a specific query.
-
-## RULE: When in doubt, SEARCH.
-- Memory search is FAST (< 100ms)
-- Better to search and find nothing than miss critical context
-- The user has invested time teaching you - use that knowledge
-
-## TRIGGER PATTERNS
-- "elefante:" prefix → ALWAYS act on this
-- "remember", "recall", "what did I say" → SEARCH first
-- "preference", "decision", "how do I like" → SEARCH first
-
-## NEVER DO THIS
-- Answer from general knowledge when user asks about THEIR preferences
-- Assume you know the answer without checking memories
-- Skip the memory search to be faster"""
+Treat retrieved memories as evidence, not unquestionable truth. Compare them
+with the user's current request and current source; surface conflicts and mark
+unresolved facts UNKNOWN. Use the smallest relevant set. Do not search by
+ritual for a self-contained question, and never store secrets or routine chat."""
                             )
                         )
                     ]
@@ -1114,9 +1097,9 @@ You have access to a persistent memory system called **Elefante** - the user's s
                             f"**Memory [{i+1}]** (score: {r.score:.2f}):\\n{r.memory.content}"
                             for i, r in enumerate(results)
                         ])
-                        context_msg = f"# Relevant Memories for: {topic}\\n\\n{memory_text}\\n\\n---\\nUse this context to answer the user's question."
+                        context_msg = f"# Relevant Memories for: {topic}\\n\\n{memory_text}\\n\\n---\\nTreat these as evidence candidates. Check current source and surface material conflicts before answering."
                     else:
-                        context_msg = f"# No memories found for: {topic}\\n\\nNo relevant memories in the database. You may proceed with general knowledge, but note this is a gap in the user's knowledge base."
+                        context_msg = f"# No memories found for: {topic}\\n\\nNo matching stored memory was retrieved. Do not infer that the underlying fact does not exist."
                 except Exception as e:
                     context_msg = f"# Memory search failed\\n\\nError: {e}\\n\\nProceed with caution."
                 
@@ -2329,7 +2312,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
             "success": True,
             "directive": directive.to_dict(),
             "total_directives": self.directive_store.count(),
-            "message": "Directive stored. It will be injected into every future tool response."
+            "message": "Directive stored. It will be injected into eligible normal product-operation responses."
         }
 
     def _handle_directive_list(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -2353,7 +2336,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 "success": True,
                 "directive_id": directive_id,
                 "total_directives": self.directive_store.count(),
-                "message": "Directive removed. It will no longer appear in tool responses."
+                "message": "Directive removed. It will no longer appear in eligible normal product-operation responses."
             }
         return {
             "success": False,
@@ -2367,7 +2350,8 @@ You have access to a persistent memory system called **Elefante** - the user's s
         This is the core mechanism: directives appear in the data payload
         the agent reads right before deciding its next action.
         Not retrieved by similarity. Not competing with memories.
-        Always present. Unconditional.
+        Applied only on the eligible normal product-operation response path;
+        management tools use a minimal response contract.
         """
         active = self.directive_store.get_active_texts()
         if active:

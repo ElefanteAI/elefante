@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : build_dmg.py
-# VERSION : 2.7.2
-# CHANGED : 2026-04-16
 # PURPOSE : Build a branded macOS .dmg installer from the Elefante installer
 #           bundle zip. Produces a drag-to-install disk image with Elefante
 #           branding, logo, tagline, and a link to www.elefante.ai.
@@ -13,7 +11,6 @@
 # NOTES   : macOS only. Requires hdiutil (ships with macOS). Icon from
 #           assets/icons/Elefante.icns. No code signing by default — pass
 #           --sign "Developer ID Application: ..." when ready.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Build a branded macOS .dmg from the Elefante installer bundle."""
 
@@ -36,7 +33,7 @@ DEFAULT_SWIFT_APP = ROOT_DIR / "scripts" / "ci" / "installer_app.swift"
 DEFAULT_LOGO_PNG = ROOT_DIR / "docs" / "assets" / "Elefante Logo 1024 white.png"
 VOLUME_NAME = "Elefante Installer"
 PRODUCT_URL = "https://www.elefante.ai"
-TAGLINE = "Elefante never forgets."
+TAGLINE = "Carry forward the context worth keeping."
 WINDOW_WIDTH = 660
 WINDOW_HEIGHT = 400
 
