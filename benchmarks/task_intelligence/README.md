@@ -5,6 +5,9 @@ product claim.
 
 ## Current truth
 
+- The Task Intelligence **evaluation infrastructure is implemented**. It can
+  validate judges, plan capped paired trials, record causal-stage metadata,
+  summarize repeated outcomes, and fail promotion closed.
 - `tasks.json` preserves 30 historical tasks and the v1 evidence record.
 - Those tasks are **diagnostic-only** because many hidden tests require an
   undisclosed historical implementation shape. A behaviorally correct repair
@@ -24,6 +27,13 @@ product claim.
 - Runner failures with no measurable model attempt abort instead of becoming
   task failures. Unobserved retry/correction counts are stored as `null`, never
   fabricated as zero.
+- Each new schema-v2 outcome records judge, retrieval, selection, delivery,
+  execution, and acceptance status plus SHA-256 evidence. Prompts, responses, memory
+  bodies, and source diffs are not stored. Whether the agent actually used a
+  delivered memory remains `UNKNOWN`.
+- Model execution against an invalid historical judge is blocked unless the
+  operator explicitly passes `--allow-diagnostic`. Diagnostic results can
+  never satisfy promotion.
 
 ## Golden path
 
@@ -81,6 +91,9 @@ invalidate promotion readiness.
 # Historical integrity: should pass, while reporting diagnostic_only=true.
 python scripts/ci/verify_task_intelligence_benchmark.py
 
+# Evaluator self-test: every eligible judge must fail on base and pass on fix.
+python scripts/ci/verify_task_intelligence_benchmark.py --verify-canaries
+
 # Promotion readiness: intentionally fails for the current historical set.
 python scripts/ci/verify_task_intelligence_benchmark.py --require-promotion-ready
 
@@ -91,9 +104,25 @@ python scripts/ci/audit_task_intelligence_retrieval.py --split calibration
 python scripts/ci/run_task_intelligence_evaluation.py \
   --task TASK_ID --brief-profile v2 --repetitions 1
 
+# Execute only after the plan reports the exact two-run cost.
+python scripts/ci/run_task_intelligence_evaluation.py \
+  --task TASK_ID --brief-profile v2 --repetitions 1 --execute \
+  --max-runs 2 \
+  --max-total-input-tokens INPUT_CAP \
+  --max-total-uncached-input-tokens UNCACHED_CAP
+
+# Report fails unless every pair and every causal-stage trace is complete.
+python scripts/ci/summarize_task_intelligence_evaluation.py \
+  --brief-profile v2 --split calibration --require-complete
+
+# Promotion is a separate, stricter gate and currently fails by design.
+python scripts/ci/summarize_task_intelligence_evaluation.py \
+  --brief-profile v2 --split holdout --require-promotion
+
 # Diagnose one side only. This cannot support a causal or promotion claim.
 python scripts/ci/run_task_intelligence_evaluation.py \
-  --task TASK_ID --brief-profile v2 --condition task-brief --repetitions 1
+  --task TASK_ID --brief-profile v2 --condition task-brief --repetitions 1 \
+  --allow-diagnostic
 ```
 
 ## Rollback

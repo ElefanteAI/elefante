@@ -23,7 +23,9 @@ if str(ROOT) not in sys.path:
 from scripts.ci.run_task_intelligence_baseline import configuration_id  # noqa: E402
 from src.core.task_intelligence import TaskBriefProfile  # noqa: E402
 from scripts.ci.verify_task_intelligence_benchmark import (  # noqa: E402
+    acceptance_test_sha256,
     manifest_promotion_readiness,
+    task_promotion_validity,
     validate_manifest,
     validate_outcome_record,
 )
@@ -106,6 +108,33 @@ def summarize(
         (task_id, repeat) in complete_pairs
         for task_id in tasks
         for repeat in range(1, repetitions + 1)
+    )
+    observed_records = [
+        record for pair in complete_pairs.values() for record in pair.values()
+    ]
+    def stage_trace_is_bound(task_id: str, record: dict[str, Any]) -> bool:
+        trace = record.get("stage_trace")
+        if not isinstance(trace, dict):
+            return False
+        validity = task_promotion_validity(tasks[task_id], ROOT)
+        expected_judge = (
+            "eligible" if validity["promotion_eligible"] else "diagnostic-only"
+        )
+        return (
+            record.get("outcome_schema_version") == 2
+            and trace.get("judge_status") == expected_judge
+            and trace.get("acceptance_fixture_sha256")
+            == acceptance_test_sha256(tasks[task_id], ROOT)
+        )
+
+    stage_observability_failures = sorted(
+        f"{task_id}:r{repeat}:{condition}"
+        for (task_id, repeat), pair in complete_pairs.items()
+        for condition, record in pair.items()
+        if not stage_trace_is_bound(task_id, record)
+    )
+    stage_observability_complete = (
+        protocol_complete and not stage_observability_failures
     )
 
     differences: dict[str, list[int]] = defaultdict(list)
@@ -213,6 +242,9 @@ def summarize(
         "expected_pairs": expected_pairs,
         "complete_pairs": total_pairs,
         "protocol_complete": protocol_complete,
+        "stage_observability_complete": stage_observability_complete,
+        "stage_observability_failures": stage_observability_failures,
+        "evaluation_complete": protocol_complete and stage_observability_complete,
         "baseline_passes": baseline_passes,
         "task_brief_passes": treatment_passes,
         "baseline_pass_rate": round(baseline_passes / denominator, 6),
@@ -239,6 +271,36 @@ def summarize(
             task_class: round(100 * sum(values) / len(values), 6)
             for task_class, values in sorted(by_class.items())
         },
+        "causal_stage_observability": {
+            "judge_eligible_records": sum(
+                record.get("stage_trace", {}).get("judge_status") == "eligible"
+                for record in observed_records
+            ),
+            "treatment_retrieval_completed": sum(
+                record.get("stage_trace", {}).get("retrieval_status") == "completed"
+                for record in condition_records["task-brief"]
+            ),
+            "treatment_selection_selected": sum(
+                record.get("stage_trace", {}).get("selection_status") == "selected"
+                for record in condition_records["task-brief"]
+            ),
+            "treatment_delivery_delivered": sum(
+                record.get("stage_trace", {}).get("delivery_status") == "delivered"
+                for record in condition_records["task-brief"]
+            ),
+            "baseline_execution_changed": sum(
+                record.get("stage_trace", {}).get("execution_status") == "changed"
+                for record in condition_records["baseline"]
+            ),
+            "treatment_execution_changed": sum(
+                record.get("stage_trace", {}).get("execution_status") == "changed"
+                for record in condition_records["task-brief"]
+            ),
+            "agent_use_unknown": sum(
+                record.get("stage_trace", {}).get("agent_use_status") == "unknown"
+                for record in observed_records
+            ),
+        },
         "pass_rate_gate": pass_rate_gate,
         "effectiveness_gate": effectiveness_gate,
         "cost_gate": cost_gate,
@@ -246,6 +308,7 @@ def summarize(
         "promotion_gate": (
             readiness["promotion_ready"]
             and protocol_complete
+            and stage_observability_complete
             and effectiveness_gate
             and cost_gate
         ),
@@ -287,7 +350,7 @@ def main(argv: list[str] | None = None) -> int:
     report = summarize(manifest, records, split=args.split)
     report["brief_profile"] = args.brief_profile
     print(json.dumps(report, indent=2, sort_keys=True))
-    if args.require_complete and not report["protocol_complete"]:
+    if args.require_complete and not report["evaluation_complete"]:
         return 2
     if args.require_promotion and not report["promotion_gate"]:
         return 3

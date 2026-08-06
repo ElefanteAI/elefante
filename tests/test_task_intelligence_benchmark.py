@@ -39,6 +39,17 @@ def test_promotion_ready_mode_fails_closed_for_historical_benchmark(capsys) -> N
     assert report["invalid_tasks"][0]["reasons"] == ["missing-contract"]
 
 
+def test_black_box_canary_verifier_proves_base_and_known_fix(capsys) -> None:
+    result = benchmark.main(["--manifest", str(MANIFEST), "--verify-canaries"])
+    report = json.loads(capsys.readouterr().out)
+
+    assert result == 0
+    assert len(report["canary_verification"]) == 3
+    assert all(item["base_rejected"] for item in report["canary_verification"])
+    assert all(item["known_fix_accepted"] for item in report["canary_verification"])
+    assert all(item["passed"] for item in report["canary_verification"])
+
+
 def test_behavioral_contract_requires_exact_known_good_restore_ref() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     task = manifest["tasks"][0]
@@ -150,6 +161,39 @@ def test_outcome_records_are_metadata_only() -> None:
             {**valid, "retries": None, "human_corrections": None}
         )
         == []
+    )
+
+    trace = {
+        "judge_status": "diagnostic-only",
+        "acceptance_fixture_sha256": "a" * 64,
+        "retrieval_status": "not-applicable",
+        "considered_memory_count": None,
+        "selection_status": "not-applicable",
+        "selected_memory_count": 0,
+        "delivery_status": "not-applicable",
+        "prompt_sha256": "b" * 64,
+        "brief_sha256": None,
+        "agent_use_status": "unknown",
+        "execution_status": "no-change",
+        "changed_files": [],
+        "change_digest": None,
+        "acceptance_status": "failed",
+        "acceptance_exit_code": 1,
+    }
+    assert (
+        benchmark.validate_outcome_record(
+            {**valid, "outcome_schema_version": 2, "stage_trace": trace}
+        )
+        == []
+    )
+    mismatch = {
+        **valid,
+        "outcome_schema_version": 2,
+        "stage_trace": {**trace, "acceptance_status": "passed"},
+    }
+    assert (
+        "stage_trace acceptance status mismatches outcome"
+        in benchmark.validate_outcome_record(mismatch)
     )
 
     leaked = {**valid, "raw_response": "private model output"}

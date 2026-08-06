@@ -31,7 +31,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.ci.verify_task_intelligence_benchmark import (  # noqa: E402
+    acceptance_test_sha256,
     acceptance_test_source,
+    task_promotion_validity,
     validate_manifest,
     validate_outcome_record,
 )
@@ -252,13 +254,14 @@ def require_successful_agent_invocation(
     )
 
 
-def evaluate_hidden_acceptance(
+def evaluate_hidden_acceptance_result(
     repo_root: Path,
     workspace: Path,
     task: dict[str, Any],
     *,
     timeout_seconds: int,
-) -> bool:
+) -> dict[str, Any]:
+    """Run the bound black-box judge and retain metadata-only diagnostics."""
     test_target = task["acceptance_command"][3]
     test_path_text, _ = test_target.split("::", 1)
     test_path = workspace / test_path_text
@@ -293,7 +296,10 @@ def evaluate_hidden_acceptance(
                 timeout=timeout_seconds,
                 env=environment,
             )
-            return result.returncode == 0
+            return {
+                "passed": result.returncode == 0,
+                "exit_code": result.returncode,
+            }
     finally:
         if existed and original is not None:
             test_path.write_bytes(original)
@@ -301,6 +307,127 @@ def evaluate_hidden_acceptance(
                 test_path.chmod(original_mode)
         elif test_path.exists():
             test_path.unlink()
+
+
+def evaluate_hidden_acceptance(
+    repo_root: Path,
+    workspace: Path,
+    task: dict[str, Any],
+    *,
+    timeout_seconds: int,
+) -> bool:
+    """Compatibility wrapper for callers that need only the verdict."""
+    return bool(
+        evaluate_hidden_acceptance_result(
+            repo_root,
+            workspace,
+            task,
+            timeout_seconds=timeout_seconds,
+        )["passed"]
+    )
+
+
+def workspace_change_evidence(workspace: Path) -> dict[str, Any]:
+    """Return bounded metadata proving whether the agent changed the snapshot."""
+    tracked = _run(
+        ["git", "diff", "--binary", "--no-ext-diff", "HEAD"],
+        cwd=workspace,
+        capture_output=True,
+    )
+    names = _run(
+        ["git", "diff", "--name-only", "-z", "HEAD"],
+        cwd=workspace,
+        capture_output=True,
+    )
+    untracked = _run(
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+        cwd=workspace,
+        capture_output=True,
+    )
+    if any(result.returncode for result in (tracked, names, untracked)):
+        raise RuntimeError("cannot inspect evaluator workspace changes")
+    untracked_paths = {
+        value.decode("utf-8", errors="surrogateescape")
+        for value in untracked.stdout.split(b"\0")
+        if value
+    }
+    paths = sorted(
+        {
+            value.decode("utf-8", errors="surrogateescape")
+            for value in names.stdout.split(b"\0")
+            if value
+        }
+        | untracked_paths
+    )
+    if len(paths) > 200:
+        raise RuntimeError("evaluator changed-file evidence exceeds 200 paths")
+    digest = hashlib.sha256()
+    digest.update(tracked.stdout)
+    for path in paths:
+        digest.update(path.encode("utf-8", errors="surrogateescape"))
+        candidate = workspace / path
+        if path in untracked_paths:
+            if candidate.is_file() and not candidate.is_symlink():
+                digest.update(hashlib.sha256(candidate.read_bytes()).digest())
+            else:
+                digest.update(b"non-regular")
+    return {
+        "changed_files": paths,
+        "change_digest": digest.hexdigest() if paths else None,
+    }
+
+
+def trial_stage_trace(
+    repo_root: Path,
+    task: dict[str, Any],
+    *,
+    condition: str,
+    prompt: str,
+    selected_memory_ids: list[str],
+    considered_memory_count: int | None,
+    brief_abstained: bool | None,
+    brief_digest: str | None,
+    change_evidence: dict[str, Any],
+    acceptance: dict[str, Any],
+) -> dict[str, Any]:
+    """Build the causal-stage trace without storing prompts or memory bodies."""
+    treatment = condition == "task-brief"
+    validity = task_promotion_validity(task, repo_root)
+    if not treatment:
+        retrieval_status = "not-applicable"
+        selection_status = "not-applicable"
+        delivery_status = "not-applicable"
+    else:
+        retrieval_status = (
+            "completed" if (considered_memory_count or 0) > 0 else "empty"
+        )
+        selection_status = (
+            "abstained"
+            if brief_abstained
+            else ("selected" if selected_memory_ids else "empty")
+        )
+        delivery_status = "delivered" if selected_memory_ids else "empty"
+    return {
+        "judge_status": (
+            "eligible" if validity["promotion_eligible"] else "diagnostic-only"
+        ),
+        "acceptance_fixture_sha256": acceptance_test_sha256(task, repo_root),
+        "retrieval_status": retrieval_status,
+        "considered_memory_count": considered_memory_count if treatment else None,
+        "selection_status": selection_status,
+        "selected_memory_count": len(selected_memory_ids),
+        "delivery_status": delivery_status,
+        "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+        "brief_sha256": brief_digest if treatment else None,
+        "agent_use_status": "unknown",
+        "execution_status": (
+            "changed" if change_evidence["changed_files"] else "no-change"
+        ),
+        "changed_files": change_evidence["changed_files"],
+        "change_digest": change_evidence["change_digest"],
+        "acceptance_status": "passed" if acceptance["passed"] else "failed",
+        "acceptance_exit_code": acceptance["exit_code"],
+    }
 
 
 def _outcome_path(
@@ -364,28 +491,33 @@ def execute_trial(
     acceptance_passed = False
     failure_category = "harness"
     try:
+        prompt = build_baseline_prompt(task)
         agent_exit, usage, duration_ms, cli_version, agent_diagnostic = run_codex_baseline(
             workspace,
             task,
             model=model,
             reasoning=reasoning,
             timeout_seconds=timeout_seconds,
+            prompt=prompt,
         )
         require_successful_agent_invocation(
             exit_code=agent_exit,
             usage=usage,
             diagnostic=agent_diagnostic,
         )
-        acceptance_passed = evaluate_hidden_acceptance(
+        change_evidence = workspace_change_evidence(workspace)
+        acceptance = evaluate_hidden_acceptance_result(
             repo_root,
             workspace,
             task,
             timeout_seconds=timeout_seconds,
         )
+        acceptance_passed = acceptance["passed"]
         failure_category = "" if acceptance_passed else (
             "agent-exit" if agent_exit else "acceptance-test"
         )
         record = {
+            "outcome_schema_version": 2,
             "evaluation_id": f"{task['id']}-baseline-r{repeat}",
             "task_id": task["id"],
             "condition": BASELINE_CONDITION,
@@ -408,6 +540,18 @@ def execute_trial(
             "output_tokens": usage["output_tokens"],
             "duration_ms": duration_ms,
             "failure_category": failure_category,
+            "stage_trace": trial_stage_trace(
+                repo_root,
+                task,
+                condition=BASELINE_CONDITION,
+                prompt=prompt,
+                selected_memory_ids=[],
+                considered_memory_count=None,
+                brief_abstained=None,
+                brief_digest=None,
+                change_evidence=change_evidence,
+                acceptance=acceptance,
+            ),
         }
         errors = validate_outcome_record(record)
         if errors:
@@ -452,6 +596,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-total-input-tokens", type=int)
     parser.add_argument("--max-total-uncached-input-tokens", type=int)
     parser.add_argument("--keep-failures", action="store_true")
+    parser.add_argument(
+        "--allow-diagnostic",
+        action="store_true",
+        help="Explicitly allow model runs against non-promotable historical judges.",
+    )
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
 
@@ -480,6 +629,13 @@ def main(argv: list[str] | None = None) -> int:
     ]
     estimate = len(pending) * args.estimated_input_tokens_per_run
     uncached_estimate = len(pending) * args.estimated_uncached_input_tokens_per_run
+    diagnostic_task_ids = sorted(
+        {
+            item["task_id"]
+            for item in pending
+            if not task_promotion_validity(item["task"], ROOT)["promotion_eligible"]
+        }
+    )
     summary = {
         "condition": BASELINE_CONDITION,
         "model": args.model,
@@ -489,10 +645,26 @@ def main(argv: list[str] | None = None) -> int:
         "estimated_input_tokens": estimate,
         "estimated_uncached_input_tokens": uncached_estimate,
         "execute": args.execute,
+        "diagnostic_task_ids": diagnostic_task_ids,
     }
     if not args.execute:
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 0
+    if diagnostic_task_ids and not args.allow_diagnostic:
+        print(
+            json.dumps(
+                {
+                    **summary,
+                    "error": (
+                        "selected tasks are diagnostic-only; pass "
+                        "--allow-diagnostic to spend model tokens intentionally"
+                    ),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 2
     if args.max_runs != len(pending):
         print(
             json.dumps(

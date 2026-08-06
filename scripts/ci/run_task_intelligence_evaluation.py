@@ -37,6 +37,7 @@ if str(ROOT) not in sys.path:
 from scripts.ci import run_task_intelligence_baseline as baseline  # noqa: E402
 from scripts.ci.verify_task_intelligence_benchmark import (  # noqa: E402
     scan_memory_payload,
+    task_promotion_validity,
     validate_manifest,
     validate_outcome_record,
 )
@@ -783,13 +784,32 @@ def execute_trial(
             usage=usage,
             diagnostic=agent_diagnostic,
         )
-        acceptance_passed = baseline.evaluate_hidden_acceptance(
+        change_evidence = baseline.workspace_change_evidence(workspace)
+        acceptance = baseline.evaluate_hidden_acceptance_result(
             ROOT,
             workspace,
             task,
             timeout_seconds=timeout_seconds,
         )
+        acceptance_passed = acceptance["passed"]
+        selected_memory_ids = brief.selected_memory_ids if brief else []
+        considered_memory_count = (
+            len(
+                {
+                    *selected_memory_ids,
+                    *(omission.memory_id for omission in brief.omissions),
+                }
+            )
+            if brief
+            else None
+        )
+        brief_digest = (
+            hashlib.sha256(brief.rendered_context.encode("utf-8")).hexdigest()
+            if brief
+            else None
+        )
         record = {
+            "outcome_schema_version": 2,
             "evaluation_id": (f"{task['id']}-{condition}-seed-{run_seed}-r{repeat}"),
             "task_id": task["id"],
             "condition": condition,
@@ -801,7 +821,7 @@ def execute_trial(
                 f"prompt_profile=task-intelligence-{brief_profile.value}"
             ),
             "run_seed": run_seed,
-            "memory_ids": brief.selected_memory_ids if brief else [],
+            "memory_ids": selected_memory_ids,
             "acceptance_passed": acceptance_passed,
             # Not exposed by this single-turn runner. Preserve UNKNOWN instead
             # of manufacturing a zero that could influence promotion.
@@ -814,6 +834,18 @@ def execute_trial(
             "failure_category": ""
             if acceptance_passed
             else ("agent-exit" if agent_exit else "acceptance-test"),
+            "stage_trace": baseline.trial_stage_trace(
+                ROOT,
+                task,
+                condition=condition,
+                prompt=prompt,
+                selected_memory_ids=selected_memory_ids,
+                considered_memory_count=considered_memory_count,
+                brief_abstained=brief.abstained if brief else None,
+                brief_digest=brief_digest,
+                change_evidence=change_evidence,
+                acceptance=acceptance,
+            ),
         }
         errors = validate_outcome_record(record)
         if errors:
@@ -898,6 +930,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-total-input-tokens", type=int)
     parser.add_argument("--max-total-uncached-input-tokens", type=int)
     parser.add_argument("--keep-failures", action="store_true")
+    parser.add_argument(
+        "--allow-diagnostic",
+        action="store_true",
+        help="Explicitly allow model runs against non-promotable historical judges.",
+    )
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
     brief_profile = TaskBriefProfile(args.brief_profile)
@@ -931,6 +968,13 @@ def main(argv: list[str] | None = None) -> int:
     ]
     estimate = len(pending) * args.estimated_input_tokens_per_run
     uncached_estimate = len(pending) * args.estimated_uncached_input_tokens_per_run
+    diagnostic_task_ids = sorted(
+        {
+            item["task_id"]
+            for item in pending
+            if not task_promotion_validity(item["task"], ROOT)["promotion_eligible"]
+        }
+    )
     summary = {
         "model": args.model,
         "reasoning": args.reasoning,
@@ -941,10 +985,26 @@ def main(argv: list[str] | None = None) -> int:
         "estimated_input_tokens": estimate,
         "estimated_uncached_input_tokens": uncached_estimate,
         "execute": args.execute,
+        "diagnostic_task_ids": diagnostic_task_ids,
     }
     if not args.execute:
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 0
+    if diagnostic_task_ids and not args.allow_diagnostic:
+        print(
+            json.dumps(
+                {
+                    **summary,
+                    "error": (
+                        "selected tasks are diagnostic-only; pass "
+                        "--allow-diagnostic to spend model tokens intentionally"
+                    ),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 2
     if args.max_runs != len(pending):
         print(
             json.dumps(

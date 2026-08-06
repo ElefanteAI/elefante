@@ -9,6 +9,8 @@ import hashlib
 import json
 import re
 import subprocess
+import sys
+import tempfile
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
@@ -26,6 +28,7 @@ FORBIDDEN_CONTEXT_PREFIXES = (
     "CHANGELOG.md",
 )
 OUTCOME_FIELDS = {
+    "outcome_schema_version",
     "evaluation_id",
     "task_id",
     "condition",
@@ -42,7 +45,32 @@ OUTCOME_FIELDS = {
     "output_tokens",
     "duration_ms",
     "failure_category",
+    "stage_trace",
 }
+OPTIONAL_OUTCOME_FIELDS = {
+    "outcome_schema_version",
+    "stage_trace",
+}  # Frozen v1 records remain readable.
+STAGE_TRACE_FIELDS = {
+    "judge_status",
+    "acceptance_fixture_sha256",
+    "retrieval_status",
+    "considered_memory_count",
+    "selection_status",
+    "selected_memory_count",
+    "delivery_status",
+    "prompt_sha256",
+    "brief_sha256",
+    "agent_use_status",
+    "execution_status",
+    "changed_files",
+    "change_digest",
+    "acceptance_status",
+    "acceptance_exit_code",
+}
+
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 def _git(repo_root: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
@@ -146,7 +174,7 @@ def validate_outcome_record(record: dict[str, Any]) -> list[str]:
         f"{field} is not an allowed metadata field"
         for field in sorted(set(record) - OUTCOME_FIELDS)
     ]
-    missing = OUTCOME_FIELDS - set(record)
+    missing = OUTCOME_FIELDS - OPTIONAL_OUTCOME_FIELDS - set(record)
     errors.extend(f"missing required field: {field}" for field in sorted(missing))
     if record.get("condition") not in {"baseline", "task-brief"}:
         errors.append("condition must be baseline or task-brief")
@@ -171,6 +199,130 @@ def validate_outcome_record(record: dict[str, Any]) -> list[str]:
             not isinstance(value, int) or isinstance(value, bool) or value < 0
         ):
             errors.append(f"{field} must be null or a non-negative integer")
+    trace = record.get("stage_trace")
+    schema_version = record.get("outcome_schema_version")
+    if schema_version is not None and schema_version != 2:
+        errors.append("outcome_schema_version must be 2 when present")
+    if schema_version == 2 and trace is None:
+        errors.append("outcome schema v2 requires stage_trace")
+    if trace is not None and schema_version != 2:
+        errors.append("stage_trace requires outcome schema v2")
+    if trace is not None:
+        if not isinstance(trace, dict):
+            errors.append("stage_trace must be an object")
+            return errors
+        unexpected = set(trace) - STAGE_TRACE_FIELDS
+        absent = STAGE_TRACE_FIELDS - set(trace)
+        errors.extend(
+            f"stage_trace.{field} is not allowed" for field in sorted(unexpected)
+        )
+        errors.extend(
+            f"stage_trace missing required field: {field}" for field in sorted(absent)
+        )
+        if unexpected or absent:
+            return errors
+        if trace["judge_status"] not in {"eligible", "diagnostic-only"}:
+            errors.append("stage_trace.judge_status is invalid")
+        if trace["retrieval_status"] not in {
+            "not-applicable",
+            "empty",
+            "completed",
+        }:
+            errors.append("stage_trace.retrieval_status is invalid")
+        if trace["selection_status"] not in {
+            "not-applicable",
+            "empty",
+            "selected",
+            "abstained",
+        }:
+            errors.append("stage_trace.selection_status is invalid")
+        if trace["delivery_status"] not in {
+            "not-applicable",
+            "empty",
+            "delivered",
+        }:
+            errors.append("stage_trace.delivery_status is invalid")
+        if trace["agent_use_status"] != "unknown":
+            errors.append("stage_trace.agent_use_status must remain unknown")
+        if trace["execution_status"] not in {"changed", "no-change"}:
+            errors.append("stage_trace.execution_status is invalid")
+        if trace["acceptance_status"] not in {"passed", "failed"}:
+            errors.append("stage_trace.acceptance_status is invalid")
+        for field in ("acceptance_fixture_sha256", "prompt_sha256"):
+            if not (
+                isinstance(trace[field], str)
+                and re.fullmatch(r"[0-9a-f]{64}", trace[field])
+            ):
+                errors.append(f"stage_trace.{field} must be SHA-256")
+        for field in ("brief_sha256", "change_digest"):
+            if trace[field] is not None and not (
+                isinstance(trace[field], str)
+                and re.fullmatch(r"[0-9a-f]{64}", trace[field])
+            ):
+                errors.append(f"stage_trace.{field} must be null or SHA-256")
+        considered = trace["considered_memory_count"]
+        if considered is not None and (
+            not isinstance(considered, int)
+            or isinstance(considered, bool)
+            or considered < 0
+        ):
+            errors.append(
+                "stage_trace.considered_memory_count must be null or non-negative"
+            )
+        selected = trace["selected_memory_count"]
+        if (
+            not isinstance(selected, int)
+            or isinstance(selected, bool)
+            or selected < 0
+        ):
+            errors.append("stage_trace.selected_memory_count must be non-negative")
+        elif isinstance(record.get("memory_ids"), list) and selected != len(
+            record["memory_ids"]
+        ):
+            errors.append("stage_trace.selected_memory_count mismatches memory_ids")
+        changed_files = trace["changed_files"]
+        if not isinstance(changed_files, list) or len(changed_files) > 200:
+            errors.append("stage_trace.changed_files must be a list of at most 200 paths")
+        else:
+            for path in changed_files:
+                if (
+                    not isinstance(path, str)
+                    or not path
+                    or Path(path).is_absolute()
+                    or ".." in Path(path).parts
+                ):
+                    errors.append("stage_trace.changed_files contains an unsafe path")
+                    break
+        exit_code = trace["acceptance_exit_code"]
+        if not isinstance(exit_code, int) or isinstance(exit_code, bool):
+            errors.append("stage_trace.acceptance_exit_code must be an integer")
+        if trace["acceptance_status"] != (
+            "passed" if record.get("acceptance_passed") is True else "failed"
+        ):
+            errors.append("stage_trace acceptance status mismatches outcome")
+        if trace["execution_status"] != (
+            "changed" if changed_files else "no-change"
+        ):
+            errors.append("stage_trace execution status mismatches changed_files")
+        if bool(changed_files) != bool(trace["change_digest"]):
+            errors.append("stage_trace change digest mismatches changed_files")
+        if record.get("condition") == "baseline":
+            if any(
+                trace[field] != "not-applicable"
+                for field in (
+                    "retrieval_status",
+                    "selection_status",
+                    "delivery_status",
+                )
+            ):
+                errors.append("baseline stage_trace must mark memory stages not-applicable")
+            if considered is not None or trace["brief_sha256"] is not None:
+                errors.append("baseline stage_trace must not contain Brief evidence")
+        elif record.get("condition") == "task-brief":
+            if considered is None or trace["brief_sha256"] is None:
+                errors.append("task-brief stage_trace must contain Brief evidence")
+            if trace["delivery_status"] == "delivered" and selected == 0:
+                errors.append("delivered stage_trace requires selected memories")
     return errors
 
 
@@ -542,11 +694,58 @@ def validate_manifest(manifest_path: Path, repo_root: Path = ROOT) -> dict[str, 
     }
 
 
+def verify_black_box_canaries(
+    manifest: dict[str, Any], repo_root: Path = ROOT
+) -> list[dict[str, Any]]:
+    """Prove every eligible judge rejects the base and accepts the known fix."""
+    from scripts.ci import run_task_intelligence_baseline as baseline
+
+    results: list[dict[str, Any]] = []
+    with tempfile.TemporaryDirectory(prefix="elefante-ti-canaries-") as temporary:
+        workspace_root = Path(temporary)
+        for task in manifest["tasks"]:
+            if not task_promotion_validity(task, repo_root)["promotion_eligible"]:
+                continue
+            verdicts: dict[str, bool] = {}
+            for label, ref in (
+                ("base", task["base_ref"]),
+                ("known_fix", task["acceptance_ref"]),
+            ):
+                workspace = workspace_root / baseline._workspace_name(
+                    "canary", task["id"], label
+                )
+                snapshot_task = {**task, "base_ref": ref}
+                baseline.prepare_workspace(repo_root, snapshot_task, workspace)
+                try:
+                    verdicts[label] = baseline.evaluate_hidden_acceptance(
+                        repo_root,
+                        workspace,
+                        task,
+                        timeout_seconds=120,
+                    )
+                finally:
+                    if workspace.exists():
+                        baseline._safe_remove_workspace(workspace, workspace_root)
+            results.append(
+                {
+                    "task_id": task["id"],
+                    "base_rejected": verdicts["base"] is False,
+                    "known_fix_accepted": verdicts["known_fix"] is True,
+                    "passed": (
+                        verdicts["base"] is False
+                        and verdicts["known_fix"] is True
+                    ),
+                }
+            )
+    return results
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--memory-export", type=Path)
     parser.add_argument("--require-promotion-ready", action="store_true")
+    parser.add_argument("--verify-canaries", action="store_true")
     args = parser.parse_args(argv)
 
     report = validate_manifest(args.manifest, ROOT)
@@ -556,6 +755,13 @@ def main(argv: list[str] | None = None) -> int:
         report["memory_leakage"] = scan_memory_payload(payload, manifest["tasks"])
         if report["memory_leakage"]:
             report["errors"].append("memory export contains benchmark answer markers")
+    if args.verify_canaries and not report["errors"]:
+        manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+        report["canary_verification"] = verify_black_box_canaries(manifest, ROOT)
+        if not report["canary_verification"]:
+            report["errors"].append("no promotion-eligible black-box canaries")
+        elif not all(item["passed"] for item in report["canary_verification"]):
+            report["errors"].append("black-box canary base/fix contract failed")
     print(json.dumps(report, indent=2, sort_keys=True))
     if report["errors"]:
         return 1

@@ -12,7 +12,12 @@ MANIFEST = ROOT / "benchmarks/task_intelligence/tasks.json"
 
 
 def _record(task_id: str, condition: str, repeat: int, passed: bool) -> dict:
+    memory_ids = [] if condition == "baseline" else ["memory"]
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    task = next((item for item in manifest["tasks"] if item["id"] == task_id), None)
+    fixture_digest = benchmark.acceptance_test_sha256(task) if task else "a" * 64
     return {
+        "outcome_schema_version": 2,
         "evaluation_id": f"{task_id}-{condition}-seed-20260805-r{repeat}",
         "task_id": task_id,
         "condition": condition,
@@ -20,7 +25,7 @@ def _record(task_id: str, condition: str, repeat: int, passed: bool) -> dict:
         "model_version": "not-exposed-by-codex-cli",
         "tool_configuration": "test",
         "run_seed": 20260805,
-        "memory_ids": [] if condition == "baseline" else ["memory"],
+        "memory_ids": memory_ids,
         "acceptance_passed": passed,
         "retries": None,
         "human_corrections": None,
@@ -29,6 +34,29 @@ def _record(task_id: str, condition: str, repeat: int, passed: bool) -> dict:
         "output_tokens": 100,
         "duration_ms": 1000 if condition == "baseline" else 1100,
         "failure_category": "" if passed else "acceptance-test",
+        "stage_trace": {
+            "judge_status": "eligible",
+            "acceptance_fixture_sha256": fixture_digest,
+            "retrieval_status": (
+                "not-applicable" if condition == "baseline" else "completed"
+            ),
+            "considered_memory_count": None if condition == "baseline" else 1,
+            "selection_status": (
+                "not-applicable" if condition == "baseline" else "selected"
+            ),
+            "selected_memory_count": len(memory_ids),
+            "delivery_status": (
+                "not-applicable" if condition == "baseline" else "delivered"
+            ),
+            "prompt_sha256": "b" * 64,
+            "brief_sha256": None if condition == "baseline" else "c" * 64,
+            "agent_use_status": "unknown",
+            "execution_status": "changed",
+            "changed_files": ["src/fix.py"],
+            "change_digest": "d" * 64,
+            "acceptance_status": "passed" if passed else "failed",
+            "acceptance_exit_code": 0 if passed else 1,
+        },
         "repeat": repeat,
     }
 
@@ -67,6 +95,9 @@ def test_complete_strong_holdout_passes_promotion_gate() -> None:
     result = report.summarize(manifest, records, split="holdout")
 
     assert result["protocol_complete"] is True
+    assert result["stage_observability_complete"] is True
+    assert result["stage_observability_failures"] == []
+    assert result["evaluation_complete"] is True
     assert result["pass_rate_lift_points"] == 100
     assert result["paired_95_percent_ci_points"] == [100, 100]
     assert result["cost_gate"] is True
@@ -74,6 +105,28 @@ def test_complete_strong_holdout_passes_promotion_gate() -> None:
     assert result["retry_correction_measurement_available"] is False
     assert result["retry_correction_gate"] is False
     assert result["promotion_gate"] is True
+    assert result["causal_stage_observability"]["treatment_delivery_delivered"] == 36
+
+    legacy_records = [
+        {
+            key: value
+            for key, value in record.items()
+            if key not in {"outcome_schema_version", "stage_trace"}
+        }
+        for record in records
+    ]
+    legacy_result = report.summarize(manifest, legacy_records, split="holdout")
+    assert legacy_result["protocol_complete"] is True
+    assert legacy_result["stage_observability_complete"] is False
+    assert len(legacy_result["stage_observability_failures"]) == len(legacy_records)
+    assert legacy_result["evaluation_complete"] is False
+    assert legacy_result["promotion_gate"] is False
+
+    tampered_records = json.loads(json.dumps(records))
+    tampered_records[0]["stage_trace"]["acceptance_fixture_sha256"] = "0" * 64
+    tampered_result = report.summarize(manifest, tampered_records, split="holdout")
+    assert tampered_result["stage_observability_complete"] is False
+    assert tampered_result["promotion_gate"] is False
 
 
 def test_measured_retry_reduction_is_an_effectiveness_path() -> None:

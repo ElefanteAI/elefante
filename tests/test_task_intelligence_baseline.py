@@ -149,6 +149,52 @@ def test_default_workspace_root_is_short_and_outside_the_repository() -> None:
     assert len(baseline._workspace_name("condition", "task", "repeat")) < 32
 
 
+def test_trial_records_end_to_end_causal_stage_trace(monkeypatch, tmp_path) -> None:
+    task = _task("install-dry-run-005")
+    fixed_path = "scripts/setup/bootstrap_release_bundle.py"
+
+    def fake_agent(workspace, _task_value, **_kwargs):
+        fixed_source = baseline._git_bytes(
+            ROOT,
+            "show",
+            f"{task['acceptance_ref']}:{fixed_path}",
+        )
+        (workspace / fixed_path).write_bytes(fixed_source)
+        return (
+            0,
+            {"input_tokens": 100, "cached_input_tokens": 40, "output_tokens": 20},
+            250,
+            "codex-test",
+            "",
+        )
+
+    monkeypatch.setattr(baseline, "run_codex_baseline", fake_agent)
+    output_dir = tmp_path / "outcomes"
+    workspace_root = tmp_path / "workspaces"
+    result = baseline.execute_trial(
+        ROOT,
+        {"task": task, "task_id": task["id"], "repeat": 1},
+        output_dir=output_dir,
+        workspace_root=workspace_root,
+        model="test-model",
+        reasoning="low",
+        timeout_seconds=60,
+        keep_failures=False,
+    )
+    record = json.loads(Path(result["outcome"]).read_text(encoding="utf-8"))
+    trace = record["stage_trace"]
+
+    assert record["acceptance_passed"] is True
+    assert trace["judge_status"] == "eligible"
+    assert trace["retrieval_status"] == "not-applicable"
+    assert trace["execution_status"] == "changed"
+    assert trace["changed_files"] == [fixed_path]
+    assert trace["acceptance_status"] == "passed"
+    assert trace["agent_use_status"] == "unknown"
+    assert baseline.validate_outcome_record(record) == []
+    assert not any(workspace_root.glob("trial-*"))
+
+
 def test_run_plan_requires_an_exact_cost_cap() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
 
@@ -194,7 +240,7 @@ def test_execute_requires_explicit_token_caps(capsys) -> None:
     result = baseline.main(
         [
             "--task",
-            _first_task()["id"],
+            "install-dry-run-005",
             "--model",
             "test-model",
             "--execute",
@@ -212,7 +258,7 @@ def test_execute_rejects_estimate_above_cap(capsys) -> None:
     result = baseline.main(
         [
             "--task",
-            _first_task()["id"],
+            "install-dry-run-005",
             "--model",
             "test-model",
             "--execute",
@@ -228,3 +274,18 @@ def test_execute_rejects_estimate_above_cap(capsys) -> None:
     report = json.loads(capsys.readouterr().out)
     assert result == 2
     assert report["error"] == "estimated execution exceeds a cumulative token cap"
+
+
+def test_execute_blocks_diagnostic_only_judges_by_default(capsys) -> None:
+    result = baseline.main(
+        [
+            "--task",
+            _first_task()["id"],
+            "--execute",
+        ]
+    )
+
+    report = json.loads(capsys.readouterr().out)
+    assert result == 2
+    assert report["diagnostic_task_ids"] == [_first_task()["id"]]
+    assert "--allow-diagnostic" in report["error"]

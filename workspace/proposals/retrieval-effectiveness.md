@@ -1,6 +1,6 @@
 # PRD / SDD: Task Intelligence Pipeline
 
-> Status: V2 SHADOW + 3 BLACK-BOX CANARIES IMPLEMENTED; NO EFFECTIVENESS LIFT PROVEN
+> Status: EVALUATION INFRASTRUCTURE IMPLEMENTED; NO EFFECTIVENESS LIFT PROVEN
 >
 > Owner: planning
 >
@@ -372,11 +372,21 @@ attempt, isolates inherited configuration, uses short temporary workspaces,
 and records unavailable retry/correction measurements as `null`. The frozen
 seed controls pair order only; it does not seed model generation.
 
-No further paired run is justified until the benchmark can distinguish the
-causal stages: valid task and judge, relevant retrieval, selection, delivery,
-agent use, correct execution, and acceptance. The next iteration adds this
-failure observability and enough independently reviewed black-box tasks before
-opening a fresh holdout.
+The delivered stage trace distinguishes judge validity, retrieval, selection,
+delivery, repository changes, and black-box acceptance using bounded metadata
+and SHA-256 evidence. It stores no prompt, response, memory body, or source
+diff. Direct evidence that the agent cognitively used a delivered memory is not
+observable and remains `UNKNOWN`; causal outcome lift must come from repeated
+paired results, not self-report.
+
+The pipeline self-test executes every eligible canary at both exact refs and
+requires base-fail/known-fix-pass. Model execution against invalid historical
+judges is blocked by default. Legacy outcome records remain readable but cannot
+pass promotion without complete stage traces.
+
+No fresh holdout is justified until enough independently reviewed black-box
+tasks exist and calibration demonstrates lift. This is a benchmark-population
+and product-effect gate, not missing evaluation infrastructure.
 
 ### Phase 3: Opt-in workflow pilot
 

@@ -47,6 +47,7 @@ jobs:
           python scripts/ci/bump_version.py --check
           version="$(python -c 'from src import __version__; print(__version__)')"
           python scripts/ci/render_release_notes.py "$version" --validate-only
+          python scripts/ci/verify_task_intelligence_benchmark.py --verify-canaries
           python -m ruff check \
             scripts/ci/audit_task_intelligence_retrieval.py \
             scripts/ci/generate_release_checksums.py \

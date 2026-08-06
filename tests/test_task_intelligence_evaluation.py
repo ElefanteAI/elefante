@@ -4,6 +4,7 @@ import importlib
 import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 
 from scripts.ci import run_task_intelligence_evaluation as evaluation
 from scripts.ci import audit_task_intelligence_retrieval as retrieval_audit
@@ -127,6 +128,68 @@ def test_v2_outcome_paths_are_isolated_from_frozen_v1() -> None:
     assert v1 != v2
     assert "brief-v2" not in v1.name
     assert "brief-v2" in v2.name
+
+
+def test_treatment_trial_records_retrieval_delivery_execution_and_acceptance(
+    monkeypatch, tmp_path
+) -> None:
+    task = next(
+        task for task in _manifest()["tasks"] if task["id"] == "install-dry-run-005"
+    )
+    fixed_path = "scripts/setup/bootstrap_release_bundle.py"
+
+    def fake_agent(workspace, _task_value, **_kwargs):
+        fixed_source = evaluation.baseline._git_bytes(
+            ROOT,
+            "show",
+            f"{task['acceptance_ref']}:{fixed_path}",
+        )
+        (workspace / fixed_path).write_bytes(fixed_source)
+        return (
+            0,
+            {"input_tokens": 100, "cached_input_tokens": 40, "output_tokens": 20},
+            250,
+            "codex-test",
+            "",
+        )
+
+    monkeypatch.setattr(evaluation.baseline, "run_codex_baseline", fake_agent)
+    brief = SimpleNamespace(
+        rendered_context="EXECUTION EVIDENCE\n- [memory-1] preserve dry-run boundaries",
+        selected_memory_ids=["memory-1"],
+        omissions=[],
+        abstained=False,
+    )
+    result = evaluation.execute_trial(
+        {
+            **task,
+            "task": task,
+            "task_id": task["id"],
+            "condition": "task-brief",
+            "repeat": 1,
+        },
+        brief=brief,
+        output_dir=tmp_path / "outcomes",
+        workspace_root=tmp_path / "workspaces",
+        model="test-model",
+        reasoning="low",
+        run_seed=20260805,
+        timeout_seconds=60,
+        keep_failures=False,
+        brief_profile=TaskBriefProfile.V2,
+    )
+    record = json.loads(Path(result["outcome"]).read_text(encoding="utf-8"))
+    trace = record["stage_trace"]
+
+    assert record["acceptance_passed"] is True
+    assert record["memory_ids"] == ["memory-1"]
+    assert trace["retrieval_status"] == "completed"
+    assert trace["selection_status"] == "selected"
+    assert trace["delivery_status"] == "delivered"
+    assert trace["considered_memory_count"] == 1
+    assert trace["execution_status"] == "changed"
+    assert trace["acceptance_status"] == "passed"
+    assert evaluation.validate_outcome_record(record) == []
 
 
 def test_source_candidates_diversify_files(monkeypatch, tmp_path) -> None:
@@ -346,6 +409,26 @@ def test_diagnostic_condition_runs_only_one_side(capsys) -> None:
     assert result == 0
     assert report["planned_runs"] == 1
     assert report["pending_runs"] == 1
+
+
+def test_paired_execution_blocks_diagnostic_only_judges_by_default(capsys) -> None:
+    task_id = _manifest()["tasks"][0]["id"]
+    result = evaluation.main(
+        [
+            "--task",
+            task_id,
+            "--repetitions",
+            "1",
+            "--brief-profile",
+            "v2",
+            "--execute",
+        ]
+    )
+    report = json.loads(capsys.readouterr().out)
+
+    assert result == 2
+    assert report["diagnostic_task_ids"] == [task_id]
+    assert "--allow-diagnostic" in report["error"]
 
 
 def test_treatment_prompt_keeps_hidden_acceptance_out() -> None:
