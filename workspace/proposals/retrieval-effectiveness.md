@@ -60,6 +60,57 @@ Those signals are not proof that a memory improved a task. Access count measures
 exposure, and co-activation measures reuse. Neither is a causal outcome signal.
 The Task Intelligence Pipeline must preserve that distinction.
 
+## Memory quality contract
+
+A memory is useful only when it can change a task decision without hiding its
+limits. Storage volume, retrieval frequency, and similarity are not quality.
+
+### Structure at ingestion
+
+Store the smallest durable unit that remains actionable:
+
+1. **scope and trigger** — where the memory applies and when it should surface;
+2. **claim or action** — the decision, constraint, dependency, failure, or
+   safeguard the agent can use;
+3. **reason** — why it matters or what failure it prevents;
+4. **provenance** — source, project, workspace, file, line, or user authority;
+5. **confidence and verification** — observed, verified, or explicitly unknown;
+6. **lifecycle** — active, conflicting, superseded, deprecated, or archived.
+
+Reject conversational residue, duplicated summaries, unsupported conclusions,
+secrets, task answers, and context that is only temporarily true. Search before
+write; update or supersede an existing memory instead of adding a competing
+copy.
+
+### Selection and signalling
+
+Selection is a sequence of gates, not one opaque score:
+
+1. valid lifecycle and correct project/workspace scope;
+2. no silently unresolved contradiction;
+3. at least two independent relevance signals, including an action anchor such
+   as a path, symbol, dependency, directive, decision, failure, or safeguard;
+4. positive marginal value beyond already selected evidence;
+5. fit inside the stage token budget; otherwise abstain.
+
+Every selected item must expose its role, provenance, verification state,
+reason for selection, and unresolved conflicts. Current source is authoritative
+for present implementation state; memory supplies durable intent and history.
+
+### Management and learning
+
+- Retrieval is exposure, not reinforcement. Do not promote a memory because it
+  was frequently seen.
+- Outcome attribution starts only after a valid control-versus-treatment task
+  effect exists. Bundle-level lift does not identify which memory caused it.
+- Per-memory learning requires repeated ablation or leave-one-out trials across
+  multiple tasks. One success or failure cannot promote, demote, merge, archive,
+  or delete a memory.
+- Learned utility must be bounded, explainable, reversible, local, and separate
+  from source reliability.
+- Preserve rollback: retain supersession links and archive recoverably; never
+  rewrite historical outcomes.
+
 ## Scope
 
 The first evaluated scope is coding work that depends on prior project context:
@@ -366,6 +417,16 @@ at 3/3 passes in both conditions. Restore still failed after the disclosed
 golden-path memory ID was confirmed in the treatment Brief. The current source
 retrieval diagnostic reaches a historical repair path in 16/18 calibration
 tasks, but this is navigation evidence only.
+
+A later controlled restore run completed all three pairs with the same frozen
+model, tools, task, seed, and v2 Brief profile. Control passed 0/3; treatment
+passed 2/3. Treatment used 20.8 percent fewer total input tokens and 33.9
+percent fewer uncached input tokens, but 44.5 percent more output tokens and
+35.9 percent more wall time. The 25 percent duration ceiling therefore failed.
+Because this is one task cluster, no cross-task confidence interval is valid;
+the evaluator now returns `null` instead of a degenerate interval and blocks
+effectiveness and promotion gates. This result supports further calibration,
+not default injection or a public claim.
 
 The evaluator now fails closed when the Codex CLI exits without a measurable
 attempt, isolates inherited configuration, uses short temporary workspaces,

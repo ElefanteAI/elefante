@@ -15,9 +15,11 @@ product claim.
 - Three tasks now have reviewed black-box canaries. Each canary fails at its
   exact base ref and passes at its exact known-good ref. The other 27 tasks
   remain ineligible, so the benchmark as a whole is not promotion-ready.
-- Current causal result: **no correctness improvement has been demonstrated**.
-  CORS tied at 3/3 passes per condition; restore still failed after its
-  disclosed golden-path memory was confirmed in the treatment Brief.
+- Current causal result: **promotable correctness improvement has not been
+  demonstrated**. CORS tied at 3/3 passes per condition. A later three-pair
+  restore canary produced 0/3 control passes and 2/3 Task Brief passes, but it
+  is one task, has no cross-task confidence interval, and exceeded the latency
+  gate. It is a useful local signal, not a product claim.
 - The current retrieval diagnostic reaches a historical repair path in 16/18
   calibration tasks. This measures navigation only, not task success.
 - `--require-promotion-ready` fails closed until every selected task has an
@@ -31,6 +33,8 @@ product claim.
   execution, and acceptance status plus SHA-256 evidence. Prompts, responses, memory
   bodies, and source diffs are not stored. Whether the agent actually used a
   delivered memory remains `UNKNOWN`.
+- One-task reports return no clustered confidence interval. Resampling one task
+  would create false certainty about performance on other tasks.
 - Model execution against an invalid historical judge is blocked unless the
   operator explicitly passes `--allow-diagnostic`. Diagnostic results can
   never satisfy promotion.
@@ -114,6 +118,10 @@ python scripts/ci/run_task_intelligence_evaluation.py \
 # Report fails unless every pair and every causal-stage trace is complete.
 python scripts/ci/summarize_task_intelligence_evaluation.py \
   --brief-profile v2 --split calibration --require-complete
+
+# Report one completed task without pretending it proves cross-task lift.
+python scripts/ci/summarize_task_intelligence_evaluation.py \
+  --brief-profile v2 --split calibration --task TASK_ID --require-complete
 
 # Promotion is a separate, stricter gate and currently fails by design.
 python scripts/ci/summarize_task_intelligence_evaluation.py \

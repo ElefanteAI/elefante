@@ -131,14 +131,15 @@ def test_complete_strong_holdout_passes_promotion_gate() -> None:
 
 def test_measured_retry_reduction_is_an_effectiveness_path() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    task = next(task for task in manifest["tasks"] if task["split"] == "holdout")
+    tasks = [task for task in manifest["tasks"] if task["split"] == "holdout"]
     records = []
-    for repeat in range(1, 4):
-        control = _record(task["id"], "baseline", repeat, True)
-        treatment = _record(task["id"], "task-brief", repeat, True)
-        control.update({"retries": 2, "human_corrections": 0})
-        treatment.update({"retries": 0, "human_corrections": 0})
-        records.extend((control, treatment))
+    for task in tasks:
+        for repeat in range(1, 4):
+            control = _record(task["id"], "baseline", repeat, True)
+            treatment = _record(task["id"], "task-brief", repeat, True)
+            control.update({"retries": 2, "human_corrections": 0})
+            treatment.update({"retries": 0, "human_corrections": 0})
+            records.extend((control, treatment))
 
     result = report.summarize(manifest, records, split="holdout")
 
@@ -148,6 +149,31 @@ def test_measured_retry_reduction_is_an_effectiveness_path() -> None:
     assert result["retry_correction_95_percent_ci_counts"] == [2, 2]
     assert result["retry_correction_gate"] is True
     assert result["effectiveness_gate"] is True
+    assert result["promotion_gate"] is False
+
+
+def test_single_task_report_is_complete_but_not_inferential() -> None:
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    task_id = "runtime-restore-integrity-025"
+    records = []
+    for repeat, treatment_passed in enumerate((True, True, False), start=1):
+        records.append(_record(task_id, "baseline", repeat, False))
+        records.append(_record(task_id, "task-brief", repeat, treatment_passed))
+
+    result = report.summarize(
+        manifest,
+        records,
+        split="calibration",
+        task_id=task_id,
+    )
+
+    assert result["expected_pairs"] == 3
+    assert result["evaluation_complete"] is True
+    assert result["pass_rate_lift_points"] == 66.666667
+    assert result["task_cluster_count"] == 1
+    assert result["inferential_evidence_available"] is False
+    assert result["paired_95_percent_ci_points"] is None
+    assert result["pass_rate_gate"] is False
     assert result["promotion_gate"] is False
 
 

@@ -47,10 +47,13 @@ def _clustered_interval(
     *,
     seed: int,
     samples: int = 10_000,
-) -> tuple[float, float]:
+) -> tuple[float, float] | None:
     task_ids = sorted(differences)
-    if not task_ids:
-        return 0.0, 0.0
+    # One task can measure a local effect, but it cannot estimate whether that
+    # effect generalizes across tasks. Resampling one cluster produces a
+    # degenerate interval and false confidence.
+    if len(task_ids) < 2:
+        return None
     generator = random.Random(seed)
     estimates: list[float] = []
     for _ in range(samples):
@@ -91,8 +94,13 @@ def summarize(
     records: list[dict[str, Any]],
     *,
     split: str,
+    task_id: str | None = None,
 ) -> dict[str, Any]:
     tasks = {task["id"]: task for task in manifest["tasks"] if task["split"] == split}
+    if task_id is not None:
+        if task_id not in tasks:
+            raise ValueError(f"task {task_id!r} is not in split {split!r}")
+        tasks = {task_id: tasks[task_id]}
     pairs: dict[tuple[str, int], dict[str, dict[str, Any]]] = defaultdict(dict)
     for record in records:
         if record["task_id"] in tasks:
@@ -158,7 +166,7 @@ def summarize(
     )
     denominator = total_pairs or 1
     lift = (treatment_passes - baseline_passes) / denominator
-    ci_low, ci_high = _clustered_interval(
+    pass_rate_interval = _clustered_interval(
         differences,
         seed=manifest["measurement"]["run_seed"],
     )
@@ -198,13 +206,13 @@ def summarize(
         if retry_measurement_available and baseline_retry_total > 0
         else None
     )
-    retry_ci_low, retry_ci_high = (
+    retry_interval = (
         _clustered_interval(
             retry_differences,
             seed=manifest["measurement"]["run_seed"],
         )
         if retry_reduction_percent is not None
-        else (0.0, 0.0)
+        else None
     )
     input_increase = (
         0.0
@@ -221,13 +229,16 @@ def summarize(
         {**manifest, "tasks": list(tasks.values())}
     )
     pass_rate_gate = (
-        lift * 100 >= measurement["minimum_pass_rate_lift_points"] and ci_low > 0
+        pass_rate_interval is not None
+        and lift * 100 >= measurement["minimum_pass_rate_lift_points"]
+        and pass_rate_interval[0] > 0
     )
     retry_correction_gate = (
         retry_reduction_percent is not None
+        and retry_interval is not None
         and retry_reduction_percent
         >= measurement["minimum_retry_reduction_percent"]
-        and retry_ci_low > 0
+        and retry_interval[0] > 0
         and treatment_passes >= baseline_passes
     )
     effectiveness_gate = pass_rate_gate or retry_correction_gate
@@ -239,6 +250,9 @@ def summarize(
     return {
         "benchmark_id": manifest["benchmark_id"],
         "split": split,
+        "task_id": task_id,
+        "task_cluster_count": len(differences),
+        "inferential_evidence_available": pass_rate_interval is not None,
         "expected_pairs": expected_pairs,
         "complete_pairs": total_pairs,
         "protocol_complete": protocol_complete,
@@ -250,10 +264,14 @@ def summarize(
         "baseline_pass_rate": round(baseline_passes / denominator, 6),
         "task_brief_pass_rate": round(treatment_passes / denominator, 6),
         "pass_rate_lift_points": round(lift * 100, 6),
-        "paired_95_percent_ci_points": [
-            round(ci_low * 100, 6),
-            round(ci_high * 100, 6),
-        ],
+        "paired_95_percent_ci_points": (
+            [
+                round(pass_rate_interval[0] * 100, 6),
+                round(pass_rate_interval[1] * 100, 6),
+            ]
+            if pass_rate_interval is not None
+            else None
+        ),
         "input_token_increase_percent": round(input_increase, 6),
         "duration_increase_percent": round(duration_increase, 6),
         "retry_correction_measurement_available": retry_measurement_available,
@@ -262,10 +280,11 @@ def summarize(
             if retry_reduction_percent is not None
             else None
         ),
-        "retry_correction_95_percent_ci_counts": [
-            round(retry_ci_low, 6),
-            round(retry_ci_high, 6),
-        ],
+        "retry_correction_95_percent_ci_counts": (
+            [round(retry_interval[0], 6), round(retry_interval[1], 6)]
+            if retry_interval is not None
+            else None
+        ),
         "retry_correction_gate": retry_correction_gate,
         "class_lift_points": {
             task_class: round(100 * sum(values) / len(values), 6)
@@ -331,6 +350,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--split", choices=("calibration", "holdout"), default="holdout"
     )
+    parser.add_argument("--task", help="Summarize one task in the selected split")
     parser.add_argument("--require-complete", action="store_true")
     parser.add_argument("--require-promotion", action="store_true")
     args = parser.parse_args(argv)
@@ -347,7 +367,11 @@ def main(argv: list[str] | None = None) -> int:
         run_seed=args.run_seed,
         brief_profile=TaskBriefProfile(args.brief_profile),
     )
-    report = summarize(manifest, records, split=args.split)
+    try:
+        report = summarize(manifest, records, split=args.split, task_id=args.task)
+    except ValueError as error:
+        print(json.dumps({"errors": [str(error)]}, indent=2))
+        return 2
     report["brief_profile"] = args.brief_profile
     print(json.dumps(report, indent=2, sort_keys=True))
     if args.require_complete and not report["evaluation_complete"]:
