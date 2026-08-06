@@ -1,6 +1,6 @@
 # PRD / SDD: Task Intelligence Pipeline
 
-> Status: PRELIMINARY HOLDOUT SHOWED NO LIFT; RETURNED TO PHASE 1
+> Status: V2 SHADOW REVISION IMPLEMENTED; HISTORICAL BENCHMARK IS DIAGNOSTIC-ONLY
 >
 > Owner: planning
 >
@@ -90,8 +90,15 @@ The system must reject evaluation tasks without observable success criteria.
 
 ### 2. Candidate retrieval
 
-Use the existing retrieval engine as the candidate generator. Do not introduce
-new scoring weights before measurement.
+The frozen v1 profile uses the existing retrieval engine. The opt-in v2 profile
+adds a deterministic pre-filter over the task's pre-fix repository snapshot,
+then uses the existing semantic model for reranking. The profiles and outcome
+files remain separate so v1 can be reproduced exactly.
+
+V2 source candidates retain file, line, heading, and symbol lineage; normalize
+common plural forms; diversify files; and exclude demo, historical archive,
+build, dependency, and benchmark material. Snapshot source is labelled observed
+and unverified: current code proves what exists, not that buggy code is correct.
 
 Apply deterministic gates in this order:
 
@@ -122,7 +129,7 @@ Minimum contract:
   "evidence": [
     {
       "memory_id": "uuid",
-      "role": "constraint | decision | dependency | failure | safeguard | context",
+      "role": "constraint | decision | dependency | failure | safeguard | implementation | context",
       "reason_selected": "human-readable explanation",
       "source": "provenance reference",
       "verified": true,
@@ -249,7 +256,9 @@ Current Phase 0 evidence (2026-08-05):
   prompts, responses, memory bodies, and transcripts are not valid outcome
   fields.
 
-Phase 0 is complete. The frozen evaluator is `gpt-5.6-terra`, low reasoning,
+The historical Phase 0 record is complete, but it is not promotion-ready. Its
+implementation-coupled acceptance tests remain diagnostic evidence only. The
+frozen evaluator is `gpt-5.6-terra`, low reasoning,
 through `codex-cli 0.147.0-alpha.1.2` and the `task-intelligence-v1` prompt
 profile. The 18-task calibration baseline ran once under a 10.8 million total
 input-token ceiling and a 1.8 million uncached-input ceiling. It passed 6 of 18
@@ -317,6 +326,33 @@ task-local implementation evidence. The next revision must:
 No public MCP method, automatic injection, client pilot, website claim, or
 performance claim is authorized by this result.
 
+### Phase 1 v2 audit and pilot (2026-08-06)
+
+V2 fixes the observed retrieval mechanism defects: source-grounded candidates,
+heading/symbol lineage, per-file diversity, independent relevance signals,
+explicit roles, unresolved-conflict exclusion, graph relationship allowlisting,
+and abstention when evidence cannot justify an action. A maintained calibration
+audit reached a historical changed implementation file in the top ten for
+18/18 calibration tasks. This is navigation evidence only, not outcome proof.
+
+One paired calibration pilot on `install-host-routing-003` failed acceptance in
+both conditions. Treatment used 244,365 input tokens in 64,077 ms; control used
+448,324 input tokens in 92,263 ms. Lower cost did not improve correctness.
+
+Adversarial review found the governing benchmark defect: the task asked for
+host-family isolation, while its hidden test required an undisclosed new module,
+exact function names, and exact constants. Review of all 30 tasks found similar
+private-API, source-substring, exact-message, or arbitrary-threshold coupling in
+many tests. A behaviorally correct alternative can fail, so the historical
+manifest is now explicitly diagnostic-only and cannot satisfy promotion.
+
+The next benchmark revision must use black-box CLI/API/filesystem/browser
+assertions, explicit observable contracts, exact rollback refs, and an
+independent adversarial review bound to the hidden-test SHA-256. It also needs
+enough validated tasks for credible confidence. `--require-promotion-ready`
+fails closed until those contracts exist. No additional holdout or model runs
+are justified before that repair.
+
 ### Phase 3: Opt-in workflow pilot
 
 - Select the smallest compatible client integration.
@@ -371,6 +407,8 @@ The design is ready for implementation planning when:
 
 - one initial task class and at least 30 candidate tasks are identified;
 - every task has an executable or explicit acceptance criterion;
+- every promotion task has a reviewed black-box acceptance contract and its
+  exact pre-change and known-good commit refs;
 - the Task Brief schema and budget policy are approved;
 - the benchmark leakage scan exists;
 - control and treatment runs can use identical environments;
@@ -379,6 +417,16 @@ The design is ready for implementation planning when:
 
 Until those conditions are met, status remains design-only and the website must
 not market Task Intelligence as a shipped capability.
+
+## Exact rollback
+
+- V1 remains the default Task Brief profile.
+- Pass `--brief-profile v1` to reproduce the frozen evaluator.
+- V2 uses `__brief-v2` outcome filenames and separate disposable worktrees.
+- Reverting the Task Intelligence v2 commit removes the shadow revision; no
+  live memory, public MCP method, customer installation, or release is mutated.
+- Historical outcome records and commits are immutable. Never rewrite them to
+  make a later design appear successful.
 
 ## Relationship to Session Intelligence
 

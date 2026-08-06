@@ -21,7 +21,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.ci.run_task_intelligence_baseline import configuration_id  # noqa: E402
+from src.core.task_intelligence import TaskBriefProfile  # noqa: E402
 from scripts.ci.verify_task_intelligence_benchmark import (  # noqa: E402
+    manifest_promotion_readiness,
+    validate_manifest,
     validate_outcome_record,
 )
 
@@ -61,11 +64,13 @@ def load_records(
     model: str,
     reasoning: str,
     run_seed: int,
+    brief_profile: TaskBriefProfile = TaskBriefProfile.V1,
 ) -> list[dict[str, Any]]:
     profile = configuration_id(model, reasoning)
+    brief_segment = "" if brief_profile == TaskBriefProfile.V1 else "__brief-v2"
     records: list[dict[str, Any]] = []
     for condition in ("baseline", "task-brief"):
-        pattern = f"{condition}__{profile}__seed-{run_seed}__*.json"
+        pattern = f"{condition}__{profile}{brief_segment}__seed-{run_seed}__*.json"
         for path in sorted(outcome_dir.glob(pattern)):
             record = json.loads(path.read_text(encoding="utf-8"))
             errors = validate_outcome_record(record)
@@ -85,17 +90,11 @@ def summarize(
     *,
     split: str,
 ) -> dict[str, Any]:
-    tasks = {
-        task["id"]: task
-        for task in manifest["tasks"]
-        if task["split"] == split
-    }
+    tasks = {task["id"]: task for task in manifest["tasks"] if task["split"] == split}
     pairs: dict[tuple[str, int], dict[str, dict[str, Any]]] = defaultdict(dict)
     for record in records:
         if record["task_id"] in tasks:
-            pairs[(record["task_id"], record["repeat"])][
-                record["condition"]
-            ] = record
+            pairs[(record["task_id"], record["repeat"])][record["condition"]] = record
     complete_pairs = {
         key: pair
         for key, pair in pairs.items()
@@ -103,13 +102,10 @@ def summarize(
     }
     repetitions = manifest["measurement"]["paired_repetitions"]
     expected_pairs = len(tasks) * repetitions
-    protocol_complete = (
-        len(complete_pairs) == expected_pairs
-        and all(
-            (task_id, repeat) in complete_pairs
-            for task_id in tasks
-            for repeat in range(1, repetitions + 1)
-        )
+    protocol_complete = len(complete_pairs) == expected_pairs and all(
+        (task_id, repeat) in complete_pairs
+        for task_id in tasks
+        for repeat in range(1, repetitions + 1)
     )
 
     differences: dict[str, list[int]] = defaultdict(list)
@@ -126,12 +122,10 @@ def summarize(
 
     total_pairs = len(complete_pairs)
     baseline_passes = sum(
-        int(record["acceptance_passed"])
-        for record in condition_records["baseline"]
+        int(record["acceptance_passed"]) for record in condition_records["baseline"]
     )
     treatment_passes = sum(
-        int(record["acceptance_passed"])
-        for record in condition_records["task-brief"]
+        int(record["acceptance_passed"]) for record in condition_records["task-brief"]
     )
     denominator = total_pairs or 1
     lift = (treatment_passes - baseline_passes) / denominator
@@ -147,6 +141,8 @@ def summarize(
     treatment_input = total("task-brief", "input_tokens")
     baseline_duration = total("baseline", "duration_ms")
     treatment_duration = total("task-brief", "duration_ms")
+    baseline_retries = total("baseline", "retries")
+    baseline_corrections = total("baseline", "human_corrections")
     input_increase = (
         0.0
         if baseline_input == 0
@@ -158,13 +154,14 @@ def summarize(
         else 100 * (treatment_duration - baseline_duration) / baseline_duration
     )
     measurement = manifest["measurement"]
+    readiness = manifest_promotion_readiness(
+        {**manifest, "tasks": list(tasks.values())}
+    )
     effectiveness_gate = (
-        lift * 100 >= measurement["minimum_pass_rate_lift_points"]
-        and ci_low > 0
+        lift * 100 >= measurement["minimum_pass_rate_lift_points"] and ci_low > 0
     )
     cost_gate = (
-        input_increase
-        <= measurement["maximum_treatment_input_increase_percent"]
+        input_increase <= measurement["maximum_treatment_input_increase_percent"]
         and duration_increase
         <= measurement["maximum_treatment_duration_increase_percent"]
     )
@@ -185,13 +182,23 @@ def summarize(
         ],
         "input_token_increase_percent": round(input_increase, 6),
         "duration_increase_percent": round(duration_increase, 6),
+        "retry_correction_measurement_available": bool(
+            baseline_retries or baseline_corrections
+        ),
+        "retry_correction_gate": False,
         "class_lift_points": {
             task_class: round(100 * sum(values) / len(values), 6)
             for task_class, values in sorted(by_class.items())
         },
         "effectiveness_gate": effectiveness_gate,
         "cost_gate": cost_gate,
-        "promotion_gate": protocol_complete and effectiveness_gate and cost_gate,
+        "benchmark_promotion_ready": readiness["promotion_ready"],
+        "promotion_gate": (
+            readiness["promotion_ready"]
+            and protocol_complete
+            and effectiveness_gate
+            and cost_gate
+        ),
         "raw_transcripts_stored": False,
     }
 
@@ -203,19 +210,32 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model", default="gpt-5.6-terra")
     parser.add_argument("--reasoning", default="low")
     parser.add_argument("--run-seed", type=int, default=20260805)
-    parser.add_argument("--split", choices=("calibration", "holdout"), default="holdout")
+    parser.add_argument(
+        "--brief-profile",
+        choices=tuple(profile.value for profile in TaskBriefProfile),
+        default=TaskBriefProfile.V1.value,
+    )
+    parser.add_argument(
+        "--split", choices=("calibration", "holdout"), default="holdout"
+    )
     parser.add_argument("--require-complete", action="store_true")
     parser.add_argument("--require-promotion", action="store_true")
     args = parser.parse_args(argv)
 
+    verification = validate_manifest(args.manifest, ROOT)
+    if verification["errors"]:
+        print(json.dumps({"errors": verification["errors"]}, indent=2))
+        return 2
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     records = load_records(
         args.outcome_dir,
         model=args.model,
         reasoning=args.reasoning,
         run_seed=args.run_seed,
+        brief_profile=TaskBriefProfile(args.brief_profile),
     )
     report = summarize(manifest, records, split=args.split)
+    report["brief_profile"] = args.brief_profile
     print(json.dumps(report, indent=2, sort_keys=True))
     if args.require_complete and not report["protocol_complete"]:
         return 2

@@ -106,6 +106,8 @@ def test_client_directive_store_excludes_developer_protocols(tmp_path):
     assert "workspace/ISSUES.md" not in contents
     assert "scripts/ci" not in contents
     assert "API keys" in contents
+    assert "Agreement is not evidence" in contents
+    assert "measured comparison" in contents
 
 
 @pytest.mark.asyncio

@@ -6,13 +6,22 @@ from uuid import UUID, uuid4
 import pytest
 
 from src.core.task_intelligence import (
+    EvidenceRole,
     TaskBriefBudget,
     TaskBriefCompiler,
+    TaskBriefProfile,
     TaskBriefRequest,
     TaskBriefService,
+    TaskStage,
 )
 from src.models.entity import Relationship, RelationshipType
-from src.models.memory import Memory, MemoryMetadata, MemoryStatus, MemoryType, SourceType
+from src.models.memory import (
+    Memory,
+    MemoryMetadata,
+    MemoryStatus,
+    MemoryType,
+    SourceType,
+)
 from src.models.query import SearchResult
 
 
@@ -31,6 +40,9 @@ def _result(
     superseded_by_id: UUID | None = None,
     conflict_ids: list[UUID] | None = None,
     source: str = "vector",
+    file_path: str | None = None,
+    custom_metadata: dict | None = None,
+    vector_score: float | None = None,
 ) -> SearchResult:
     memory = Memory(
         id=memory_id or uuid4(),
@@ -48,11 +60,18 @@ def _result(
             archived=archived,
             superseded_by_id=superseded_by_id,
             conflict_ids=conflict_ids or [],
+            file_path=file_path,
+            custom_metadata=custom_metadata or {},
             created_at=datetime(2026, 1, 1),
             last_accessed=datetime(2026, 1, 1),
         ),
     )
-    return SearchResult(memory=memory, score=score, source=source)
+    return SearchResult(
+        memory=memory,
+        score=score,
+        source=source,
+        vector_score=vector_score,
+    )
 
 
 def test_compiler_filters_lifecycle_scope_and_trust_without_mutation() -> None:
@@ -119,7 +138,9 @@ def test_compiler_is_deterministic_bounded_and_surfaces_conflicts() -> None:
 
     assert first == second
     assert first.estimated_tokens <= request.budget.total_tokens
-    assert all(packet.estimated_tokens <= packet.token_budget for packet in first.packets)
+    assert all(
+        packet.estimated_tokens <= packet.token_budget for packet in first.packets
+    )
     assert len(first.selected_memory_ids) <= request.budget.max_evidence_items
     assert first.conflicts[0].related_memory_ids == [str(conflict_id)]
     assert any(item.truncated for packet in first.packets for item in packet.evidence)
@@ -188,3 +209,140 @@ async def test_service_uses_non_mutating_search_and_exactly_one_graph_hop() -> N
     ]
     assert len(graph_evidence) == 1
     assert graph_evidence[0].relationship_path == ["DEPENDS_ON"]
+
+
+def test_v2_prefers_actionable_source_and_exposes_selection_contract() -> None:
+    generic = _result(
+        "The dashboard architecture provides a stable backend abstraction.",
+        score=0.95,
+        vector_score=0.95,
+        file_path="docs/reference/architecture.md",
+    )
+    implementation = _result(
+        "def memory_to_dashboard_node(memory, vector_source): return vector_source",
+        score=0.62,
+        vector_score=0.62,
+        file_path="src/utils/dashboard_serializer.py",
+        custom_metadata={"symbol": "memory_to_dashboard_node"},
+    )
+    request = TaskBriefRequest(
+        task_id="dashboard-backend-label",
+        task="Report the configured dashboard vector backend label.",
+        success_criteria=["Serialized memory nodes expose the backend label."],
+        project="elefante",
+        workspace="/repo",
+        profile=TaskBriefProfile.V2,
+    )
+
+    brief = TaskBriefCompiler().compile(request, [generic, implementation])
+
+    assert brief.profile == TaskBriefProfile.V2
+    assert brief.task_id == "dashboard-backend-label"
+    assert brief.success_criteria == request.success_criteria
+    assert brief.selected_memory_ids == [str(implementation.memory.id)]
+    evidence = next(item for packet in brief.packets for item in packet.evidence)
+    assert evidence.role == EvidenceRole.IMPLEMENTATION
+    assert evidence.stage == TaskStage.EXECUTION
+    assert "source_code" in evidence.reason_selected
+    assert evidence.retrieval_signals["actionability"] >= 0.3
+
+
+def test_v2_abstains_when_evidence_is_only_generic_semantic_context() -> None:
+    generic = _result(
+        "Persistent systems should remain reliable and easy to understand.",
+        score=0.92,
+        vector_score=0.92,
+        file_path="docs/reference/architecture.md",
+    )
+    brief = TaskBriefCompiler().compile(
+        TaskBriefRequest(
+            task="Repair an unrelated installer permission failure.",
+            profile=TaskBriefProfile.V2,
+            project="elefante",
+            workspace="/repo",
+        ),
+        [generic],
+    )
+
+    assert brief.abstained is True
+    assert brief.selected_memory_ids == []
+    assert "ABSTAIN" in brief.rendered_context
+    assert {item.reason for item in brief.omissions} == {
+        "insufficient-independent-relevance"
+    }
+
+
+def test_v2_source_type_alone_does_not_prove_task_relevance() -> None:
+    unrelated_source = _result(
+        "def render_widget(theme): return theme",
+        score=0.93,
+        vector_score=0.93,
+        file_path="src/dashboard/theme.py",
+    )
+    brief = TaskBriefCompiler().compile(
+        TaskBriefRequest(
+            task="Repair installer permissions for the extracted launcher.",
+            profile=TaskBriefProfile.V2,
+            project="elefante",
+            workspace="/repo",
+        ),
+        [unrelated_source],
+    )
+
+    assert brief.abstained is True
+    assert brief.omissions[0].reason == "insufficient-independent-relevance"
+
+
+def test_v2_never_selects_one_side_of_an_unresolved_conflict() -> None:
+    conflicting = _result(
+        "Decision: use a global customer runtime for every host.",
+        memory_type=MemoryType.DECISION,
+        conflict_ids=[uuid4()],
+        file_path="workspace/PLANNING.md",
+        vector_score=0.9,
+    )
+    brief = TaskBriefCompiler().compile(
+        TaskBriefRequest(
+            task="Choose the customer runtime installation scope.",
+            profile=TaskBriefProfile.V2,
+            project="elefante",
+            workspace="/repo",
+        ),
+        [conflicting],
+    )
+
+    assert brief.abstained is True
+    assert brief.conflicts[0].memory_id == str(conflicting.memory.id)
+    assert brief.omissions[0].reason == "unresolved-conflict"
+
+
+def test_v2_decision_with_test_word_remains_planning_evidence() -> None:
+    decision = _result(
+        "Architecture decision: tests must use the stable customer runtime.",
+        memory_type=MemoryType.DECISION,
+        file_path="workspace/PLANNING.md",
+        vector_score=0.8,
+    )
+    brief = TaskBriefCompiler().compile(
+        TaskBriefRequest(
+            task="Plan stable customer runtime tests.",
+            profile=TaskBriefProfile.V2,
+            project="elefante",
+            workspace="/repo",
+        ),
+        [decision],
+    )
+
+    evidence = next(item for packet in brief.packets for item in packet.evidence)
+    assert evidence.role == EvidenceRole.DECISION
+    assert evidence.stage == TaskStage.PLANNING
+
+
+def test_v2_term_matching_normalizes_plurals_and_rewards_focused_paths() -> None:
+    query = TaskBriefCompiler._terms("host selections across adapter families")
+    path = TaskBriefCompiler._terms("scripts/setup/host_selection.py")
+
+    assert {"selection", "family"}.issubset(query)
+    assert TaskBriefCompiler._focused_overlap(query, path) > TaskBriefCompiler._overlap(
+        query, path
+    )

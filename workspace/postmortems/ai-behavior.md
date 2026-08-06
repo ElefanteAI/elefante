@@ -93,11 +93,18 @@
 **Active candidates pending (broader surface):** (a) pre-edit hook requiring `BUG-NNN | new` classification before any Edit/Write call; (b) maintained transcript-scanning verifier.
 **Lesson:** An agent constitution loaded once at session start is a passive protocol. Every doc edit starts at Known Issues. No exceptions. Active guards beat prose at the moment of action.
 
+## Issue #13: Task Intelligence Judge Encoded Hidden Implementation Shape [BUG-044, MITIGATED, guarded]
+
+**Trigger:** Source-grounded v2 retrieval reached relevant repair files and reduced one pilot's token/time cost, but both conditions failed a hidden acceptance test.
+**Root cause:** The task described observable host isolation while the judge required undisclosed exact module, function, and constant names. Audit found the same private-shape coupling class across the historical set, so failure could mean “different implementation” rather than “wrong behavior.”
+**Solution:** Preserve historical outcomes as diagnostic-only; make promotion fail closed unless each task declares behavioral assertions and exact base/known-good refs; stop model runs until a fresh black-box CLI/API/filesystem/browser benchmark is independently reviewed.
+**Lesson:** An evaluation cannot prove intelligence improvement when its judge rewards one hidden patch shape. Retrieval quality, task quality, and judge validity are separate gates.
+
 ---
 
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
-The recurring rules from these 12 issues:
+The recurring rules from these 13 issues:
 
 1. **STATE → DO → VERIFY in the same response** — analysis without action is entertainment. Issues #1, #4.
 2. **Trigger words require proof** — "done" / "ready" / "fixed" must include verification output. Issue #2.
@@ -106,6 +113,7 @@ The recurring rules from these 12 issues:
 5. **Differentiate "slow" from "hung"** — timeouts cannot fix deadlocks. Issue #9.
 6. **Broadest scope for behavioral instructions** — system-level injection, not workspace-level file presence. Issue #10.
 7. **Every export needs a documented import** — exportable ≠ restorable. Issue #11.
+8. **Judge observable outcomes, not hidden patch shape** — an invalid acceptance test can erase real improvement or reward overfitting. Issue #13.
 
 Distill any new repeating rule into `../lessons.md`. Postmortems hold the bug-specific narrative; `lessons.md` holds the cross-bug edge.
 

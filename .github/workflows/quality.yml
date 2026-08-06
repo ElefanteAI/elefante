@@ -48,6 +48,7 @@ jobs:
           version="$(python -c 'from src import __version__; print(__version__)')"
           python scripts/ci/render_release_notes.py "$version" --validate-only
           python -m ruff check \
+            scripts/ci/audit_task_intelligence_retrieval.py \
             scripts/ci/generate_release_checksums.py \
             scripts/ci/run_task_intelligence_baseline.py \
             scripts/ci/run_task_intelligence_evaluation.py \

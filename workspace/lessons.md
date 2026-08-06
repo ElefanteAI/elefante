@@ -369,6 +369,14 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Proof:** [postmortems/dashboard.md Issue #12](postmortems/dashboard.md#issue-12-orphaned-stale-dashboard-process-from-trashed-directory-bug-033-fixed-guarded) and [ISSUES.md](ISSUES.md) BUG-033 row.
 - **Avoid:** Assuming that an active listener on port 8000 is running code from the current workspace directory.
 
+### Judge Observable Outcomes, Not Hidden Patch Shape (BUG-044)
+
+- **Trigger:** A benchmark uses a historical repair test to judge whether an agent solved a task.
+- **Rule:** Promotion tests must assert a stated CLI, API, filesystem, or browser outcome. Undisclosed module names, private symbols, source substrings, exact internal messages, and arbitrary historical thresholds make a task diagnostic-only.
+- **Why:** A correct alternative implementation can fail an implementation-coupled judge. That confounds task quality with patch imitation and can hide real retrieval improvement.
+- **Proof:** [postmortems/ai-behavior.md Issue #13](postmortems/ai-behavior.md#issue-13-task-intelligence-judge-encoded-hidden-implementation-shape-bug-044-mitigated-guarded), [../scripts/ci/verify_task_intelligence_benchmark.py](../scripts/ci/verify_task_intelligence_benchmark.py), and [../tests/test_task_intelligence_benchmark.py](../tests/test_task_intelligence_benchmark.py).
+- **Avoid:** Calling a test behavioral because a manifest says so. Review its assertions and preserve the exact pre-change and known-good refs before spending holdout compute.
+
 ---
 
 ## Update Protocol

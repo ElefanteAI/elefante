@@ -91,6 +91,10 @@ SYSTEM_DIRECTIVE_DEFINITIONS = (
 
 CLIENT_SYSTEM_DIRECTIVE_DEFINITIONS = (
     (
+        "system-client-critical-thinking",
+        "ELEFANTE Critical Thinking: Agreement is not evidence. Identify the governing objective, inspect current evidence, state material uncertainty or contradictions, test the strongest competing explanation, and choose the smallest change that addresses the root cause. Do not claim improvement without a measured comparison.",
+    ),
+    (
         "system-client-grounding",
         "ELEFANTE Grounding: Use stored memory and current task evidence for project-specific claims; identify material uncertainty instead of guessing.",
     ),

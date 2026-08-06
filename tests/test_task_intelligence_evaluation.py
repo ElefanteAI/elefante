@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 
 from scripts.ci import run_task_intelligence_evaluation as evaluation
+from scripts.ci import audit_task_intelligence_retrieval as retrieval_audit
+from src.core.task_intelligence import TaskBriefProfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,6 +29,163 @@ def test_document_chunks_are_bounded_and_stable() -> None:
     assert first[0] == (1, "# Heading")
 
 
+def test_v2_chunks_retain_heading_and_symbol_lineage() -> None:
+    markdown = "# Installer\n\n## Rollback\n\nRestore the previous stable runtime.\n"
+    source = "def configure_runtime(path):\n    return path\n\ndef verify_runtime():\n    return True\n"
+
+    doc_chunks = evaluation._heading_aware_chunks(markdown, path="docs/install.md")
+    code_chunks = evaluation._heading_aware_chunks(source, path="scripts/install.py")
+
+    assert doc_chunks[0]["heading"] == "Installer > Rollback"
+    assert doc_chunks[0]["content"].startswith("Section: Installer > Rollback")
+    assert [chunk["symbol"] for chunk in code_chunks] == [
+        "configure_runtime",
+        "verify_runtime",
+    ]
+    assert code_chunks[0]["content"].startswith("Symbol: configure_runtime")
+
+
+def test_v2_source_candidates_read_only_the_prefixed_base(monkeypatch) -> None:
+    task = {
+        "id": "source-isolation",
+        "task_statement": "Configure the stable customer runtime path.",
+        "success_criteria": ["The runtime path is configured."],
+        "base_ref": "a" * 40,
+        "acceptance_ref": "b" * 40,
+    }
+    calls: list[tuple[str, ...]] = []
+
+    def fake_git(_root, *arguments):
+        calls.append(arguments)
+        assert arguments == ("archive", "--format=tar", task["base_ref"])
+        import io
+        import tarfile
+
+        payload = io.BytesIO()
+        content = b"def configure_runtime(path):\n    return path\n"
+        with tarfile.open(fileobj=payload, mode="w:") as archive:
+            member = tarfile.TarInfo("scripts/setup/install.py")
+            member.size = len(content)
+            archive.addfile(member, io.BytesIO(content))
+            demo = tarfile.TarInfo("scripts/demo/generate_showcase_snapshot.py")
+            demo.size = len(content)
+            archive.addfile(demo, io.BytesIO(content))
+        return payload.getvalue()
+
+    monkeypatch.setattr(evaluation.baseline, "_git_bytes", fake_git)
+
+    candidates = evaluation.source_grounded_candidates(ROOT, task)
+
+    assert candidates
+    assert {candidate["path"] for candidate in candidates} == {
+        "scripts/setup/install.py"
+    }
+    assert calls == [("archive", "--format=tar", task["base_ref"])]
+    assert all(
+        task["acceptance_ref"] not in argument for call in calls for argument in call
+    )
+
+
+def test_v2_prompt_applies_critical_reasoning_to_both_conditions() -> None:
+    task = _manifest()["tasks"][0]
+
+    class Brief:
+        rendered_context = "ELEFANTE TASK BRIEF\nABSTAIN: weak evidence"
+
+    control = evaluation.build_profile_prompt(task, profile=TaskBriefProfile.V2)
+    treatment = evaluation.build_treatment_prompt(
+        task,
+        Brief(),
+        profile=TaskBriefProfile.V2,
+    )
+
+    directive = "Agreement is not evidence."
+    assert control.count(directive) == 1
+    assert treatment.count(directive) == 1
+    assert treatment.startswith(control)
+
+
+def test_v2_outcome_paths_are_isolated_from_frozen_v1() -> None:
+    item = {"condition": "task-brief", "task_id": "task", "repeat": 1}
+    v1 = evaluation._outcome_path(
+        Path("outcomes"),
+        item,
+        model="model",
+        reasoning="low",
+        run_seed=7,
+        brief_profile=TaskBriefProfile.V1,
+    )
+    v2 = evaluation._outcome_path(
+        Path("outcomes"),
+        item,
+        model="model",
+        reasoning="low",
+        run_seed=7,
+        brief_profile=TaskBriefProfile.V2,
+    )
+
+    assert v1 != v2
+    assert "brief-v2" not in v1.name
+    assert "brief-v2" in v2.name
+
+
+def test_source_candidates_diversify_files(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(
+        evaluation,
+        "_repository_files",
+        lambda *_: [
+            (
+                "src/alpha.py",
+                b"def host_selection():\n    return 'adapter family'\n" * 8,
+            ),
+            ("src/beta.py", b"def host_adapter():\n    return 'selection family'\n"),
+        ],
+    )
+    task = {
+        "task_statement": "isolate host selections by adapter family",
+        "success_criteria": ["each host family remains isolated"],
+        "base_ref": "unused",
+    }
+
+    candidates = evaluation.source_grounded_candidates(tmp_path, task, limit=8)
+
+    assert {candidate["path"] for candidate in candidates} == {
+        "src/alpha.py",
+        "src/beta.py",
+    }
+    assert sum(candidate["path"] == "src/alpha.py" for candidate in candidates) <= 3
+
+
+def test_retrieval_audit_scores_only_after_prefixed_retrieval(
+    monkeypatch, tmp_path
+) -> None:
+    calls = []
+    task = {
+        "id": "task",
+        "base_ref": "a" * 40,
+        "acceptance_ref": "b" * 40,
+    }
+
+    def candidates(*_args, **_kwargs):
+        calls.append("retrieve")
+        return [{"path": "src/fix.py"}]
+
+    def git(*_args):
+        calls.append(_args[1])
+        if _args[1] == "diff":
+            return type("Result", (), {"returncode": 0, "stdout": "src/fix.py\n"})()
+        return type("Result", (), {"returncode": 0, "stdout": ""})()
+
+    monkeypatch.setattr(retrieval_audit, "source_grounded_candidates", candidates)
+    monkeypatch.setattr(retrieval_audit, "_git", git)
+
+    result = retrieval_audit.audit_task(tmp_path, task, top_k=10)
+
+    assert calls[0] == "retrieve"
+    assert result["hit"] is True
+    assert result["hits"] == ["src/fix.py"]
+
+
 def test_snapshot_memories_are_from_prefixed_base_context_only() -> None:
     task = _manifest()["tasks"][0]
 
@@ -37,7 +196,40 @@ def test_snapshot_memories_are_from_prefixed_base_context_only() -> None:
         task["context_paths"]
     )
     assert all(memory.metadata.project == "elefante" for memory in memories)
-    assert all(memory.metadata.workspace == "historical-snapshot" for memory in memories)
+    assert all(
+        memory.metadata.workspace == "historical-snapshot" for memory in memories
+    )
+
+
+def test_v2_snapshot_observation_is_not_mislabelled_verified(monkeypatch) -> None:
+    monkeypatch.setattr(
+        evaluation,
+        "source_grounded_candidates",
+        lambda *_: [
+            {
+                "path": "src/runtime.py",
+                "line_number": 7,
+                "content": "def configure_runtime(): return True",
+                "heading": "",
+                "symbol": "configure_runtime",
+                "lexical_score": 0.5,
+                "path_score": 0.5,
+                "symbol_score": 1.0,
+                "source_code": True,
+            }
+        ],
+    )
+    task = {
+        "id": "task",
+        "base_ref": "a" * 40,
+        "acceptance_ref": "b" * 40,
+    }
+
+    memories = evaluation.source_snapshot_memories(ROOT, task)
+
+    assert memories[0].metadata.verified is False
+    assert memories[0].metadata.source_reliability == 0.8
+    assert memories[0].metadata.custom_metadata["observed_at_ref"] == task["base_ref"]
 
 
 def test_paired_plan_is_seeded_balanced_and_repeatable() -> None:

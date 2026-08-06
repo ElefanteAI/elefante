@@ -5,6 +5,18 @@
   "source_repository": "ElefanteAI/elefante",
   "source_head": "e84a8b54155add7673aafa6ab712540a85fdfd73",
   "scope": "Coding tasks whose success depends on prior project constraints, architecture, or safeguards.",
+  "evaluation_policy": {
+    "status": "diagnostic-only",
+    "promotion_allowed": false,
+    "promotion_blockers": [
+      "implementation-coupled-acceptance",
+      "hidden-test-coupling",
+      "insufficient-failure-observability"
+    ],
+    "historical_outcomes_immutable": true,
+    "invalid_task_policy": "fail-closed",
+    "source_head_policy": "historical-only"
+  },
   "task_brief_budget": {
     "total_tokens": 1500,
     "stage_tokens": {

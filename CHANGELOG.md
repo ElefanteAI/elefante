@@ -11,6 +11,20 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added an opt-in Task Intelligence v2 shadow profile with source-grounded
+  evidence, file/line/symbol lineage, action-value gates, conflict exclusion,
+  explicit abstention, and a maintained retrieval diagnostic.
+- Added a customer critical-thinking directive: agreement is not evidence,
+  uncertainty must remain explicit, and improvement requires measurement.
+
+### Changed
+
+- The historical Task Intelligence benchmark is now explicitly diagnostic-only.
+  Promotion fails closed until tasks provide behavioral acceptance contracts
+  and rollback refs; v1 remains the default reproducible profile.
+
 ### Fixed
 
 - Customer repairs now replace pre-manifest Elefante host registrations only

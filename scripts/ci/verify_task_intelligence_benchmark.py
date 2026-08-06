@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import json
+import re
 import subprocess
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -85,7 +87,9 @@ def _acceptance_target(task: dict[str, Any]) -> tuple[str, str] | None:
     return test_path, node
 
 
-def scan_memory_payload(payload: Any, tasks: list[dict[str, Any]]) -> list[dict[str, str]]:
+def scan_memory_payload(
+    payload: Any, tasks: list[dict[str, Any]]
+) -> list[dict[str, str]]:
     """Find exact benchmark-answer markers in a prospective memory export."""
     strings = list(_walk_strings(payload))
     findings: list[dict[str, str]] = []
@@ -132,13 +136,124 @@ def validate_outcome_record(record: dict[str, Any]) -> list[str]:
     return errors
 
 
+def acceptance_test_sha256(task: dict[str, Any], repo_root: Path = ROOT) -> str | None:
+    """Digest the exact hidden test artifact that received adversarial review."""
+    target = _acceptance_target(task)
+    acceptance_ref = task.get("acceptance_ref")
+    if target is None or not isinstance(acceptance_ref, str):
+        return None
+    source = _git_text(repo_root, "show", f"{acceptance_ref}:{target[0]}")
+    if source is None:
+        return None
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()
+
+
+def task_promotion_validity(
+    task: dict[str, Any], repo_root: Path = ROOT
+) -> dict[str, Any]:
+    """Validate the explicit behavioral and rollback contract for one task."""
+    reasons: list[str] = []
+    contract = task.get("acceptance_contract")
+    if not isinstance(contract, dict):
+        reasons.append("missing-contract")
+        return {
+            "task_id": task.get("id"),
+            "promotion_eligible": False,
+            "reasons": reasons,
+        }
+    if contract.get("kind") != "behavioral":
+        reasons.append("implementation-coupled-acceptance")
+    if contract.get("promotion_eligible") is not True:
+        reasons.append("task-promotion-disabled")
+    surfaces = contract.get("observable_surface")
+    if not (
+        isinstance(surfaces, list)
+        and surfaces
+        and all(isinstance(item, str) and item for item in surfaces)
+    ):
+        reasons.append("missing-observable-surface")
+    acceptance = contract.get("acceptance")
+    if not isinstance(acceptance, dict):
+        reasons.append("missing-behavioral-acceptance")
+    else:
+        if acceptance.get("command") != task.get("acceptance_command"):
+            reasons.append("acceptance-command-mismatch")
+        assertions = acceptance.get("assertions")
+        if not (
+            isinstance(assertions, list)
+            and assertions
+            and all(isinstance(item, str) and item for item in assertions)
+        ):
+            reasons.append("missing-behavioral-assertions")
+    rollback = contract.get("rollback")
+    if not isinstance(rollback, dict):
+        reasons.append("missing-rollback")
+    else:
+        if rollback.get("base_ref") != task.get("base_ref"):
+            reasons.append("rollback-base-mismatch")
+        restore_ref = rollback.get("restore_ref")
+        if not isinstance(restore_ref, str) or len(restore_ref) != 40:
+            reasons.append("missing-restore-ref")
+        elif restore_ref != task.get("acceptance_ref"):
+            reasons.append("rollback-restore-mismatch")
+    review = contract.get("adversarial_review")
+    if not isinstance(review, dict):
+        reasons.append("missing-adversarial-review")
+    else:
+        if review.get("status") != "approved":
+            reasons.append("adversarial-review-not-approved")
+        if review.get("implementation_coupling_found") is not False:
+            reasons.append("implementation-coupling-not-rejected")
+        if (
+            not isinstance(review.get("reviewer"), str)
+            or not review["reviewer"].strip()
+        ):
+            reasons.append("missing-reviewer")
+        reviewed_at = review.get("reviewed_at")
+        if (
+            not isinstance(reviewed_at, str)
+            or re.fullmatch(r"\d{4}-\d{2}-\d{2}", reviewed_at) is None
+        ):
+            reasons.append("missing-review-date")
+        expected_digest = acceptance_test_sha256(task, repo_root)
+        if expected_digest is None or review.get("test_sha256") != expected_digest:
+            reasons.append("reviewed-test-digest-mismatch")
+    return {
+        "task_id": task.get("id"),
+        "promotion_eligible": not reasons,
+        "reasons": reasons,
+    }
+
+
+def manifest_promotion_readiness(
+    manifest: dict[str, Any], repo_root: Path = ROOT
+) -> dict[str, Any]:
+    tasks = manifest.get("tasks") if isinstance(manifest.get("tasks"), list) else []
+    validity = [task_promotion_validity(task, repo_root) for task in tasks]
+    eligible = sum(int(item["promotion_eligible"]) for item in validity)
+    policy = manifest.get("evaluation_policy")
+    policy_allows = isinstance(policy, dict) and policy.get("promotion_allowed") is True
+    return {
+        "diagnostic_only": not policy_allows,
+        "promotion_ready": policy_allows
+        and bool(validity)
+        and eligible == len(validity),
+        "promotion_eligible_tasks": eligible,
+        "invalid_tasks": [item for item in validity if not item["promotion_eligible"]],
+    }
+
+
 def validate_manifest(manifest_path: Path, repo_root: Path = ROOT) -> dict[str, Any]:
     """Validate task provenance, acceptance nodes, splits, budget, and leakage."""
     errors: list[str] = []
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        return {"errors": [f"cannot read manifest: {error}"], "task_count": 0, "class_count": 0}
+        return {
+            "errors": [f"cannot read manifest: {error}"],
+            "task_count": 0,
+            "class_count": 0,
+        }
 
     tasks = manifest.get("tasks")
     if not isinstance(tasks, list):
@@ -149,7 +264,9 @@ def validate_manifest(manifest_path: Path, repo_root: Path = ROOT) -> dict[str, 
     if policy.get("total_tokens") != 1500 or sum(stage_tokens.values()) != 1500:
         errors.append("Task Brief budget must freeze 1,500 tokens across all stages")
     if policy.get("max_evidence_items") != 8 or policy.get("max_graph_hops") != 1:
-        errors.append("Task Brief evidence and graph bounds do not match the approved SDD")
+        errors.append(
+            "Task Brief evidence and graph bounds do not match the approved SDD"
+        )
 
     measurement = manifest.get("measurement", {})
     if measurement.get("minimum_pass_rate_lift_points") != 10:
@@ -169,7 +286,9 @@ def validate_manifest(manifest_path: Path, repo_root: Path = ROOT) -> dict[str, 
     if baseline.get("model") != "gpt-5.6-terra" or baseline.get("reasoning") != "low":
         errors.append("baseline model and reasoning configuration are not frozen")
     if baseline.get("calibration_tasks") != 18 or baseline.get("repetitions") != 1:
-        errors.append("calibration baseline scope must remain 18 tasks by one repetition")
+        errors.append(
+            "calibration baseline scope must remain 18 tasks by one repetition"
+        )
     evidence = manifest.get("baseline_evidence", {})
     if evidence.get("passed") != 6 or evidence.get("failed") != 12:
         errors.append("calibration baseline result must remain 6 passed and 12 failed")
@@ -179,19 +298,31 @@ def validate_manifest(manifest_path: Path, repo_root: Path = ROOT) -> dict[str, 
     preliminary = manifest.get("preliminary_holdout_evidence", {})
     if preliminary:
         if preliminary.get("completed_pairs") != 12 or preliminary.get("runs") != 24:
-            errors.append("preliminary holdout evidence must remain 12 pairs and 24 runs")
-        if preliminary.get("baseline_passes") != 1 or preliminary.get("task_brief_passes") != 1:
-            errors.append("preliminary holdout result must remain tied at 1 pass per condition")
+            errors.append(
+                "preliminary holdout evidence must remain 12 pairs and 24 runs"
+            )
+        if (
+            preliminary.get("baseline_passes") != 1
+            or preliminary.get("task_brief_passes") != 1
+        ):
+            errors.append(
+                "preliminary holdout result must remain tied at 1 pass per condition"
+            )
         if preliminary.get("pass_rate_lift_points") != 0.0:
             errors.append("preliminary holdout lift must remain zero")
         if preliminary.get("paired_95_percent_ci_points") != [0.0, 0.0]:
             errors.append("preliminary holdout confidence interval must remain [0, 0]")
-        if preliminary.get("effectiveness_gate") is not False or preliminary.get("promotion_gate") is not False:
+        if (
+            preliminary.get("effectiveness_gate") is not False
+            or preliminary.get("promotion_gate") is not False
+        ):
             errors.append("preliminary holdout must remain non-promotable")
         if preliminary.get("protocol_complete") is not False:
             errors.append("preliminary holdout protocol must remain incomplete")
         if preliminary.get("holdout_reusable_for_promotion") is not False:
-            errors.append("inspected holdout must not be reused as fresh promotion evidence")
+            errors.append(
+                "inspected holdout must not be reused as fresh promotion evidence"
+            )
         if preliminary.get("raw_transcripts_stored") is not False:
             errors.append("preliminary holdout must remain metadata-only")
         if preliminary.get("decision") != "return-to-phase-1":
@@ -223,10 +354,17 @@ def validate_manifest(manifest_path: Path, repo_root: Path = ROOT) -> dict[str, 
         else:
             errors.append(f"{prefix}: split must be calibration or holdout")
 
-        if not isinstance(task.get("task_statement"), str) or len(task["task_statement"]) < 30:
+        if (
+            not isinstance(task.get("task_statement"), str)
+            or len(task["task_statement"]) < 30
+        ):
             errors.append(f"{prefix}: task_statement is not specific enough")
         criteria = task.get("success_criteria")
-        if not isinstance(criteria, list) or not criteria or not all(isinstance(item, str) for item in criteria):
+        if (
+            not isinstance(criteria, list)
+            or not criteria
+            or not all(isinstance(item, str) for item in criteria)
+        ):
             errors.append(f"{prefix}: success_criteria must be a non-empty string list")
 
         base_ref = task.get("base_ref")
@@ -235,7 +373,9 @@ def validate_manifest(manifest_path: Path, repo_root: Path = ROOT) -> dict[str, 
             isinstance(value, str) and len(value) == 40
             for value in (base_ref, acceptance_ref)
         ):
-            errors.append(f"{prefix}: base_ref and acceptance_ref must be full commit SHAs")
+            errors.append(
+                f"{prefix}: base_ref and acceptance_ref must be full commit SHAs"
+            )
             continue
         commit_splits[acceptance_ref].add(split)
         parents = _git_text(repo_root, "show", "-s", "--format=%P", acceptance_ref)
@@ -252,14 +392,22 @@ def validate_manifest(manifest_path: Path, repo_root: Path = ROOT) -> dict[str, 
             errors.append(f"{prefix}: acceptance test file is absent at acceptance_ref")
         else:
             try:
-                names = {node.name for node in ast.walk(ast.parse(test_source)) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+                names = {
+                    node.name
+                    for node in ast.walk(ast.parse(test_source))
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                }
             except SyntaxError:
                 names = set()
             if test_node not in names:
-                errors.append(f"{prefix}: acceptance test node is absent at acceptance_ref")
+                errors.append(
+                    f"{prefix}: acceptance test node is absent at acceptance_ref"
+                )
         changed = _git_text(repo_root, "diff", "--name-only", base_ref, acceptance_ref)
         if changed is None or test_path not in changed.splitlines():
-            errors.append(f"{prefix}: acceptance test was not changed by the source task")
+            errors.append(
+                f"{prefix}: acceptance test was not changed by the source task"
+            )
 
         context_paths = task.get("context_paths")
         if not isinstance(context_paths, list) or not context_paths:
@@ -270,16 +418,30 @@ def validate_manifest(manifest_path: Path, repo_root: Path = ROOT) -> dict[str, 
                 errors.append(f"{prefix}: context path must be a string")
                 continue
             if context_path.startswith(FORBIDDEN_CONTEXT_PREFIXES):
-                errors.append(f"{prefix}: forbidden answer-bearing context path {context_path}")
+                errors.append(
+                    f"{prefix}: forbidden answer-bearing context path {context_path}"
+                )
                 continue
             content = _git_text(repo_root, "show", f"{base_ref}:{context_path}")
             if content is None:
-                errors.append(f"{prefix}: context path absent at base_ref: {context_path}")
+                errors.append(
+                    f"{prefix}: context path absent at base_ref: {context_path}"
+                )
                 continue
-            leakage_markers = [acceptance_ref, test_node, *task.get("forbidden_leakage_terms", [])]
+            leakage_markers = [
+                acceptance_ref,
+                test_node,
+                *task.get("forbidden_leakage_terms", []),
+            ]
             for marker in leakage_markers:
-                if isinstance(marker, str) and marker and marker.casefold() in content.casefold():
-                    errors.append(f"{prefix}: context path leaks answer marker {marker}")
+                if (
+                    isinstance(marker, str)
+                    and marker
+                    and marker.casefold() in content.casefold()
+                ):
+                    errors.append(
+                        f"{prefix}: context path leaks answer marker {marker}"
+                    )
 
     if len(tasks) < MINIMUM_TASKS:
         errors.append(f"benchmark requires at least {MINIMUM_TASKS} tasks")
@@ -289,8 +451,11 @@ def validate_manifest(manifest_path: Path, repo_root: Path = ROOT) -> dict[str, 
         errors.append("benchmark requires both calibration and holdout tasks")
     for commit, assigned in commit_splits.items():
         if len(assigned) > 1:
-            errors.append(f"acceptance commit crosses calibration and holdout splits: {commit}")
+            errors.append(
+                f"acceptance commit crosses calibration and holdout splits: {commit}"
+            )
 
+    readiness = manifest_promotion_readiness(manifest, repo_root)
     return {
         "benchmark_id": manifest.get("benchmark_id"),
         "task_count": len(tasks),
@@ -298,6 +463,7 @@ def validate_manifest(manifest_path: Path, repo_root: Path = ROOT) -> dict[str, 
         "classes": dict(sorted(classes.items())),
         "calibration_count": splits["calibration"],
         "holdout_count": splits["holdout"],
+        **readiness,
         "errors": errors,
     }
 
@@ -306,6 +472,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--memory-export", type=Path)
+    parser.add_argument("--require-promotion-ready", action="store_true")
     args = parser.parse_args(argv)
 
     report = validate_manifest(args.manifest, ROOT)
@@ -316,7 +483,11 @@ def main(argv: list[str] | None = None) -> int:
         if report["memory_leakage"]:
             report["errors"].append("memory export contains benchmark answer markers")
     print(json.dumps(report, indent=2, sort_keys=True))
-    return 1 if report["errors"] else 0
+    if report["errors"]:
+        return 1
+    if args.require_promotion_ready and not report["promotion_ready"]:
+        return 2
+    return 0
 
 
 if __name__ == "__main__":
