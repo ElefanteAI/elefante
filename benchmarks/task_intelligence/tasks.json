@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "benchmark_id": "elefante-context-coding-v1",
-  "status": "phase-1-shadow-ready-holdout-not-run",
+  "status": "phase-1-revision-required-preliminary-holdout-no-lift",
   "source_repository": "ElefanteAI/elefante",
   "source_head": "e84a8b54155add7673aafa6ab712540a85fdfd73",
   "scope": "Coding tasks whose success depends on prior project constraints, architecture, or safeguards.",
@@ -50,6 +50,34 @@
     "output_tokens": 54096,
     "promotion_evidence": false,
     "outcomes": "local-metadata-only"
+  },
+  "preliminary_holdout_evidence": {
+    "completed_on": "2026-08-05",
+    "source_commit": "fa04f2bbe3ba1966e0655f4b3cee06a4ea6ebf5f",
+    "model": "gpt-5.6-terra",
+    "reasoning": "low",
+    "run_seed": 20260805,
+    "completed_pairs": 12,
+    "planned_pairs": 36,
+    "runs": 24,
+    "baseline_passes": 1,
+    "task_brief_passes": 1,
+    "baseline_pass_rate": 0.083333,
+    "task_brief_pass_rate": 0.083333,
+    "pass_rate_lift_points": 0.0,
+    "paired_95_percent_ci_points": [0.0, 0.0],
+    "input_token_increase_percent": -16.302249,
+    "uncached_input_token_increase_percent": 2.931721,
+    "duration_increase_percent": -1.883154,
+    "effectiveness_gate": false,
+    "cost_gate": true,
+    "promotion_gate": false,
+    "protocol_complete": false,
+    "remaining_pairs_skipped": 24,
+    "holdout_reusable_for_promotion": false,
+    "raw_transcripts_stored": false,
+    "outcomes": "local-metadata-only",
+    "decision": "return-to-phase-1"
   },
   "tasks": [
     {
