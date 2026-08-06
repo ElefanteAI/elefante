@@ -44,11 +44,13 @@ def test_outcome_records_are_metadata_only() -> None:
         "retries": 1,
         "human_corrections": 0,
         "input_tokens": 100,
+        "cached_input_tokens": 60,
         "output_tokens": 50,
         "duration_ms": 1000,
         "failure_category": "acceptance-test",
     }
     assert benchmark.validate_outcome_record(valid) == []
+    assert benchmark.validate_outcome_record({**valid, "cached_input_tokens": None}) == []
 
     leaked = {**valid, "raw_response": "private model output"}
     assert "raw_response is not an allowed metadata field" in benchmark.validate_outcome_record(leaked)

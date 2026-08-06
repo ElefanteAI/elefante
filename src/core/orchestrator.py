@@ -749,6 +749,7 @@ class MemoryOrchestrator:
         session_id: Optional[UUID] = None,
         return_debug: bool = False,
         apply_temporal_decay: bool = True,
+        reinforce_access: bool = True,
         recent_memory_ids: Optional[list[str]] = None
     ) -> List[SearchResult]:
         """
@@ -804,11 +805,28 @@ class MemoryOrchestrator:
             if include_stored:
                 # Execute traditional search (semantic/structured/hybrid) with temporal decay
                 if mode == QueryMode.SEMANTIC:
-                    stored_results = await self._search_semantic(query, plan, filters, apply_temporal_decay)
+                    stored_results = await self._search_semantic(
+                        query,
+                        plan,
+                        filters,
+                        apply_temporal_decay,
+                        reinforce_access,
+                    )
                 elif mode == QueryMode.STRUCTURED:
-                    stored_results = await self._search_structured(query, plan, apply_temporal_decay)
+                    stored_results = await self._search_structured(
+                        query,
+                        plan,
+                        apply_temporal_decay,
+                        reinforce_access,
+                    )
                 else:  # HYBRID
-                    stored_results = await self._search_hybrid(query, plan, filters, apply_temporal_decay)
+                    stored_results = await self._search_hybrid(
+                        query,
+                        plan,
+                        filters,
+                        apply_temporal_decay,
+                        reinforce_access,
+                    )
                 results.extend(stored_results)
             
             if include_conversation and session_id:
@@ -1221,7 +1239,8 @@ class MemoryOrchestrator:
         query: str,
         plan: QueryPlan,
         filters: Optional[SearchFilters] = None,
-        apply_temporal_decay: bool = True
+        apply_temporal_decay: bool = True,
+        reinforce_access: bool = True,
     ) -> List[SearchResult]:
         """
         Execute hybrid search combining vector and graph results with temporal decay
@@ -1297,7 +1316,7 @@ class MemoryOrchestrator:
         
         merged_results = list(merged.values())
 
-        if apply_temporal_decay:
+        if apply_temporal_decay and reinforce_access:
             for result in merged_results:
                 is_vector_backed_graph = (
                     result.source == "graph"

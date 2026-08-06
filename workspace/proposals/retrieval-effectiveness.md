@@ -1,6 +1,6 @@
 # PRD / SDD: Task Intelligence Pipeline
 
-> Status: PHASE 0 IN PROGRESS; 30 candidate fixtures frozen; model baseline not run
+> Status: PHASE 1 COMPLETE IN SHADOW; HOLDOUT EVALUATION NOT RUN
 >
 > Owner: planning
 >
@@ -249,10 +249,14 @@ Current Phase 0 evidence (2026-08-05):
   prompts, responses, memory bodies, and transcripts are not valid outcome
   fields.
 
-Phase 0 is not complete. The model/version/tool configuration and evaluation
-compute budget are not yet frozen, and the no-Brief agent baseline has not run.
-No Task Brief generator, automatic injection, public MCP change, or product
-performance claim is authorized by this fixture work.
+Phase 0 is complete. The frozen evaluator is `gpt-5.6-terra`, low reasoning,
+through `codex-cli 0.147.0-alpha.1.2` and the `task-intelligence-v1` prompt
+profile. The 18-task calibration baseline ran once under a 10.8 million total
+input-token ceiling and a 1.8 million uncached-input ceiling. It passed 6 of 18
+tasks (33.3 percent), using 4,971,429 input tokens, of which 4,329,216 were
+cached, plus 54,096 output tokens. The local metadata-only outcomes remain
+gitignored. This one-repetition calibration result establishes headroom and
+compute cost; it is not promotion evidence.
 
 ### Phase 1: Deterministic Task Brief generator
 
@@ -265,6 +269,20 @@ performance claim is authorized by this fixture work.
 Exit: identical inputs produce an equivalent ordered Brief and no memory is
 mutated.
 
+Phase 1 is complete in shadow mode. `src/core/task_intelligence.py` provides a
+pure deterministic compiler and a read-only service over the current hybrid
+retriever and one-hop graph. It excludes deprecated, archived, superseded,
+low-reliability, low-score, cross-project, and cross-workspace evidence;
+surfaces stored conflicts without choosing a winner; retains provenance; and
+enforces the frozen per-stage and eight-item limits. Shadow search disables
+temporal reinforcement, so generating a Brief does not increment access counts
+or mutate memory. There is no public MCP method and no automatic injection.
+
+The answer-isolated evaluation path creates local embeddings only from context
+files at each task's pre-fix commit. It uses the current local GTE embedding
+model and CognitiveRetriever, forbids model-hub network access, and scans the
+resulting corpus for acceptance-answer markers before generating a Brief.
+
 ### Phase 2: Controlled evaluation
 
 - Execute randomized paired baseline and treatment runs.
@@ -272,6 +290,14 @@ mutated.
 - Review every regression and every context-caused failure.
 
 Exit: promotion gate passes, or the design returns to Phase 1.
+
+Phase 2 is ready but has not run against holdout tasks. The protocol freezes
+seed `20260805`, three paired repetitions, randomized within-pair order, the
+same model/tool limits in both conditions, a maximum 20 percent treatment input
+increase, and a maximum 25 percent treatment duration increase. The report uses
+a task-clustered 95 percent bootstrap interval and cannot promote an incomplete
+protocol. Holdout outcomes must be produced from the committed evaluator, not
+from an uncommitted worktree.
 
 ### Phase 3: Opt-in workflow pilot
 
