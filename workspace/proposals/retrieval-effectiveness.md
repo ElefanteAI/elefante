@@ -1,6 +1,7 @@
 # PRD / SDD: Task Intelligence Pipeline
 
-> Status: EVALUATION INFRASTRUCTURE IMPLEMENTED; NO EFFECTIVENESS LIFT PROVEN
+> Status: EVALUATION INFRASTRUCTURE IMPLEMENTED; MEMORY GOVERNANCE BOUNDARY
+> DEFINED; NO EFFECTIVENESS LIFT PROVEN
 >
 > Owner: planning
 >
@@ -59,6 +60,79 @@ The current product already provides useful foundations:
 Those signals are not proof that a memory improved a task. Access count measures
 exposure, and co-activation measures reuse. Neither is a causal outcome signal.
 The Task Intelligence Pipeline must preserve that distinction.
+
+## Memory governance and Task Intelligence boundary
+
+Elefante stores memories, but it is not always the authority that decides what
+must be retained or injected. A user may explicitly protect or enforce a memory.
+The product must therefore keep five decisions independent:
+
+1. **storage** — whether the memory exists in the local store;
+2. **retention** — whether it is permanent, managed, or ephemeral;
+3. **lifecycle** — whether it is active, dormant, conflicting, superseded, or
+   archived;
+4. **retrieval** — whether it is relevant to the current task;
+5. **injection** — whether it must be delivered to the agent now.
+
+Keeping a memory permanently does not require injecting it into every task.
+User enforcement must have an explicit meaning:
+
+- **never forget** — retain permanently; retrieve according to task relevance;
+- **surface on trigger** — deliver whenever its declared scope and trigger match;
+- **always inject** — deliver for every task in scope; reserve this for global
+  directives, safety constraints, and other deliberate user policy.
+
+The target governance fields are `retention_policy = permanent | managed |
+ephemeral`, `injection_policy = always | triggered | ranked`, a scope and trigger,
+an explicit user lock, and the lifecycle state. These policy fields are design
+intent and are not yet part of the released schema.
+
+### Two operating modes
+
+`I use Elefante` and `our workflow uses Elefante` are different operating modes,
+not different memory stores.
+
+**Direct user operation** means the person explicitly asks Elefante to remember,
+retrieve, protect, amend, archive, or delete something. The user is the authority
+for the requested action. Direct retrieval may bypass normal ranking when the
+user identifies a specific memory, but conflicts and provenance must remain
+visible.
+
+**Workflow-mediated operation** means an IDE, agent, or automation calls Elefante
+while planning, executing, or validating a task. The workflow may retrieve and
+deliver context automatically only within the user's governance rules. It must
+not silently create user authority, convert retrieval into reinforcement, delete
+memory, or hide which context was injected.
+
+Both modes use the same local memory and lifecycle model. Each operation must
+carry an `invocation_mode = user_directed | workflow_managed` plus caller, task,
+stage, and scope when available. This invocation context belongs to the operation
+trace, not the semantic content of the memory. The field is target design intent,
+not a released contract.
+
+In workflow-managed mode, Task Intelligence is responsible for candidate
+selection, bounded delivery, and outcome measurement. In user-directed mode,
+Task Intelligence may assist search and explanation, but it must not overrule an
+explicit memory action.
+
+Elefante may warn that an enforced memory conflicts with current source, another
+memory, or the available token budget. It must not silently weaken, archive, or
+override a user-locked memory. Current source remains authoritative for what the
+implementation does; an enforced memory can remain authoritative for user intent.
+
+Forgetting is normally a reversible accessibility transition, not destruction:
+
+~~~text
+active <-> dormant -> archived
+~~~
+
+Dormant memories leave ordinary retrieval but remain searchable. Archived
+memories leave active intelligence but remain recoverable. Deletion requires an
+explicit user action, a privacy requirement, or separately verified garbage.
+
+Task Intelligence begins after those governance rules are applied. Its job is
+to combine mandatory memories with the smallest additional set of trusted,
+task-relevant memories that can improve the current task.
 
 ## Memory quality contract
 
@@ -523,6 +597,81 @@ not market Task Intelligence as a shipped capability.
   live memory, public MCP method, customer installation, or release is mutated.
 - Historical outcome records and commits are immutable. Never rewrite them to
   make a later design appear successful.
+
+## Developer continuation guide
+
+### Verified state
+
+- The deterministic Task Brief compiler, metadata-only outcome records, stage
+  traces, paired evaluator, promotion report, fail-closed judge gate, and exact
+  rollback path exist.
+- Three CLI/API/filesystem canaries have reviewed black-box contracts. The other
+  27 historical tasks are implementation-coupled and cannot support promotion.
+- One three-pair restore trial improved acceptance from 0/3 to 2/3 and reduced
+  input tokens, but increased output tokens and duration. It is a useful local
+  signal, not proof of general lift.
+- V1 remains the default. Task Intelligence has no public MCP surface, automatic
+  injection, released-product claim, or authorized per-memory learning.
+
+### Remaining source findings that must not be normalized as intended behaviour
+
+The 2026-08-06 documentation audit reconciled the active relevance formula with
+`docs/reference/scoring.md` and added a regression guard. The remaining product
+contract gaps are:
+
+1. Specifications and directives have a zero type decay rate, but the independent
+   freshness term still reduces their vitality.
+2. Normal retrieval can increment access count before use or task benefit is
+   known; MCP co-activation is recorded before archived/deprecated filtering.
+3. The MCP search response removes provenance and retrieval explanations, then
+   labels all returned memories authoritative.
+4. The public ingestion path does not map every available structured provenance,
+   verification, conflict, and scope field into `MemoryMetadata`.
+5. Current scoring tests prove bounded arithmetic and relative decay. They do not
+   prove memory usefulness, safe forgetting, user enforcement, or task lift.
+
+These are contract gaps. Do not repair them by tuning weights or changing decay
+constants in isolation.
+
+### Required implementation order
+
+1. Freeze the governance schema and backward-compatible mapping for existing
+   lifecycle fields. Resolve the two remaining product decisions: the overflow
+   behaviour for `always inject`, and the default retention policy when the user
+   did not specify one.
+2. Write contract tests for permanent/user-locked retention, triggered and global
+   injection, direct-user versus workflow-managed authority, reversible
+   dormancy/archive, conflict visibility, lifecycle filtering before learning,
+   and read-only retrieval.
+3. Implement the smallest schema and MCP changes that satisfy those tests. Keep
+   migration reversible and preserve existing stored memories.
+4. Move access reinforcement and co-activation behind an explicit delivery/use
+   event. Do not treat retrieval as positive feedback.
+5. Return provenance, verification, selection reason, lifecycle, and conflicts in
+   the bounded Task Brief. Never label unverified or conflicting context
+   authoritative.
+6. Replace or independently review enough historical tasks to create a credible
+   black-box calibration set. Do not spend model tokens on the 27 invalid judges.
+7. Run shadow control-versus-treatment evaluation. Diagnose failures by stage:
+   judge, retrieval, selection, delivery, repository change, and acceptance.
+8. Freeze a new untouched holdout only after calibration shows repeatable lift
+   within token and latency limits. Keep default injection blocked until the
+   promotion gate passes.
+
+### How another developer can help safely
+
+- Start with this file, `workspace/PLANNING.md`, `workspace/ISSUES.md` BUG-044,
+  and `workspace/postmortems/ai-behavior.md` Issue 13.
+- Read `src/models/memory.py`, `src/core/retrieval.py`,
+  `src/core/orchestrator.py`, `src/core/sqlite_vector_store.py`, and
+  `src/mcp/server.py` before changing behaviour.
+- Work on one bounded contract at a time and preserve V1 as the rollback path.
+- Never test workflow automation by weakening direct user authority. Use the same
+  store, but assert the invocation mode and its permitted side effects.
+- Record unknowns as `UNKNOWN`; do not infer usefulness from similarity, access
+  count, co-activation, or a single successful task.
+- Keep this work in the developer workspace until controlled evidence authorizes
+  a released user contract.
 
 ## Relationship to Session Intelligence
 

@@ -1,6 +1,6 @@
 # Elefante Vision
 
-> Product explanation · Current published version: v2.12.1
+> Product explanation · Current published version: v2.12.2
 
 ## The Thesis
 
@@ -24,14 +24,17 @@ The store remains on the user's machine. Context the user intentionally sends
 to a connected AI client is governed by that provider's data policy.
 
 The dashboard reads a redacted local snapshot. It explains memory freshness,
-confidence, lifecycle state, sources, and explicit decision relationships
+lifecycle state, sources, and explicit decision relationships
 without giving the browser authority to query or mutate the live store.
 
 ## The Four Laws
 
-1. **Continuity** — a session is a continuation, not a blank start.
-2. **Compliance** — search before writing so existing knowledge is reused.
-3. **Grounding** — if a claim is not in memory or the workspace, it is unknown.
+1. **Continuity** — relevant durable context can carry across sessions without
+   forcing unrelated history into a new task.
+2. **Compliance** — search before a memory write so existing knowledge is
+   reused or amended instead of duplicated.
+3. **Grounding** — project-specific claims need current memory or workspace
+   evidence; otherwise they are unknown.
 4. **Full Signal Injection** — injected context must improve the next answer;
    irrelevant memory is noise.
 

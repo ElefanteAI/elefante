@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : advise_version_bump.py
-# VERSION : 2.7.1
-# CHANGED : 2026-04-15
 # PURPOSE : Inspect staged git diff, classify MAJOR/MINOR/PATCH, then hand off
 #           to bump_version.py only when the matching CHANGELOG entry already exists.
 # WHEN    : After staging changes. Usually run BEFORE writing the CHANGELOG entry
@@ -13,7 +11,6 @@
 #           yet contain the proposed release entry, the advisor stops after printing
 #           the recommended next steps instead of calling bump_version.py. Manual
 #           lower-version overrides are treated as unpublished rebaseline corrections.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """
 advise_version_bump.py — Smart version bump advisor.

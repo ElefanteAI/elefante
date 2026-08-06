@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : build_installer_bundle.py
-# VERSION : 2.12.1
-# CHANGED : 2026-08-04
 # PURPOSE : Build a downloadable Elefante installer bundle that carries a full
 #           payload plus a platform-specific, customer-legible entrypoint.
 # WHEN    : In CI after dashboard assets are built, or locally when validating
@@ -11,7 +9,6 @@
 #           [--output dist/elefante-installer-macOS.zip]
 # NOTES   : Requires src/dashboard/ui/dist/index.html to exist. It packages a
 #           repo-like payload without .git, .venv*, dist/, node_modules, or data artifacts.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Build a downloadable Elefante installer bundle."""
 

@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_refinery.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PROVES  : Deterministic refinery plan generation: correct identification of
 #           stale, low-score, and superseded memories for pruning.
 # RUN     : pytest tests/test_refinery.py -v

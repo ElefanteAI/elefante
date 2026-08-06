@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : select_release_assets.py
-# VERSION : 2.7.2
-# CHANGED : 2026-04-16
 # PURPOSE : Select GitHub release assets that fit under the platform's hard
 #           per-file size cap and emit the workflow outputs consumed by the
 #           release job.
@@ -11,7 +9,6 @@
 # USAGE   : python scripts/ci/select_release_assets.py
 # NOTES   : Defaults to the Elefante binary and installer-bundle artifact paths
 #           and uses GITHUB_OUTPUT and GITHUB_STEP_SUMMARY when present.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Select releasable GitHub assets under the platform file-size cap."""
 

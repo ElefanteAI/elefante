@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : verify_mcp_handshake.py
-# VERSION : 2.12.2
-# CHANGED : 2026-08-05
 # PURPOSE : Minimal JSON-RPC initialize probe that proves the customer stdio
 #           bridge and local daemon can answer a real MCP handshake.
 # WHEN    : After restart_elefante.py, to quickly confirm the server came back
@@ -12,7 +10,6 @@
 # NOTES   : Starts the server briefly, sends one JSON-RPC initialize request,
 #           checks the response, then exits. Much faster than verify_e2e_tests.py
 #           but proves only that the handshake succeeds, not tool correctness.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 import asyncio
 import json

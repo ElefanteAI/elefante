@@ -27,6 +27,15 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Active user, developer, agent, proposal, example, and embedded MCP
+  documentation now agrees with the v2.12.2 release, SQLite/Kuzu default,
+  16-tool/2-prompt surface, conditional context injection, and implemented
+  scoring/lifecycle behavior. Broken paths and obsolete release-candidate,
+  migration, and legacy-tool guidance were removed or labeled historical;
+  customer commands now target the installed runtime, and Task Intelligence no
+  longer retrieves a retained pre-release installer design as current guidance.
+  Regression checks now guard release versions, relative links, tool names,
+  manifest types, Python compatibility, command forms, and scoring claims.
 - Customer repairs now replace pre-manifest Elefante host registrations only
   when their command structurally identifies an older Elefante MCP runtime.
   Unrelated user-owned servers with the same name remain untouched.

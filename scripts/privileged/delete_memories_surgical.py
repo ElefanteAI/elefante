@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : delete_memories_surgical.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Risk-scored memory deletion workbench: impact report, backup JSON,
 #           then delete from both ChromaDB and Kuzu only when authorized.
 # WHEN    : When the memory graph has accumulated low-value artifacts (test
@@ -13,7 +11,6 @@
 #           dry-run (no flags). Always run backup_elefante_data.py first. The
 #           backup JSON written by this script can be inspected via
 #           inspect_memory_graph.py --from-backup.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Privileged memory debugger: surgical review + deletion.
 

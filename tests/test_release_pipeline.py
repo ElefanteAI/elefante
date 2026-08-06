@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_release_pipeline.py
-# VERSION : 2.12.1
-# CHANGED : 2026-08-04
 # PROVES  : GitHub release publication logic stays local-testable: release notes
 #           render from CHANGELOG, oversize assets are filtered before publish,
 #           and the workflow calls the maintained scripts instead of inline code.
@@ -152,7 +150,11 @@ def test_version_sync_tracks_release_identifiers_without_rewriting_history():
     assert not any(path.startswith("workspace/postmortems/") for path in targets)
     assert module.GLOB_TARGETS == []
 
-    assert "v2.12.1" in (ROOT / "README.md").read_text(encoding="utf-8")
+    source_version = re.search(
+        r'__version__\s*=\s*"([^"]+)"',
+        (ROOT / "src" / "__init__.py").read_text(encoding="utf-8"),
+    ).group(1)
+    assert f"v{source_version}" in (ROOT / "README.md").read_text(encoding="utf-8")
 
 
 def test_version_advisor_accepts_candidate_changelog_entries():

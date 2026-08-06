@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/models/conversation.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Conversation message and search candidate dataclasses for context-
 #           aware retrieval using recent conversation history.
 # ROLE    : Models — used by conversation_context.py and server.py.
@@ -106,5 +104,4 @@ class SearchCandidate(BaseModel):
     
     def __repr__(self) -> str:
         return self.__str__()
-
 

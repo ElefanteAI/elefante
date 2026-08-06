@@ -26,4 +26,5 @@ When this directory's content conflicts with `docs/`:
 - **Constitution / process rules** — `agents/orchestrator.md` wins.
 - **Bug status** — `workspace/ISSUES.md` wins.
 
-This will simplify as migration completes. See `PLANNING.md §2 Active Release § Migration State` for current step.
+No ADR migration is scheduled. Until one is explicitly approved, `PLANNING.md`
+and the linked postmortems remain authoritative.

@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/core/retrieval.py
-# VERSION : 2.7.0
-# CHANGED : 2026-04-15
 # PURPOSE : Cognitive retrieval engine: ranked memory results with multi-signal
 #           scoring (semantic, temporal, access reinforcement).
 # ROLE    : Core query path — called by orchestrator for all MemorySearch ops.

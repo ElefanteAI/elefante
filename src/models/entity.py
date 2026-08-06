@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/models/entity.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Entity and Relationship dataclasses for Kuzu knowledge graph storage.
 # ROLE    : Models — used by graph_store.py and ETL pipeline.
 # TOUCHED : When adding new entity types, relationship types, or graph node
@@ -169,4 +167,3 @@ class Relationship(BaseModel):
     
     def __repr__(self) -> str:
         return self.__str__()
-

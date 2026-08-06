@@ -1,6 +1,8 @@
 # PRD: Elefante Installer Procedure
 
-> **Status**: IMPLEMENTED — v2.12.2; customer-upgrade hardening tracked by BUG-040
+> **Status**: RETAINED DESIGN RECORD — implemented in v2.12.2. This file
+> preserves pre-release rationale for developer evaluation only. It is not
+> current installation guidance; use `docs/how-to/install.md` and source.
 >
 > **Author**: Agent
 >
@@ -10,17 +12,17 @@
 
 ---
 
-## 1. Problem Statement
+## 1. Historical Problem Statement
 
 Elefante already has a real installer.
 
 That installer is `scripts/setup/install.py`, with thin wrappers at `install.sh` and `install.bat`.
 
-The current failure is not missing install logic.
+At the time of this proposal, the failure was not missing install logic.
 
-The failure is the product entrypoint.
+The failure was the product entrypoint.
 
-Today an end user must still:
+Before v2.12.2, an end user still had to:
 
 - find the GitHub repository
 - clone it
@@ -32,7 +34,7 @@ That is not a finished installation product.
 
 ### Core Requirement
 
-Phase 1 must create a downloadable Elefante installer product that installs **Elefante as it exists now**.
+Phase 1 required a downloadable Elefante installer product without a repository clone.
 
 It must not introduce provider selection yet.
 
@@ -412,33 +414,23 @@ No vague success banner without stage truth.
 
 ---
 
-## 12. Phase 2 Is Explicitly Deferred
+## 12. Model-provider setup is out of scope
 
-Phase 2 may later add:
-
-- LLM provider choices
-- OpenAI / xAI / DeepSeek selection
-- Ollama model choices
-- runtime provider profile persistence
-- provider-aware verification
-
-Phase 2 must not begin until phase 1 is tested and working as intended.
-
-That gate is intentional.
-
-Phase 1 is about making Elefante installable as a product.
-
-Phase 2 is about optional connected runtime choices.
+Elefante is a local memory engine, not a model host. Its installer must not ask
+for LLM-provider credentials, select hosted models, or persist provider
+profiles. Any future connected-runtime work requires a separate proposal and
+must not be presented as a deferred phase of this released installer.
 
 ---
 
-## 13. Open Questions
+## 13. Historical Questions and Current Disposition
 
-1. Should the durable app root be exactly `~/.elefante/app/current` and `%LOCALAPPDATA%\Elefante\app\current`, or should the product use a different stable path?
-2. Should Linux ship the same full installer bundle in phase 1, or follow after Windows and macOS validation?
-3. Does phase 1 also need Python bootstrap, or is a clear Python blocker acceptable for the first product release?
-4. Should the product installer launch a post-install verifier automatically, or only summarize the commands/results?
+These questions belonged to the pre-release PRD. The v2.12.2 source and tests,
+not this section, define the decisions that shipped. Any change to install root,
+platform packaging, Python bootstrap, or post-install verification must start as
+a new proposal with fresh acceptance evidence; none is promised here.
 
 ---
 
-*This PRD documents phase 1 only. Provider-choice work is intentionally deferred until the downloadable Elefante installer is real, tested, and truthful.*
+*This PRD preserves the design rationale for the released installer. Provider
+choice is not part of the v2.12.2 installer contract.*

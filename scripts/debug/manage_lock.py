@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : manage_lock.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Inspect and remove the Elefante write lock; optional MCP process kill.
 #           Merged from remove_lock_kuzu.py + unlock_database_transactions.py.
 # WHEN    : When write operations hang, elefante-Memory(action="add") times out, or the server reports
@@ -12,7 +10,6 @@
 # NOTES   : Requires ELEFANTE_PRIVILEGED=1 env var to apply. Deleting the lock
 #           while a write is genuinely in progress can corrupt state — stop or
 #           kill the server first. Default (no flags) is always dry-run / inspect.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Manage Elefante's transaction write lock (safe-by-default).
 

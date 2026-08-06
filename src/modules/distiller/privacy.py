@@ -5,7 +5,7 @@ Responsibility: Scrub secrets, API keys, passwords, and tokens BEFORE storage.
 This is a CRITICAL trust feature. If Elefante stores someone's AWS_SECRET_ACCESS_KEY
 in a vector database, the product is dead on arrival.
 
-Runs BEFORE any content hits ChromaDB or the knowledge graph.
+Runs BEFORE any content reaches the configured vector store or knowledge graph.
 """
 
 from __future__ import annotations

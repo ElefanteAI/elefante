@@ -8,7 +8,7 @@
 
 ## What is Elefante?
 
-A local-first persistent memory engine for AI agents, exposed via the Model Context Protocol (MCP). Stores, scores, and retrieves facts, preferences, decisions, and code patterns across sessions. Embedded SQLite vectors and Kuzu relationships form the current storage architecture. **v2.12.1** is the latest published release. Release Client Candidate 1.0 is the validation lane for the upcoming v2.12.2 customer runtime; it is not a separate product version or public download.
+A local-first persistent memory engine for AI agents, exposed via the Model Context Protocol (MCP). Stores, scores, and retrieves facts, preferences, decisions, and code patterns across sessions. Embedded SQLite vectors and Kuzu relationships form the current storage architecture. **v2.12.2** is the latest published release. Release Client Candidate 1.0 was the validation lane that produced the v2.12.2 customer runtime; it is not a separate product version.
 
 Detail: [`README.md`](README.md) for product overview, [`docs/reference/architecture.md`](docs/reference/architecture.md) for system design.
 
@@ -18,30 +18,33 @@ Detail: [`README.md`](README.md) for product overview, [`docs/reference/architec
 
 | You are... | Read | Then |
 |------------|------|------|
-| **An end-user agent** helping someone install/use Elefante through MCP | [`.github/copilot-instructions.md`](.github/copilot-instructions.md) (Four Laws, cardinal sins, tool table) | [`docs/`](docs/) — `technical/spec-tools.md` for MCP tool reference, `technical/ops-installation.md` for install, `technical/ops-ide-configuration.md` for IDE wiring |
+| **An end-user agent** helping someone install/use Elefante through MCP | [`.github/copilot-instructions.md`](.github/copilot-instructions.md) (Four Laws, cardinal sins, tool table) | [`docs/`](docs/) — [`reference/tools.md`](docs/reference/tools.md) for MCP tools, [`how-to/install.md`](docs/how-to/install.md) for installation, [`how-to/configure-ide.md`](docs/how-to/configure-ide.md) for host wiring |
 | **A developer agent** building or debugging Elefante itself | [`agents/orchestrator.md`](agents/orchestrator.md) (Loop, Five Gates, Documentation Skill, Modes, Closure Sequence) | [`workspace/PLANNING.md`](workspace/PLANNING.md) for current state + roadmap, [`workspace/ISSUES.md`](workspace/ISSUES.md) for BUG/GAP tracker, [`agents/`](agents/) for specialist protocols |
 
 ---
 
-## The Elefante Workflow Lifecycle (canonical, every session)
+## The Elefante Workflow Lifecycle (state-changing developer work)
 
-Every development session follows steps **0 → 10 linearly. No skipping. No reordering.**
+Use the full lifecycle for state-changing developer work. Read-only analysis
+stops after evidence and reporting; it does not create memory, journal, or git
+mutations by ritual.
 
 | # | Step | Action |
 |---|------|--------|
-| 0 | **ENGAGE** | `elefante-Memory(action="search")` for context relevant to today's task |
+| 0 | **ENGAGE** | For non-trivial repository work, search Elefante for prior decisions; use canonical workspace sources if unavailable |
 | 1 | **CLASSIFY** | Read `workspace/ISSUES.md`; match BUG/GAP or declare NEW |
-| 2 | **SEARCH** | Compliance Gate — search before write |
+| 2 | **SEARCH** | Search Elefante before memory writes; search canonical repository sources before file edits |
 | 3 | **PROPOSE** | State Question / Proof / Result / Next |
-| 4 | **ARCHIVE** | If distilling/cutting/deleting, copy verbatim to `<peer>/_archive/<name>-full.md` FIRST |
+| 4 | **PRESERVE** | Confirm a rollback path; archive only unique evidence not already recoverable from version control |
 | 5 | **WRITE** | Author in canonical home per Closed Surface Map |
 | 6 | **INDEX** | Update the relevant index in the same change |
-| 7 | **INGEST** | `elefante-Memory(action="add")` for lessons; `elefante-DirectiveAdd` for rules |
+| 7 | **INGEST** | Only for a new durable lesson: search, then add/update; never ingest routine progress |
 | 8 | **VERIFY** | `pytest tests/test_developer_routing.py` + targeted regression + Elefante retrieval check |
-| 9 | **JOURNAL** | Append to [`workspace/PLANNING.md §10`](workspace/PLANNING.md) with date / event / driver / measurement |
-| 10 | **CLOSE** | CLEAN → DOCS → VERSION → COMMIT |
+| 9 | **JOURNAL** | Update [`workspace/PLANNING.md §10`](workspace/PLANNING.md) only when product state, a decision, or a verified conclusion changed |
+| 10 | **CLOSE** | CLEAN → DOCS → VERIFY; commit, VERSION, and remote actions only within authority |
 
-Every cycle ends with **INGEST + JOURNAL + COMMIT** — without all three, the loop has not closed.
+Verification is mandatory for changed behavior. Ingestion, journaling, commits,
+and remote actions are conditional; empty process artifacts are forbidden.
 
 Full detail: [`agents/orchestrator.md`](agents/orchestrator.md) § The Elefante Workflow Lifecycle.
 
@@ -54,7 +57,7 @@ Don't browse — load the specialist for your task.
 | Symptom | Load |
 |---------|------|
 | Building a feature, debugging Elefante itself | [`agents/orchestrator.md`](agents/orchestrator.md) |
-| Any `MemoryAdd` / `MemoryUpdate` / `MemoryDelete` (auto) | [`agents/memory-janitor.md`](agents/memory-janitor.md) |
+| Any `elefante-Memory(action="add"|"update"|"delete")` operation | [`agents/memory-janitor.md`](agents/memory-janitor.md) |
 | "What do I have stored?", export, audit | [`agents/memory-inspector.md`](agents/memory-inspector.md) |
 | Install failed, broken venv, repair | [`agents/installer.md`](agents/installer.md) |
 | MCP tools missing in IDE, server stuck | [`agents/restarter.md`](agents/restarter.md) |
@@ -78,14 +81,10 @@ elefante/
 │   ├── copilot-instructions.md  ← end-user agent constitution
 │   └── workflows/               ← CI
 ├── .claude/
-│   ├── README.md                ← what this directory is for (documentation)
-│   └── settings.local.json      ← Claude Code permission whitelist
+│   └── README.md                ← what this directory is for (documentation)
 ├── agents/                      ← 11 specialist agent protocols (loaded on trigger)
 ├── docs/
 │   ├── README.md                ← documentation navigation
-│   ├── debug/                   ← BUG/GAP tracker, compendiums, best practices
-│   ├── technical/               ← reference (spec-*) + how-to (ops-*) + dev-etiquette
-│   │   └── ide-integration-matrix.yaml  ← machine-readable integration surface (16 IDEs)
 │   ├── explanation/             ← released product concepts
 │   ├── how-to/                  ← released user procedures
 │   └── reference/               ← released product contracts
@@ -108,23 +107,23 @@ elefante/
 | Sequential immutable IDs (BUG-NNN, GAP-NNN, X-NNN, P-NNN, OB-NNN) — **never date-stamped or version-stamped filenames** | [`agents/orchestrator.md`](agents/orchestrator.md) Documentation Skill § Forbidden Patterns |
 | Status as field, not folder | Filenames stable; lifecycle is a frontmatter field |
 | Search before write (Compliance Gate) | Mandatory in MCP tool surface |
-| Closure sequence: CLEAN → DOCS → VERSION → COMMIT | [`docs/how-to/close-a-feature.md`](docs/how-to/close-a-feature.md) |
-| Memory Janitor: delete with a `### Removed` `CHANGELOG.md` record; create with a recorded question; resolve don't file | [`agents/memory-janitor.md`](agents/memory-janitor.md) |
+| Closure sequence: CLEAN → DOCS → VERIFY; commit/version/remote actions only within authority | [`docs/how-to/close-a-feature.md`](docs/how-to/close-a-feature.md) |
+| Memory Janitor: record removal of released artifacts; retain audit reasons for memory deletion; create with a recorded question; resolve don't file | [`agents/memory-janitor.md`](agents/memory-janitor.md) |
 | Five Gates: Source-First, Spec Integrity, Leakage Scan, Numeric Verification, Output Discipline | [`agents/orchestrator.md`](agents/orchestrator.md) § The Five Gates |
 
 Active enforcement: [`tests/test_developer_routing.py`](tests/test_developer_routing.py) fails CI on filename anti-patterns and routing drift.
 
 ---
 
-## Integration surface (16 IDEs / agent runtimes)
+## Integration surface
 
-Machine-readable inventory of every IDE/agent integration: [`agents/manifests/ide-integration.yaml`](agents/manifests/ide-integration.yaml).
+Machine-readable inventory of released, preview, community, and planned host
+surfaces: [`agents/manifests/ide-integration.yaml`](agents/manifests/ide-integration.yaml).
 
 For each surface, the matrix records: skill/rules path (project + global), MCP config path, file format, document URL, last-verified date, and current configuration status.
 
-Currently configured surfaces in this repo:
+Currently configured instruction surface in this repo:
 - `.github/copilot-instructions.md` — VS Code Copilot, GitHub Copilot
-- `.claude/settings.local.json` — Claude Code permission whitelist
 
 Per-IDE installation: [`docs/how-to/configure-ide.md`](docs/how-to/configure-ide.md).
 
@@ -157,7 +156,7 @@ Companion canonical sources:
 
 `v{MAJOR}.{MINOR}.{PATCH}`. Strict semver per [`docs/how-to/close-a-feature.md`](docs/how-to/close-a-feature.md). Use `scripts/ci/advise_version_bump.py` then `scripts/ci/bump_version.py X.Y.Z`. Never edit version strings manually.
 
-Current published release: **v2.12.1**. Release Client Candidate 1.0 validates the upcoming v2.12.2 customer artifact without creating a second public version system. Future work is tracked as unversioned **Upcoming** in [`workspace/PLANNING.md`](workspace/PLANNING.md).
+Current published release: **v2.12.2**. Release Client Candidate 1.0 was the private validation lane for this customer artifact, not a second public version system. Future work is tracked as unversioned **Upcoming** in [`workspace/PLANNING.md`](workspace/PLANNING.md).
 
 ---
 
@@ -174,7 +173,7 @@ Tests that catch documentation drift before it ships:
 | `tests/test_developer_routing.py::test_self_protocol_docs_are_linked` | Whole-system verifier reference integrity |
 | `tests/test_developer_routing.py::test_scripts_readme_covers_live_script_inventory` | Script catalog drift |
 
-Run: `pytest tests/test_developer_routing.py -v`. All 18 currently green.
+Run: `pytest tests/test_developer_routing.py -v`. Do not state a current result without running it on the exact commit.
 
 ---
 
@@ -186,7 +185,7 @@ Every documentation change must answer **one question in one canonical place**. 
 
 | Event | Canonical home |
 |-------|----------------|
-| New idea | `workspace/PLANNING.md` § Backlog (or `docs/explanation/vision.md` during migration) |
+| New idea | `workspace/PLANNING.md` §4.1 Backlog |
 | Accepted feature design | `workspace/PLANNING.md` § Features |
 | Current release state | `workspace/PLANNING.md` §2 Released Product |
 | Bug or GAP | `workspace/ISSUES.md` |
@@ -194,7 +193,7 @@ Every documentation change must answer **one question in one canonical place**. 
 | Reusable lesson | `workspace/lessons.md` |
 | Shipped contract | `docs/reference/<name>.md` |
 | Operational procedure | `docs/how-to/<name>.md` |
-| Developer workflow | `agents/orchestrator.md` (constitution) or `agents/orchestrator.md` (loadable) |
+| Developer workflow | `agents/orchestrator.md` |
 | Agent executable protocol | `agents/*.md` |
 | Architecture decision | `workspace/decisions/ADR-NNNN-*.md` (when migrated; currently `workspace/PLANNING.md §2.5` for rejections) |
 | IDE integration | `agents/manifests/ide-integration.yaml` |

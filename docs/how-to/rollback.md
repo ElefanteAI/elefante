@@ -1,83 +1,90 @@
-# Backup & Rollback Procedures
+# Backup and Rollback
 
-**Goal:** If a future change goes sideways, safely return to a known-good state with minimal downtime and no permanent data loss.
+This runbook separates customer rollback, source-code rollback, and data
+restore. They are different operations. Never change a storage format or
+restore files without a verified backup and a stopped runtime.
 
-This runbook is operational (not a postmortem). Lessons learned belong in the relevant `workspace/postmortems/<domain>.md` entry and are indexed by `workspace/ISSUES.md`.
+## 1. Create a recoverable backup
 
----
+The released default data root is `~/.elefante/data` on macOS/Linux or the
+Elefante user-data directory on Windows; configuration can override it.
 
-## Preconditions
-
-1. **Tag the release** before making changes:
-   - `git tag v2.1.3` (or the current version, if not already tagged).
-
-2. **Take a data backup** before any changes that touch storage formats:
-   - Databases live under `data/` by default (configurable in `config.yaml`).
-
-3. **Confirm version alignment**:
-   - Runtime version: `src/__init__.py`
-   - Packaging version: `setup.py`
-   - Dashboard ribbon: `/api/stats` -> `elefante.package_version`
-
----
-
-## Backup (File-System Snapshot)
-
-Stop Elefante first, then use the backup script. It does not open database
-handles, but a live database cannot be promised as a consistent file snapshot.
+Stop the daemon and all direct Elefante processes. On macOS/Linux, use the
+stable customer runtime to preview and then remove only the installer-owned
+service registration; this does not delete memory data:
 
 ```bash
-python scripts/lifecycle/backup_elefante_data.py
+ELEFANTE_RUNTIME="$HOME/.elefante/app/current"
+"$ELEFANTE_RUNTIME/.venv/bin/python" \
+  "$ELEFANTE_RUNTIME/scripts/lifecycle/daemon_service.py" uninstall
+"$ELEFANTE_RUNTIME/.venv/bin/python" \
+  "$ELEFANTE_RUNTIME/scripts/lifecycle/daemon_service.py" uninstall --apply
 ```
 
-This creates a timestamped zip archive under the configured backup directory.
-Each new archive carries a checksum manifest; nested recovery archives are not
-copied into future backups.
-
----
-
-## Rollback Procedure
-
-1. **Stop all services** that hold locks:
-   - MCP server(s)
-   - Dashboard server
-   - Any Python process using SQLite, Kuzu, or a legacy ChromaDB store
-
-2. **Preflight then restore data backup** (if the change touched storage formats or corrupted data):
+Then create the backup:
 
 ```bash
-python scripts/lifecycle/restore_elefante_data.py --latest
-python scripts/lifecycle/restore_elefante_data.py --latest --apply
+"$ELEFANTE_RUNTIME/.venv/bin/python" \
+  "$ELEFANTE_RUNTIME/scripts/lifecycle/backup_elefante_data.py"
 ```
 
-The first command validates archive paths and checksums without changing data.
-The applied restore stages the archive before replacement and moves current data
-to `data.pre_restore.<timestamp>` for recovery. `--discard-existing` is an
-exceptional destructive option and additionally requires `--confirm DISCARD`.
+On Windows PowerShell, set
+`$ElefanteRuntime = "$env:LOCALAPPDATA\Elefante\app\current"` and use
+`$ElefanteRuntime\.venv\Scripts\python.exe` with the same lifecycle scripts.
 
-3. **Roll back code** to the desired version:
+Confirm the reported archive exists, is non-empty, and passes its checksum
+verification. JSON/CSV export is analysis-only and is not a restorable backup.
+
+## 2. Restore data safely
+
+Stop every process using SQLite, Kuzu, or an explicitly configured legacy
+ChromaDB store. Preflight first:
 
 ```bash
-git checkout v2.1.3   # or whichever tagged version
+"$ELEFANTE_RUNTIME/.venv/bin/python" \
+  "$ELEFANTE_RUNTIME/scripts/lifecycle/restore_elefante_data.py" --latest
+"$ELEFANTE_RUNTIME/.venv/bin/python" \
+  "$ELEFANTE_RUNTIME/scripts/lifecycle/restore_elefante_data.py" --latest --apply
 ```
 
-4. **Restart services**:
+The first command validates without mutation. Apply stages the archive and
+preserves the replaced data in a recovery directory. Reinstall/start the
+installer-owned customer daemon with the same runtime's
+`daemon_service.py install` dry run followed by `install --apply`. Do not use
+`--discard-existing` unless the user explicitly authorizes permanent removal.
+
+## 3. Roll back product code
+
+For a customer installation, download a known-good published release and run
+its installer. Do not point IDEs at a developer checkout as a rollback.
+
+For a developer checkout:
+
+1. Confirm `git status --short` is clean or preserve every local change.
+2. Confirm the intended tag exists locally and on GitHub.
+3. Inspect the release notes and data compatibility before switching code.
+4. Use a separate worktree or detached checkout for the known-good tag; do not
+   rewrite the branch containing current work.
+
+The currently published release is v2.12.2. A future rollback target must be
+selected from actual published tags, not copied from this document.
+
+## 4. Verify
 
 ```bash
-python scripts/lifecycle/restart_elefante.py --verify
-python -m src.dashboard.server
+"$ELEFANTE_RUNTIME/.venv/bin/python" \
+  "$ELEFANTE_RUNTIME/scripts/lifecycle/daemon_service.py" status
+"$ELEFANTE_RUNTIME/.venv/bin/python" \
+  "$ELEFANTE_RUNTIME/scripts/lifecycle/doctor.py" --json
+curl --fail http://127.0.0.1:8765/health
 ```
 
-5. **Verify**:
-   - `http://127.0.0.1:8000/api/stats` reports the correct `package_version`
-   - `python scripts/verify/verify_health.py` passes
+Confirm the daemon health response, configured host registrations, expected
+runtime version, memory search, and dashboard snapshot. If verification fails,
+stop and preserve both the failed state and backup before seeking support.
 
----
+## Compatibility rule
 
-## Compatibility Rules
-
-When making changes beyond the current release:
-
-- Prefer **backward-compatible** changes (current version can still read the data).
-- If not possible, migrations must be **guarded** and **reversible**, and a backup must be taken first.
-- Document all schema changes in `docs/reference/`.
+Storage migrations must be backup-gated, dry-run-first, reversible, and
+explicitly authorized. A code rollback cannot be assumed to reverse a data
+migration.

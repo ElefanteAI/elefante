@@ -1,12 +1,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/core/refinery.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
-# PURPOSE : Deterministic (LLM-free) memory cleanup: builds a refinery plan
-#           to identify stale, low-score, or superseded memories for pruning.
+# PURPOSE : Deterministic (LLM-free) cleanup of duplicates and test/ephemeral
+#           memories, with canonicalization and explicit action plans.
 # ROLE    : Core maintenance — called by elefante-Refinery MCP tool.
-# TOUCHED : When changing staleness criteria, score thresholds, decay logic,
-#           or the refinery action set (archive, delete, supersede).
+# TOUCHED : When changing canonicalization, duplicate grouping, quarantine, or
+#           the refinery action set.
 # ─────────────────────────────────────────────────────────────────────────────
 """Deterministic memory cleanup (LLM-free).
 

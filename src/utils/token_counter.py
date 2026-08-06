@@ -1,10 +1,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/utils/token_counter.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
-# PURPOSE : Heuristic token counting and TOKEN_STATS injection for all MCP
-#           tool responses; negligible CPU cost; multilingual support.
-# ROLE    : Utils — called by server.py to inject TOKEN_STATS on every response.
+# PURPOSE : Heuristic token counting and TOKEN_STATS construction for MCP tool
+#           responses; negligible CPU cost; multilingual support.
+# ROLE    : Utils — called by server.py when building response statistics.
 # TOUCHED : When changing token budget constants (per memory type), heuristic
 #           counting formula, CJK/Arabic ratio blending, or the TOKEN_STATS
 #           field names exposed in tool responses.
@@ -35,7 +33,7 @@ from typing import Any, Dict, Optional
 # Used to compute proportionality score (actual / expected_max).
 #
 # Rationale (linked to memory type half-lives in spec-memory-schema.md):
-#   specification (800): Immutable authority (authority=1.0), rarely accessed
+#   specification (800): High authority (authority=1.0), rarely accessed
 #       but immensely valuable. Specs justify length because they prevent
 #       re-derivation of architecture decisions.
 #   directive (200): Injected into EVERY response. Must be concise to avoid
@@ -43,11 +41,11 @@ from typing import Any, Dict, Optional
 #   insight (500): Variable-length patterns with high reuse (access_count > 5
 #       typical). Worth the tokens because they transfer learning across tasks.
 #   decision (400): Need enough context to explain WHY, not just WHAT.
-#   preference (300): Stable over ~347 days. Moderate length.
+#   preference (300): Lowest non-zero type decay. Moderate length.
 #   fact (250): Atomic truths. Should not need paragraphs.
-#   note (150): Decays in ~46 days. Keep lean — if it needs more tokens,
+#   note (150): Higher type decay. Keep lean — if it needs more tokens,
 #       it should probably be an insight or decision.
-#   conversation (100): Ephemeral (~28 days). Minimal footprint.
+#   conversation (100): Highest type decay. Minimal footprint.
 # ============================================================================
 
 TYPE_TOKEN_BUDGETS: Dict[str, int] = {

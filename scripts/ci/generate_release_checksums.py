@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : generate_release_checksums.py
-# VERSION : 2.12.0
-# CHANGED : 2026-07-30
 # PURPOSE : Generate and verify the deterministic SHA256SUMS manifest shipped
 #           beside Elefante release assets.
 # WHEN    : After platform archives are built and again after release artifacts
@@ -11,7 +9,6 @@
 #           python scripts/ci/generate_release_checksums.py --verify SHA256SUMS FILE...
 # NOTES   : Manifest entries use asset basenames, are sorted by basename, and
 #           reject duplicate basenames so verification remains unambiguous.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Generate or verify a deterministic SHA256SUMS release manifest."""
 

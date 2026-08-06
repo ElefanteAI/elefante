@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/utils/elefante_mode.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Transaction-scoped write locking: acquire, work, release in 
 #           milliseconds — not session-level. Exposes WRITE_LOCK_FILE path.
 # ROLE    : Utils — wraps all state-mutating operations in orchestrator.py.
@@ -301,7 +299,8 @@ class ElefanteModeManager:
         """
         Context manager for read operations.
         
-        Reads don't need locks in our model - ChromaDB and Kuzu
+        Reads don't need Elefante's transaction lock in this model; the
+        configured vector store and Kuzu still enforce their own ownership.
         handle read consistency internally.
         """
         # No-op context manager - reads are lock-free

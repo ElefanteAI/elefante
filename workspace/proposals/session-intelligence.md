@@ -1,18 +1,23 @@
 # PRD: Session Intelligence - Privacy-Respecting Invocation Telemetry
 
-> **Status**: DRAFT - Feature request
+> **Status**: DRAFT — reconciled with v2.12.2; no implementation or release commitment
 >
 > **Owner**: Elefante dev team
 >
 > **Date**: 2026-04-17
 >
-> **Scope**: Local-first session and invocation telemetry so Elefante can answer when it was called, by which client, what happened, and whether it helped, without storing raw chat transcripts by default
+> **Scope**: Local-first session and invocation telemetry so Elefante can answer
+> when it was called, by which client, and what happened. Helpfulness remains
+> unknown unless a separate controlled Task Intelligence evaluation supplies
+> outcome evidence. Raw chat transcripts are not stored by default.
 
 ---
 
 ## Question This Spec Answers
 
-How can Elefante tell, per session and per client, when it was invoked, how it was used, and whether it helped, without violating user privacy?
+How can Elefante tell, per session and per client, when it was invoked and how
+it was used without violating user privacy, while linking to controlled outcome
+evidence when that evidence exists?
 
 ---
 
@@ -40,13 +45,13 @@ The current system has partial building blocks, but not a real session-intellige
 
 | Surface | Current State | Gap |
 | ------- | ------------- | --- |
-| MCP session identity | `session_id` exists as an optional tool argument | Elefante does not generate session IDs on its own |
-| Client attribution | Not captured in the MCP server | Cannot tell VS Code from Cursor, Bob, Antigravity, or another client |
+| Transport/write provenance | The daemon or stdio process records bounded tool, instance, session, cwd, and transport context on new writes | This is write provenance, not an invocation-event or conversation lifecycle |
+| Client attribution | Installed bridges provide a normalized host id; HTTP can also use client metadata | No maintained per-call event store or aggregate usage report exists |
 | Per-call token stats | Computed by `SessionTokenLedger` and returned as `TOKEN_STATS` | Not persisted; lost on restart |
 | Retrieval history | Last 20 retrieved memory IDs persisted for 7 days | Too thin to reconstruct real invocation history |
 | Co-activation | Persisted in Kuzu and already useful as a reuse proxy | Does not answer query-level provenance |
-| Retrieval effectiveness | Planned in `spec-retrieval-effectiveness.md` | Still missing per-retrieval logs, unanswered-query logs, and usefulness surfacing |
-| Privacy | No remote telemetry, rotating logs, secrets scrubber in the distiller | Direct `MemoryAdd` calls are not scrubbed and raw session invocation metadata is not structured |
+| Retrieval effectiveness | Evaluation infrastructure exists in [`retrieval-effectiveness.md`](retrieval-effectiveness.md) | Product lift remains unproven; per-retrieval outcomes are not persisted |
+| Privacy | No Elefante product telemetry; the optional distiller has a secrets scrubber | Direct memory writes are not a general-purpose secret scrubber; invocation metadata is not persisted |
 
 This feature request exists because the current system cannot answer session-level product questions with confidence.
 
@@ -59,7 +64,7 @@ Elefante must gain a privacy-respecting session-intelligence layer that can answ
 1. **Who called Elefante** - client or IDE name when available.
 2. **When Elefante was called** - session lifecycle plus per-tool invocation timestamps.
 3. **What happened** - tool name, result shape, latency, token cost, retrieval count.
-4. **Whether it helped** - downstream reuse or reinforcement signal, not just raw retrieval count.
+4. **Whether a valid evaluation linked it to an outcome** - otherwise usefulness remains unknown.
 5. **What failed to help** - unanswered queries and dead-weight retrievals.
 
 This must remain local-first and privacy-bounded.
@@ -126,7 +131,7 @@ Retention must be automatic, documented, and testable.
 
 This feature should ship as **Session Intelligence**, a local event layer dedicated to session and invocation analytics.
 
-It should not be forced into ChromaDB semantic memory records.
+It should not be forced into semantic memory records.
 
 It should not overload the Kuzu graph with high-volume event noise.
 
@@ -143,7 +148,8 @@ Reason:
 - time-window aggregates are first-class
 - retention pruning is cheap
 - daily and weekly rollups are easy
-- session events are not semantic memory and should not pollute ChromaDB
+- session events are not semantic memory and should not pollute the configured
+  vector store
 
 Fallback if the team rejects a dedicated store:
 
@@ -157,9 +163,11 @@ Do **not** store this in a way that makes weekly statistics or retention enforce
 
 ## 6. What Must Exist
 
-### 6.1 Server-Generated Session Lifecycle
+### 6.1 Canonical Session Lifecycle
 
-Elefante must stop depending on the client to provide `session_id`.
+Transport session ids and memory-level optional `session_id` fields are not a
+complete conversation lifecycle. Session Intelligence needs a bounded local
+record that is explicit about what the runtime can and cannot observe.
 
 The MCP server should create:
 
@@ -170,11 +178,12 @@ If a client supplies its own session identifier, Elefante may record it as `clie
 
 ### 6.2 Client Attribution
 
-Capture client identity from the MCP handshake or request context when available.
+Reuse the normalized host provenance already captured by the daemon/bridge;
+do not create a second naming system.
 
 Minimum field:
 
-- `client_name` = `vscode`, `cursor`, `bob`, `antigravity`, `openclaw`, `claude_desktop`, or `unknown`
+- `client_name` = canonical id from `scripts/setup/host_selection.py`, or `unknown`
 
 This must be normalized, not free-form.
 
@@ -202,22 +211,24 @@ For retrieval-bearing calls, also record:
 - `returned_memory_ids`
 - `top_score`
 
-### 6.4 Retrieval Usefulness Signals
+### 6.4 Retrieval diagnostics and outcome evidence
 
-This feature must not stop at invocation counts.
+Invocation telemetry must not convert exposure into usefulness. Retrieval,
+access-count increase, co-activation, repetition, or agent acknowledgement are
+diagnostic observations only; none proves that a memory improved the task.
 
-It must measure whether a retrieval mattered.
+Operational diagnostics may include:
 
-Minimum acceptable proxy set:
+- unanswered query count;
+- result count and selected/delivered memory IDs;
+- same-session reuse or co-activation;
+- explicit user or agent feedback, labeled as feedback rather than fact.
 
-- retrieval followed by same-session co-activation
-- retrieval followed by reinforcement or access_count increase inside the same session
-- unanswered query count
-- dead-weight retrieval count (`retrieved often`, `never reused`)
-
-Optional later signal:
-
-- explicit agent acknowledgement that a retrieved memory was useful
+A usefulness claim requires an opted-in task trace with observable success
+criteria, selected and delivered memory IDs, and a valid control/treatment or
+repeated ablation result. Without that evidence, the stored outcome is
+`unknown`. This proposal must reuse the Task Intelligence evaluation contract
+rather than inventing a weaker telemetry-derived score.
 
 ### 6.5 Session Summary Surface
 
@@ -241,28 +252,40 @@ Elefante must be able to answer, at minimum:
 - unanswered-query totals by day
 - dead-weight memories surfaced this week
 
-### 6.7 Source / Origin Schema (Multi-Instance Writes) — Closes GAP-025
+### 6.7 Released Source provenance prerequisite
 
-All of § 6.1–§ 6.6 assume Elefante can attribute every write to a specific client, project, and session. The daemon now captures this tuple for new writes; legacy provenance apply and the session-metrics pipeline remain pending (see [`../postmortems/memory.md`](../postmortems/memory.md#issue-15-multi-instance-write-origin-tracking-gap-025-in-progress)).
+The daemon now captures a bounded Source tuple for new writes. Legacy
+provenance apply remains an explicitly authorized support operation, and the
+session-metrics pipeline remains unbuilt (see
+[`../postmortems/memory.md`](../postmortems/memory.md#issue-15)).
 
-**Required Source tuple, captured on every memory-affecting write:**
+**Released Source tuple, captured with safe fallbacks on new memory writes:**
 
 | Field | Purpose | Source |
 | ----- | ------- | ------ |
-| `source.tool` | Normalized client name, matching [`../../agents/manifests/ide-integration.yaml`](../../agents/manifests/ide-integration.yaml) | MCP handshake client envelope |
-| `source.instance_id` | UUID per IDE window/process. Lets Session Intelligence distinguish two concurrently open IDEs of the same tool | Generated by daemon at MCP connection open |
-| `source.session_id` | Canonical server-generated session id per § 6.1 | Session lifecycle (§ 6.1) |
-| `source.cwd` | Working directory active at the moment of the write. Lets per-project reuse analysis exist at all | Captured on each invocation |
-| `source.matrix_version` | Version of the integration matrix the client was installed against. Lets drift audit correlate stale-install writes with known matrix changes | Stamped at install time, read from the IDE-side config emitted by the installer |
-| `source.timestamp_utc` | Write instant, independent of the memory's own `created_at` | Daemon clock |
+| `source.tool` | Bounded host id or `unknown-*` fallback | Bridge environment or MCP client/header context |
+| `source.instance_id` | Bounded connection/process identity or fallback | Bridge environment, MCP session id, or server-process id |
+| `source.session_id` | Transport session identity; not yet a conversation lifecycle | MCP session id, or `stdio` fallback |
+| `source.cwd` | Bounded working-directory context when supplied | Bridge environment or request header |
+| `WRITTEN_BY.observed_at` | Write-link instant, independent of memory creation time | Daemon clock |
 
-**Graph shape:** `(:Memory)-[:WRITTEN_BY]->(:Source)`. Source nodes are deduplicated on the `(tool, instance_id, session_id)` tuple — one Source node per live connection, not one per write.
+**Graph shape:** a memory's graph Entity is linked by `WRITTEN_BY` to a Source
+node. Source nodes are deduplicated on `(tool, instance_id, session_id)`—one
+Source node per observed connection identity, not one per write.
 
-**Writer contract:** the daemon (see [`ide-integration-surface.md`](ide-integration-surface.md) § 4.2 and § 7.1) is the only writer. It composes the Source tuple from the handshake envelope plus per-invocation `cwd`, and stamps it onto every memory-affecting call. Agent-side tool arguments never fabricate `source.*` — the daemon overwrites with ground truth.
+**Writer contract:** the released customer daemon is the durable-store writer.
+It composes Source context from transport-owned headers/environment plus `cwd`
+and stamps new memory writes. Direct source-mode stdio remains a developer
+compatibility path and records its own process identity.
 
-**Why this sits in session-intelligence, not only in the IDE-integration spec:** the tuple is the join key between the invocation event log (§ 6.3), the retrieval usefulness signals (§ 6.4), and the session summary (§ 6.5). Without the Source schema, none of the session-intelligence questions can be answered per-client or per-project. § 6.7 is therefore a hard prerequisite for the rest of § 6, not a nice-to-have annotation.
+**Boundary:** Source provenance answers who wrote a memory; it does not prove
+which retrieval helped a later task. Session Intelligence may join to this
+identity, but it must not reinterpret write provenance as outcome evidence.
 
-**Acceptance (mirrors § 10 additions):** every memory written after the closure date has a non-null `source.tool` and `source.instance_id`; no row in the store is anonymous; two concurrently open IDEs produce two distinct `source.instance_id` values with no Kuzu lock contention.
+**Current proof boundary:** new writes receive fallbacks when a host does not
+provide identity. Therefore `unknown-*` is valid provenance, not proof of a
+known client. Host-specific attribution remains only as strong as the bridge or
+handshake evidence.
 
 ---
 
@@ -306,13 +329,16 @@ Success for Phase 1:
 
 - Elefante can answer when it was called, by which client, and which tools ran.
 
-### Phase 2 - Measure Whether It Helped
+### Phase 2 - Link Diagnostics to Outcome Evidence
 
-Ship usefulness proxies and unanswered-query tracking.
+Ship unanswered-query tracking and connect eligible invocations to the
+controlled Task Intelligence outcome contract. Keep reuse and access signals
+labeled as diagnostics, not usefulness proxies.
 
 Success for Phase 2:
 
-- Elefante can distinguish frequent retrieval from useful retrieval.
+- Elefante can distinguish frequent retrieval from retrieval with valid outcome
+  evidence, and reports all other usefulness as `unknown`.
 
 ### Phase 3 - Surface It Cleanly
 
@@ -347,7 +373,7 @@ This feature is only done when all of the following are true:
 
 This is the concrete request to the Elefante dev team.
 
-1. Review this PRD against `spec-vision.md` Law 4 and confirm the feature improves signal quality rather than adding vanity analytics.
+1. Review this PRD against [`docs/explanation/vision.md`](../../docs/explanation/vision.md) and confirm the feature improves task outcomes rather than adding vanity analytics.
 2. Choose and document the local event store.
 3. Implement Phase 1 first: session IDs, client attribution, per-call event logging, retention.
 4. Extend the already planned retrieval-effectiveness work instead of building a second usefulness system.
@@ -360,20 +386,22 @@ This is the concrete request to the Elefante dev team.
 
 Elefante claims to maximize signal per token.
 
-That claim becomes stronger, not weaker, when the system can answer:
+That claim becomes testable only when the system can distinguish diagnostics
+from controlled outcome evidence. It should eventually answer:
 
-- which retrievals helped
-- which retrievals wasted context
-- which clients or workflows produce useful reuse
+- which retrievals have evidence of improving an outcome
+- which retrievals added context without improving the measured outcome
+- which clients or workflows show reuse, and which show measured outcome lift
 - which sessions are blind spots
 
-If Elefante cannot measure those things locally and privately, the product remains partially blind to its own value.
+Until Elefante can measure those things locally and privately, product value
+remains unproven rather than inferred from activity.
 
 ---
 
 ## 13. Related Bugs And Specs
 
-- Closes at the data layer: **GAP-025** — [`../postmortems/memory.md`](../postmortems/memory.md#issue-15-multi-instance-write-origin-tracking-gap-025-in-progress).
+- Closes at the data layer: **GAP-025** — [`../postmortems/memory.md`](../postmortems/memory.md#issue-15).
 - Prerequisite: [`ide-integration-surface.md`](ide-integration-surface.md) daemon ownership and Source tuple.
 - Paired product work: [`retrieval-effectiveness.md`](retrieval-effectiveness.md); Session Intelligence consumes that signal rather than duplicating it.
 - Governed by: [`../../docs/explanation/vision.md`](../../docs/explanation/vision.md) Four Laws and Non-Goals.

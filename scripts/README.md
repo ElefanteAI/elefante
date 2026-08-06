@@ -85,7 +85,7 @@ See the Installation Verification Ladder above for steps 1–3. Other verifiers:
 | `restart_elefante.py` | Process-level restart with stale-lock cleanup and optional post-restart verification. | After `src/` changes that the live server needs to pick up. |
 | `backup_elefante_data.py` | Checksum-manifested zip backup of `~/.elefante/data`; excludes nested recovery archives. | **Stop Elefante, then run before any destructive operation.** |
 | `restore_elefante_data.py` | Dry-run-first checksum-verified restore; existing data is moved aside by default. | Undo accidental data loss or a factory reset. Stop Elefante first; inspect, then add `--apply`. |
-| `reset_factory.py` | Destructive full reset of configured/default ChromaDB, SQLite, and Kuzu durable-state locations with backup gates. | Last resort. Never for Kuzu-only or lock-only issues. It refuses a configuration that would contain its own recovery directory. |
+| `reset_factory.py` | Privileged, dry-run-first reset that moves configured/default vector and Kuzu stores into a timestamped recovery area. | Last resort or explicit privacy wipe. Never for Kuzu-only or lock-only issues. It refuses a configuration that would contain its own recovery directory. |
 | `backfill_memory_provenance.py` | Adds explicit `legacy` provenance to memories created before the daemon. Dry-run by default; `--apply` persists. | After reviewing migration candidates, before treating provenance as complete. |
 | `migrate_chroma_to_sqlite.py` | Copies ChromaDB to an isolated snapshot, stages SQLite, and verifies UUID/metadata/embedding/search parity. Dry-run uses temporary storage; `--apply` requires an exact verified backup and `STOPPED` confirmation, leaves Chroma and configuration unchanged, and reserves a new destination without replacing any existing path. | Before replacing ChromaDB because of GAP-029; run dry-run first, then inspect its JSON proof before authorizing apply. |
 | `daemon_service.py` | Renders and manages a launchd, systemd-user, or Task Scheduler user daemon. Dry-run by default; `--apply` writes or removes only Elefante's unchanged service definition. | Install, inspect, or remove the shared local daemon service. |
@@ -121,7 +121,7 @@ Release flow: `advise_version_bump.py` → write CHANGELOG → `bump_version.py 
 | `render_release_notes.py` | Renders GitHub release body from the matching `CHANGELOG.md` entry. | In CI before publishing a tagged release. |
 | `select_release_assets.py` | Filters artifacts against GitHub's per-file upload cap; emits workflow outputs. | In CI before `action-gh-release`. |
 | `generate_release_checksums.py` | Generates or verifies a deterministic, basename-sorted `SHA256SUMS` manifest for an exact set of release assets. | On each build runner for archive integrity smoke tests, then in the release job before publishing assets. |
-| `list_mcp_tools.py` | Reads `server.py` and prints the live MCP tool + prompt inventory. | After modifying `server.py` to verify spec-tools.md is in sync. |
+| `list_mcp_tools.py` | Reads `server.py` and prints the live MCP tool + prompt inventory. | After modifying `server.py` to verify `docs/reference/tools.md` is in sync. |
 | `bundle_docker_package.sh` | Tarball of the Docker bundle for environments without full repo access. | Distribution packaging. |
 
 ## `scripts/debug/` — Incident Response

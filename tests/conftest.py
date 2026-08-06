@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/conftest.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PROVES  : Shared pytest fixtures and test configuration for the whole suite.
 # RUN     : loaded automatically by pytest — do not run directly.
 # WHEN    : Modify when adding new shared fixtures, changing temp-dir setup,
@@ -26,7 +24,7 @@ def isolated_orchestrator(tmp_path, monkeypatch):
     """
     Create an orchestrator with isolated temporary databases.
     
-    This fixture creates fresh ChromaDB and Kuzu databases in a temporary
+    This fixture creates fresh SQLite-vector and Kuzu databases in a temporary
     directory that is cleaned up after the test.
     """
     from src.core.orchestrator import MemoryOrchestrator

@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/utils/dashboard_serializer.py
-# VERSION : 2.11.0
-# CHANGED : 2026-07-26
 # PURPOSE : Single source of truth for converting Memory objects into dashboard
 #           node/edge JSON consumed by the frontend and snapshot pipeline.
 # ROLE    : Utils — shared by update_dashboard_data.py and the live server.
@@ -115,7 +113,7 @@ def compute_live_score(mem: Memory) -> int:
 
 
 def compute_live_score_from_raw(meta: dict) -> int:
-    """Score from a raw ChromaDB metadata dict. Same formula as compute_live_score()."""
+    """Score from raw persisted metadata. Same formula as compute_live_score()."""
     try:
         memory_type = str(meta.get("memory_type", "fact"))
         decay_rate = TYPE_DECAY_RATES.get(memory_type, 0.01)

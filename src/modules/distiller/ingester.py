@@ -4,7 +4,7 @@ Bridge between the Distiller pipeline and Elefante's MemoryOrchestrator.
 
 Two modes:
   1. Raw Archive: Store a lightweight session reference (high decay).
-  2. Insight Promotion: Store distilled insights as permanent memories.
+  2. Insight Promotion: Store distilled insights as durable memories.
 """
 
 from __future__ import annotations
@@ -87,7 +87,7 @@ class MemoryIngester:
 
     def store_insights(self, session: ChatSession, insights: List[DistilledInsight]) -> List[str]:
         """
-        Store distilled insights as high-value, permanent memories.
+        Store distilled insights as high-value, durable memories.
         This is the Pro Tier — the money maker.
         Returns list of memory IDs for successfully stored insights.
         """
@@ -100,7 +100,7 @@ class MemoryIngester:
                 "category": f"distilled_{insight.insight_type.value}",
                 "source_detail": "session_distiller",
                 "confidence": insight.confidence,
-                "decay_rate": 0.0,  # Permanent — this is refined knowledge
+                "decay_rate": 0.0,  # No type-specific creation decay
                 "custom_metadata": {
                     "source_session": session.session_id,
                     "source_workspace": session.workspace_name or session.workspace_id,

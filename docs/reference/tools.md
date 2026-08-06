@@ -1,4 +1,4 @@
-# Usage Guide & API Reference (v2.12.0)
+# Usage Guide & API Reference (v2.12.2)
 
 ## 1. Natural Language Interaction
 
@@ -29,9 +29,15 @@ Elefante exposes **16 tools** and **2 prompts**. Memory operations use one
 
 **Tool response contract**:
 
-- Every tool response injects `ENTRYPOINT_SEQUENCE_READ_THIS_FIRST`, `MANDATORY_PROTOCOLS_READ_THIS_FIRST`, `DIRECTIVES`, and `TOKEN_STATS`.
+- Every tool response includes `TOKEN_STATS`. Normal memory, graph, context,
+  session, ETL, and task operations also receive the entrypoint, pitfall, and
+  active-directive blocks. System, dashboard, and directive-management tools
+  return through a minimal management path and do not receive those recursive
+  policy blocks.
 - Some responses also inject `RELEVANT_CONTEXT` when Elefante can surface related memories automatically.
-- `ENTRYPOINT_SEQUENCE_READ_THIS_FIRST` is the exact developer/debug routing path for repository work: Known Issues -> verification command -> compendium -> maintained test surface.
+- `ENTRYPOINT_SEQUENCE_READ_THIS_FIRST` is environment-specific. Developer
+  runtimes receive repository-debug routing; customer runtimes receive a short
+  memory-use and secret-handling sequence.
 - `RELEVANT_CONTEXT` is conditional, not universal. It is skipped for tools that already return memory-heavy data, and when present it contains a short `note` plus a `memories` list of summarized snippets rather than full raw memory payloads.
 - `TOKEN_STATS` is injected into every tool response. It tells the agent what each tool call costs in tokens. Fields:
   - `output_tokens` (int): Total tokens in the response, including protocol overhead and the TOKEN_STATS block itself.
@@ -49,11 +55,11 @@ Elefante exposes **16 tools** and **2 prompts**. Memory operations use one
 
 **Purpose**: Single discriminated entry point for all persistent memory operations. The `action` parameter selects the operation: `add`, `search`, `update`, `delete`, or `consolidate`.
 
-**Why one tool, not five**: Five separate memory tools forced agents to pre-classify intent before naming a tool. Consolidation moves that branch into a parameter, halves the memory surface in tool listings, and lets the schema document all five flows together. Atomic-swapped at v2.10.0 / 2026-05-02 — no overlap window, no aliases.
+**Why one tool, not five**: Five separate memory tools forced agents to pre-classify intent before naming a tool. Consolidation moves that branch into a parameter, reduces five memory entries to one, and lets the schema document all five flows together. Atomic-swapped at v2.10.0 / 2026-05-02 — no overlap window, no aliases.
 
 **Why `memory_type` matters** (`action=add`): Not cosmetic metadata. It changes decay, ranking, and lifespan.
 
-- `specification` and `directive` never decay.
+- `specification` and `directive` have zero type-specific creation decay, but the current freshness term still lowers their behavioral vitality when they are not accessed.
 - `note` and `conversation` decay quickly.
 - Wrong type = wrong behavior later.
 
@@ -80,7 +86,7 @@ Elefante exposes **16 tools** and **2 prompts**. Memory operations use one
 
 - Requires prior `action="search"` (Compliance Gate).
 - `force_new=true` should be rare. It skips title deduplication, preference merge, and high-similarity redundancy checks.
-- Use `specification` for durable architecture or contract truths. Use `directive` for rules that must not fade. Use `note` only for short-lived context.
+- Use `specification` for durable architecture or contract truths. Use `directive` for behavioral rules. Use `note` only for short-lived context. User-locked retention and injection policies are design work, not part of the released schema.
 
 **Example**:
 
@@ -114,7 +120,7 @@ Elefante exposes **16 tools** and **2 prompts**. Memory operations use one
 - `mode` (optional, string, default `hybrid`): `semantic`, `structured`, or `hybrid`.
 - `limit` (optional, integer, default `10`, min `1`, max `100`): Maximum results to return.
 - `filters` (optional, object): Filter by `memory_type`, `domain`, `category`, `min_score`, `tags`, `start_date`, or `end_date`.
-- `min_similarity` (optional, number, default `0.3`, min `0.0`, max `1.0`): Minimum semantic similarity threshold.
+- `min_similarity` (optional, number, default `0.1`, min `0.0`, max `1.0`): Minimum semantic similarity threshold for the MCP memory-search path.
 - `include_conversation` (optional, boolean, default `true`): Include recent conversation context.
 - `include_stored` (optional, boolean, default `true`): Include stored memories from the configured local semantic store and Kuzu.
 - `session_id` (optional, string): Session UUID. Required when `include_conversation=true` and the caller needs session-scoped context.
@@ -419,7 +425,10 @@ Elefante exposes **16 tools** and **2 prompts**. Memory operations use one
 
 ### Directives
 
-Directives are always-on behavioral constraints. They are not memories. They are injected into every tool response and cannot be outcompeted by similarity scores.
+Directives are persistent behavioral constraints. They are not memories and
+cannot be outcompeted by similarity scores. Active directives are injected on
+normal product operations and error responses; directive-management, system,
+and dashboard management paths omit recursive directive injection.
 
 #### `elefante-DirectiveAdd`
 
@@ -443,7 +452,9 @@ Directives are always-on behavioral constraints. They are not memories. They are
 
 **Purpose**: List active directives.
 
-**Why this exists**: Directives need inspection and audit because they affect every future tool response.
+**Why this exists**: Directives need inspection and audit because active rules
+affect normal product-operation responses. Minimal system, dashboard, and
+directive-management responses do not recursively inject them.
 
 **Parameters**: None.
 
@@ -498,7 +509,7 @@ Prompts are not tools. They inject memory-aware instructions or pre-fetched cont
 ## 3. Best Practices
 
 1. **Search before write**: Run `elefante-Memory(action="search")` before `action="add"|"update"|"delete"` or `elefante-GraphConnect`.
-2. **Choose memory type by lifespan**: Use `specification` and `directive` for permanent truths. Use `note` and `conversation` only for short-lived context.
+2. **Choose memory type by lifespan**: Use `specification` for durable product truths and the Directive tools for active behavioral constraints. Specification and directive memories have zero type-specific decay, but freshness still affects their current vitality; they are not automatically immutable or permanently injected. Use `note` and `conversation` only for short-lived context.
 3. **Use `list_all` deliberately**: It is browse/export mode, not a replacement for a targeted relevance search.
 4. **Batch graph work**: Prefer one `GraphConnect` call with refs or IDs over many small graph mutations.
 5. **Keep GraphQuery read-only**: Use `GraphQuery` for retrieval and `GraphConnect` for explicit mutations; parameterize Cypher rather than building queries with string interpolation.

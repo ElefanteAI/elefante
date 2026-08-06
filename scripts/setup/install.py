@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : install.py
-# VERSION : 2.7.2
-# CHANGED : 2026-04-16
 # PURPOSE : Single-entry installer: venv, deps, DB init, daemon plus detected
 #           MCP host configuration, status files, rolling terminal UI, and system
 #           verification in one cross-platform script.
@@ -16,7 +14,6 @@
 #           requirements.txt, calls init_databases.py, then calls both
 #           configure_*.py scripts. Safe to re-run if install is interrupted.
 #           Requires Python 3.11+.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """
 Elefante Unified Installation Script

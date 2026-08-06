@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/desktop.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Desktop/system-tray integration for Elefante (non-MCP GUI path).
 # ROLE    : Optional UI layer — not required for MCP/agent operation.
 # TOUCHED : When changing the system-tray menu, desktop notifications, or the

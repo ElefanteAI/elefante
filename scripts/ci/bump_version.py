@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : bump_version.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Cascade a semver string across runtime/package declarations. Public
 #           release claims remain pinned until publication is verified.
 # WHEN    : After writing the CHANGELOG entry for the new version. Never run before
 #           the CHANGELOG entry exists — the script will refuse. After bumping, run
-#           --check to confirm all 48 tracked files agree.
+#           --check to confirm every authoritative declaration agrees.
 # USAGE   : python scripts/ci/bump_version.py X.Y.Z [--allow-rebaseline] | --sync | --check
 # NOTES   : Mandatory sequence: (1) write CHANGELOG entry, (2) bump, (3) --check,
 #           (4) git commit. Lowering the local version requires explicit
 #           --allow-rebaseline and is only for unpublished release correction.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """
 Bump Elefante version across all files.

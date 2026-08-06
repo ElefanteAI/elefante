@@ -2,7 +2,8 @@
 
 This guide shows how to run Elefante in a clean Docker environment.
 
-If you are an autonomous agent operating inside an Agent Zero / A0 project layout, read `docs/how-to/agent-handoff.md` first.
+If you are an autonomous agent operating inside an Agent Zero / A0 project
+layout, read [`agent-handoff.md`](agent-handoff.md) first.
 
 ## What you will get
 
@@ -13,9 +14,11 @@ If you are an autonomous agent operating inside an Agent Zero / A0 project layou
 
 - Docker Desktop installed and running.
 
-## Best practice: clone from GitHub inside the Docker environment
+## Use a released source tag
 
-If your Docker environment can reach GitHub, cloning is the cleanest way to ensure you have the latest Elefante `main`.
+If your Docker environment can reach GitHub, clone and check out the released
+v2.12.2 tag. `main` is a development branch and is not the customer release
+contract.
 
 If your destination folder already contains `.a0proj/`, do not use `git clone <url> .` (git refuses cloning into a non-empty directory).
 Use one of the clone patterns in the "Agent Zero / A0 projects" section below.
@@ -49,7 +52,7 @@ docker compose up -d --build
 docker compose up --build
 ```
 
-1. Open the dashboard in your browser:
+3. Open the dashboard in your browser:
 
 - <http://localhost:8000>
 
@@ -72,6 +75,8 @@ Use one of these two safe patterns instead.
 cd /a0/usr/projects/elefante
 git clone --depth 1 https://github.com/ElefanteAI/elefante elefante-repo-files
 cd elefante-repo-files
+git fetch --depth 1 origin tag v2.12.2
+git checkout --detach v2.12.2
 docker compose up -d --build
 ```
 
@@ -85,8 +90,8 @@ cd /a0/usr/projects/elefante
 # Initialize git in-place (safe when .a0proj exists)
 git init
 git remote add origin https://github.com/ElefanteAI/elefante || true
-git fetch --depth 1 origin main
-git checkout -B main FETCH_HEAD
+git fetch --depth 1 origin tag v2.12.2
+git checkout --detach FETCH_HEAD
 
 docker compose up -d --build
 ```
@@ -113,9 +118,12 @@ docker compose up
 
 ## Important note about MCP
 
-Elefante MCP is designed to be started by your IDE and communicate over stdio.
+The released customer topology is one local daemon plus transport-only bridges
+configured by the platform installer. This Docker Compose file runs the
+snapshot dashboard only; it is not a substitute for the customer runtime.
 
 If you are using **Agent Zero (A0)**, you can configure the MCP server by updating your `mcpServers` JSON object. See [agent-handoff.md](agent-handoff.md) for the exact JSON snippet to add to your `mcp_servers.json` or equivalent configuration file.
 
-Running MCP inside Docker is possible but is an advanced setup (you have to bridge stdio/tooling into your IDE).
-For beginners, use Docker for the dashboard and scripts first.
+Running the daemon or MCP bridge across a container boundary is an advanced,
+community-tier setup. For beginners, use Docker only for the snapshot dashboard
+and install the released customer runtime for IDE memory.

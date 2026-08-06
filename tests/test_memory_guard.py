@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_memory_guard.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PROVES  : MemoryAdd intelligence-pipeline guard: ensures rejection_reason is
 #           returned for filtered memories (BUG-011 guard).
 # RUN     : pytest tests/test_memory_guard.py -v

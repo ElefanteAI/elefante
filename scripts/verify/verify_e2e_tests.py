@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : verify_e2e_tests.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Authoritative self-protocol harness: launches MCP server in an
 #           isolated temp environment and proves the full live tool/prompt surface.
 # WHEN    : Before any release. After changes to server.py, orchestrator.py,
@@ -13,7 +11,6 @@
 # NOTES   : Launches a real MCP server subprocess in a temp dir. Slow (~60s)
 #           but definitive. --with-dashboard-open enables the optional 16-tool
 #           sweep including dashboard tools. Requires all dependencies installed.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Elefante self-protocol verification harness.
 

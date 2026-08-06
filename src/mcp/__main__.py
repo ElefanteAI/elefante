@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/mcp/__main__.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Module entry point enabling `python -m src.mcp` execution.
 #           Fixes the RuntimeWarning about src.mcp.server in sys.modules.
 # ROLE    : MCP package glue — do not put logic here; delegate to server.py.
@@ -22,4 +20,3 @@ from src.mcp.server import main
 
 if __name__ == "__main__":
     asyncio.run(main())
-

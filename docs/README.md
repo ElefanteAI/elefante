@@ -1,6 +1,6 @@
 # Elefante User Documentation
 
-> **v2.12.1** · Published user documentation. The GitHub release and installers
+> **v2.12.2** · Published user documentation. The GitHub release and installers
 > are public.
 
 Use this index to install, configure, operate, and understand the released
@@ -22,19 +22,21 @@ draft contracts are intentionally outside this user-documentation surface.
 | [`architecture.md`](reference/architecture.md) | System design, triple-layer brain, retrieval workflow |
 | [`tools.md`](reference/tools.md) | MCP tool reference (16 tools, 2 prompts) — full schemas |
 | [`scoring.md`](reference/scoring.md) | 5-signal cognitive scoring (vector / concept / co-activation / authority / temporal) |
-| [`ingestion.md`](reference/ingestion.md) | 5-step pipeline (Extract → Classify → Integrity → Write → Reinforce) |
-| [`memory-schema.md`](reference/memory-schema.md) | V4 cognitive fields + V5 knowledge topology |
+| [`ingestion.md`](reference/ingestion.md) | Validated write, deduplication, persistence, graph links, and optional agent ETL |
+| [`memory-schema.md`](reference/memory-schema.md) | Released memory metadata, lifecycle, provenance, and persistence contract |
 | [`dashboard-snapshot.md`](reference/dashboard-snapshot.md) | Dashboard JSON schema |
 | [`self-protocol.md`](reference/self-protocol.md) | Whole-system MCP self-protocol verification contract |
 | [`token-intelligence.md`](reference/token-intelligence.md) | Token-budget layer (TOKEN_STATS, type budgets, density warnings) — shipped v2.5.0 |
 
-Source-of-truth for every spec is `src/`; specs lag. When formula and spec disagree, source wins.
+Source authority for every reference is the released implementation in `src/`.
+Documentation drift is a defect; when source and documentation disagree, report
+the mismatch rather than normalizing it.
 
 ## How-to (`how-to/`) — what to DO
 
 | Doc | Procedure |
 |-----|-----------|
-| [`install.md`](how-to/install.md) | Full install + Python version details |
+| [`install.md`](how-to/install.md) | Customer installation, verification, repair, and source-path boundary |
 | [`configure-ide.md`](how-to/configure-ide.md) | IDE and CLI-agent MCP setup (VS Code, Cursor, Bob, Antigravity, Kiro, Gemini CLI, Claude Code, Codex, OpenClaw) |
 | [`run-mcp-server.md`](how-to/run-mcp-server.md) | Manual server startup + handshake verification |
 | [`view-dashboard.md`](how-to/view-dashboard.md) | Dashboard launch + verification |
@@ -52,11 +54,14 @@ Source-of-truth for every spec is `src/`; specs lag. When formula and spec disag
 
 ---
 
-## Boundaries (Diátaxis-pure)
+## Documentation boundaries
 
-- **`reference/` is for what the system IS.** No how-to steps, no rationale paragraphs.
-- **`how-to/` is for procedures.** Goal-oriented. Numbered steps. No conceptual deep-dives.
-- **`explanation/` is for WHY.** Design rationale, philosophy, thesis. No commands, no schemas.
+- **`reference/` is for what the system IS.** It may include a narrow command
+  that verifies the documented contract.
+- **`how-to/` is for procedures.** Goal-oriented steps with only the context
+  needed to perform them safely.
+- **`explanation/` is for WHY.** Design rationale, philosophy, and product
+  boundaries rather than operational instructions.
 - **Developer state is not user documentation.** Drafts, bugs, postmortems, and
   release procedures are maintained separately and are not linked from this
   index.

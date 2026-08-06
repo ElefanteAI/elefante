@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/models/query.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Query and search parameter models for MemorySearch and related tools.
 # ROLE    : Models — used by server.py to validate and deserialize search requests
 #           before passing to orchestrator.
@@ -164,4 +162,3 @@ class SearchFilters(BaseModel):
             filters["file_path"] = self.file_path
             
         return filters
-

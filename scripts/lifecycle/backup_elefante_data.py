@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : backup_elefante_data.py
-# VERSION : 2.5.2
-# CHANGED : 2026-07-22
 # PURPOSE : Verified file-level zip backup of Elefante durable data.
 # WHEN    : Before any destructive operation, storage upgrade, or migration.
 # USAGE   : python scripts/lifecycle/backup_elefante_data.py [--elefante-home PATH] [--out-dir PATH]
 # NOTES   : Stop Elefante first for a consistent database snapshot. The archive
 #           carries a checksum manifest and excludes nested recovery archives.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Create a verified, portable archive of Elefante durable data.
 

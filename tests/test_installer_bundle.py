@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_installer_bundle.py
-# VERSION : 2.12.1
-# CHANGED : 2026-08-04
 # PROVES  : Installer bundle bootstrap logic keeps Elefante payload placement
 #           truthful, excludes local .venv backup directories, and emits clean,
 #           platform-specific launchers with executable metadata.

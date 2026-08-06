@@ -1,14 +1,12 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/models/memory.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Core Memory dataclass and MemoryMetadata; the canonical in-memory
 #           representation passed through the entire pipeline.
 # ROLE    : Models — imported everywhere. This is the data contract between
 #           vector_store, graph_store, orchestrator, server, and serializers.
 # TOUCHED : When adding new memory fields, changing the metadata schema, or
 #           adding new memory_type values. Changes here ripple across the entire
-#           system including ChromaDB schema and Kuzu schema.
+#           system including vector-store persistence and Kuzu schema.
 # ─────────────────────────────────────────────────────────────────────────────
 """
 Memory data models for Elefante.
@@ -39,7 +37,7 @@ class DomainType(str, Enum):
 class MemoryType(str, Enum):
     """Types of memories that can be stored.
     
-    Simplified from 12 to 6 values based on actual usage data.
+    Simplified from an older, wider taxonomy to 8 current values.
     Industry research (Mem0, Cognee, Generative Agents) confirms:
     static type enums add zero retrieval power. These exist for
     human browsing and decay-rate differentiation only.
@@ -108,8 +106,8 @@ TYPE_DECAY_RATES: Dict[str, float] = {
     "insight": 0.008,       # ~87 days   — insights are validated or forgotten
     "note": 0.015,          # ~46 days   — notes are transient
     "conversation": 0.025,  # ~28 days   — conversations are ephemeral
-    "specification": 0.0,   # Immutable  — specifications do not decay
-    "directive": 0.0,       # Immutable  — directives do not decay
+    "specification": 0.0,   # Zero type decay; freshness still affects vitality
+    "directive": 0.0,       # Zero type decay; freshness still affects vitality
 }
 
 

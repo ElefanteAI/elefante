@@ -1,38 +1,58 @@
-# Elefante Developer Etiquette Specification
+# Close an Elefante Development Change
 
-**Version:** 2.10.0
-**Type:** SPECIFICATION
+**Applies to:** current developer workflow at v2.12.2
 
-This document governs the required closure sequence for all feature development, bug fixes, and architectural adjustments within the Elefante repository. 
+This is a developer procedure, not customer documentation. `AGENTS.md` and
+`agents/orchestrator.md` define the governing workflow.
 
-As a `SPECIFICATION`, this document holds immutable authority (1.0). Agents MUST execute the following sequence precisely before claiming that a task is complete.
+## 1. Clean
 
-## 1. Delete Leftovers (`CLEAN_ENVIRONMENT`)
-Never leave experimental artifacts, scratchpads, debug logs, or temporary scripts in the repository once a feature is proven and integrated.
+- Review `git status --short` and preserve unrelated user work.
+- Remove temporary diagnostics, generated scratch artifacts, and dead code.
+- Do not delete user data, backups, or another contributor's changes.
 
-*   **Audit the Tree:** Run a `git status` or `tree` equivalent to identify untracked files.
-*   **Wipe Experiments:** Delete any `.md` or `.py` files created solely to formulate a plan or test a hypothesis that is now resolved. The final implementation is the truth; the scratchpad is liability.
-*   **Remove Dead Code:** Do not leave commented-out blocks of the previous implementation. If it's old, delete it. Git maintains the history.
+## 2. Synchronize documentation
 
-## 2. Update Documentation (`DOC_SYNC`)
-Code is secondary; the specification is primary. You cannot consider a code change "done" until the public and technical documentation reflects it.
+- Update the single canonical product, operational, or developer document that
+  owns the changed claim.
+- Update `docs/README.md` only when its published navigation changes.
+- Update `CHANGELOG.md` under `Unreleased` for a user-visible or release-relevant
+  change. Use live Keep a Changelog headings: `### Added`, `### Fixed`,
+  `### Changed`, or `### Removed`.
+- Never use retired headings such as `### The Problem Solved`,
+  `### The Solution`, or `### Changes`.
 
-*   **READMEs:** Ensure `README.md` is updated if the core feature set, architecture, or installation process changes. `docs/README.md` is a navigation index — update it only when files are added, moved, or deleted.
-*   **Architecture Specs:** Update `docs/reference/architecture.md` immediately if the cognitive flow or component interaction changes.
-*   **Changelog:** Add an entry to `CHANGELOG.md` matching the current version bump. Use the live Keep a Changelog headings `### Added`, `### Fixed`, and `### Changed`, place the change in the correct section, and explicitly document the "Why," "What," and "Impact." Never use retired headings such as `### The Problem Solved`, `### The Solution`, or `### Changes`.
+## 3. Verify
 
-## 3. Versioning (`STRICT_SEMVER`)
-Elefante enforces strict, automated semantic versioning (`x.y.z`). Manual version edits in individual files are prohibited.
+Run the smallest maintained regression that proves the change, then the
+required routing/release gates for its scope. Record exact results; “looks
+correct” is not proof.
 
-*   **Understand the Bump:**
-    *   `MAJOR` (x): Breaking changes or DB migrations.
-    *   `MINOR` (y): New features, backward compatible (e.g., adding `SPECIFICATION` schema).
-    *   `PATCH` (z): Bug fixes, internal cleanup.
-*   **Use the Bumper:** If you need help choosing the next version, run `python3 scripts/ci/advise_version_bump.py`, then apply the cascade with `python3 scripts/ci/bump_version.py <version>`. Never hand-edit version strings.
+```bash
+./.venv/bin/python -m pytest tests/test_developer_routing.py -q
+git diff --check
+```
 
-## 4. Final Lock (Git Etiquette)
-Once the tree is clean, the docs are synced, and the version is cascaded, lock the state.
+Use `tests/README.md` for targeted and full-suite routes.
 
-*   **Diff Audit:** Review the diff to ensure no accidental debug print statements or commented code escaped.
-*   **Atomic Commit:** Write a clean, professional commit message outlining the feature completion and the version bump.
-*   **Clean Tree:** Run `git status` before finishing. It must return `nothing to commit, working tree clean`.
+## 4. Version only during an approved release
+
+Do not bump the product for every development commit. When a release is
+approved, write its changelog entry first, then run:
+
+```bash
+./.venv/bin/python scripts/ci/advise_version_bump.py
+./.venv/bin/python scripts/ci/bump_version.py <X.Y.Z>
+./.venv/bin/python scripts/ci/bump_version.py --check
+```
+
+The advisor provides evidence; approved scope determines the final SemVer.
+Never hand-edit scattered version strings.
+
+## 5. Commit and publish within authority
+
+- Review the complete diff and test results.
+- Commit one coherent concern.
+- Push, open a PR, tag, publish, merge, or deploy only when the user's request
+  authorizes that external change.
+- After a push, verify the intended local and remote commit and required CI.

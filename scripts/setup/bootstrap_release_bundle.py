@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : bootstrap_release_bundle.py
-# VERSION : 2.7.2
-# CHANGED : 2026-04-16
 # PURPOSE : Place a shipped Elefante installer bundle into a stable install
 #           location, then delegate the real install work to scripts/setup/install.py.
 # WHEN    : Running a downloadable Elefante installer bundle outside a source checkout.
@@ -10,7 +8,6 @@
 #           [--venv-mode ask|fresh|backup|reuse|abort] [--dry-run]
 # NOTES   : Does not duplicate dependency, database, or IDE setup logic. It only
 #           copies the payload into a durable path and hands off to install.py.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Bootstrap a shipped Elefante installer bundle into a stable install root."""
 

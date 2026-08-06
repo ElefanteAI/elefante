@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/core/scoring.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Score normalization and weight calculation for hybrid search results
 #           across heterogeneous sources (vector, graph, behavioral).
 # ROLE    : Core utility — used by retrieval.py and orchestrator.py.
@@ -29,7 +27,7 @@ class ScoreNormalizer:
     
     Handles the challenge of comparing scores from different systems:
     - Conversation: recency + keyword overlap (0-1)
-    - Semantic (ChromaDB): cosine similarity (0-1)
+    - Semantic (configured vector store): cosine similarity (0-1)
     - Graph (Kuzu): score/100 (0-1)
     """
     
@@ -218,5 +216,3 @@ class ScoreNormalizer:
         
         # Clamp to [0, 1]
         return max(0.0, min(1.0, combined))
-
-
