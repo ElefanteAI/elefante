@@ -1,6 +1,8 @@
 """Safety tests for paired Task Intelligence evaluation."""
 
+import importlib
 import json
+import os
 from pathlib import Path
 
 from scripts.ci import run_task_intelligence_evaluation as evaluation
@@ -80,3 +82,13 @@ def test_treatment_prompt_keeps_hidden_acceptance_out() -> None:
     assert task["acceptance_ref"] not in prompt
     assert task["acceptance_command"][3] not in prompt
     assert "stable customer rule" in prompt
+
+
+def test_import_does_not_force_offline_mode_into_product_runtime(monkeypatch) -> None:
+    monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
+    monkeypatch.delenv("TRANSFORMERS_OFFLINE", raising=False)
+
+    importlib.reload(evaluation)
+
+    assert "HF_HUB_OFFLINE" not in os.environ
+    assert "TRANSFORMERS_OFFLINE" not in os.environ

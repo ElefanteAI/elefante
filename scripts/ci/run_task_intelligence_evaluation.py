@@ -25,11 +25,6 @@ DEFAULT_ESTIMATED_INPUT_TOKENS = 600_000
 DEFAULT_ESTIMATED_UNCACHED_INPUT_TOKENS = 100_000
 CONDITIONS = ("baseline", "task-brief")
 
-# The evaluation must use the already installed local model and never reach a
-# model hub while a benchmark is running.
-os.environ.setdefault("HF_HUB_OFFLINE", "1")
-os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
-
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -454,6 +449,10 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({**summary, "error": "estimated execution exceeds a cumulative token cap"}, indent=2, sort_keys=True))
         return 2
 
+    # Apply offline mode only inside an explicitly executed evaluation. Setting
+    # these at module import would leak into normal pytest collection/runtime.
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
     embedding_service = EmbeddingService()
     embedding_service._load_model()
     briefs = asyncio.run(_briefs_for_plan(pending, embedding_service))
