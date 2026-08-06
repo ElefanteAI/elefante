@@ -1,7 +1,7 @@
 # Elefante Test Suite
 
-> **Version:** 2.10.0  
-> **Last Updated:** 2026-04-13
+> **Version:** 2.12.2
+> **Last Updated:** 2026-08-05
 
 ## Quick Reference
 
@@ -26,6 +26,12 @@ pytest tests/test_integration_smoke.py -v
 
 # Verify the frozen Task Intelligence benchmark contract
 ./.venv/bin/python scripts/ci/verify_task_intelligence_benchmark.py
+
+# Dry-plan the frozen three-repetition holdout protocol (no model calls)
+./.venv/bin/python scripts/ci/run_task_intelligence_evaluation.py
+
+# Report current local paired evidence; incomplete evidence cannot promote
+./.venv/bin/python scripts/ci/summarize_task_intelligence_evaluation.py
 ```
 
 The shipped self-protocol runs against an isolated temporary Elefante home/data directory so it validates the live MCP workflow without polluting the user's durable memory store. By default it verifies 15/16 tools plus both prompts; `--with-dashboard-open` is opt-in because that tool binds fixed port 8000 and is not fully self-contained.
@@ -59,6 +65,10 @@ Use the existing tests in this file before writing any ad hoc validation script.
 | [test_installer_bundle.py](test_installer_bundle.py) | Release-bundle bootstrap install root placement, delegated installer command wiring, and archive contents | When changing `scripts/setup/bootstrap_release_bundle.py` or `scripts/ci/build_installer_bundle.py` |
 | [test_install_setup.py](test_install_setup.py) | Installer state, daemon service, MCP host adapters, safe uninstall ownership, and seed-memory guard | When changing `scripts/setup/` or `scripts/lifecycle/` installer paths |
 | [test_task_intelligence_benchmark.py](test_task_intelligence_benchmark.py) | Historical task provenance, acceptance nodes, split isolation, leakage scanning, and metadata-only outcomes | When changing the Task Intelligence SDD, benchmark manifest, or evaluator |
+| [test_task_intelligence_baseline.py](test_task_intelligence_baseline.py) | Historical snapshot isolation, hidden acceptance boundaries, model-profile outcome isolation, resume behavior, and cumulative token caps | When changing the no-Brief baseline runner |
+| [test_task_intelligence.py](test_task_intelligence.py) | Deterministic Task Brief lifecycle/scope/trust filters, conflict visibility, provenance, per-stage budgets, one graph hop, and non-mutating shadow search | When changing the Task Brief compiler or service |
+| [test_task_intelligence_evaluation.py](test_task_intelligence_evaluation.py) | Pre-fix evidence chunking, local snapshot corpus, seeded pair order, and treatment prompt leakage boundaries | When changing paired evaluation |
+| [test_task_intelligence_report.py](test_task_intelligence_report.py) | Protocol completeness, clustered confidence, resource limits, and fail-closed promotion | When changing outcome reporting or promotion thresholds |
 
 ### INTEGRATION (Run before release)
 

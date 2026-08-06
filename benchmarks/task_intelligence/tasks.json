@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "benchmark_id": "elefante-context-coding-v1",
-  "status": "candidate-fixtures-frozen-baseline-not-run",
+  "status": "phase-1-shadow-ready-holdout-not-run",
   "source_repository": "ElefanteAI/elefante",
   "source_head": "e84a8b54155add7673aafa6ab712540a85fdfd73",
   "scope": "Coding tasks whose success depends on prior project constraints, architecture, or safeguards.",
@@ -23,7 +23,33 @@
     "minimum_retry_reduction_percent": 20,
     "confidence_level": 0.95,
     "raw_transcripts_stored": false,
-    "local_outcome_retention_days": 30
+    "local_outcome_retention_days": 30,
+    "run_seed": 20260805,
+    "maximum_treatment_input_increase_percent": 20,
+    "maximum_treatment_duration_increase_percent": 25
+  },
+  "baseline_configuration": {
+    "model": "gpt-5.6-terra",
+    "model_version": "not-exposed-by-codex-cli",
+    "reasoning": "low",
+    "codex_cli": "codex-cli 0.147.0-alpha.1.2",
+    "prompt_profile": "task-intelligence-v1",
+    "calibration_tasks": 18,
+    "repetitions": 1,
+    "maximum_total_input_tokens": 10800000,
+    "maximum_total_uncached_input_tokens": 1800000
+  },
+  "baseline_evidence": {
+    "completed_on": "2026-08-05",
+    "passed": 6,
+    "failed": 12,
+    "pass_rate": 0.333333,
+    "input_tokens": 4971429,
+    "cached_input_tokens": 4329216,
+    "uncached_input_tokens": 642213,
+    "output_tokens": 54096,
+    "promotion_evidence": false,
+    "outcomes": "local-metadata-only"
   },
   "tasks": [
     {

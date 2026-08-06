@@ -36,6 +36,7 @@ OUTCOME_FIELDS = {
     "retries",
     "human_corrections",
     "input_tokens",
+    "cached_input_tokens",
     "output_tokens",
     "duration_ms",
     "failure_category",
@@ -119,10 +120,13 @@ def validate_outcome_record(record: dict[str, Any]) -> list[str]:
         "retries",
         "human_corrections",
         "input_tokens",
+        "cached_input_tokens",
         "output_tokens",
         "duration_ms",
     ):
         value = record.get(field)
+        if field == "cached_input_tokens" and value is None:
+            continue
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:
             errors.append(f"{field} must be a non-negative integer")
     return errors
@@ -154,6 +158,23 @@ def validate_manifest(manifest_path: Path, repo_root: Path = ROOT) -> dict[str, 
         errors.append("retry-reduction promotion threshold must remain 20 percent")
     if measurement.get("paired_repetitions") != 3:
         errors.append("nondeterministic paired repetitions must remain 3")
+    if measurement.get("run_seed") != 20260805:
+        errors.append("paired evaluation seed must remain frozen")
+    if measurement.get("maximum_treatment_input_increase_percent") != 20:
+        errors.append("treatment input-cost limit must remain 20 percent")
+    if measurement.get("maximum_treatment_duration_increase_percent") != 25:
+        errors.append("treatment duration limit must remain 25 percent")
+
+    baseline = manifest.get("baseline_configuration", {})
+    if baseline.get("model") != "gpt-5.6-terra" or baseline.get("reasoning") != "low":
+        errors.append("baseline model and reasoning configuration are not frozen")
+    if baseline.get("calibration_tasks") != 18 or baseline.get("repetitions") != 1:
+        errors.append("calibration baseline scope must remain 18 tasks by one repetition")
+    evidence = manifest.get("baseline_evidence", {})
+    if evidence.get("passed") != 6 or evidence.get("failed") != 12:
+        errors.append("calibration baseline result must remain 6 passed and 12 failed")
+    if evidence.get("promotion_evidence") is not False:
+        errors.append("calibration baseline must not be labelled promotion evidence")
 
     ids: set[str] = set()
     classes: Counter[str] = Counter()

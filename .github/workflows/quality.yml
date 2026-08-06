@@ -49,9 +49,19 @@ jobs:
           python scripts/ci/render_release_notes.py "$version" --validate-only
           python -m ruff check \
             scripts/ci/generate_release_checksums.py \
+            scripts/ci/run_task_intelligence_baseline.py \
+            scripts/ci/run_task_intelligence_evaluation.py \
+            scripts/ci/summarize_task_intelligence_evaluation.py \
+            scripts/ci/verify_task_intelligence_benchmark.py \
             scripts/demo/generate_showcase_snapshot.py \
             scripts/setup/host_selection.py \
-            scripts/setup/init_databases.py
+            scripts/setup/init_databases.py \
+            src/core/task_intelligence.py \
+            tests/test_task_intelligence.py \
+            tests/test_task_intelligence_baseline.py \
+            tests/test_task_intelligence_benchmark.py \
+            tests/test_task_intelligence_evaluation.py \
+            tests/test_task_intelligence_report.py
           git diff --check
 
   dashboard:
