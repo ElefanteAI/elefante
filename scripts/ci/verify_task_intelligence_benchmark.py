@@ -46,10 +46,12 @@ OUTCOME_FIELDS = {
     "duration_ms",
     "failure_category",
     "stage_trace",
+    "task_contract_sha256",
 }
 OPTIONAL_OUTCOME_FIELDS = {
     "outcome_schema_version",
     "stage_trace",
+    "task_contract_sha256",
 }  # Frozen v1 records remain readable.
 STAGE_TRACE_FIELDS = {
     "judge_status",
@@ -135,6 +137,101 @@ def _benchmark_fixture_path(task: dict[str, Any], repo_root: Path) -> Path | Non
     return candidate
 
 
+def _memory_fixture_path(task: dict[str, Any], repo_root: Path) -> Path | None:
+    fixture = task.get("memory_fixture")
+    if not isinstance(fixture, dict):
+        return None
+    path = fixture.get("path")
+    if (
+        fixture.get("source") != "sealed-durable-memory-export"
+        or not isinstance(path, str)
+        or not path.startswith("benchmarks/task_intelligence/fixtures/")
+    ):
+        return None
+    candidate = (repo_root / path).resolve()
+    fixture_root = (repo_root / "benchmarks/task_intelligence/fixtures").resolve()
+    if fixture_root not in candidate.parents:
+        return None
+    return candidate
+
+
+def validate_memory_fixture(task: dict[str, Any], repo_root: Path) -> list[str]:
+    """Validate a sealed real-memory fixture without trusting its label."""
+    fixture_contract = task.get("memory_fixture")
+    if fixture_contract is None:
+        return []
+    errors: list[str] = []
+    path = _memory_fixture_path(task, repo_root)
+    if path is None or not path.is_file():
+        return ["invalid or missing sealed memory fixture"]
+    raw = path.read_bytes()
+    observed_digest = hashlib.sha256(raw).hexdigest()
+    if fixture_contract.get("sha256") != observed_digest:
+        errors.append("sealed memory fixture digest mismatch")
+    if fixture_contract.get("promotion_use") is not False:
+        errors.append("sealed memory fixture must be calibration-only")
+    if task.get("split") != "calibration":
+        errors.append("sealed memory fixture may not be attached to a holdout task")
+    try:
+        payload = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return [*errors, "sealed memory fixture is not valid JSON"]
+    if payload.get("schema_version") != 1:
+        errors.append("sealed memory fixture schema_version must be 1")
+    if task.get("id") not in payload.get("task_ids", []):
+        errors.append("sealed memory fixture is not bound to this task")
+    source = payload.get("source")
+    memory = payload.get("memory")
+    lifecycle = payload.get("lifecycle_review")
+    privacy = payload.get("privacy_review")
+    if (
+        not isinstance(source, dict)
+        or source.get("kind") != "local-durable-memory-export"
+    ):
+        errors.append("sealed memory fixture source is invalid")
+    if not isinstance(memory, dict):
+        errors.append("sealed memory fixture memory is absent")
+    else:
+        if not isinstance(source, dict) or source.get("memory_id") != memory.get("id"):
+            errors.append("sealed memory fixture source ID mismatch")
+        content = memory.get("content")
+        if not isinstance(content, str) or not 40 <= len(content) <= 1200:
+            errors.append("sealed memory fixture content must be 40-1200 characters")
+        if memory.get("memory_type") not in {
+            "decision",
+            "directive",
+            "fact",
+            "specification",
+        }:
+            errors.append("sealed memory fixture memory_type is invalid")
+    if not isinstance(source, dict) or not re.fullmatch(
+        r"[0-9a-f]{64}", str(source.get("memory_json_sha256", ""))
+    ):
+        errors.append("sealed memory fixture source digest is invalid")
+    if not (
+        isinstance(lifecycle, dict)
+        and lifecycle.get("status") == "approved"
+        and lifecycle.get("resolution") == "user-reaffirmed-for-calibration"
+        and lifecycle.get("promotion_use") is False
+        and isinstance(lifecycle.get("original_status"), str)
+    ):
+        errors.append("sealed memory fixture lifecycle review is not approved")
+    if not (
+        isinstance(privacy, dict)
+        and privacy.get("status") == "approved"
+        and privacy.get("contains_secret") is False
+        and privacy.get("contains_personal_data") is False
+    ):
+        errors.append("sealed memory fixture privacy review is not approved")
+    findings = scan_memory_payload(
+        {"memories": [{"content": (memory or {}).get("content", "")}]},
+        [task],
+    )
+    if findings:
+        errors.append("sealed memory fixture leaks answer or forbidden content")
+    return errors
+
+
 def acceptance_test_source(task: dict[str, Any], repo_root: Path = ROOT) -> str | None:
     fixture = _benchmark_fixture_path(task, repo_root)
     if fixture is not None:
@@ -166,6 +263,12 @@ def scan_memory_payload(
                 findings.append({"task_id": task["id"], "marker": marker})
                 break
     return findings
+
+
+def task_contract_sha256(task: dict[str, Any]) -> str:
+    """Bind an outcome to the complete observable task and judge contract."""
+    payload = json.dumps(task, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def validate_outcome_record(record: dict[str, Any]) -> list[str]:
@@ -201,12 +304,17 @@ def validate_outcome_record(record: dict[str, Any]) -> list[str]:
             errors.append(f"{field} must be null or a non-negative integer")
     trace = record.get("stage_trace")
     schema_version = record.get("outcome_schema_version")
-    if schema_version is not None and schema_version != 2:
-        errors.append("outcome_schema_version must be 2 when present")
-    if schema_version == 2 and trace is None:
-        errors.append("outcome schema v2 requires stage_trace")
-    if trace is not None and schema_version != 2:
-        errors.append("stage_trace requires outcome schema v2")
+    if schema_version is not None and schema_version not in {2, 3}:
+        errors.append("outcome_schema_version must be 2 or 3 when present")
+    if schema_version in {2, 3} and trace is None:
+        errors.append(f"outcome schema v{schema_version} requires stage_trace")
+    if trace is not None and schema_version not in {2, 3}:
+        errors.append("stage_trace requires outcome schema v2 or v3")
+    task_digest = record.get("task_contract_sha256")
+    if schema_version == 3 and not (
+        isinstance(task_digest, str) and re.fullmatch(r"[0-9a-f]{64}", task_digest)
+    ):
+        errors.append("outcome schema v3 requires task_contract_sha256")
     if trace is not None:
         if not isinstance(trace, dict):
             errors.append("stage_trace must be an object")
@@ -270,11 +378,7 @@ def validate_outcome_record(record: dict[str, Any]) -> list[str]:
                 "stage_trace.considered_memory_count must be null or non-negative"
             )
         selected = trace["selected_memory_count"]
-        if (
-            not isinstance(selected, int)
-            or isinstance(selected, bool)
-            or selected < 0
-        ):
+        if not isinstance(selected, int) or isinstance(selected, bool) or selected < 0:
             errors.append("stage_trace.selected_memory_count must be non-negative")
         elif isinstance(record.get("memory_ids"), list) and selected != len(
             record["memory_ids"]
@@ -282,7 +386,9 @@ def validate_outcome_record(record: dict[str, Any]) -> list[str]:
             errors.append("stage_trace.selected_memory_count mismatches memory_ids")
         changed_files = trace["changed_files"]
         if not isinstance(changed_files, list) or len(changed_files) > 200:
-            errors.append("stage_trace.changed_files must be a list of at most 200 paths")
+            errors.append(
+                "stage_trace.changed_files must be a list of at most 200 paths"
+            )
         else:
             for path in changed_files:
                 if (
@@ -300,9 +406,7 @@ def validate_outcome_record(record: dict[str, Any]) -> list[str]:
             "passed" if record.get("acceptance_passed") is True else "failed"
         ):
             errors.append("stage_trace acceptance status mismatches outcome")
-        if trace["execution_status"] != (
-            "changed" if changed_files else "no-change"
-        ):
+        if trace["execution_status"] != ("changed" if changed_files else "no-change"):
             errors.append("stage_trace execution status mismatches changed_files")
         if bool(changed_files) != bool(trace["change_digest"]):
             errors.append("stage_trace change digest mismatches changed_files")
@@ -315,7 +419,9 @@ def validate_outcome_record(record: dict[str, Any]) -> list[str]:
                     "delivery_status",
                 )
             ):
-                errors.append("baseline stage_trace must mark memory stages not-applicable")
+                errors.append(
+                    "baseline stage_trace must mark memory stages not-applicable"
+                )
             if considered is not None or trace["brief_sha256"] is not None:
                 errors.append("baseline stage_trace must not contain Brief evidence")
         elif record.get("condition") == "task-brief":
@@ -577,6 +683,10 @@ def validate_manifest(manifest_path: Path, repo_root: Path = ROOT) -> dict[str, 
                 if not isinstance(content, str) or not 40 <= len(content) <= 1200:
                     errors.append(f"{memory_prefix} content must be 40-1200 characters")
 
+        errors.extend(
+            f"{prefix}: {error}" for error in validate_memory_fixture(task, repo_root)
+        )
+
         base_ref = task.get("base_ref")
         acceptance_ref = task.get("acceptance_ref")
         if not all(
@@ -622,7 +732,9 @@ def validate_manifest(manifest_path: Path, repo_root: Path = ROOT) -> dict[str, 
                     f"{prefix}: acceptance test node is absent at acceptance_ref"
                 )
         changed = _git_text(repo_root, "diff", "--name-only", base_ref, acceptance_ref)
-        if fixture is None and (changed is None or test_path not in changed.splitlines()):
+        if fixture is None and (
+            changed is None or test_path not in changed.splitlines()
+        ):
             errors.append(
                 f"{prefix}: acceptance test was not changed by the source task"
             )
@@ -732,8 +844,7 @@ def verify_black_box_canaries(
                     "base_rejected": verdicts["base"] is False,
                     "known_fix_accepted": verdicts["known_fix"] is True,
                     "passed": (
-                        verdicts["base"] is False
-                        and verdicts["known_fix"] is True
+                        verdicts["base"] is False and verdicts["known_fix"] is True
                     ),
                 }
             )

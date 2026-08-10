@@ -36,9 +36,12 @@ Specifications and directives have zero **type** decay, but the freshness
 factor still lowers their vitality when they have not been accessed. They are
 therefore not mathematically immutable or guaranteed to rank first.
 
-Access slows type decay logarithmically. In the current implementation,
-retrieval can increment access before a downstream agent has used the memory.
-That is exposure evidence, not confirmed usefulness.
+Access slows type decay logarithmically. Retrieval is now read-only: a search or
+automatic context delivery does not increment access or create co-activation.
+The development `record_use` path writes a reversible declared-use event to the
+Task Intelligence ledger. It does not yet update access history,
+co-activation, or ranking. That separation prevents observational pilot data
+from silently changing retrieval before causal benefit is established.
 
 ## Retrieval ranking
 
@@ -83,7 +86,9 @@ The memory model currently defaults `reinforcement_factor` to `0.25`. The
 configuration model also exposes `default_reinforcement_factor: 0.1`, but that
 setting is not wired into normal memory creation. Until that implementation gap
 is closed, documentation and callers must not claim the configurable default
-controls runtime reinforcement.
+controls runtime reinforcement. The current Task Intelligence ledger is an
+observational boundary only; no runtime reinforcement is authorized from its
+declared-use or outcome events.
 
 ## Lifecycle behavior
 
@@ -96,7 +101,10 @@ automatic resurrection are not implemented.
 Future memory governance is specified separately in the developer proposal. A
 user-enforced memory may require retention or delivery; managed memories may
 become dormant or archived. Governance is applied before task-specific ranking.
-No design-only lifecycle field should be presented as a released capability.
+The development branch now enforces the first bounded contract: scope and
+trigger gates run before ranking, locked `always` memories are reserved, and
+protected memories are not silently archived by the refinery. These fields are
+not presented as part of the published v2.12.2 client until released.
 
 ## Verification
 

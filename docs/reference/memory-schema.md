@@ -1,8 +1,8 @@
 # Memory Schema
 
 This reference describes the current `Memory` and `MemoryMetadata` models in
-`src/models/memory.py`. Design-only governance fields are not part of this
-released schema.
+`src/models/memory.py`. The governance fields below are implemented on the
+development branch but are not part of the published v2.12.2 client contract.
 
 ## Memory
 
@@ -48,9 +48,22 @@ authority with four other signals; see [`scoring.md`](scoring.md).
 - `version`, `deprecated`, `archived`, `summary`
 
 Deprecated and archived memories are excluded from normal semantic results.
-The current schema does not include user locks, retention class, injection
-policy, dormant state, utility confidence, or automatic forgetting controls.
-Those remain developer design work.
+
+### Governance (development extension)
+
+- `retention_policy`: managed, permanent, or ephemeral
+- `injection_policy`: ranked, triggered, or always
+- `scope`: optional project, workspace, or task scope
+- `trigger`: up to 20 phrases for triggered delivery
+- `user_locked`: explicit user authority that protects the memory from
+  automated refinery lifecycle changes
+
+Defaults are managed, ranked, no scope, no triggers, and unlocked.
+Always-inject is fail-closed unless user_locked is true. Governance is applied
+before Task Intelligence ranking; protected duplicates are not silently
+archived. Ephemeral is currently declarative—automatic expiry is not
+implemented. Invocation authority and causal task utility remain separate
+operation/evaluation concerns.
 
 ### Provenance
 
@@ -63,7 +76,8 @@ workflows. Provenance indicates origin; it does not by itself prove truth.
 
 ### Temporal fields
 
-- `last_accessed`, `last_modified`, `access_count`
+- `last_accessed`, `last_modified`, `access_count`. Ordinary retrieval and the
+  development Task Intelligence `record_use` ledger do not update access.
 - `decay_rate`, `reinforcement_factor`
 
 Type decay is assigned when a Memory is constructed. Specifications and

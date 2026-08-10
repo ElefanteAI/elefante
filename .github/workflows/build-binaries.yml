@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/build-binaries.yml"
       - "scripts/ci/build_release_client.py"
+      - "scripts/ci/resolve_release_publication.py"
       - "scripts/ci/verify_release_client.py"
       - "scripts/setup/**"
       - "scripts/lifecycle/**"
@@ -61,10 +62,20 @@ jobs:
           npm ci
           npm run build
 
+      - name: Resolve publication status
+        id: publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(python scripts/ci/resolve_release_publication.py \
+            --ref-type "${GITHUB_REF_TYPE}" \
+            --ref-name "${GITHUB_REF_NAME}")"
+          echo "status=${status}" >> "$GITHUB_OUTPUT"
+
       - name: Build clean customer installer
         run: |
-          python scripts/ci/build_release_client.py --platform "${{ runner.os }}" --publication-status release --output dist/elefante-installer-${{ runner.os }}.zip
-          python scripts/ci/verify_release_client.py --archive dist/elefante-installer-${{ runner.os }}.zip --require-clean-source --expected-publication-status release --expected-platform "${{ runner.os }}"
+          python scripts/ci/build_release_client.py --platform "${{ runner.os }}" --publication-status "${{ steps.publication.outputs.status }}" --output dist/elefante-installer-${{ runner.os }}.zip
+          python scripts/ci/verify_release_client.py --archive dist/elefante-installer-${{ runner.os }}.zip --require-clean-source --expected-publication-status "${{ steps.publication.outputs.status }}" --expected-platform "${{ runner.os }}"
 
       - name: Install Python Dependencies
         run: |

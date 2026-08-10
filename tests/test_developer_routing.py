@@ -25,6 +25,21 @@ def _read(rel_path: str) -> str:
     return (ROOT / rel_path).read_text(encoding="utf-8")
 
 
+def test_task_and_memory_text_are_not_written_to_runtime_logs() -> None:
+    query_logging_paths = (
+        "src/core/orchestrator.py",
+        "src/core/vector_store.py",
+        "src/core/graph_store.py",
+        "src/core/scoring.py",
+        "src/core/conversation_context.py",
+    )
+    for rel_path in query_logging_paths:
+        source = _read(rel_path)
+        assert "query=query[:" not in source, rel_path
+    assert "arguments=arguments" not in _read("src/mcp/server.py")
+    assert "content[:50]" not in _read("src/core/orchestrator.py")
+
+
 def _current_version() -> str:
     match = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', _read("src/__init__.py"), re.MULTILINE)
     assert match is not None
@@ -39,8 +54,12 @@ def _markdown_heading_slug(heading: str) -> str:
 
 
 def _mcp_surface_counts() -> tuple[int, int]:
-    server = _read("src/mcp/server.py")
-    return server.count("types.Tool("), server.count("Prompt(")
+    tool_names, prompt_names = _mcp_surface_names()
+    # Task Intelligence is default-off and Recall is still an unreleased
+    # customer candidate. Public v2.12.2 documentation remains frozen.
+    tool_names.discard("elefante-TaskIntelligence")
+    tool_names.discard("elefante-Recall")
+    return len(tool_names), len(prompt_names)
 
 
 def _mcp_surface_names() -> tuple[set[str], set[str]]:
@@ -213,11 +232,13 @@ def test_active_tool_docs_match_current_mcp_surface() -> None:
     startup_guide = _read("docs/how-to/run-mcp-server.md")
     self_protocol = _read("docs/reference/self-protocol.md")
     verifier = _read("scripts/verify/verify_e2e_tests.py")
-    default_tool_count = tool_count - 1  # DashboardOpen is opt-in by design.
+    source_tool_names, _ = _mcp_surface_names()
+    source_tool_count = len(source_tool_names)
+    default_tool_count = source_tool_count - 1  # DashboardOpen is opt-in.
     assert f"Available MCP Tools: {tool_count}" in startup_guide
     assert "Available MCP Tools: 21" not in startup_guide
-    assert f"{default_tool_count}/{tool_count} tools" in verifier
-    assert f"{default_tool_count} of {tool_count} tools" in self_protocol
+    assert f"{default_tool_count}/{source_tool_count}" in verifier
+    assert f"{default_tool_count} of {source_tool_count}" in self_protocol
 
     assert "docs/technical/dashboard.md" not in readme
     assert "docs/how-to/view-dashboard.md" in readme
@@ -444,6 +465,21 @@ def test_scoring_reference_matches_runtime_contract() -> None:
     assert '"vector": 0.35' in cognitive_scoring
     assert "automatic archive" not in scoring_doc.lower()
     assert "5-10ms" not in scoring_doc
+    assert "does not yet update access history" in scoring_doc
+    assert "no runtime reinforcement is authorized" in scoring_doc
+
+
+def test_task_intelligence_docs_keep_release_and_learning_boundaries() -> None:
+    tools_doc = _read("docs/reference/tools.md")
+    proposal = _read("workspace/proposals/retrieval-effectiveness.md")
+    changelog = _read("CHANGELOG.md")
+
+    assert "absent from MCP discovery" in tools_doc
+    assert "ELEFANTE_TASK_INTELLIGENCE_ENABLED=1" in tools_doc
+    assert "ELEFANTE_TASK_INTELLIGENCE_PILOT=1" in tools_doc
+    assert "does not update ranking" in tools_doc
+    assert "proves the pipeline, not that Elefante improves diverse tasks" in proposal
+    assert "does not change ranking" in changelog
 
 
 def test_changelog_contract_is_synced_across_docs_and_embedded_rules() -> None:

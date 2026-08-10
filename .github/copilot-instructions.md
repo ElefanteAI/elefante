@@ -6,17 +6,17 @@ input to reasoning, not proof that a memory is correct.
 
 ## When to retrieve
 
-Call `elefante-Memory(action="search")` before answering when the request may
-depend on:
+Call `elefante-Recall` before answering when the request may depend on:
 
 - the user's preferences or enforced instructions;
 - earlier project decisions, constraints, or unresolved problems;
 - work performed in another session, IDE, or agent host.
 
-Use an explicit standalone query with named projects, files, people, and
-concepts. If nothing relevant is found, say so when that absence matters. Do
-not fetch memory for a self-contained question that cannot benefit from prior
-context.
+Pass the complete standalone question with named projects, files, people, and
+concepts. Recall returns only a bounded governed context or abstains. Use
+`elefante-Memory(action="search")` for broad inspection and before memory
+mutations. Do not fetch memory for a self-contained question that cannot benefit
+from prior context.
 
 ## How to reason with results
 
@@ -68,9 +68,11 @@ store.
 
 ## Current MCP surface
 
-Elefante v2.12.2 exposes 16 tools and 2 prompts:
+Published Elefante v2.12.2 exposes 16 tools and 2 prompts. The unreleased
+customer candidate adds the default-on, read-only `elefante-Recall` path; it is
+not a published release claim.
 
-- Memory: `elefante-Memory`
+- Memory: `elefante-Recall`, `elefante-Memory`
 - Context and graph: `elefante-ContextGet`, `elefante-GraphQuery`,
   `elefante-GraphConnect`
 - Sessions and tasks: `elefante-SessionsList`, `elefante-TaskCreate`,

@@ -30,7 +30,7 @@ from datetime import datetime
 
 from src.models.memory import (
     Memory, MemoryType, MemoryMetadata, MemoryStatus,
-    DomainType, SourceType, TYPE_DECAY_RATES
+    DomainType, InjectionPolicy, RetentionPolicy, SourceType, TYPE_DECAY_RATES
 )
 from src.models.entity import Entity, EntityType, Relationship, RelationshipType
 from src.models.query import QueryMode, QueryPlan, SearchResult, SearchFilters
@@ -214,12 +214,30 @@ class MemoryOrchestrator:
 
 
         # ==================================================================================
-        # STEP 1: VALIDATE INPUT
+        # STEP 1: PRIVACY + VALIDATE INPUT
         # ==================================================================================
+        from src.modules.distiller.privacy import PrivacyFilter
+
+        if metadata is not None and not isinstance(metadata, dict):
+            raise ValueError("metadata must be an object")
+        payload, privacy_redactions, privacy_types = PrivacyFilter().scrub_payload(
+            {
+                "content": content,
+                "tags": tags or [],
+                "entities": entities or [],
+                "metadata": dict(metadata or {}),
+            }
+        )
+        content = payload["content"]
+        tags = payload["tags"]
+        entities = payload["entities"]
+        metadata = payload["metadata"]
+        if privacy_redactions:
+            system_metadata = dict(metadata.get("system_metadata") or {})
+            system_metadata["privacy_redactions"] = privacy_redactions
+            system_metadata["privacy_redacted_types"] = privacy_types
+            metadata["system_metadata"] = system_metadata
         validate_memory_content(content)
-        
-        if metadata is None:
-            metadata = {}
 
         # Guardrail: block test-memory creation unless explicitly allowed.
         # Rationale: production memory graph should not accumulate E2E/persistence test artifacts.
@@ -320,7 +338,10 @@ class MemoryOrchestrator:
         # Agent-driven enrichment (Elefante never calls an LLM).
         action = metadata.get("action")
         if isinstance(action, str) and action.strip().upper() == "IGNORE":
-            self.logger.info(f"Memory ignored by agent instruction: {content[:50]}...")
+            self.logger.info(
+                "Memory ignored by agent instruction",
+                content_sha256=hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            )
             return None
 
         provided_title = metadata.get("title")
@@ -566,7 +587,19 @@ class MemoryOrchestrator:
             
             custom_metadata = {
                 k: v for k, v in metadata.items()
-                if k not in ["domain", "category", "confidence", "source"]
+                if k not in [
+                    "domain",
+                    "category",
+                    "confidence",
+                    "source",
+                    "project",
+                    "workspace",
+                    "retention_policy",
+                    "injection_policy",
+                    "scope",
+                    "trigger",
+                    "user_locked",
+                ]
             }
             
             # ==================================================================================
@@ -593,6 +626,17 @@ class MemoryOrchestrator:
                 category=category,
                 confidence=confidence,
                 source=SourceType(source),
+                project=metadata.get("project") or None,
+                workspace=metadata.get("workspace") or None,
+                retention_policy=metadata.get(
+                    "retention_policy", RetentionPolicy.MANAGED
+                ),
+                injection_policy=metadata.get(
+                    "injection_policy", InjectionPolicy.RANKED
+                ),
+                scope=metadata.get("scope") or None,
+                trigger=metadata.get("trigger") or [],
+                user_locked=bool(metadata.get("user_locked", False)),
                 # Cognitive retrieval fields
                 concepts=concepts,
                 surfaces_when=surfaces_when,
@@ -749,7 +793,7 @@ class MemoryOrchestrator:
         session_id: Optional[UUID] = None,
         return_debug: bool = False,
         apply_temporal_decay: bool = True,
-        reinforce_access: bool = True,
+        reinforce_access: bool = False,
         recent_memory_ids: Optional[list[str]] = None
     ) -> List[SearchResult]:
         """
@@ -773,6 +817,9 @@ class MemoryOrchestrator:
             session_id: Session UUID for conversation context
             return_debug: Return debug statistics with results
             apply_temporal_decay: Apply temporal strength scoring (default: True)
+            reinforce_access: Record explicit memory use after retrieval (default: False).
+                Retrieval is exposure; callers must opt in only after confirming that
+                returned memories informed a task.
             
         Returns:
             List[SearchResult]: Ranked search results
@@ -787,7 +834,7 @@ class MemoryOrchestrator:
         
         self.logger.info(
             "Searching memories (enhanced)",
-            query=query[:100],
+            query_sha256=hashlib.sha256(query.encode("utf-8")).hexdigest(),
             mode=mode.value,
             limit=limit,
             include_conversation=include_conversation,
@@ -1006,8 +1053,10 @@ class MemoryOrchestrator:
     
     async def record_coactivation(self, memory_ids: list[str]) -> None:
         """
-        Passive graph maintenance: Record co-activations of retrieved memories.
-        Maintains Hebbian learning edges in Kuzu based on MCP session usage.
+        Record co-activations for an explicitly acknowledged use event.
+
+        Retrieval results alone must never call this method.  The caller must
+        first establish that the selected memories informed the task.
         """
         if not memory_ids or len(memory_ids) < 2:
             return
@@ -1043,7 +1092,7 @@ class MemoryOrchestrator:
                 
             self.logger.debug(f"Recorded co-activations for {len(pairs)} memory pairs.")
         except Exception as e:
-            self.logger.warning(f"Failed to record passive graph co-activations: {e}")
+            self.logger.warning(f"Failed to record explicit-use graph co-activations: {e}")
     
     async def _search_semantic(
         self,

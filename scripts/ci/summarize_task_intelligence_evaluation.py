@@ -26,6 +26,7 @@ from scripts.ci.verify_task_intelligence_benchmark import (  # noqa: E402
     acceptance_test_sha256,
     manifest_promotion_readiness,
     task_promotion_validity,
+    task_contract_sha256,
     validate_manifest,
     validate_outcome_record,
 )
@@ -72,7 +73,9 @@ def load_records(
     brief_profile: TaskBriefProfile = TaskBriefProfile.V1,
 ) -> list[dict[str, Any]]:
     profile = configuration_id(model, reasoning)
-    brief_segment = "" if brief_profile == TaskBriefProfile.V1 else "__brief-v2"
+    brief_segment = (
+        "" if brief_profile == TaskBriefProfile.V1 else "__brief-v2__contract-*"
+    )
     records: list[dict[str, Any]] = []
     for condition in ("baseline", "task-brief"):
         pattern = f"{condition}__{profile}{brief_segment}__seed-{run_seed}__*.json"
@@ -120,6 +123,7 @@ def summarize(
     observed_records = [
         record for pair in complete_pairs.values() for record in pair.values()
     ]
+
     def stage_trace_is_bound(task_id: str, record: dict[str, Any]) -> bool:
         trace = record.get("stage_trace")
         if not isinstance(trace, dict):
@@ -129,7 +133,9 @@ def summarize(
             "eligible" if validity["promotion_eligible"] else "diagnostic-only"
         )
         return (
-            record.get("outcome_schema_version") == 2
+            record.get("outcome_schema_version") == 3
+            and record.get("task_contract_sha256")
+            == task_contract_sha256(tasks[task_id])
             and trace.get("judge_status") == expected_judge
             and trace.get("acceptance_fixture_sha256")
             == acceptance_test_sha256(tasks[task_id], ROOT)
@@ -179,8 +185,7 @@ def summarize(
     baseline_duration = total("baseline", "duration_ms")
     treatment_duration = total("task-brief", "duration_ms")
     retry_measurement_available = bool(complete_pairs) and all(
-        isinstance(record.get(field), int)
-        and not isinstance(record.get(field), bool)
+        isinstance(record.get(field), int) and not isinstance(record.get(field), bool)
         for pair in complete_pairs.values()
         for record in pair.values()
         for field in ("retries", "human_corrections")
@@ -191,12 +196,10 @@ def summarize(
     if retry_measurement_available:
         for (task_id, _repeat), pair in complete_pairs.items():
             baseline_count = sum(
-                pair["baseline"][field]
-                for field in ("retries", "human_corrections")
+                pair["baseline"][field] for field in ("retries", "human_corrections")
             )
             treatment_count = sum(
-                pair["task-brief"][field]
-                for field in ("retries", "human_corrections")
+                pair["task-brief"][field] for field in ("retries", "human_corrections")
             )
             baseline_retry_total += baseline_count
             treatment_retry_total += treatment_count
@@ -236,8 +239,7 @@ def summarize(
     retry_correction_gate = (
         retry_reduction_percent is not None
         and retry_interval is not None
-        and retry_reduction_percent
-        >= measurement["minimum_retry_reduction_percent"]
+        and retry_reduction_percent >= measurement["minimum_retry_reduction_percent"]
         and retry_interval[0] > 0
         and treatment_passes >= baseline_passes
     )

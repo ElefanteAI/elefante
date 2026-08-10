@@ -1438,9 +1438,23 @@ def main():
                     else:
                         logger.log(f"WARN: {host} MCP configuration was not changed ({result})")
 
+                failed_cli_hosts = sorted(
+                    host
+                    for host, result in cli_hosts.items()
+                    if result not in {"configured", "updated", "already-present"}
+                )
                 verified_surfaces = configured_surfaces(Path.home())
                 uncovered_hosts = uncovered_required_hosts(required_hosts, verified_surfaces)
-                if uncovered_hosts:
+                if failed_cli_hosts:
+                    labels = ", ".join(HOST_LABELS[host] for host in failed_cli_hosts)
+                    ide_detail = f"CLI integration failed: {labels}"
+                    logger.log(f"ERROR: {ide_detail}")
+                    if args.installation_scope == "customer":
+                        state_tracker.fail_stage("4", "IDE Configuration", ide_detail)
+                        success = False
+                    else:
+                        state_tracker.warn_stage("4", "IDE Configuration", ide_detail)
+                elif uncovered_hosts:
                     labels = ", ".join(HOST_LABELS[host] for host in uncovered_hosts)
                     ide_detail = f"Detected hosts not verified: {labels}"
                     logger.log(f"ERROR: {ide_detail}")

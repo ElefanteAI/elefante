@@ -65,10 +65,12 @@ ETL contract.
 ## Retrieval and reinforcement
 
 Search uses the stored semantic and graph signals described in
-[`scoring.md`](scoring.md). Retrieval currently increments access metadata
-before the caller proves the result helped. Therefore access count measures
-exposure, not verified usefulness. Co-activation is learned during retrieval;
-it is not an ingestion step.
+[`scoring.md`](scoring.md). Retrieval and automatic context delivery are
+read-only: they do not increment access metadata or create co-activation.
+The development `elefante-Memory(action="record_use")` path records a reversible,
+trace-bound acknowledgement for delivered IDs in a separate metadata ledger.
+That is declared use, not verified task utility; it does not change ranking or
+co-activation and is not an ingestion step.
 
 ## Lifecycle limits
 

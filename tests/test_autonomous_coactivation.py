@@ -1,13 +1,13 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_autonomous_coactivation.py
-# PROVES  : Passive autonomous co-activation (Hebbian learning): related memories
-#           reinforce each other's access scores automatically over time.
+# PROVES  : Legacy co-activation scoring remains functional while ordinary
+#           retrieval and Task Intelligence declared use stay non-reinforcing.
 # RUN     : pytest tests/test_autonomous_coactivation.py -v
 # WHEN    : After changes to access reinforcement or co-activation logic in
 #           orchestrator.py or retrieval.py.
 # ─────────────────────────────────────────────────────────────────────────────
 """
-Tests for Passive Autonomous Co-Activation (Hebbian Learning)
+Tests for governed co-activation and non-reinforcing retrieval.
 """
 from pathlib import Path
 
@@ -83,6 +83,25 @@ async def test_record_coactivation_boosts_score(isolated_orchestrator: MemoryOrc
     assert m2_score_after > m2_score_before, f"Expected boosted score > {m2_score_before}, got {m2_score_after}"
 
 
+@pytest.mark.asyncio
+async def test_search_is_exposure_and_does_not_reinforce_access(
+    isolated_orchestrator: MemoryOrchestrator,
+):
+    memory = await isolated_orchestrator.add_memory(
+        content="The customer runtime is shared by every compatible IDE.",
+        memory_type="decision",
+    )
+    before = await isolated_orchestrator.vector_store.get_memory(memory.id)
+
+    await isolated_orchestrator.search_memories(
+        "Which runtime is shared by every compatible IDE?",
+        mode=QueryMode.SEMANTIC,
+        limit=5,
+    )
+    after_search = await isolated_orchestrator.vector_store.get_memory(memory.id)
+    assert after_search.metadata.access_count == before.metadata.access_count
+
+
 def test_directive_store_includes_system_sdd_baseline(tmp_path):
     store = DirectiveStore(path=tmp_path / "directives.json")
 
@@ -142,7 +161,9 @@ def test_mcp_server_does_not_fire_and_forget_coactivation():
     source = server_path.read_text(encoding="utf-8")
 
     assert "asyncio.create_task(orchestrator.record_coactivation" not in source
-    assert source.count("await orchestrator.record_coactivation") >= 2
+    assert "await orchestrator.record_coactivation" not in source
+    assert "_handle_record_memory_use" in source
+    assert "record_use" in source
 
 
 def test_mcp_server_injects_entrypoint_protocol_on_success_and_error():

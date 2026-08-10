@@ -14,6 +14,8 @@ Provides utilities to normalize scores across heterogeneous sources
 on query characteristics.
 """
 
+import hashlib
+
 from typing import List, Dict, Set
 from src.models.conversation import SearchCandidate
 from src.utils.logger import get_logger
@@ -180,7 +182,7 @@ class ScoreNormalizer:
         
         logger.info(
             "Adaptive weights calculated",
-            query=query[:50],
+            query_sha256=hashlib.sha256(query.encode("utf-8")).hexdigest(),
             has_session=has_session,
             weights=weights
         )

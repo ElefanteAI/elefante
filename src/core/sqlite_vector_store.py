@@ -135,6 +135,7 @@ class SQLiteVectorStore(VectorStore):
             "category": metadata.category,
             "source": getattr(metadata.source, "value", metadata.source),
             "project": metadata.project or "",
+            "workspace": metadata.workspace or "",
             "file_path": metadata.file_path or "",
             "session_id": str(metadata.session_id) if metadata.session_id else "",
             "score": metadata.score,
@@ -150,6 +151,7 @@ class SQLiteVectorStore(VectorStore):
                 "category",
                 "source",
                 "project",
+                "workspace",
                 "file_path",
                 "session_id",
             ):
@@ -338,7 +340,13 @@ class SQLiteVectorStore(VectorStore):
         if "content" in updates:
             memory.content = updates["content"]
             memory.embedding = await self._embedding_service.generate_embedding(memory.content)
-        for name in ("score", "tags", "status", "deprecated", "archived", "relationship_type", "supersedes_id", "superseded_by_id", "last_accessed", "last_modified", "access_count"):
+        for name in (
+            "score", "tags", "status", "deprecated", "archived",
+            "relationship_type", "supersedes_id", "superseded_by_id",
+            "last_accessed", "last_modified", "access_count",
+            "retention_policy", "injection_policy", "scope", "trigger",
+            "user_locked",
+        ):
             if name in updates:
                 setattr(memory.metadata, name, updates[name])
         if isinstance(updates.get("custom_metadata"), dict):

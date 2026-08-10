@@ -14,13 +14,20 @@ Provides semantic memory storage and retrieval using vector embeddings.
 
 import asyncio
 import ast
+import hashlib
 import json
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime
 from pathlib import Path
 
-from src.models.memory import Memory, MemoryMetadata, TYPE_DECAY_RATES
+from src.models.memory import (
+    InjectionPolicy,
+    Memory,
+    MemoryMetadata,
+    RetentionPolicy,
+    TYPE_DECAY_RATES,
+)
 from src.models.query import SearchResult, SearchFilters
 from src.core.embeddings import get_embedding_service
 from src.utils.config import get_config
@@ -176,8 +183,16 @@ class VectorStore:
             
             # Context Anchoring
             "project": memory.metadata.project or "",
+            "workspace": memory.metadata.workspace or "",
             "file_path": memory.metadata.file_path or "",
             "session_id": str(memory.metadata.session_id) if memory.metadata.session_id else "",
+
+            # Governance (stored as primitives for Chroma compatibility)
+            "retention_policy": getattr(memory.metadata.retention_policy, "value", memory.metadata.retention_policy),
+            "injection_policy": getattr(memory.metadata.injection_policy, "value", memory.metadata.injection_policy),
+            "scope": memory.metadata.scope or "",
+            "trigger": json.dumps(memory.metadata.trigger or []),
+            "user_locked": memory.metadata.user_locked,
             
             # Temporal Intelligence
             "last_accessed": memory.metadata.last_accessed.isoformat(),
@@ -327,7 +342,13 @@ class VectorStore:
         expanded_query = _expand_query_text(query)
 
         # Generate query embedding
-        logger.debug("searching_memories", query=expanded_query[:80], limit=limit, temporal_decay=temporal_enabled)
+        query_sha256 = hashlib.sha256(query.encode("utf-8")).hexdigest()
+        logger.debug(
+            "searching_memories",
+            query_sha256=query_sha256,
+            limit=limit,
+            temporal_decay=temporal_enabled,
+        )
         query_embedding = await self._embedding_service.generate_embedding(expanded_query)
         
         # Build where clause from filters
@@ -413,7 +434,7 @@ class VectorStore:
             
             logger.info(
                 "search_completed",
-                query=query[:50],
+                query_sha256=query_sha256,
                 results_count=len(search_results),
                 temporal_decay=temporal_enabled
             )
@@ -421,7 +442,11 @@ class VectorStore:
             return search_results
             
         except Exception as e:
-            logger.error("search_failed", query=query[:50], error=str(e))
+            logger.error(
+                "search_failed",
+                query_sha256=query_sha256,
+                error_type=type(e).__name__,
+            )
             raise
     
     def _build_where_clause(self, filters: SearchFilters) -> Dict[str, Any]:
@@ -442,6 +467,9 @@ class VectorStore:
         
         if filters.project:
             where["project"] = filters.project
+
+        if filters.workspace:
+            where["workspace"] = filters.workspace
         
         if filters.min_score is not None:
             where["score"] = {"$gte": filters.min_score}
@@ -476,10 +504,12 @@ class VectorStore:
             "category", "memory_type", "subcategory", "score", "importance",
             "confidence", "tags", "keywords", "status", "parent_id",
             "relationship_type", "related_memory_ids", "conflict_ids", "supersedes_id", "superseded_by_id",
-            "source", "source_reliability", "verified", "project", "file_path",
+            "source", "source_reliability", "verified", "project", "workspace", "file_path",
             "session_id", "last_accessed", "last_modified", "access_count", "version", "deprecated", "archived",
             # Cognitive Retrieval
             "concepts", "surfaces_when", "authority_score",
+            # Governance
+            "retention_policy", "injection_policy", "scope", "trigger", "user_locked",
             # Token Intelligence
             "system_metadata",
         }
@@ -635,8 +665,24 @@ class VectorStore:
             
             # Context
             project=metadata.get("project") or None,
+            workspace=metadata.get("workspace") or None,
             file_path=metadata.get("file_path") or None,
             session_id=UUID(metadata["session_id"]) if metadata.get("session_id") else None,
+
+            # Governance
+            retention_policy=get_enum_value(
+                RetentionPolicy,
+                metadata.get("retention_policy"),
+                RetentionPolicy.MANAGED,
+            ),
+            injection_policy=get_enum_value(
+                InjectionPolicy,
+                metadata.get("injection_policy"),
+                InjectionPolicy.RANKED,
+            ),
+            scope=metadata.get("scope") or None,
+            trigger=parse_string_list(metadata.get("trigger")),
+            user_locked=bool(metadata.get("user_locked", False)),
             
             # Temporal
             last_accessed=datetime.fromisoformat(metadata.get("last_accessed", datetime.utcnow().isoformat())),
@@ -790,6 +836,21 @@ class VectorStore:
 
             if "archived" in updates:
                 memory.metadata.archived = bool(updates["archived"])
+
+            if "retention_policy" in updates:
+                memory.metadata.retention_policy = updates["retention_policy"]
+
+            if "injection_policy" in updates:
+                memory.metadata.injection_policy = updates["injection_policy"]
+
+            if "scope" in updates:
+                memory.metadata.scope = updates["scope"]
+
+            if "trigger" in updates:
+                memory.metadata.trigger = updates["trigger"]
+
+            if "user_locked" in updates:
+                memory.metadata.user_locked = bool(updates["user_locked"])
 
             if "relationship_type" in updates:
                 memory.metadata.relationship_type = updates["relationship_type"]

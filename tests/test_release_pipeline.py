@@ -170,14 +170,22 @@ def test_build_workflow_uses_maintained_release_scripts():
 
     assert "pull_request:" in workflow
     assert '"scripts/ci/build_release_client.py"' in workflow
+    assert '"scripts/ci/resolve_release_publication.py"' in workflow
     assert '"scripts/ci/verify_release_client.py"' in workflow
     assert '"scripts/setup/**"' in workflow
     assert '"scripts/lifecycle/**"' in workflow
     assert '"src/**"' in workflow
     assert "python scripts/ci/build_release_client.py" in workflow
     assert "python scripts/ci/verify_release_client.py" in workflow
-    assert "--publication-status release" in workflow
-    assert "--expected-publication-status release" in workflow
+    assert "python scripts/ci/resolve_release_publication.py" in workflow
+    assert '--ref-type "${GITHUB_REF_TYPE}"' in workflow
+    assert '--ref-name "${GITHUB_REF_NAME}"' in workflow
+    assert '--publication-status "${{ steps.publication.outputs.status }}"' in workflow
+    assert (
+        '--expected-publication-status "${{ steps.publication.outputs.status }}"'
+        in workflow
+    )
+    assert "--publication-status release" not in workflow
     assert "requirements.client.lock" in workflow
     assert "python scripts/ci/generate_release_checksums.py" in workflow
     assert "python3 scripts/ci/render_release_notes.py" in workflow
@@ -194,6 +202,37 @@ def test_build_workflow_uses_maintained_release_scripts():
     assert 'ditto -x -k "$installer_archive"' in workflow
     assert '"${bundle_root}/Install Elefante.command"' in workflow
     assert "python3 - <<'PY'" not in workflow
+
+
+def test_release_publication_requires_the_exact_source_version_tag(tmp_path):
+    module = _load_module(
+        ROOT / "scripts/ci/resolve_release_publication.py",
+        "resolve_release_publication",
+    )
+    source_root = tmp_path / "source"
+    (source_root / "src").mkdir(parents=True)
+    (source_root / "src" / "__init__.py").write_text(
+        '__version__ = "2.12.2"\n', encoding="utf-8"
+    )
+
+    version = module.source_version(source_root)
+    assert version == "2.12.2"
+    assert (
+        module.publication_status(
+            ref_type="branch", ref_name="main", version=version
+        )
+        == "candidate"
+    )
+    assert (
+        module.publication_status(
+            ref_type="tag", ref_name="v2.12.2", version=version
+        )
+        == "release"
+    )
+    with pytest.raises(ValueError, match="does not match source version"):
+        module.publication_status(
+            ref_type="tag", ref_name="v2.12.3", version=version
+        )
 
 
 def test_readme_uses_the_verified_macos_customer_launcher():

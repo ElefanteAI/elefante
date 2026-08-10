@@ -37,9 +37,12 @@ if str(ROOT) not in sys.path:
 from scripts.ci import run_task_intelligence_baseline as baseline  # noqa: E402
 from scripts.ci.verify_task_intelligence_benchmark import (  # noqa: E402
     scan_memory_payload,
+    task_contract_sha256,
     task_promotion_validity,
     validate_manifest,
+    validate_memory_fixture,
     validate_outcome_record,
+    verify_black_box_canaries,
 )
 from src.core.embeddings import EmbeddingService  # noqa: E402
 from src.core.retrieval import CognitiveRetriever, MemoryCandidate  # noqa: E402
@@ -53,6 +56,7 @@ from src.models.memory import (  # noqa: E402
     DomainType,
     Memory,
     MemoryMetadata,
+    MemoryStatus,
     MemoryType,
     SOURCE_RELIABILITY_SCORES,
     SourceType,
@@ -94,11 +98,12 @@ V2_EXCLUDED_NAMES = frozenset(
     {"CHANGELOG.md", "package-lock.json", "requirements.lock"}
 )
 V2_MAX_FILE_BYTES = 200_000
-V2_MAX_CANDIDATE_CHUNKS = 32
+V2_MAX_CANDIDATE_CHUNKS = 64
 V2_MAX_CHUNKS_PER_PATH = 5
 _SYMBOL_PATTERN = re.compile(
-    r"^\s*(?:async\s+def|def|class|function|export\s+(?:async\s+)?function|"
-    r"export\s+class|const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)"
+    r"^\s*(?:(?:async\s+def|def|class|function|export\s+(?:async\s+)?function|"
+    r"export\s+class|const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)|"
+    r"([A-Z][A-Z0-9_]*)\s*=)"
 )
 
 
@@ -159,8 +164,31 @@ def _focused_overlap(query_terms: set[str], evidence_terms: set[str]) -> float:
     return TaskBriefCompiler._focused_overlap(query_terms, evidence_terms)
 
 
+def _location_overlap(query_terms: set[str], location_terms: set[str]) -> float:
+    return TaskBriefCompiler._location_overlap(query_terms, location_terms)
+
+
 def _canonical_terms(value: str) -> set[str]:
     return TaskBriefCompiler._canonical_terms(value)
+
+
+def _source_kind(path: str) -> str:
+    candidate = PurePosixPath(path)
+    name = candidate.name.casefold()
+    parts = {part.casefold() for part in candidate.parts}
+    if candidate.suffix.casefold() == ".md":
+        return "documentation"
+    if (
+        "tests" in parts
+        or "test" in parts
+        or name.startswith("test_")
+        or ".test." in name
+        or ".spec." in name
+    ):
+        return "test"
+    if candidate.suffix.casefold() in {".json", ".toml", ".yaml", ".yml"}:
+        return "configuration"
+    return "implementation"
 
 
 def _heading_aware_chunks(
@@ -214,7 +242,7 @@ def _heading_aware_chunks(
             symbol_match = _SYMBOL_PATTERN.match(line)
             if symbol_match:
                 flush()
-                symbol = symbol_match.group(1)
+                symbol = symbol_match.group(1) or symbol_match.group(2)
                 current_symbol = symbol
                 current_heading = ""
         stripped = line.rstrip()
@@ -271,6 +299,8 @@ def source_grounded_candidates(
     """Rank pre-fix repository chunks without reading any future ref."""
     query = "\n".join([task["task_statement"], *task["success_criteria"]])
     query_terms = _canonical_terms(query)
+    declared_context_paths = list(dict.fromkeys(task.get("context_paths", [])))
+    declared_context_set = set(declared_context_paths)
     candidates: list[dict[str, Any]] = []
     document_frequency: Counter[str] = Counter()
     chunk_count = 0
@@ -290,9 +320,21 @@ def source_grounded_candidates(
             matched_terms = query_terms & evidence_terms
             document_frequency.update(matched_terms)
             minimum_matches = 1 if len(query_terms) <= 4 else 2
-            if len(matched_terms) < minimum_matches:
+            strong_location_match = (
+                max(
+                    _location_overlap(query_terms, path_terms),
+                    _location_overlap(query_terms, symbol_terms),
+                )
+                >= 0.5
+            )
+            if (
+                len(matched_terms) < minimum_matches
+                and not strong_location_match
+                and path not in declared_context_set
+            ):
                 continue
-            source_code = PurePosixPath(path).suffix.casefold() != ".md"
+            source_kind = _source_kind(path)
+            source_code = source_kind != "documentation"
             candidates.append(
                 {
                     **chunk,
@@ -303,6 +345,7 @@ def source_grounded_candidates(
                     "_content_terms": content_terms,
                     "_symbol_terms": symbol_terms,
                     "source_code": source_code,
+                    "source_kind": source_kind,
                 }
             )
     weights = {
@@ -312,17 +355,27 @@ def source_grounded_candidates(
     weight_total = sum(weights.values()) or 1.0
 
     def weighted_overlap(evidence_terms: set[str]) -> float:
-        return sum(weights[term] for term in query_terms & evidence_terms) / weight_total
+        return (
+            sum(weights[term] for term in query_terms & evidence_terms) / weight_total
+        )
 
     for candidate in candidates:
-        path_score = weighted_overlap(candidate.pop("_path_terms"))
-        lexical_score = weighted_overlap(candidate.pop("_content_terms"))
-        symbol_score = weighted_overlap(candidate.pop("_symbol_terms"))
+        path_terms = candidate.pop("_path_terms")
+        content_terms = candidate.pop("_content_terms")
+        symbol_terms = candidate.pop("_symbol_terms")
+        path_score = weighted_overlap(path_terms)
+        lexical_score = weighted_overlap(content_terms)
+        symbol_score = weighted_overlap(symbol_terms)
+        focused_location_score = max(
+            _location_overlap(query_terms, path_terms),
+            _location_overlap(query_terms, symbol_terms),
+        )
         candidate.update(
             {
                 "path_score": path_score,
                 "lexical_score": lexical_score,
                 "symbol_score": symbol_score,
+                "focused_location_score": focused_location_score,
                 "pre_score": (
                     0.62 * lexical_score
                     + 0.23 * path_score
@@ -342,7 +395,17 @@ def source_grounded_candidates(
     )
     diversified: list[dict[str, Any]] = []
     chunks_per_path: dict[str, int] = {}
-    primary_limit = max(1, limit - min(4, limit // 4))
+    declared_reserve = (
+        min(12, max(1, limit // 5))
+        if declared_context_paths and limit > 1
+        else 0
+    )
+    anchor_reserve = min(6, max(1, limit // 10)) if limit > 1 else 0
+    neighbor_reserve = min(6, limit // 10)
+    primary_limit = max(
+        1,
+        limit - declared_reserve - anchor_reserve - neighbor_reserve,
+    )
     for candidate in ranked:
         path = candidate["path"]
         if chunks_per_path.get(path, 0) >= V2_MAX_CHUNKS_PER_PATH:
@@ -354,6 +417,64 @@ def source_grounded_candidates(
     selected_keys = {
         (candidate["path"], candidate["line_number"]) for candidate in diversified
     }
+    selected_paths = {candidate["path"] for candidate in diversified}
+    declared_queues = {
+        path: [
+            candidate
+            for candidate in ranked
+            if candidate["path"] == path
+            and (candidate["path"], candidate["line_number"]) not in selected_keys
+        ]
+        for path in declared_context_paths
+    }
+    declared_added = 0
+    while declared_added < declared_reserve:
+        progressed = False
+        for path in declared_context_paths:
+            queue = declared_queues[path]
+            if not queue:
+                continue
+            candidate = queue.pop(0)
+            key = (candidate["path"], candidate["line_number"])
+            if key in selected_keys:
+                continue
+            diversified.append(candidate)
+            selected_keys.add(key)
+            selected_paths.add(path)
+            declared_added += 1
+            progressed = True
+            if declared_added == declared_reserve:
+                break
+        if not progressed:
+            break
+    anchor_limit = min(
+        anchor_reserve,
+        max(0, limit - len(diversified) - neighbor_reserve),
+    )
+    anchor_candidates = sorted(
+        (
+            candidate
+            for candidate in candidates
+            if candidate["path"] not in selected_paths
+            and candidate["focused_location_score"] >= 0.5
+        ),
+        key=lambda item: (
+            -item["focused_location_score"],
+            -item["pre_score"],
+            item["path"],
+            item["line_number"],
+        ),
+    )
+    anchor_target = len(diversified) + anchor_limit
+    for candidate in anchor_candidates:
+        path = candidate["path"]
+        if path in selected_paths:
+            continue
+        diversified.append(candidate)
+        selected_paths.add(path)
+        selected_keys.add((path, candidate["line_number"]))
+        if len(diversified) == anchor_target:
+            break
     ordered_paths = list(dict.fromkeys(candidate["path"] for candidate in diversified))
     for path in ordered_paths:
         path_candidates = sorted(
@@ -410,9 +531,14 @@ def source_grounded_candidates(
                 "path_score": weighted_overlap(_canonical_terms(path)),
                 "lexical_score": weighted_overlap(neighbor_content_terms),
                 "symbol_score": weighted_overlap(neighbor_symbol_terms),
+                "focused_location_score": max(
+                    _location_overlap(query_terms, _canonical_terms(path)),
+                    _location_overlap(query_terms, neighbor_symbol_terms),
+                ),
                 "matched_terms": len(neighbor_matches),
                 "pre_score": candidate["pre_score"] * 0.9,
                 "source_code": True,
+                "source_kind": candidate["source_kind"],
                 "structural_dependency": True,
                 "_chunk_index": next_index,
             }
@@ -469,6 +595,7 @@ def source_snapshot_memories(repo_root: Path, task: dict[str, Any]) -> list[Memo
     """Build v2 memories only from task-relevant pre-fix source evidence."""
     memories: list[Memory] = []
     candidates = source_grounded_candidates(repo_root, task)
+    declared_context_paths = set(task.get("context_paths", []))
     maximum_pre_score = max(
         (float(candidate.get("pre_score", 0.0)) for candidate in candidates),
         default=1.0,
@@ -509,15 +636,25 @@ def source_snapshot_memories(repo_root: Path, task: dict[str, Any]) -> list[Memo
                         "path_score": candidate["path_score"],
                         "symbol_score": candidate["symbol_score"],
                         "retrieval_specificity": (
-                            float(candidate.get("pre_score", 0.0)) / maximum_pre_score
-                            if maximum_pre_score
-                            else 0.0
+                            1.0
+                            if path in declared_context_paths
+                            else (
+                                float(candidate.get("pre_score", 0.0))
+                                / maximum_pre_score
+                                if maximum_pre_score
+                                else 0.0
+                            )
                         ),
+                        "declared_context_path": path in declared_context_paths,
                         "structural_dependency": bool(
                             candidate.get("structural_dependency", False)
                         ),
-                        "source_kind": (
-                            "implementation" if source_code else "documentation"
+                        "source_kind": candidate.get("source_kind", _source_kind(path)),
+                        "evidence_role": (
+                            "safeguard"
+                            if candidate.get("source_kind", _source_kind(path))
+                            == "test"
+                            else ""
                         ),
                         "observed_at_ref": task["base_ref"],
                     },
@@ -568,15 +705,85 @@ def source_snapshot_memories(repo_root: Path, task: dict[str, Any]) -> list[Memo
     return memories
 
 
-async def generate_snapshot_brief(
+def sealed_fixture_memories(
+    repo_root: Path,
+    task: dict[str, Any],
+    *,
+    fixture_override: Path | None = None,
+) -> list[Memory]:
+    """Load only a manifest-bound, reviewed durable-memory fixture."""
+    contract = task.get("memory_fixture")
+    if contract is None:
+        if fixture_override is not None:
+            raise RuntimeError("--memory-fixture requires a manifest-bound fixture")
+        return []
+    errors = validate_memory_fixture(task, repo_root)
+    if errors:
+        raise RuntimeError("invalid sealed memory fixture: " + "; ".join(errors))
+    declared = (repo_root / contract["path"]).resolve()
+    if fixture_override is not None and fixture_override.resolve() != declared:
+        raise RuntimeError("--memory-fixture must equal the task's sealed fixture path")
+    payload = json.loads(declared.read_text(encoding="utf-8"))
+    source = payload["source"]
+    memory = payload["memory"]
+    lifecycle = payload["lifecycle_review"]
+    return [
+        Memory(
+            id=memory["id"],
+            content=memory["content"],
+            metadata=MemoryMetadata(
+                domain=DomainType.PROJECT,
+                memory_type=MemoryType(memory["memory_type"]),
+                status=MemoryStatus.VERIFIED,
+                score=90,
+                confidence=0.95,
+                concepts=extract_concepts(memory["content"], max_concepts=8),
+                authority_score=0.9,
+                source=SourceType(memory["source"]),
+                source_detail=memory["source_detail"],
+                source_reliability=float(memory["source_reliability"]),
+                verified=True,
+                project=memory.get("project"),
+                workspace="historical-snapshot",
+                retention_policy="permanent",
+                injection_policy="triggered",
+                scope=memory.get("scope"),
+                trigger=memory.get("trigger", []),
+                user_locked=True,
+                custom_metadata={
+                    "evidence_role": "constraint",
+                    "retrieval_specificity": 1.0,
+                    "fixture_id": payload["fixture_id"],
+                    "fixture_sha256": contract["sha256"],
+                    "source_memory_json_sha256": source["memory_json_sha256"],
+                    "original_store_status": lifecycle["original_status"],
+                    "lifecycle_resolution": lifecycle["resolution"],
+                    "promotion_use": False,
+                },
+                created_at=datetime.utcnow(),
+                last_accessed=datetime.utcnow(),
+            ),
+        )
+    ]
+
+
+async def _snapshot_brief_inputs(
     repo_root: Path,
     task: dict[str, Any],
     embedding_service: EmbeddingService,
     *,
     profile: TaskBriefProfile = TaskBriefProfile.V1,
-) -> TaskBrief:
+    memory_fixture_path: Path | None = None,
+) -> tuple[TaskBriefRequest, list[SearchResult]]:
     memories = (
-        source_snapshot_memories(repo_root, task)
+        [
+            *source_snapshot_memories(repo_root, task),
+            *sealed_fixture_memories(
+                repo_root,
+                task,
+                fixture_override=memory_fixture_path,
+            ),
+        ]
         if profile == TaskBriefProfile.V2
         else snapshot_memories(repo_root, task)
     )
@@ -641,7 +848,25 @@ async def generate_snapshot_brief(
         profile=profile,
     )
     candidate_results = results if profile == TaskBriefProfile.V2 else results[:24]
-    return TaskBriefCompiler().compile(request, candidate_results)
+    return request, candidate_results
+
+
+async def generate_snapshot_brief(
+    repo_root: Path,
+    task: dict[str, Any],
+    embedding_service: EmbeddingService,
+    *,
+    profile: TaskBriefProfile = TaskBriefProfile.V1,
+    memory_fixture_path: Path | None = None,
+) -> TaskBrief:
+    request, candidates = await _snapshot_brief_inputs(
+        repo_root,
+        task,
+        embedding_service,
+        profile=profile,
+        memory_fixture_path=memory_fixture_path,
+    )
+    return TaskBriefCompiler().compile(request, candidates)
 
 
 def build_profile_prompt(
@@ -717,7 +942,10 @@ def _outcome_path(
     brief_profile: TaskBriefProfile = TaskBriefProfile.V1,
 ) -> Path:
     profile = baseline.configuration_id(model, reasoning)
-    brief_segment = "" if brief_profile == TaskBriefProfile.V1 else "__brief-v2"
+    brief_segment = ""
+    if brief_profile == TaskBriefProfile.V2:
+        task = item.get("task", item)
+        brief_segment = f"__brief-v2__contract-{task_contract_sha256(task)[:12]}"
     return output_dir / (
         f"{item['condition']}__{profile}{brief_segment}__seed-{run_seed}__"
         f"{item['task_id']}__r{item['repeat']}.json"
@@ -809,9 +1037,10 @@ def execute_trial(
             else None
         )
         record = {
-            "outcome_schema_version": 2,
+            "outcome_schema_version": 3,
             "evaluation_id": (f"{task['id']}-{condition}-seed-{run_seed}-r{repeat}"),
             "task_id": task["id"],
+            "task_contract_sha256": task_contract_sha256(task),
             "condition": condition,
             "model": model,
             "model_version": "not-exposed-by-codex-cli",
@@ -855,7 +1084,7 @@ def execute_trial(
             json.dumps(record, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        return {
+        result = {
             "task_id": task["id"],
             "condition": condition,
             "repeat": repeat,
@@ -866,6 +1095,9 @@ def execute_trial(
             "duration_ms": duration_ms,
             "outcome": str(outcome_path),
         }
+        if keep_failures and not acceptance_passed:
+            result["failure_workspace"] = str(workspace)
+        return result
     finally:
         if workspace.exists() and not (keep_failures and not acceptance_passed):
             baseline._safe_remove_workspace(workspace, workspace_root)
@@ -876,6 +1108,7 @@ async def _briefs_for_plan(
     embedding_service: EmbeddingService,
     *,
     profile: TaskBriefProfile = TaskBriefProfile.V1,
+    memory_fixture_path: Path | None = None,
 ) -> dict[str, TaskBrief]:
     tasks = {item["task_id"]: item["task"] for item in plan}
     briefs: dict[str, TaskBrief] = {}
@@ -885,13 +1118,99 @@ async def _briefs_for_plan(
             tasks[task_id],
             embedding_service,
             profile=profile,
+            memory_fixture_path=memory_fixture_path,
         )
     return briefs
+
+
+async def verify_fixture_briefs(
+    repo_root: Path,
+    tasks: list[dict[str, Any]],
+    embedding_service: EmbeddingService,
+    *,
+    fixture_override: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Prove a sealed durable memory is selected, bounded, and deterministic."""
+    reports: list[dict[str, Any]] = []
+    for task in tasks:
+        contract = task["memory_fixture"]
+        fixture_path = (repo_root / contract["path"]).resolve()
+        payload = json.loads(fixture_path.read_text(encoding="utf-8"))
+        expected_memory_id = str(payload["source"]["memory_id"])
+        override = fixture_override if len(tasks) == 1 else None
+        request, candidates = await _snapshot_brief_inputs(
+            repo_root,
+            task,
+            embedding_service,
+            profile=TaskBriefProfile.V2,
+            memory_fixture_path=override,
+        )
+        compiler = TaskBriefCompiler()
+        first = compiler.compile(request, candidates)
+        second = compiler.compile(request, candidates)
+        errors: list[str] = []
+        if expected_memory_id not in first.selected_memory_ids:
+            errors.append("sealed durable memory was not selected")
+        if first.abstained or first.delivery_blocked:
+            errors.append("Task Brief abstained or blocked delivery")
+        if first.estimated_tokens > first.token_budget:
+            errors.append("Task Brief exceeded its hard token budget")
+        if (
+            first.rendered_context != second.rendered_context
+            or first.selected_memory_ids != second.selected_memory_ids
+        ):
+            errors.append("Task Brief selection or rendering is nondeterministic")
+        if scan_memory_payload({"rendered_context": first.rendered_context}, [task]):
+            errors.append("Task Brief leaked hidden acceptance evidence")
+        selected_sources = [
+            {
+                "file_path": evidence.file_path,
+                "role": evidence.role.value,
+                "source_detail": evidence.source_detail,
+                "stage": evidence.stage.value,
+                "truncated": evidence.truncated,
+            }
+            for packet in first.packets
+            for evidence in packet.evidence
+        ]
+        reports.append(
+            {
+                "task_id": task["id"],
+                "passed": not errors,
+                "errors": errors,
+                "expected_memory_id": expected_memory_id,
+                "selected_memory_ids": first.selected_memory_ids,
+                "selected_sources": selected_sources,
+                "estimated_tokens": first.estimated_tokens,
+                "token_budget": first.token_budget,
+                "brief_sha256": hashlib.sha256(
+                    first.rendered_context.encode("utf-8")
+                ).hexdigest(),
+                "deterministic": (
+                    first.rendered_context == second.rendered_context
+                    and first.selected_memory_ids == second.selected_memory_ids
+                ),
+            }
+        )
+    return reports
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    parser.add_argument(
+        "--memory-fixture",
+        type=Path,
+        help=(
+            "Exact sealed fixture declared by the selected task. Arbitrary memory "
+            "payloads are rejected."
+        ),
+    )
+    parser.add_argument(
+        "--preflight",
+        action="store_true",
+        help="Validate the sealed fixture and base/fix black-box judge without a model run.",
+    )
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--task")
     selection.add_argument("--task-class")
@@ -929,7 +1248,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-runs", type=int)
     parser.add_argument("--max-total-input-tokens", type=int)
     parser.add_argument("--max-total-uncached-input-tokens", type=int)
-    parser.add_argument("--keep-failures", action="store_true")
+    parser.add_argument(
+        "--keep-failures",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Preserve failed disposable workspaces for diagnosis (default: true); "
+            "pass --no-keep-failures to discard them explicitly."
+        ),
+    )
     parser.add_argument(
         "--allow-diagnostic",
         action="store_true",
@@ -938,6 +1265,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
     brief_profile = TaskBriefProfile(args.brief_profile)
+    if args.preflight and args.execute:
+        parser.error("--preflight and --execute are mutually exclusive")
 
     report = validate_manifest(args.manifest, ROOT)
     if report["errors"]:
@@ -954,6 +1283,36 @@ def main(argv: list[str] | None = None) -> int:
     )
     if args.condition:
         plan = [item for item in plan if item["condition"] == args.condition]
+    selected_tasks = {item["task_id"]: item["task"] for item in plan}
+    if args.memory_fixture and len(selected_tasks) != 1:
+        print(
+            json.dumps(
+                {"error": "--memory-fixture requires exactly one selected task"},
+                indent=2,
+            )
+        )
+        return 2
+    fixture_task_ids = sorted(
+        task_id
+        for task_id, task in selected_tasks.items()
+        if task.get("memory_fixture") is not None
+    )
+    fixture_errors = {
+        task_id: validate_memory_fixture(task, ROOT)
+        for task_id, task in selected_tasks.items()
+        if task.get("memory_fixture") is not None
+    }
+    fixture_errors = {
+        task_id: errors for task_id, errors in fixture_errors.items() if errors
+    }
+    if args.memory_fixture:
+        only_task = next(iter(selected_tasks.values()))
+        try:
+            sealed_fixture_memories(
+                ROOT, only_task, fixture_override=args.memory_fixture
+            )
+        except RuntimeError as error:
+            fixture_errors[only_task["id"]] = [str(error)]
     pending = [
         item
         for item in plan
@@ -968,11 +1327,21 @@ def main(argv: list[str] | None = None) -> int:
     ]
     estimate = len(pending) * args.estimated_input_tokens_per_run
     uncached_estimate = len(pending) * args.estimated_uncached_input_tokens_per_run
+    evaluation_policy = manifest.get("evaluation_policy", {})
+    manifest_is_diagnostic = not (
+        isinstance(evaluation_policy, dict)
+        and evaluation_policy.get("promotion_allowed") is True
+    )
     diagnostic_task_ids = sorted(
         {
             item["task_id"]
             for item in pending
-            if not task_promotion_validity(item["task"], ROOT)["promotion_eligible"]
+            if manifest_is_diagnostic
+            or not task_promotion_validity(item["task"], ROOT)["promotion_eligible"]
+            or (
+                isinstance(item["task"].get("memory_fixture"), dict)
+                and item["task"]["memory_fixture"].get("promotion_use") is not True
+            )
         }
     )
     summary = {
@@ -986,7 +1355,62 @@ def main(argv: list[str] | None = None) -> int:
         "estimated_uncached_input_tokens": uncached_estimate,
         "execute": args.execute,
         "diagnostic_task_ids": diagnostic_task_ids,
+        "sealed_memory_fixture_task_ids": fixture_task_ids,
+        "sealed_memory_fixture_errors": fixture_errors,
     }
+    if args.preflight:
+        if not fixture_task_ids:
+            print(
+                json.dumps(
+                    {
+                        **summary,
+                        "preflight_ready": False,
+                        "error": "no sealed fixture selected",
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 2
+        canaries = verify_black_box_canaries(
+            {"tasks": [selected_tasks[task_id] for task_id in fixture_task_ids]},
+            ROOT,
+        )
+        brief_reports: list[dict[str, Any]] = []
+        if not fixture_errors and all(item["passed"] for item in canaries):
+            # This is local embedding computation only. It makes no model/API call.
+            os.environ.setdefault("HF_HUB_OFFLINE", "1")
+            os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+            embedding_service = EmbeddingService()
+            embedding_service._load_model()
+            brief_reports = asyncio.run(
+                verify_fixture_briefs(
+                    ROOT,
+                    [selected_tasks[task_id] for task_id in fixture_task_ids],
+                    embedding_service,
+                    fixture_override=args.memory_fixture,
+                )
+            )
+        ready = (
+            not fixture_errors
+            and all(item["passed"] for item in canaries)
+            and bool(brief_reports)
+            and all(item["passed"] for item in brief_reports)
+        )
+        print(
+            json.dumps(
+                {
+                    **summary,
+                    "preflight_ready": ready,
+                    "model_runs": 0,
+                    "black_box_canaries": canaries,
+                    "fixture_briefs": brief_reports,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 0 if ready else 2
     if not args.execute:
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 0
@@ -1040,15 +1464,25 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
 
-    # Apply offline mode only inside an explicitly executed evaluation. Setting
-    # these at module import would leak into normal pytest collection/runtime.
-    os.environ.setdefault("HF_HUB_OFFLINE", "1")
-    os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
-    embedding_service = EmbeddingService()
-    embedding_service._load_model()
-    briefs = asyncio.run(
-        _briefs_for_plan(pending, embedding_service, profile=brief_profile)
-    )
+    treatment_plan = [item for item in pending if item["condition"] == "task-brief"]
+    briefs: dict[str, TaskBrief] = {}
+    if treatment_plan:
+        # Brief construction belongs only to the treatment. A baseline-only
+        # calibration screen must not pay for or depend on Elefante retrieval.
+        # Apply offline mode only inside an explicitly executed treatment;
+        # setting these at module import would leak into normal product runtime.
+        os.environ.setdefault("HF_HUB_OFFLINE", "1")
+        os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+        embedding_service = EmbeddingService()
+        embedding_service._load_model()
+        briefs = asyncio.run(
+            _briefs_for_plan(
+                treatment_plan,
+                embedding_service,
+                profile=brief_profile,
+                memory_fixture_path=args.memory_fixture,
+            )
+        )
     args.workspace_root.mkdir(parents=True, exist_ok=True)
     results: list[dict[str, Any]] = []
     total_input = 0

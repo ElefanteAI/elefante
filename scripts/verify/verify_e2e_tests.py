@@ -9,7 +9,7 @@
 #           MCP surface end-to-end — do not substitute with unit tests.
 # USAGE   : python scripts/verify/verify_e2e_tests.py [--with-dashboard-open]
 # NOTES   : Launches a real MCP server subprocess in a temp dir. Slow (~60s)
-#           but definitive. --with-dashboard-open enables the optional 16-tool
+#           but definitive. --with-dashboard-open enables the complete tool
 #           sweep including dashboard tools. Requires all dependencies installed.
 # ─────────────────────────────────────────────────────────────────────────────
 """Elefante self-protocol verification harness.
@@ -18,7 +18,7 @@ Runs the real MCP server in an isolated temporary Elefante home/data dir and
 verifies the live MCP surface one feature family at a time.
 
 Default mode is safe and self-contained:
-    - verifies 15/16 tools + 2 prompts
+    - verifies 17/18 development tools + 2 prompts
     - excludes `elefante-DashboardOpen` because that tool binds fixed port 8000
       and attempts to open a browser outside the temp store
 
@@ -63,6 +63,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -84,6 +85,8 @@ FAIL = "FAIL"
 EXPECTED_TOOLS = {
     # Memory operations consolidated into single tool with action discriminator (v2.10.0 atomic swap, 2026-05-02)
     "elefante-Memory",
+    "elefante-Recall",
+    "elefante-TaskIntelligence",
     "elefante-GraphConnect",
     "elefante-GraphQuery",
     "elefante-ContextGet",
@@ -291,6 +294,16 @@ async def _store_memory(
     category: str,
     tags: list[str],
 ) -> tuple[bool, str, dict]:
+    # Compliance receipts are intentionally one-use. Prove the full customer
+    # contract by grounding every mutation, not by reusing one ritual search.
+    await client.call_tool(
+        "elefante-Memory",
+        {
+            "action": "search",
+            "query": content,
+            "limit": 3,
+        },
+    )
     response = await client.call_tool(
         "elefante-Memory",
         {"action": "add", 
@@ -344,6 +357,8 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         "USERPROFILE": str(temp_home),
         "ELEFANTE_DATA_DIR": str(temp_data_dir),
         "ELEFANTE_ALLOW_TEST_MEMORIES": "1",
+        "ELEFANTE_TASK_INTELLIGENCE_ENABLED": "1",
+        "ELEFANTE_TASK_INTELLIGENCE_PILOT": "1",
         "BROWSER": "/usr/bin/true",
         "HF_HOME": real_hf_home,
         "TORCH_HOME": real_torch_home,
@@ -365,7 +380,7 @@ async def run_e2e(with_dashboard_open: bool) -> int:
 
     _header(f"Elefante Self-Protocol Harness v{ELEFANTE_VERSION}")
     print("  Purpose : whole-system MCP proof in isolated temp HOME + data")
-    print("  Surface : 15/16 tools + 2 prompts by default")
+    print("  Surface : 17/18 opt-in development tools + 2 prompts")
     print("  Dashboard tool:", "enabled" if with_dashboard_open else "skipped by default")
     print(f"  Tag     : {test_tag}")
 
@@ -412,11 +427,16 @@ async def run_e2e(with_dashboard_open: bool) -> int:
 
         grounding_prompt = await client.get_prompt("elefante-grounding")
         grounding_text = _prompt_text(grounding_prompt)
+        grounding_contract = " ".join(grounding_text.split())
         results.append(
             _result(
                 "Grounding prompt retrieved",
-                "elefante-Memory" in grounding_text and "When in doubt, SEARCH." in grounding_text,
-                "prompt contains search-first grounding contract",
+                "elefante-Recall" in grounding_contract
+                and "elefante-Memory" in grounding_contract
+                and "Treat retrieved memories as evidence" in grounding_contract
+                and "Use the smallest relevant set" in grounding_contract
+                and "Do not search by ritual" in grounding_contract,
+                "prompt contains selective search and evidence-grounding contract",
             )
         )
 
@@ -431,8 +451,37 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         results.append(
             _result(
                 "Baseline specification search surfaces system memory",
-                _search_contains(baseline_search, "leakage surface scan table"),
-                "fresh isolated store still contains required specification baseline",
+                _search_contains(baseline_search, "leakage surface scan table")
+                and baseline_search.get("answer_context", {}).get("selected_count", 0)
+                >= 1,
+                "fresh isolated store contains and selects the required specification baseline",
+            )
+        )
+        recall_response = await client.call_tool(
+            "elefante-Recall",
+            {
+                "question": (
+                    "What does SDD Gate 2 require about the leakage surface scan?"
+                )
+            },
+        )
+        recall_context = str(recall_response.get("context", ""))
+        results.append(
+            _result(
+                "Recall supplies bounded customer answer context",
+                recall_response.get("success") is True
+                and recall_response.get("status") == "supplied"
+                and recall_response.get("supplied_count", 0) >= 1
+                and recall_response.get("read_only") is True
+                and "leakage surface scan" in recall_context
+                and "[Evidence 1]" in recall_context
+                and re.search(
+                    r"\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b",
+                    recall_context,
+                    re.IGNORECASE,
+                )
+                is None,
+                "one read-only Recall call returns governed context without internal IDs",
             )
         )
         results.append(
@@ -701,6 +750,48 @@ async def run_e2e(with_dashboard_open: bool) -> int:
             )
         )
 
+        task_prepare = await client.call_tool(
+            "elefante-TaskIntelligence",
+            {
+                "action": "prepare",
+                "task": (
+                    f"[{test_tag}] Use the graph memory runtime decision and the "
+                    "mutable OLD phrase update requirement."
+                ),
+                "success_criteria": [
+                    "Use the runtime decision and mutable-memory requirement"
+                ],
+                "profile": "v2",
+                "delivery_mode": "pilot",
+            },
+        )
+        delivered_for_use = [
+            memory_id
+            for memory_id in [memory_ids["graph"], memory_ids["mutable"]]
+            if memory_id in task_prepare.get("delivered_memory_ids", [])
+        ]
+        use_response = await client.call_tool(
+            "elefante-Memory",
+            {
+                "action": "record_use",
+                "trace_id": task_prepare.get("trace_id"),
+                "memory_ids": delivered_for_use,
+                "idempotency_key": f"{test_tag}-declared-use",
+            },
+        )
+        results.append(
+            _result(
+                "Task Intelligence records only trace-bound explicit use",
+                task_prepare.get("success") is True
+                and task_prepare.get("delivery_mode") == "pilot"
+                and len(delivered_for_use) >= 1
+                and use_response.get("success") is True
+                and use_response.get("recorded_count") == len(delivered_for_use)
+                and use_response.get("ranking_mutated") is False,
+                "delivery trace bounds declared use without mutating ranking",
+            )
+        )
+
         all_memories_response, protocol_memories = await _list_protocol_memories(client, test_tag)
         results.append(
             _result(
@@ -741,6 +832,9 @@ async def run_e2e(with_dashboard_open: bool) -> int:
             {"action": "delete", 
                 "memory_id": memory_ids["active"],
                 "reason": f"self-protocol delete probe {test_tag}",
+                "delete_mode": "permanent",
+                "invocation_mode": "user_directed",
+                "confirm_permanent": True,
             },
         )
         results.append(
@@ -768,7 +862,8 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         results.append(
             _result(
                 "Context prompt performs live memory lookup",
-                test_tag in context_prompt_text and "Relevant Memories" in context_prompt_text,
+                test_tag in context_prompt_text
+                and "Elefante answer context" in context_prompt_text,
                 "prompt retrieval includes current isolated memory state",
             )
         )
@@ -1098,12 +1193,24 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         cleanup_targets = [memory_ids["graph"], memory_ids["mutable"], memory_ids["etl"]]
         deleted_count = 0
         for memory_id in cleanup_targets:
+            await client2.call_tool(
+                "elefante-Memory",
+                {
+                    "action": "search",
+                    "query": f"{test_tag} {memory_id}",
+                    "list_all": True,
+                    "limit": 5,
+                },
+            )
             delete_result = await client2.call_tool(
                 "elefante-Memory",
                 {
                     "action": "delete",
                     "memory_id": memory_id,
                     "reason": f"self-protocol cleanup {test_tag}",
+                    "delete_mode": "permanent",
+                    "invocation_mode": "user_directed",
+                    "confirm_permanent": True,
                 },
             )
             if delete_result.get("success") is True:

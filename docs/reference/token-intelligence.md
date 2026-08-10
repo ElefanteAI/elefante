@@ -28,7 +28,7 @@ Every tool response includes:
   `0.0–1.0`.
 
 `RELEVANT_CONTEXT` is measured separately in the in-memory session ledger. It
-is conditional and is not counted as static protocol overhead.
+is default-off, conditional, and is not counted as static protocol overhead.
 
 ## Estimation method
 

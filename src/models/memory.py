@@ -77,6 +77,22 @@ class SourceType(str, Enum):
     CONVERSATION = "conversation"
 
 
+class RetentionPolicy(str, Enum):
+    """How long a memory is allowed to remain available."""
+
+    MANAGED = "managed"
+    PERMANENT = "permanent"
+    EPHEMERAL = "ephemeral"
+
+
+class InjectionPolicy(str, Enum):
+    """How governance permits a memory to enter task context."""
+
+    RANKED = "ranked"
+    TRIGGERED = "triggered"
+    ALWAYS = "always"
+
+
 # ============================================================================
 # SOURCE RELIABILITY SCORING
 # ============================================================================
@@ -128,7 +144,7 @@ class MemoryMetadata(BaseModel):
     memory_type: MemoryType = MemoryType.FACT
 
     # Relevance (system-computed — do NOT set manually)
-    score: int = Field(default=100, ge=0, le=100, description="Behavioral vitality (0-100). Born at 100 — decays slowly with age, grows with retrieval. Unproven memories keep full vitality until the agent actually uses them.")
+    score: int = Field(default=100, ge=0, le=100, description="Behavioral vitality (0-100). Born at 100 and decays with age. Retrieval and Task Intelligence declared-use events do not reinforce it.")
     confidence: float = Field(default=0.7, ge=0.0, le=1.0)
     tags: List[str] = Field(default_factory=list)
     keywords: List[str] = Field(default_factory=list)
@@ -176,6 +192,13 @@ class MemoryMetadata(BaseModel):
     deprecated: bool = False
     archived: bool = False
     summary: Optional[str] = None
+
+    # Governance (backward-compatible defaults preserve current behavior)
+    retention_policy: RetentionPolicy = RetentionPolicy.MANAGED
+    injection_policy: InjectionPolicy = InjectionPolicy.RANKED
+    scope: Optional[str] = Field(default=None, max_length=500)
+    trigger: List[str] = Field(default_factory=list, max_length=20)
+    user_locked: bool = False
 
     # Extensibility
     custom_metadata: Dict[str, Any] = Field(default_factory=dict)
@@ -247,7 +270,7 @@ class Memory(BaseModel):
 
         Nobody assigns importance. Vitality emerges from behavior:
         - Recency: core exponential decay based on memory type's half-life
-        - Reinforcement: frequent retrieval SLOWS the decay rate (extends half-life)
+        - Reinforcement: separately authorized access history SLOWS decay
           rather than multiplying the product — this keeps scores bounded 0–100
           and ensures high-use memories survive longer WITHOUT inflating to 100+
         - Freshness: gentle additional penalty for memories not accessed recently
@@ -275,7 +298,7 @@ class Memory(BaseModel):
         days_since_access = max(0, (current_time - self.metadata.last_accessed).total_seconds() / 86400)
         access_count = max(0, self.metadata.access_count)
 
-        # Reinforcement slows decay — frequent retrieval extends the half-life.
+        # Reinforcement slows decay when access history was separately authorized.
         # This is bounded below by decay_rate (no access) and above by decay_rate/2+
         # The product exp(-eff_dr * age) is always in [0, 1].
         effective_decay_rate = self.metadata.decay_rate / (

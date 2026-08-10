@@ -81,7 +81,10 @@ contracts, and the UI must not present them as stored product truth.
 
 **`score` MUST be computed live at snapshot generation time. NEVER read from stored `mem.metadata.score`.**
 
-The stored `mem.metadata.score` in the vector record is a stale birth-time value that is only updated on retrieval (`record_access()`). Most memories are never retrieved, so their stored score stays at 100 forever.
+The stored `mem.metadata.score` in the vector record is a stale birth-time value.
+Ordinary retrieval and Task Intelligence declared-use events do not update it;
+the dashboard must therefore compute live vitality instead of presenting the
+stored value as current.
 
 **Single source of truth:** `src/utils/dashboard_serializer.py`
 

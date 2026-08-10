@@ -848,11 +848,16 @@ class GraphStore:
                 result_dict["values"] = row
                 results.append(result_dict)
             
-            logger.info("query_executed", query=cypher_query[:100])
+            query_sha256 = hashlib.sha256(cypher_query.encode("utf-8")).hexdigest()
+            logger.info("query_executed", query_sha256=query_sha256)
             return results
             
         except Exception as e:
-            logger.error("query_execution_failed", query=cypher_query[:100], error=str(e))
+            logger.error(
+                "query_execution_failed",
+                query_sha256=hashlib.sha256(cypher_query.encode("utf-8")).hexdigest(),
+                error_type=type(e).__name__,
+            )
             raise
     
     async def find_path(
@@ -1076,7 +1081,7 @@ class GraphStore:
             
             logger.info(
                 "graph_search_completed",
-                query=query[:50],
+                query_sha256=hashlib.sha256(query.encode("utf-8")).hexdigest(),
                 results_count=len(memories),
                 temporal_decay=temporal_enabled
             )
@@ -1084,7 +1089,11 @@ class GraphStore:
             return memories
             
         except Exception as e:
-            logger.error("graph_search_failed", query=query[:50], error=str(e))
+            logger.error(
+                "graph_search_failed",
+                query_sha256=hashlib.sha256(query.encode("utf-8")).hexdigest(),
+                error_type=type(e).__name__,
+            )
             return []
     
     

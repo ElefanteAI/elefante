@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 import logging
 from dataclasses import dataclass, field
-from typing import List, Tuple
+from typing import Any, List, Tuple
 
 logger = logging.getLogger("elefante.distiller.privacy")
 
@@ -106,3 +106,30 @@ class PrivacyFilter:
             logger.warning(f"Privacy filter scrubbed {result.redactions} secrets: {result.redacted_types}")
 
         return scrubbed, result
+
+    def scrub_payload(self, value: Any) -> tuple[Any, int, list[str]]:
+        """Recursively scrub secret-shaped strings in ingestion payloads."""
+        if isinstance(value, str):
+            scrubbed, result = self.scrub(value)
+            return scrubbed, result.redactions, result.redacted_types
+        if isinstance(value, list):
+            output: list[Any] = []
+            count = 0
+            kinds: list[str] = []
+            for item in value:
+                clean, item_count, item_kinds = self.scrub_payload(item)
+                output.append(clean)
+                count += item_count
+                kinds.extend(item_kinds)
+            return output, count, sorted(set(kinds))
+        if isinstance(value, dict):
+            output_dict: dict[Any, Any] = {}
+            count = 0
+            kinds: list[str] = []
+            for key, item in value.items():
+                clean, item_count, item_kinds = self.scrub_payload(item)
+                output_dict[key] = clean
+                count += item_count
+                kinds.extend(item_kinds)
+            return output_dict, count, sorted(set(kinds))
+        return value, 0, []

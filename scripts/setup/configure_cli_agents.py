@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -17,13 +18,26 @@ if _SETUP_DIR not in sys.path:
     sys.path.insert(0, _SETUP_DIR)
 
 from install_manifest import (  # noqa: E402
+    emitted_text_block_recorded,
     is_elefante_runtime_entry,
+    is_unchanged_emitted_text_block,
     matching_host_add_command,
+    record_emitted_text_block,
     record_host_command,
+    write_text_atomically,
 )
 
 
 DAEMON_URL = "http://127.0.0.1:8765/mcp/"
+CODEX_GUIDANCE_START = "<!-- ELEFANTE MANAGED RECALL START -->"
+CODEX_GUIDANCE_END = "<!-- ELEFANTE MANAGED RECALL END -->"
+CODEX_GUIDANCE_SURFACE = "codex-recall-routing"
+CODEX_GUIDANCE_BLOCK = f"""{CODEX_GUIDANCE_START}
+## Elefante memory
+
+- Before answering a question that may depend on stored preferences, prior decisions, or project context, call `elefante-Recall` with the complete question.
+- If Recall reports `no_match`, `blocked`, or `unavailable`, do not invent prior context; continue from current evidence or say that the prior context is unavailable.
+{CODEX_GUIDANCE_END}"""
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 
 
@@ -40,6 +54,92 @@ def bridge_environment(elefante_path: Path, tool: str) -> dict[str, str]:
         "ELEFANTE_CLIENT_TOOL": tool,
         "ANONYMIZED_TELEMETRY": "False",
     }
+
+
+def _codex_guidance_path(codex_home: Path) -> Path:
+    """Select the one global guidance file Codex actually reads."""
+    override = codex_home / "AGENTS.override.md"
+    try:
+        if override.exists() and override.read_text(encoding="utf-8").strip():
+            return override
+    except OSError:
+        return override
+    return codex_home / "AGENTS.md"
+
+
+def configure_codex_guidance(
+    *,
+    codex_home: Path | None = None,
+    manifest_home: Path | None = None,
+) -> str:
+    """Install one reversible Recall rule without owning other user guidance."""
+    resolved_codex_home = codex_home or Path(
+        os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))
+    ).expanduser()
+    path = _codex_guidance_path(resolved_codex_home)
+    created = not path.exists()
+    try:
+        original = path.read_text(encoding="utf-8") if path.exists() else ""
+    except OSError:
+        return "failed"
+
+    recorded = emitted_text_block_recorded(
+        path,
+        CODEX_GUIDANCE_SURFACE,
+        CODEX_GUIDANCE_START,
+        CODEX_GUIDANCE_END,
+        home=manifest_home,
+    )
+    marker_count = original.count(CODEX_GUIDANCE_START) + original.count(CODEX_GUIDANCE_END)
+    if marker_count:
+        if marker_count != 2 or not is_unchanged_emitted_text_block(
+            path,
+            CODEX_GUIDANCE_SURFACE,
+            CODEX_GUIDANCE_START,
+            CODEX_GUIDANCE_END,
+            home=manifest_home,
+        ):
+            return "preserved"
+        start = original.index(CODEX_GUIDANCE_START)
+        end = original.index(CODEX_GUIDANCE_END, start) + len(CODEX_GUIDANCE_END)
+        current = original[start:end]
+        if current == CODEX_GUIDANCE_BLOCK:
+            return "already-present"
+        updated = original[:start] + CODEX_GUIDANCE_BLOCK + original[end:]
+        leading_separator = "\n" if start and original[start - 1:start] == "\n" else ""
+        trailing_separator = "\n" if original[end:end + 1] == "\n" else ""
+        status = "updated"
+    else:
+        if recorded:
+            # The user removed or changed a previously managed rule. Respect it.
+            return "preserved"
+        leading_separator = "" if not original else ("\n" if original.endswith("\n") else "\n\n")
+        trailing_separator = "\n"
+        updated = original + leading_separator + CODEX_GUIDANCE_BLOCK + trailing_separator
+        status = "configured"
+
+    try:
+        write_text_atomically(path, updated)
+        record_emitted_text_block(
+            path,
+            CODEX_GUIDANCE_SURFACE,
+            CODEX_GUIDANCE_START,
+            CODEX_GUIDANCE_END,
+            created=created,
+            leading_separator=leading_separator,
+            trailing_separator=trailing_separator,
+            home=manifest_home,
+        )
+    except Exception:
+        try:
+            if created:
+                path.unlink(missing_ok=True)
+            else:
+                write_text_atomically(path, original)
+        except OSError:
+            pass
+        return "failed"
+    return status
 
 
 def host_commands(host: str, executable: str, elefante_path: Path, python_cmd: str) -> tuple[list[str], list[str], list[str]]:
@@ -102,6 +202,7 @@ def configure_cli_host(
     home: Path | None = None,
     runner: Runner = subprocess.run,
     adopt_legacy: bool = False,
+    codex_home: Path | None = None,
 ) -> str:
     """Add or safely refresh one host registration without overwriting user entries."""
     get, add, remove = host_commands(host, executable, elefante_path, python_cmd)
@@ -164,6 +265,14 @@ def configure_cli_host(
     record_host_command(
         key, host, get, add, remove, registered.stdout, home=home
     )
+    if host == "codex":
+        guidance_home = codex_home or (home / ".codex" if home is not None else None)
+        guidance = configure_codex_guidance(
+            codex_home=guidance_home,
+            manifest_home=home,
+        )
+        if guidance not in {"configured", "updated", "already-present"}:
+            return "failed"
     return "updated" if old_add is not None else "configured"
 
 
@@ -176,6 +285,7 @@ def configure_detected_cli_hosts(
     runner: Runner = subprocess.run,
     selected: set[str] | None = None,
     adopt_legacy: bool = False,
+    codex_home: Path | None = None,
 ) -> dict[str, str]:
     """Use native CLIs only when installed; no raw host config is edited."""
     results: dict[str, str] = {}
@@ -193,6 +303,7 @@ def configure_detected_cli_hosts(
                 home=home,
                 runner=runner,
                 adopt_legacy=adopt_legacy,
+                codex_home=codex_home,
             )
     return results
 

@@ -8,18 +8,31 @@ product claim.
 - The Task Intelligence **evaluation infrastructure is implemented**. It can
   validate judges, plan capped paired trials, record causal-stage metadata,
   summarize repeated outcomes, and fail promotion closed.
-- `tasks.json` preserves 30 historical tasks and the v1 evidence record.
+- `tasks.json` preserves 30 historical tasks, one additional sealed real-memory
+  calibration task, and the v1 evidence record.
 - Those tasks are **diagnostic-only** because many hidden tests require an
   undisclosed historical implementation shape. A behaviorally correct repair
   can therefore fail.
-- Three tasks now have reviewed black-box canaries. Each canary fails at its
-  exact base ref and passes at its exact known-good ref. The other 27 tasks
+- Eight tasks now have reviewed black-box canaries. Each canary fails at its
+  exact base ref and passes at its exact known-good ref. The other 23 tasks
   remain ineligible, so the benchmark as a whole is not promotion-ready.
+- The sealed task binds a reviewed export of one real durable memory to its
+  source-record digest and a model-independent black-box canary. Preflight
+  proves exact selection, deterministic rendering, hard budget, and leakage
+  safety without spending model tokens or changing the live store.
+- Its current deterministic Brief is 1,252/1,500 tokens and carries the durable
+  constraint, canonical host registry, doctor target, verified-manifest logic,
+  and validation safeguard. A treatment-only diagnostic changed the correct
+  public surface. Its first verdict exposed one undisclosed Bob detection path
+  in the judge; after the judge was limited to the frozen adapter's existing
+  platform roots, base failed, known fix passed, and the preserved treatment
+  patch passed. This is one-task diagnostic evidence, not paired causal lift.
 - Current causal result: **promotable correctness improvement has not been
   demonstrated**. CORS tied at 3/3 passes per condition. A later three-pair
   restore canary produced 0/3 control passes and 2/3 Task Brief passes, but it
   is one task, has no cross-task confidence interval, and exceeded the latency
-  gate. It is a useful local signal, not a product claim.
+  gate. Two additional three-pair canaries tied at 3/3, and one harder pair
+  failed in both conditions. It is a useful local signal, not a product claim.
 - The current retrieval diagnostic reaches a historical repair path in 16/18
   calibration tasks. This measures navigation only, not task success.
 - `--require-promotion-ready` fails closed until every selected task has an
@@ -29,26 +42,35 @@ product claim.
 - Runner failures with no measurable model attempt abort instead of becoming
   task failures. Unobserved retry/correction counts are stored as `null`, never
   fabricated as zero.
-- Each new schema-v2 outcome records judge, retrieval, selection, delivery,
-  execution, and acceptance status plus SHA-256 evidence. Prompts, responses, memory
-  bodies, and source diffs are not stored. Whether the agent actually used a
-  delivered memory remains `UNKNOWN`.
+- Each new schema-v3 outcome binds the complete task contract and records judge,
+  retrieval, selection, delivery, execution, and acceptance status plus SHA-256
+  evidence. A task or judge change therefore cannot silently reuse a stale
+  outcome. Prompts, responses, memory bodies, and source diffs are not stored.
+  Whether the agent actually used a delivered memory remains `UNKNOWN`.
 - One-task reports return no clustered confidence interval. Resampling one task
   would create false certainty about performance on other tasks.
 - Model execution against an invalid historical judge is blocked unless the
   operator explicitly passes `--allow-diagnostic`. Diagnostic results can
   never satisfy promotion.
+- A baseline-only calibration screen does not load embeddings or construct a
+  Task Brief. Control screening therefore remains independent from Elefante
+  retrieval and avoids treatment-only preprocessing cost.
 
 ## Golden path
 
 1. Freeze a repository base commit and observable success criteria.
 2. Use a black-box CLI, API, filesystem, or browser acceptance test. Do not
    require private symbols, source substrings, or arbitrary historical patch
-   structure unless the task states that interface explicitly.
+   structure. Every detection convention or exact output contract exercised by
+   the judge must already be public in the frozen task or base snapshot.
 3. Give control and treatment the same model, tools, task, critical-reasoning
    protocol, limits, and disposable repository snapshot.
 4. Give only the treatment a deterministic v2 Task Brief built from the base
-   snapshot. Never read the acceptance ref while retrieving evidence.
+   snapshot and, when applicable, the exact manifest-bound sealed memory
+   fixture. Never accept an arbitrary fixture or read the acceptance ref while
+   retrieving evidence. Preserve bounded chunks from declared context paths so
+   the semantic selector can choose the relevant function, not only a nearby
+   constant or high-frequency adapter.
 5. Keep raw prompts, responses, and memory bodies out of outcome records.
 6. Promote only after the manifest is promotion-ready, all paired runs are
    complete, correctness improves with a confidence interval excluding zero,
@@ -108,7 +130,17 @@ python scripts/ci/audit_task_intelligence_retrieval.py --split calibration
 python scripts/ci/run_task_intelligence_evaluation.py \
   --task TASK_ID --brief-profile v2 --repetitions 1
 
+# Required first for a sealed real-memory task. This runs no model/API call.
+python scripts/ci/run_task_intelligence_evaluation.py \
+  --task install-uncovered-host-black-box-031 \
+  --brief-profile v2 --repetitions 1 \
+  --memory-fixture \
+  benchmarks/task_intelligence/fixtures/install-uncovered-host-031.memory.json \
+  --preflight
+
 # Execute only after the plan reports the exact two-run cost.
+# Failed disposable workspaces are preserved by default for diagnosis. Use
+# --no-keep-failures only when intentionally discarding that evidence.
 python scripts/ci/run_task_intelligence_evaluation.py \
   --task TASK_ID --brief-profile v2 --repetitions 1 --execute \
   --max-runs 2 \
@@ -137,9 +169,11 @@ python scripts/ci/run_task_intelligence_evaluation.py \
 
 - Immediate evaluator rollback: omit `--brief-profile v2` or pass
   `--brief-profile v1`.
-- v1 and v2 outcome filenames and disposable worktrees are isolated.
+- v1 and v2 outcome filenames and disposable worktrees are isolated. Schema-v3
+  filenames also bind the complete current task contract.
 - A failed evaluation changes no branch or live memory. Delete only its
-  disposable benchmark worktree after inspection.
+  disposable benchmark worktree after inspection; failures are preserved by
+  default and the result prints the exact path.
 - Before merge, return to the unchanged product with `git switch main`.
 - After merge, revert the Task Intelligence commit; do not reset or rewrite
   shared history. Record the exact commit ID in the pull request.

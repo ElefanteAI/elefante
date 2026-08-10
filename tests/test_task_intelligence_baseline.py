@@ -199,8 +199,11 @@ def test_run_plan_requires_an_exact_cost_cap() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
 
     plan = baseline.build_run_plan(manifest, split="calibration", repetitions=3)
+    calibration_count = sum(
+        task["split"] == "calibration" for task in manifest["tasks"]
+    )
 
-    assert len(plan) == 54
+    assert len(plan) == calibration_count * 3
     assert plan[0]["repeat"] == 1
     assert plan[-1]["repeat"] == 3
 
@@ -209,7 +212,12 @@ def test_run_plan_requires_an_exact_cost_cap() -> None:
         split="calibration",
         task_class="installation-and-distribution",
     )
-    assert len(installation) == 6
+    installation_count = sum(
+        task["split"] == "calibration"
+        and task["task_class"] == "installation-and-distribution"
+        for task in manifest["tasks"]
+    )
+    assert len(installation) == installation_count
     assert {item["task"]["task_class"] for item in installation} == {
         "installation-and-distribution"
     }

@@ -200,3 +200,22 @@ def test_runtime_profile_infers_client_only_from_client_payload(tmp_path):
 
     (tmp_path / "requirements.lock").write_text("developer\n", encoding="utf-8")
     assert module.runtime_profile(root=tmp_path, environment={}) == "developer"
+
+
+def test_customer_configuration_cannot_enable_unreleased_task_intelligence():
+    builder = _load_module(
+        ROOT / "scripts/ci/build_release_client.py",
+        "build_release_client_feature_boundary",
+    )
+    customer_configuration = [
+        ROOT / "config.yaml",
+        *(ROOT / path for path in builder.CLIENT_RUNTIME_SCRIPTS),
+    ]
+    rendered = "\n".join(
+        path.read_text(encoding="utf-8") for path in customer_configuration
+    )
+
+    assert "ELEFANTE_TASK_INTELLIGENCE_ENABLED" not in rendered
+    assert "ELEFANTE_TASK_INTELLIGENCE_PILOT" not in rendered
+    assert "ELEFANTE_TASK_CONTEXT_ON_TOOL_CALL" not in rendered
+    assert '"elefante-TaskIntelligence"' not in rendered

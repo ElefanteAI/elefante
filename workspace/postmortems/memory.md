@@ -90,8 +90,13 @@ path. `signal_ratio` was added to `TOKEN_STATS`.
 
 **Trigger:** Search results show what memories exist but don't tell the agent how to *use* them in the next response.
 **Root cause:** A memory search returns evidence, not proof that the caller will apply it. Knowing "this memory is relevant" is not the same as using it correctly.
-**Solution:** Inject `RELEVANT_CONTEXT` block into MCP tool responses — pre-formatted with applicable rules + IDs + content. Agent receives instructions, not raw data.
-**Lesson:** A search tool that returns raw memories assumes the agent will apply them. Inject application directives, not just retrieval candidates. (Active injection — cross-bug with ai-behavior #6.)
+**Solution:** Provide an explicit answer-context selection map on search and an
+opt-in `RELEVANT_CONTEXT` block for workflow pilots. Automatic delivery is now
+default-off and requires the three local flags documented in
+`docs/reference/tools.md`; this is not a released effectiveness claim.
+**Lesson:** A search tool that returns raw memories assumes the agent will apply
+them. Delivery must be bounded, governed, measurable, and immediately
+reversible rather than always active. (Cross-bug with ai-behavior #6.)
 
 <a id="issue-10"></a>
 
@@ -129,6 +134,11 @@ path. `signal_ratio` was added to `TOKEN_STATS`.
 **Solution:** Persisted session retrieval history to disk (`~/.elefante/data/session_history.json`), restored on init. Read path now reconstructs from persisted IDs.
 **Lesson:** State that should persist across restarts must persist to disk, not memory. Co-activation is a multi-session signal; treating it as in-process state is a category error.
 
+**Current contract note (2026-08-08):** This historical repair is superseded by
+BUG-046 for normal operation. Retrieval IDs are no longer treated as use
+evidence. The development `record_use` event is observational and does not
+populate ranking history or co-activation input.
+
 <a id="issue-14"></a>
 
 ## Issue #14: ChromaDB query() with where filter fails [BUG-022, FIXED v2.9.0]
@@ -148,6 +158,15 @@ path. `signal_ratio` was added to `TOKEN_STATS`.
 **Acceptance:** Two concurrent bridge clients produce distinct `source.instance_id` values with zero Kuzu lock contention. Proof: `pytest tests/test_mcp_daemon.py -m slow -q`. Full closure still requires an authorized apply of pending legacy graph links and host-level install/reconnect/upgrade/uninstall certification.
 **Lesson (provisional):** A multi-writer contract on a single-writer database is a category error. Push concurrency to the layer above the database (daemon), not into the database's locking primitives.
 
+<a id="issue-16"></a>
+
+## Issue #16: Memory Governance Had No Authority Boundary [BUG-047, FIXED in development]
+
+**Trigger:** A workflow-managed call could assert permanent or user-locked policy, later automation could change that protected record, refinery cleanup could archive it, and normal delete permanently removed data.
+**Root cause:** Storage metadata described retention and injection preferences, but mutation authority and forgetting semantics were not enforced at the MCP and maintenance boundaries.
+**Solution:** Require an explicit invocation mode, reserve protected policy for user-directed calls, reject workflow changes to protected records, exclude protected memories from automated archival, and make archive the default delete behavior. Permanent deletion now requires explicit user-directed confirmation and a second confirmation for protected memory.
+**Lesson:** Retention, retrieval, injection, and deletion are separate decisions. Automation may operate inside user policy; it may not manufacture or silently weaken user authority.
+
 ---
 
 ## Cross-bug pattern (extracted to `../lessons.md`)
@@ -163,5 +182,6 @@ path. `signal_ratio` was added to `TOKEN_STATS`.
 9. **State that persists across restarts must persist to disk** — Issue #13.
 10. **Library bugs surface at scale — test with production-size data** — Issue #14.
 11. **Push concurrency to the layer above the database** — Issue #15 (GAP-025, v2.11.0 closure).
+12. **Automation cannot grant itself user authority** — Issue #16.
 
 Distill any new repeating rule into `../lessons.md`.

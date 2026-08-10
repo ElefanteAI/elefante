@@ -55,10 +55,11 @@ The current product already provides useful foundations:
   conflict, supersession, project, workspace, file, and session fields.
 - Kuzu stores explicit relationships and the orchestrator already owns task
   graph operations.
-- Access counts and co-activation record retrieval behaviour.
+- Access counts and co-activation remain historical ranking signals. Ordinary
+  retrieval and Task Intelligence declared-use events do not update them.
 
-Those signals are not proof that a memory improved a task. Access count measures
-exposure, and co-activation measures reuse. Neither is a causal outcome signal.
+Those signals are not proof that a memory improved a task. Neither historical
+access nor co-activation is a causal outcome signal.
 The Task Intelligence Pipeline must preserve that distinction.
 
 ## Memory governance and Task Intelligence boundary
@@ -84,8 +85,10 @@ User enforcement must have an explicit meaning:
 
 The target governance fields are `retention_policy = permanent | managed |
 ephemeral`, `injection_policy = always | triggered | ranked`, a scope and trigger,
-an explicit user lock, and the lifecycle state. These policy fields are design
-intent and are not yet part of the released schema.
+an explicit user lock, and the lifecycle state. The development branch now
+implements the bounded policy fields and pre-ranking gates; they are not yet
+part of the published v2.12.2 client schema. Invocation authority and causal
+utility remain separate contracts.
 
 ### Two operating modes
 
@@ -466,7 +469,7 @@ both conditions. Treatment used 244,365 input tokens in 64,077 ms; control used
 
 Adversarial review found the governing benchmark defect: the task asked for
 host-family isolation, while its hidden test required an undisclosed new module,
-exact function names, and exact constants. Review of all 30 tasks found similar
+exact function names, and exact constants. Review of the then-30-task historical manifest found similar
 private-API, source-substring, exact-message, or arbitrary-threshold coupling in
 many tests. A behaviorally correct alternative can fail, so the historical
 manifest is now explicitly diagnostic-only and cannot satisfy promotion.
@@ -480,10 +483,11 @@ are justified before that repair.
 
 ### Black-box causal canaries (2026-08-06)
 
-Three replacement fixtures now test observable installer dry-run containment,
-dashboard CORS boundaries, and restore archive integrity. Each fixture fails at
-its pinned base ref and passes at its pinned known-good ref; its reviewed digest
-is bound into the manifest. The remaining 27 historical tasks are still
+Seven replacement fixtures now test observable installer startup and dry-run
+containment, dashboard CORS and null-data behavior, restore path and archive
+integrity, and factory-reset containment. Each fixture fails at its pinned base
+ref and passes at its pinned known-good ref; its reviewed digest is bound into
+the manifest. The remaining 23 historical tasks are still
 ineligible, so the benchmark remains diagnostic-only.
 
 The repaired canaries did not prove Task Intelligence effectiveness. CORS tied
@@ -501,6 +505,19 @@ Because this is one task cluster, no cross-task confidence interval is valid;
 the evaluator now returns `null` instead of a degenerate interval and blocks
 effectiveness and promotion gates. This result supports further calibration,
 not default injection or a public claim.
+
+Three newer controlled calibration tasks did not reproduce a correctness lift.
+Dashboard null-data handling tied at 3/3 while treatment used 18.5 percent fewer
+input tokens and 15.7 percent less model time. Restore path containment tied at
+3/3 while treatment used 26.0 percent fewer input tokens and 0.8 percent less
+model time. Factory-reset containment failed in both conditions in one bounded
+pair; treatment used 40.1 percent fewer input tokens and 31.9 percent less model
+time. These are efficiency observations, not intelligence improvement. The
+factory-reset Brief selected seven code/test excerpts but no durable memory
+carried the missing runtime-configuration boundary; delivery alone therefore
+did not change correctness. No further model run is justified without a real,
+pre-existing user or workflow memory that is relevant to an independently
+reviewed task.
 
 The evaluator now fails closed when the Codex CLI exits without a measurable
 attempt, isolates inherited configuration, uses short temporary workspaces,
@@ -585,33 +602,64 @@ The design is ready for implementation planning when:
 - privacy and rollback paths are testable;
 - implementation ownership and compute budget are assigned.
 
-Until those conditions are met, status remains design-only and the website must
-not market Task Intelligence as a shipped capability.
+Those design gates produced the current unreleased implementation. Release
+promotion is a separate gate: the website must not market Task Intelligence as
+shipped or effective until a fresh representative holdout passes.
 
 ## Exact rollback
 
 - V1 remains the default Task Brief profile.
 - Pass `--brief-profile v1` to reproduce the frozen evaluator.
 - V2 uses `__brief-v2` outcome filenames and separate disposable worktrees.
-- Reverting the Task Intelligence v2 commit removes the shadow revision; no
-  live memory, public MCP method, customer installation, or release is mutated.
+- Schema-v3 filenames bind the complete task contract; a task or judge edit
+  creates a new path instead of reusing stale evidence.
+- Remove `ELEFANTE_TASK_INTELLIGENCE_ENABLED` to hide the development tool.
+  Remove `ELEFANTE_TASK_INTELLIGENCE_PILOT` to stop context delivery while
+  retaining shadow traces. Remove `ELEFANTE_TASK_CONTEXT_ON_TOOL_CALL` to stop
+  automatic eligible-tool delivery independently. None is present in the
+  released client.
 - Historical outcome records and commits are immutable. Never rewrite them to
   make a later design appear successful.
 
 ## Developer continuation guide
+
+### Customer Recall golden path (separate from the evaluation pilot)
+
+The unreleased candidate now proves the smallest customer outcome directly:
+install the exact client archive, ask a normal question in a clean Codex
+directory, and receive the correct durable fact through one automatic read-only
+`elefante-Recall` call. The verified 2026-08-10 run executed no shell command,
+selected one memory, emitted only seven response fields, and answered
+`Indigo-Echo`. This validates availability, routing, authorization, governed
+selection, and payload economy for one real path. It does **not** establish
+representative Task Intelligence lift or authorize a release claim.
 
 ### Verified state
 
 - The deterministic Task Brief compiler, metadata-only outcome records, stage
   traces, paired evaluator, promotion report, fail-closed judge gate, and exact
   rollback path exist.
-- Three CLI/API/filesystem canaries have reviewed black-box contracts. The other
-  27 historical tasks are implementation-coupled and cannot support promotion.
+- Eight CLI/API/filesystem canaries have reviewed black-box contracts. The other
+  23 historical tasks are implementation-coupled and cannot support promotion.
+- One canary is bound to a digest-sealed export of a real durable memory. Its
+  model-free preflight proves base failure, known-fix success, exact memory
+  selection, deterministic rendering, 1,252/1,500 tokens, and no answer
+  leakage. The selected portfolio is the durable constraint, canonical host
+  registry, doctor target, manifest verification, and a validation safeguard.
+- One capped treatment diagnostic changed only `doctor.py`. Its first verdict
+  exposed a hidden `~/.bob` judge convention absent from the frozen contract.
+  After replacing that convention with the existing platform-specific Bob root,
+  the canary still failed on base, passed on the known fix, and the preserved
+  treatment patch passed. This is a valid one-task functional signal, not a
+  paired or cross-task lift estimate.
 - One three-pair restore trial improved acceptance from 0/3 to 2/3 and reduced
   input tokens, but increased output tokens and duration. It is a useful local
   signal, not proof of general lift.
-- V1 remains the default. Task Intelligence has no public MCP surface, automatic
-  injection, released-product claim, or authorized per-memory learning.
+- A 17th development MCP tool now closes prepare, delivery, declared-use,
+  outcome, inspection, and retraction in a local metadata-only ledger. It is
+  absent by default and pilot delivery has a second kill switch.
+- V1 remains the default. There is no automatic host interception, released
+  product claim, or authorized ranking/learning mutation.
 
 ### Remaining source findings that must not be normalized as intended behaviour
 
@@ -621,47 +669,44 @@ contract gaps are:
 
 1. Specifications and directives have a zero type decay rate, but the independent
    freshness term still reduces their vitality.
-2. Normal retrieval can increment access count before use or task benefit is
-   known; MCP co-activation is recorded before archived/deprecated filtering.
-3. The MCP search response removes provenance and retrieval explanations, then
-   labels all returned memories authoritative.
-4. The public ingestion path does not map every available structured provenance,
-   verification, conflict, and scope field into `MemoryMetadata`.
-5. Current scoring tests prove bounded arithmetic and relative decay. They do not
-   prove memory usefulness, safe forgetting, user enforcement, or task lift.
+2. **Resolved in unreleased development:** retrieval and delivery are read-only.
+   Trace-bound declared use is reversible observational data and does not update
+   access, co-activation, or ranking.
+3. **Resolved in unreleased development:** bounded results and Task Briefs expose
+   provenance, lifecycle, conflict, scope, selection reason, and current-source
+   state; secret-shaped legacy content is withheld.
+4. **Resolved in unreleased development:** user/workflow authority, protected
+   retention, triggered/always injection, archive-first forgetting, and
+   protected-refinery behavior have contract tests.
+5. The remaining gap is causal outcome evidence. One real-memory preflight
+   proves the pipeline, not that Elefante improves diverse tasks.
 
 These are contract gaps. Do not repair them by tuning weights or changing decay
 constants in isolation.
 
 ### Required implementation order
 
-1. Freeze the governance schema and backward-compatible mapping for existing
-   lifecycle fields. Resolve the two remaining product decisions: the overflow
-   behaviour for `always inject`, and the default retention policy when the user
-   did not specify one.
-2. Write contract tests for permanent/user-locked retention, triggered and global
-   injection, direct-user versus workflow-managed authority, reversible
-   dormancy/archive, conflict visibility, lifecycle filtering before learning,
-   and read-only retrieval.
-3. Implement the smallest schema and MCP changes that satisfy those tests. Keep
-   migration reversible and preserve existing stored memories.
-4. Move access reinforcement and co-activation behind an explicit delivery/use
-   event. Do not treat retrieval as positive feedback.
-5. Return provenance, verification, selection reason, lifecycle, and conflicts in
-   the bounded Task Brief. Never label unverified or conflicting context
-   authoritative.
-6. Replace or independently review enough historical tasks to create a credible
-   black-box calibration set. Do not spend model tokens on the 27 invalid judges.
-7. Run shadow control-versus-treatment evaluation. Diagnose failures by stage:
-   judge, retrieval, selection, delivery, repository change, and acceptance.
-8. Freeze a new untouched holdout only after calibration shows repeatable lift
-   within token and latency limits. Keep default injection blocked until the
-   promotion gate passes.
+1. Preserve task 031 as calibration evidence; do not rerun it merely to replace
+   the invalidated pre-repair verdict. Do not spend on the 23 invalid judges.
+2. Add independently reviewed real-memory canaries from other task classes.
+   Each fixture must preserve source digest, lifecycle review, privacy review,
+   and a base-fail/known-fix-pass behavioral judge.
+3. Run paired calibration only after each deterministic preflight proves the
+   target, ownership chain, safeguard, deterministic budget, and judge contract.
+   Diagnose judge, retrieval, selection, delivery, execution, and acceptance;
+   a tie or failure returns to the failed stage rather than buying repetitions.
+   Require
+   repeatable correctness lift within token and latency limits.
+4. Freeze a new untouched holdout after calibration. Never reuse the consumed
+   preliminary holdout for promotion.
+5. Keep all three runtime switches off and all claims internal until that holdout
+   passes; then review the smallest customer release surface separately.
 
 ### How another developer can help safely
 
 - Start with this file, `workspace/PLANNING.md`, `workspace/ISSUES.md` BUG-044,
-  and `workspace/postmortems/ai-behavior.md` Issue 13.
+  BUG-049, and BUG-050, and `workspace/postmortems/ai-behavior.md` Issues 13,
+  17, and 18.
 - Read `src/models/memory.py`, `src/core/retrieval.py`,
   `src/core/orchestrator.py`, `src/core/sqlite_vector_store.py`, and
   `src/mcp/server.py` before changing behaviour.
@@ -675,8 +720,7 @@ constants in isolation.
 
 ## Relationship to Session Intelligence
 
-Session Intelligence may provide local invocation and outcome metadata later.
-It must not duplicate the Task Brief evidence contract or become a remote
-analytics system. The Task Intelligence evaluation can start with an isolated
-benchmark event store and integrate with Session Intelligence only after both
-schemas are reviewed together.
+Task Intelligence now owns its minimal local invocation/use/outcome ledger.
+Session Intelligence must not duplicate that schema or become remote analytics.
+Any future integration should consume metadata-only summaries after a separate
+privacy and retention review.

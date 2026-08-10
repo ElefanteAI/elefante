@@ -41,7 +41,8 @@ Default mode is intentionally self-contained:
 
 - Uses temporary `HOME`, `USERPROFILE`, and `ELEFANTE_DATA_DIR`
 - Enables `ELEFANTE_ALLOW_TEST_MEMORIES=1`
-- Verifies **15 of 16 tools** plus **both prompts**
+- Explicitly enables the default-off Task Intelligence development surface
+- Verifies **17 of 18 development tools** plus **both prompts**
 - Deletes protocol-created memories through the tool surface
 - Removes the entire temporary Elefante store at the end
 
@@ -65,7 +66,7 @@ That means it is not fully self-contained, so it cannot be part of the default s
 ./.venv/bin/python scripts/verify/verify_e2e_tests.py --with-dashboard-open
 ```
 
-Use this only when you explicitly want the sixteenth tool checked.
+Use this only when you explicitly want the eighteenth development tool checked.
 
 Preconditions:
 
@@ -88,11 +89,16 @@ If you do not need the `elefante-DashboardOpen` tool itself, do not run this mod
 The authoritative harness verifies these phases in order:
 
 1. **Handshake and inventory**
-   The real MCP server boots, completes `initialize`, and exposes the expected 16-tool plus 2-prompt surface.
-2. **Prompt retrieval**
-   `elefante-grounding` and `elefante-context` both return usable content over the live prompt surface.
+   The real MCP server boots, completes `initialize`, and exposes the expected
+   opt-in 18-tool plus 2-prompt development surface. Normal v2.12.2 discovery
+   remains 16 tools; the unreleased customer candidate exposes 17 by default.
+2. **Answer context and prompt retrieval**
+   `elefante-Recall` returns its seven-field bounded read-only payload without
+   internal IDs or generic protocol wrappers;
+   `elefante-grounding` and `elefante-context` return usable prompt content.
 3. **Routing and directives**
-   Successful and failing tool calls both inject `DIRECTIVES` and `ENTRYPOINT_SEQUENCE_READ_THIS_FIRST`.
+   Successful and failing non-Recall tool calls both inject `DIRECTIVES` and
+   `ENTRYPOINT_SEQUENCE_READ_THIS_FIRST`.
 4. **System compatibility**
    `elefante-SystemStatusGet` and `elefante-System` behave correctly under transaction-scoped mode.
 5. **Directive lifecycle**
@@ -101,22 +107,28 @@ The authoritative harness verifies these phases in order:
    A fresh session with no prior search cannot mutate memory.
 7. **Memory lifecycle**
    `elefante-Memory` actions `add`, `search` (including `list_all`), `update`, and `delete` all round-trip through the live store.
-8. **Graph and context**
+8. **Task Intelligence lifecycle**
+   A pilot Task Brief delivers bounded memory IDs, and declared use is accepted
+   only for the same trace without changing ranking.
+9. **Graph and context**
    `GraphConnect`, `GraphQuery`, `ContextGet`, and `SessionsList` all return meaningful state derived from protocol-created entities.
-9. **Task graph**
+10. **Task graph**
    `TaskCreate`, `TaskUpdate`, and `TaskGraph` persist and read back live task state.
-10. **ETL workflow**
+11. **ETL workflow**
     `ETLProcess` returns raw memories and `ETLClassify` removes a classified memory from the raw queue.
-11. **Refinery workflow**
+12. **Refinery workflow**
     `elefante-Memory(action="consolidate", force=false)` returns a dry-run refinery plan and stats.
-12. **Restart persistence**
+13. **Restart persistence**
     Memory, graph-backed state, task state, and sessions survive a full MCP subprocess restart.
-13. **Cleanup isolation**
+14. **Cleanup isolation**
     Protocol-created memories are deleted through the tool surface, then the temp Elefante home/data tree is removed.
 
 ## Full-Surface Coverage Map
 
-When run with `--with-dashboard-open`, the self-protocol invokes all 16 live MCP tools and both prompts. Default mode verifies 15 tools and skips only `elefante-DashboardOpen`.
+When run with `--with-dashboard-open`, the self-protocol invokes all 18 opt-in
+development MCP tools and both prompts. Default mode verifies 17 of 18 and skips
+only `elefante-DashboardOpen`. The harness sets both Task Intelligence flags only
+inside its isolated temporary environment.
 
 ### Tools
 
@@ -124,6 +136,8 @@ When run with `--with-dashboard-open`, the self-protocol invokes all 16 live MCP
 | --- | --- | --- | --- |
 | `elefante-Memory(action="add")` | Memory lifecycle | Yes | Yes |
 | `elefante-Memory(action="search")` | Routing, compliance reset, memory lifecycle, cleanup | Yes | Yes |
+| `elefante-Recall` | Bounded customer answer context | Yes | Yes |
+| `elefante-TaskIntelligence` | Bounded prepare and trace-bound declared use | Yes | Yes |
 | `elefante-GraphQuery` | Graph and context | Yes | Yes |
 | `elefante-ContextGet` | Graph and context | Yes | Yes |
 | `elefante-SessionsList` | Graph and context, restart persistence | Yes | Yes |
@@ -161,7 +175,7 @@ Default mode does **not** prove `elefante-DashboardOpen` itself.
 That exclusion is deliberate. The dashboard tool is process- and UI-bearing, so its safest automated coverage remains split:
 
 - Default self-protocol: everything self-contained
-- Opt-in `--with-dashboard-open`: full 16-tool sweep when explicitly requested
+- Opt-in `--with-dashboard-open`: full 18-tool development sweep when explicitly requested
 - Targeted dashboard guards: `pytest tests/test_dashboard_serializer.py -k "dashboard" -v`
 
 This is not a gap hidden under the rug. It is an explicit boundary between self-contained proof and global side-effect proof.

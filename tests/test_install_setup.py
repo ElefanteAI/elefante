@@ -1045,6 +1045,84 @@ def test_cli_agent_registration_and_uninstall_require_matching_host_configuratio
     assert configured is False
 
 
+def test_codex_recall_guidance_preserves_user_content_and_uninstalls_exact_block(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/configure_cli_agents.py", "codex_guidance_module")
+    manifest = _load_module(ROOT / "scripts/setup/install_manifest.py", "codex_guidance_manifest_module")
+    home = tmp_path / "home"
+    codex_home = home / ".codex"
+    codex_home.mkdir(parents=True)
+    agents = codex_home / "AGENTS.md"
+    original = "# User guidance\n\n- Preserve this rule.\n"
+    agents.write_text(original, encoding="utf-8")
+
+    assert module.configure_codex_guidance(
+        codex_home=codex_home, manifest_home=home
+    ) == "configured"
+    configured = agents.read_text(encoding="utf-8")
+    assert configured.startswith(original)
+    assert configured.count(module.CODEX_GUIDANCE_START) == 1
+    assert "call `elefante-Recall`" in configured
+
+    removed, preserved = manifest.remove_unchanged_files(home=home, apply=True)
+    assert removed == [agents]
+    assert preserved == []
+    assert agents.read_text(encoding="utf-8") == original
+
+
+def test_codex_recall_guidance_uses_active_override_and_preserves_modified_block(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/configure_cli_agents.py", "codex_override_guidance_module")
+    manifest = _load_module(ROOT / "scripts/setup/install_manifest.py", "codex_override_guidance_manifest_module")
+    home = tmp_path / "home"
+    codex_home = home / ".codex"
+    codex_home.mkdir(parents=True)
+    agents = codex_home / "AGENTS.md"
+    override = codex_home / "AGENTS.override.md"
+    agents.write_text("# Base guidance\n", encoding="utf-8")
+    override.write_text("# Active override\n", encoding="utf-8")
+
+    assert module.configure_codex_guidance(
+        codex_home=codex_home, manifest_home=home
+    ) == "configured"
+    assert module.CODEX_GUIDANCE_START not in agents.read_text(encoding="utf-8")
+    modified = override.read_text(encoding="utf-8").replace(
+        "call `elefante-Recall`", "ask before calling `elefante-Recall`"
+    )
+    override.write_text(modified, encoding="utf-8")
+
+    assert module.configure_codex_guidance(
+        codex_home=codex_home, manifest_home=home
+    ) == "preserved"
+    removed, preserved = manifest.remove_unchanged_files(home=home, apply=True)
+    assert removed == []
+    assert preserved == [override]
+    assert override.read_text(encoding="utf-8") == modified
+
+
+def test_codex_surface_requires_registration_and_recall_routing(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/configure_cli_agents.py", "codex_ready_module")
+    manifest = _load_module(ROOT / "scripts/setup/install_manifest.py", "codex_ready_manifest_module")
+    home = tmp_path / "home"
+    configuration = '{"name":"elefante"}'
+    manifest.record_host_command(
+        "codex:elefante",
+        "codex",
+        ["codex", "mcp", "get", "elefante"],
+        ["codex", "mcp", "add", "elefante"],
+        ["codex", "mcp", "remove", "elefante"],
+        configuration,
+        home=home,
+    )
+
+    def runner(command, **_kwargs):
+        return subprocess.CompletedProcess(command, 0, stdout=configuration)
+
+    assert manifest.configured_surfaces(home, runner=runner) == set()
+    assert module.configure_codex_guidance(
+        codex_home=home / ".codex", manifest_home=home
+    ) == "configured"
+    assert manifest.configured_surfaces(home, runner=runner) == {"codex"}
+
+
 def test_openclaw_adapter_uses_native_registry_and_safe_manifest_ownership(tmp_path):
     module = _load_module(ROOT / "scripts/setup/configure_cli_agents.py", "openclaw_cli_agents_module")
     manifest = _load_module(ROOT / "scripts/setup/install_manifest.py", "openclaw_manifest_module")
@@ -1237,6 +1315,7 @@ def test_codex_cli_registration_round_trip_uses_an_isolated_config_home():
             sys.executable,
             home=temp_root / "elefante-home",
             runner=runner,
+            codex_home=codex_home,
         )
         assert result == "configured"
         current = runner([codex, "mcp", "get", "elefante", "--json"], capture_output=True, text=True, check=False)
@@ -1259,6 +1338,7 @@ def test_codex_cli_registration_round_trip_uses_an_isolated_config_home():
             sys.executable,
             home=temp_root / "elefante-home",
             runner=runner,
+            codex_home=codex_home,
         ) == "updated"
         refreshed = runner([codex, "mcp", "get", "elefante", "--json"], capture_output=True, text=True, check=False)
         assert refreshed.returncode == 0
@@ -1295,6 +1375,7 @@ def test_codex_cli_registration_round_trip_uses_an_isolated_config_home():
             sys.executable,
             home=temp_root / "elefante-home",
             runner=runner,
+            codex_home=codex_home,
         ) == "configured"
 
         removed, preserved = manifest.remove_unchanged_host_commands(

@@ -112,7 +112,35 @@
       "success_criteria": ["The installer help path starts under Python isolated from site packages."],
       "base_ref": "1a580044bf967530b62fa31a7f83fd7c0feb777a",
       "acceptance_ref": "1ae7a481d93761e13883461fd0ad434f28ae28e3",
-      "acceptance_command": ["python", "-m", "pytest", "tests/test_install_setup.py::test_installer_entrypoint_starts_without_product_dependencies", "-q"],
+      "acceptance_command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_installer_clean_bootstrap_black_box.py::test_installer_help_starts_without_installed_product_dependencies", "-q"],
+      "acceptance_artifact": {
+        "source": "benchmark-fixture",
+        "path": "benchmarks/task_intelligence/acceptance/test_installer_clean_bootstrap_black_box.py",
+        "sha256": "79482b26fae7d9b9b703775d9ac2c27f8b94f1c2687316d53218fbbb582e2d61"
+      },
+      "acceptance_contract": {
+        "kind": "behavioral",
+        "promotion_eligible": true,
+        "observable_surface": ["documented installer help command", "process exit status"],
+        "acceptance": {
+          "command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_installer_clean_bootstrap_black_box.py::test_installer_help_starts_without_installed_product_dependencies", "-q"],
+          "assertions": [
+            "The installer help command starts successfully without site packages.",
+            "Startup does not fail because product dependencies are not installed yet."
+          ]
+        },
+        "rollback": {
+          "base_ref": "1a580044bf967530b62fa31a7f83fd7c0feb777a",
+          "restore_ref": "1ae7a481d93761e13883461fd0ad434f28ae28e3"
+        },
+        "adversarial_review": {
+          "status": "approved",
+          "implementation_coupling_found": false,
+          "reviewer": "ARAA primary review",
+          "reviewed_at": "2026-08-06",
+          "test_sha256": "79482b26fae7d9b9b703775d9ac2c27f8b94f1c2687316d53218fbbb582e2d61"
+        }
+      },
       "context_paths": ["docs/how-to/install.md", "scripts/README.md", "agents/manifests/ide-integration.yaml"],
       "forbidden_leakage_terms": []
     },
@@ -195,7 +223,7 @@
     {
       "id": "install-uncovered-host-007",
       "task_class": "installation-and-distribution",
-      "split": "holdout",
+      "split": "calibration",
       "task_statement": "Make customer readiness fail closed and report a compatible host that is detected locally but not connected to the stable runtime.",
       "success_criteria": ["Doctor distinguishes runtime health from customer readiness and identifies uncovered host labels without secrets."],
       "base_ref": "58706ce372349b33b35de2e0a1d6c5d43911bf3a",
@@ -207,7 +235,7 @@
     {
       "id": "install-bob-registry-008",
       "task_class": "installation-and-distribution",
-      "split": "holdout",
+      "split": "calibration",
       "task_statement": "Configure a detected Bob host through its user-global registry while preserving the one-runtime customer installation contract.",
       "success_criteria": ["A detected Bob installation receives a verifiable user-global Elefante registration."],
       "base_ref": "58706ce372349b33b35de2e0a1d6c5d43911bf3a",
@@ -219,7 +247,7 @@
     {
       "id": "install-runtime-identity-009",
       "task_class": "installation-and-distribution",
-      "split": "holdout",
+      "split": "calibration",
       "task_statement": "Persist stable customer runtime identity without discarding installer ownership records for already configured host surfaces.",
       "success_criteria": ["Runtime identity and existing owned surfaces survive one manifest update."],
       "base_ref": "58706ce372349b33b35de2e0a1d6c5d43911bf3a",
@@ -231,7 +259,7 @@
     {
       "id": "install-manifest-isolation-010",
       "task_class": "installation-and-distribution",
-      "split": "holdout",
+      "split": "calibration",
       "task_statement": "Prevent low-level IDE adapter tests from writing installer ownership into the real user home when no isolated manifest home is supplied.",
       "success_criteria": ["The adapter requires an explicit ownership-manifest home and tests remain isolated."],
       "base_ref": "188a39b3543784412b5154258d6b55b9595264bc",
@@ -248,7 +276,35 @@
       "success_criteria": ["The graph endpoint serializes null-name nodes safely instead of returning an error."],
       "base_ref": "3266ff1ee7ae8c3ca64bac81ddb25b510fd8b89a",
       "acceptance_ref": "8fcba52af3cadd45bd4e0eebbe76f1a6f8771f14",
-      "acceptance_command": ["python", "-m", "pytest", "tests/test_dashboard_serializer.py::test_get_graph_handles_null_name_safely", "-q"],
+      "acceptance_command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_dashboard_null_graph_black_box.py::test_dashboard_graph_serializes_a_null_node_name", "-q"],
+      "acceptance_artifact": {
+        "source": "benchmark-fixture",
+        "path": "benchmarks/task_intelligence/acceptance/test_dashboard_null_graph_black_box.py",
+        "sha256": "b6c53deddf7966be3394d2464721a80dd6825d488c9c5490f620412126aac1f0"
+      },
+      "acceptance_contract": {
+        "kind": "behavioral",
+        "promotion_eligible": true,
+        "observable_surface": ["dashboard HTTP graph response"],
+        "acceptance": {
+          "command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_dashboard_null_graph_black_box.py::test_dashboard_graph_serializes_a_null_node_name", "-q"],
+          "assertions": [
+            "A snapshot node with a null name does not make the graph endpoint fail.",
+            "The HTTP response represents the missing display name as an empty string."
+          ]
+        },
+        "rollback": {
+          "base_ref": "3266ff1ee7ae8c3ca64bac81ddb25b510fd8b89a",
+          "restore_ref": "8fcba52af3cadd45bd4e0eebbe76f1a6f8771f14"
+        },
+        "adversarial_review": {
+          "status": "approved",
+          "implementation_coupling_found": false,
+          "reviewer": "ARAA primary review",
+          "reviewed_at": "2026-08-06",
+          "test_sha256": "b6c53deddf7966be3394d2464721a80dd6825d488c9c5490f620412126aac1f0"
+        }
+      },
       "context_paths": ["docs/reference/architecture.md", "docs/reference/scoring.md", "scripts/README.md"],
       "forbidden_leakage_terms": []
     },
@@ -432,7 +488,35 @@
       "success_criteria": ["Traversal-style ZIP members fail validation with the existing data untouched."],
       "base_ref": "9e81833adb0eafd15e93a637bc8b88c21fef8bf1",
       "acceptance_ref": "188a39b3543784412b5154258d6b55b9595264bc",
-      "acceptance_command": ["python", "-m", "pytest", "tests/test_backup_restore.py::test_restore_rejects_unsafe_zip_members_without_touching_data", "-q"],
+      "acceptance_command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_restore_path_black_box.py::test_restore_rejects_traversal_before_changing_customer_data", "-q"],
+      "acceptance_artifact": {
+        "source": "benchmark-fixture",
+        "path": "benchmarks/task_intelligence/acceptance/test_restore_path_black_box.py",
+        "sha256": "08114ad8d16ec3b89fd1512b987784cb8794dbcb8aa976acecc2ef71c30986e8"
+      },
+      "acceptance_contract": {
+        "kind": "behavioral",
+        "promotion_eligible": true,
+        "observable_surface": ["restore command exit status", "customer data filesystem"],
+        "acceptance": {
+          "command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_restore_path_black_box.py::test_restore_rejects_traversal_before_changing_customer_data", "-q"],
+          "assertions": [
+            "An archive containing a traversal path is rejected.",
+            "Existing customer data and paths outside the data directory remain unchanged."
+          ]
+        },
+        "rollback": {
+          "base_ref": "9e81833adb0eafd15e93a637bc8b88c21fef8bf1",
+          "restore_ref": "188a39b3543784412b5154258d6b55b9595264bc"
+        },
+        "adversarial_review": {
+          "status": "approved",
+          "implementation_coupling_found": false,
+          "reviewer": "ARAA primary review",
+          "reviewed_at": "2026-08-06",
+          "test_sha256": "08114ad8d16ec3b89fd1512b987784cb8794dbcb8aa976acecc2ef71c30986e8"
+        }
+      },
       "context_paths": ["docs/reference/architecture.md", "docs/reference/tools.md", "agents/orchestrator.md"],
       "forbidden_leakage_terms": []
     },
@@ -492,7 +576,35 @@
       "success_criteria": ["Unsafe containment is rejected before reset or backup mutation."],
       "base_ref": "9e81833adb0eafd15e93a637bc8b88c21fef8bf1",
       "acceptance_ref": "188a39b3543784412b5154258d6b55b9595264bc",
-      "acceptance_command": ["python", "-m", "pytest", "tests/test_factory_reset.py::test_reset_refuses_a_configured_path_that_contains_the_recovery_directory", "-q"],
+      "acceptance_command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_factory_reset_containment_black_box.py::test_factory_reset_rejects_a_store_containing_its_recovery_directory", "-q"],
+      "acceptance_artifact": {
+        "source": "benchmark-fixture",
+        "path": "benchmarks/task_intelligence/acceptance/test_factory_reset_containment_black_box.py",
+        "sha256": "ee8ab07c246afc94737b96049e01d8263f6fe51bda075515c04ccefe3f7c69ab"
+      },
+      "acceptance_contract": {
+        "kind": "behavioral",
+        "promotion_eligible": true,
+        "observable_surface": ["factory-reset command exit status", "customer data filesystem"],
+        "acceptance": {
+          "command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_factory_reset_containment_black_box.py::test_factory_reset_rejects_a_store_containing_its_recovery_directory", "-q"],
+          "assertions": [
+            "Factory reset rejects a configured store that contains its own recovery directory.",
+            "The existing customer state remains unchanged."
+          ]
+        },
+        "rollback": {
+          "base_ref": "9e81833adb0eafd15e93a637bc8b88c21fef8bf1",
+          "restore_ref": "188a39b3543784412b5154258d6b55b9595264bc"
+        },
+        "adversarial_review": {
+          "status": "approved",
+          "implementation_coupling_found": false,
+          "reviewer": "ARAA primary review",
+          "reviewed_at": "2026-08-06",
+          "test_sha256": "ee8ab07c246afc94737b96049e01d8263f6fe51bda075515c04ccefe3f7c69ab"
+        }
+      },
       "context_paths": ["docs/reference/architecture.md", "docs/reference/tools.md", "agents/orchestrator.md"],
       "forbidden_leakage_terms": []
     },
@@ -542,6 +654,79 @@
       "acceptance_ref": "e9bfbbd96637b5a70ff86039c4c543086767b42f",
       "acceptance_command": ["python", "-m", "pytest", "tests/test_release_client_bundle.py::test_release_client_archive_is_reproducible", "-q"],
       "context_paths": ["docs/reference/architecture.md", "docs/reference/tools.md", "agents/orchestrator.md"],
+      "forbidden_leakage_terms": []
+    },
+    {
+      "id": "install-uncovered-host-black-box-031",
+      "task_class": "installation-and-distribution",
+      "split": "calibration",
+      "task_statement": "Make the documented doctor CLI expose schema version 2 customer readiness and identify every compatible host detected locally but not connected to the stable runtime.",
+      "success_criteria": [
+        "The public doctor JSON uses canonical host IDs under host_coverage.detected, verified, and uncovered; customer_ready is false and customer_diagnostics contains detected_hosts_unconfigured when any detected host is uncovered.",
+        "A manifest claim counts as verified only while its current host configuration still matches; the acceptance test imports or patches no doctor internals."
+      ],
+      "base_ref": "58706ce372349b33b35de2e0a1d6c5d43911bf3a",
+      "acceptance_ref": "a7d7e5aa69aad96602ded0e01b6d61b6f44e2bd7",
+      "acceptance_command": [
+        "python",
+        "-m",
+        "pytest",
+        "benchmarks/task_intelligence/acceptance/test_doctor_host_coverage_black_box.py::test_doctor_cli_reports_a_detected_unconfigured_host",
+        "-q"
+      ],
+      "acceptance_artifact": {
+        "source": "benchmark-fixture",
+        "path": "benchmarks/task_intelligence/acceptance/test_doctor_host_coverage_black_box.py",
+        "sha256": "d7252c7674b6e1868283faa4e1438ab9c89df4adf73a077217d77300fd97c25d"
+      },
+      "acceptance_contract": {
+        "kind": "behavioral",
+        "promotion_eligible": true,
+        "observable_surface": [
+          "documented doctor CLI JSON",
+          "process exit status",
+          "customer host coverage"
+        ],
+        "acceptance": {
+          "command": [
+            "python",
+            "-m",
+            "pytest",
+            "benchmarks/task_intelligence/acceptance/test_doctor_host_coverage_black_box.py::test_doctor_cli_reports_a_detected_unconfigured_host",
+            "-q"
+          ],
+          "assertions": [
+            "The documented doctor CLI runs as a subprocess against an isolated user home.",
+            "All locally represented supported IDE and CLI hosts appear by canonical ID in the uncovered list.",
+            "A stale manifest claim does not move a host into the verified list.",
+            "Schema version 2 customer readiness fails closed without requiring implementation-private symbols."
+          ]
+        },
+        "rollback": {
+          "base_ref": "58706ce372349b33b35de2e0a1d6c5d43911bf3a",
+          "restore_ref": "a7d7e5aa69aad96602ded0e01b6d61b6f44e2bd7"
+        },
+        "adversarial_review": {
+          "status": "approved",
+          "implementation_coupling_found": false,
+          "reviewer": "ARAA primary review",
+          "reviewed_at": "2026-08-09",
+          "test_sha256": "d7252c7674b6e1868283faa4e1438ab9c89df4adf73a077217d77300fd97c25d"
+        }
+      },
+      "memory_fixture": {
+        "source": "sealed-durable-memory-export",
+        "path": "benchmarks/task_intelligence/fixtures/install-uncovered-host-031.memory.json",
+        "sha256": "f2bcbd3a3b8364958568fea15cdaf3a980f816954270a201947f1691e7c19bec",
+        "promotion_use": false
+      },
+      "context_paths": [
+        "docs/how-to/install.md",
+        "docs/how-to/configure-ide.md",
+        "scripts/lifecycle/doctor.py",
+        "scripts/setup/host_selection.py",
+        "scripts/setup/install_manifest.py"
+      ],
       "forbidden_leakage_terms": []
     }
   ]

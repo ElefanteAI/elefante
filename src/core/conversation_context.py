@@ -15,6 +15,7 @@ Enables the system to understand pronouns and recent context.
 """
 
 import asyncio
+import hashlib
 from typing import List, Optional, Set
 from uuid import UUID
 from datetime import datetime, timedelta
@@ -70,7 +71,7 @@ class ConversationSearcher:
         """
         self.logger.info(
             "Collecting conversation candidates",
-            query=query[:100],
+            query_sha256=hashlib.sha256(query.encode("utf-8")).hexdigest(),
             session_id=str(session_id),
             limit=limit
         )

@@ -83,7 +83,9 @@ that a memory improved the downstream task.
 - Normal memory, graph, context, session, ETL, and task operations also receive
   entrypoint/pitfall blocks and active directives.
 - `RELEVANT_CONTEXT` is supplementary and conditional. It is skipped for
-  memory-heavy and management tools and requires a usable signal in the call.
+  memory-heavy and management tools, requires a usable signal in the call, and
+  is disabled unless all three development pilot flags documented in
+  [`tools.md`](tools.md) are explicitly enabled.
 - System, dashboard, and directive-management tools use a minimal management
   response.
 

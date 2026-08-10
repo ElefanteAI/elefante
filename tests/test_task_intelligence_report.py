@@ -16,10 +16,12 @@ def _record(task_id: str, condition: str, repeat: int, passed: bool) -> dict:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     task = next((item for item in manifest["tasks"] if item["id"] == task_id), None)
     fixture_digest = benchmark.acceptance_test_sha256(task) if task else "a" * 64
+    task_digest = benchmark.task_contract_sha256(task) if task else "a" * 64
     return {
-        "outcome_schema_version": 2,
+        "outcome_schema_version": 3,
         "evaluation_id": f"{task_id}-{condition}-seed-20260805-r{repeat}",
         "task_id": task_id,
+        "task_contract_sha256": task_digest,
         "condition": condition,
         "model": "gpt-5.6-terra",
         "model_version": "not-exposed-by-codex-cli",
@@ -89,8 +91,10 @@ def test_complete_strong_holdout_passes_promotion_gate() -> None:
     records = []
     for task in holdout:
         for repeat in range(1, 4):
-            records.append(_record(task["id"], "baseline", repeat, False))
-            records.append(_record(task["id"], "task-brief", repeat, True))
+            for condition, passed in (("baseline", False), ("task-brief", True)):
+                record = _record(task["id"], condition, repeat, passed)
+                record["task_contract_sha256"] = benchmark.task_contract_sha256(task)
+                records.append(record)
 
     result = report.summarize(manifest, records, split="holdout")
 
@@ -105,13 +109,17 @@ def test_complete_strong_holdout_passes_promotion_gate() -> None:
     assert result["retry_correction_measurement_available"] is False
     assert result["retry_correction_gate"] is False
     assert result["promotion_gate"] is True
-    assert result["causal_stage_observability"]["treatment_delivery_delivered"] == 36
+    assert (
+        result["causal_stage_observability"]["treatment_delivery_delivered"]
+        == len(holdout) * 3
+    )
 
     legacy_records = [
         {
             key: value
             for key, value in record.items()
-            if key not in {"outcome_schema_version", "stage_trace"}
+            if key
+            not in {"outcome_schema_version", "stage_trace", "task_contract_sha256"}
         }
         for record in records
     ]
@@ -127,6 +135,14 @@ def test_complete_strong_holdout_passes_promotion_gate() -> None:
     tampered_result = report.summarize(manifest, tampered_records, split="holdout")
     assert tampered_result["stage_observability_complete"] is False
     assert tampered_result["promotion_gate"] is False
+
+    stale_contract_records = json.loads(json.dumps(records))
+    stale_contract_records[0]["task_contract_sha256"] = "0" * 64
+    stale_contract_result = report.summarize(
+        manifest, stale_contract_records, split="holdout"
+    )
+    assert stale_contract_result["stage_observability_complete"] is False
+    assert stale_contract_result["promotion_gate"] is False
 
 
 def test_measured_retry_reduction_is_an_effectiveness_path() -> None:
@@ -208,7 +224,7 @@ def test_incomplete_or_non_improving_results_do_not_promote() -> None:
 
 def test_v2_report_loader_does_not_mix_frozen_v1_outcomes(tmp_path) -> None:
     task_id = "task"
-    for suffix in ("", "__brief-v2"):
+    for suffix in ("", "__brief-v2__contract-aaaaaaaaaaaa"):
         for condition in ("baseline", "task-brief"):
             record = _record(task_id, condition, 1, True)
             record.pop("repeat")

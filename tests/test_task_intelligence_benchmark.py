@@ -20,13 +20,18 @@ def test_task_intelligence_manifest_is_reproducible_and_leak_free() -> None:
     assert report["holdout_count"] > 0
     assert report["diagnostic_only"] is True
     assert report["promotion_ready"] is False
-    assert report["promotion_eligible_tasks"] == 3
-    assert len(report["invalid_tasks"]) == report["task_count"] - 3
+    assert report["promotion_eligible_tasks"] == 8
+    assert len(report["invalid_tasks"]) == report["task_count"] - 8
     invalid_ids = {item["task_id"] for item in report["invalid_tasks"]}
     assert {
+        "install-clean-bootstrap-002",
         "install-dry-run-005",
+        "dashboard-null-graph-011",
         "runtime-dashboard-cors-022",
+        "runtime-restore-paths-024",
         "runtime-restore-integrity-025",
+        "runtime-reset-containment-026",
+        "install-uncovered-host-black-box-031",
     }.isdisjoint(invalid_ids)
 
 
@@ -44,7 +49,7 @@ def test_black_box_canary_verifier_proves_base_and_known_fix(capsys) -> None:
     report = json.loads(capsys.readouterr().out)
 
     assert result == 0
-    assert len(report["canary_verification"]) == 3
+    assert len(report["canary_verification"]) == 8
     assert all(item["base_rejected"] for item in report["canary_verification"])
     assert all(item["known_fix_accepted"] for item in report["canary_verification"])
     assert all(item["passed"] for item in report["canary_verification"])
@@ -185,6 +190,22 @@ def test_outcome_records_are_metadata_only() -> None:
             {**valid, "outcome_schema_version": 2, "stage_trace": trace}
         )
         == []
+    )
+    assert (
+        benchmark.validate_outcome_record(
+            {
+                **valid,
+                "outcome_schema_version": 3,
+                "task_contract_sha256": "c" * 64,
+                "stage_trace": trace,
+            }
+        )
+        == []
+    )
+    assert "outcome schema v3 requires task_contract_sha256" in (
+        benchmark.validate_outcome_record(
+            {**valid, "outcome_schema_version": 3, "stage_trace": trace}
+        )
     )
     mismatch = {
         **valid,

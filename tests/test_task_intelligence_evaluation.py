@@ -1,6 +1,7 @@
 """Safety tests for paired Task Intelligence evaluation."""
 
 import importlib
+import asyncio
 import json
 import os
 from pathlib import Path
@@ -32,7 +33,11 @@ def test_document_chunks_are_bounded_and_stable() -> None:
 
 def test_v2_chunks_retain_heading_and_symbol_lineage() -> None:
     markdown = "# Installer\n\n## Rollback\n\nRestore the previous stable runtime.\n"
-    source = "def configure_runtime(path):\n    return path\n\ndef verify_runtime():\n    return True\n"
+    source = (
+        "SUPPORTED_HOSTS = ('cursor', 'codex')\n\n"
+        "def configure_runtime(path):\n    return path\n\n"
+        "def verify_runtime():\n    return True\n"
+    )
 
     doc_chunks = evaluation._heading_aware_chunks(markdown, path="docs/install.md")
     code_chunks = evaluation._heading_aware_chunks(source, path="scripts/install.py")
@@ -40,10 +45,21 @@ def test_v2_chunks_retain_heading_and_symbol_lineage() -> None:
     assert doc_chunks[0]["heading"] == "Installer > Rollback"
     assert doc_chunks[0]["content"].startswith("Section: Installer > Rollback")
     assert [chunk["symbol"] for chunk in code_chunks] == [
+        "SUPPORTED_HOSTS",
         "configure_runtime",
         "verify_runtime",
     ]
-    assert code_chunks[0]["content"].startswith("Symbol: configure_runtime")
+    assert code_chunks[0]["content"].startswith("Symbol: SUPPORTED_HOSTS")
+
+
+def test_v2_source_kind_separates_tests_from_runtime_code() -> None:
+    assert evaluation._source_kind("tests/test_install_setup.py") == "test"
+    assert evaluation._source_kind("src/core/orchestrator.py") == "implementation"
+    assert (
+        evaluation._source_kind("agents/manifests/ide-integration.yaml")
+        == "configuration"
+    )
+    assert evaluation._source_kind("docs/how-to/install.md") == "documentation"
 
 
 def test_v2_source_candidates_read_only_the_prefixed_base(monkeypatch) -> None:
@@ -128,6 +144,39 @@ def test_v2_outcome_paths_are_isolated_from_frozen_v1() -> None:
     assert v1 != v2
     assert "brief-v2" not in v1.name
     assert "brief-v2" in v2.name
+
+
+def test_v2_outcome_path_changes_with_the_complete_task_contract() -> None:
+    item = {
+        "condition": "task-brief",
+        "task_id": "task",
+        "repeat": 1,
+        "task": {"id": "task", "task_statement": "original contract"},
+    }
+    changed = {
+        **item,
+        "task": {"id": "task", "task_statement": "revised contract"},
+    }
+
+    first = evaluation._outcome_path(
+        Path("outcomes"),
+        item,
+        model="model",
+        reasoning="low",
+        run_seed=7,
+        brief_profile=TaskBriefProfile.V2,
+    )
+    second = evaluation._outcome_path(
+        Path("outcomes"),
+        changed,
+        model="model",
+        reasoning="low",
+        run_seed=7,
+        brief_profile=TaskBriefProfile.V2,
+    )
+
+    assert first != second
+    assert "__contract-" in first.name
 
 
 def test_treatment_trial_records_retrieval_delivery_execution_and_acceptance(
@@ -220,6 +269,133 @@ def test_source_candidates_diversify_files(monkeypatch, tmp_path) -> None:
         sum(candidate["path"] == "src/alpha.py" for candidate in candidates)
         <= evaluation.V2_MAX_CHUNKS_PER_PATH + 1
     )
+
+
+def test_source_candidates_keep_a_strong_symbol_anchor_with_one_term(
+    monkeypatch,
+) -> None:
+    noise = [
+        (
+            f"src/noise_{index}.py",
+            (
+                "def run():\n"
+                "    return 'report compatible host canonical identifiers customer readiness'\n"
+            ).encode(),
+        )
+        for index in range(12)
+    ]
+    monkeypatch.setattr(
+        evaluation,
+        "_repository_files",
+        lambda *_: [
+            *noise,
+            (
+                "scripts/setup/host_selection.py",
+                b"SUPPORTED_HOSTS = ('cursor', 'codex')\n",
+            ),
+        ],
+    )
+    task = {
+        "task_statement": "Report every compatible host.",
+        "success_criteria": ["Use canonical identifiers."],
+        "base_ref": "unused",
+    }
+
+    candidates = evaluation.source_grounded_candidates(Path.cwd(), task, limit=8)
+
+    anchor = next(
+        item for item in candidates if item["path"] == "scripts/setup/host_selection.py"
+    )
+    assert anchor["symbol"] == "SUPPORTED_HOSTS"
+    assert anchor["focused_location_score"] >= 0.5
+
+
+def test_source_candidates_preserve_declared_context_chunks_beyond_lexical_gate(
+    monkeypatch,
+) -> None:
+    noise = [
+        (
+            f"src/noise_{index}.py",
+            b"def report_host_readiness():\n    return 'canonical compatible host'\n",
+        )
+        for index in range(12)
+    ]
+    monkeypatch.setattr(
+        evaluation,
+        "_repository_files",
+        lambda *_: [
+            *noise,
+            (
+                "src/declared_target.py",
+                b"def probe_runtime_surface():\n    return {'bob': '.bob'}\n",
+            ),
+        ],
+    )
+    task = {
+        "task_statement": "Report every compatible host.",
+        "success_criteria": ["Use canonical identifiers."],
+        "base_ref": "unused",
+        "context_paths": ["src/declared_target.py"],
+    }
+
+    candidates = evaluation.source_grounded_candidates(Path.cwd(), task, limit=8)
+
+    assert any(item["path"] == "src/declared_target.py" for item in candidates)
+
+
+def test_source_snapshot_prioritizes_declared_context_paths(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(
+        evaluation,
+        "source_grounded_candidates",
+        lambda *_: [
+            {
+                "path": "src/target.py",
+                "line_number": 7,
+                "content": "def target_runtime():\n    return 'ready'",
+                "heading": "",
+                "symbol": "target_runtime",
+                "lexical_score": 0.1,
+                "path_score": 0.1,
+                "symbol_score": 0.1,
+                "pre_score": 0.1,
+                "source_code": True,
+                "source_kind": "implementation",
+            },
+            {
+                "path": "src/high_score.py",
+                "line_number": 3,
+                "content": "def nearby_runtime():\n    return 'ready'",
+                "heading": "",
+                "symbol": "nearby_runtime",
+                "lexical_score": 0.8,
+                "path_score": 0.8,
+                "symbol_score": 0.8,
+                "pre_score": 0.8,
+                "source_code": True,
+                "source_kind": "implementation",
+            },
+        ],
+    )
+    task = {
+        "id": "declared-context",
+        "base_ref": "a" * 40,
+        "context_paths": ["src/target.py"],
+        "disclosed_memories": [],
+    }
+
+    memories = evaluation.source_snapshot_memories(tmp_path, task)
+    by_path = {memory.metadata.file_path: memory for memory in memories}
+
+    assert by_path["src/target.py"].metadata.custom_metadata[
+        "declared_context_path"
+    ]
+    assert (
+        by_path["src/target.py"].metadata.custom_metadata["retrieval_specificity"]
+        == 1.0
+    )
+    assert not by_path["src/high_score.py"].metadata.custom_metadata[
+        "declared_context_path"
+    ]
 
 
 def test_cors_retrieval_surfaces_boundary_not_single_word_memory_noise() -> None:
@@ -360,13 +536,56 @@ def test_disclosed_golden_memory_is_treatment_only_verified_evidence() -> None:
     assert str(disclosed[0].id) in brief.selected_memory_ids
 
 
+def test_fixture_brief_preflight_requires_exact_memory_and_is_deterministic(
+    monkeypatch,
+) -> None:
+    task = next(
+        task
+        for task in _manifest()["tasks"]
+        if task["id"] == "install-uncovered-host-black-box-031"
+    )
+    expected = "f3482775-83b7-47b5-9cbb-d54da9d8bc73"
+    sealed = evaluation.sealed_fixture_memories(ROOT, task)[0]
+    request = evaluation.TaskBriefRequest(
+        task_id=task["id"],
+        task=task["task_statement"],
+        success_criteria=task["success_criteria"],
+        project="elefante",
+        workspace="historical-snapshot",
+        profile=TaskBriefProfile.V2,
+    )
+    candidates = [
+        evaluation.SearchResult(
+            memory=sealed,
+            score=0.9,
+            source="vector",
+            vector_score=0.9,
+        )
+    ]
+
+    async def fake_inputs(*_args, **_kwargs):
+        return request, candidates
+
+    monkeypatch.setattr(evaluation, "_snapshot_brief_inputs", fake_inputs)
+    reports = asyncio.run(
+        evaluation.verify_fixture_briefs(ROOT, [task], SimpleNamespace())
+    )
+
+    assert reports[0]["passed"] is True
+    assert reports[0]["expected_memory_id"] == expected
+    assert reports[0]["deterministic"] is True
+    assert reports[0]["selected_sources"][0]["source_detail"] == (
+        "sealed-durable-memory-export"
+    )
+
+
 def test_paired_plan_is_seeded_balanced_and_repeatable() -> None:
     manifest = _manifest()
     first = evaluation.paired_plan(
         manifest,
         split="holdout",
         task_id=None,
-        task_class="installation-and-distribution",
+        task_class="runtime-safety-and-trust",
         repetitions=3,
         run_seed=7,
     )
@@ -374,7 +593,7 @@ def test_paired_plan_is_seeded_balanced_and_repeatable() -> None:
         manifest,
         split="holdout",
         task_id=None,
-        task_class="installation-and-distribution",
+        task_class="runtime-safety-and-trust",
         repetitions=3,
         run_seed=7,
     )
@@ -411,6 +630,61 @@ def test_diagnostic_condition_runs_only_one_side(capsys) -> None:
     assert report["pending_runs"] == 1
 
 
+def test_baseline_only_execution_does_not_build_task_briefs(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    def fail_if_constructed():
+        raise AssertionError("baseline-only execution must not load embeddings")
+
+    monkeypatch.setattr(evaluation, "EmbeddingService", fail_if_constructed)
+    monkeypatch.setattr(
+        evaluation,
+        "execute_trial",
+        lambda item, **_kwargs: {
+            "task_id": item["task_id"],
+            "condition": item["condition"],
+            "repeat": item["repeat"],
+            "acceptance_passed": False,
+            "input_tokens": 100,
+            "cached_input_tokens": 40,
+            "output_tokens": 10,
+            "duration_ms": 100,
+            "outcome": str(tmp_path / "outcome.json"),
+        },
+    )
+
+    result = evaluation.main(
+        [
+            "--task",
+            "runtime-reset-containment-026",
+            "--split",
+            "calibration",
+            "--repetitions",
+            "1",
+            "--condition",
+            "baseline",
+            "--brief-profile",
+            "v2",
+            "--output-dir",
+            str(tmp_path / "outcomes"),
+            "--workspace-root",
+            str(tmp_path / "workspaces"),
+            "--execute",
+            "--allow-diagnostic",
+            "--max-runs",
+            "1",
+            "--max-total-input-tokens",
+            "600000",
+            "--max-total-uncached-input-tokens",
+            "100000",
+        ]
+    )
+    report = json.loads(capsys.readouterr().out)
+
+    assert result == 0
+    assert report["results"][0]["condition"] == "baseline"
+
+
 def test_paired_execution_blocks_diagnostic_only_judges_by_default(capsys) -> None:
     task_id = _manifest()["tasks"][0]["id"]
     result = evaluation.main(
@@ -421,6 +695,35 @@ def test_paired_execution_blocks_diagnostic_only_judges_by_default(capsys) -> No
             "1",
             "--brief-profile",
             "v2",
+            "--execute",
+        ]
+    )
+    report = json.loads(capsys.readouterr().out)
+
+    assert result == 2
+    assert report["diagnostic_task_ids"] == [task_id]
+    assert "--allow-diagnostic" in report["error"]
+
+
+def test_paired_execution_blocks_valid_task_in_diagnostic_manifest(
+    tmp_path, capsys
+) -> None:
+    task_id = "install-uncovered-host-black-box-031"
+    result = evaluation.main(
+        [
+            "--task",
+            task_id,
+            "--repetitions",
+            "1",
+            "--brief-profile",
+            "v2",
+            "--memory-fixture",
+            str(
+                ROOT / "benchmarks/task_intelligence/fixtures/"
+                "install-uncovered-host-031.memory.json"
+            ),
+            "--output-dir",
+            str(tmp_path / "outcomes"),
             "--execute",
         ]
     )
