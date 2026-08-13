@@ -237,6 +237,37 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 **Guard:** `pytest tests/test_install_setup.py -k "client_health_checks_customer_baseline" -v`; the isolated macOS workflow requires the entire customer launcher and `doctor` readiness path to pass.
 **Lesson:** Product health must verify the product contract for the active runtime profile, not the development environment that produced it.
 
+<a id="issue-24"></a>
+
+## Issue #24: Installed Runtime Version Did Not Identify Its Source [BUG-052, OPEN]
+
+**Trigger:** A 2026-08-13 audit compared the installed runtime with published
+main and the Task Intelligence development branch. The installed
+`src/mcp/server.py` blob matched unreleased commit `7c705ca`, while
+`src/__init__.py` and `~/.elefante/install-manifest.json` reported `2.12.2`.
+The manifest contained no source commit or release channel.
+**Root cause:** Runtime identity records only the semantic version, application
+root, data root, and customer/developer scope. That is sufficient when every
+build with a version is byte-equivalent to the release, but it cannot distinguish
+published, development, or candidate code built from different commits.
+**Impact:** Installed-path evidence can be attributed to the wrong release;
+`doctor` can report a truthful semantic version but an incomplete build
+identity; development features may appear published. This does not prove that
+any external customer received the development build.
+**Required solution:** Define an additive build-provenance contract containing
+semantic version, immutable source commit, and release channel. Installer,
+manifest reader, `doctor`, archive metadata, upgrade/repair, and rollback must
+agree on that identity and fail visibly on inconsistent state. Stable and
+development runtimes must remain independently recoverable; do not mutate the
+current installation until the implementation plan and rollback are approved.
+**Required guard:** Contract tests must cover published, development, malformed,
+legacy-manifest, upgrade, repair, and rollback states. Exact-artifact verification
+must compare the recorded source identity with the built payload before any
+release claim.
+**Lesson:** A semantic version identifies a release contract, not arbitrary code
+built after that release. Reproducible product evidence requires version plus
+source provenance and channel.
+
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
 The five most-recurring rules from the issues above:

@@ -1,6 +1,6 @@
 ---
 status: living
-last_updated: 2026-08-10
+last_updated: 2026-08-13
 audience: developer-agents
 authority: state + roadmap + features + aspect-plans for Elefante development
 related:
@@ -186,10 +186,9 @@ verification methods, not product priorities.
 
 | Priority | Customer outcome | Current state | Exit gate |
 |----------|------------------|---------------|-----------|
-| **P0 — Recall works in a normal question** | Install once, ask normally, receive the smallest safe durable context automatically | Candidate verified on 2026-08-10 from the exact macOS client archive: clean Codex session, one automatic read-only Recall, zero shell commands, one relevant memory, correct answer | Repeat on every certified host; publish only with fresh release authorization |
-| **P1 — Installation remains trustworthy** | Global runtime, clear `doctor`, safe upgrade/uninstall, preserved user configuration, immediate rollback | macOS exact-artifact install and rollback backup verified; adapter regression suite green | Host-driven macOS/Windows/Linux install, repair, reconnect, and uninstall evidence |
-| **P2 — Recall quality improves without noise** | Direct answers pass; stale, conflicting, secret, and unrelated memories abstain | Direct-answer contradiction fixed; governed gates and bounded payload verified | Add regressions only for reproduced customer failures; no broad weight tuning |
-| **P3 — Measure broader task lift** | Demonstrate that supplied memory improves outcomes across task classes | Evaluation infrastructure exists; representative causal lift remains `UNKNOWN` | Independently reviewed black-box tasks, then paired runs and randomized order |
+| **P0 — Improve one real memory-dependent task** | The governed memory bundle causes a better accepted answer/action than the current Task Brief v2 path | Evaluation infrastructure exists; the next eligible task and its first failed causal stage are `UNKNOWN` | Freeze one new task, diagnose model-free, implement one repair, then require the pre-registered local causal gate |
+| **P1 — Generalize without losing trust** | Benefit repeats across independent task classes without privacy, authority, scope, contradiction, token, or latency failure | No one-task result establishes representative benefit | Repeat on an independent task, then use a fresh powered design only if both local signals survive |
+| **P2 — Ship a recoverable customer capability** | Supported hosts receive the proven behavior with clear diagnostics and rollback | Published v2.12.2 is stable; later behavior is unreleased | BUG-052 provenance, exact-SHA customer packages, host install/repair/uninstall, docs, and explicit release authority |
 
 ### §3.5 Upcoming (no release or date commitment)
 
@@ -232,9 +231,9 @@ Each row links to the full PRD. **Authority:** the linked file is the source of 
 | Feature | PRD | Status |
 |---------|-----|--------|
 | Host integration surface (daemon, adapters, ownership schema) | [`workspace/proposals/ide-integration-surface.md`](../workspace/proposals/ide-integration-surface.md) | Shared runtime and verified detected-host coverage implemented; additional adapters and certification upcoming |
-| Session intelligence (privacy-respecting telemetry) | [`workspace/proposals/session-intelligence.md`](../workspace/proposals/session-intelligence.md) | DRAFT |
-| Task Intelligence Pipeline (memory governance + bounded Task Briefs + controlled outcome evaluation) | [`workspace/proposals/retrieval-effectiveness.md`](../workspace/proposals/retrieval-effectiveness.md) | Unreleased development implementation exists: authority-aware governance, bounded Task Briefs, a metadata-only invocation/use/outcome ledger, and a sealed real-memory black-box preflight. The surface and pilot are independently default-off; representative product lift remains unproven. |
-| Memory identity | [`workspace/proposals/memory-identity.md`](../workspace/proposals/memory-identity.md) | DRAFT |
+| Session intelligence (privacy-respecting telemetry) | [`workspace/proposals/session-intelligence.md`](../workspace/proposals/session-intelligence.md) | DRAFT — downstream of the existing Task Intelligence ledger; no duplicate usefulness system |
+| Task Intelligence (eligible task → failed-stage diagnosis → one causal repair → behavioral outcome) | [`workspace/proposals/retrieval-effectiveness.md`](../workspace/proposals/retrieval-effectiveness.md) | NORTH STAR — unreleased infrastructure exists; one bounded experiment is specified; the task, failed stage, repair, representative lift, and customer promotion remain gated |
+| Memory identity | [`workspace/proposals/memory-identity.md`](../workspace/proposals/memory-identity.md) | DEFERRED DESIGN REFERENCE — no schema implementation unless Task Intelligence evidence first proves a state/scope failure and local benefit from resolution |
 
 ### §4.3 Released design record
 
@@ -329,9 +328,14 @@ v2.10.0 journal and changelog; reopen only with new user or retrieval evidence.
 ### §5.1 Active blockers
 
 - Task Intelligence has evaluation infrastructure but no demonstrated outcome lift across a representative multi-task corpus.
+- The next independently reviewed real memory-dependent task is not selected,
+  so its first failed causal stage and justified implementation remain
+  `UNKNOWN`.
 - Default Task Brief injection remains blocked until the evaluation proves benefit without unacceptable token cost or regressions.
 - Governance and Task Intelligence lifecycle behavior are implemented only in
   unreleased development. The published v2.12.2 client remains unchanged.
+- BUG-052 must close before installed-candidate evidence or customer promotion,
+  but it does not block the isolated model-free experiment.
 
 ### §5.2 Performance / efficiency improvements
 
@@ -485,6 +489,7 @@ This section is the chronological record of curation events, decisions, and abso
 
 | Date | Event | Driver | Measurement |
 |------|-------|--------|-------------|
+| 2026-08-13 | **Task Intelligence reduced to one evidence-led implementation experiment.** The North Star remains better accepted task outcomes from the smallest safe durable-memory bundle. The next task is selected and diagnosed model-free before code; the first failed causal stage chooses one repair; Memory Identity and scoped state resolution are conditional rather than presumed; the model ceiling is three frozen pairs with explicit local go/stop/inconclusive rules. | The prior PRD still assigned architecture before evidence. Preserved results show retrieval, selection, and delivery can complete while acceptance fails and agent use remains unknown, so state identity is not yet an established root cause. | Documentation-only. The canonical PRD fell from 735 lines to a bounded experiment; no source behavior, schema, live store, installed runtime, benchmark outcome, version, merge, release, or deployment changed. Immediate gate: select one new eligible memory-dependent task and identify its first failed stage without a model run. |
 | 2026-08-09 | **BUG-050 closed the last known Task Intelligence runtime-infrastructure bypass.** Normal search context, the context prompt, explicit Task Briefs, and opt-in tool-response delivery now deep-copy and current-source-check candidates before the same governed compiler runs. | Current-tree adversarial audit reproduced a digest-stale locked memory that the explicit Task Brief blocked but other delivery paths injected. | Independent replay passed all four delivery paths and confirmed no store mutation. Final exact-tree proof: 435 fast tests passed (4 skipped, 1 slow deselected), the isolated slow proof passed, the live MCP lifecycle passed 47/47, eight canaries remained base-fail/fix-pass, model-free sealed preflight remained deterministic at 1,252/1,500 tokens with zero model calls, all three client archives and checksums verified, dashboard build/audit passed, and promotion correctly stayed blocked. Causal effectiveness remains a separate open gate. |
 | 2026-08-09 | **BUG-049 closed evaluator truth-loss paths and produced one valid real-memory functional signal.** V2 source selection now preserves diverse ownership files, declared context chunks, and later validation evidence under the hard budget; test artifacts are safeguards. Failed workspaces are retained by default, schema-v3 filenames bind the complete task contract, and preflight names selected sources. | The first real-memory pair failed without causal clarity. A later treatment changed the correct public surface but one hidden `~/.bob` judge convention—not disclosed by the frozen source or task—turned it into a false failure. | Final model-free Brief: deterministic, 1,252/1,500 tokens, exact durable memory plus host registry, doctor, manifest, and safeguard. Eight canaries still base-fail/known-fix-pass. The preserved treatment patch passes the corrected judge without another model call. This is one-task diagnostic evidence; 23 historical tasks remain invalid, no paired multi-task lift exists, V1 and all runtime flags remain off, and release promotion stays blocked. |
 | 2026-08-08 | **BUG-047/048 production Task Intelligence loop implemented behind two rollback switches.** User/workflow authority is enforced at write, maintenance, and delete boundaries; archive is the default forgetting operation. A default-off 17th development MCP tool now prepares bounded context and records session-bound delivery, declared use, metadata-only outcome, inspection, and retraction without changing ranking. | The prior compiler/evaluator stopped at retrieval and could not prove which governed memory reached which task or outcome. Governance metadata also had no effective authority boundary. | Focused governance/ledger tests pass. The isolated live MCP self-protocol passes 47/47 with the opt-in surface and leaves the user's store untouched. Normal v2.12.2 discovery remains 16 tools; neither feature enablement nor pilot delivery is released or automatic. |

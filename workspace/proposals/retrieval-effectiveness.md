@@ -1,726 +1,387 @@
-# PRD / SDD: Task Intelligence Pipeline
+# North Star / Implementation PRD: Task Intelligence
 
-> Status: EVALUATION INFRASTRUCTURE IMPLEMENTED; MEMORY GOVERNANCE BOUNDARY
-> DEFINED; NO EFFECTIVENESS LIFT PROVEN
+> Status: NORTH STAR — ONE BOUNDED FEASIBILITY EXPERIMENT
 >
-> Owner: planning
+> Product state: governed Recall, Task Brief v2, evaluation, and a metadata-only
+> outcome ledger exist in unreleased development. Representative task lift is
+> not proven.
 >
-> Consumer: Elefante developers building and evaluating retrieval
+> Canonical role: this file owns the Task Intelligence objective, the immediate
+> experiment, its evidence gates, and the boundary to later product work.
 >
-> Loading model: routed from workspace/PLANNING.md section 4.2
->
-> This stable proposal replaces the earlier retrieval-effectiveness sketch in the same canonical file.
+> Current implementation baseline: `7c705ca03371771be68460afb270fe0998f30231`.
+> Published customer release:
+> v2.12.2. This document authorizes neither merge nor release.
 
-## Question
+## 0. Resume contract — do not restart the debate
 
-How can Elefante measurably improve task outcomes by delivering the smallest set
-of trusted, task-relevant memories at the workflow stage where they can change
-the result?
+A future developer starts here, not from the conversation that produced this
+PRD.
 
-## Product decision
+- The objective is accepted: durable memory must measurably improve an eligible
+  task's accepted answer or action.
+- The existing infrastructure is not the missing proof. Do not rebuild Recall,
+  Task Brief v2, governance, the evaluator, or the outcome ledger.
+- Do not rerun the consumed holdout, task 031, or the historical 20/30-task
+  audits as if they were new evidence.
+- Do not implement Memory Identity, Project Truth, Task Capsule, a state schema,
+  or automatic injection first. They are conditional future mechanisms.
+- Do not choose a repair before the first failed causal stage is reproduced.
+- Do not spend model tokens before model-free judge, eligibility, retrieval,
+  selection, delivery, determinism, and no-mutation checks pass.
+- Do not create another PRD or handoff file. Current state belongs in
+  [`../PLANNING.md`](../PLANNING.md); defects belong in
+  [`../ISSUES.md`](../ISSUES.md).
+- The only immediate action is §5 E0, followed by §6 E1. Product code remains
+  unchanged until E1 identifies the failed stage.
 
-Persistence is a mechanism, not the outcome. The outcome is better task
-performance.
+If new evidence contradicts this contract, update this canonical PRD and its
+planning index in the same change. Do not silently route around it.
 
-Elefante will treat task intelligence as a closed, inspectable loop:
+## 1. North Star
 
-1. understand the task and its success criteria;
-2. retrieve candidate memories;
-3. reject stale, contradictory, unsupported, or low-value candidates;
-4. compile a bounded Task Brief with provenance;
-5. deliver each item at planning, execution, or validation time;
-6. measure the task outcome against a no-Brief baseline;
-7. learn only from repeated, attributable evidence.
+> **For an eligible memory-dependent task, Elefante must cause a better accepted
+> answer or action by supplying the smallest safe set of applicable durable
+> memories.**
 
-Elefante does not increase a model's intrinsic intelligence. It can improve the
-model's effective task performance by improving the information available to it.
+A task may be a question, decision, plan, code change, or validation action.
+Persistence, retrieval, lower token use, and agent acknowledgement are not the
+outcome. They are mechanisms or diagnostics.
 
-## Falsifiable hypothesis
+Priority order:
 
-For a defined class of coding tasks, a deterministic Elefante Task Brief will
-increase acceptance-test pass rate or reduce retries and corrections without an
-unacceptable increase in tokens, latency, privacy exposure, or regressions.
+1. privacy, user authority, scope correctness, and recoverability;
+2. observable task correctness;
+3. tokens, retries, corrections, latency, and cost;
+4. retrieval and delivery diagnostics.
 
-If controlled evaluation does not demonstrate that result, the Task Brief must
-not become a default workflow and no public performance claim may be made.
+Efficiency never compensates for unchanged correctness. Correctness never
+compensates for a trust violation.
 
-## Source-grounded starting point
+## 2. Current truth
 
-The current product already provides useful foundations:
+The development baseline already contains:
 
-- CognitiveRetriever ranks candidates with vector, concept, co-activation,
-  authority, and temporal signals.
-- RetrievalExplanation exposes why a candidate surfaced.
-- MemoryMetadata carries source reliability, verification, lifecycle,
-  conflict, supersession, project, workspace, file, and session fields.
-- Kuzu stores explicit relationships and the orchestrator already owns task
-  graph operations.
-- Access counts and co-activation remain historical ranking signals. Ordinary
-  retrieval and Task Intelligence declared-use events do not update them.
+- read-only `elefante-Recall`;
+- one `TaskBriefCompiler` with v1 and v2 profiles;
+- governance, source-currentness, conflict, secret, scope, provenance, and
+  token-budget gates;
+- a default-off Task Intelligence lifecycle;
+- a metadata-only delivery/use/outcome ledger;
+- a paired black-box evaluator and sealed-memory preflight.
 
-Those signals are not proof that a memory improved a task. Neither historical
-access nor co-activation is a causal outcome signal.
-The Task Intelligence Pipeline must preserve that distinction.
+Do not build another compiler, public tool, ledger, store, or prompt framework.
 
-## Memory governance and Task Intelligence boundary
+The evidence boundary is equally important:
 
-Elefante stores memories, but it is not always the authority that decides what
-must be retained or injected. A user may explicitly protect or enforce a memory.
-The product must therefore keep five decisions independent:
+- the first holdout tied at 1/12 versus 1/12: zero correctness lift;
+- later runs produced lower input cost without repeatable correctness lift;
+- one task produced a local 2/3 treatment versus 0/3 control signal but failed
+  the latency gate and did not establish cross-task benefit;
+- one schema-v3 sealed-memory evaluation recorded retrieval, selection, and
+  delivery as complete while acceptance failed and agent use remained `unknown`;
+- the installed Recall proof proves the pipeline, not that Elefante improves diverse tasks.
 
-1. **storage** — whether the memory exists in the local store;
-2. **retention** — whether it is permanent, managed, or ephemeral;
-3. **lifecycle** — whether it is active, dormant, conflicting, superseded, or
-   archived;
-4. **retrieval** — whether it is relevant to the current task;
-5. **injection** — whether it must be delivered to the agent now.
+Therefore, “add more context” is rejected. “Implement Memory Identity first” is
+also not yet justified: no preserved outcome proves that state identity or scope
+resolution was the first causal failure.
 
-Keeping a memory permanently does not require injecting it into every task.
-User enforcement must have an explicit meaning:
+## 3. Immediate decision
 
-- **never forget** — retain permanently; retrieve according to task relevance;
-- **surface on trigger** — deliver whenever its declared scope and trigger match;
-- **always inject** — deliver for every task in scope; reserve this for global
-  directives, safety constraints, and other deliberate user policy.
+Implement **one evidence-led causal repair vertical**. Do not implement the full
+Project Intelligence Control Plane.
 
-The target governance fields are `retention_policy = permanent | managed |
-ephemeral`, `injection_policy = always | triggered | ranked`, a scope and trigger,
-an explicit user lock, and the lifecycle state. The development branch now
-implements the bounded policy fields and pre-ranking gates; they are not yet
-part of the published v2.12.2 client schema. Invocation authority and causal
-utility remain separate contracts.
+The vertical asks one question:
 
-### Two operating modes
+> On one independently reviewed real task, what is the first stage that prevents
+> durable memory from improving the accepted result, and does the smallest repair
+> to that stage produce a repeatable local improvement?
 
-`I use Elefante` and `our workflow uses Elefante` are different operating modes,
-not different memory stores.
-
-**Direct user operation** means the person explicitly asks Elefante to remember,
-retrieve, protect, amend, archive, or delete something. The user is the authority
-for the requested action. Direct retrieval may bypass normal ranking when the
-user identifies a specific memory, but conflicts and provenance must remain
-visible.
-
-**Workflow-mediated operation** means an IDE, agent, or automation calls Elefante
-while planning, executing, or validating a task. The workflow may retrieve and
-deliver context automatically only within the user's governance rules. It must
-not silently create user authority, convert retrieval into reinforcement, delete
-memory, or hide which context was injected.
-
-Both modes use the same local memory and lifecycle model. Each operation must
-carry an `invocation_mode = user_directed | workflow_managed` plus caller, task,
-stage, and scope when available. This invocation context belongs to the operation
-trace, not the semantic content of the memory. The field is target design intent,
-not a released contract.
-
-In workflow-managed mode, Task Intelligence is responsible for candidate
-selection, bounded delivery, and outcome measurement. In user-directed mode,
-Task Intelligence may assist search and explanation, but it must not overrule an
-explicit memory action.
-
-Elefante may warn that an enforced memory conflicts with current source, another
-memory, or the available token budget. It must not silently weaken, archive, or
-override a user-locked memory. Current source remains authoritative for what the
-implementation does; an enforced memory can remain authoritative for user intent.
-
-Forgetting is normally a reversible accessibility transition, not destruction:
+Only one causal chain is in scope:
 
 ~~~text
-active <-> dormant -> archived
+eligible task
+  -> candidate retrieval
+  -> governed selection
+  -> delivery
+  -> agent application
+  -> behavioral acceptance
 ~~~
 
-Dormant memories leave ordinary retrieval but remain searchable. Archived
-memories leave active intelligence but remain recoverable. Deletion requires an
-explicit user action, a privacy requirement, or separately verified garbage.
+The first failed stage chooses the repair. The PRD does not choose a preferred
+architecture in advance.
 
-Task Intelligence begins after those governance rules are applied. Its job is
-to combine mandatory memories with the smallest additional set of trusted,
-task-relevant memories that can improve the current task.
+## 4. Experiment scope
 
-## Memory quality contract
+### In scope
 
-A memory is useful only when it can change a task decision without hiding its
-limits. Storage volume, retrieval frequency, and similarity are not quality.
+- one new, real, memory-dependent task;
+- one pre-existing durable memory that can materially help that task;
+- model-free validation and stage diagnosis before any paid run;
+- one smallest repair to the first reproducible failed stage;
+- deterministic regression tests for that repair;
+- at most three frozen paired runs;
+- preserved task-level evidence and immediate rollback.
 
-### Structure at ingestion
+### Out of scope
 
-Store the smallest durable unit that remains actionable:
+- persistent schema or migration;
+- automatic memory creation, rewriting, reinforcement, or deletion;
+- a new MCP tool or public response field;
+- a second compiler, evaluator, or usefulness ledger;
+- broad Session Intelligence, Project Truth, Task Capsule, Candidate State
+  Delta, Project Mode, team sync, or cloud services;
+- a new holdout, product claim, website change, version, merge, or release.
 
-1. **scope and trigger** — where the memory applies and when it should surface;
-2. **claim or action** — the decision, constraint, dependency, failure, or
-   safeguard the agent can use;
-3. **reason** — why it matters or what failure it prevents;
-4. **provenance** — source, project, workspace, file, line, or user authority;
-5. **confidence and verification** — observed, verified, or explicitly unknown;
-6. **lifecycle** — active, conflicting, superseded, deprecated, or archived.
+[`memory-identity.md`](memory-identity.md) remains a deferred design reference.
+Its schema work activates only if the experiment traces the first failure to
+state/scope ambiguity and a read-only resolver improves the frozen task.
 
-Reject conversational residue, duplicated summaries, unsupported conclusions,
-secrets, task answers, and context that is only temporarily true. Search before
-write; update or supersede an existing memory instead of adding a competing
-copy.
+## 5. E0 — Freeze one eligible task
 
-### Selection and signalling
+The exact task is **UNKNOWN** until it passes every condition below. Do not use
+task 031 or any consumed holdout as new evidence.
 
-Selection is a sequence of gates, not one opaque score:
+The task is eligible only when:
 
-1. valid lifecycle and correct project/workspace scope;
-2. no silently unresolved contradiction;
-3. at least two independent relevance signals, including an action anchor such
-   as a path, symbol, dependency, directive, decision, failure, or safeguard;
-4. positive marginal value beyond already selected evidence;
-5. fit inside the stage token budget; otherwise abstain.
+1. a durable memory existed before the task;
+2. the memory is useful but does not contain the expected answer or patch;
+3. the task has a black-box acceptance check;
+4. the judge fails on the exact base and passes on the known-good reference;
+5. the task and judge expose every required convention without requiring one
+   historical implementation shape;
+6. control and treatment start from equivalent clean state;
+7. current source, tools, model, limits, and mandatory user policy can remain
+   identical across conditions;
+8. the expected memory-to-outcome path survives an adversarial review.
 
-Every selected item must expose its role, provenance, verification state,
-reason for selection, and unresolved conflicts. Current source is authoritative
-for present implementation state; memory supplies durable intent and history.
+Before code changes, bind these values in the existing benchmark contract:
 
-### Management and learning
+- task ID, repository, exact base SHA, and known-good SHA;
+- acceptance command and test digest;
+- observable success condition;
+- durable memory ID, creation time, content digest, and sanitized fixture;
+- expected useful information, without copying the answer;
+- model, reasoning level, tools, timeout, token cap, repetition count, and pair
+  order seed;
+- maximum three pairs and one repair iteration.
 
-- Retrieval is exposure, not reinforcement. Do not promote a memory because it
-  was frequently seen.
-- Outcome attribution starts only after a valid control-versus-treatment task
-  effect exists. Bundle-level lift does not identify which memory caused it.
-- Per-memory learning requires repeated ablation or leave-one-out trials across
-  multiple tasks. One success or failure cannot promote, demote, merge, archive,
-  or delete a memory.
-- Learned utility must be bounded, explainable, reversible, local, and separate
-  from source reliability.
-- Preserve rollback: retain supersession links and archive recoverably; never
-  rewrite historical outcomes.
+If no task passes, stop. The blocker is missing causal evidence, not missing
+architecture.
 
-## Scope
+## 6. E1 — Locate the first failed stage without a model run
 
-The first evaluated scope is coding work that depends on prior project context:
+Use existing code and preserved artifacts first. Generate the current v2 Task
+Brief twice and require byte-identical output. Record:
 
-- architectural and implementation decisions;
-- requirements and constraints;
-- dependency relationships;
-- previous failures and safeguards;
-- stable user or project preferences.
+| Stage | Required evidence | Failure classification |
+|---|---|---|
+| Judge | base fails; known-good passes; exact digest bound | `JUDGE_INVALID` |
+| Eligibility | real prior memory and causal path approved | `TASK_INELIGIBLE` |
+| Retrieval | intended memory is among candidates | `RETRIEVAL_MISS` |
+| Selection | intended memory survives governance and is selected | `SELECTION_MISS` |
+| Delivery | selected ID and bounded content reach treatment | `DELIVERY_MISS` |
+| Application | agent behavior changes in the intended direction | `APPLICATION_MISS` |
+| Acceptance | black-box contract passes | `ACCEPTANCE_FAIL` |
 
-General personal memory, team synchronization, autonomous self-modification,
-and broad claims across every task type are outside the first scope.
+Stop at the first failed stage. Do not tune ranking, add scope machinery, or run
+more repetitions to compensate for an invalid earlier stage.
 
-## Workflow contract
+## 7. E2 — Implement only the demonstrated repair
 
-### 1. Task intake
+### Common contract
 
-A benchmark or opted-in client supplies:
+Every allowed repair must:
 
-- task identifier;
-- task statement;
-- observable success criteria;
-- repository or project scope;
-- optional token budget;
-- workflow stage: planning, execution, or validation.
+- reuse `TaskBriefCompiler`, Task Brief v2, the existing evaluator, and the
+  existing outcome record;
+- be deterministic and read-only through retrieval, selection, and delivery;
+- preserve memory IDs, provenance, governance, conflict, and token limits;
+- preserve exact current behavior when disabled;
+- default off;
+- add no persistent schema in this experiment.
 
-The system must reject evaluation tasks without observable success criteria.
+### Repair routing
 
-### 2. Candidate retrieval
+| First failure | Smallest allowed repair | Primary files |
+|---|---|---|
+| `RETRIEVAL_MISS` | Correct candidate generation for the reproduced query; no selector rewrite | `src/core/retrieval.py`, existing retrieval tests |
+| `SELECTION_MISS` caused by ordinary relevance/budget | Correct the existing v2 selector at the failing gate | `src/core/task_intelligence.py`, `tests/test_task_intelligence.py` |
+| `SELECTION_MISS` caused by state/scope ambiguity | Add the evaluation-only read-only resolver in §8 | `src/core/task_intelligence.py`, new focused resolver tests |
+| `DELIVERY_MISS` | Repair the existing Task Brief/evaluator handoff | `scripts/ci/run_task_intelligence_evaluation.py`, evaluator tests |
+| `APPLICATION_MISS` | Improve evidence rendering inside the existing Task Brief only if an ablation proves the representation caused the miss | `src/core/task_intelligence.py`, focused rendering tests |
+| `JUDGE_INVALID` or `TASK_INELIGIBLE` | Fix or reject the task; no product code | benchmark contract and verifier only |
 
-The frozen v1 profile uses the existing retrieval engine. The opt-in v2 profile
-adds a deterministic pre-filter over the task's pre-fix repository snapshot,
-then uses the existing semantic model for reranking. The profiles and outcome
-files remain separate so v1 can be reproduced exactly.
+Do not combine repairs. If two stages fail, repair the earlier stage and rerun
+model-free preflight before evaluating the next.
 
-V2 source candidates retain file, line, heading, and symbol lineage; normalize
-common plural forms; diversify files; and exclude demo, historical archive,
-build, dependency, and benchmark material. Snapshot source is labelled observed
-and unverified: current code proves what exists, not that buggy code is correct.
+## 8. Conditional resolver contract
 
-Apply deterministic gates in this order:
+This section applies **only** when E1 proves a state/scope selection failure.
 
-1. remove archived and deprecated memories;
-2. isolate the requested project or repository when that scope is known;
-3. surface unresolved conflicts rather than choosing a side silently;
-4. retain verified specifications, directives, and explicit constraints first;
-5. retain relevant decisions, dependencies, failures, and safeguards second;
-6. add supporting context only while the Task Brief remains inside budget;
-7. expand the graph by at most one relationship hop using an explicit allowlist;
-8. record why every selected and rejected candidate was handled that way.
+### No-schema input
 
-More context is not automatically better. Token budget is a product constraint.
-
-### 3. Task Brief
-
-The Task Brief is an inspectable context packet, not a free-form summary.
-
-Minimum contract:
+Use a sealed evaluation overlay keyed by existing memory ID. Do not alter the
+live memory or `MemoryMetadata`.
 
 ~~~json
 {
-  "task_id": "local identifier",
-  "task_summary": "bounded task statement",
-  "success_criteria": ["observable condition"],
-  "stage": "planning | execution | validation",
-  "token_budget": 0,
-  "evidence": [
-    {
-      "memory_id": "uuid",
-      "role": "constraint | decision | dependency | failure | safeguard | implementation | context",
-      "reason_selected": "human-readable explanation",
-      "source": "provenance reference",
-      "verified": true,
-      "conflict_ids": [],
-      "retrieval_signals": {}
-    }
-  ],
-  "unresolved_conflicts": [],
-  "omitted_candidate_count": 0
+  "memory_id": "existing-uuid",
+  "subject": "bounded subject",
+  "predicate": "bounded predicate",
+  "assertion_role": "governing | observed | supporting",
+  "scope": {"dimension": "normalized value"},
+  "normalized_value": "reviewed value",
+  "supersedes": []
 }
 ~~~
 
-Every evidence item must retain its memory identifier and provenance. A Brief
-must never present generated synthesis as if it were stored evidence.
+Only scope dimensions required by the frozen task are allowed. No universal
+scope taxonomy is designed in this experiment.
+
+### Pure output
+
+~~~json
+{
+  "status": "READY | REQUIRES_SCOPE | UNRESOLVED_CONFLICT",
+  "applicable_memory_ids": [],
+  "excluded": [{"memory_id": "...", "reason": "..."}],
+  "conflicts": []
+}
+~~~
+
+### Resolution rules
 
-### 4. Delivery timing
+1. Apply existing lifecycle, authority, and privacy gates first.
+2. Match the task scope; exact values outrank wildcards.
+3. Group state assertions by `project + subject + predicate + normalized scope`.
+4. A governing assertion defines intent; an observed assertion can support or
+   contradict it but cannot silently replace it.
+5. Incompatible active governing values at the same exact key return
+   `UNRESOLVED_CONFLICT`.
+6. Missing scope needed to choose between incompatible claims returns
+   `REQUIRES_SCOPE`.
+7. Supporting history cannot define governing state.
+8. Resolution does not mutate memory, graph, access, co-activation, ranking, or
+   the overlay.
 
-- Planning receives requirements, constraints, decisions, and known blockers.
-- Execution receives file, dependency, pattern, and prior-failure evidence.
-- Validation receives success criteria, safeguards, and relevant regressions.
+### Code interface
 
-Phase 1 may generate all three packets in shadow mode. Automatic injection is
-not authorized until controlled evaluation passes.
+Add a pure `TaskStateResolver` beside the existing compiler in
+`src/core/task_intelligence.py`. The existing compile path receives an optional
+sealed state contract; `None` must preserve current output exactly. The
+evaluator supplies the contract only to the resolved-treatment condition.
+
+Do not edit `src/models/memory.py` or expose the resolver through
+`src/mcp/server.py` during this experiment.
+
+## 9. E3 — Deterministic proof
+
+Write the failing test before the repair. The smallest required set is:
+
+1. exact reproduction of the selected stage failure;
+2. intended memory is retrieved, selected, or delivered after the repair;
+3. wrong-scope or contradictory memory does not replace it;
+4. feature-off output equals the pre-change output;
+5. two identical runs produce identical IDs, ordering, reasons, and rendered
+   context;
+6. memory, graph, access count, co-activation, ranking, and ledger remain
+   unchanged during preflight;
+7. hard token and evidence-item limits still hold;
+8. existing Task Intelligence and evaluator tests remain green.
+
+If the conditional resolver is used, add focused tests for exact-scope match,
+wildcard fallback, missing scope, governing/observed mismatch, same-key
+conflict, and no mutation.
+
+No model run is allowed until all deterministic checks pass.
+
+## 10. E4 — Causal component test
+
+Extend the existing evaluator; do not create another harness.
+
+- **Control:** current Task Brief v2 on the frozen task.
+- **Treatment:** the same Task Brief v2 plus only the demonstrated repair.
+- **Held constant:** task, base state, mandatory user policy, model, reasoning,
+  tools, prompt protocol, budget, timeout, and acceptance judge.
+- **Order:** seeded paired order fixed before execution.
+- **Ceiling:** three valid pairs; abort on an invalid judge, failed delivery,
+  infrastructure failure, or trust violation.
+
+The outcome record must bind the task contract and record retrieval, selection,
+delivery, execution, and acceptance. It must not store raw prompts, responses,
+memory bodies, source diffs, or secrets.
+
+### Decision rule
+
+This is a local feasibility gate, not product proof.
+
+- **LOCAL GO:** treatment passes 3/3, control passes 0/3, the intended memory is
+  selected and delivered in every treatment, the behavioral difference follows
+  the pre-registered causal path, and all hard constraints pass.
+- **STOP:** the repair does not change the intended stage, treatment passes 0/3,
+  or any privacy, authority, scope, contradiction, mutation, or rollback rule
+  fails.
+- **INCONCLUSIVE:** every other result. Permit one repair iteration only when a
+  deterministic trace exposes a reproducible defect. Do not weaken the judge or
+  decision rule after seeing results.
+
+Tokens or latency may break a `LOCAL GO`; they cannot create one.
+
+## 11. Rollback
+
+- The experiment flag defaults off.
+- Feature-off behavior remains the current v2 path.
+- No persistent schema or live store changes exist to undo.
+- Evaluation uses disposable repository state and a sanitized sealed fixture.
+- Failed workspaces and immutable outcomes remain available for diagnosis.
+- Revert the single repair commit to remove the experiment; do not rewrite
+  shared history.
 
-### 5. Outcome record
+## 12. Exit and next decision
 
-The evaluation layer records metadata, not raw transcripts:
+### If `STOP`
 
-- task and evaluation identifiers;
-- baseline or Task Brief condition;
-- model, version, tool configuration, and run seed when supported;
-- memory identifiers delivered;
-- acceptance-test result;
-- retries or recovery turns;
-- human corrections;
-- input and output token counts;
-- wall-clock duration;
-- explicit failure category.
+Preserve the evidence, reject the tested mechanism, and choose no replacement
+until a different first-stage failure is demonstrated.
 
-Outcome records remain local and use bounded retention. Raw prompts, responses,
-secrets, and full memory bodies are not duplicated into outcome telemetry.
+### If `INCONCLUSIVE`
 
-## Measurement protocol
+Do not expand architecture or buy more runs. Diagnose the recorded stage trace.
 
-### Benchmark construction
+### If `LOCAL GO`
 
-1. Select at least 30 real, reproducible coding tasks from at least three task
-   classes.
-2. Freeze repository inputs, test commands, and success criteria before running.
-3. Separate calibration tasks from a holdout set.
-4. Prevent benchmark answers or expected patches from entering retrieval memory.
-5. Run at least three paired repetitions per condition when model
-   nondeterminism is present.
-
-### Controlled comparison
-
-For each task, keep the model, model version, tools, repository state, system
-instructions, and limits equal.
-
-- Control: current workflow without a Task Brief.
-- Treatment: identical workflow with the deterministic Task Brief.
-- Run order: randomized within each pair.
-
-An LLM judge may provide diagnostics but cannot be the primary success measure.
-Maintained tests or explicit human acceptance determine task success.
-
-### Metrics
-
-Primary:
-
-- acceptance-test pass rate.
+The repair earns only the next experiment:
 
-Secondary:
-
-- retries or recovery turns;
-- human corrections;
-- total tokens;
-- time to accepted result;
-- task failures caused by stale or contradictory context;
-- selected context per successful task.
-
-### Promotion gate
-
-Default injection is allowed only when the holdout evaluation shows either:
-
-- at least a 10 percentage-point pass-rate improvement; or
-- at least a 20 percent reduction in retries or corrections with non-inferior
-  pass rate;
-
-and the paired 95 percent confidence interval for the chosen improvement
-excludes zero.
-
-There must also be no material privacy, contradiction, latency, token, or
-regression failure. If the dataset is too small for credible confidence, the
-result remains exploratory.
-
-## Delivery phases
-
-### Phase 0: Benchmark contract
-
-- Choose the initial task class.
-- Freeze fixtures, acceptance commands, metrics, and promotion thresholds.
-- Add a leakage check proving expected answers are absent from memory.
-- Produce a baseline report before changing retrieval.
-
-Exit: benchmark is reproducible and baseline results are stored.
-
-Current Phase 0 evidence (2026-08-05):
-
-- `benchmarks/task_intelligence/tasks.json` freezes 30 real historical tasks:
-  ten installation/distribution, ten dashboard-data-integrity, and ten
-  runtime-safety/trust tasks.
-- Each task pins its pre-fix commit, fix commit, exact pytest acceptance node,
-  success criterion, and answer-isolated context paths from the pre-fix tree.
-- Calibration contains 18 tasks and holdout contains 12. Tasks from the same
-  fix commit cannot cross the split boundary.
-- The first budget is 1,500 estimated tokens total: 450 planning, 750
-  execution, and 300 validation; at most eight evidence items and one graph
-  hop. This is a benchmark limit, not a product default.
-- `scripts/ci/verify_task_intelligence_benchmark.py` verifies commit ancestry,
-  executable acceptance nodes, context availability, split isolation, the SDD
-  thresholds, memory-export answer leakage, and metadata-only outcome records.
-- Local outcome files and temporary benchmark worktrees are gitignored. Raw
-  prompts, responses, memory bodies, and transcripts are not valid outcome
-  fields.
-
-The historical Phase 0 record is complete, but it is not promotion-ready. Its
-implementation-coupled acceptance tests remain diagnostic evidence only. The
-frozen evaluator is `gpt-5.6-terra`, low reasoning,
-through `codex-cli 0.147.0-alpha.1.2` and the `task-intelligence-v1` prompt
-profile. The 18-task calibration baseline ran once under a 10.8 million total
-input-token ceiling and a 1.8 million uncached-input ceiling. It passed 6 of 18
-tasks (33.3 percent), using 4,971,429 input tokens, of which 4,329,216 were
-cached, plus 54,096 output tokens. The local metadata-only outcomes remain
-gitignored. This one-repetition calibration result establishes headroom and
-compute cost; it is not promotion evidence.
-
-### Phase 1: Deterministic Task Brief generator
-
-- Build an internal service over the existing retriever and graph.
-- Add contract tests for lifecycle filtering, project isolation, conflict
-  surfacing, graph-hop limits, provenance, and token budget.
-- Generate Briefs in shadow mode only.
-- Do not add or change the public MCP surface in this phase.
-
-Exit: identical inputs produce an equivalent ordered Brief and no memory is
-mutated.
-
-Phase 1 is complete in shadow mode. `src/core/task_intelligence.py` provides a
-pure deterministic compiler and a read-only service over the current hybrid
-retriever and one-hop graph. It excludes deprecated, archived, superseded,
-low-reliability, low-score, cross-project, and cross-workspace evidence;
-surfaces stored conflicts without choosing a winner; retains provenance; and
-enforces the frozen per-stage and eight-item limits. Shadow search disables
-temporal reinforcement, so generating a Brief does not increment access counts
-or mutate memory. There is no public MCP method and no automatic injection.
-
-The answer-isolated evaluation path creates local embeddings only from context
-files at each task's pre-fix commit. It uses the current local GTE embedding
-model and CognitiveRetriever, forbids model-hub network access, and scans the
-resulting corpus for acceptance-answer markers before generating a Brief.
-
-### Phase 2: Controlled evaluation
-
-- Execute randomized paired baseline and treatment runs.
-- Produce a local evaluation report with task-level evidence.
-- Review every regression and every context-caused failure.
-
-Exit: promotion gate passes, or the design returns to Phase 1.
-
-Phase 2 stopped after the first paired repetition on all 12 holdout tasks. The
-committed evaluator at `fa04f2b` ran 24 model trials with seed `20260805`.
-Baseline and Task Brief each passed 1 of 12 tasks (8.3 percent): zero pass-rate
-lift with a paired 95 percent interval of `[0, 0]`. Treatment used 16.3 percent
-fewer total input tokens and finished 1.9 percent faster, but uncached input
-rose 2.9 percent. The cost gate passed; the effectiveness and promotion gates
-failed.
-
-The remaining 24 pairs (48 model trials) were not run because the preliminary
-result showed no correctness signal. The inspected holdout is now diagnostic
-evidence and must not be reused as fresh promotion evidence after tuning.
-Iteration returns to Phase 1 and calibration tasks only. Before another final
-evaluation, freeze a new answer-isolated holdout.
-
-Observed Briefs frequently surfaced broad documentation instead of precise
-task-local implementation evidence. The next revision must:
-
-1. retrieve source-grounded implementation evidence, not documentation alone;
-2. retain heading and file-path context so fragments remain meaningful;
-3. require lexical, path, or dependency relevance and abstain when evidence is
-   too weak;
-4. prove lift on calibration before consuming a new holdout.
-
-No public MCP method, automatic injection, client pilot, website claim, or
-performance claim is authorized by this result.
-
-### Phase 1 v2 audit and pilot (2026-08-06)
-
-V2 fixes the observed retrieval mechanism defects: source-grounded candidates,
-heading/symbol lineage, per-file diversity, independent relevance signals,
-explicit roles, unresolved-conflict exclusion, graph relationship allowlisting,
-and abstention when evidence cannot justify an action. A maintained calibration
-audit reached a historical changed implementation file in the top ten for
-18/18 calibration tasks. This is navigation evidence only, not outcome proof.
-
-One paired calibration pilot on `install-host-routing-003` failed acceptance in
-both conditions. Treatment used 244,365 input tokens in 64,077 ms; control used
-448,324 input tokens in 92,263 ms. Lower cost did not improve correctness.
-
-Adversarial review found the governing benchmark defect: the task asked for
-host-family isolation, while its hidden test required an undisclosed new module,
-exact function names, and exact constants. Review of the then-30-task historical manifest found similar
-private-API, source-substring, exact-message, or arbitrary-threshold coupling in
-many tests. A behaviorally correct alternative can fail, so the historical
-manifest is now explicitly diagnostic-only and cannot satisfy promotion.
-
-The next benchmark revision must use black-box CLI/API/filesystem/browser
-assertions, explicit observable contracts, exact rollback refs, and an
-independent adversarial review bound to the hidden-test SHA-256. It also needs
-enough validated tasks for credible confidence. `--require-promotion-ready`
-fails closed until those contracts exist. No additional holdout or model runs
-are justified before that repair.
-
-### Black-box causal canaries (2026-08-06)
-
-Seven replacement fixtures now test observable installer startup and dry-run
-containment, dashboard CORS and null-data behavior, restore path and archive
-integrity, and factory-reset containment. Each fixture fails at its pinned base
-ref and passes at its pinned known-good ref; its reviewed digest is bound into
-the manifest. The remaining 23 historical tasks are still
-ineligible, so the benchmark remains diagnostic-only.
-
-The repaired canaries did not prove Task Intelligence effectiveness. CORS tied
-at 3/3 passes in both conditions. Restore still failed after the disclosed
-golden-path memory ID was confirmed in the treatment Brief. The current source
-retrieval diagnostic reaches a historical repair path in 16/18 calibration
-tasks, but this is navigation evidence only.
-
-A later controlled restore run completed all three pairs with the same frozen
-model, tools, task, seed, and v2 Brief profile. Control passed 0/3; treatment
-passed 2/3. Treatment used 20.8 percent fewer total input tokens and 33.9
-percent fewer uncached input tokens, but 44.5 percent more output tokens and
-35.9 percent more wall time. The 25 percent duration ceiling therefore failed.
-Because this is one task cluster, no cross-task confidence interval is valid;
-the evaluator now returns `null` instead of a degenerate interval and blocks
-effectiveness and promotion gates. This result supports further calibration,
-not default injection or a public claim.
-
-Three newer controlled calibration tasks did not reproduce a correctness lift.
-Dashboard null-data handling tied at 3/3 while treatment used 18.5 percent fewer
-input tokens and 15.7 percent less model time. Restore path containment tied at
-3/3 while treatment used 26.0 percent fewer input tokens and 0.8 percent less
-model time. Factory-reset containment failed in both conditions in one bounded
-pair; treatment used 40.1 percent fewer input tokens and 31.9 percent less model
-time. These are efficiency observations, not intelligence improvement. The
-factory-reset Brief selected seven code/test excerpts but no durable memory
-carried the missing runtime-configuration boundary; delivery alone therefore
-did not change correctness. No further model run is justified without a real,
-pre-existing user or workflow memory that is relevant to an independently
-reviewed task.
-
-The evaluator now fails closed when the Codex CLI exits without a measurable
-attempt, isolates inherited configuration, uses short temporary workspaces,
-and records unavailable retry/correction measurements as `null`. The frozen
-seed controls pair order only; it does not seed model generation.
-
-The delivered stage trace distinguishes judge validity, retrieval, selection,
-delivery, repository changes, and black-box acceptance using bounded metadata
-and SHA-256 evidence. It stores no prompt, response, memory body, or source
-diff. Direct evidence that the agent cognitively used a delivered memory is not
-observable and remains `UNKNOWN`; causal outcome lift must come from repeated
-paired results, not self-report.
-
-The pipeline self-test executes every eligible canary at both exact refs and
-requires base-fail/known-fix-pass. Model execution against invalid historical
-judges is blocked by default. Legacy outcome records remain readable but cannot
-pass promotion without complete stage traces.
-
-No fresh holdout is justified until enough independently reviewed black-box
-tasks exist and calibration demonstrates lift. This is a benchmark-population
-and product-effect gate, not missing evaluation infrastructure.
-
-### Phase 3: Opt-in workflow pilot
-
-- Select the smallest compatible client integration.
-- Require explicit opt-in.
-- Expose the Brief and provenance before injection.
-- Provide an immediate disable and rollback path.
-- Measure real tasks without storing raw transcripts.
-
-Exit: pilot confirms benchmark lift without new trust or workflow failures.
-
-### Phase 4: Utility learning
-
-This phase is not authorized by this SDD. It requires a separate design review.
-
-Only after sufficient attributable outcomes may Elefante adjust per-memory
-utility. One task cannot promote, demote, merge, or delete a memory. Learned
-weights must be bounded, explainable, reversible, and tested against a frozen
-baseline.
-
-## Failure modes and required controls
-
-| Failure | Required control |
-|---|---|
-| Too much context degrades reasoning | hard token budget and omission report |
-| Stale memory overrides current code | lifecycle filter, provenance, and current-source validation |
-| Conflicting memories are silently resolved | explicit conflict section; no automatic winner |
-| Evaluation answers leak into memory | pre-run leakage scan and isolated benchmark store |
-| Model variation is mistaken for product lift | paired repetitions and randomized order |
-| Frequently retrieved is mistaken for helpful | task outcome is primary; access count is not |
-| Feedback corrupts trusted memory | no automatic mutation before Phase 4 |
-| Telemetry captures private content | metadata-only local records with bounded retention |
-| One workflow improves while another regresses | task-class reporting; no global claim |
-
-## Spec-driven implementation procedure
-
-1. Freeze this SDD and record unresolved decisions.
-2. Perform a source and leakage-surface audit before choosing interfaces.
-3. Decide the internal Task Brief and outcome-record schemas.
-4. Write contract tests before the generator.
-5. Build the deterministic generator without public API changes.
-6. Establish the no-Brief baseline.
-7. Run shadow-mode Brief generation and inspect provenance and conflicts.
-8. Run the paired holdout evaluation.
-9. Publish the evidence internally and make a go, revise, or stop decision.
-10. Only after promotion approval, specify the smallest opt-in client surface.
-11. Update released user documentation only when functionality actually ships.
-12. Make public performance claims only when linked to a maintained evaluation.
-
-## Acceptance for this SDD
-
-The design is ready for implementation planning when:
-
-- one initial task class and at least 30 candidate tasks are identified;
-- every task has an executable or explicit acceptance criterion;
-- every promotion task has a reviewed black-box acceptance contract and its
-  exact pre-change and known-good commit refs;
-- the Task Brief schema and budget policy are approved;
-- the benchmark leakage scan exists;
-- control and treatment runs can use identical environments;
-- privacy and rollback paths are testable;
-- implementation ownership and compute budget are assigned.
-
-Those design gates produced the current unreleased implementation. Release
-promotion is a separate gate: the website must not market Task Intelligence as
-shipped or effective until a fresh representative holdout passes.
-
-## Exact rollback
-
-- V1 remains the default Task Brief profile.
-- Pass `--brief-profile v1` to reproduce the frozen evaluator.
-- V2 uses `__brief-v2` outcome filenames and separate disposable worktrees.
-- Schema-v3 filenames bind the complete task contract; a task or judge edit
-  creates a new path instead of reusing stale evidence.
-- Remove `ELEFANTE_TASK_INTELLIGENCE_ENABLED` to hide the development tool.
-  Remove `ELEFANTE_TASK_INTELLIGENCE_PILOT` to stop context delivery while
-  retaining shadow traces. Remove `ELEFANTE_TASK_CONTEXT_ON_TOOL_CALL` to stop
-  automatic eligible-tool delivery independently. None is present in the
-  released client.
-- Historical outcome records and commits are immutable. Never rewrite them to
-  make a later design appear successful.
-
-## Developer continuation guide
-
-### Customer Recall golden path (separate from the evaluation pilot)
-
-The unreleased candidate now proves the smallest customer outcome directly:
-install the exact client archive, ask a normal question in a clean Codex
-directory, and receive the correct durable fact through one automatic read-only
-`elefante-Recall` call. The verified 2026-08-10 run executed no shell command,
-selected one memory, emitted only seven response fields, and answered
-`Indigo-Echo`. This validates availability, routing, authorization, governed
-selection, and payload economy for one real path. It does **not** establish
-representative Task Intelligence lift or authorize a release claim.
-
-### Verified state
-
-- The deterministic Task Brief compiler, metadata-only outcome records, stage
-  traces, paired evaluator, promotion report, fail-closed judge gate, and exact
-  rollback path exist.
-- Eight CLI/API/filesystem canaries have reviewed black-box contracts. The other
-  23 historical tasks are implementation-coupled and cannot support promotion.
-- One canary is bound to a digest-sealed export of a real durable memory. Its
-  model-free preflight proves base failure, known-fix success, exact memory
-  selection, deterministic rendering, 1,252/1,500 tokens, and no answer
-  leakage. The selected portfolio is the durable constraint, canonical host
-  registry, doctor target, manifest verification, and a validation safeguard.
-- One capped treatment diagnostic changed only `doctor.py`. Its first verdict
-  exposed a hidden `~/.bob` judge convention absent from the frozen contract.
-  After replacing that convention with the existing platform-specific Bob root,
-  the canary still failed on base, passed on the known fix, and the preserved
-  treatment patch passed. This is a valid one-task functional signal, not a
-  paired or cross-task lift estimate.
-- One three-pair restore trial improved acceptance from 0/3 to 2/3 and reduced
-  input tokens, but increased output tokens and duration. It is a useful local
-  signal, not proof of general lift.
-- A 17th development MCP tool now closes prepare, delivery, declared-use,
-  outcome, inspection, and retraction in a local metadata-only ledger. It is
-  absent by default and pilot delivery has a second kill switch.
-- V1 remains the default. There is no automatic host interception, released
-  product claim, or authorized ranking/learning mutation.
-
-### Remaining source findings that must not be normalized as intended behaviour
-
-The 2026-08-06 documentation audit reconciled the active relevance formula with
-`docs/reference/scoring.md` and added a regression guard. The remaining product
-contract gaps are:
-
-1. Specifications and directives have a zero type decay rate, but the independent
-   freshness term still reduces their vitality.
-2. **Resolved in unreleased development:** retrieval and delivery are read-only.
-   Trace-bound declared use is reversible observational data and does not update
-   access, co-activation, or ranking.
-3. **Resolved in unreleased development:** bounded results and Task Briefs expose
-   provenance, lifecycle, conflict, scope, selection reason, and current-source
-   state; secret-shaped legacy content is withheld.
-4. **Resolved in unreleased development:** user/workflow authority, protected
-   retention, triggered/always injection, archive-first forgetting, and
-   protected-refinery behavior have contract tests.
-5. The remaining gap is causal outcome evidence. One real-memory preflight
-   proves the pipeline, not that Elefante improves diverse tasks.
-
-These are contract gaps. Do not repair them by tuning weights or changing decay
-constants in isolation.
-
-### Required implementation order
-
-1. Preserve task 031 as calibration evidence; do not rerun it merely to replace
-   the invalidated pre-repair verdict. Do not spend on the 23 invalid judges.
-2. Add independently reviewed real-memory canaries from other task classes.
-   Each fixture must preserve source digest, lifecycle review, privacy review,
-   and a base-fail/known-fix-pass behavioral judge.
-3. Run paired calibration only after each deterministic preflight proves the
-   target, ownership chain, safeguard, deterministic budget, and judge contract.
-   Diagnose judge, retrieval, selection, delivery, execution, and acceptance;
-   a tie or failure returns to the failed stage rather than buying repetitions.
-   Require
-   repeatable correctness lift within token and latency limits.
-4. Freeze a new untouched holdout after calibration. Never reuse the consumed
-   preliminary holdout for promotion.
-5. Keep all three runtime switches off and all claims internal until that holdout
-   passes; then review the smallest customer release surface separately.
-
-### How another developer can help safely
-
-- Start with this file, `workspace/PLANNING.md`, `workspace/ISSUES.md` BUG-044,
-  BUG-049, and BUG-050, and `workspace/postmortems/ai-behavior.md` Issues 13,
-  17, and 18.
-- Read `src/models/memory.py`, `src/core/retrieval.py`,
-  `src/core/orchestrator.py`, `src/core/sqlite_vector_store.py`, and
-  `src/mcp/server.py` before changing behaviour.
-- Work on one bounded contract at a time and preserve V1 as the rollback path.
-- Never test workflow automation by weakening direct user authority. Use the same
-  store, but assert the invocation mode and its permitted side effects.
-- Record unknowns as `UNKNOWN`; do not infer usefulness from similarity, access
-  count, co-activation, or a single successful task.
-- Keep this work in the developer workspace until controlled evidence authorizes
-  a released user contract.
-
-## Relationship to Session Intelligence
-
-Task Intelligence now owns its minimal local invocation/use/outcome ledger.
-Session Intelligence must not duplicate that schema or become remote analytics.
-Any future integration should consume metadata-only summaries after a separate
-privacy and retention review.
+1. reproduce benefit on a second independent memory-dependent task;
+2. then test multiple task classes with a pre-registered powered design;
+3. only after representative lift, design persistent identity or runtime
+   integration if the proven mechanism requires it;
+4. close BUG-052 before installed-candidate evidence or any release claim;
+5. complete customer artifact, host, privacy, rollback, and release gates under
+   separate explicit authority.
+
+No one-task result authorizes automatic injection, marketing, merge, version,
+tag, release, or deployment.
+
+## 13. Implementation checklist
+
+- [ ] E0 task and exact evidence contract approved.
+- [ ] E1 first failed stage recorded from model-free preflight.
+- [ ] One repair selected from the routing table.
+- [ ] Failing deterministic regression included with the repair change.
+- [ ] Feature-off equivalence and no-mutation proof pass.
+- [ ] Existing focused Task Intelligence suites pass.
+- [ ] Exact capped paired plan reviewed before execution.
+- [ ] Result classified `LOCAL GO`, `STOP`, or `INCONCLUSIVE` without changing
+      the rule.
+- [ ] Evidence and current state recorded in canonical developer surfaces.
+
+## 14. Immediate goal
+
+> **Your goal is to select and freeze one new eligible memory-dependent task,
+> run the existing model-free preflight, and identify the first failed causal
+> stage. Do not change product code until that stage is known.**
+
+This is the smallest action that can justify an implementation instead of
+another architecture hypothesis.
