@@ -20,8 +20,8 @@ def test_task_intelligence_manifest_is_reproducible_and_leak_free() -> None:
     assert report["holdout_count"] > 0
     assert report["diagnostic_only"] is True
     assert report["promotion_ready"] is False
-    assert report["promotion_eligible_tasks"] == 8
-    assert len(report["invalid_tasks"]) == report["task_count"] - 8
+    assert report["promotion_eligible_tasks"] == 9
+    assert len(report["invalid_tasks"]) == report["task_count"] - 9
     invalid_ids = {item["task_id"] for item in report["invalid_tasks"]}
     assert {
         "install-clean-bootstrap-002",
@@ -49,7 +49,7 @@ def test_black_box_canary_verifier_proves_base_and_known_fix(capsys) -> None:
     report = json.loads(capsys.readouterr().out)
 
     assert result == 0
-    assert len(report["canary_verification"]) == 8
+    assert len(report["canary_verification"]) == 9
     assert all(item["base_rejected"] for item in report["canary_verification"])
     assert all(item["known_fix_accepted"] for item in report["canary_verification"])
     assert all(item["passed"] for item in report["canary_verification"])

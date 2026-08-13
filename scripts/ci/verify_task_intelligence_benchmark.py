@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 from collections import Counter, defaultdict
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -176,8 +177,9 @@ def validate_memory_fixture(task: dict[str, Any], repo_root: Path) -> list[str]:
         payload = json.loads(raw)
     except (UnicodeDecodeError, json.JSONDecodeError):
         return [*errors, "sealed memory fixture is not valid JSON"]
-    if payload.get("schema_version") != 1:
-        errors.append("sealed memory fixture schema_version must be 1")
+    schema_version = payload.get("schema_version")
+    if schema_version not in {1, 2}:
+        errors.append("sealed memory fixture schema_version must be 1 or 2")
     if task.get("id") not in payload.get("task_ids", []):
         errors.append("sealed memory fixture is not bound to this task")
     source = payload.get("source")
@@ -204,6 +206,126 @@ def validate_memory_fixture(task: dict[str, Any], repo_root: Path) -> list[str]:
             "specification",
         }:
             errors.append("sealed memory fixture memory_type is invalid")
+        if schema_version == 2:
+            metadata = memory.get("metadata")
+            overlay = memory.get("evaluation_overlay")
+            if not isinstance(metadata, dict):
+                errors.append("schema v2 sealed memory fixture metadata is absent")
+            else:
+                required_metadata = {
+                    "created_at",
+                    "last_modified",
+                    "category",
+                    "project",
+                    "workspace",
+                    "status",
+                    "verified",
+                    "deprecated",
+                    "archived",
+                    "conflict_ids",
+                    "retention_policy",
+                    "injection_policy",
+                    "scope",
+                    "trigger",
+                    "user_locked",
+                }
+                missing_metadata = required_metadata - set(metadata)
+                errors.extend(
+                    f"schema v2 sealed memory fixture metadata missing {field}"
+                    for field in sorted(missing_metadata)
+                )
+                for field in ("created_at", "last_modified"):
+                    try:
+                        datetime.fromisoformat(str(metadata.get(field, "")))
+                    except ValueError:
+                        errors.append(
+                            f"schema v2 sealed memory fixture {field} is invalid"
+                        )
+                if metadata.get("status") not in {
+                    "new",
+                    "redundant",
+                    "contradictory",
+                    "related",
+                    "consolidated",
+                    "refined",
+                    "verified",
+                    "deprecated",
+                    "archived",
+                }:
+                    errors.append("schema v2 sealed memory fixture status is invalid")
+                if metadata.get("retention_policy") not in {
+                    "managed",
+                    "permanent",
+                    "ephemeral",
+                }:
+                    errors.append(
+                        "schema v2 sealed memory fixture retention_policy is invalid"
+                    )
+                if metadata.get("injection_policy") not in {
+                    "ranked",
+                    "triggered",
+                    "always",
+                }:
+                    errors.append(
+                        "schema v2 sealed memory fixture injection_policy is invalid"
+                    )
+                for field in ("verified", "deprecated", "archived", "user_locked"):
+                    if not isinstance(metadata.get(field), bool):
+                        errors.append(
+                            f"schema v2 sealed memory fixture {field} must be boolean"
+                        )
+                if not isinstance(metadata.get("conflict_ids"), list) or not all(
+                    isinstance(item, str) for item in metadata.get("conflict_ids", [])
+                ):
+                    errors.append(
+                        "schema v2 sealed memory fixture conflict_ids must be strings"
+                    )
+                if not isinstance(metadata.get("trigger"), list) or not all(
+                    isinstance(item, str) for item in metadata.get("trigger", [])
+                ):
+                    errors.append(
+                        "schema v2 sealed memory fixture trigger must be strings"
+                    )
+            if not isinstance(overlay, dict):
+                errors.append(
+                    "schema v2 sealed memory fixture evaluation_overlay is absent"
+                )
+            else:
+                if (
+                    overlay.get("status") != "verified"
+                    or overlay.get("verified") is not True
+                ):
+                    errors.append(
+                        "schema v2 evaluation overlay must bind reviewed verified state"
+                    )
+                if overlay.get("evidence_role") not in {
+                    "constraint",
+                    "decision",
+                    "dependency",
+                    "failure",
+                    "safeguard",
+                    "implementation",
+                    "context",
+                }:
+                    errors.append("schema v2 evaluation overlay role is invalid")
+                if not isinstance(overlay.get("score"), int) or not (
+                    0 <= overlay["score"] <= 100
+                ):
+                    errors.append("schema v2 evaluation overlay score is invalid")
+                for field in ("confidence", "authority_score", "retrieval_specificity"):
+                    value = overlay.get(field)
+                    if (
+                        not isinstance(value, (int, float))
+                        or isinstance(value, bool)
+                        or not 0 <= value <= 1
+                    ):
+                        errors.append(
+                            f"schema v2 evaluation overlay {field} is invalid"
+                        )
+                if overlay.get("last_accessed_fallback") != "created_at":
+                    errors.append(
+                        "schema v2 evaluation overlay last_accessed fallback is invalid"
+                    )
     if not isinstance(source, dict) or not re.fullmatch(
         r"[0-9a-f]{64}", str(source.get("memory_json_sha256", ""))
     ):
@@ -279,8 +401,13 @@ def validate_outcome_record(record: dict[str, Any]) -> list[str]:
     ]
     missing = OUTCOME_FIELDS - OPTIONAL_OUTCOME_FIELDS - set(record)
     errors.extend(f"missing required field: {field}" for field in sorted(missing))
-    if record.get("condition") not in {"baseline", "task-brief"}:
-        errors.append("condition must be baseline or task-brief")
+    if record.get("condition") not in {
+        "baseline",
+        "task-brief",
+        "source-brief",
+        "memory-brief",
+    }:
+        errors.append("condition is not a supported Task Intelligence condition")
     if not isinstance(record.get("memory_ids"), list):
         errors.append("memory_ids must be a list")
     if not isinstance(record.get("acceptance_passed"), bool):
@@ -424,9 +551,9 @@ def validate_outcome_record(record: dict[str, Any]) -> list[str]:
                 )
             if considered is not None or trace["brief_sha256"] is not None:
                 errors.append("baseline stage_trace must not contain Brief evidence")
-        elif record.get("condition") == "task-brief":
+        else:
             if considered is None or trace["brief_sha256"] is None:
-                errors.append("task-brief stage_trace must contain Brief evidence")
+                errors.append("Brief stage_trace must contain Brief evidence")
             if trace["delivery_status"] == "delivered" and selected == 0:
                 errors.append("delivered stage_trace requires selected memories")
     return errors

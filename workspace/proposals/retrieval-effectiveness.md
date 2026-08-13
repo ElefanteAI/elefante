@@ -1,6 +1,6 @@
 # North Star / Implementation PRD: Task Intelligence
 
-> Status: NORTH STAR — ONE BOUNDED FEASIBILITY EXPERIMENT
+> Status: NORTH STAR — FIRST BOUNDED FEASIBILITY EXPERIMENT COMPLETE (`STOP`)
 >
 > Product state: governed Recall, Task Brief v2, evaluation, and a metadata-only
 > outcome ledger exist in unreleased development. Representative task lift is
@@ -32,8 +32,10 @@ PRD.
 - Do not create another PRD or handoff file. Current state belongs in
   [`../PLANNING.md`](../PLANNING.md); defects belong in
   [`../ISSUES.md`](../ISSUES.md).
-- The only immediate action is §5 E0, followed by §6 E1. Product code remains
-  unchanged until E1 identifies the failed stage.
+- Task 032 completed the bounded path through §10. Its local verdict is `STOP`;
+  do not rerun it, weaken its judge, or treat it as product evidence.
+- The next action is the replacement-task screen in §14. Product code remains
+  unchanged until a different reproducible causal failure is demonstrated.
 
 If new evidence contradicts this contract, update this canonical PRD and its
 planning index in the same change. Do not silently route around it.
@@ -80,16 +82,21 @@ The evidence boundary is equally important:
   the latency gate and did not establish cross-task benefit;
 - one schema-v3 sealed-memory evaluation recorded retrieval, selection, and
   delivery as complete while acceptance failed and agent use remained `unknown`;
+- task 032 selected and delivered its intended memory in 3/3 treatments, but
+  treatment passed 0/3 and the source-only control passed 0/2 before the
+  pre-registered early `STOP`; every preserved patch missed the same required
+  public Recall tool;
 - the installed Recall proof proves the pipeline, not that Elefante improves diverse tasks.
 
 Therefore, “add more context” is rejected. “Implement Memory Identity first” is
 also not yet justified: no preserved outcome proves that state identity or scope
 resolution was the first causal failure.
 
-## 3. Immediate decision
+## 3. Completed decision
 
-Implement **one evidence-led causal repair vertical**. Do not implement the full
-Project Intelligence Control Plane.
+The first evidence-led causal repair vertical is complete. Do not implement the
+full Project Intelligence Control Plane and do not promote the tested memory
+component.
 
 The vertical asks one question:
 
@@ -108,8 +115,13 @@ eligible task
   -> behavioral acceptance
 ~~~
 
-The first failed stage chooses the repair. The PRD does not choose a preferred
-architecture in advance.
+The model-free first failure was an evaluator `SELECTION_MISS`: a real ranked,
+unlocked memory was silently rewritten as triggered and locked. The smallest
+repair preserves source governance and applies a separate reviewed evaluation
+overlay. After that repair, retrieval, selection, and delivery passed, while
+model execution failed at application/acceptance. The selected installation
+architecture memory did not supply the task-local evidence required to add the
+public Recall MCP surface.
 
 ## 4. Experiment scope
 
@@ -139,8 +151,25 @@ state/scope ambiguity and a read-only resolver improves the frozen task.
 
 ## 5. E0 — Freeze one eligible task
 
-The exact task is **UNKNOWN** until it passes every condition below. Do not use
-task 031 or any consumed holdout as new evidence.
+Task 032 is frozen and consumed. Do not use task 031, task 032, or any consumed
+holdout as new evidence.
+
+| Bound field | Frozen value |
+|---|---|
+| Task | `install-codex-recall-routing-black-box-032` |
+| Base | `788e8aedd830297c628325696906e50d896f8715` |
+| Known good | `7c705ca03371771be68460afb270fe0998f30231` |
+| Memory | `f3482775-83b7-47b5-9cbb-d54da9d8bc73` |
+| Judge digest | `bd641d73bc34494e08228e508e793a69547a19862fe17712b1c71eeded74e9bc` |
+| Fixture digest | `d278f31026c363d56fc559bd0bbf3f0945093e8405e2c8680e5c49f906655931` |
+| Model | `gpt-5.6-sol`, reasoning `max` |
+| Seed / ceiling | `20260805`; three treatment repeats and at most three controls |
+
+The black-box judge runs documented setup and uninstall commands in an isolated
+home, preserves the user's instruction bytes, checks host registration, and
+lists the real stdio MCP surface. Base fails and known good passes. The sealed
+fixture preserves the live record's actual governance metadata and carries a
+separate reviewed evaluation overlay; it does not mutate the live store.
 
 The task is eligible only when:
 
@@ -166,8 +195,8 @@ Before code changes, bind these values in the existing benchmark contract:
   order seed;
 - maximum three pairs and one repair iteration.
 
-If no task passes, stop. The blocker is missing causal evidence, not missing
-architecture.
+For a replacement task, every condition still applies. If no task passes, stop.
+The blocker is missing causal evidence, not missing architecture.
 
 ## 6. E1 — Locate the first failed stage without a model run
 
@@ -187,7 +216,26 @@ Brief twice and require byte-identical output. Record:
 Stop at the first failed stage. Do not tune ranking, add scope machinery, or run
 more repetitions to compensate for an invalid earlier stage.
 
+### Task 032 result
+
+- Judge: base rejected; known good accepted; exact digest bound.
+- Eligibility: one prior durable customer-installation memory; no answer or
+  patch embedded in the fixture.
+- Retrieval: intended memory present.
+- Initial selection: failed because the evaluator invented trigger/lock
+  metadata instead of preserving the live ranked/unlocked record.
+- Repaired selection: intended memory selected first; deterministic.
+- Delivery: intended memory reached all three treatments within a 1,500-token
+  Brief; live memory and product state remained unchanged.
+- Application/acceptance: failed. All five measured patches changed installer
+  or guidance files but omitted `elefante-Recall` from the MCP server.
+
 ## 7. E2 — Implement only the demonstrated repair
+
+Task 032 used the `SELECTION_MISS` route. Fixture schema v2 now preserves exact
+source governance and represents reviewed evaluation adjudication separately.
+Schema v1 behavior remains unchanged. This is evaluator correctness, not a
+product ranking or runtime-delivery change.
 
 ### Common contract
 
@@ -300,8 +348,10 @@ No model run is allowed until all deterministic checks pass.
 
 Extend the existing evaluator; do not create another harness.
 
-- **Control:** current Task Brief v2 on the frozen task.
-- **Treatment:** the same Task Brief v2 plus only the demonstrated repair.
+- **Control:** the same source-grounded Task Brief v2 without the sealed durable
+  memory.
+- **Treatment:** the same source-grounded Task Brief v2 plus only the sealed
+  durable memory.
 - **Held constant:** task, base state, mandatory user policy, model, reasoning,
   tools, prompt protocol, budget, timeout, and acceptance judge.
 - **Order:** seeded paired order fixed before execution.
@@ -328,6 +378,45 @@ This is a local feasibility gate, not product proof.
 
 Tokens or latency may break a `LOCAL GO`; they cannot create one.
 
+### Task 032 measured result
+
+**Decision: `STOP`.** This is a valid local negative result, not a product
+failure rate or release claim.
+
+| Evidence | Result |
+|---|---|
+| Model-free canary | base failed; known good passed |
+| Determinism | source-only and memory Briefs reproduced byte-identically |
+| Intended memory | selected and delivered in 3/3 treatments |
+| Treatment acceptance | 0/3 |
+| Source-only control acceptance | 0/2; a third attempt was terminated before a measurable outcome once treatment 0/3 made `STOP` irreversible |
+| Root failure | application/acceptance: all five patches passed earlier routing, preservation, and uninstall assertions, then failed because live MCP `tools/list` lacked `elefante-Recall` |
+| Stored evidence | five schema-v3 metadata-only outcomes; no prompts, responses, memory bodies, or source diffs |
+| Measured token cost | Five completed outcomes: 1,417,856 input; 1,112,064 cached; 305,792 uncached; 83,452 output. Exact partial usage from the terminated sixth attempt is `UNKNOWN`. |
+
+The memory was architecturally relevant but not causally discriminative. It
+described stable per-user installation, one data root, a loopback daemon, and
+host coverage; it did not identify or explain the missing task-local Recall API
+surface. Both conditions therefore converged on installer routing changes and
+missed the same product behavior. This rejects the tested mechanism: selecting
+and appending a broadly relevant durable memory is insufficient to improve this
+task.
+
+The evaluator now supports a strict `memory-component` comparison and a
+decision-complete early stop. Early stop never creates a `LOCAL GO` or marks the
+paired protocol complete; it activates on a bound failed delivery or after all
+three treatment repeats are bound and observable.
+
+### Final implementation gates
+
+- Full maintained fast suite: 455 passed, 4 skipped, 1 slow deselected.
+- Maintained slow gate: 1 passed.
+- Benchmark canaries: 9/9 rejected base and accepted known fix.
+- Focused Task Intelligence and documentation routing: 86 passed.
+- Ruff 0.1.15 and `git diff --check`: passed.
+- Exact resume replay: `STOP`, zero new results, one remaining control not
+  started; `--require-decision` passed while promotion remained false.
+
 ## 11. Rollback
 
 - The experiment flag defaults off.
@@ -344,6 +433,9 @@ Tokens or latency may break a `LOCAL GO`; they cannot create one.
 
 Preserve the evidence, reject the tested mechanism, and choose no replacement
 until a different first-stage failure is demonstrated.
+
+Task 032 is in this state. Do not patch its prompt, add more memories, or buy a
+fourth treatment. Its evidence is consumed.
 
 ### If `INCONCLUSIVE`
 
@@ -366,22 +458,24 @@ tag, release, or deployment.
 
 ## 13. Implementation checklist
 
-- [ ] E0 task and exact evidence contract approved.
-- [ ] E1 first failed stage recorded from model-free preflight.
-- [ ] One repair selected from the routing table.
-- [ ] Failing deterministic regression included with the repair change.
-- [ ] Feature-off equivalence and no-mutation proof pass.
-- [ ] Existing focused Task Intelligence suites pass.
-- [ ] Exact capped paired plan reviewed before execution.
-- [ ] Result classified `LOCAL GO`, `STOP`, or `INCONCLUSIVE` without changing
+- [x] E0 task and exact evidence contract approved.
+- [x] E1 first failed stage recorded from model-free preflight.
+- [x] One repair selected from the routing table.
+- [x] Failing deterministic regression included with the repair change.
+- [x] Feature-off equivalence and no-mutation proof pass.
+- [x] Existing focused Task Intelligence suites pass.
+- [x] Exact capped paired plan reviewed before execution.
+- [x] Result classified `LOCAL GO`, `STOP`, or `INCONCLUSIVE` without changing
       the rule.
-- [ ] Evidence and current state recorded in canonical developer surfaces.
+- [x] Evidence and current state recorded in canonical developer surfaces.
 
 ## 14. Immediate goal
 
-> **Your goal is to select and freeze one new eligible memory-dependent task,
-> run the existing model-free preflight, and identify the first failed causal
-> stage. Do not change product code until that stage is known.**
+> **Your goal is to find one different task where a pre-existing durable memory
+> contains a specific decision-relevant fact that is absent from the frozen
+> source-only Brief, then prove that difference model-free. Do not spend model
+> tokens or change product code until that discriminative evidence path passes.**
 
-This is the smallest action that can justify an implementation instead of
-another architecture hypothesis.
+This is the smallest action that tests memory value rather than broad semantic
+relevance. If no such task exists, improve memory quality at capture time before
+changing retrieval or delivery.

@@ -29,13 +29,22 @@ DEFAULT_OUTCOMES = ROOT / "benchmarks/task_intelligence/outcomes"
 DEFAULT_WORKSPACES = Path(tempfile.gettempdir()) / "elefante-ti"
 DEFAULT_ESTIMATED_INPUT_TOKENS = 600_000
 DEFAULT_ESTIMATED_UNCACHED_INPUT_TOKENS = 100_000
-CONDITIONS = ("baseline", "task-brief")
+STANDARD_CONDITIONS = ("baseline", "task-brief")
+MEMORY_COMPONENT_CONDITIONS = ("source-brief", "memory-brief")
+LOCAL_DECISION_REPETITIONS = 3
+COMPARISON_CONDITIONS = {
+    "standard": STANDARD_CONDITIONS,
+    "memory-component": MEMORY_COMPONENT_CONDITIONS,
+}
+CONDITIONS = STANDARD_CONDITIONS
+ALL_CONDITIONS = (*STANDARD_CONDITIONS, *MEMORY_COMPONENT_CONDITIONS)
 
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.ci import run_task_intelligence_baseline as baseline  # noqa: E402
 from scripts.ci.verify_task_intelligence_benchmark import (  # noqa: E402
+    acceptance_test_sha256,
     scan_memory_payload,
     task_contract_sha256,
     task_promotion_validity,
@@ -727,6 +736,51 @@ def sealed_fixture_memories(
     source = payload["source"]
     memory = payload["memory"]
     lifecycle = payload["lifecycle_review"]
+    source_metadata = (
+        memory.get("metadata") if payload["schema_version"] == 2 else None
+    )
+    evaluation_overlay = (
+        memory.get("evaluation_overlay") if payload["schema_version"] == 2 else None
+    )
+    if source_metadata is None:
+        source_metadata = {
+            "created_at": None,
+            "last_modified": None,
+            "category": "general",
+            "project": memory.get("project"),
+            "workspace": "historical-snapshot",
+            "status": MemoryStatus.VERIFIED.value,
+            "verified": True,
+            "deprecated": False,
+            "archived": False,
+            "conflict_ids": [],
+            "retention_policy": "permanent",
+            "injection_policy": "triggered",
+            "scope": memory.get("scope"),
+            "trigger": memory.get("trigger", []),
+            "user_locked": True,
+        }
+    if evaluation_overlay is None:
+        evaluation_overlay = {
+            "status": MemoryStatus.VERIFIED.value,
+            "verified": True,
+            "score": 90,
+            "confidence": 0.95,
+            "authority_score": 0.9,
+            "evidence_role": "constraint",
+            "retrieval_specificity": 1.0,
+            "last_accessed_fallback": "created_at",
+        }
+    created_at = (
+        datetime.fromisoformat(source_metadata["created_at"])
+        if source_metadata["created_at"] is not None
+        else datetime.utcnow()
+    )
+    last_modified = (
+        datetime.fromisoformat(source_metadata["last_modified"])
+        if source_metadata["last_modified"] is not None
+        else created_at
+    )
     return [
         Memory(
             id=memory["id"],
@@ -734,34 +788,42 @@ def sealed_fixture_memories(
             metadata=MemoryMetadata(
                 domain=DomainType.PROJECT,
                 memory_type=MemoryType(memory["memory_type"]),
-                status=MemoryStatus.VERIFIED,
-                score=90,
-                confidence=0.95,
+                status=MemoryStatus(evaluation_overlay["status"]),
+                score=evaluation_overlay["score"],
+                confidence=evaluation_overlay["confidence"],
+                category=source_metadata["category"],
                 concepts=extract_concepts(memory["content"], max_concepts=8),
-                authority_score=0.9,
+                authority_score=evaluation_overlay["authority_score"],
                 source=SourceType(memory["source"]),
                 source_detail=memory["source_detail"],
                 source_reliability=float(memory["source_reliability"]),
-                verified=True,
-                project=memory.get("project"),
-                workspace="historical-snapshot",
-                retention_policy="permanent",
-                injection_policy="triggered",
-                scope=memory.get("scope"),
-                trigger=memory.get("trigger", []),
-                user_locked=True,
+                verified=evaluation_overlay["verified"],
+                project=source_metadata["project"],
+                workspace=source_metadata["workspace"],
+                retention_policy=source_metadata["retention_policy"],
+                injection_policy=source_metadata["injection_policy"],
+                scope=source_metadata["scope"],
+                trigger=source_metadata["trigger"],
+                user_locked=source_metadata["user_locked"],
+                deprecated=source_metadata["deprecated"],
+                archived=source_metadata["archived"],
+                conflict_ids=source_metadata["conflict_ids"],
                 custom_metadata={
-                    "evidence_role": "constraint",
-                    "retrieval_specificity": 1.0,
+                    "evidence_role": evaluation_overlay["evidence_role"],
+                    "retrieval_specificity": evaluation_overlay[
+                        "retrieval_specificity"
+                    ],
                     "fixture_id": payload["fixture_id"],
                     "fixture_sha256": contract["sha256"],
                     "source_memory_json_sha256": source["memory_json_sha256"],
                     "original_store_status": lifecycle["original_status"],
+                    "original_store_verified": source_metadata["verified"],
                     "lifecycle_resolution": lifecycle["resolution"],
                     "promotion_use": False,
                 },
-                created_at=datetime.utcnow(),
-                last_accessed=datetime.utcnow(),
+                created_at=created_at,
+                last_modified=last_modified,
+                last_accessed=created_at,
             ),
         )
     ]
@@ -774,19 +836,20 @@ async def _snapshot_brief_inputs(
     *,
     profile: TaskBriefProfile = TaskBriefProfile.V1,
     memory_fixture_path: Path | None = None,
+    include_sealed_fixture: bool = True,
 ) -> tuple[TaskBriefRequest, list[SearchResult]]:
-    memories = (
-        [
-            *source_snapshot_memories(repo_root, task),
-            *sealed_fixture_memories(
-                repo_root,
-                task,
-                fixture_override=memory_fixture_path,
-            ),
-        ]
-        if profile == TaskBriefProfile.V2
-        else snapshot_memories(repo_root, task)
-    )
+    if profile == TaskBriefProfile.V2:
+        memories = source_snapshot_memories(repo_root, task)
+        if include_sealed_fixture:
+            memories.extend(
+                sealed_fixture_memories(
+                    repo_root,
+                    task,
+                    fixture_override=memory_fixture_path,
+                )
+            )
+    else:
+        memories = snapshot_memories(repo_root, task)
     if not memories:
         raise RuntimeError(f"no benchmark memories available for {task['id']}")
     query = "\n".join([task["task_statement"], *task["success_criteria"]])
@@ -858,6 +921,7 @@ async def generate_snapshot_brief(
     *,
     profile: TaskBriefProfile = TaskBriefProfile.V1,
     memory_fixture_path: Path | None = None,
+    include_sealed_fixture: bool = True,
 ) -> TaskBrief:
     request, candidates = await _snapshot_brief_inputs(
         repo_root,
@@ -865,6 +929,7 @@ async def generate_snapshot_brief(
         embedding_service,
         profile=profile,
         memory_fixture_path=memory_fixture_path,
+        include_sealed_fixture=include_sealed_fixture,
     )
     return TaskBriefCompiler().compile(request, candidates)
 
@@ -912,6 +977,7 @@ def paired_plan(
     task_class: str | None,
     repetitions: int,
     run_seed: int,
+    conditions: tuple[str, str] = STANDARD_CONDITIONS,
 ) -> list[dict[str, Any]]:
     task_plan = baseline.build_run_plan(
         manifest,
@@ -922,7 +988,7 @@ def paired_plan(
     )
     plan: list[dict[str, Any]] = []
     for item in task_plan:
-        order = list(CONDITIONS)
+        order = list(conditions)
         digest = hashlib.sha256(
             f"{run_seed}:{item['task_id']}:{item['repeat']}".encode()
         ).digest()
@@ -950,6 +1016,114 @@ def _outcome_path(
         f"{item['condition']}__{profile}{brief_segment}__seed-{run_seed}__"
         f"{item['task_id']}__r{item['repeat']}.json"
     )
+
+
+def memory_component_stop_status(
+    plan: list[dict[str, Any]],
+    *,
+    output_dir: Path,
+    model: str,
+    reasoning: str,
+    run_seed: int,
+    brief_profile: TaskBriefProfile,
+) -> dict[str, Any] | None:
+    """Return a decisive local STOP once every treatment repeat is measured.
+
+    The North Star rule makes treatment 0/3 a STOP independently of any
+    remaining control run. Detecting that state prevents a known-redundant
+    model call while leaving the paired protocol explicitly incomplete.
+    """
+    task_ids = {item["task_id"] for item in plan}
+    conditions = {item["condition"] for item in plan}
+    if len(task_ids) != 1 or conditions != set(MEMORY_COMPONENT_CONDITIONS):
+        return None
+    treatment = [item for item in plan if item["condition"] == "memory-brief"]
+    if (
+        len(treatment) != LOCAL_DECISION_REPETITIONS
+        or {item["repeat"] for item in treatment}
+        != set(range(1, LOCAL_DECISION_REPETITIONS + 1))
+    ):
+        return None
+    task = treatment[0]["task"]
+    fixture = task.get("memory_fixture")
+    if not isinstance(fixture, dict):
+        return None
+    payload = json.loads((ROOT / fixture["path"]).read_text(encoding="utf-8"))
+    intended_memory_id = str(payload["source"]["memory_id"])
+    records: list[dict[str, Any]] = []
+    for item in treatment:
+        path = _outcome_path(
+            output_dir,
+            item,
+            model=model,
+            reasoning=reasoning,
+            run_seed=run_seed,
+            brief_profile=brief_profile,
+        )
+        if not path.exists():
+            continue
+        record = json.loads(path.read_text(encoding="utf-8"))
+        errors = validate_outcome_record(record)
+        if errors:
+            raise RuntimeError(f"{path.name}: {'; '.join(errors)}")
+        task = item["task"]
+        trace = record.get("stage_trace", {})
+        expected_evaluation_id = (
+            f"{item['task_id']}-{item['condition']}-seed-{run_seed}-"
+            f"r{item['repeat']}"
+        )
+        if (
+            record.get("evaluation_id") != expected_evaluation_id
+            or record.get("task_id") != item["task_id"]
+            or record.get("condition") != item["condition"]
+            or record.get("run_seed") != run_seed
+            or record.get("model") != model
+            or f"reasoning={reasoning}"
+            not in str(record.get("tool_configuration", ""))
+        ):
+            raise RuntimeError(f"{path.name}: outcome identity mismatch")
+        expected_judge = (
+            "eligible"
+            if task_promotion_validity(task, ROOT)["promotion_eligible"]
+            else "diagnostic-only"
+        )
+        if (
+            record.get("task_contract_sha256") != task_contract_sha256(task)
+            or trace.get("acceptance_fixture_sha256")
+            != acceptance_test_sha256(task, ROOT)
+            or trace.get("judge_status") != expected_judge
+        ):
+            raise RuntimeError(f"{path.name}: outcome contract mismatch")
+        records.append(record)
+
+    if not records:
+        return None
+    delivered = sum(
+        intended_memory_id in record.get("memory_ids", [])
+        and record.get("stage_trace", {}).get("delivery_status") == "delivered"
+        for record in records
+    )
+    passes = sum(bool(record["acceptance_passed"]) for record in records)
+    if delivered < len(records):
+        return {
+            "decision": "STOP",
+            "reason": "intended_memory_not_delivered",
+            "treatment_runs": len(records),
+            "treatment_passes": passes,
+            "intended_memory_deliveries": delivered,
+        }
+    if len(records) != LOCAL_DECISION_REPETITIONS:
+        return None
+    expected = LOCAL_DECISION_REPETITIONS
+    if passes == 0:
+        return {
+            "decision": "STOP",
+            "reason": f"treatment_passed_0_of_{expected}",
+            "treatment_runs": expected,
+            "treatment_passes": 0,
+            "intended_memory_deliveries": delivered,
+        }
+    return None
 
 
 def execute_trial(
@@ -1109,6 +1283,7 @@ async def _briefs_for_plan(
     *,
     profile: TaskBriefProfile = TaskBriefProfile.V1,
     memory_fixture_path: Path | None = None,
+    include_sealed_fixture: bool = True,
 ) -> dict[str, TaskBrief]:
     tasks = {item["task_id"]: item["task"] for item in plan}
     briefs: dict[str, TaskBrief] = {}
@@ -1119,6 +1294,7 @@ async def _briefs_for_plan(
             embedding_service,
             profile=profile,
             memory_fixture_path=memory_fixture_path,
+            include_sealed_fixture=include_sealed_fixture,
         )
     return briefs
 
@@ -1148,6 +1324,13 @@ async def verify_fixture_briefs(
         compiler = TaskBriefCompiler()
         first = compiler.compile(request, candidates)
         second = compiler.compile(request, candidates)
+        control_candidates = [
+            candidate
+            for candidate in candidates
+            if str(candidate.memory.id) != expected_memory_id
+        ]
+        control_first = compiler.compile(request, control_candidates)
+        control_second = compiler.compile(request, control_candidates)
         errors: list[str] = []
         if expected_memory_id not in first.selected_memory_ids:
             errors.append("sealed durable memory was not selected")
@@ -1160,6 +1343,13 @@ async def verify_fixture_briefs(
             or first.selected_memory_ids != second.selected_memory_ids
         ):
             errors.append("Task Brief selection or rendering is nondeterministic")
+        if (
+            control_first.rendered_context != control_second.rendered_context
+            or control_first.selected_memory_ids != control_second.selected_memory_ids
+        ):
+            errors.append("source-only control Brief is nondeterministic")
+        if expected_memory_id in control_first.selected_memory_ids:
+            errors.append("source-only control contains the sealed durable memory")
         if scan_memory_payload({"rendered_context": first.rendered_context}, [task]):
             errors.append("Task Brief leaked hidden acceptance evidence")
         selected_sources = [
@@ -1186,6 +1376,19 @@ async def verify_fixture_briefs(
                 "brief_sha256": hashlib.sha256(
                     first.rendered_context.encode("utf-8")
                 ).hexdigest(),
+                "component_control": {
+                    "selected_memory_ids": control_first.selected_memory_ids,
+                    "estimated_tokens": control_first.estimated_tokens,
+                    "brief_sha256": hashlib.sha256(
+                        control_first.rendered_context.encode("utf-8")
+                    ).hexdigest(),
+                    "deterministic": (
+                        control_first.rendered_context
+                        == control_second.rendered_context
+                        and control_first.selected_memory_ids
+                        == control_second.selected_memory_ids
+                    ),
+                },
                 "deterministic": (
                     first.rendered_context == second.rendered_context
                     and first.selected_memory_ids == second.selected_memory_ids
@@ -1211,6 +1414,15 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Validate the sealed fixture and base/fix black-box judge without a model run.",
     )
+    parser.add_argument(
+        "--comparison",
+        choices=tuple(COMPARISON_CONDITIONS),
+        default="standard",
+        help=(
+            "standard compares no Brief with a Task Brief; memory-component "
+            "compares the same v2 source Brief without and with sealed memory"
+        ),
+    )
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--task")
     selection.add_argument("--task-class")
@@ -1223,7 +1435,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--reasoning", default="low")
     parser.add_argument(
         "--condition",
-        choices=CONDITIONS,
+        choices=ALL_CONDITIONS,
         help="Run one diagnostic condition; omit for a paired evaluation.",
     )
     parser.add_argument(
@@ -1265,8 +1477,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
     brief_profile = TaskBriefProfile(args.brief_profile)
+    comparison_conditions = COMPARISON_CONDITIONS[args.comparison]
     if args.preflight and args.execute:
         parser.error("--preflight and --execute are mutually exclusive")
+    if args.condition and args.condition not in comparison_conditions:
+        parser.error("--condition must belong to the selected --comparison")
+    if (
+        args.comparison == "memory-component"
+        and brief_profile != TaskBriefProfile.V2
+    ):
+        parser.error("--comparison memory-component requires --brief-profile v2")
 
     report = validate_manifest(args.manifest, ROOT)
     if report["errors"]:
@@ -1280,6 +1500,7 @@ def main(argv: list[str] | None = None) -> int:
         task_class=args.task_class,
         repetitions=args.repetitions,
         run_seed=args.run_seed,
+        conditions=comparison_conditions,
     )
     if args.condition:
         plan = [item for item in plan if item["condition"] == args.condition]
@@ -1297,6 +1518,21 @@ def main(argv: list[str] | None = None) -> int:
         for task_id, task in selected_tasks.items()
         if task.get("memory_fixture") is not None
     )
+    if args.comparison == "memory-component" and set(fixture_task_ids) != set(
+        selected_tasks
+    ):
+        print(
+            json.dumps(
+                {
+                    "error": (
+                        "memory-component comparison requires one sealed fixture "
+                        "for every selected task"
+                    )
+                },
+                indent=2,
+            )
+        )
+        return 2
     fixture_errors = {
         task_id: validate_memory_fixture(task, ROOT)
         for task_id, task in selected_tasks.items()
@@ -1349,6 +1585,8 @@ def main(argv: list[str] | None = None) -> int:
         "reasoning": args.reasoning,
         "run_seed": args.run_seed,
         "brief_profile": brief_profile.value,
+        "comparison": args.comparison,
+        "conditions": list(comparison_conditions),
         "planned_runs": len(plan),
         "pending_runs": len(pending),
         "estimated_input_tokens": estimate,
@@ -1464,25 +1702,66 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
 
-    treatment_plan = [item for item in pending if item["condition"] == "task-brief"]
-    briefs: dict[str, TaskBrief] = {}
-    if treatment_plan:
-        # Brief construction belongs only to the treatment. A baseline-only
-        # calibration screen must not pay for or depend on Elefante retrieval.
-        # Apply offline mode only inside an explicitly executed treatment;
-        # setting these at module import would leak into normal product runtime.
+    early_stop = (
+        memory_component_stop_status(
+            plan,
+            output_dir=args.output_dir,
+            model=args.model,
+            reasoning=args.reasoning,
+            run_seed=args.run_seed,
+            brief_profile=brief_profile,
+        )
+        if args.comparison == "memory-component" and not args.condition
+        else None
+    )
+    if early_stop is not None:
+        print(
+            json.dumps(
+                {
+                    **summary,
+                    "results": [],
+                    "early_stop": early_stop,
+                    "remaining_runs_not_started": len(pending),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 0
+
+    brief_plan = [item for item in pending if item["condition"] != "baseline"]
+    briefs: dict[tuple[str, str], TaskBrief] = {}
+    if brief_plan:
+        # Brief construction belongs only to Brief conditions. A baseline-only
+        # screen must not pay for or depend on Elefante retrieval. Apply offline
+        # mode here so evaluator settings cannot leak into product runtime.
         os.environ.setdefault("HF_HUB_OFFLINE", "1")
         os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
         embedding_service = EmbeddingService()
         embedding_service._load_model()
-        briefs = asyncio.run(
-            _briefs_for_plan(
-                treatment_plan,
-                embedding_service,
-                profile=brief_profile,
-                memory_fixture_path=args.memory_fixture,
+        for condition in comparison_conditions:
+            condition_plan = [
+                item for item in brief_plan if item["condition"] == condition
+            ]
+            if not condition_plan:
+                continue
+            condition_briefs = asyncio.run(
+                _briefs_for_plan(
+                    condition_plan,
+                    embedding_service,
+                    profile=brief_profile,
+                    memory_fixture_path=(
+                        args.memory_fixture if condition != "source-brief" else None
+                    ),
+                    include_sealed_fixture=condition != "source-brief",
+                )
             )
-        )
+            briefs.update(
+                {
+                    (task_id, condition): brief
+                    for task_id, brief in condition_briefs.items()
+                }
+            )
     args.workspace_root.mkdir(parents=True, exist_ok=True)
     results: list[dict[str, Any]] = []
     total_input = 0
@@ -1491,8 +1770,8 @@ def main(argv: list[str] | None = None) -> int:
     for item in pending:
         result = execute_trial(
             item,
-            brief=briefs[item["task_id"]]
-            if item["condition"] == "task-brief"
+            brief=briefs[(item["task_id"], item["condition"])]
+            if item["condition"] != "baseline"
             else None,
             output_dir=args.output_dir,
             workspace_root=args.workspace_root,
@@ -1520,6 +1799,47 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
             return 3
+        early_stop = (
+            memory_component_stop_status(
+                plan,
+                output_dir=args.output_dir,
+                model=args.model,
+                reasoning=args.reasoning,
+                run_seed=args.run_seed,
+                brief_profile=brief_profile,
+            )
+            if args.comparison == "memory-component" and not args.condition
+            else None
+        )
+        if early_stop is not None:
+            remaining = sum(
+                not _outcome_path(
+                    args.output_dir,
+                    planned,
+                    model=args.model,
+                    reasoning=args.reasoning,
+                    run_seed=args.run_seed,
+                    brief_profile=brief_profile,
+                ).exists()
+                for planned in plan
+            )
+            print(
+                json.dumps(
+                    {
+                        **summary,
+                        "results": results,
+                        "early_stop": early_stop,
+                        "remaining_runs_not_started": remaining,
+                        "actual_input_tokens": total_input,
+                        "actual_cached_input_tokens": total_cached,
+                        "actual_uncached_input_tokens": total_input - total_cached,
+                        "actual_output_tokens": total_output,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
     print(
         json.dumps(
             {

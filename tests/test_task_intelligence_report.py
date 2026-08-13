@@ -193,6 +193,146 @@ def test_single_task_report_is_complete_but_not_inferential() -> None:
     assert result["promotion_gate"] is False
 
 
+def test_memory_component_report_requires_intended_memory_for_local_go() -> None:
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    task_id = "install-codex-recall-routing-black-box-032"
+    task = next(task for task in manifest["tasks"] if task["id"] == task_id)
+    fixture = json.loads((ROOT / task["memory_fixture"]["path"]).read_text())
+    intended = fixture["source"]["memory_id"]
+    records = []
+    for repeat in range(1, 4):
+        control = _record(task_id, "source-brief", repeat, False)
+        treatment = _record(task_id, "memory-brief", repeat, True)
+        control["memory_ids"] = ["source-evidence"]
+        control["stage_trace"]["selected_memory_count"] = 1
+        treatment["memory_ids"] = ["source-evidence", intended]
+        treatment["stage_trace"]["selected_memory_count"] = 2
+        records.extend((control, treatment))
+
+    result = report.summarize(
+        manifest,
+        records,
+        split="calibration",
+        task_id=task_id,
+        comparison="memory-component",
+    )
+
+    assert result["control_condition"] == "source-brief"
+    assert result["treatment_condition"] == "memory-brief"
+    assert result["control_passes"] == 0
+    assert result["treatment_passes"] == 3
+    assert result["intended_memory_deliveries"] == 3
+    assert result["local_decision"] == "LOCAL GO"
+
+
+def test_memory_component_zero_of_three_is_a_decisive_early_stop() -> None:
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    task_id = "install-codex-recall-routing-black-box-032"
+    task = next(task for task in manifest["tasks"] if task["id"] == task_id)
+    fixture = json.loads((ROOT / task["memory_fixture"]["path"]).read_text())
+    intended = fixture["source"]["memory_id"]
+    records = []
+    for repeat in range(1, 4):
+        treatment = _record(task_id, "memory-brief", repeat, False)
+        treatment["memory_ids"] = ["source-evidence", intended]
+        treatment["stage_trace"]["selected_memory_count"] = 2
+        records.append(treatment)
+        if repeat < 3:
+            records.append(_record(task_id, "source-brief", repeat, False))
+
+    result = report.summarize(
+        manifest,
+        records,
+        split="calibration",
+        task_id=task_id,
+        comparison="memory-component",
+    )
+
+    assert result["protocol_complete"] is False
+    assert result["evaluation_complete"] is False
+    assert result["decision_complete"] is True
+    assert result["decisive_early_stop"] is True
+    assert result["early_stop_reason"] == "treatment_passed_0_of_3"
+    assert result["observed_control_runs"] == 2
+    assert result["observed_treatment_runs"] == 3
+    assert result["intended_memory_deliveries"] == 3
+    assert result["local_decision"] == "STOP"
+
+
+def test_memory_component_zero_of_two_remains_inconclusive() -> None:
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    task_id = "install-codex-recall-routing-black-box-032"
+    task = next(task for task in manifest["tasks"] if task["id"] == task_id)
+    fixture = json.loads((ROOT / task["memory_fixture"]["path"]).read_text())
+    intended = fixture["source"]["memory_id"]
+    records = [
+        _record(task_id, condition, repeat, False)
+        for repeat in range(1, 3)
+        for condition in ("source-brief", "memory-brief")
+    ]
+    for record in records:
+        if record["condition"] == "memory-brief":
+            record["memory_ids"] = [intended]
+
+    result = report.summarize(
+        manifest,
+        records,
+        split="calibration",
+        task_id=task_id,
+        comparison="memory-component",
+    )
+
+    assert result["decision_complete"] is False
+    assert result["decisive_early_stop"] is False
+    assert result["local_decision"] == "INCONCLUSIVE"
+
+
+def test_memory_component_requires_recorded_delivery_not_only_memory_id() -> None:
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    task_id = "install-codex-recall-routing-black-box-032"
+    task = next(task for task in manifest["tasks"] if task["id"] == task_id)
+    fixture = json.loads((ROOT / task["memory_fixture"]["path"]).read_text())
+    intended = fixture["source"]["memory_id"]
+    records = []
+    for repeat in range(1, 4):
+        control = _record(task_id, "source-brief", repeat, False)
+        treatment = _record(task_id, "memory-brief", repeat, True)
+        treatment["memory_ids"] = [intended]
+        treatment["stage_trace"]["delivery_status"] = "blocked"
+        records.extend((control, treatment))
+
+    result = report.summarize(
+        manifest,
+        records,
+        split="calibration",
+        task_id=task_id,
+        comparison="memory-component",
+    )
+
+    assert result["intended_memory_deliveries"] == 0
+    assert result["local_decision"] == "STOP"
+
+
+def test_memory_component_failed_delivery_stops_after_one_bound_treatment() -> None:
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    task_id = "install-codex-recall-routing-black-box-032"
+    record = _record(task_id, "memory-brief", 1, False)
+    record["stage_trace"]["delivery_status"] = "blocked"
+
+    result = report.summarize(
+        manifest,
+        [record],
+        split="calibration",
+        task_id=task_id,
+        comparison="memory-component",
+    )
+
+    assert result["protocol_complete"] is False
+    assert result["decision_complete"] is True
+    assert result["early_stop_reason"] == "intended_memory_not_delivered"
+    assert result["local_decision"] == "STOP"
+
+
 def test_historical_manifest_blocks_promotion_even_with_perfect_results() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     task = next(task for task in manifest["tasks"] if task["split"] == "holdout")

@@ -405,6 +405,14 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Proof:** [postmortems/ai-behavior.md Issue #17](postmortems/ai-behavior.md#issue-17), `tests/test_task_intelligence_evaluation.py`, and the schema-v3 benchmark verifier.
 - **Avoid:** Rerunning after a bare red verdict, rewriting an old outcome after the contract changes, or tuning retrieval to satisfy an undisclosed test detail.
 
+### Select Memory For Decision Value, Not Topical Similarity (GAP-053)
+
+- **Trigger:** A memory is semantically related to the task and survives every retrieval and governance gate, but the accepted result does not improve.
+- **Rule:** Before a model run, name the exact next decision the memory can change and prove that its decisive fact is absent from the source-only evidence. If no such fact exists, reject the memory-task pair.
+- **Why:** Broad relevance can steer an agent toward the right subsystem without supplying the missing implementation, constraint, preference, or fact. That memory consumes context but cannot cause a better outcome.
+- **Proof:** Task 032 delivered its installation-contract memory in 3/3 treatments, yet treatment accepted 0/3; all five measured patches changed installer routing and omitted the required public Recall MCP tool. See [postmortems/ai-behavior.md Issue #20](postmortems/ai-behavior.md#issue-20).
+- **Avoid:** Treating selection or delivery as usefulness; adding more broadly related memories after an application failure; choosing the task because its vocabulary matches the memory.
+
 ---
 
 ## Update Protocol

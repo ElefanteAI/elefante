@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from scripts.ci import run_task_intelligence_evaluation as evaluation
 from scripts.ci import audit_task_intelligence_retrieval as retrieval_audit
 from src.core.task_intelligence import TaskBriefProfile
@@ -574,8 +576,69 @@ def test_fixture_brief_preflight_requires_exact_memory_and_is_deterministic(
     assert reports[0]["passed"] is True
     assert reports[0]["expected_memory_id"] == expected
     assert reports[0]["deterministic"] is True
+    assert reports[0]["component_control"]["deterministic"] is True
+    assert expected not in reports[0]["component_control"]["selected_memory_ids"]
     assert reports[0]["selected_sources"][0]["source_detail"] == (
         "sealed-durable-memory-export"
+    )
+
+
+def test_schema_v2_fixture_preserves_source_governance_metadata() -> None:
+    task = next(
+        task
+        for task in _manifest()["tasks"]
+        if task["id"] == "install-codex-recall-routing-black-box-032"
+    )
+
+    sealed = evaluation.sealed_fixture_memories(ROOT, task)[0]
+
+    assert str(sealed.metadata.injection_policy) == "ranked"
+    assert str(sealed.metadata.retention_policy) == "managed"
+    assert sealed.metadata.user_locked is False
+    assert sealed.metadata.scope is None
+    assert sealed.metadata.trigger == []
+    assert sealed.metadata.project is None
+    assert sealed.metadata.workspace is None
+    assert str(sealed.metadata.status) == "verified"
+    assert sealed.metadata.verified is True
+    assert sealed.metadata.custom_metadata["original_store_status"] == "contradictory"
+    assert sealed.metadata.custom_metadata["original_store_verified"] is False
+    assert sealed.metadata.created_at.isoformat() == "2026-08-05T18:53:56.598176"
+
+
+def test_schema_v2_ranked_fixture_is_not_rejected_by_invented_trigger() -> None:
+    task = next(
+        task
+        for task in _manifest()["tasks"]
+        if task["id"] == "install-codex-recall-routing-black-box-032"
+    )
+    sealed = evaluation.sealed_fixture_memories(ROOT, task)[0]
+    request = evaluation.TaskBriefRequest(
+        task_id=task["id"],
+        task=task["task_statement"],
+        success_criteria=task["success_criteria"],
+        project="elefante",
+        workspace="historical-snapshot",
+        profile=TaskBriefProfile.V2,
+    )
+
+    brief = evaluation.TaskBriefCompiler().compile(
+        request,
+        [
+            evaluation.SearchResult(
+                memory=sealed,
+                score=0.9,
+                source="vector",
+                vector_score=0.9,
+            )
+        ],
+    )
+
+    assert str(sealed.id) in brief.selected_memory_ids
+    assert not any(
+        omission.memory_id == str(sealed.id)
+        and omission.reason == "trigger-not-matched"
+        for omission in brief.omissions
     )
 
 
@@ -608,6 +671,284 @@ def test_paired_plan_is_seeded_balanced_and_repeatable() -> None:
             "baseline",
             "task-brief",
         }
+
+
+def test_memory_component_plan_pairs_source_and_memory_briefs() -> None:
+    manifest = _manifest()
+
+    plan = evaluation.paired_plan(
+        manifest,
+        split="calibration",
+        task_id="install-codex-recall-routing-black-box-032",
+        task_class=None,
+        repetitions=3,
+        run_seed=20260805,
+        conditions=evaluation.MEMORY_COMPONENT_CONDITIONS,
+    )
+
+    assert len(plan) == 6
+    for index in range(0, len(plan), 2):
+        pair = plan[index : index + 2]
+        assert pair[0]["repeat"] == pair[1]["repeat"]
+        assert {item["condition"] for item in pair} == {
+            "source-brief",
+            "memory-brief",
+        }
+
+
+def test_memory_component_runner_stops_after_zero_of_three_treatments(
+    monkeypatch, tmp_path
+) -> None:
+    manifest = _manifest()
+    task_id = "install-codex-recall-routing-black-box-032"
+    task = next(task for task in manifest["tasks"] if task["id"] == task_id)
+    fixture = json.loads((ROOT / task["memory_fixture"]["path"]).read_text())
+    intended = fixture["source"]["memory_id"]
+    plan = evaluation.paired_plan(
+        manifest,
+        split="calibration",
+        task_id=task_id,
+        task_class=None,
+        repetitions=3,
+        run_seed=20260805,
+        conditions=evaluation.MEMORY_COMPONENT_CONDITIONS,
+    )
+    monkeypatch.setattr(evaluation, "validate_outcome_record", lambda _record: [])
+    for item in plan:
+        if item["condition"] != "memory-brief":
+            continue
+        path = evaluation._outcome_path(
+            tmp_path,
+            item,
+            model="test-model",
+            reasoning="low",
+            run_seed=20260805,
+            brief_profile=TaskBriefProfile.V2,
+        )
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(
+                {
+                    "evaluation_id": (
+                        f"{task_id}-memory-brief-seed-20260805-r{item['repeat']}"
+                    ),
+                    "task_id": task_id,
+                    "condition": "memory-brief",
+                    "run_seed": 20260805,
+                    "model": "test-model",
+                    "tool_configuration": "test; reasoning=low",
+                    "task_contract_sha256": evaluation.task_contract_sha256(task),
+                    "memory_ids": [intended],
+                    "acceptance_passed": False,
+                    "stage_trace": {
+                        "acceptance_fixture_sha256": evaluation.acceptance_test_sha256(
+                            task, ROOT
+                        ),
+                        "judge_status": "eligible",
+                        "delivery_status": "delivered",
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    stop = evaluation.memory_component_stop_status(
+        plan,
+        output_dir=tmp_path,
+        model="test-model",
+        reasoning="low",
+        run_seed=20260805,
+        brief_profile=TaskBriefProfile.V2,
+    )
+
+    assert stop == {
+        "decision": "STOP",
+        "reason": "treatment_passed_0_of_3",
+        "treatment_runs": 3,
+        "treatment_passes": 0,
+        "intended_memory_deliveries": 3,
+    }
+
+    first_treatment = next(
+        item for item in plan if item["condition"] == "memory-brief"
+    )
+    first_path = evaluation._outcome_path(
+        tmp_path,
+        first_treatment,
+        model="test-model",
+        reasoning="low",
+        run_seed=20260805,
+        brief_profile=TaskBriefProfile.V2,
+    )
+    tampered = json.loads(first_path.read_text(encoding="utf-8"))
+    tampered["model"] = "different-model"
+    first_path.write_text(json.dumps(tampered), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="outcome identity mismatch"):
+        evaluation.memory_component_stop_status(
+            plan,
+            output_dir=tmp_path,
+            model="test-model",
+            reasoning="low",
+            run_seed=20260805,
+            brief_profile=TaskBriefProfile.V2,
+        )
+
+
+def test_memory_component_runner_does_not_stop_before_three_treatments(
+    tmp_path,
+) -> None:
+    manifest = _manifest()
+    plan = evaluation.paired_plan(
+        manifest,
+        split="calibration",
+        task_id="install-codex-recall-routing-black-box-032",
+        task_class=None,
+        repetitions=2,
+        run_seed=20260805,
+        conditions=evaluation.MEMORY_COMPONENT_CONDITIONS,
+    )
+
+    assert (
+        evaluation.memory_component_stop_status(
+            plan,
+            output_dir=tmp_path,
+            model="test-model",
+            reasoning="low",
+            run_seed=20260805,
+            brief_profile=TaskBriefProfile.V2,
+        )
+        is None
+    )
+
+
+def test_memory_component_runner_stops_on_first_failed_delivery(
+    monkeypatch, tmp_path
+) -> None:
+    manifest = _manifest()
+    task_id = "install-codex-recall-routing-black-box-032"
+    task = next(task for task in manifest["tasks"] if task["id"] == task_id)
+    plan = evaluation.paired_plan(
+        manifest,
+        split="calibration",
+        task_id=task_id,
+        task_class=None,
+        repetitions=3,
+        run_seed=20260805,
+        conditions=evaluation.MEMORY_COMPONENT_CONDITIONS,
+    )
+    item = next(item for item in plan if item["condition"] == "memory-brief")
+    path = evaluation._outcome_path(
+        tmp_path,
+        item,
+        model="test-model",
+        reasoning="low",
+        run_seed=20260805,
+        brief_profile=TaskBriefProfile.V2,
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "evaluation_id": (
+                    f"{task_id}-memory-brief-seed-20260805-r{item['repeat']}"
+                ),
+                "task_id": task_id,
+                "condition": "memory-brief",
+                "run_seed": 20260805,
+                "model": "test-model",
+                "tool_configuration": "test; reasoning=low",
+                "task_contract_sha256": evaluation.task_contract_sha256(task),
+                "memory_ids": [],
+                "acceptance_passed": False,
+                "stage_trace": {
+                    "acceptance_fixture_sha256": (
+                        evaluation.acceptance_test_sha256(task, ROOT)
+                    ),
+                    "judge_status": "eligible",
+                    "delivery_status": "blocked",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(evaluation, "validate_outcome_record", lambda _record: [])
+
+    stop = evaluation.memory_component_stop_status(
+        plan,
+        output_dir=tmp_path,
+        model="test-model",
+        reasoning="low",
+        run_seed=20260805,
+        brief_profile=TaskBriefProfile.V2,
+    )
+
+    assert stop == {
+        "decision": "STOP",
+        "reason": "intended_memory_not_delivered",
+        "treatment_runs": 1,
+        "treatment_passes": 0,
+        "intended_memory_deliveries": 0,
+    }
+
+
+def test_memory_component_control_excludes_only_the_sealed_memory(
+    monkeypatch,
+) -> None:
+    source = evaluation.Memory(
+        id="11111111-1111-4111-8111-111111111111",
+        content="Source evidence for Codex host setup.",
+        metadata=evaluation.MemoryMetadata(
+            project="elefante",
+            workspace="historical-snapshot",
+        ),
+    )
+    sealed = evaluation.Memory(
+        id="22222222-2222-4222-8222-222222222222",
+        content="Durable customer installation decision.",
+        metadata=evaluation.MemoryMetadata(project="elefante"),
+    )
+    monkeypatch.setattr(evaluation, "source_snapshot_memories", lambda *_: [source])
+    monkeypatch.setattr(
+        evaluation,
+        "sealed_fixture_memories",
+        lambda *_args, **_kwargs: [sealed],
+    )
+
+    class FakeEmbeddings:
+        async def generate_embeddings_batch(self, values):
+            return [[1.0, 0.0] for _ in values]
+
+    task = {
+        "id": "component-task",
+        "task_statement": "Configure Codex customer memory routing safely.",
+        "success_criteria": ["Preserve existing user instructions."],
+    }
+    control_request, control = asyncio.run(
+        evaluation._snapshot_brief_inputs(
+            ROOT,
+            task,
+            FakeEmbeddings(),
+            profile=TaskBriefProfile.V2,
+            include_sealed_fixture=False,
+        )
+    )
+    treatment_request, treatment = asyncio.run(
+        evaluation._snapshot_brief_inputs(
+            ROOT,
+            task,
+            FakeEmbeddings(),
+            profile=TaskBriefProfile.V2,
+            include_sealed_fixture=True,
+        )
+    )
+
+    assert control_request == treatment_request
+    assert {str(result.memory.id) for result in control} == {str(source.id)}
+    assert {str(result.memory.id) for result in treatment} == {
+        str(source.id),
+        str(sealed.id),
+    }
 
 
 def test_diagnostic_condition_runs_only_one_side(capsys) -> None:

@@ -180,11 +180,20 @@
 **Solution:** Keep registration separate, add one manifest-owned reversible global Codex routing block, declare Recall read-only/idempotent/non-destructive/closed-world, allow a strong `direct_answer` to bypass only the implementation-actionability threshold, and return a seven-field Recall payload without internal wrappers. Rebuild and install the exact customer archive, then prove the journey in an empty directory with Codex JSON events.
 **Lesson:** Availability is not use. A customer memory path is complete only when the host routes a normal question, invokes safely, selects answer-bearing evidence, and returns less context than it saves.
 
+<a id="issue-20"></a>
+
+## Issue #20: Relevant Memory Did Not Supply the Decisive Task Evidence [GAP-053, OPEN]
+
+**Trigger:** Task 032's sealed installation-contract memory was retrieved, selected, and delivered in every treatment, yet treatment accepted 0/3. The two completed source-only controls also failed.
+**Root cause:** Semantic relevance was mistaken for decision value. The memory described global runtime architecture and host coverage, but the black-box task required a real public `elefante-Recall` MCP surface; all five preserved patches changed routing or installer files and omitted that API.
+**Solution:** Reject task 032's tested memory component and preserve its `STOP`. Before another model run, require a different task whose prior memory contributes one specific decision-relevant fact absent from the source-only Brief, then prove that difference in deterministic preflight. The evaluator now compares source-only and memory Briefs directly and stops redundant controls after a bound treatment 0/3.
+**Lesson:** A memory should be selected because it changes the next task action, not because it is topically related. Retrieval, selection, and delivery are healthy only when the evidence portfolio contains the missing decision input.
+
 ---
 
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
-The recurring rules from these 19 issues:
+The recurring rules from these 20 issues:
 
 1. **STATE → DO → VERIFY in the same response** — analysis without action is entertainment. Issues #1, #4.
 2. **Trigger words require proof** — "done" / "ready" / "fixed" must include verification output. Issue #2.
@@ -200,6 +209,7 @@ The recurring rules from these 19 issues:
 12. **Bind and preserve evaluation truth** — task, judge, evidence portfolio, failed workspace, and verdict must remain one inspectable contract. Issue #17.
 13. **Share the complete delivery pipeline** — preprocessing, source validation, selection, and budgets must be identical across runtime paths. Issue #18.
 14. **Prove the normal-question journey** — registration, routing, authorization, selection, and payload economy are separate gates. Issue #19.
+15. **Select for decision value, not topical similarity** — a relevant memory that cannot change the next action is context cost, not Task Intelligence. Issue #20.
 
 Distill any new repeating rule into `../lessons.md`. Postmortems hold the bug-specific narrative; `lessons.md` holds the cross-bug edge.
 

@@ -1,0 +1,64 @@
+{
+  "schema_version": 2,
+  "fixture_id": "install-codex-recall-routing-032-durable-memory",
+  "task_ids": [
+    "install-codex-recall-routing-black-box-032"
+  ],
+  "source": {
+    "kind": "local-durable-memory-export",
+    "memory_id": "f3482775-83b7-47b5-9cbb-d54da9d8bc73",
+    "memory_json_sha256": "db21a34d04f1541088ec00644cf72cdcf52e897563b0ce0b2eb87109ca44265f",
+    "created_at": "2026-08-05T18:53:56.598176",
+    "exported_at": "2026-08-13"
+  },
+  "memory": {
+    "id": "f3482775-83b7-47b5-9cbb-d54da9d8bc73",
+    "content": "Elefante customer installation contract: a release installer places one stable per-user runtime, uses one private data root and one loopback daemon, and verifies user-level registration for every detected compatible IDE or CLI agent. A customer install must fail if any detected compatible host is uncovered. A source checkout is developer scope and must not replace the customer runtime.",
+    "memory_type": "decision",
+    "source": "user_input",
+    "source_detail": "direct_input",
+    "source_reliability": 0.9,
+    "metadata": {
+      "created_at": "2026-08-05T18:53:56.598176",
+      "last_modified": "2026-08-05T18:53:56.598204",
+      "category": "installation",
+      "project": null,
+      "workspace": null,
+      "status": "contradictory",
+      "verified": false,
+      "deprecated": false,
+      "archived": false,
+      "conflict_ids": [],
+      "retention_policy": "managed",
+      "injection_policy": "ranked",
+      "scope": null,
+      "trigger": [],
+      "user_locked": false
+    },
+    "evaluation_overlay": {
+      "status": "verified",
+      "verified": true,
+      "score": 90,
+      "confidence": 0.95,
+      "authority_score": 0.9,
+      "evidence_role": "constraint",
+      "retrieval_specificity": 1.0,
+      "last_accessed_fallback": "created_at"
+    }
+  },
+  "lifecycle_review": {
+    "original_status": "contradictory",
+    "original_verified": false,
+    "original_conflict_ids": [],
+    "resolution": "user-reaffirmed-for-calibration",
+    "status": "approved",
+    "reviewed_at": "2026-08-13",
+    "basis": "The project owner explicitly reaffirmed one global customer runtime across supported tools. This task reuses that pre-existing decision for a distinct Codex Recall-routing behavior; the durable store remains unchanged and the fixture is calibration-only.",
+    "promotion_use": false
+  },
+  "privacy_review": {
+    "status": "approved",
+    "contains_secret": false,
+    "contains_personal_data": false
+  }
+}

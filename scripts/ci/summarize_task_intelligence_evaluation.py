@@ -16,6 +16,10 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MANIFEST = ROOT / "benchmarks/task_intelligence/tasks.json"
 DEFAULT_OUTCOMES = ROOT / "benchmarks/task_intelligence/outcomes"
+COMPARISON_CONDITIONS = {
+    "standard": ("baseline", "task-brief"),
+    "memory-component": ("source-brief", "memory-brief"),
+}
 
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -71,13 +75,14 @@ def load_records(
     reasoning: str,
     run_seed: int,
     brief_profile: TaskBriefProfile = TaskBriefProfile.V1,
+    comparison: str = "standard",
 ) -> list[dict[str, Any]]:
     profile = configuration_id(model, reasoning)
     brief_segment = (
         "" if brief_profile == TaskBriefProfile.V1 else "__brief-v2__contract-*"
     )
     records: list[dict[str, Any]] = []
-    for condition in ("baseline", "task-brief"):
+    for condition in COMPARISON_CONDITIONS[comparison]:
         pattern = f"{condition}__{profile}{brief_segment}__seed-{run_seed}__*.json"
         for path in sorted(outcome_dir.glob(pattern)):
             record = json.loads(path.read_text(encoding="utf-8"))
@@ -98,7 +103,9 @@ def summarize(
     *,
     split: str,
     task_id: str | None = None,
+    comparison: str = "standard",
 ) -> dict[str, Any]:
+    control_condition, treatment_condition = COMPARISON_CONDITIONS[comparison]
     tasks = {task["id"]: task for task in manifest["tasks"] if task["split"] == split}
     if task_id is not None:
         if task_id not in tasks:
@@ -111,7 +118,7 @@ def summarize(
     complete_pairs = {
         key: pair
         for key, pair in pairs.items()
-        if set(pair) == {"baseline", "task-brief"}
+        if set(pair) == {control_condition, treatment_condition}
     }
     repetitions = manifest["measurement"]["paired_repetitions"]
     expected_pairs = len(tasks) * repetitions
@@ -120,9 +127,7 @@ def summarize(
         for task_id in tasks
         for repeat in range(1, repetitions + 1)
     )
-    observed_records = [
-        record for pair in complete_pairs.values() for record in pair.values()
-    ]
+    observed_records = [record for pair in pairs.values() for record in pair.values()]
 
     def stage_trace_is_bound(task_id: str, record: dict[str, Any]) -> bool:
         trace = record.get("stage_trace")
@@ -150,25 +155,45 @@ def summarize(
     stage_observability_complete = (
         protocol_complete and not stage_observability_failures
     )
+    observed_stage_observability_failures = sorted(
+        f"{observed_task_id}:r{repeat}:{condition}"
+        for (observed_task_id, repeat), pair in pairs.items()
+        for condition, record in pair.items()
+        if not stage_trace_is_bound(observed_task_id, record)
+    )
 
     differences: dict[str, list[int]] = defaultdict(list)
     by_class: dict[str, list[int]] = defaultdict(list)
     condition_records: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for (task_id, _repeat), pair in complete_pairs.items():
-        difference = int(pair["task-brief"]["acceptance_passed"]) - int(
-            pair["baseline"]["acceptance_passed"]
+        difference = int(pair[treatment_condition]["acceptance_passed"]) - int(
+            pair[control_condition]["acceptance_passed"]
         )
         differences[task_id].append(difference)
         by_class[tasks[task_id]["task_class"]].append(difference)
         for condition, record in pair.items():
             condition_records[condition].append(record)
+    observed_condition_records: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for pair in pairs.values():
+        for condition, record in pair.items():
+            observed_condition_records[condition].append(record)
 
     total_pairs = len(complete_pairs)
     baseline_passes = sum(
-        int(record["acceptance_passed"]) for record in condition_records["baseline"]
+        int(record["acceptance_passed"])
+        for record in condition_records[control_condition]
     )
     treatment_passes = sum(
-        int(record["acceptance_passed"]) for record in condition_records["task-brief"]
+        int(record["acceptance_passed"])
+        for record in condition_records[treatment_condition]
+    )
+    observed_control_passes = sum(
+        int(record["acceptance_passed"])
+        for record in observed_condition_records[control_condition]
+    )
+    observed_treatment_passes = sum(
+        int(record["acceptance_passed"])
+        for record in observed_condition_records[treatment_condition]
     )
     denominator = total_pairs or 1
     lift = (treatment_passes - baseline_passes) / denominator
@@ -180,10 +205,10 @@ def summarize(
     def total(condition: str, field: str) -> int:
         return sum(record[field] for record in condition_records[condition])
 
-    baseline_input = total("baseline", "input_tokens")
-    treatment_input = total("task-brief", "input_tokens")
-    baseline_duration = total("baseline", "duration_ms")
-    treatment_duration = total("task-brief", "duration_ms")
+    baseline_input = total(control_condition, "input_tokens")
+    treatment_input = total(treatment_condition, "input_tokens")
+    baseline_duration = total(control_condition, "duration_ms")
+    treatment_duration = total(treatment_condition, "duration_ms")
     retry_measurement_available = bool(complete_pairs) and all(
         isinstance(record.get(field), int) and not isinstance(record.get(field), bool)
         for pair in complete_pairs.values()
@@ -196,10 +221,12 @@ def summarize(
     if retry_measurement_available:
         for (task_id, _repeat), pair in complete_pairs.items():
             baseline_count = sum(
-                pair["baseline"][field] for field in ("retries", "human_corrections")
+                pair[control_condition][field]
+                for field in ("retries", "human_corrections")
             )
             treatment_count = sum(
-                pair["task-brief"][field] for field in ("retries", "human_corrections")
+                pair[treatment_condition][field]
+                for field in ("retries", "human_corrections")
             )
             baseline_retry_total += baseline_count
             treatment_retry_total += treatment_count
@@ -249,10 +276,84 @@ def summarize(
         and duration_increase
         <= measurement["maximum_treatment_duration_increase_percent"]
     )
+    intended_memory_id: str | None = None
+    intended_memory_deliveries = 0
+    if comparison == "memory-component" and task_id is not None:
+        fixture = tasks[task_id].get("memory_fixture")
+        if isinstance(fixture, dict):
+            payload = json.loads(
+                (ROOT / fixture["path"]).read_text(encoding="utf-8")
+            )
+            intended_memory_id = str(payload["source"]["memory_id"])
+            intended_memory_deliveries = sum(
+                intended_memory_id in record.get("memory_ids", [])
+                and record.get("stage_trace", {}).get("delivery_status")
+                == "delivered"
+                for record in observed_condition_records[treatment_condition]
+            )
+    local_decision: str | None = None
+    decisive_early_stop = False
+    early_stop_reason: str | None = None
+    if comparison == "memory-component" and task_id is not None:
+        treatment_by_repeat = {
+            repeat: pair[treatment_condition]
+            for (observed_task_id, repeat), pair in pairs.items()
+            if observed_task_id == task_id and treatment_condition in pair
+        }
+        treatment_repeats_complete = set(treatment_by_repeat) == set(
+            range(1, repetitions + 1)
+        )
+        treatment_stages_bound = treatment_repeats_complete and all(
+            stage_trace_is_bound(task_id, record)
+            for record in treatment_by_repeat.values()
+        )
+        observed_treatment_stages_bound = bool(treatment_by_repeat) and all(
+            stage_trace_is_bound(task_id, record)
+            for record in treatment_by_repeat.values()
+        )
+        intended_delivery_failed = observed_treatment_stages_bound and any(
+            intended_memory_id not in record.get("memory_ids", [])
+            or record.get("stage_trace", {}).get("delivery_status") != "delivered"
+            for record in treatment_by_repeat.values()
+        )
+        if intended_delivery_failed:
+            decisive_early_stop = True
+            early_stop_reason = "intended_memory_not_delivered"
+        elif treatment_stages_bound and observed_treatment_passes == 0:
+            decisive_early_stop = True
+            early_stop_reason = f"treatment_passed_0_of_{repetitions}"
+        if (
+            protocol_complete
+            and stage_observability_complete
+            and treatment_passes == expected_pairs
+            and baseline_passes == 0
+            and intended_memory_deliveries == expected_pairs
+            and cost_gate
+        ):
+            local_decision = "LOCAL GO"
+        elif (
+            (
+                protocol_complete
+                and (
+                    treatment_passes == 0
+                    or intended_memory_deliveries < expected_pairs
+                )
+            )
+            or decisive_early_stop
+        ):
+            local_decision = "STOP"
+        else:
+            local_decision = "INCONCLUSIVE"
+    decision_complete = (
+        protocol_complete and stage_observability_complete
+    ) or decisive_early_stop
     return {
         "benchmark_id": manifest["benchmark_id"],
         "split": split,
         "task_id": task_id,
+        "comparison": comparison,
+        "control_condition": control_condition,
+        "treatment_condition": treatment_condition,
         "task_cluster_count": len(differences),
         "inferential_evidence_available": pass_rate_interval is not None,
         "expected_pairs": expected_pairs,
@@ -260,9 +361,21 @@ def summarize(
         "protocol_complete": protocol_complete,
         "stage_observability_complete": stage_observability_complete,
         "stage_observability_failures": stage_observability_failures,
+        "observed_stage_observability_failures": observed_stage_observability_failures,
         "evaluation_complete": protocol_complete and stage_observability_complete,
+        "decision_complete": decision_complete,
+        "decisive_early_stop": decisive_early_stop,
+        "early_stop_reason": early_stop_reason,
         "baseline_passes": baseline_passes,
         "task_brief_passes": treatment_passes,
+        "control_passes": baseline_passes,
+        "treatment_passes": treatment_passes,
+        "observed_control_runs": len(observed_condition_records[control_condition]),
+        "observed_treatment_runs": len(
+            observed_condition_records[treatment_condition]
+        ),
+        "observed_control_passes": observed_control_passes,
+        "observed_treatment_passes": observed_treatment_passes,
         "baseline_pass_rate": round(baseline_passes / denominator, 6),
         "task_brief_pass_rate": round(treatment_passes / denominator, 6),
         "pass_rate_lift_points": round(lift * 100, 6),
@@ -299,23 +412,23 @@ def summarize(
             ),
             "treatment_retrieval_completed": sum(
                 record.get("stage_trace", {}).get("retrieval_status") == "completed"
-                for record in condition_records["task-brief"]
+                for record in observed_condition_records[treatment_condition]
             ),
             "treatment_selection_selected": sum(
                 record.get("stage_trace", {}).get("selection_status") == "selected"
-                for record in condition_records["task-brief"]
+                for record in observed_condition_records[treatment_condition]
             ),
             "treatment_delivery_delivered": sum(
                 record.get("stage_trace", {}).get("delivery_status") == "delivered"
-                for record in condition_records["task-brief"]
+                for record in observed_condition_records[treatment_condition]
             ),
             "baseline_execution_changed": sum(
                 record.get("stage_trace", {}).get("execution_status") == "changed"
-                for record in condition_records["baseline"]
+                for record in observed_condition_records[control_condition]
             ),
             "treatment_execution_changed": sum(
                 record.get("stage_trace", {}).get("execution_status") == "changed"
-                for record in condition_records["task-brief"]
+                for record in observed_condition_records[treatment_condition]
             ),
             "agent_use_unknown": sum(
                 record.get("stage_trace", {}).get("agent_use_status") == "unknown"
@@ -333,6 +446,9 @@ def summarize(
             and effectiveness_gate
             and cost_gate
         ),
+        "intended_memory_id": intended_memory_id,
+        "intended_memory_deliveries": intended_memory_deliveries,
+        "local_decision": local_decision,
         "raw_transcripts_stored": False,
     }
 
@@ -353,7 +469,13 @@ def main(argv: list[str] | None = None) -> int:
         "--split", choices=("calibration", "holdout"), default="holdout"
     )
     parser.add_argument("--task", help="Summarize one task in the selected split")
+    parser.add_argument(
+        "--comparison",
+        choices=tuple(COMPARISON_CONDITIONS),
+        default="standard",
+    )
     parser.add_argument("--require-complete", action="store_true")
+    parser.add_argument("--require-decision", action="store_true")
     parser.add_argument("--require-promotion", action="store_true")
     args = parser.parse_args(argv)
 
@@ -368,15 +490,24 @@ def main(argv: list[str] | None = None) -> int:
         reasoning=args.reasoning,
         run_seed=args.run_seed,
         brief_profile=TaskBriefProfile(args.brief_profile),
+        comparison=args.comparison,
     )
     try:
-        report = summarize(manifest, records, split=args.split, task_id=args.task)
+        report = summarize(
+            manifest,
+            records,
+            split=args.split,
+            task_id=args.task,
+            comparison=args.comparison,
+        )
     except ValueError as error:
         print(json.dumps({"errors": [str(error)]}, indent=2))
         return 2
     report["brief_profile"] = args.brief_profile
     print(json.dumps(report, indent=2, sort_keys=True))
     if args.require_complete and not report["evaluation_complete"]:
+        return 2
+    if args.require_decision and not report["decision_complete"]:
         return 2
     if args.require_promotion and not report["promotion_gate"]:
         return 3

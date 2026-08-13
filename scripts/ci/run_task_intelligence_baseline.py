@@ -391,7 +391,7 @@ def trial_stage_trace(
     acceptance: dict[str, Any],
 ) -> dict[str, Any]:
     """Build the causal-stage trace without storing prompts or memory bodies."""
-    treatment = condition == "task-brief"
+    treatment = condition != BASELINE_CONDITION
     validity = task_promotion_validity(task, repo_root)
     if not treatment:
         retrieval_status = "not-applicable"

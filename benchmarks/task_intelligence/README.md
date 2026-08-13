@@ -8,12 +8,12 @@ product claim.
 - The Task Intelligence **evaluation infrastructure is implemented**. It can
   validate judges, plan capped paired trials, record causal-stage metadata,
   summarize repeated outcomes, and fail promotion closed.
-- `tasks.json` preserves 30 historical tasks, one additional sealed real-memory
-  calibration task, and the v1 evidence record.
+- `tasks.json` preserves 30 historical tasks, two sealed real-memory calibration
+  tasks, and the v1 evidence record.
 - Those tasks are **diagnostic-only** because many hidden tests require an
   undisclosed historical implementation shape. A behaviorally correct repair
   can therefore fail.
-- Eight tasks now have reviewed black-box canaries. Each canary fails at its
+- Nine tasks now have reviewed black-box canaries. Each canary fails at its
   exact base ref and passes at its exact known-good ref. The other 23 tasks
   remain ineligible, so the benchmark as a whole is not promotion-ready.
 - The sealed task binds a reviewed export of one real durable memory to its
@@ -33,6 +33,14 @@ product claim.
   is one task, has no cross-task confidence interval, and exceeded the latency
   gate. Two additional three-pair canaries tied at 3/3, and one harder pair
   failed in both conditions. It is a useful local signal, not a product claim.
+- Task 032 ran the stricter memory-component comparison: identical source Briefs
+  without versus with one sealed durable memory. The intended memory was selected
+  and delivered in 3/3 treatments, but treatment passed 0/3 and control passed
+  0/2 before the decision-complete early `STOP`. Every preserved patch passed
+  routing, instruction-preservation, and uninstall checks, then failed because
+  the real MCP surface still lacked `elefante-Recall`. The memory was relevant
+  architecture context but did not supply the task-local API evidence needed to
+  improve the result.
 - The current retrieval diagnostic reaches a historical repair path in 16/18
   calibration tasks. This measures navigation only, not task success.
 - `--require-promotion-ready` fails closed until every selected task has an
@@ -55,6 +63,10 @@ product claim.
 - A baseline-only calibration screen does not load embeddings or construct a
   Task Brief. Control screening therefore remains independent from Elefante
   retrieval and avoids treatment-only preprocessing cost.
+- A one-task memory-component run stops on a bound failed delivery or after all
+  three bound treatment outcomes make the frozen `STOP` rule irreversible. This
+  reports `decision_complete=true` while leaving paired
+  `evaluation_complete=false`; it can never create a promotion or `LOCAL GO`.
 
 ## Golden path
 
@@ -132,18 +144,20 @@ python scripts/ci/run_task_intelligence_evaluation.py \
 
 # Required first for a sealed real-memory task. This runs no model/API call.
 python scripts/ci/run_task_intelligence_evaluation.py \
-  --task install-uncovered-host-black-box-031 \
-  --brief-profile v2 --repetitions 1 \
+  --task install-codex-recall-routing-black-box-032 \
+  --brief-profile v2 --comparison memory-component --repetitions 3 \
   --memory-fixture \
-  benchmarks/task_intelligence/fixtures/install-uncovered-host-031.memory.json \
+  benchmarks/task_intelligence/fixtures/install-codex-recall-routing-032.memory.json \
   --preflight
 
-# Execute only after the plan reports the exact two-run cost.
+# Execute only after the plan reports the exact capped run count and cost.
 # Failed disposable workspaces are preserved by default for diagnosis. Use
 # --no-keep-failures only when intentionally discarding that evidence.
 python scripts/ci/run_task_intelligence_evaluation.py \
-  --task TASK_ID --brief-profile v2 --repetitions 1 --execute \
-  --max-runs 2 \
+  --task TASK_ID --brief-profile v2 --comparison memory-component \
+  --repetitions 3 --memory-fixture SEALED_FIXTURE \
+  --model gpt-5.6-sol --reasoning max --execute \
+  --max-runs 6 \
   --max-total-input-tokens INPUT_CAP \
   --max-total-uncached-input-tokens UNCACHED_CAP
 
@@ -154,6 +168,12 @@ python scripts/ci/summarize_task_intelligence_evaluation.py \
 # Report one completed task without pretending it proves cross-task lift.
 python scripts/ci/summarize_task_intelligence_evaluation.py \
   --brief-profile v2 --split calibration --task TASK_ID --require-complete
+
+# A pre-registered 0/3 treatment can finish the local STOP decision while a
+# redundant final control remains unrun. It is not a complete paired evaluation.
+python scripts/ci/summarize_task_intelligence_evaluation.py \
+  --brief-profile v2 --comparison memory-component --split calibration \
+  --task TASK_ID --model gpt-5.6-sol --reasoning max --require-decision
 
 # Promotion is a separate, stricter gate and currently fails by design.
 python scripts/ci/summarize_task_intelligence_evaluation.py \
