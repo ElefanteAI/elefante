@@ -38,6 +38,27 @@ journaling are conditional on durable new knowledge or state; commits and all
 remote actions are conditional on authority. “No-op” records are noise, not
 proof of discipline.
 
+### Task Intelligence acquisition boundary
+
+When `elefante-TaskIntelligence` is discoverable, non-trivial repository work
+uses it as part of the lifecycle rather than as a separate benchmark ritual:
+
+1. Before execution, call `action="prepare"` once with the concrete task and
+   observable success criteria. Shadow is the default; pilot delivery requires
+   the explicit local kill switch and `profile="v2"`.
+2. Abstention is valid. Continue from current source/runtime evidence when no
+   memory meets the relevance and governance gates; never weaken selection just
+   to force context.
+3. Keep the tool session alive. Record only delivered IDs that actually informed
+   the work, then record one metadata-only outcome from user, host, or test
+   evidence before the trace expires.
+4. After verification, Step 7 may capture at most one absent, stable, reusable
+   fact. Search first, verify a likely future Recall question, and do not count
+   that post-task memory as evidence for the task that created it.
+
+If the tool is absent or disabled, continue the normal lifecycle using Recall
+and canonical sources; unavailability is not a reason to stop product work.
+
 **The Five Gates (below) and the Documentation Skill (below) are not separate protocols.** They are detailed implementations of step 5 (WRITE) and step 8 (VERIFY). Read them once, internalize, then return to the lifecycle as the operational sequence.
 
 ## The Five Gates

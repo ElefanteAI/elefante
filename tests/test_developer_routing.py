@@ -473,6 +473,7 @@ def test_task_intelligence_docs_keep_release_and_learning_boundaries() -> None:
     tools_doc = _read("docs/reference/tools.md")
     proposal = _read("workspace/proposals/retrieval-effectiveness.md")
     planning = _read("workspace/PLANNING.md")
+    orchestrator = _read("agents/orchestrator.md")
     changelog = _read("CHANGELOG.md")
 
     assert "absent from MCP discovery" in tools_doc
@@ -485,6 +486,11 @@ def test_task_intelligence_docs_keep_release_and_learning_boundaries() -> None:
     assert "if it abstains" in proposal
     assert "Stop and wait for that task" not in proposal
     assert "No second independent causal lift is proven" in planning
+    assert "### Task Intelligence acquisition boundary" in orchestrator
+    assert "Abstention is valid" in orchestrator
+    assert "Keep the tool session alive" in orchestrator
+    assert "do not count" in orchestrator
+    assert "unavailability is not a reason to stop product work" in orchestrator
     assert "does not change ranking" in changelog
 
 
