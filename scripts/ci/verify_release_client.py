@@ -17,6 +17,7 @@ PUBLICATION_STATUSES = ("candidate", "release")
 RUNTIME_FILES = {
     "LICENSE",
     "config.yaml",
+    "elefante-build.json",
     "requirements.client.txt",
     "requirements.client.lock",
 }
@@ -248,6 +249,21 @@ def validate_release_client_archive(
         ):
             raise ValueError(
                 "Publishable client installer requires a clean identified source"
+            )
+
+        build_identity = json.loads(
+            archive.read(f"{payload_prefix}elefante-build.json").decode("utf-8")
+        )
+        expected_identity = {
+            "schema_version": 1,
+            "version": version,
+            "source_commit": commit,
+            "source_clean": source["clean"],
+            "release_channel": publication_status,
+        }
+        if build_identity != expected_identity:
+            raise ValueError(
+                "Installed payload identity does not match the client archive manifest"
             )
 
         if platform_name == "Windows":

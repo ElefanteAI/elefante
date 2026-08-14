@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Callable
@@ -22,10 +23,41 @@ from scripts.setup.host_selection import (  # noqa: E402
     normalize_manifest_surfaces,
 )
 from scripts.setup.install_manifest import (  # noqa: E402
+    BUILD_IDENTITY_FILE_NAME,
+    RELEASE_CHANNELS,
+    SOURCE_COMMIT_PATTERN,
     configured_surfaces,
     manifest_path,
     read_runtime_installation,
 )
+
+
+def _source_version(repo_root: Path) -> str | None:
+    """Read the installed payload version without importing product dependencies."""
+    try:
+        contents = (repo_root / "src" / "__init__.py").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    match = re.search(
+        r'^__version__\s*=\s*"(\d+\.\d+\.\d+)"\s*$',
+        contents,
+        flags=re.MULTILINE,
+    )
+    return match.group(1) if match else None
+
+
+def _build_identity(repo_root: Path) -> tuple[dict[str, Any] | None, str | None]:
+    """Read immutable identity shipped inside a customer payload."""
+    target = repo_root / BUILD_IDENTITY_FILE_NAME
+    if not target.is_file():
+        return None, "runtime_build_identity_missing"
+    try:
+        payload = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, "runtime_build_identity_invalid"
+    if not isinstance(payload, dict):
+        return None, "runtime_build_identity_invalid"
+    return payload, None
 
 
 def _read_manifest(home: Path) -> tuple[dict[str, Any], list[str]]:
@@ -132,6 +164,55 @@ def build_report(
             customer_diagnostics.append("runtime_scope_not_customer")
         if Path(runtime_installation["app_root"]).resolve() != repo_root.resolve():
             customer_diagnostics.append("runtime_root_mismatch")
+        provenance_fields = {"source_commit", "release_channel", "source_clean"}
+        if not provenance_fields <= runtime_installation.keys():
+            customer_diagnostics.append("runtime_provenance_missing")
+        else:
+            source_commit = runtime_installation["source_commit"]
+            release_channel = runtime_installation["release_channel"]
+            source_clean = runtime_installation["source_clean"]
+            provenance_valid = (
+                isinstance(source_commit, str)
+                and (
+                    SOURCE_COMMIT_PATTERN.fullmatch(source_commit) is not None
+                    or (
+                        release_channel == "development"
+                        and source_commit == "unavailable"
+                    )
+                )
+                and isinstance(release_channel, str)
+                and release_channel in RELEASE_CHANNELS
+                and isinstance(source_clean, bool)
+            )
+            if not provenance_valid:
+                customer_diagnostics.append("runtime_provenance_invalid")
+            installed_version = _source_version(repo_root)
+            if installed_version is None:
+                customer_diagnostics.append("runtime_version_unreadable")
+            elif installed_version != runtime_installation["version"]:
+                customer_diagnostics.append("runtime_version_mismatch")
+
+            if runtime_installation["scope"] == "customer":
+                if not isinstance(release_channel, str) or release_channel not in {
+                    "candidate",
+                    "release",
+                }:
+                    customer_diagnostics.append("runtime_release_channel_invalid")
+                if source_clean is not True:
+                    customer_diagnostics.append("runtime_source_not_clean")
+                payload_identity, identity_diagnostic = _build_identity(repo_root)
+                if identity_diagnostic:
+                    customer_diagnostics.append(identity_diagnostic)
+                elif provenance_valid:
+                    expected_identity = {
+                        "schema_version": 1,
+                        "version": runtime_installation["version"],
+                        "source_commit": source_commit,
+                        "source_clean": source_clean,
+                        "release_channel": release_channel,
+                    }
+                    if payload_identity != expected_identity:
+                        customer_diagnostics.append("runtime_build_identity_mismatch")
     if uncovered_hosts:
         customer_diagnostics.append("detected_hosts_unconfigured")
     runtime_ready = not diagnostics
@@ -183,6 +264,15 @@ def _render_text(report: dict) -> str:
             "customer_diagnostics=" + ",".join(report["customer_diagnostics"] or ["none"]),
         ]
     )
+    installation = report.get("installation")
+    if isinstance(installation, dict):
+        lines.extend(
+            [
+                f"installation_version={installation.get('version', 'unknown')}",
+                f"release_channel={installation.get('release_channel', 'unknown')}",
+                f"source_commit={installation.get('source_commit', 'unknown')}",
+            ]
+        )
     return "\n".join(lines)
 
 

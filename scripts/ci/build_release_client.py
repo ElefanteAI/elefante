@@ -27,6 +27,7 @@ PUBLICATION_STATUSES = ("candidate", "release")
 FALLBACK_ARCHIVE_TIMESTAMP = (2026, 8, 5, 12, 0, 0)
 PAYLOAD_ROOT = Path("payload") / "elefante"
 BOOTSTRAP_SCRIPT = Path("scripts/setup/bootstrap_release_bundle.py")
+BUILD_IDENTITY_FILE = "elefante-build.json"
 CLIENT_RUNTIME_FILES = (
     Path("LICENSE"),
     Path("config.yaml"),
@@ -211,6 +212,20 @@ def build_manifest(
     return manifest
 
 
+def build_identity(manifest: dict[str, object]) -> dict[str, object]:
+    """Bind the installed payload to the exact archive source identity."""
+    source = manifest["source"]
+    if not isinstance(source, dict):
+        raise ValueError("Client manifest source identity is invalid")
+    return {
+        "schema_version": 1,
+        "version": manifest["version"],
+        "source_commit": source["commit"],
+        "source_clean": source["clean"],
+        "release_channel": manifest["publication_status"],
+    }
+
+
 def build_unix_wrapper() -> str:
     return """#!/usr/bin/env bash
 set -euo pipefail
@@ -366,6 +381,12 @@ def build_release_client(
     payload_paths = client_payload_paths(root_dir)
     bundle_dir = bundle_directory(platform_name)
     timestamp = source_timestamp(root_dir)
+    manifest = build_manifest(
+        root_dir,
+        platform_name=platform_name,
+        publication_status=publication_status,
+    )
+    identity = build_identity(manifest)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     if output_path.exists():
         output_path.unlink()
@@ -374,15 +395,7 @@ def build_release_client(
         write_text_entry(
             archive,
             f"{bundle_dir}/installer-manifest.json",
-            json.dumps(
-                build_manifest(
-                    root_dir,
-                    platform_name=platform_name,
-                    publication_status=publication_status,
-                ),
-                indent=2,
-            )
-            + "\n",
+            json.dumps(manifest, indent=2) + "\n",
             timestamp=timestamp,
         )
         write_text_entry(
@@ -422,6 +435,12 @@ def build_release_client(
             archive,
             f"{bundle_dir}/{BOOTSTRAP_SCRIPT.as_posix()}",
             root_dir / BOOTSTRAP_SCRIPT,
+            timestamp=timestamp,
+        )
+        write_text_entry(
+            archive,
+            f"{bundle_dir}/{PAYLOAD_ROOT.as_posix()}/{BUILD_IDENTITY_FILE}",
+            json.dumps(identity, indent=2) + "\n",
             timestamp=timestamp,
         )
         for relative_path in payload_paths:

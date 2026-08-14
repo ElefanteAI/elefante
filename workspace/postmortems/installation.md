@@ -239,7 +239,7 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 
 <a id="issue-24"></a>
 
-## Issue #24: Installed Runtime Version Did Not Identify Its Source [BUG-052, OPEN]
+## Issue #24: Installed Runtime Version Did Not Identify Its Source [BUG-052, FIXED in development]
 
 **Trigger:** A 2026-08-13 audit compared the installed runtime with published
 main and the Task Intelligence development branch. The installed
@@ -254,16 +254,20 @@ published, development, or candidate code built from different commits.
 `doctor` can report a truthful semantic version but an incomplete build
 identity; development features may appear published. This does not prove that
 any external customer received the development build.
-**Required solution:** Define an additive build-provenance contract containing
-semantic version, immutable source commit, and release channel. Installer,
-manifest reader, `doctor`, archive metadata, upgrade/repair, and rollback must
-agree on that identity and fail visibly on inconsistent state. Stable and
-development runtimes must remain independently recoverable; do not mutate the
-current installation until the implementation plan and rollback are approved.
-**Required guard:** Contract tests must cover published, development, malformed,
-legacy-manifest, upgrade, repair, and rollback states. Exact-artifact verification
-must compare the recorded source identity with the built payload before any
-release claim.
+**Solution:** Customer archives now contain the source identity twice at
+different boundaries: publication metadata in `installer-manifest.json` and an
+installed `elefante-build.json` inside the payload. The verifier and bootstrap
+require them to match before host mutation; `install.py` records version, source
+commit, source cleanliness, and channel in schema-v3 ownership state; `doctor`
+compares that state with the installed payload and rejects missing, legacy,
+dirty, development-channel, version-mismatched, or commit-mismatched customer
+identity. Developer bundles declare `development`; known-good rollback is a
+normal reinstall whose older payload identity replaces the newer record.
+**Guard:** Focused installer, release-client, doctor, and workflow tests cover
+candidate/release versus development, malformed and legacy identity, archive
+drift, delegated-install drift, upgrade, repair, and known-good reinstall. The
+macOS candidate workflow additionally requires the installed source commit to
+equal `GITHUB_SHA`. The existing live installation was not modified.
 **Lesson:** A semantic version identifies a release contract, not arbitrary code
 built after that release. Reproducible product evidence requires version plus
 source provenance and channel.

@@ -349,6 +349,9 @@ def test_release_client_candidate_workflow_is_validation_only():
     assert '"$install_root/scripts/lifecycle/doctor.py" --json' in workflow
     assert 'report["customer_ready"] is True' in workflow
     assert 'report["installation"]["version"] == "2.12.2"' in workflow
+    assert 'report["installation"]["release_channel"] == "candidate"' in workflow
+    assert 'report["installation"]["source_commit"] == os.environ["GITHUB_SHA"]' in workflow
+    assert 'report["installation"]["source_clean"] is True' in workflow
     assert '"$install_root/scripts/lifecycle/uninstall_elefante.py" --apply' in workflow
     assert "if manifest_path.exists():" in workflow
     assert "softprops/action-gh-release" not in workflow

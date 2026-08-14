@@ -5,13 +5,17 @@ from __future__ import annotations
 import os
 import hashlib
 import json
+import re
 import subprocess
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 
 MANIFEST_NAME = "install-manifest.json"
-MANIFEST_SCHEMA_VERSION = 2
+MANIFEST_SCHEMA_VERSION = 3
+BUILD_IDENTITY_FILE_NAME = "elefante-build.json"
+RELEASE_CHANNELS = {"candidate", "development", "release"}
+SOURCE_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
 
 
 def file_hash(path: Path) -> str:
@@ -122,11 +126,27 @@ def record_runtime_installation(
     data_root: Path,
     version: str,
     scope: str,
+    source_commit: str,
+    release_channel: str,
+    source_clean: bool,
     home: Path | None = None,
 ) -> Path:
     """Record the runtime identity that customer readiness must verify."""
     if scope not in {"customer", "developer"}:
         raise ValueError("runtime installation scope must be customer or developer")
+    if release_channel not in RELEASE_CHANNELS:
+        raise ValueError("runtime release channel must be candidate, development, or release")
+    if not SOURCE_COMMIT_PATTERN.fullmatch(source_commit):
+        if not (release_channel == "development" and source_commit == "unavailable"):
+            raise ValueError("runtime source commit must be a 40-character lowercase Git SHA")
+    if not isinstance(source_clean, bool):
+        raise ValueError("runtime source cleanliness must be boolean")
+    if scope == "customer" and (
+        release_channel not in {"candidate", "release"}
+        or source_commit == "unavailable"
+        or not source_clean
+    ):
+        raise ValueError("customer runtime requires clean candidate or release source provenance")
     target = manifest_path(home)
     target.parent.mkdir(parents=True, exist_ok=True)
     data = _load_manifest(target)
@@ -134,14 +154,22 @@ def record_runtime_installation(
         "app_root": str(Path(app_root).expanduser().resolve()),
         "data_root": str(Path(data_root).expanduser().resolve()),
         "scope": scope,
+        "source_clean": source_clean,
+        "source_commit": source_commit,
+        "release_channel": release_channel,
         "version": version,
     }
     _write_manifest(target, data)
     return target
 
 
-def read_runtime_installation(home: Path | None = None) -> dict[str, str] | None:
-    """Read a valid runtime identity without adopting malformed state."""
+def read_runtime_installation(home: Path | None = None) -> dict[str, str | bool] | None:
+    """Read basic runtime identity while preserving provenance for diagnosis.
+
+    Legacy schema-v2 manifests remain readable so repair and doctor can explain
+    the missing provenance instead of pretending the installation never existed.
+    New writes are strict schema-v3 identities.
+    """
     target = manifest_path(home)
     if not target.exists():
         return None
@@ -156,7 +184,11 @@ def read_runtime_installation(home: Path | None = None) -> dict[str, str] | None
         return None
     if runtime["scope"] not in {"customer", "developer"}:
         return None
-    return {key: runtime[key] for key in required}
+    result: dict[str, str | bool] = {key: runtime[key] for key in required}
+    for key in ("source_commit", "release_channel", "source_clean"):
+        if key in runtime:
+            result[key] = runtime[key]
+    return result
 
 
 def configured_surfaces(

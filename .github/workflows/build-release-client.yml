@@ -89,6 +89,7 @@ jobs:
             "$install_root/scripts/lifecycle/doctor.py" --json > "$doctor_report"
           python - "$doctor_report" "$install_root" <<'PY'
           import json
+          import os
           import sys
           from pathlib import Path
 
@@ -98,6 +99,9 @@ jobs:
           assert report["customer_ready"] is True, report
           assert report["installation"]["scope"] == "customer", report
           assert report["installation"]["version"] == "2.12.2", report
+          assert report["installation"]["release_channel"] == "candidate", report
+          assert report["installation"]["source_commit"] == os.environ["GITHUB_SHA"], report
+          assert report["installation"]["source_clean"] is True, report
           assert report["installation"]["app_root"] == expected_root, report
           assert report["host_coverage"]["uncovered"] == [], report
           PY

@@ -26,6 +26,50 @@ from packaging.requirements import Requirement
 
 
 ROOT = Path(__file__).resolve().parents[1]
+TEST_SOURCE_COMMIT = "a" * 40
+
+
+def _write_customer_runtime_identity(repo: Path, home: Path, version: str) -> Path:
+    """Create one internally consistent installed-customer identity fixture."""
+    source_dir = repo / "src"
+    source_dir.mkdir(parents=True, exist_ok=True)
+    (source_dir / "__init__.py").write_text(
+        f'__version__ = "{version}"\n',
+        encoding="utf-8",
+    )
+    build_identity = {
+        "schema_version": 1,
+        "version": version,
+        "source_commit": TEST_SOURCE_COMMIT,
+        "source_clean": True,
+        "release_channel": "candidate",
+    }
+    (repo / "elefante-build.json").write_text(
+        json.dumps(build_identity),
+        encoding="utf-8",
+    )
+    manifest = home / ".elefante" / "install-manifest.json"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": 3,
+                "files": {},
+                "commands": {},
+                "runtime": {
+                    "app_root": str(repo),
+                    "data_root": str(home / ".elefante" / "data"),
+                    "scope": "customer",
+                    "version": version,
+                    "source_commit": TEST_SOURCE_COMMIT,
+                    "source_clean": True,
+                    "release_channel": "candidate",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    return manifest
 
 
 def test_installer_entrypoint_starts_without_product_dependencies():
@@ -247,6 +291,42 @@ def _load_module(path: Path, name: str):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def test_customer_installer_requires_identity_bound_to_payload(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/install.py", "install_identity_module")
+    identity = {
+        "schema_version": 1,
+        "version": module.ELEFANTE_VERSION,
+        "source_commit": TEST_SOURCE_COMMIT,
+        "source_clean": True,
+        "release_channel": "candidate",
+    }
+    (tmp_path / "elefante-build.json").write_text(
+        json.dumps(identity),
+        encoding="utf-8",
+    )
+
+    assert module.resolve_runtime_provenance(
+        root_dir=tmp_path,
+        installation_scope="customer",
+        release_profile="client",
+        expected_version=module.ELEFANTE_VERSION,
+        source_commit=TEST_SOURCE_COMMIT,
+        release_channel="candidate",
+        source_clean=True,
+    ) == identity
+
+    with pytest.raises(ValueError, match="do not match"):
+        module.resolve_runtime_provenance(
+            root_dir=tmp_path,
+            installation_scope="customer",
+            release_profile="client",
+            expected_version=module.ELEFANTE_VERSION,
+            source_commit="b" * 40,
+            release_channel="candidate",
+            source_clean=True,
+        )
 
 
 def test_build_dashboard_ui_prefers_bundled_assets(tmp_path):
@@ -539,24 +619,7 @@ def test_doctor_reports_ready_only_when_runtime_and_daemon_are_healthy(tmp_path)
     )
 
     home = tmp_path / "home"
-    manifest = home / ".elefante" / "install-manifest.json"
-    manifest.parent.mkdir(parents=True)
-    manifest.write_text(
-        json.dumps(
-            {
-                "schema_version": 2,
-                "files": {},
-                "commands": {},
-                "runtime": {
-                    "app_root": str(repo),
-                    "data_root": str(home / ".elefante" / "data"),
-                    "scope": "customer",
-                    "version": "9.9.9",
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
+    _write_customer_runtime_identity(repo, home, "9.9.9")
 
     report = module.build_report(
         repo_root=repo,
@@ -586,6 +649,38 @@ def test_client_doctor_uses_runtime_host_contract_without_developer_manifest(tmp
     (repo / ".venv" / "bin").mkdir(parents=True)
     (repo / ".venv" / "bin" / "python").write_text("", encoding="utf-8")
     (repo / "config.yaml").write_text("app_name: elefante\n", encoding="utf-8")
+    home = tmp_path / "home"
+    _write_customer_runtime_identity(repo, home, "2.12.2")
+
+    report = module.build_report(
+        repo_root=repo,
+        home=home,
+        service_inspector=lambda _: {
+            "daemon_health": True,
+            "service_runtime": "active",
+            "service_file_ownership": "owned",
+        },
+        host_detector=lambda **_: set(),
+        surface_inspector=lambda _: set(),
+    )
+
+    assert report["ready"] is True
+    assert report["customer_ready"] is True
+    assert report["diagnostics"] == []
+    assert report["integrations"]["compatible"] == sorted(module.SUPPORTED_HOSTS)
+
+
+def test_doctor_rejects_legacy_customer_identity_without_provenance(tmp_path):
+    module = _load_module(ROOT / "scripts/lifecycle/doctor.py", "doctor_legacy_identity_module")
+    repo = tmp_path / "repo"
+    (repo / ".venv" / "bin").mkdir(parents=True)
+    (repo / ".venv" / "bin" / "python").write_text("", encoding="utf-8")
+    (repo / "config.yaml").write_text("app_name: elefante\n", encoding="utf-8")
+    (repo / "src").mkdir()
+    (repo / "src" / "__init__.py").write_text(
+        '__version__ = "2.12.2"\n',
+        encoding="utf-8",
+    )
     home = tmp_path / "home"
     manifest = home / ".elefante" / "install-manifest.json"
     manifest.parent.mkdir(parents=True)
@@ -619,9 +714,41 @@ def test_client_doctor_uses_runtime_host_contract_without_developer_manifest(tmp
     )
 
     assert report["ready"] is True
-    assert report["customer_ready"] is True
-    assert report["diagnostics"] == []
-    assert report["integrations"]["compatible"] == sorted(module.SUPPORTED_HOSTS)
+    assert report["customer_ready"] is False
+    assert report["customer_diagnostics"] == ["runtime_provenance_missing"]
+
+
+def test_doctor_rejects_runtime_and_payload_identity_mismatch(tmp_path):
+    module = _load_module(ROOT / "scripts/lifecycle/doctor.py", "doctor_identity_mismatch_module")
+    repo = tmp_path / "repo"
+    (repo / ".venv" / "bin").mkdir(parents=True)
+    (repo / ".venv" / "bin" / "python").write_text("", encoding="utf-8")
+    (repo / "config.yaml").write_text("app_name: elefante\n", encoding="utf-8")
+    home = tmp_path / "home"
+    _write_customer_runtime_identity(repo, home, "2.12.2")
+    payload_identity = json.loads(
+        (repo / "elefante-build.json").read_text(encoding="utf-8")
+    )
+    payload_identity["source_commit"] = "b" * 40
+    (repo / "elefante-build.json").write_text(
+        json.dumps(payload_identity),
+        encoding="utf-8",
+    )
+
+    report = module.build_report(
+        repo_root=repo,
+        home=home,
+        service_inspector=lambda _: {
+            "daemon_health": True,
+            "service_runtime": "active",
+            "service_file_ownership": "owned",
+        },
+        host_detector=lambda **_: set(),
+        surface_inspector=lambda _: set(),
+    )
+
+    assert report["customer_ready"] is False
+    assert "runtime_build_identity_mismatch" in report["customer_diagnostics"]
 
 
 def test_doctor_reports_missing_runtime_and_invalid_manifest_without_mutating_it(tmp_path):
@@ -716,24 +843,7 @@ def test_doctor_reports_detected_but_unconfigured_customer_hosts(tmp_path):
     matrix.mkdir(parents=True)
     (matrix / "ide-integration.yaml").write_text("surfaces: []\n", encoding="utf-8")
     home = tmp_path / "home"
-    manifest = home / ".elefante" / "install-manifest.json"
-    manifest.parent.mkdir(parents=True)
-    manifest.write_text(
-        json.dumps(
-            {
-                "schema_version": 2,
-                "files": {},
-                "commands": {},
-                "runtime": {
-                    "app_root": str(repo),
-                    "data_root": str(home / ".elefante" / "data"),
-                    "scope": "customer",
-                    "version": "9.9.9",
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
+    _write_customer_runtime_identity(repo, home, "9.9.9")
 
     report = module.build_report(
         repo_root=repo,
@@ -1527,14 +1637,77 @@ def test_install_manifest_records_customer_runtime_without_losing_owned_surfaces
         data_root=home / ".elefante" / "data",
         version="9.9.9",
         scope="customer",
+        source_commit=TEST_SOURCE_COMMIT,
+        release_channel="release",
+        source_clean=True,
         home=home,
     )
     payload = json.loads(target.read_text(encoding="utf-8"))
 
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == 3
     assert payload["runtime"]["scope"] == "customer"
+    assert payload["runtime"]["source_commit"] == TEST_SOURCE_COMMIT
+    assert payload["runtime"]["release_channel"] == "release"
     assert module.read_runtime_installation(home)["version"] == "9.9.9"
     assert module.configured_surfaces(home) == {"vscode-copilot"}
+
+
+def test_runtime_identity_tracks_upgrade_repair_and_known_good_rollback(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/install_manifest.py", "runtime_upgrade_module")
+    home = tmp_path / "home"
+    app_root = tmp_path / "app" / "current"
+    data_root = home / ".elefante" / "data"
+
+    module.record_runtime_installation(
+        app_root=app_root,
+        data_root=data_root,
+        version="2.12.2",
+        scope="customer",
+        source_commit="a" * 40,
+        release_channel="release",
+        source_clean=True,
+        home=home,
+    )
+    module.record_runtime_installation(
+        app_root=app_root,
+        data_root=data_root,
+        version="2.12.3",
+        scope="customer",
+        source_commit="b" * 40,
+        release_channel="candidate",
+        source_clean=True,
+        home=home,
+    )
+    upgraded = module.read_runtime_installation(home)
+    assert upgraded["version"] == "2.12.3"
+    assert upgraded["source_commit"] == "b" * 40
+
+    module.record_runtime_installation(
+        app_root=app_root,
+        data_root=data_root,
+        version="2.12.3",
+        scope="customer",
+        source_commit="b" * 40,
+        release_channel="candidate",
+        source_clean=True,
+        home=home,
+    )
+    assert module.read_runtime_installation(home) == upgraded
+
+    module.record_runtime_installation(
+        app_root=app_root,
+        data_root=data_root,
+        version="2.12.2",
+        scope="customer",
+        source_commit="a" * 40,
+        release_channel="release",
+        source_clean=True,
+        home=home,
+    )
+    rolled_back = module.read_runtime_installation(home)
+    assert rolled_back["version"] == "2.12.2"
+    assert rolled_back["source_commit"] == "a" * 40
+    assert rolled_back["release_channel"] == "release"
 
 
 def test_json_surface_verification_ignores_unrelated_user_settings(tmp_path):
@@ -1651,6 +1824,9 @@ def test_complete_uninstall_can_clear_customer_runtime_identity(tmp_path):
         data_root=home / ".elefante" / "data",
         version="9.9.9",
         scope="customer",
+        source_commit=TEST_SOURCE_COMMIT,
+        release_channel="release",
+        source_clean=True,
         home=home,
     )
 

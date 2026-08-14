@@ -76,6 +76,19 @@ The installer:
 Rerunning the same installer repairs the runtime and connects compatible hosts
 installed later. It preserves the existing memory store.
 
+### Build identity boundary
+
+The published v2.12.2 installer records its semantic version but predates the
+source-provenance guard. Do not use that version alone to attribute unreleased
+behavior to the published release.
+
+The next provenance-aware customer candidate records and cross-checks the
+semantic version, exact clean source commit, and `candidate` or `release`
+channel in the archive, installed payload, ownership manifest, and `doctor`
+report. A legacy, dirty, development-channel, or mismatched customer runtime is
+not reported customer-ready. Reinstalling a known-good published archive
+restores that archive's identity without changing the memory data root.
+
 ## 4. Verify the customer installation
 
 Restart the IDE or agent host, then ask:
@@ -102,7 +115,9 @@ Run the read-only doctor if needed:
 ```
 
 `doctor` is diagnostic. It does not start services, change host configuration,
-or migrate data.
+migrate data, or repair build identity. A provenance-aware customer runtime
+reports matching `installation.version`, `installation.source_commit`, and
+`installation.release_channel` values.
 
 ## 5. Supported installation surfaces
 

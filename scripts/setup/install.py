@@ -124,6 +124,8 @@ from configure_antigravity import (  # noqa: E402
 from configure_cursor_kiro import configure_detected_hosts, infer_repo_python  # noqa: E402
 from configure_cli_agents import configure_detected_cli_hosts  # noqa: E402
 from install_manifest import (  # noqa: E402
+    BUILD_IDENTITY_FILE_NAME,
+    SOURCE_COMMIT_PATTERN,
     configured_surfaces,
     read_runtime_installation,
     record_runtime_installation,
@@ -143,6 +145,92 @@ from host_selection import (  # noqa: E402
 
 class InstallationCancelled(Exception):
     """Raised when the operator cancels at a safe checkpoint."""
+
+
+def _git_source_identity(root_dir: Path) -> tuple[str, bool]:
+    """Return source-checkout provenance for a developer installation."""
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=root_dir,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        dirty = bool(
+            subprocess.run(
+                ["git", "status", "--porcelain", "--untracked-files=no"],
+                cwd=root_dir,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return "unavailable", False
+    return commit, not dirty
+
+
+def resolve_runtime_provenance(
+    *,
+    root_dir: Path,
+    installation_scope: str,
+    release_profile: str,
+    expected_version: str | None,
+    source_commit: str | None,
+    release_channel: str | None,
+    source_clean: bool,
+) -> dict[str, str | bool]:
+    """Resolve one fail-closed identity before installation mutates the host."""
+    if expected_version is not None and expected_version != ELEFANTE_VERSION:
+        raise ValueError(
+            f"installer expected version {expected_version}, payload reports {ELEFANTE_VERSION}"
+        )
+
+    if installation_scope == "customer":
+        if release_profile != RELEASE_PROFILE_CLIENT:
+            raise ValueError("customer installation requires the client runtime profile")
+        if expected_version is None or source_commit is None or release_channel is None:
+            raise ValueError("customer installation requires complete build provenance")
+        if (
+            release_channel not in {"candidate", "release"}
+            or not SOURCE_COMMIT_PATTERN.fullmatch(source_commit)
+            or not source_clean
+        ):
+            raise ValueError("customer installation requires clean candidate or release provenance")
+        identity_path = root_dir / BUILD_IDENTITY_FILE_NAME
+        try:
+            payload_identity = json.loads(identity_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise ValueError("customer payload build identity is missing or invalid") from error
+        expected_identity = {
+            "schema_version": 1,
+            "version": ELEFANTE_VERSION,
+            "source_commit": source_commit,
+            "source_clean": True,
+            "release_channel": release_channel,
+        }
+        if payload_identity != expected_identity:
+            raise ValueError("customer payload and delegated installer identities do not match")
+        return expected_identity
+
+    if release_profile != RELEASE_PROFILE_DEVELOPER:
+        raise ValueError("developer installation requires the developer runtime profile")
+    if release_channel not in {None, "development"}:
+        raise ValueError("developer installation cannot claim a customer release channel")
+    if source_commit is None:
+        source_commit, source_clean = _git_source_identity(root_dir)
+    elif not (
+        SOURCE_COMMIT_PATTERN.fullmatch(source_commit) or source_commit == "unavailable"
+    ):
+        raise ValueError("developer source commit identity is invalid")
+    return {
+        "schema_version": 1,
+        "version": ELEFANTE_VERSION,
+        "source_commit": source_commit,
+        "source_clean": source_clean,
+        "release_channel": "development",
+    }
 
 
 def developer_runtime_conflicts_with_customer(
@@ -1183,6 +1271,18 @@ def main():
             "direct source-checkout installs are developer runtimes."
         ),
     )
+    parser.add_argument("--expected-version", help="Bundle-declared semantic version")
+    parser.add_argument("--source-commit", help="Bundle-declared immutable source commit")
+    parser.add_argument(
+        "--release-channel",
+        choices=("candidate", "development", "release"),
+        help="Bundle-declared release channel",
+    )
+    parser.add_argument(
+        "--source-clean",
+        action="store_true",
+        help="Confirm the bundle was built from a clean source tree",
+    )
     args = parser.parse_args()
 
     verbose_mode = args.verbose
@@ -1190,6 +1290,19 @@ def main():
     release_profile = args.release_profile
 
     root_dir = ROOT_DIR
+    try:
+        runtime_provenance = resolve_runtime_provenance(
+            root_dir=root_dir,
+            installation_scope=args.installation_scope,
+            release_profile=release_profile,
+            expected_version=args.expected_version,
+            source_commit=args.source_commit,
+            release_channel=args.release_channel,
+            source_clean=args.source_clean,
+        )
+    except ValueError as error:
+        print(f"ERROR: Invalid runtime identity: {error}")
+        raise SystemExit(1) from error
     log_file = resolve_output_path(root_dir, args.log_file, INSTALL_LOG_FILE_NAME)
     status_file = resolve_output_path(root_dir, args.status_file, INSTALL_STATUS_FILE_NAME)
     summary_file = resolve_output_path(root_dir, args.summary_file, INSTALL_SUMMARY_FILE_NAME)
@@ -1237,6 +1350,8 @@ def main():
     logger.log(f"  Log:         {log_file}")
     logger.log(f"  Python:      {sys.version.split()[0]}")
     logger.log(f"  Profile:     {release_profile}")
+    logger.log(f"  Channel:     {runtime_provenance['release_channel']}")
+    logger.log(f"  Source:      {str(runtime_provenance['source_commit'])[:12]}")
     if args.installation_scope == "customer":
         logger.log("  Agent hosts: every detected compatible host (customer-global)")
     elif selected_hosts is None:
@@ -1532,6 +1647,9 @@ def main():
                     data_root=Path(data_dir),
                     version=ELEFANTE_VERSION,
                     scope=args.installation_scope,
+                    source_commit=str(runtime_provenance["source_commit"]),
+                    release_channel=str(runtime_provenance["release_channel"]),
+                    source_clean=bool(runtime_provenance["source_clean"]),
                 )
             except (OSError, RuntimeError, ValueError) as error:
                 logger.log(f"ERROR: Could not record runtime installation: {error}")

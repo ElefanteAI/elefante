@@ -10,13 +10,17 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import stat
 import sys
 import zipfile
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
+TEST_COMMIT = "a" * 40
 
 
 def _load_module(path: Path, name: str):
@@ -103,7 +107,7 @@ def test_build_install_command_targets_installed_payload(tmp_path):
     assert command[0] == "/usr/bin/python3"
     assert command[1] == str(install_root / "scripts/setup/install.py")
     assert str(install_root / ".elefante-install-status.txt") in command
-    assert command[command.index("--installation-scope") + 1] == "customer"
+    assert command[command.index("--installation-scope") + 1] == "developer"
     assert "--host" not in command
 
 
@@ -118,9 +122,20 @@ def test_client_bundle_command_selects_the_client_runtime_profile(tmp_path):
         python_executable="/usr/bin/python3",
         venv_mode="reuse",
         release_profile="client",
+        build_identity={
+            "schema_version": 1,
+            "version": "9.9.9",
+            "source_commit": TEST_COMMIT,
+            "source_clean": True,
+            "release_channel": "candidate",
+        },
     )
 
     assert command[-2:] == ["--release-profile", "client"]
+    assert command[command.index("--installation-scope") + 1] == "customer"
+    assert command[command.index("--source-commit") + 1] == TEST_COMMIT
+    assert command[command.index("--release-channel") + 1] == "candidate"
+    assert "--source-clean" in command
 
 
 def test_client_bundle_layout_requires_the_client_lock(tmp_path):
@@ -135,11 +150,57 @@ def test_client_bundle_layout_requires_the_client_lock(tmp_path):
     (payload_root / "scripts" / "setup" / "install.py").write_text("", encoding="utf-8")
     (payload_root / "requirements.client.txt").write_text("", encoding="utf-8")
     (payload_root / "requirements.client.lock").write_text("", encoding="utf-8")
+    (payload_root / "elefante-build.json").write_text("{}", encoding="utf-8")
     (bundle_root / "scripts" / "setup" / "bootstrap_release_bundle.py").write_text(
         "", encoding="utf-8"
     )
 
     assert module.ensure_bundle_layout(bundle_root, release_profile="client") == payload_root
+
+
+def test_bootstrap_rejects_archive_payload_identity_mismatch(tmp_path):
+    module = _load_module(
+        ROOT / "scripts/setup/bootstrap_release_bundle.py",
+        "bootstrap_release_bundle_identity_module",
+    )
+    bundle_root = tmp_path / "bundle"
+    payload_root = bundle_root / "payload" / "elefante"
+    payload_root.mkdir(parents=True)
+    manifest = {
+        "version": "9.9.9",
+        "release_profile": "client",
+        "publication_status": "candidate",
+        "source": {"commit": TEST_COMMIT, "clean": True},
+    }
+    identity = {
+        "schema_version": 1,
+        "version": "9.9.9",
+        "source_commit": TEST_COMMIT,
+        "source_clean": True,
+        "release_channel": "candidate",
+    }
+    (payload_root / "elefante-build.json").write_text(
+        json.dumps(identity),
+        encoding="utf-8",
+    )
+
+    assert module.load_build_identity(
+        bundle_root,
+        manifest,
+        release_profile="client",
+    ) == identity
+
+    identity["source_commit"] = "b" * 40
+    (payload_root / "elefante-build.json").write_text(
+        json.dumps(identity),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="do not match"):
+        module.load_build_identity(
+            bundle_root,
+            manifest,
+            release_profile="client",
+        )
 
 
 def test_render_failed_install_guidance_points_to_persisted_files(tmp_path):
@@ -169,6 +230,28 @@ def test_bundle_dry_run_never_places_payload(monkeypatch, tmp_path):
     (payload_root / "scripts" / "setup" / "install.py").write_text("", encoding="utf-8")
     (payload_root / "requirements.txt").write_text("", encoding="utf-8")
     (payload_root / "requirements.lock").write_text("", encoding="utf-8")
+    identity = {
+        "schema_version": 1,
+        "version": "9.9.9",
+        "source_commit": "unavailable",
+        "source_clean": False,
+        "release_channel": "development",
+    }
+    (payload_root / "elefante-build.json").write_text(
+        json.dumps(identity),
+        encoding="utf-8",
+    )
+    (bundle_root / "installer-manifest.json").write_text(
+        json.dumps(
+            {
+                "version": "9.9.9",
+                "release_profile": "developer",
+                "release_channel": "development",
+                "source": {"commit": "unavailable", "clean": False},
+            }
+        ),
+        encoding="utf-8",
+    )
     (bundle_root / "scripts" / "setup" / "bootstrap_release_bundle.py").write_text(
         "",
         encoding="utf-8",
@@ -234,9 +317,12 @@ def test_build_installer_bundle_writes_macos_launchers_and_payload(tmp_path):
     assert "elefante-installer-macOS/Install Elefante.bat" not in names
     assert "elefante-installer-macOS/scripts/setup/bootstrap_release_bundle.py" in names
     assert "elefante-installer-macOS/payload/elefante/scripts/setup/install.py" in names
+    assert "elefante-installer-macOS/payload/elefante/elefante-build.json" in names
     assert "elefante-installer-macOS/payload/elefante/requirements.lock" in names
     assert "elefante-installer-macOS/payload/elefante/src/dashboard/ui/dist/index.html" in names
     assert '"entrypoints": [\n    "Install Elefante.command",\n    "install.sh"\n  ]' in manifest
+    assert '"release_profile": "developer"' in manifest
+    assert '"release_channel": "development"' in manifest
     assert 'Double-click "Install Elefante.command"' in start_here
     assert "Administrator access and Terminal commands are not required." in start_here
     assert "chmod +x" not in start_here

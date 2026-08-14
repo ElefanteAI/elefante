@@ -114,6 +114,11 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Unrelated user-owned servers with the same name remain untouched.
 - Installation now proves the same stdio bridge and local daemon path used by
   customer IDEs, with enough startup time for a cold local runtime.
+- Customer build identity now binds archive metadata, installed payload,
+  ownership state, and `doctor` to the same semantic version, clean source
+  commit, and candidate/release channel. Legacy, dirty, development-channel,
+  or mismatched customer runtimes fail readiness instead of allowing
+  development behavior to masquerade as a published release.
 
 ## [2.12.2] - 2026-08-05
 
