@@ -44,8 +44,10 @@ published, v2.12.2 installers still expose the documented 16-tool surface.
   only when the user explicitly requests that protection. Never infer durable
   capture from ordinary conversation, and never store secrets. Leave `scope`
   unset unless an exact project, workspace, or task identifier is known; never
-  use descriptive prose. A triggered policy needs literal future-question
-  phrases. After writing, call `elefante-Recall` with one likely future question;
+  use descriptive prose. Prefer ranked delivery when relevant paraphrases should
+  work. Use a triggered policy only when literal phrases are intentionally
+  required; never choose it merely to pass one verification question. After
+  writing, call `elefante-Recall` with one likely future question;
   a stored receipt is not proof that the memory is deliverable.
 
 **Tool response contract**:

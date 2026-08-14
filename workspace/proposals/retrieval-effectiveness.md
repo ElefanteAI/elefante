@@ -37,8 +37,9 @@ PRD.
   [`../ISSUES.md`](../ISSUES.md).
 - Task 032 completed the bounded path through §10. Its local verdict is `STOP`;
   do not rerun it, weaken its judge, or treat it as product evidence.
-- The next action is the replacement-task screen in §14. Product code remains
-  unchanged until a different reproducible causal failure is demonstrated.
+- The replacement-task screen in §14 exposed a reproducible answer-selection
+  failure and a positive-control overcorrection. The bounded repair and first
+  real question result are recorded there; do not restart the task-032 path.
 
 If new evidence contradicts this contract, update this canonical PRD and its
 planning index in the same change. Do not silently route around it.
@@ -108,7 +109,9 @@ The evidence boundary is equally important:
 
 Therefore, “add more context” is rejected. “Implement Memory Identity first” is
 also not yet justified: no preserved outcome proves that state identity or scope
-resolution was the first causal failure.
+resolution was the first causal failure. A later real fresh-session question did
+produce a one-task local correctness signal after capture policy and selection
+were corrected; it is not representative evidence.
 
 ## 3. Completed decision
 
@@ -508,13 +511,39 @@ tag, release, or deployment.
       the rule.
 - [x] Evidence and current state recorded in canonical developer surfaces.
 
-## 14. Immediate goal
+## 14. Immediate goal and first real question signal
 
-> **Your goal is to preserve the proven explicit search→write→Recall path, then
-> select one independently arising task where a pre-existing memory contains a
-> decision-relevant fact absent from source-only evidence. Prove that difference
-> model-free, then measure accepted task value per total token in the frozen pair.**
+The first independently arising question after durable capture asked for the
+single criterion that distinguishes valuable Elefante work from overhead. The
+pre-existing canonical mission contained that user decision; the clean control
+had no project source or prior conversation.
 
-The capture and delivery gate is complete; task lift is not. If no eligible task
-exists, stop and wait rather than inventing one, changing retrieval, or spending
-model tokens.
+The first live Recall attempt exposed two sequential failures. The mission had
+been configured as literal-triggered to make one verification question pass, so
+a natural paraphrase was blocked. After a reversible `triggered` → `ranked`
+metadata correction, the first selector repair still rejected the mission
+because it replaced a false-positive role shortcut with one absolute lexical
+coverage threshold. The final bounded repair keeps that negative guard and adds
+one explicit governance path: a user-locked, scoped, ranked directive may guide
+a semantically strong decision question in its named scope. Ordinary memories
+still need direct or structural task evidence, and the rule does not depend on
+unrelated competitors being present.
+
+Model-free proof now selects only the canonical mission for the paraphrase and
+still abstains on the unrelated issue-2 screen. A seeded three-pair Sol Max
+component screen produced 3/3 accepted treatment answers and 0/3 control answers
+(`UNKNOWN`). Total input plus output tokens were 43,984 treatment and 43,532
+control; the additional 452 tokens changed accepted value from zero to three.
+A separate fresh Codex session invoked live `elefante-Recall` and answered the
+question correctly. This is a local one-task signal, not a representative or
+release claim; the maintained evaluator does not yet bind question-response
+outcomes, so do not call it promotion evidence.
+
+> **Your goal is now to preserve this two-sided selector and reproduce accepted
+> value per total token on one second independently arising task with a different
+> pre-existing decision-changing memory. Do not invent that task or build a new
+> framework while waiting for it.**
+
+One local question lift exists; representative lift does not. If no second
+eligible task exists, stop and wait rather than inventing one, changing
+retrieval, or spending model tokens.

@@ -588,7 +588,7 @@ def test_v2_constraint_role_cannot_replace_a_question_specific_anchor() -> None:
         workspace=None,
         status=MemoryStatus.RELATED,
         score=0.60,
-        vector_score=0.86,
+        vector_score=0.95,
     )
     request = TaskBriefRequest(
         task=(
@@ -609,6 +609,121 @@ def test_v2_constraint_role_cannot_replace_a_question_specific_anchor() -> None:
     assert brief.abstained is True
     assert brief.selected_memory_ids == []
     assert brief.omissions[0].reason == "insufficient-independent-relevance"
+
+
+def test_v2_selects_scoped_user_locked_directive_for_decision_paraphrase() -> None:
+    mission = _result(
+        (
+            "Elefante canonical objective: maximize accepted task quality per total "
+            "token spent. A failed answer contributes zero accepted value regardless "
+            "of cheapness; memory volume and feature count are not success."
+        ),
+        memory_type=MemoryType.DIRECTIVE,
+        project=None,
+        workspace=None,
+        status=MemoryStatus.RELATED,
+        score=0.678,
+        vector_score=0.895530,
+    )
+    mission.memory.metadata.scope = "elefante"
+    mission.memory.metadata.user_locked = True
+    mission.memory.metadata.injection_policy = "ranked"
+    noise = _result(
+        (
+            "Elefante Developer Etiquette specification for versioning, CLEAN, and "
+            "DOC_SYNC. Review the working tree before claiming done."
+        ),
+        memory_type=MemoryType.SPECIFICATION,
+        project=None,
+        workspace=None,
+        status=MemoryStatus.RELATED,
+        score=0.595,
+        vector_score=0.888275,
+    )
+    request = TaskBriefRequest(
+        task=(
+            "In a fresh Elefante project session, what single criterion must govern "
+            "whether the next change is valuable rather than overhead?"
+        ),
+        profile=TaskBriefProfile.V2,
+    )
+
+    compiler = TaskBriefCompiler()
+    ranked = compiler._rank_candidates_v2(request, [noise, mission])
+    by_id = {str(item.result.memory.id): item for item in ranked}
+    brief = compiler.compile(request, [noise, mission])
+
+    assert by_id[str(mission.memory.id)].retrieval_signals["governing_directive"] == 1.0
+    assert by_id[str(noise.memory.id)].retrieval_signals["governing_directive"] == 0.0
+    assert compiler._is_actionable(by_id[str(mission.memory.id)]) is True
+    assert compiler._is_actionable(by_id[str(noise.memory.id)]) is False
+    assert brief.selected_memory_ids == [str(mission.memory.id)]
+
+
+def test_v2_governing_directive_does_not_depend_on_competing_candidates() -> None:
+    mission = _result(
+        "Aster canonical objective is accepted customer value per total cost.",
+        memory_type=MemoryType.DIRECTIVE,
+        project=None,
+        workspace=None,
+        status=MemoryStatus.RELATED,
+        score=0.68,
+        vector_score=0.89,
+    )
+    mission.memory.metadata.scope = "aster"
+    mission.memory.metadata.user_locked = True
+    mission.memory.metadata.injection_policy = "ranked"
+    request = TaskBriefRequest(
+        task="Which criterion should govern Aster product priorities?",
+        profile=TaskBriefProfile.V2,
+    )
+
+    brief = TaskBriefCompiler().compile(request, [mission])
+
+    assert brief.selected_memory_ids == [str(mission.memory.id)]
+
+
+def test_v2_governing_directive_requires_decision_scope_and_strong_relevance() -> None:
+    mission = _result(
+        "Aster canonical objective is accepted customer value per total cost.",
+        memory_type=MemoryType.DIRECTIVE,
+        project=None,
+        workspace=None,
+        status=MemoryStatus.RELATED,
+        score=0.68,
+        vector_score=0.95,
+    )
+    mission.memory.metadata.scope = "aster"
+    mission.memory.metadata.user_locked = True
+    mission.memory.metadata.injection_policy = "ranked"
+    compiler = TaskBriefCompiler()
+
+    non_decision = compiler.compile(
+        TaskBriefRequest(
+            task="Explain Aster contact form error logs.",
+            profile=TaskBriefProfile.V2,
+        ),
+        [mission],
+    )
+    wrong_scope = compiler.compile(
+        TaskBriefRequest(
+            task="Which criterion should govern Borealis product priorities?",
+            profile=TaskBriefProfile.V2,
+        ),
+        [mission],
+    )
+    mission.vector_score = 0.84
+    weak_relevance = compiler.compile(
+        TaskBriefRequest(
+            task="Which criterion should govern Aster product priorities?",
+            profile=TaskBriefProfile.V2,
+        ),
+        [mission],
+    )
+
+    assert non_decision.abstained is True
+    assert wrong_scope.abstained is True
+    assert weak_relevance.abstained is True
 
 
 def test_v2_selects_a_constraint_with_a_question_specific_text_anchor() -> None:

@@ -978,7 +978,7 @@ class ElefanteMCPServer:
             result["ENTRYPOINT_SEQUENCE_READ_THIS_FIRST"] = [
                 "1. Search Elefante memory before asserting project preferences, decisions, or prior context.",
                 "2. When the user explicitly asks Elefante to remember something across sessions, search the exact concept, then add or correct one concise record with invocation_mode=\"user_directed\".",
-                "3. Leave scope unset unless an exact project, workspace, or task identifier is known; never use descriptive prose. A triggered policy requires literal phrases expected in a future question.",
+                "3. Leave scope unset unless an exact project, workspace, or task identifier is known; never use descriptive prose. Prefer ranked delivery when relevant paraphrases should work. Use a triggered policy only when literal phrases are intentionally required; never choose it merely to pass one verification question.",
                 "4. After a successful write, Recall one likely future question. Stored is not proof of deliverable. Never infer memory from ordinary conversation; require explicit authority for locks or permanent retention, and never store passwords, API keys, access tokens, or secrets.",
                 "5. Use retrieved memories as evidence, surface material conflicts, and keep only the smallest useful context set.",
             ]
@@ -1166,7 +1166,7 @@ class ElefanteMCPServer:
 
 Call action=search before answering when user preferences, past decisions, or prior project context may materially change the result. Treat matches as evidence candidates: compare recency, provenance, lifecycle, and current source; surface material conflicts instead of applying a fixed type or timestamp winner.
 
-**CRITICAL PERSISTENCE RULE:** The chronological session context buffer clears on IDE restart. When the user explicitly asks Elefante to remember something across sessions, search the exact concept, then add or correct one concise record with `invocation_mode="user_directed"`. Leave `scope` unset unless an exact project, workspace, or task identifier is known; never use descriptive prose. A triggered policy requires literal future-question phrases. After writing, verify one likely future question with `elefante-Recall`; a stored receipt is not proof that the memory is deliverable. Never infer durable capture from ordinary conversation, and never store secrets.""",
+**CRITICAL PERSISTENCE RULE:** The chronological session context buffer clears on IDE restart. When the user explicitly asks Elefante to remember something across sessions, search the exact concept, then add or correct one concise record with `invocation_mode="user_directed"`. Leave `scope` unset unless an exact project, workspace, or task identifier is known; never use descriptive prose. Prefer ranked delivery when relevant paraphrases should work. Use a triggered policy only when literal phrases are intentionally required; never choose it merely to pass one verification question. After writing, verify one likely future question with `elefante-Recall`; a stored receipt is not proof that the memory is deliverable. Never infer durable capture from ordinary conversation, and never store secrets.""",
                     inputSchema={
                         "type": "object",
                         "properties": {

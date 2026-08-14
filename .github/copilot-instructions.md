@@ -43,8 +43,10 @@ concept and then add or correct one concise record with
 `invocation_mode="user_directed"`. Set `user_locked=true` or permanent retention
 only when the user explicitly requests that protection. Never infer a memory
 request from ordinary conversation. Leave `scope` unset unless an exact project,
-workspace, or task identifier is known; never use descriptive prose. A triggered
-policy needs literal phrases expected in a future question. After writing, call
+workspace, or task identifier is known; never use descriptive prose. Prefer
+ranked delivery when relevant paraphrases should work. Use a triggered policy
+only when literal phrases are intentionally required; never choose it merely to
+pass one verification question. After writing, call
 `elefante-Recall` with one likely future question; stored is not proof of
 deliverable.
 

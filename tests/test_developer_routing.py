@@ -684,6 +684,8 @@ def test_explicit_user_capture_contract_is_synced_across_loaded_surfaces() -> No
         assert "explicitly asks Elefante to remember" in document, name
         assert "user_directed" in document, name
         assert "descriptive prose" in document, name
+        assert "ranked" in document and "paraphrase" in document, name
+        assert "one verification question" in document, name
         assert "stored" in document.lower() and "deliverable" in document.lower(), name
         assert "ordinary conversation" in document, name
         assert "secret" in document.lower(), name

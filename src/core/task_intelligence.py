@@ -15,7 +15,8 @@ from uuid import UUID
 from pydantic import BaseModel, Field, model_validator
 
 from src.core.governance import governance_reason, is_mandatory
-from src.models.memory import Memory, MemoryStatus, MemoryType
+from src.core.retrieval import CognitiveRetriever
+from src.models.memory import InjectionPolicy, Memory, MemoryStatus, MemoryType
 from src.models.query import QueryMode, SearchFilters, SearchResult
 from src.utils.token_counter import estimate_tokens
 
@@ -165,6 +166,7 @@ class TaskBriefCompiler:
     MIN_RELIABILITY = 0.5
     MIN_RETRIEVAL_SCORE = 0.3
     MIN_ROLE_ANCHOR_COVERAGE = 0.20
+    MIN_GOVERNING_DIRECTIVE_SEMANTIC = 0.85
     _VALIDATION_MARKERS = (
         "acceptance",
         "assert",
@@ -655,6 +657,7 @@ class TaskBriefCompiler:
         query_counts = self._canonical_term_counts(query_text)
         query_terms = set(query_counts)
         anchor_terms = {term for term, count in query_counts.items() if count >= 2}
+        query_intent = CognitiveRetriever.infer_intent(query_text)
         for result in candidates:
             memory = result.memory
             memory_id = str(memory.id)
@@ -683,6 +686,21 @@ class TaskBriefCompiler:
             )
             semantic = float(
                 result.vector_score if result.vector_score is not None else result.score
+            )
+            memory_type = str(memory.metadata.memory_type).casefold()
+            governing_directive = float(
+                query_intent == "decide"
+                and memory_type == MemoryType.DIRECTIVE.value
+                and bool(memory.metadata.user_locked)
+                and str(memory.metadata.injection_policy).casefold()
+                == InjectionPolicy.RANKED.value
+                and self._declared_scope_anchor(
+                    memory.metadata.scope,
+                    query_text,
+                    project=request.project,
+                    workspace=request.workspace,
+                )
+                and semantic >= self.MIN_GOVERNING_DIRECTIVE_SEMANTIC
             )
             role = self._role_for(memory, relationships)
             stage = self._stage_for_role(role)
@@ -719,6 +737,7 @@ class TaskBriefCompiler:
                     6,
                 ),
                 "actionability": round(actionability, 6),
+                "governing_directive": governing_directive,
             }
             signals["direct_answer"] = float(
                 semantic >= 0.78
@@ -727,7 +746,14 @@ class TaskBriefCompiler:
             )
             positive_signals = [
                 name
-                for name in ("lexical", "path", "symbol", "dependency", "source_code")
+                for name in (
+                    "lexical",
+                    "path",
+                    "symbol",
+                    "dependency",
+                    "source_code",
+                    "governing_directive",
+                )
                 if float(signals[name]) > 0
             ]
             reason = (
@@ -776,10 +802,14 @@ class TaskBriefCompiler:
             )
             >= 0.5
         )
+        governing_directive = (
+            float(signals.get("governing_directive", 0.0)) > 0.0
+        )
         if (
             int(signals.get("matched_terms", 0)) < minimum_matches
             and float(signals.get("dependency", 0.0)) == 0.0
             and not strong_location_match
+            and not governing_directive
         ):
             return False
         if float(signals.get("specificity", 0.0)) == 0.0:
@@ -797,6 +827,7 @@ class TaskBriefCompiler:
                 float(signals.get("path", 0.0)) > 0.0,
                 float(signals.get("symbol", 0.0)) > 0.0,
                 float(signals.get("dependency", 0.0)) > 0.0,
+                governing_directive,
             )
         )
         decision_bearing_role = item.role in {
@@ -817,6 +848,7 @@ class TaskBriefCompiler:
             or float(signals.get("dependency", 0.0)) > 0.0
             or float(signals.get("specificity", 0.0)) > 0.0
             or float(signals.get("direct_answer", 0.0)) > 0.0
+            or governing_directive
             or role_text_anchor
         )
         # A candidate already classified as a direct answer has strong semantic
@@ -828,6 +860,35 @@ class TaskBriefCompiler:
             independent >= 2
             and action_anchor
             and (direct_answer or item.actionability_score >= 0.3)
+        )
+
+    @staticmethod
+    def _declared_scope_anchor(
+        scope: str | None,
+        query: str,
+        *,
+        project: str | None,
+        workspace: str | None,
+    ) -> bool:
+        """Require the declared non-global scope to be explicit in this task."""
+        declared = str(scope or "").strip().casefold()
+        if not declared or declared == "global":
+            return False
+        aliases = {declared}
+        if ":" in declared:
+            aliases.add(declared.split(":", 1)[1])
+        explicit = {
+            str(project or "").strip().casefold(),
+            str(workspace or "").strip().casefold(),
+        }
+        explicit.discard("")
+        if aliases & explicit:
+            return True
+        query_folded = str(query or "").casefold()
+        return any(
+            bool(re.search(rf"(?<!\w){re.escape(alias)}(?!\w)", query_folded))
+            for alias in aliases
+            if alias
         )
 
     @classmethod
