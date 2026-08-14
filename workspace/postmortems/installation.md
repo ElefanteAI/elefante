@@ -239,17 +239,24 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 
 <a id="issue-24"></a>
 
-## Issue #24: Installed Runtime Version Did Not Identify Its Source [BUG-052, FIXED in development]
+## Issue #24: Installed Runtime Version Did Not Identify Its Source [BUG-052, FIXED AGAIN in development]
 
 **Trigger:** A 2026-08-13 audit compared the installed runtime with published
 main and the Task Intelligence development branch. The installed
 `src/mcp/server.py` blob matched unreleased commit `7c705ca`, while
 `src/__init__.py` and `~/.elefante/install-manifest.json` reported `2.12.2`.
 The manifest contained no source commit or release channel.
+During the first exact-candidate attempt, GitHub Actions then exposed a second
+boundary error: the pull-request workflow used the default temporary merge
+checkout, so the archive truthfully embedded an ephemeral merge SHA rather than
+the durable reviewed branch-head SHA. Installation was stopped before mutation.
 **Root cause:** Runtime identity records only the semantic version, application
 root, data root, and customer/developer scope. That is sufficient when every
 build with a version is byte-equivalent to the release, but it cannot distinguish
 published, development, or candidate code built from different commits.
+The candidate workflow also assumed `GITHUB_SHA` always meant the reviewed
+source commit; for a `pull_request` event it denotes GitHub's temporary merge
+commit.
 **Impact:** Installed-path evidence can be attributed to the wrong release;
 `doctor` can report a truthful semantic version but an incomplete build
 identity; development features may appear published. This does not prove that
@@ -263,11 +270,18 @@ compares that state with the installed payload and rejects missing, legacy,
 dirty, development-channel, version-mismatched, or commit-mismatched customer
 identity. Developer bundles declare `development`; known-good rollback is a
 normal reinstall whose older payload identity replaces the newer record.
+Candidate artifact jobs now resolve one `SOURCE_COMMIT`: the pull-request head
+SHA for PRs and `github.sha` for tags, pushes, and manual runs. They check out
+that exact commit before building and compare the installed identity with the
+same value. Candidate checksum manifests are generated from inside `dist/`, so
+they remain valid after GitHub strips the upload directory.
 **Guard:** Focused installer, release-client, doctor, and workflow tests cover
 candidate/release versus development, malformed and legacy identity, archive
 drift, delegated-install drift, upgrade, repair, and known-good reinstall. The
 macOS candidate workflow additionally requires the installed source commit to
-equal `GITHUB_SHA`. The existing live installation was not modified.
+equal `SOURCE_COMMIT`. Workflow regressions require both candidate producers to
+use the same durable checkout rule and require the standalone artifact checksum
+to use a portable basename. The existing live installation was not replaced.
 **Lesson:** A semantic version identifies a release contract, not arbitrary code
 built after that release. Reproducible product evidence requires version plus
 source provenance and channel.

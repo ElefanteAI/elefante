@@ -175,6 +175,8 @@ def test_build_workflow_uses_maintained_release_scripts():
     assert '"scripts/setup/**"' in workflow
     assert '"scripts/lifecycle/**"' in workflow
     assert '"src/**"' in workflow
+    assert "SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}" in workflow
+    assert "ref: ${{ env.SOURCE_COMMIT }}" in workflow
     assert "python scripts/ci/build_release_client.py" in workflow
     assert "python scripts/ci/verify_release_client.py" in workflow
     assert "python scripts/ci/resolve_release_publication.py" in workflow
@@ -350,8 +352,12 @@ def test_release_client_candidate_workflow_is_validation_only():
     assert 'report["customer_ready"] is True' in workflow
     assert 'report["installation"]["version"] == "2.12.2"' in workflow
     assert 'report["installation"]["release_channel"] == "candidate"' in workflow
-    assert 'report["installation"]["source_commit"] == os.environ["GITHUB_SHA"]' in workflow
+    assert "SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}" in workflow
+    assert "ref: ${{ env.SOURCE_COMMIT }}" in workflow
+    assert 'report["installation"]["source_commit"] == os.environ["SOURCE_COMMIT"]' in workflow
     assert 'report["installation"]["source_clean"] is True' in workflow
+    assert "(cd dist && shasum -a 256 elefante-v2.12.2-rc.1-macOS.zip > SHA256SUMS)" in workflow
+    assert '"tests/test_release_pipeline.py"' in workflow
     assert '"$install_root/scripts/lifecycle/uninstall_elefante.py" --apply' in workflow
     assert "if manifest_path.exists():" in workflow
     assert "softprops/action-gh-release" not in workflow

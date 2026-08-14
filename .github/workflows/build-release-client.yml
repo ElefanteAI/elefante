@@ -17,17 +17,22 @@ on:
       - "scripts/setup/install.py"
       - "src/**"
       - "tests/test_release_client_bundle.py"
+      - "tests/test_release_pipeline.py"
   workflow_dispatch:
 
 jobs:
   macos-client-candidate:
     name: Build clean macOS client candidate
     runs-on: macos-latest
+    env:
+      SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
     permissions:
       contents: read
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SOURCE_COMMIT }}
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
@@ -66,7 +71,7 @@ jobs:
         run: |
           python scripts/ci/build_release_client.py --platform macOS --publication-status candidate --output dist/elefante-v2.12.2-rc.1-macOS.zip
           python scripts/ci/verify_release_client.py --archive dist/elefante-v2.12.2-rc.1-macOS.zip --require-clean-source --expected-publication-status candidate --expected-platform macOS
-          shasum -a 256 dist/elefante-v2.12.2-rc.1-macOS.zip > dist/SHA256SUMS
+          (cd dist && shasum -a 256 elefante-v2.12.2-rc.1-macOS.zip > SHA256SUMS)
       - name: Prove a fresh macOS customer installation
         shell: bash
         run: |
@@ -100,7 +105,7 @@ jobs:
           assert report["installation"]["scope"] == "customer", report
           assert report["installation"]["version"] == "2.12.2", report
           assert report["installation"]["release_channel"] == "candidate", report
-          assert report["installation"]["source_commit"] == os.environ["GITHUB_SHA"], report
+          assert report["installation"]["source_commit"] == os.environ["SOURCE_COMMIT"], report
           assert report["installation"]["source_clean"] is True, report
           assert report["installation"]["app_root"] == expected_root, report
           assert report["host_coverage"]["uncovered"] == [], report
