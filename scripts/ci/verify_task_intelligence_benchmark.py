@@ -696,8 +696,8 @@ def validate_manifest(manifest_path: Path, repo_root: Path = ROOT) -> dict[str, 
         errors.append("nondeterministic paired repetitions must remain 3")
     if measurement.get("run_seed") != 20260805:
         errors.append("paired evaluation seed must remain frozen")
-    if measurement.get("maximum_treatment_input_increase_percent") != 20:
-        errors.append("treatment input-cost limit must remain 20 percent")
+    if measurement.get("maximum_treatment_total_token_increase_percent") != 20:
+        errors.append("treatment total-token limit must remain 20 percent")
     if measurement.get("maximum_treatment_duration_increase_percent") != 25:
         errors.append("treatment duration limit must remain 25 percent")
 

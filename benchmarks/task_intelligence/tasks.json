@@ -37,7 +37,7 @@
     "raw_transcripts_stored": false,
     "local_outcome_retention_days": 30,
     "run_seed": 20260805,
-    "maximum_treatment_input_increase_percent": 20,
+    "maximum_treatment_total_token_increase_percent": 20,
     "maximum_treatment_duration_increase_percent": 25
   },
   "baseline_configuration": {

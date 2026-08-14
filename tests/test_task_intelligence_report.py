@@ -168,6 +168,115 @@ def test_measured_retry_reduction_is_an_effectiveness_path() -> None:
     assert result["promotion_gate"] is False
 
 
+def test_accepted_results_can_improve_total_token_intelligence() -> None:
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    tasks = [task for task in manifest["tasks"] if task["split"] == "holdout"]
+    records = []
+    for task in tasks:
+        for repeat in range(1, 4):
+            control = _record(task["id"], "baseline", repeat, True)
+            treatment = _record(task["id"], "task-brief", repeat, True)
+            treatment.update({"input_tokens": 500, "cached_input_tokens": 400})
+            treatment["output_tokens"] = 50
+            records.extend((control, treatment))
+
+    result = report.summarize(manifest, records, split="holdout")
+
+    assert result["pass_rate_gate"] is False
+    assert result["paired_control_total_tokens"] == len(tasks) * 3 * 1100
+    assert result["paired_treatment_total_tokens"] == len(tasks) * 3 * 550
+    assert result["observed_total_tokens"] == len(tasks) * 3 * 1650
+    assert result["paired_total_token_increase_percent"] == -50
+    assert (
+        result["paired_control_accepted_outcomes_per_million_total_tokens"]
+        == 909.090909
+    )
+    assert (
+        result["paired_treatment_accepted_outcomes_per_million_total_tokens"]
+        == 1818.181818
+    )
+    assert result["token_intelligence_lift_per_million_total_tokens"] == 909.090909
+    assert result["token_intelligence_95_percent_ci_per_million_total_tokens"] == [
+        909.090909,
+        909.090909,
+    ]
+    assert result["token_intelligence_gate"] is True
+    assert result["effectiveness_gate"] is True
+
+
+def test_cheap_failures_have_zero_token_intelligence_value() -> None:
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    tasks = [task for task in manifest["tasks"] if task["split"] == "holdout"]
+    records = []
+    for task in tasks:
+        for repeat in range(1, 4):
+            control = _record(task["id"], "baseline", repeat, False)
+            treatment = _record(task["id"], "task-brief", repeat, False)
+            treatment.update(
+                {"input_tokens": 1, "cached_input_tokens": 0, "output_tokens": 1}
+            )
+            records.extend((control, treatment))
+
+    result = report.summarize(manifest, records, split="holdout")
+
+    assert result["paired_control_accepted_outcomes_per_million_total_tokens"] == 0
+    assert result["paired_treatment_accepted_outcomes_per_million_total_tokens"] == 0
+    assert result["token_intelligence_lift_per_million_total_tokens"] == 0
+    assert result["token_intelligence_95_percent_ci_per_million_total_tokens"] == [
+        0,
+        0,
+    ]
+    assert result["token_intelligence_gate"] is False
+    assert result["effectiveness_gate"] is False
+
+
+def test_token_efficiency_cannot_hide_an_acceptance_regression() -> None:
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    tasks = [task for task in manifest["tasks"] if task["split"] == "holdout"]
+    records = []
+    for task in tasks:
+        for repeat in range(1, 4):
+            control = _record(task["id"], "baseline", repeat, True)
+            treatment = _record(
+                task["id"], "task-brief", repeat, passed=repeat < 3
+            )
+            treatment.update(
+                {"input_tokens": 1, "cached_input_tokens": 0, "output_tokens": 1}
+            )
+            records.extend((control, treatment))
+
+    result = report.summarize(manifest, records, split="holdout")
+
+    assert result["treatment_passes"] < result["control_passes"]
+    assert result["token_intelligence_lift_per_million_total_tokens"] > 0
+    assert result["token_intelligence_gate"] is False
+    assert result["effectiveness_gate"] is False
+
+
+def test_output_tokens_are_part_of_the_cost_gate() -> None:
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    task_id = "runtime-restore-integrity-025"
+    records = []
+    for repeat in range(1, 4):
+        control = _record(task_id, "baseline", repeat, True)
+        treatment = _record(task_id, "task-brief", repeat, True)
+        treatment.update(
+            {"input_tokens": 1000, "cached_input_tokens": 800, "output_tokens": 1000}
+        )
+        records.extend((control, treatment))
+
+    result = report.summarize(
+        manifest,
+        records,
+        split="calibration",
+        task_id=task_id,
+    )
+
+    assert result["input_token_increase_percent"] == 0
+    assert result["paired_total_token_increase_percent"] == 81.818182
+    assert result["cost_gate"] is False
+
+
 def test_single_task_report_is_complete_but_not_inferential() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     task_id = "runtime-restore-integrity-025"
@@ -255,6 +364,11 @@ def test_memory_component_zero_of_three_is_a_decisive_early_stop() -> None:
     assert result["early_stop_reason"] == "treatment_passed_0_of_3"
     assert result["observed_control_runs"] == 2
     assert result["observed_treatment_runs"] == 3
+    assert result["paired_control_total_tokens"] == 2400
+    assert result["paired_treatment_total_tokens"] == 2400
+    assert result["observed_control_total_tokens"] == 2400
+    assert result["observed_treatment_total_tokens"] == 3600
+    assert result["observed_total_tokens"] == 6000
     assert result["intended_memory_deliveries"] == 3
     assert result["local_decision"] == "STOP"
 

@@ -1,6 +1,6 @@
 ---
 status: living
-last_updated: 2026-08-13
+last_updated: 2026-08-14
 audience: developer-agents
 authority: state + roadmap + features + aspect-plans for Elefante development
 related:
@@ -21,11 +21,13 @@ related:
 
 ## §1 Vision
 
-**Elefante is a local memory authority that improves intelligence per task.**
+**Elefante is a local memory authority that maximizes accepted task quality per
+total token.**
 
 Every AI agent runs on the same physics: a finite context window where every token either raises the probability of a correct answer or dilutes it. Most workflows lose by injecting noise — restated history, irrelevant retrievals, polite filler, stale assumptions. Elefante wins by injecting only the tokens with the highest decision-value at the moment of action.
 
-**The product is one sentence:** *Elefante gives each task the smallest governed set of durable context that measurably improves its outcome.*
+**The product is one sentence:** *Elefante gives each task the smallest governed
+set of durable context that measurably improves accepted value per total token.*
 
 User-facing definition: *"Elefante is a persistent second brain for AI agents."*
 
@@ -34,7 +36,8 @@ User-facing definition: *"Elefante is a persistent second brain for AI agents."*
 1. **Continuity** — Relevant durable context can carry across sessions; a new task is not forced to inherit unrelated history.
 2. **Compliance** — Search before a memory write so existing knowledge is reused or amended instead of duplicated.
 3. **Grounding** — Project-specific claims require current memory or workspace evidence; otherwise they are UNKNOWN.
-4. **Task Intelligence** — Retrieved context must measurably improve task outcomes. Token efficiency is a constraint, not a substitute for correctness.
+4. **Task Intelligence** — Retrieved context must improve accepted task value
+   per total token. A failed task has zero value, however cheaply it fails.
 
 Laws 1–3 protect continuity and truth; Law 4 defines the product outcome.
 
@@ -186,7 +189,7 @@ verification methods, not product priorities.
 
 | Priority | Customer outcome | Current state | Exit gate |
 |----------|------------------|---------------|-----------|
-| **P0 — Improve one real memory-dependent task** | The governed memory bundle causes a better accepted answer/action than the source-only Task Brief v2 path | Task 032 is a completed local `STOP`. GAP-054's explicit capture gate now passes model-free: one user-directed canonical mission is durable and Recall-deliverable after literal scope correction. This proves continuity, not lift; no eligible independent task has been selected. | Select one independently arising task where a pre-existing memory contributes a decision-changing fact absent from source-only evidence. Prove the difference model-free before any capped paired run. |
+| **P0 — Improve one real memory-dependent task** | The governed memory bundle increases accepted task value per total token against the source-only Task Brief v2 path | Task 032 is a completed local `STOP`. GAP-054's explicit capture gate now passes model-free: one user-directed canonical mission is durable and Recall-deliverable after literal scope correction. GAP-055 aligns the evaluator with total input plus output tokens, but proves no task lift. No eligible independent task has been selected. | Select one independently arising task where a pre-existing memory contributes a decision-changing fact absent from source-only evidence. Prove the difference model-free before any capped paired run. |
 | **P1 — Generalize without losing trust** | Benefit repeats across independent task classes without privacy, authority, scope, contradiction, token, or latency failure | No one-task result establishes representative benefit | Repeat on an independent task, then use a fresh powered design only if both local signals survive |
 | **P2 — Ship a recoverable customer capability** | Supported hosts receive the proven behavior with clear diagnostics and rollback | Published v2.12.2 is stable; later behavior is unreleased | BUG-052 provenance, exact-SHA customer packages, host install/repair/uninstall, docs, and explicit release authority |
 
@@ -327,7 +330,9 @@ v2.10.0 journal and changelog; reopen only with new user or retrieval evidence.
 
 ### §5.1 Active blockers
 
-- Task Intelligence has evaluation infrastructure but no demonstrated outcome lift across a representative multi-task corpus.
+- Task Intelligence has evaluation infrastructure but no demonstrated increase
+  in accepted task value per total token across a representative multi-task
+  corpus.
 - No next task is selected. GAP-054's explicit user-directed capture and Recall
   delivery path now passes model-free, but no independently arising task has
   yet shown a pre-existing memory fact absent from source-only evidence.
@@ -353,8 +358,10 @@ v2.10.0 journal and changelog; reopen only with new user or retrieval evidence.
   preflight is green and with explicit cumulative token caps.
 - Add independently reviewed real-memory tasks from different task classes;
   never reuse the consumed preliminary holdout for promotion.
-- Measure correctness, retries, corrections, token cost, latency, privacy, and
-  failure stage independently.
+- Measure black-box acceptance, retries, corrections, total input-plus-output
+  token cost, latency, privacy, and failure stage independently; compare the
+  combined accepted-value-per-total-token result only within frozen paired
+  tasks.
 - Keep the 17th development tool and pilot delivery default-off until a fresh
   representative holdout demonstrates net task improvement.
 
@@ -489,6 +496,7 @@ This section is the chronological record of curation events, decisions, and abso
 
 | Date | Event | Driver | Measurement |
 |------|-------|--------|-------------|
+| 2026-08-14 | **GAP-055 aligned Task Intelligence with accepted task value per total token.** The paired report now counts input plus output tokens, reports accepted outcomes per million total tokens, gives rejected work zero value, blocks acceptance regression, and admits token intelligence as an effectiveness path only when the task-clustered 95% lower bound is positive. Fair comparison uses complete pairs while observed spend includes every completed run. The user-directed canonical objective was amended in place in memory `0b27fa62-d459-4029-a390-391305ab555d`; a fresh Recall supplied the corrected objective. | The prior evaluator separated correctness/retries from an input-only cost ceiling. It omitted output cost and could neither express the governing objective nor distinguish accepted work made cheaper from cheap failure. The first replay also hid an unpaired early-stop treatment from pair totals. | Four new tests plus strengthened early-stop accounting pass. Exact-tree proof: 90 Task Intelligence tests and 36 routing tests pass; the 32-task manifest reports zero errors and remains diagnostic-only; the full fast suite passes 462 tests with 4 skips and 1 slow deselection; the isolated slow two-client gate passes. Task 032 remains `STOP`, and its five completed runs now report the exact 1,501,308 observed input-plus-output tokens. Scoped Ruff and whitespace checks pass. Historical outcomes were not relabelled, no model run occurred, and no merge, version, release, or deployment changed. |
 | 2026-08-13 | **GAP-054 explicit durable capture and delivery gate passed model-free.** The reversible global Codex block and customer guidance now distinguish explicit user-directed capture from ordinary conversation, require exact scope and literal triggers, and verify one likely future question after a write. | Recall cannot improve a later task when the host never captures the decision; a successful write also does not prove governance will deliver it. | Initial full-question Recall returned `no_match` against five unsuitable records. Canonical mission memory `0b27fa62-d459-4029-a390-391305ab555d` was stored. Raw retrieval ranked it first, but Recall initially selected an unrelated specification because the mission used prose as exact scope. Correcting scope to `elefante` made Recall supply only the mission. The 178-test affected set, 458-test fast suite (4 skips, 1 slow deselected), isolated slow two-client proof, scoped Ruff, compilation, and whitespace checks pass. No model run, ranking change, task-lift claim, merge, release, or deployment occurred. |
 | 2026-08-13 | **Task 032 completed with a local `STOP`; GAP-053 opened.** The evaluator now preserves fixture source governance, separates reviewed evaluation metadata, compares identical source-only and memory Briefs, binds the real Recall MCP surface in its black-box judge, and automatically prevents redundant model calls after treatment 0/3 makes the decision irreversible. | The initial preflight exposed evaluator-created trigger/lock metadata. After that repair, the intended memory selected and delivered correctly, but all measured patches still missed the same task-local API behavior. | Base failed and known good passed. Memory treatment: 0/3 accepted with intended memory delivered 3/3. Source-only control: 0/2. A third control attempt was terminated before a measurable outcome; exact partial usage is `UNKNOWN`, and a subsequent automatic replay started zero model calls. All five completed patches passed routing, instruction-preservation, and uninstall assertions, then failed because `tools/list` lacked `elefante-Recall`. Recorded completed outcomes used 1,417,856 input tokens, 1,112,064 cached, 305,792 uncached, and 83,452 output. No product code, live memory, version, merge, release, or deployment changed. |
 | 2026-08-13 | **Task Intelligence reduced to one evidence-led implementation experiment.** The North Star remains better accepted task outcomes from the smallest safe durable-memory bundle. The next task is selected and diagnosed model-free before code; the first failed causal stage chooses one repair; Memory Identity and scoped state resolution are conditional rather than presumed; the model ceiling is three frozen pairs with explicit local go/stop/inconclusive rules. | The prior PRD still assigned architecture before evidence. Preserved results show retrieval, selection, and delivery can complete while acceptance fails and agent use remains unknown, so state identity is not yet an established root cause. | Documentation-only. The canonical PRD fell from 735 lines to a bounded experiment; no source behavior, schema, live store, installed runtime, benchmark outcome, version, merge, release, or deployment changed. Immediate gate: select one new eligible memory-dependent task and identify its first failed stage without a model run. |

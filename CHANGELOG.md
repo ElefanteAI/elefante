@@ -39,6 +39,13 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Task Intelligence evaluation now reports accepted outcomes per million total
+  tokens, counting input (including cached input) plus output. Failed outcomes
+  contribute zero value, acceptance regression cannot be hidden by cheaper
+  execution, and only a positive task-clustered paired lower bound can make
+  token intelligence an effectiveness path. Complete-pair efficiency and all
+  observed spend are reported separately so early-stop work is not hidden.
+  Historical consumed evidence remains diagnostic-only.
 - The reversible global Codex memory block now handles explicit cross-session
   remember requests as well as Recall: it searches first, writes only concise
   user-directed durable records, requires explicit authority for locks or

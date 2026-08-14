@@ -199,11 +199,20 @@
 **Proof:** The live store initially had five unrelated or unsuitable records and the complete candidate-selection question returned `no_match`. Pilot memory `0b27fa62-d459-4029-a390-391305ab555d` was then stored. Raw retrieval ranked it first, but the first Recall rejected its descriptive scope and supplied a loose developer specification; after the same record's scope was corrected to literal `elefante`, Recall supplied only the canonical mission. This proves capture and deliverability, not a better task outcome.
 **Lesson:** Recall cannot improve a later task when the workflow never captured the decision, and `stored` does not mean `deliverable`. Safe capture is an explicit, closed-loop causal stage; it is not automatic conversation harvesting and it is not evidence of task lift.
 
+<a id="issue-22"></a>
+
+## Issue #22: Evaluator Separated Task Value From Overall Token Cost [GAP-055, FIXED in development]
+
+**Trigger:** The product objective was restated as intelligence per overall token, but the paired report measured acceptance and retries as effectiveness while using input-token growth only as a secondary cost ceiling; output tokens were omitted from the gate.
+**Root cause:** Outcome quality and token cost were evaluated in separate gates instead of one paired value measure. This could recognize correctness lift without showing its overall-token efficiency and could not recognize equal accepted value delivered with reliably fewer total tokens.
+**Solution:** Define the current observable value proxy as one unit for a black-box accepted outcome and zero for failure; define total tokens as input, including cached input, plus output. Report accepted outcomes per million tokens and a task-clustered difference from complete pairs, while separately reporting all observed spend so early-stop work is not hidden. The gate requires at least one treatment acceptance, no acceptance-count regression, and a 95% lower bound above zero; historical consumed evidence remains non-promotable.
+**Lesson:** Measure accepted value and complete cost together. Cheap failure is zero intelligence, and raw ratios across unrelated task mixes are not comparable evidence.
+
 ---
 
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
-The recurring rules from these 20 issues:
+The recurring rules from these 22 issues:
 
 1. **STATE → DO → VERIFY in the same response** — analysis without action is entertainment. Issues #1, #4.
 2. **Trigger words require proof** — "done" / "ready" / "fixed" must include verification output. Issue #2.
@@ -221,6 +230,7 @@ The recurring rules from these 20 issues:
 14. **Prove the normal-question journey** — registration, routing, authorization, selection, and payload economy are separate gates. Issue #19.
 15. **Select for decision value, not topical similarity** — a relevant memory that cannot change the next action is context cost, not Task Intelligence. Issue #20.
 16. **Capture and verify before depending on Recall** — explicit user-directed durable decisions need a governed write plus one future-question delivery check before a later task can depend on them. Issue #21.
+17. **Measure accepted value against complete token cost** — input-only savings and cheap failures cannot establish intelligence per overall token. Issue #22.
 
 Distill any new repeating rule into `../lessons.md`. Postmortems hold the bug-specific narrative; `lessons.md` holds the cross-bug edge.
 

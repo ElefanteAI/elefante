@@ -1,6 +1,7 @@
 # North Star / Implementation PRD: Task Intelligence
 
-> Status: NORTH STAR — FIRST BOUNDED FEASIBILITY EXPERIMENT COMPLETE (`STOP`)
+> Status: NORTH STAR — METRIC ALIGNED; FIRST BOUNDED FEASIBILITY EXPERIMENT
+> COMPLETE (`STOP`)
 >
 > Product state: governed Recall, Task Brief v2, evaluation, and a metadata-only
 > outcome ledger exist in unreleased development. Representative task lift is
@@ -9,7 +10,9 @@
 > Canonical role: this file owns the Task Intelligence objective, the immediate
 > experiment, its evidence gates, and the boundary to later product work.
 >
-> Current implementation baseline: `7c705ca03371771be68460afb270fe0998f30231`.
+> Task 032 implementation baseline: `7c705ca03371771be68460afb270fe0998f30231`.
+> Current development line: `agent/task-intelligence-causal-repair`; verify its
+> exact HEAD before work.
 > Published customer release:
 > v2.12.2. This document authorizes neither merge nor release.
 
@@ -18,8 +21,8 @@
 A future developer starts here, not from the conversation that produced this
 PRD.
 
-- The objective is accepted: durable memory must measurably improve an eligible
-  task's accepted answer or action.
+- The objective is accepted: maximize accepted task quality per total token on
+  eligible memory-dependent tasks.
 - The existing infrastructure is not the missing proof. Do not rebuild Recall,
   Task Brief v2, governance, the evaluator, or the outcome ledger.
 - Do not rerun the consumed holdout, task 031, or the historical 20/30-task
@@ -42,23 +45,34 @@ planning index in the same change. Do not silently route around it.
 
 ## 1. North Star
 
-> **For an eligible memory-dependent task, Elefante must cause a better accepted
-> answer or action by supplying the smallest safe set of applicable durable
-> memories.**
+> **For an eligible memory-dependent task, Elefante must maximize accepted task
+> quality per total token by supplying the smallest safe set of applicable
+> durable memories.**
 
 A task may be a question, decision, plan, code change, or validation action.
 Persistence, retrieval, lower token use, and agent acknowledgement are not the
 outcome. They are mechanisms or diagnostics.
 
+The current measurable quality proxy is black-box task acceptance: one accepted
+outcome contributes one unit of value; a failed outcome contributes zero. Total
+tokens are input tokens, including cached input, plus output tokens. The paired
+report compares only the same frozen tasks and reports accepted outcomes per
+million total tokens; it is not a universal score for comparing unrelated task
+difficulty. Paired fields include complete pairs only; `observed_total_tokens`
+also exposes every completed run, including unpaired work that caused an early
+stop.
+
 Priority order:
 
 1. privacy, user authority, scope correctness, and recoverability;
-2. observable task correctness;
-3. tokens, retries, corrections, latency, and cost;
+2. accepted task value per total token;
+3. retries, corrections, latency, and other outcome diagnostics;
 4. retrieval and delivery diagnostics.
 
-Efficiency never compensates for unchanged correctness. Correctness never
-compensates for a trust violation.
+A cheaper failure remains zero value. With accepted value preserved, fewer total
+tokens are a real improvement; with accepted value increased, extra tokens are
+justified only when the paired value-per-token result improves. No efficiency
+result compensates for a trust violation.
 
 ## 2. Current truth
 
@@ -369,6 +383,13 @@ The outcome record must bind the task contract and record retrieval, selection,
 delivery, execution, and acceptance. It must not store raw prompts, responses,
 memory bodies, source diffs, or secrets.
 
+The report computes the §1 metric from complete matched pairs. A future
+multi-task evaluation may use token intelligence as an effectiveness path only
+when treatment has at least one accepted outcome, does not reduce the number of
+accepted outcomes, and the task-clustered 95% lower bound of the paired
+value-per-total-token difference is above zero. This rule applies prospectively;
+consumed outcomes remain diagnostic and cannot be relabelled for promotion.
+
 ### Decision rule
 
 This is a local feasibility gate, not product proof.
@@ -399,9 +420,11 @@ failure rate or release claim.
 | Source-only control acceptance | 0/2; a third attempt was terminated before a measurable outcome once treatment 0/3 made `STOP` irreversible |
 | Root failure | application/acceptance: all five patches passed earlier routing, preservation, and uninstall assertions, then failed because live MCP `tools/list` lacked `elefante-Recall` |
 | Stored evidence | five schema-v3 metadata-only outcomes; no prompts, responses, memory bodies, or source diffs |
-| Measured token cost | Five completed outcomes: 1,417,856 input; 1,112,064 cached; 305,792 uncached; 83,452 output. Exact partial usage from the terminated sixth attempt is `UNKNOWN`. |
+| Measured token cost | Five completed outcomes: 1,417,856 input; 1,112,064 cached; 305,792 uncached; 83,452 output; 1,501,308 total input plus output. Exact partial usage from the terminated sixth attempt is `UNKNOWN`. |
 
-The memory was architecturally relevant but not causally discriminative. It
+Every completed task 032 outcome failed, so accepted value was zero regardless
+of token cost. The memory was architecturally relevant but not causally
+discriminative. It
 described stable per-user installation, one data root, a loopback daemon, and
 host coverage; it did not identify or explain the missing task-local Recall API
 surface. Both conditions therefore converged on installer routing changes and
@@ -490,7 +513,7 @@ tag, release, or deployment.
 > **Your goal is to preserve the proven explicit search→write→Recall path, then
 > select one independently arising task where a pre-existing memory contains a
 > decision-relevant fact absent from source-only evidence. Prove that difference
-> model-free before any paired model run.**
+> model-free, then measure accepted task value per total token in the frozen pair.**
 
 The capture and delivery gate is complete; task lift is not. If no eligible task
 exists, stop and wait rather than inventing one, changing retrieval, or spending

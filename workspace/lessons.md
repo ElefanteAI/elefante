@@ -421,6 +421,14 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Proof:** The 2026-08-13 live audit found five stored records and no canonical Elefante mission. After the mission was stored, raw retrieval ranked it first but Recall rejected a descriptive scope; correcting scope to literal `elefante` made Recall supply the intended memory. See [postmortems/ai-behavior.md Issue #21](postmortems/ai-behavior.md#issue-21).
 - **Avoid:** Treating a stored receipt as delivery proof; using prose as an exact scope; treating an empty or low-quality store as a ranking problem; manufacturing a benchmark memory after selecting its task; silently storing ordinary chat, inferred preferences, or secrets.
 
+### Measure Accepted Value Against Complete Token Cost (GAP-055)
+
+- **Trigger:** An evaluation claims better Task Intelligence from correctness, retrieval, or token savings alone.
+- **Rule:** Compare matched frozen tasks using accepted outcomes per total input-plus-output tokens. A failed outcome contributes zero; treatment must not reduce accepted outcomes; cross-task evidence requires a positive task-clustered lower bound.
+- **Why:** Separate quality and input-only cost gates can reward an expensive correctness gain without proving overall-token value, omit output cost, or make cheap failure look efficient.
+- **Proof:** [postmortems/ai-behavior.md Issue #22](postmortems/ai-behavior.md#issue-22), `scripts/ci/summarize_task_intelligence_evaluation.py`, and `tests/test_task_intelligence_report.py`.
+- **Avoid:** Comparing raw ratios across unrelated task mixes; excluding output or cached input from overall cost; treating lower cost on rejected work as product improvement; retroactively relabelling consumed evidence.
+
 ---
 
 ## Update Protocol
