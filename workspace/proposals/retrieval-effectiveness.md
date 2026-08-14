@@ -539,11 +539,30 @@ question correctly. This is a local one-task signal, not a representative or
 release claim; the maintained evaluator does not yet bind question-response
 outcomes, so do not call it promotion evidence.
 
+A later frozen diagnostic compared the same mission question under selective
+Recall and full-store injection. Both isolated Sol Max arms returned the exact
+accepted criterion. Selective Recall supplied one memory and used 14,912 total
+tokens; full-store injection supplied all six records and used 15,420. The
+selective arm therefore preserved accepted value while saving 508 tokens (3.3%
+of the full arm). Two earlier attempts are invalid and excluded: one leaked the
+expected answer through response choices, and one judge matched `controlled` as
+if it proved a no-memory `control`. This is evidence against full-store delivery
+as the default on this task, not representative lift.
+
+The inventory audit found no second eligible decision memory. After that audit,
+the user's previously explicit evidence-based, non-sycophantic,
+token-disciplined working protocol was captured as protected ranked memory
+`6550d201-75a9-4de6-a7b4-bdb864836920`. Fresh Recall supplied only that record
+at score 0.976. Because it was written after the current diagnostic began, it
+cannot be used retroactively; it is only a candidate for a later independently
+arising task. Its rollback is recoverable archive by ID.
+
 > **Your goal is now to preserve this two-sided selector and reproduce accepted
 > value per total token on one second independently arising task with a different
 > pre-existing decision-changing memory. Do not invent that task or build a new
 > framework while waiting for it.**
 
-One local question lift exists; representative lift does not. If no second
-eligible task exists, stop and wait rather than inventing one, changing
-retrieval, or spending model tokens.
+One local question lift exists; representative lift does not. A second distinct
+memory now pre-exists, but no eligible task for it has arisen. Stop and wait for
+that task rather than inventing one, changing retrieval, or spending model
+tokens.
