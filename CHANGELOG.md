@@ -64,6 +64,12 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Recall no longer treats an intrinsic `constraint`, `decision`, `failure`, or
+  `safeguard` label as sufficient evidence that a memory applies to the current
+  question. Role-based delivery now requires substantial question-term
+  coverage; otherwise the memory needs a strong direct-answer or explicit
+  structural/task-specific anchor. Loosely related process memories therefore
+  abstain instead of consuming answer tokens.
 - A healthy global runtime no longer depends on the model guessing when to use
   memory in Codex. A normal question that can depend on durable preferences,
   decisions, or project context now routes through `elefante-Recall` before the

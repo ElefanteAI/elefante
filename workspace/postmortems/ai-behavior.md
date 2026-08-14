@@ -128,12 +128,12 @@
 
 <a id="issue-14"></a>
 
-## Issue #14: Search Ranking Was Mistaken for Answer Context [BUG-045, FIXED, guarded]
+## Issue #14: Search Ranking Was Mistaken for Answer Context [BUG-045, FIXED AGAIN, guarded]
 
-**Trigger:** `elefante-context` injected the raw top five search hits, and normal search told the agent that every result was authoritative. A high-scoring but non-responsive memory—or retained system-test data—could shape an unrelated answer.
-**Root cause:** Retrieval and answer delivery were treated as one operation. Ranking optimizes candidate discovery; it does not prove that a memory directly answers the current question, is conflict-free, or is safe to inject.
-**Solution:** Keep broad search for exploration, but add one fail-closed answer selector to both existing question paths. It filters lifecycle conflicts, secrets, and inapplicable test data; requires a question-specific action anchor plus independent semantic, concept, or graph corroboration; caps injection at three memories and 450 tokens; disables read reinforcement; exposes selection reasons; and explicitly abstains when no candidate qualifies.
-**Lesson:** A retrieved memory is a candidate, not an answer. Question-time context must be selected, bounded, and allowed to abstain.
+**Trigger:** `elefante-context` initially injected the raw top five search hits, and normal search told the agent that every result was authoritative. On 2026-08-14, a live replacement-task screen exposed a recurrence: Recall supplied unrelated SDD/developer-etiquette constraints for three real GitHub product questions instead of abstaining.
+**Root cause:** Retrieval and answer delivery were initially treated as one operation. The first v2 guard then counted an intrinsic evidence role (`constraint`, `decision`, `failure`, or `safeguard`) as both independent relevance and a question-specific action anchor; one live false positive matched only 3 of 28 task terms (10.7%) but passed because it was classified as a constraint.
+**Solution:** Keep broad search for exploration and one fail-closed answer selector for delivery. The selector filters lifecycle conflicts, secrets, and inapplicable test data; caps injection at three memories and 450 tokens; disables read reinforcement; exposes selection reasons; and abstains when no candidate qualifies. An intrinsic role now anchors delivery only with at least 20% query-term coverage; otherwise a candidate needs a strong direct-answer or explicit path, symbol, dependency, or evaluator-specificity anchor. Mandatory user policy remains governed separately.
+**Lesson:** A retrieved memory and its semantic role are candidates, not proof of task applicability. Decision value must be joined to a question-specific relation; role labels cannot manufacture relevance.
 
 <a id="issue-15"></a>
 

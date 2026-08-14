@@ -576,6 +576,69 @@ def test_v2_abstains_when_evidence_is_only_generic_semantic_context() -> None:
     }
 
 
+def test_v2_constraint_role_cannot_replace_a_question_specific_anchor() -> None:
+    unrelated_process_constraint = _result(
+        (
+            "SDD Gate 2 leakage surface scan specification for contributors. "
+            "Every change checks MCP response contracts, database round trips, "
+            "stdout purity, state machines, snapshots, and documentation links."
+        ),
+        memory_type=MemoryType.SPECIFICATION,
+        project=None,
+        workspace=None,
+        status=MemoryStatus.RELATED,
+        score=0.60,
+        vector_score=0.86,
+    )
+    request = TaskBriefRequest(
+        task=(
+            "GitHub issue 2 asks whether customer search results should explain "
+            "vector similarity, concept overlap, domain match, authority, and "
+            "temporal signals. Decide whether to implement it now and identify "
+            "the governing customer-facing constraints."
+        ),
+        profile=TaskBriefProfile.V2,
+    )
+    compiler = TaskBriefCompiler()
+    ranked = compiler._rank_candidates_v2(request, [unrelated_process_constraint])
+
+    assert ranked[0].role == EvidenceRole.CONSTRAINT
+    assert ranked[0].retrieval_signals["query_coverage"] < 0.20
+    assert compiler._is_actionable(ranked[0]) is False
+    brief = compiler.compile(request, [unrelated_process_constraint])
+    assert brief.abstained is True
+    assert brief.selected_memory_ids == []
+    assert brief.omissions[0].reason == "insufficient-independent-relevance"
+
+
+def test_v2_selects_a_constraint_with_a_question_specific_text_anchor() -> None:
+    relevant_constraint = _result(
+        (
+            "Customer retrieval explanations must expose only verified signals "
+            "and must not fabricate missing score components."
+        ),
+        memory_type=MemoryType.SPECIFICATION,
+        project=None,
+        workspace=None,
+        score=0.72,
+        vector_score=0.70,
+    )
+    request = TaskBriefRequest(
+        task="What constraint governs customer retrieval explanations and score signals?",
+        profile=TaskBriefProfile.V2,
+    )
+
+    compiler = TaskBriefCompiler()
+    ranked = compiler._rank_candidates_v2(request, [relevant_constraint])
+    brief = compiler.compile(request, [relevant_constraint])
+
+    assert ranked[0].retrieval_signals["direct_answer"] == 0.0
+    assert ranked[0].retrieval_signals["query_coverage"] >= 0.20
+    assert compiler._is_actionable(ranked[0]) is True
+    assert brief.abstained is False
+    assert brief.selected_memory_ids == [str(relevant_constraint.memory.id)]
+
+
 def test_v2_accepts_strong_direct_answer_without_implementation_signals() -> None:
     direct_answer = _result(
         "The Elefante validation passphrase is Copper-Orbit.",

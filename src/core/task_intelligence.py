@@ -164,6 +164,7 @@ class TaskBriefCompiler:
 
     MIN_RELIABILITY = 0.5
     MIN_RETRIEVAL_SCORE = 0.3
+    MIN_ROLE_ANCHOR_COVERAGE = 0.20
     _VALIDATION_MARKERS = (
         "acceptance",
         "assert",
@@ -796,27 +797,27 @@ class TaskBriefCompiler:
                 float(signals.get("path", 0.0)) > 0.0,
                 float(signals.get("symbol", 0.0)) > 0.0,
                 float(signals.get("dependency", 0.0)) > 0.0,
-                item.role
-                in {
-                    EvidenceRole.CONSTRAINT,
-                    EvidenceRole.DECISION,
-                    EvidenceRole.FAILURE,
-                    EvidenceRole.SAFEGUARD,
-                },
             )
+        )
+        decision_bearing_role = item.role in {
+            EvidenceRole.CONSTRAINT,
+            EvidenceRole.DECISION,
+            EvidenceRole.FAILURE,
+            EvidenceRole.SAFEGUARD,
+        }
+        role_text_anchor = (
+            decision_bearing_role
+            and int(signals.get("matched_terms", 0)) >= minimum_matches
+            and float(signals.get("query_coverage", 0.0))
+            >= self.MIN_ROLE_ANCHOR_COVERAGE
         )
         action_anchor = (
             float(signals.get("path", 0.0)) > 0.0
             or float(signals.get("symbol", 0.0)) > 0.0
             or float(signals.get("dependency", 0.0)) > 0.0
+            or float(signals.get("specificity", 0.0)) > 0.0
             or float(signals.get("direct_answer", 0.0)) > 0.0
-            or item.role
-            in {
-                EvidenceRole.CONSTRAINT,
-                EvidenceRole.DECISION,
-                EvidenceRole.FAILURE,
-                EvidenceRole.SAFEGUARD,
-            }
+            or role_text_anchor
         )
         # A candidate already classified as a direct answer has strong semantic
         # similarity plus bounded lexical coverage. Do not reject that evidence
