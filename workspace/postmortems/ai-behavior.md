@@ -189,6 +189,16 @@
 **Solution:** Reject task 032's tested memory component and preserve its `STOP`. Before another model run, require a different task whose prior memory contributes one specific decision-relevant fact absent from the source-only Brief, then prove that difference in deterministic preflight. The evaluator now compares source-only and memory Briefs directly and stops redundant controls after a bound treatment 0/3.
 **Lesson:** A memory should be selected because it changes the next task action, not because it is topically related. Retrieval, selection, and delivery are healthy only when the evidence portfolio contains the missing decision input.
 
+<a id="issue-21"></a>
+
+## Issue #21: Recall-Only Workflow Had No Durable Decision Supply [GAP-054, FIXED in development]
+
+**Trigger:** After Task 032 stopped, a model-free search for a different eligible memory-task pair returned `no_match`. The live customer store contained five records: one synthetic passcode, two unverified related specifications, and two contradictory records; it did not contain Elefante's user-declared canonical mission.
+**Root cause:** The installed Codex guidance actively routed prior-context questions through Recall but had no active rule for an explicit user request to remember something across sessions. It also treated a successful write as sufficient even though governance can make a stored record ineligible; availability, capture, deliverability, and outcome had been collapsed into “memory exists.”
+**Solution:** Extend the manifest-owned reversible Codex block and customer entrypoint with one narrow capture contract: only an explicit cross-session remember request or canonical/non-negotiable declaration triggers search-first add/update; the mutation is `user_directed`; user locks and permanent retention require explicit protection; ordinary conversation and secrets are excluded. Scope must be an exact identifier rather than prose, triggered delivery must name future-question phrases, and one likely future question must pass Recall after the write.
+**Proof:** The live store initially had five unrelated or unsuitable records and the complete candidate-selection question returned `no_match`. Pilot memory `0b27fa62-d459-4029-a390-391305ab555d` was then stored. Raw retrieval ranked it first, but the first Recall rejected its descriptive scope and supplied a loose developer specification; after the same record's scope was corrected to literal `elefante`, Recall supplied only the canonical mission. This proves capture and deliverability, not a better task outcome.
+**Lesson:** Recall cannot improve a later task when the workflow never captured the decision, and `stored` does not mean `deliverable`. Safe capture is an explicit, closed-loop causal stage; it is not automatic conversation harvesting and it is not evidence of task lift.
+
 ---
 
 ## Cross-bug pattern (extracted to `../lessons.md`)
@@ -210,6 +220,7 @@ The recurring rules from these 20 issues:
 13. **Share the complete delivery pipeline** — preprocessing, source validation, selection, and budgets must be identical across runtime paths. Issue #18.
 14. **Prove the normal-question journey** — registration, routing, authorization, selection, and payload economy are separate gates. Issue #19.
 15. **Select for decision value, not topical similarity** — a relevant memory that cannot change the next action is context cost, not Task Intelligence. Issue #20.
+16. **Capture and verify before depending on Recall** — explicit user-directed durable decisions need a governed write plus one future-question delivery check before a later task can depend on them. Issue #21.
 
 Distill any new repeating rule into `../lessons.md`. Postmortems hold the bug-specific narrative; `lessons.md` holds the cross-bug edge.
 

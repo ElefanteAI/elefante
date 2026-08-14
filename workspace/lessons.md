@@ -413,6 +413,14 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Proof:** Task 032 delivered its installation-contract memory in 3/3 treatments, yet treatment accepted 0/3; all five measured patches changed installer routing and omitted the required public Recall MCP tool. See [postmortems/ai-behavior.md Issue #20](postmortems/ai-behavior.md#issue-20).
 - **Avoid:** Treating selection or delivery as usefulness; adding more broadly related memories after an application failure; choosing the task because its vocabulary matches the memory.
 
+### Capture Explicit Decisions Before Expecting Recall (GAP-054)
+
+- **Trigger:** A user explicitly asks Elefante to remember a durable decision across sessions, but a later Recall has no eligible memory to supply.
+- **Rule:** Treat durable capture as its own causal stage. Search first, then add or correct one concise record only from an explicit cross-session remember request or canonical/non-negotiable declaration; use user-directed authority and require separate explicit authority for locks or permanent retention. Leave scope unset unless an exact identifier is known, define literal future-question triggers when using triggered delivery, and verify one likely future question through Recall.
+- **Why:** A globally available Recall tool cannot improve a future task if the host workflow never creates the memory or if governance makes the stored record ineligible. Automatic conversation harvesting is not a valid repair because it creates noise, privacy risk, and false authority.
+- **Proof:** The 2026-08-13 live audit found five stored records and no canonical Elefante mission. After the mission was stored, raw retrieval ranked it first but Recall rejected a descriptive scope; correcting scope to literal `elefante` made Recall supply the intended memory. See [postmortems/ai-behavior.md Issue #21](postmortems/ai-behavior.md#issue-21).
+- **Avoid:** Treating a stored receipt as delivery proof; using prose as an exact scope; treating an empty or low-quality store as a ranking problem; manufacturing a benchmark memory after selecting its task; silently storing ordinary chat, inferred preferences, or secrets.
+
 ---
 
 ## Update Protocol

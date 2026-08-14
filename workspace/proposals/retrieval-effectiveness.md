@@ -86,6 +86,10 @@ The evidence boundary is equally important:
   treatment passed 0/3 and the source-only control passed 0/2 before the
   pre-registered early `STOP`; every preserved patch missed the same required
   public Recall tool;
+- a post-`STOP` live inventory found only five durable records: one synthetic
+  test fact, two unverified related specifications, and two contradictory
+  records. The user-declared canonical mission was absent, and Recall returned
+  `no_match` when asked for a different eligible memory-task pair;
 - the installed Recall proof proves the pipeline, not that Elefante improves diverse tasks.
 
 Therefore, “add more context” is rejected. “Implement Memory Identity first” is
@@ -107,7 +111,10 @@ The vertical asks one question:
 Only one causal chain is in scope:
 
 ~~~text
-eligible task
+explicit user-directed durable decision
+  -> governed capture
+  -> eligible pre-existing memory
+  -> eligible task
   -> candidate retrieval
   -> governed selection
   -> delivery
@@ -437,6 +444,15 @@ until a different first-stage failure is demonstrated.
 Task 032 is in this state. Do not patch its prompt, add more memories, or buy a
 fourth treatment. Its evidence is consumed.
 
+The next candidate scan also stopped before model execution: the live store had
+no unconsumed decision-changing memory suitable for a new task. GAP-054's
+explicit user-directed capture path now passes model-free: the canonical mission
+was stored, an invalid prose scope was exposed rather than hidden, and the same
+record became Recall-deliverable after literal scope correction. Do not convert
+that continuity proof into a lift claim. Let the stored decision predate a future
+independently arising task and reject the pair unless its fact is absent from the
+source-only Brief and can change the answer or action.
+
 ### If `INCONCLUSIVE`
 
 Do not expand architecture or buy more runs. Diagnose the recorded stage trace.
@@ -471,11 +487,11 @@ tag, release, or deployment.
 
 ## 14. Immediate goal
 
-> **Your goal is to find one different task where a pre-existing durable memory
-> contains a specific decision-relevant fact that is absent from the frozen
-> source-only Brief, then prove that difference model-free. Do not spend model
-> tokens or change product code until that discriminative evidence path passes.**
+> **Your goal is to preserve the proven explicit search→write→Recall path, then
+> select one independently arising task where a pre-existing memory contains a
+> decision-relevant fact absent from source-only evidence. Prove that difference
+> model-free before any paired model run.**
 
-This is the smallest action that tests memory value rather than broad semantic
-relevance. If no such task exists, improve memory quality at capture time before
-changing retrieval or delivery.
+The capture and delivery gate is complete; task lift is not. If no eligible task
+exists, stop and wait rather than inventing one, changing retrieval, or spending
+model tokens.

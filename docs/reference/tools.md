@@ -37,6 +37,16 @@ published, v2.12.2 installers still expose the documented 16-tool surface.
 - Call `elefante-Recall` before answering when stored preferences, decisions, or
   project context could materially change the answer.
 - Call `elefante-Memory(action="search", ...)` before `elefante-Memory(action="add"|"update"|"delete", ...)` or `elefante-GraphConnect`.
+- When the user explicitly asks Elefante to remember information across sessions
+  or declares a project decision canonical or non-negotiable, search the exact
+  concept and add or correct one concise record with
+  `invocation_mode="user_directed"`. Use `user_locked=true` or permanent retention
+  only when the user explicitly requests that protection. Never infer durable
+  capture from ordinary conversation, and never store secrets. Leave `scope`
+  unset unless an exact project, workspace, or task identifier is known; never
+  use descriptive prose. A triggered policy needs literal future-question
+  phrases. After writing, call `elefante-Recall` with one likely future question;
+  a stored receipt is not proof that the memory is deliverable.
 
 **Tool response contract**:
 

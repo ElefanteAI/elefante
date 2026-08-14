@@ -1062,6 +1062,11 @@ def test_codex_recall_guidance_preserves_user_content_and_uninstalls_exact_block
     assert configured.startswith(original)
     assert configured.count(module.CODEX_GUIDANCE_START) == 1
     assert "call `elefante-Recall`" in configured
+    assert "explicitly asks Elefante to remember" in configured
+    assert 'invocation_mode="user_directed"' in configured
+    assert "never put descriptive prose in `scope`" in configured
+    assert "stored receipt is not proof" in configured
+    assert "Never infer a memory request from ordinary conversation" in configured
 
     removed, preserved = manifest.remove_unchanged_files(home=home, apply=True)
     assert removed == [agents]
@@ -1096,6 +1101,43 @@ def test_codex_recall_guidance_uses_active_override_and_preserves_modified_block
     assert removed == []
     assert preserved == [override]
     assert override.read_text(encoding="utf-8") == modified
+
+
+def test_codex_memory_guidance_upgrades_an_unchanged_recall_only_block(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/configure_cli_agents.py", "codex_guidance_upgrade_module")
+    manifest = _load_module(ROOT / "scripts/setup/install_manifest.py", "codex_guidance_upgrade_manifest_module")
+    home = tmp_path / "home"
+    codex_home = home / ".codex"
+    codex_home.mkdir(parents=True)
+    agents = codex_home / "AGENTS.md"
+    legacy_block = f"""{module.CODEX_GUIDANCE_START}
+## Elefante memory
+
+- Before answering a question that may depend on stored preferences, prior decisions, or project context, call `elefante-Recall` with the complete question.
+- If Recall reports `no_match`, `blocked`, or `unavailable`, do not invent prior context; continue from current evidence or say that the prior context is unavailable.
+{module.CODEX_GUIDANCE_END}"""
+    agents.write_text(legacy_block + "\n", encoding="utf-8")
+    manifest.record_emitted_text_block(
+        agents,
+        module.CODEX_GUIDANCE_SURFACE,
+        module.CODEX_GUIDANCE_START,
+        module.CODEX_GUIDANCE_END,
+        created=True,
+        leading_separator="",
+        trailing_separator="\n",
+        home=home,
+    )
+
+    assert module.configure_codex_guidance(
+        codex_home=codex_home, manifest_home=home
+    ) == "updated"
+    upgraded = agents.read_text(encoding="utf-8")
+    assert upgraded.count(module.CODEX_GUIDANCE_START) == 1
+    assert "explicitly asks Elefante to remember" in upgraded
+    assert 'invocation_mode="user_directed"' in upgraded
+    assert "never put descriptive prose in `scope`" in upgraded
+    assert "stored receipt is not proof" in upgraded
+    assert manifest.remove_unchanged_files(home=home, apply=False)[0] == [agents]
 
 
 def test_codex_surface_requires_registration_and_recall_routing(tmp_path):

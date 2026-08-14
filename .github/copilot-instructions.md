@@ -37,6 +37,17 @@ Search first; the MCP Compliance Gate requires it. Then write only durable,
 useful information that the user requested or that the active task clearly
 needs across sessions.
 
+When the user explicitly asks Elefante to remember something across sessions,
+or declares a project decision canonical or non-negotiable, search the exact
+concept and then add or correct one concise record with
+`invocation_mode="user_directed"`. Set `user_locked=true` or permanent retention
+only when the user explicitly requests that protection. Never infer a memory
+request from ordinary conversation. Leave `scope` unset unless an exact project,
+workspace, or task identifier is known; never use descriptive prose. A triggered
+policy needs literal phrases expected in a future question. After writing, call
+`elefante-Recall` with one likely future question; stored is not proof of
+deliverable.
+
 - `add`: a new decision, preference, verified fact, reusable insight, or
   durable specification.
 - `update`: correct or supersede an existing record.

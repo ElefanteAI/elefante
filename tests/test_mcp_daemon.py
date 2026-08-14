@@ -769,10 +769,16 @@ def test_client_protocol_excludes_developer_workspace_routing(monkeypatch):
     result = ElefanteMCPServer._inject_entrypoint_protocol(object(), {})
     pitfalls = ElefanteMCPServer._inject_pitfalls(object(), {}, "elefante-Memory")
     rendered = json.dumps({"result": result, "pitfalls": pitfalls})
+    entrypoint = "\n".join(result["ENTRYPOINT_SEQUENCE_READ_THIS_FIRST"])
 
     assert "workspace/" not in rendered
     assert "tests/" not in rendered
     assert "API keys" in rendered
+    assert "explicitly asks Elefante to remember" in rendered
+    assert 'invocation_mode="user_directed"' in entrypoint
+    assert "never use descriptive prose" in rendered
+    assert "Stored is not proof of deliverable" in rendered
+    assert "ordinary conversation" in rendered
 
 
 @pytest.mark.asyncio

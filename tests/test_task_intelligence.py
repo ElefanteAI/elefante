@@ -263,6 +263,46 @@ def test_v2_governance_fails_closed_for_trigger_and_scope() -> None:
     assert "governance-scope" in reasons
 
 
+def test_v2_explicit_capture_is_deliverable_only_with_literal_scope_and_trigger() -> None:
+    mission = _result(
+        "Elefante canonical mission: improve intelligence per task.",
+        score=0.93,
+        vector_score=0.93,
+        memory_type=MemoryType.DIRECTIVE,
+        project=None,
+        workspace=None,
+    )
+    mission.memory.metadata.scope = "elefante"
+    mission.memory.metadata.injection_policy = "triggered"
+    mission.memory.metadata.trigger = ["canonical mission"]
+    prose_scoped = _result(
+        "Elefante canonical mission: improve intelligence per task.",
+        score=0.86,
+        vector_score=0.86,
+        memory_type=MemoryType.DIRECTIVE,
+        project=None,
+        workspace=None,
+    )
+    prose_scoped.memory.metadata.scope = "Elefante product and development decisions"
+    prose_scoped.memory.metadata.injection_policy = "triggered"
+    prose_scoped.memory.metadata.trigger = ["canonical mission"]
+
+    brief = TaskBriefCompiler().compile(
+        TaskBriefRequest(
+            task="What is Elefante's canonical mission?",
+            profile=TaskBriefProfile.V2,
+        ),
+        [mission, prose_scoped],
+    )
+
+    assert brief.selected_memory_ids == [str(mission.memory.id)]
+    assert any(
+        item.memory_id == str(prose_scoped.memory.id)
+        and item.reason == "governance-scope"
+        for item in brief.omissions
+    )
+
+
 def test_compiler_is_deterministic_bounded_and_surfaces_conflicts() -> None:
     conflict_id = uuid4()
     candidates = [

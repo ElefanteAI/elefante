@@ -37,6 +37,9 @@ CODEX_GUIDANCE_BLOCK = f"""{CODEX_GUIDANCE_START}
 
 - Before answering a question that may depend on stored preferences, prior decisions, or project context, call `elefante-Recall` with the complete question.
 - If Recall reports `no_match`, `blocked`, or `unavailable`, do not invent prior context; continue from current evidence or say that the prior context is unavailable.
+- When the user explicitly asks Elefante to remember something across sessions or declares a project decision canonical or non-negotiable, first call `elefante-Memory` with `action="search"` for the exact concept. Update an equivalent memory only when the user is correcting it; otherwise add one concise durable record with `invocation_mode="user_directed"`.
+- Leave `scope` unset unless the user or current host provides an exact project, workspace, or task identifier; never put descriptive prose in `scope`. If using `injection_policy="triggered"`, include literal trigger phrases expected in a future question. Set `user_locked=true` or permanent retention only when the user explicitly requests that protection.
+- After a successful write, call `elefante-Recall` with one likely future question. A stored receipt is not proof that the memory is deliverable. Never infer a memory request from ordinary conversation, and never store passwords, API keys, access tokens, or other secrets. Report the actual write and verification results.
 {CODEX_GUIDANCE_END}"""
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 
@@ -72,7 +75,7 @@ def configure_codex_guidance(
     codex_home: Path | None = None,
     manifest_home: Path | None = None,
 ) -> str:
-    """Install one reversible Recall rule without owning other user guidance."""
+    """Install one reversible Recall/capture rule without owning other guidance."""
     resolved_codex_home = codex_home or Path(
         os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))
     ).expanduser()

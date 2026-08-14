@@ -672,6 +672,23 @@ def test_spec_tools_documents_prompt_arguments_and_conditional_context_contract(
     assert "This prompt performs a live hybrid memory search before returning content." in spec_tools
 
 
+def test_explicit_user_capture_contract_is_synced_across_loaded_surfaces() -> None:
+    surfaces = {
+        "codex installer guidance": _read("scripts/setup/configure_cli_agents.py"),
+        "customer MCP entrypoint": _read("src/mcp/server.py"),
+        "repository agent constitution": _read(".github/copilot-instructions.md"),
+        "tool reference": _read("docs/reference/tools.md"),
+    }
+
+    for name, document in surfaces.items():
+        assert "explicitly asks Elefante to remember" in document, name
+        assert "user_directed" in document, name
+        assert "descriptive prose" in document, name
+        assert "stored" in document.lower() and "deliverable" in document.lower(), name
+        assert "ordinary conversation" in document, name
+        assert "secret" in document.lower(), name
+
+
 def test_scripts_readme_covers_live_script_inventory() -> None:
     scripts_readme = _read("scripts/README.md")
     scripts_root = ROOT / "scripts"

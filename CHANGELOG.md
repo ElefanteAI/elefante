@@ -39,6 +39,12 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The reversible global Codex memory block now handles explicit cross-session
+  remember requests as well as Recall: it searches first, writes only concise
+  user-directed durable records, requires explicit authority for locks or
+  permanent retention, refuses secrets, and never infers capture from ordinary
+  conversation. Exact scope and triggered-delivery rules are explicit, and one
+  likely future question must pass Recall before the write is called deliverable.
 - Customer grounding now routes answer-time continuity through the simple
   read-only Recall tool while retaining broad `elefante-Memory(action="search")`
   for inspection and search-before-write compliance.
