@@ -557,12 +557,38 @@ at score 0.976. Because it was written after the current diagnostic began, it
 cannot be used retroactively; it is only a candidate for a later independently
 arising task. Its rollback is recoverable archive by ID.
 
-> **Your goal is now to preserve this two-sided selector and reproduce accepted
-> value per total token on one second independently arising task with a different
-> pre-existing decision-changing memory. Do not invent that task or build a new
-> framework while waiting for it.**
+### Active acquisition loop
 
-One local question lift exists; representative lift does not. A second distinct
-memory now pre-exists, but no eligible task for it has arisen. Stop and wait for
-that task rather than inventing one, changing retrieval, or spending model
-tokens.
+The absence of an eligible evaluation task is not authority to invent one, but
+it is also not a reason to stop product work. Continue the highest-value normal
+Elefante task and run the following bounded loop:
+
+1. prepare Task Intelligence before the decision;
+2. deliver memory only when it contains discriminative task evidence;
+3. if it abstains, proceed from current source and runtime evidence without
+   forcing context;
+4. after the outcome is verified, capture at most one stable reusable fact when
+   it is absent from the store;
+5. verify Recall delivery, then leave causal testing to a later independent
+   task that the memory predates.
+
+The exact-candidate validation task exercised this loop. The two pre-existing
+records were too generic, so the pilot returned a 21-token abstention and no
+delivery. After the task exposed and fixed the durable-source defect, one
+managed Elefante-scoped release invariant was captured as memory
+`726655b2-4941-4602-a1ba-bdbb9ed66eae`. Recall supplied it for a matching future
+question, and a model-free lifecycle check delivered it, recorded declared use,
+and recorded a test-accepted outcome in trace
+`61f1e713-5776-4bf1-a43b-3f9deecc7502` using 217 estimated Brief tokens with no
+ranking mutation.
+
+This proves abstention, acquisition, delivery, declared use, and outcome
+recording. It does not prove causal lift because the memory was created after
+the source task and the later delivery check had no source-only control.
+
+> **Your goal is to keep solving the highest-value Elefante work while this
+> loop accumulates clean pre-task opportunities. The next causal comparison is
+> allowed only when a previously stored fact can change an independently
+> arising task; do not invent a benchmark task or inject generic context.**
+
+One local question lift exists; representative lift does not.

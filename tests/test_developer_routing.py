@@ -472,6 +472,7 @@ def test_scoring_reference_matches_runtime_contract() -> None:
 def test_task_intelligence_docs_keep_release_and_learning_boundaries() -> None:
     tools_doc = _read("docs/reference/tools.md")
     proposal = _read("workspace/proposals/retrieval-effectiveness.md")
+    planning = _read("workspace/PLANNING.md")
     changelog = _read("CHANGELOG.md")
 
     assert "absent from MCP discovery" in tools_doc
@@ -479,6 +480,11 @@ def test_task_intelligence_docs_keep_release_and_learning_boundaries() -> None:
     assert "ELEFANTE_TASK_INTELLIGENCE_PILOT=1" in tools_doc
     assert "does not update ranking" in tools_doc
     assert "proves the pipeline, not that Elefante improves diverse tasks" in proposal
+    assert "### Active acquisition loop" in proposal
+    assert "Continue the highest-value normal" in proposal
+    assert "if it abstains" in proposal
+    assert "Stop and wait for that task" not in proposal
+    assert "No second independent causal lift is proven" in planning
     assert "does not change ranking" in changelog
 
 

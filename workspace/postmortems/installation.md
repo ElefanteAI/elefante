@@ -286,6 +286,14 @@ to use a portable basename. The existing live installation was not replaced.
 built after that release. Reproducible product evidence requires version plus
 source provenance and channel.
 
+**Exact-candidate evidence:** PR head
+`b05d794078c7121c6da009d7fe6e0ded322b721f` passed the dedicated hosted-macOS
+fresh install, health, and uninstall job plus the macOS, Windows, and Linux
+package builds. Downloaded `SHA256SUMS` verifies without path rewriting; the
+archive manifest and payload identity both report that full SHA and clean
+candidate status; the Finder launcher remains executable; and a local dry run
+left its target absent. The existing live runtime was not replaced.
+
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
 The five most-recurring rules from the issues above:
