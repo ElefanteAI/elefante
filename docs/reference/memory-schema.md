@@ -7,15 +7,17 @@ This document is the normative specification for Elefante's memory metadata sche
 
 ## V4: Cognitive Retrieval Fields
 
-V4 adds fields that make memories discoverable not just by content similarity, but by shared concepts, query patterns, and authority.
+V4 added enrichment fields for concept retrieval, dashboard inspection, and
+forward-compatible trigger metadata. The current retriever uses `concepts`,
+but does not score `surfaces_when` or the stored `authority_score` field.
 
 ### New Metadata Fields
 
 | Field             | Type       | Purpose                                        | Auto-populated |
 | ----------------- | ---------- | ---------------------------------------------- | -------------- |
-| `concepts`        | `string[]` | 3-5 key terms extracted from content           | Yes            |
-| `surfaces_when`   | `string[]` | Query patterns that should trigger this memory | Yes            |
-| `authority_score` | `float`    | Composite score (0-1) for ranking              | Yes            |
+| `concepts`        | `string[]` | 3-5 key terms used by concept-overlap retrieval | Yes            |
+| `surfaces_when`   | `string[]` | Stored trigger metadata for inspection and future proactive surfacing; not a current ranking signal | Yes |
+| `authority_score` | `float`    | Stored compatibility/dashboard field; the current retriever derives authority from vitality and access count | Yes |
 
 ### Concept Extraction
 
@@ -38,7 +40,8 @@ concepts = extract_concepts(content)
 
 **File**: `src/utils/curation.py` → `infer_surfaces_when()`
 
-Generates query patterns that should surface this memory:
+Generates candidate query patterns for future proactive surfacing. The values
+are persisted and shown in the dashboard, but are not a current ranking signal:
 
 | Content Pattern           | Generated Triggers                            |
 | ------------------------- | --------------------------------------------- |
@@ -51,7 +54,7 @@ Generates query patterns that should surface this memory:
 
 **File**: `src/utils/curation.py` → `compute_authority_score()`
 
-Composite score for retrieval ranking:
+Legacy enrichment score stored for compatibility and dashboard inspection:
 
 ```python
 authority = (
@@ -61,6 +64,9 @@ authority = (
     0.20 × exp(-0.05 × days_since_accessed)    # Access recency
 )
 ```
+
+The current retrieval authority signal is computed at query time from stored
+behavioral vitality and access count. See [`scoring.md`](scoring.md).
 
 ### Dashboard Edges
 

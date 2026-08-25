@@ -562,7 +562,7 @@ class ElefanteMCPServer:
 - `action=search` — query memory. ChromaDB (semantic) + Kuzu (structured) hybrid by default. Rewrite pronouns to specific entities before calling. Use `list_all=true` to bypass semantic relevance filtering for browsing/export.
 - `action=update` — amend an existing memory in-place. memory_id + content/tags/deprecated/archived/supersedes_id. Compliance Gate.
 - `action=delete` — permanently remove a memory. memory_id + reason (audit trail). Compliance Gate.
-- `action=consolidate` — deterministic LLM-free cleanup (canonicalize, mark redundant, decay-prune). Default dry-run; pass `force=true` to apply.
+- `action=consolidate` — deterministic LLM-free cleanup (canonicalize and mark duplicates redundant). Default dry-run; pass `force=true` to apply.
 
 **ALWAYS** call action=search before answering questions about user preferences, past decisions, or "the usual way". **NEVER** assume you know an answer that might be in memory. **IF RESULTS ARE CONTRADICTORY:** prefer most recent timestamp; "decision"/"fact" types over "conversation".
 
@@ -908,7 +908,7 @@ This returns raw memories that need agent enrichment. YOU must analyze each one 
 Enrichment fields:
 - **summary**: One-line description of what this memory is about
 - **concepts**: 3-5 key terms for graph edges and retrieval (optional, improves search)
-- **surfaces_when**: Query patterns that should trigger this memory (optional, improves search)
+- **surfaces_when**: Stored trigger metadata for inspection and future proactive surfacing; not a current ranking signal
 
 Flow:
 1. Call elefante-ETLProcess(limit=5) → Get raw memories
@@ -942,9 +942,9 @@ Required fields:
 - memory_id: From elefante-ETLProcess
 - summary: One-line description (max 200 chars)
 
-Optional fields (improve retrieval quality):
+Optional enrichment fields:
 - concepts: 3-5 key terms for graph edges
-- surfaces_when: Query patterns that should trigger this memory""",
+- surfaces_when: Stored trigger metadata for inspection and future proactive surfacing; not a current ranking signal""",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -964,7 +964,7 @@ Optional fields (improve retrieval quality):
                             "surfaces_when": {
                                 "type": "array",
                                 "items": {"type": "string"},
-                                "description": "Query patterns that should trigger this memory"
+                                "description": "Stored trigger metadata for inspection and future proactive surfacing; not a current ranking signal"
                             }
                         },
                         "required": ["memory_id", "summary"]
@@ -2268,7 +2268,7 @@ You have access to a persistent memory system called **Elefante** - the user's s
                 "success": True,
                 "count": len(raw_memories),
                 "memories": raw_memories,
-                "instructions": "Analyze each memory and call elefante-ETLClassify with your enrichment. Required: summary (one-line). Optional: concepts (3-5 key terms), surfaces_when (query patterns)."
+                "instructions": "Analyze each memory and call elefante-ETLClassify with your enrichment. Required: summary (one-line). Optional: concepts (3-5 retrieval terms), surfaces_when (stored trigger metadata; not a current ranking signal)."
             }
         
         # include_stats (absorbs former elefante-ETLProcess (include_stats=true))

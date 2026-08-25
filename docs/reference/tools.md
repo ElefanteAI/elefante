@@ -340,7 +340,7 @@ Elefante exposes **16 tools** and **2 prompts**. Memory operations use one
 
 **Purpose**: Fetch raw memories that still need agent enrichment.
 
-**Why this exists**: Elefante stores memory first, then lets an agent enrich retrieval quality later with summary and trigger patterns.
+**Why this exists**: Elefante stores memory first, then lets an agent add a summary, retrieval concepts, and trigger metadata later.
 
 **Parameters**:
 
@@ -357,14 +357,14 @@ Elefante exposes **16 tools** and **2 prompts**. Memory operations use one
 
 **Purpose**: Submit agent-written enrichment for a memory returned by `ETLProcess`.
 
-**Why this exists**: Retrieval improves only if the agent supplies usable summaries, concepts, and trigger phrases.
+**Why this exists**: Agent enrichment adds usable summaries and retrieval concepts while preserving trigger metadata for inspection and future proactive surfacing.
 
 **Parameters**:
 
 - `memory_id` (required, string): Memory UUID from `ETLProcess`.
 - `summary` (required, string): One-line summary, max 200 characters.
 - `concepts` (optional, string[]): Key terms for graph edges and retrieval.
-- `surfaces_when` (optional, string[]): Query patterns that should trigger this memory later.
+- `surfaces_when` (optional, string[]): Stored trigger metadata for inspection and future proactive surfacing; not a current ranking signal.
 
 **Important**:
 

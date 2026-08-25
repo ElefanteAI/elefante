@@ -127,11 +127,11 @@ def test_release_documentation_audit_passes_for_repo_history():
 def test_published_release_can_render_public_notes():
     module = _load_module(ROOT / "scripts/ci/render_release_notes.py", "render_published_notes")
 
-    assert "2.12.1" not in module.release_candidate_versions(
+    assert "2.12.2" not in module.release_candidate_versions(
         (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     )
-    module.validate_release_documentation("2.12.1")
-    assert "## [2.12.1] - 2026-08-04" in module.render_release_notes("2.12.1")
+    module.validate_release_documentation("2.12.2")
+    assert "## [2.12.2] - 2026-08-05" in module.render_release_notes("2.12.2")
 
 
 def test_version_sync_tracks_release_identifiers_without_rewriting_history():
@@ -152,7 +152,7 @@ def test_version_sync_tracks_release_identifiers_without_rewriting_history():
     assert not any(path.startswith("workspace/postmortems/") for path in targets)
     assert module.GLOB_TARGETS == []
 
-    assert "v2.12.1" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "v2.12.2" in (ROOT / "README.md").read_text(encoding="utf-8")
 
 
 def test_version_advisor_accepts_candidate_changelog_entries():

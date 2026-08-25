@@ -138,7 +138,7 @@ class MemoryMetadata(BaseModel):
     
     # Cognitive Retrieval
     concepts: List[str] = Field(default_factory=list, description="3-5 key terms for graph edges")
-    surfaces_when: List[str] = Field(default_factory=list, description="Query patterns that trigger this memory")
+    surfaces_when: List[str] = Field(default_factory=list, description="Stored trigger metadata for inspection and future proactive surfacing; not a current ranking signal")
     authority_score: float = Field(default=0.5, ge=0.0, le=1.0, description="score x access x freshness")
     
     # Relationship Tracking

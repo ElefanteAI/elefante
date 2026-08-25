@@ -162,6 +162,16 @@ def test_dashboard_frontend_normalizes_production_edge_endpoints():
     assert "edgeEndpoints(e)" in memories_source
 
 
+def test_dashboard_labels_snapshot_search_truthfully():
+    repo_root = Path(__file__).resolve().parents[1]
+    memories_source = (repo_root / "src" / "dashboard" / "ui" / "src" / "components" / "MemoriesTab.tsx").read_text(encoding="utf-8")
+
+    assert "Snapshot search... (2+ characters)" in memories_source
+    assert "snapshot results" in memories_source
+    assert "Semantic search" not in memories_source
+    assert "semantic results" not in memories_source
+
+
 def test_dashboard_shell_uses_elefante_brand_assets_not_vite_defaults():
     repo_root = Path(__file__).resolve().parents[1]
     html = (repo_root / "src" / "dashboard" / "ui" / "index.html").read_text(encoding="utf-8")
@@ -473,4 +483,3 @@ def test_get_graph_handles_null_name_safely(monkeypatch):
     assert result["nodes"][0]["label"] == ""
     assert result["nodes"][0]["name"] == ""
     assert result["nodes"][1]["label"] == "Valid Node"
-
