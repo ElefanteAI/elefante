@@ -1,0 +1,12 @@
+# Elefante v2.12.3 release authorization
+
+Authorized: 2026-08-25
+Purpose: Publish customer-repair hardening and release/capability truth corrections without changing the public MCP or storage contract.
+Source changes: PR #26
+
+Publication requirements:
+- Every maintained version declaration and the dated changelog entry resolve to 2.12.3.
+- PR #26 quality, dashboard, dependency audit, client candidate, and all platform installer builds are green before merge.
+- Candidate identity, archive paths, and installed-version checks derive from the package version without importing product dependencies before setup.
+- Task Intelligence remains internal evaluation infrastructure and is not promoted as a public capability.
+- Published v2.12.0, v2.12.1, and v2.12.2 tags remain immutable.
