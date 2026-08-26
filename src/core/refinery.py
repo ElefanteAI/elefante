@@ -1,12 +1,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/core/refinery.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
-# PURPOSE : Deterministic (LLM-free) memory cleanup: builds a refinery plan
-#           to identify stale, low-score, or superseded memories for pruning.
+# PURPOSE : Deterministic (LLM-free) cleanup of duplicates and test/ephemeral
+#           memories, with canonicalization and explicit action plans.
 # ROLE    : Core maintenance — called by elefante-Refinery MCP tool.
-# TOUCHED : When changing staleness criteria, score thresholds, decay logic,
-#           or the refinery action set (archive, delete, supersede).
+# TOUCHED : When changing canonicalization, duplicate grouping, quarantine, or
+#           the refinery action set.
 # ─────────────────────────────────────────────────────────────────────────────
 """Deterministic memory cleanup (LLM-free).
 
@@ -30,6 +28,7 @@ import re
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 from uuid import UUID
 
+from src.core.governance import is_protected
 from src.models.memory import Memory, MemoryStatus
 from src.models.entity import RelationshipType
 from src.utils.logger import get_logger
@@ -160,6 +159,9 @@ def infer_canonical_key(memory: Memory) -> str:
 
 def _select_winner(memories: List[Memory]) -> Memory:
     """Pick a canonical winner deterministically."""
+    protected = [memory for memory in memories if is_protected(memory.metadata)]
+    if protected:
+        memories = protected
     # Prefer active (not archived/deprecated/redundant), then processed, then higher score,
     # then higher access_count, then newer created_at.
     def sort_key(m: Memory) -> Tuple[int, int, int, int, float, str]:
@@ -215,9 +217,15 @@ def build_refinery_plan(memories: Iterable[Memory]) -> RefineryPlan:
     redundant_count = 0
     namespace_marked_test = 0
     canonical_key_set = 0
+    protected_groups = 0
+    protected_lifecycle_skips = 0
 
     for (namespace, canonical_key), group in groups.items():
+        protected = [memory for memory in group if is_protected(memory.metadata)]
+        if protected:
+            protected_groups += 1
         winner = _select_winner(group)
+        multiple_protected = len(protected) > 1
 
         for memory in group:
             patch: Dict[str, Any] = {}
@@ -241,11 +249,14 @@ def build_refinery_plan(memories: Iterable[Memory]) -> RefineryPlan:
             # This fixes cases where a memory is already REDUNDANT but is the sole
             # member of its (namespace, canonical_key) group (so it wouldn't get
             # the non-winner patch below).
-            if memory.metadata.status == MemoryStatus.REDUNDANT:
+            if (
+                memory.metadata.status == MemoryStatus.REDUNDANT
+                and not is_protected(memory.metadata)
+            ):
                 patch.setdefault("deprecated", True)
                 patch.setdefault("archived", True)
 
-            if memory.id != winner.id:
+            if memory.id != winner.id and not multiple_protected:
                 # Mark as redundant and link to winner
                 patch.update(
                     {
@@ -257,6 +268,8 @@ def build_refinery_plan(memories: Iterable[Memory]) -> RefineryPlan:
                     }
                 )
                 redundant_count += 1
+            elif memory.id != winner.id and multiple_protected:
+                protected_lifecycle_skips += 1
 
             if patch:
                 updates.append(RefineryUpdate(memory_id=memory.id, updates=patch))
@@ -282,6 +295,8 @@ def build_refinery_plan(memories: Iterable[Memory]) -> RefineryPlan:
         "redundant_marked": redundant_count,
         "canonical_key_set": canonical_key_set,
         "namespace_set": namespace_marked_test,
+        "protected_groups": protected_groups,
+        "protected_lifecycle_skips": protected_lifecycle_skips,
         "planned_updates": len(updates),
         "generated_at": _now_utc().isoformat(),
     }

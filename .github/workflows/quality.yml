@@ -1,6 +1,7 @@
 name: Quality
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches: [main]
@@ -47,20 +48,27 @@ jobs:
           python scripts/ci/bump_version.py --check
           version="$(python scripts/ci/build_release_client.py --print-version)"
           python scripts/ci/render_release_notes.py "$version" --validate-only
+          python scripts/ci/verify_task_intelligence_benchmark.py --verify-canaries
           python -m ruff check \
+            scripts/ci/audit_task_intelligence_retrieval.py \
             scripts/ci/generate_release_checksums.py \
             scripts/ci/run_task_intelligence_baseline.py \
             scripts/ci/run_task_intelligence_evaluation.py \
+            scripts/ci/resolve_release_publication.py \
             scripts/ci/summarize_task_intelligence_evaluation.py \
             scripts/ci/verify_task_intelligence_benchmark.py \
             scripts/demo/generate_showcase_snapshot.py \
             scripts/setup/host_selection.py \
             scripts/setup/init_databases.py \
+            src/core/governance.py \
             src/core/task_intelligence.py \
+            src/core/task_intelligence_ledger.py \
+            src/modules/distiller/privacy.py \
             tests/test_task_intelligence.py \
             tests/test_task_intelligence_baseline.py \
             tests/test_task_intelligence_benchmark.py \
             tests/test_task_intelligence_evaluation.py \
+            tests/test_task_intelligence_ledger.py \
             tests/test_task_intelligence_report.py
           git diff --check
 

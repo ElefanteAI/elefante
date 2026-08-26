@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "fixture_id": "install-uncovered-host-031-durable-memory",
+  "task_ids": [
+    "install-uncovered-host-black-box-031"
+  ],
+  "source": {
+    "kind": "local-durable-memory-export",
+    "memory_id": "f3482775-83b7-47b5-9cbb-d54da9d8bc73",
+    "memory_json_sha256": "db21a34d04f1541088ec00644cf72cdcf52e897563b0ce0b2eb87109ca44265f",
+    "exported_at": "2026-08-08"
+  },
+  "memory": {
+    "id": "f3482775-83b7-47b5-9cbb-d54da9d8bc73",
+    "content": "Elefante customer installation contract: a release installer places one stable per-user runtime, uses one private data root and one loopback daemon, and verifies user-level registration for every detected compatible IDE or CLI agent. A customer install must fail if any detected compatible host is uncovered. A source checkout is developer scope and must not replace the customer runtime.",
+    "memory_type": "decision",
+    "source": "user_input",
+    "source_detail": "sealed-durable-memory-export",
+    "source_reliability": 0.9,
+    "project": "elefante",
+    "scope": "global",
+    "trigger": [
+      "detected compatible host",
+      "customer readiness",
+      "global runtime"
+    ]
+  },
+  "lifecycle_review": {
+    "original_status": "contradictory",
+    "original_verified": false,
+    "original_conflict_ids": [],
+    "resolution": "user-reaffirmed-for-calibration",
+    "status": "approved",
+    "reviewed_at": "2026-08-08",
+    "basis": "The project owner explicitly reaffirmed one global customer runtime across supported tools and required uncovered compatible hosts to fail customer readiness. The durable store remains unchanged; this adjudication applies only to the sealed calibration fixture.",
+    "promotion_use": false
+  },
+  "privacy_review": {
+    "status": "approved",
+    "contains_secret": false,
+    "contains_personal_data": false
+  }
+}

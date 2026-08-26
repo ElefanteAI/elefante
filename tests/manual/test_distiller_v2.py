@@ -5,14 +5,15 @@ Exercises: Scanner → Parser → Privacy → Tracker → CLI
 import sys
 import os
 
-# Add src to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
+# Add the repository root, not ``src/``. Adding ``src/`` makes ``src/mcp``
+# shadow the installed ``mcp`` dependency during pytest collection.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from modules.distiller.scanner import SessionScanner
-from modules.distiller.parser import ChatParser
-from modules.distiller.privacy import PrivacyFilter
-from modules.distiller.tracker import SessionTracker
-from modules.distiller.models import ResponseKind
+from src.modules.distiller.scanner import SessionScanner
+from src.modules.distiller.parser import ChatParser
+from src.modules.distiller.privacy import PrivacyFilter
+from src.modules.distiller.tracker import SessionTracker
+from src.modules.distiller.models import ResponseKind
 
 PASS = "✓"
 FAIL = "✗"

@@ -91,6 +91,11 @@ async def test_sqlite_vector_store_round_trips_metadata_and_retrieves_locally(tm
         content="The production database uses encrypted backups.",
         metadata=MemoryMetadata(
             tags=["security", "database"],
+            retention_policy="permanent",
+            injection_policy="always",
+            scope="global",
+            trigger=["database recovery"],
+            user_locked=True,
             custom_metadata={
                 "title": "Database backups",
                 "elefante_source": {"tool": "codex", "transport": "streamable-http"},
@@ -107,6 +112,11 @@ async def test_sqlite_vector_store_round_trips_metadata_and_retrieves_locally(tm
     assert recovered is not None
     assert recovered.metadata.tags == ["security", "database"]
     assert recovered.metadata.custom_metadata["elefante_source"]["tool"] == "codex"
+    assert recovered.metadata.retention_policy == "permanent"
+    assert recovered.metadata.injection_policy == "always"
+    assert recovered.metadata.scope == "global"
+    assert recovered.metadata.trigger == ["database recovery"]
+    assert recovered.metadata.user_locked is True
     assert [result.memory.id for result in matches] == [memory.id]
     assert matches[0].memory.embedding == [1.0, 0.0, 0.0]
     assert await store.find_by_title("Database backups") is not None
@@ -122,6 +132,7 @@ async def test_sqlite_vector_store_updates_filters_and_deletes_without_chromadb(
         metadata=MemoryMetadata(
             category="operations",
             project="elefante",
+            workspace="/repo/elefante",
             file_path="docs/migration.md",
             tags=["migration", "security"],
             score=65,
@@ -143,6 +154,7 @@ async def test_sqlite_vector_store_updates_filters_and_deletes_without_chromadb(
     filters = SearchFilters(
         category="operations",
         project="elefante",
+        workspace="/repo/elefante",
         file_path="docs/migration.md",
         tags=["migration", "verified"],
         min_score=70,

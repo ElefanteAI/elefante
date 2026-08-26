@@ -1,7 +1,7 @@
 ---
 PROTOCOL: operator
 INVOKE: elefante-operator
-PROTOCOL_VERSION: 2.10.0-pre
+PROTOCOL_VERSION: 2.12.2
 LOAD_WHEN: Backup, restore, factory reset, dashboard pipeline refresh, planned downtime, any destructive op against a live install.
 DIAGNOSTIC_QUESTION: "Is the backup current AND is the server stopped before any file-level operation?"
 AUTHORITY: This file owns OPERATOR mode. Backup-first is non-negotiable.
@@ -15,8 +15,13 @@ AUTHORITY: This file owns OPERATOR mode. Backup-first is non-negotiable.
 
 Before any operation in this file:
 
-1. **Backup is current.** `python scripts/lifecycle/backup_elefante_data.py`. Verify the backup file exists and is non-empty.
-2. **Server is stopped** (for file-level ops). `python scripts/lifecycle/restart_elefante.py --stop`. Confirm.
+1. **Backup is current.** `./.venv/bin/python scripts/lifecycle/backup_elefante_data.py`. Verify the backup file exists and is non-empty.
+2. **Store owner is stopped** (for file-level ops). For an installer-owned
+   customer daemon, preview then apply
+   `scripts/lifecycle/daemon_service.py uninstall`; this removes the owned
+   service registration, not memory data. For a direct source server, stop the
+   exact process gracefully. Confirm port 8765 and direct database owners are
+   inactive before continuing.
 
 Skip either = data loss is on you.
 
@@ -25,33 +30,42 @@ Skip either = data loss is on you.
 | Need | Run | Pre-flight |
 | ---- | --- | ---------- |
 | Routine backup | `scripts/lifecycle/backup_elefante_data.py` | none |
-| Restore from backup | `scripts/lifecycle/restore_elefante_data.py <backup-path>` | server stopped |
+| Restore from backup | `scripts/lifecycle/restore_elefante_data.py --archive <backup-path>` or `--latest` | store owner stopped |
 | Factory reset (wipe everything) | `scripts/lifecycle/reset_factory.py` | backup + server stopped |
-| Restart cleanly | `scripts/lifecycle/restart_elefante.py --stop` then `--start` | none |
-| Refresh dashboard data | `scripts/pipeline/update_dashboard_data.py` | server alive |
+| Repair/restart customer daemon | `scripts/lifecycle/daemon_service.py install` then `install --apply` | installer-owned service only |
+| Restart direct source server | `scripts/lifecycle/restart_elefante.py --verify` | source/developer topology only |
+| Refresh dashboard through MCP | `elefante-DashboardOpen(refresh=true)` | customer daemon healthy |
+| Refresh dashboard from source | `scripts/pipeline/update_dashboard_data.py` | no competing direct database owner |
 | Surgical memory delete | `scripts/privileged/delete_memories_surgical.py` | PRIVILEGED + backup + dry-run |
 
 ## Backup Protocol
 
-`backup_elefante_data.py` snapshots both ChromaDB and Kuzu. Output is a timestamped archive.
+`backup_elefante_data.py` snapshots the configured vector store (SQLite by default; legacy ChromaDB when explicitly configured) and Kuzu. Output is a timestamped archive.
 
 - **Always backup before:** factory reset, Kuzu nuclear reset, surgical delete, schema migration, restore-test.
 - **Verify the backup:** non-zero size, both DBs included.
-- **Retention:** keep at least the last 3 backups. Older ones can be cleaned per `agents/memory-janitor.md` rule 1 (CHANGELOG `### Removed` entry).
+- **Retention:** keep at least the last 3 backups unless the user selects a
+  stricter policy. Removing local backup files is an operator audit event, not
+  a product changelog entry.
 
 ## Restore Protocol
 
 1. Stop the server.
-2. `python scripts/lifecycle/restore_elefante_data.py <backup-path>`.
-3. Start the server.
-4. Verify with `python scripts/verify/verify_health.py`.
-5. Run dashboard refresh: `python scripts/pipeline/update_dashboard_data.py`.
+2. Preflight with `./.venv/bin/python scripts/lifecycle/restore_elefante_data.py --archive <backup-path>` (or `--latest`), then repeat with `--apply`.
+3. Reinstall/start an installer-owned daemon with a dry run followed by
+   `./.venv/bin/python scripts/lifecycle/daemon_service.py install --apply`.
+4. Verify with `./.venv/bin/python scripts/verify/verify_health.py`.
+5. After the customer daemon is healthy, refresh through
+   `elefante-DashboardOpen(refresh=true)`. From a stopped source/developer
+   topology, the standalone pipeline is also valid.
 
 If verify_health fails after restore: stop, do not retry. Load `agents/orchestrator.md` and route through `workspace/postmortems/database.md`.
 
 ## Factory Reset (the destructive path)
 
-`reset_factory.py` wipes all memories, resets schema, restores seed memory. Used for:
+`reset_factory.py` recoverably moves configured stores out of the active data
+paths. Initialization after the reset recreates empty stores and the normal
+seed path. Used for:
 
 - Demo prep
 - Recovery from unrecoverable corruption
@@ -62,8 +76,9 @@ Procedure:
 1. **Backup** (non-negotiable).
 2. **Confirm intent.** This is irreversible; the user must explicitly authorize.
 3. Stop server.
-4. `python scripts/lifecycle/reset_factory.py`.
-5. Run `pytest tests/test_factory_reset.py -v` to confirm clean state.
+4. Review `./.venv/bin/python scripts/lifecycle/reset_factory.py`, then apply
+   with `--apply --confirm DELETE`.
+5. Run `./.venv/bin/python -m pytest tests/test_factory_reset.py -v` to confirm clean state.
 6. Start server.
 7. Re-run install seed verification: ask AI `What is my Elefante test passcode?`.
 
@@ -74,8 +89,13 @@ Surgical operations that bypass the orchestrator (delete-by-id, graph-edit) requ
 - `ELEFANTE_PRIVILEGED=1` in environment
 - Backup completed in this session
 - Dry-run completed first
-- Reason recorded in the eventual commit message
+- Reason reported in the operator result and, when product state changed, the
+  existing planning or issue ledger. Do not create a separate handoff file.
 
 ## Closure
 
-Every operation produces a CHANGELOG entry if the system state changed observably. Restore + factory reset always entail a `### Changed` entry naming the data window affected.
+Live data operations are not product changelog entries. Report the backup,
+target, authorization, result, and rollback location to the user; update the
+existing state ledger only when durable product state changed. Do not create a
+new handoff document. Update `CHANGELOG.md` only when source-controlled product
+behavior changes.

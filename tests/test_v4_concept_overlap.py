@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_v4_concept_overlap.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PROVES  : V4 cognitive retrieval concept overlap: concept labels are
 #           canonicalized and overlap is non-zero for same concept with
 #           different surface forms (regression guard).

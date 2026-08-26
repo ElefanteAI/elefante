@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : update_dashboard_data.py
-# VERSION : 2.5.2
-# CHANGED : 2026-07-23
 # PURPOSE : Read the configured embedded vector store + Kuzu state and emit
 #           dashboard_snapshot.json
 #           consumed by the dashboard server/frontend.
@@ -14,7 +12,6 @@
 #           entities/relationships.
 #           The output file path is determined by config.yaml. Dashboard must be
 #           restarted or will auto-poll for the new snapshot depending on config.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 import asyncio
 import json

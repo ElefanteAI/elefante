@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : configure_antigravity.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Write the Antigravity IDE mcp_config.json to wire Elefante as an
 #           MCP server in that IDE. Called by install.py; safe to run standalone.
 # WHEN    : Initial Antigravity IDE setup, or after moving the repo to a new
@@ -11,7 +9,6 @@
 # NOTES   : Writes to ~/.gemini/antigravity/mcp_config.json. If both this and
 #           configure_vscode_bob.py are run, each IDE gets its own config file —
 #           there is no conflict. Safe to re-run; user-owned entries are preserved.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """
 Automatic Antigravity MCP Configuration Script

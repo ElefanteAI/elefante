@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_memory_persistence.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PROVES  : Memories are durably stored in the configured vector store and Kuzu
 #           without temporary scripts; graph/session schema contract and
 #           relationship property constraints.
@@ -527,11 +525,13 @@ async def test_live_mcp_server_survives_shutdown_regression(tmp_path):
         assert "capabilities" in init
         await client.ensure_alive("post-initialize")
 
-        initial = await client.call_tool("elefante-Memory", {"action": "search", "query": shared_phrase, "limit": 5})
-        assert isinstance(initial, dict)
-        await client.ensure_alive("after initial search")
-
         for index in range(2):
+            search = await client.call_tool(
+                "elefante-Memory",
+                {"action": "search", "query": shared_phrase, "limit": 5},
+            )
+            assert search.get("success") is True, search
+            assert search.get("gate_status") == "UNLOCKED_ONCE_FOR_THIS_SESSION"
             response = await client.call_tool(
                 "elefante-Memory",
                 {"action": "add", 
@@ -561,11 +561,19 @@ async def test_live_mcp_server_survives_shutdown_regression(tmp_path):
         await client.ensure_alive("after status check")
 
         for memory_id in memory_ids:
+            search = await client.call_tool(
+                "elefante-Memory",
+                {"action": "search", "query": shared_phrase, "limit": 10},
+            )
+            assert search.get("success") is True, search
             response = await client.call_tool(
                 "elefante-Memory",
                 {"action": "delete", 
                     "memory_id": memory_id,
                     "reason": f"Cleanup for live MCP crash regression probe {token}",
+                    "delete_mode": "permanent",
+                    "invocation_mode": "user_directed",
+                    "confirm_permanent": True,
                 },
             )
             assert response.get("success", False), f"MemoryDelete failed for {memory_id}: {response}"

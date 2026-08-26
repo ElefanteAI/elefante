@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/utils/curation.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Deterministic (no LLM) curation helpers: generate title/summary
 #           fields at ingestion time and during batch backfills.
 # ROLE    : Utils — called by orchestrator.py and ETL pipeline at write time.

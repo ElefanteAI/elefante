@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_dashboard_serializer.py
-# VERSION : 2.11.0
-# CHANGED : 2026-07-26
 # PROVES  : Dashboard serialization correctness and launch safeguards; ensures
 #           Memory objects are converted to valid dashboard node/edge JSON.
 # RUN     : pytest tests/test_dashboard_serializer.py -v
@@ -195,12 +193,12 @@ def test_showcase_snapshot_is_deterministic_grounded_and_contract_complete():
     assert snapshot == repeated
     assert snapshot["curation"] == {
         "purpose": "Elefante Memory Intelligence dashboard showcase",
-        "product_baseline": "v2.12.0",
+        "product_baseline": "v2.12.2",
         "deterministic": True,
         "synthetic_behavioral_metadata": True,
         "source_grounded_content": True,
         "contains_user_data": False,
-        "disclaimer": "Counts and access history demonstrate product behavior; they are not customer or performance claims.",
+        "disclaimer": "Counts and access history demonstrate the interface; they are not observed customer behavior or performance claims.",
     }
     assert snapshot["stats"] == {
         "total_nodes": 48,
@@ -224,7 +222,8 @@ def test_showcase_snapshot_is_deterministic_grounded_and_contract_complete():
     assert all(memory["properties"]["namespace"] == "showcase" for memory in memories)
     corpus = json.dumps(snapshot).lower()
     assert "six signals" not in corpus
-    assert "chromadb holds semantic memories" not in corpus
+    assert "chromadb" not in corpus
+    assert "migration" not in corpus
 
     memory_relationships = {
         (edge["from"], edge["to"], edge["label"])
@@ -246,9 +245,9 @@ def test_showcase_snapshot_is_deterministic_grounded_and_contract_complete():
         ),
         ("demo:snapshot-evidence", "demo:snapshot-decision", "LED_TO"),
         ("demo:snapshot-decision", "demo:loopback-guard", "GUARDED_BY"),
-        ("demo:chroma-blocker", "demo:sqlite-default", "LED_TO"),
-        ("demo:sqlite-default", "demo:migration-parity", "GUARDED_BY"),
-        ("demo:migration-parity", "demo:no-live-migration", "ENFORCED_BY"),
+        ("demo:dependency-audit", "demo:runtime-lock", "LED_TO"),
+        ("demo:runtime-lock", "demo:sqlite-default", "ENABLES"),
+        ("demo:sqlite-default", "demo:data-control", "GUARDED_BY"),
     } <= memory_relationships
     semantic_relationships = [
         edge

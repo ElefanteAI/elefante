@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : render_release_notes.py
-# VERSION : 2.7.1
-# CHANGED : 2026-04-15
 # PURPOSE : Render curated GitHub release notes directly from CHANGELOG.md so
 #           tagged releases ship with a real narrative, not an empty shell.
 # WHEN    : In CI before softprops/action-gh-release, or manually to preview a
@@ -10,7 +8,6 @@
 # USAGE   : python scripts/ci/render_release_notes.py v2.7.1 --output release-notes.md
 # NOTES   : Accepts v-prefixed or bare semver. Fails if CHANGELOG lacks the
 #           requested entry. Output is markdown suitable for body_path.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Render curated release notes from CHANGELOG.md."""
 

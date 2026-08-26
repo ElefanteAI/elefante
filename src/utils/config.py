@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/utils/config.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Load config.yaml with env var overrides; single source of truth
 #           for all Elefante configuration at runtime.
 # ROLE    : Utils — imported by virtually every other module via get_config().
@@ -237,7 +235,7 @@ class Config:
         """Derive vector/graph storage paths from elefante.data_dir when unset.
 
         This keeps `ELEFANTE_DATA_DIR` and/or `config.yaml` consistent with
-        ChromaDB and Kuzu default locations.
+        configured vector-store and Kuzu locations.
         """
         data_dir_path = Path(str(config_dict.get('data_dir') or DATA_DIR))
         config_dict['data_dir'] = str(data_dir_path)

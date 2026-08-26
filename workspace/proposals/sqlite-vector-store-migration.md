@@ -1,49 +1,29 @@
-# SQLite Vector Store Migration
+# Legacy ChromaDB to SQLite Support Path
 
-## Decision
+> **Status:** COMPLETED for fresh installations. SQLite is the released default;
+> this document remains only for operators with an existing legacy ChromaDB store.
 
-Elefante now has an opt-in, dependency-free SQLite vector-store backend. It is
-the recommended escape path for GAP-029, but it is **not** the default and it
-does not read, modify, or migrate existing ChromaDB data.
+## Current decision
 
-The current default remains ChromaDB until the user explicitly authorizes a
-backup-first migration. This preserves current installations and prevents an
-unreviewed storage conversion from silently changing retrieval behavior.
+Fresh Elefante v2.12.2 installations use the embedded SQLite vector store plus
+Kuzu. ChromaDB is not in the production dependency lock. Elefante does not
+silently inspect, convert, or delete a legacy ChromaDB store.
 
-## Why SQLite
+The support utility `scripts/lifecycle/migrate_chroma_to_sqlite.py` stages and
+verifies a legacy conversion. It does not switch the configured backend and it
+does not remove the source store.
 
-- Embedded and local-only: no vector-server process or network client.
-- Uses Python's standard SQLite runtime and NumPy already required by Elefante.
-- Stores the complete versioned `Memory` JSON contract plus a float32 embedding
-  in one file, preserving metadata that ChromaDB's primitive-only metadata
-  format flattens.
-- Exact cosine search is deterministic and dependency-free. It is appropriate
-  for the initial developer-memory migration path; indexing is a later,
-  benchmark-gated optimization rather than a precondition for correctness.
+## Why SQLite became the default
 
-## Benchmark Evidence
+- It is embedded and local-only.
+- It stores the complete versioned `Memory` JSON plus explicit float32 vectors.
+- Exact cosine search is deterministic.
+- It removed the former ChromaDB production advisory and dependency footprint.
 
-`scripts/demo/benchmark_sqlite_vector_store.py` creates only a temporary,
-deterministic SQLite store and exercises the public exact-search path. It never
-opens or changes an existing ChromaDB store. On the current development CPU,
-5,000 synthetic 768-dimensional memories, 20 warm searches, and `limit=10`
-measured p50 **221.522 ms** and p95 **235.530 ms**. This is a baseline, not a
-cross-platform SLO or a default-change decision. Run the same command on each
-supported operating system and realistic corpus before selecting a threshold:
+Kuzu remains the released graph store. Replacing it is a separate architectural
+decision and is not implied by the vector-store change.
 
-```bash
-.venv/bin/python scripts/demo/benchmark_sqlite_vector_store.py \
-  --records 5000 --queries 20 --dimension 768 --limit 10 --max-p95-ms 300
-```
-
-Kuzu is not the recommended replacement: its upstream repository is archived.
-`sqlite-vec` is not selected for the first migration because its maintainers
-describe it as pre-v1 with possible breaking changes.
-
-## Current Safe Capability
-
-Set this only for a fresh, isolated installation or an explicitly prepared
-empty data directory:
+## Fresh-install contract
 
 ```yaml
 elefante:
@@ -52,59 +32,33 @@ elefante:
     persist_directory: ~/.elefante/data/vector
 ```
 
-`ELEFANTE_VECTOR_STORE_TYPE=sqlite` is also supported. With
-`ELEFANTE_DATA_DIR`, an unset SQLite directory resolves to `data/vector`; the
-existing ChromaDB default remains `data/chroma`.
+`ELEFANTE_VECTOR_STORE_TYPE=sqlite` and `ELEFANTE_DATA_DIR` are supported. The
+SQLite file is named `<collection_name>.sqlite3`. Backup, restore, export,
+factory-reset, shutdown, and dashboard-snapshot code use the configured store.
 
-The SQLite file is named `<collection_name>.sqlite3`. It is never created by a
-default ChromaDB installation.
+## Legacy migration gate
 
-The shared daemon and an explicit Elefante-mode shutdown both release the
-SQLite handle before they relinquish their graph-store resources. The existing
-checksum-manifested backup and dry-run-first restore commands include this file
-as ordinary durable data; a regression test verifies that its contents and the
-replaced copy are recoverable.
+Only use this path for an existing ChromaDB installation:
 
-Read-only JSON/CSV export also uses the configured embedded backend, and the
-privileged factory reset moves the default `data/vector` directory as well as
-the default ChromaDB and Kuzu locations into its timestamped recovery area.
-It also reads explicit vector and graph paths from the configured Elefante YAML
-file, failing closed if a target would contain the recovery directory. Dashboard
-snapshot generation reads the configured embedded backend, including SQLite,
-and has a regression proof for both backend paths.
+1. Stop the daemon and every process that can own either database.
+2. Create and verify a checksummed Elefante backup.
+3. Run the migration utility without `--apply`; inspect its parity report.
+4. Re-run with `--apply`, the verified backup, and
+   `--confirm-stopped STOPPED`. The tool writes a new SQLite destination.
+5. Verify record IDs, reconstructed memory JSON, embedding dimensions, and
+   representative search parity.
+6. Change configuration only after validation. Preserve both the ChromaDB
+   source and backup until the SQLite runtime is accepted.
 
-## Migration Gate
+The migration is an explicit support operation, not part of normal customer
+installation and not a marketing feature.
 
-`scripts/lifecycle/migrate_chroma_to_sqlite.py` now implements the conversion
-and parity gate without silently switching storage authority. Its default run
-uses only temporary output. `--apply` requires a verified backup whose Chroma
-files exactly match the source plus `--confirm-stopped STOPPED`; it reserves a
-new SQLite directory without replacing any existing path, but leaves ChromaDB
-and Elefante configuration unchanged.
-The operator must validate the result before changing configuration.
+## Verification
 
-The authorized migration sequence must:
+```bash
+./.venv/bin/python -m pytest tests/test_sqlite_vector_store.py -q
+uv tool run pip-audit --requirement requirements.lock --disable-pip --require-hashes --strict --progress-spinner off
+```
 
-1. Stop the daemon and every database-owning process.
-2. Confirm shutdown completed, then create and verify an Elefante backup archive.
-3. Run the default temporary dry-run and inspect its JSON parity report.
-4. Re-run with `--apply`, the verified backup path, and the explicit stopped
-   confirmation to write a new SQLite directory beside Chroma, never in place.
-5. Validate record count, UUID set, reconstructed metadata JSON, embedding dimension,
-   and deterministic search parity on a representative corpus.
-6. Leave ChromaDB untouched until the user validates the new store.
-7. Support an immediate configuration rollback to ChromaDB and preserve the
-   backup archive.
-
-## Acceptance Criteria Before Default Change
-
-- Fresh SQLite CRUD, filters, pagination, search, provenance, update, delete,
-  backup, restore, and restart contracts pass on macOS, Linux, and Windows.
-- The migration dry-run and apply paths have isolated fixture round-trips with
-  UUID/metadata/embedding/search-parity evidence and exact backup matching.
-- Benchmark evidence establishes an acceptable retrieval latency envelope at
-  realistic memory volumes; any index addition is separately versioned and
-  benchmarked.
-- `pip-audit` is clean after ChromaDB is removed from the runtime lock.
-- Migration, rollback, backup, and recovery documentation are independently
-  reviewed against the shipped command behavior.
+`scripts/demo/benchmark_sqlite_vector_store.py` provides a disposable local
+latency measurement. Historical measurements are not a cross-platform SLO.

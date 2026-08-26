@@ -34,7 +34,7 @@ pytest tests/test_integration_smoke.py -v
 ./.venv/bin/python scripts/ci/summarize_task_intelligence_evaluation.py
 ```
 
-The shipped self-protocol runs against an isolated temporary Elefante home/data directory so it validates the live MCP workflow without polluting the user's durable memory store. By default it verifies 15/16 tools plus both prompts; `--with-dashboard-open` is opt-in because that tool binds fixed port 8000 and is not fully self-contained.
+The shipped self-protocol runs against an isolated temporary Elefante home/data directory so it validates the live MCP workflow without polluting the user's durable memory store. It explicitly enables the default-off Task Intelligence development surface and verifies 17/18 tools plus both prompts; `--with-dashboard-open` is opt-in because that tool binds fixed port 8000 and is not fully self-contained. Normal v2.12.2 discovery remains 16 tools; the unreleased customer candidate exposes 17 by default.
 
 Use the existing tests in this file before writing any ad hoc validation script. If a listed test no longer reflects current behavior, update that test first. Parallel scratch tests are noise unless the existing suite cannot express the failure mode.
 
@@ -48,7 +48,9 @@ Use the existing tests in this file before writing any ad hoc validation script.
 | ---- | ------------- | ------------ |
 | [test_memory_persistence.py](test_memory_persistence.py) | Memories persist, current Kuzu path/lock contract stays truthful, GraphStore close barrier works, live MCP shutdown regression stays alive | Without this, users lose memories, get routed through stale Kuzu recovery advice, or crash the server |
 | [test_memory_guard.py](test_memory_guard.py) | `[test]` tagged memories blocked by default | Prevents test data polluting real memory DB |
-| [test_autonomous_coactivation.py](test_autonomous_coactivation.py) | Co-activation scoring, built-in directive baseline, system specification bootstrap, entrypoint response-contract guard | Prevents regressions in automatic graph maintenance and the embedded directive/specification baseline |
+| [test_autonomous_coactivation.py](test_autonomous_coactivation.py) | Legacy explicit reinforcement behavior, read-only retrieval boundary, built-in directive baseline, system specification bootstrap, entrypoint response-contract guard | Prevents retrieval exposure from mutating memory history and protects the embedded directive/specification baseline |
+| [test_task_intelligence_ledger.py](test_task_intelligence_ledger.py) | Session-bound prepare/use/outcome traces, metadata-only storage, idempotency, retraction, shadow default, and pilot kill switch | Prevents observational Task Intelligence data from leaking content, crossing sessions, or silently changing ranking |
+| [test_mcp_daemon.py](test_mcp_daemon.py) | Shared-daemon transport, governed answer delivery, authority, source-digest validation, and live runtime contracts | Prevents prompt, search, or opt-in delivery from bypassing governance or current-source checks |
 
 ### UNIT TESTS (Run during development)
 
@@ -64,11 +66,11 @@ Use the existing tests in this file before writing any ad hoc validation script.
 | [test_backup_restore.py](test_backup_restore.py) | Backup manifests, restore preflight, archive safety, integrity, and recoverable replacement | When changing `scripts/lifecycle/backup_elefante_data.py` or `restore_elefante_data.py` |
 | [test_installer_bundle.py](test_installer_bundle.py) | Release-bundle bootstrap install root placement, delegated installer command wiring, and archive contents | When changing `scripts/setup/bootstrap_release_bundle.py` or `scripts/ci/build_installer_bundle.py` |
 | [test_install_setup.py](test_install_setup.py) | Installer state, daemon service, MCP host adapters, safe uninstall ownership, and seed-memory guard | When changing `scripts/setup/` or `scripts/lifecycle/` installer paths |
-| [test_task_intelligence_benchmark.py](test_task_intelligence_benchmark.py) | Historical task provenance, acceptance nodes, split isolation, leakage scanning, and metadata-only outcomes | When changing the Task Intelligence SDD, benchmark manifest, or evaluator |
+| [test_task_intelligence_benchmark.py](test_task_intelligence_benchmark.py) | Historical task provenance, acceptance nodes, split isolation, leakage scanning, metadata-only outcomes, and fail-closed behavioral promotion readiness | When changing the Task Intelligence SDD, benchmark manifest, or evaluator |
 | [test_task_intelligence_baseline.py](test_task_intelligence_baseline.py) | Historical snapshot isolation, hidden acceptance boundaries, model-profile outcome isolation, resume behavior, and cumulative token caps | When changing the no-Brief baseline runner |
-| [test_task_intelligence.py](test_task_intelligence.py) | Deterministic Task Brief lifecycle/scope/trust filters, conflict visibility, provenance, per-stage budgets, one graph hop, and non-mutating shadow search | When changing the Task Brief compiler or service |
-| [test_task_intelligence_evaluation.py](test_task_intelligence_evaluation.py) | Pre-fix evidence chunking, local snapshot corpus, seeded pair order, and treatment prompt leakage boundaries | When changing paired evaluation |
-| [test_task_intelligence_report.py](test_task_intelligence_report.py) | Protocol completeness, clustered confidence, resource limits, and fail-closed promotion | When changing outcome reporting or promotion thresholds |
+| [test_task_intelligence.py](test_task_intelligence.py) | V1 reproducibility plus v2 lifecycle/scope/trust, independent relevance, abstention, conflict, provenance, stage, graph, and non-mutation contracts | When changing the Task Brief compiler or service |
+| [test_task_intelligence_evaluation.py](test_task_intelligence_evaluation.py) | Pre-fix source isolation, lineage, declared-context preservation, source/stage diversity, sealed-fixture determinism, paired order, contract-bound outcome paths, and prompt leakage boundaries | When changing paired evaluation or retrieval audit |
+| [test_task_intelligence_report.py](test_task_intelligence_report.py) | Protocol completeness, profile and task-contract isolation, clustered confidence, resource limits, stale-outcome rejection, and behavioral-contract promotion gate | When changing outcome reporting or promotion thresholds |
 
 ### INTEGRATION (Run before release)
 

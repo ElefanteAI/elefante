@@ -1,12 +1,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/core/etl.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
-# PURPOSE : Two-phase memory ingestion (ETL) pipeline using the agent LLM brain
-#           for Phase 2 enrichment (classification, entity extraction).
+# PURPOSE : Two-phase memory ingestion pipeline using the agent LLM for
+#           summary, concept, and surfacing-hint enrichment.
 # ROLE    : Core ingestion — called by elefante-ETLProcess MCP tool.
-# TOUCHED : When changing ingestion phases, memory type classification rules,
-#           entity extraction logic, or the ETL tool prompt templates.
+# TOUCHED : When changing ingestion phases, enrichment fields, or the ETL tool
+#           prompt templates.
 # ─────────────────────────────────────────────────────────────────────────────
 """
 Elefante ETL Pipeline - Agent-Brain Architecture
@@ -42,7 +40,7 @@ class ProcessingStatus:
     """Memory lifecycle states"""
     RAW = "raw"              # Just ingested, awaiting agent classification
     PROCESSING = "processing" # Handed to agent for classification
-    PROCESSED = "processed"   # Agent classified with V5 fields (ring, topic, knowledge_type)
+    PROCESSED = "processed"   # Agent supplied summary/concepts/surfaces_when
     FAILED = "failed"         # Classification failed
 
 

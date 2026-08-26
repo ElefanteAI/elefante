@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/core/deduplication.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Remove near-duplicate results from hybrid search using embedding
 #           similarity to prevent redundant returns to the agent.
 # ROLE    : Core post-processing — applied to retrieval results before injection.
@@ -344,5 +342,4 @@ def get_deduplicator(threshold: float = 0.95) -> ResultDeduplicator:
     if _deduplicator is None or _deduplicator.threshold != threshold:
         _deduplicator = ResultDeduplicator(threshold)
     return _deduplicator
-
 

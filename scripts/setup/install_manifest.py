@@ -5,13 +5,17 @@ from __future__ import annotations
 import os
 import hashlib
 import json
+import re
 import subprocess
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 
 MANIFEST_NAME = "install-manifest.json"
-MANIFEST_SCHEMA_VERSION = 2
+MANIFEST_SCHEMA_VERSION = 3
+BUILD_IDENTITY_FILE_NAME = "elefante-build.json"
+RELEASE_CHANNELS = {"candidate", "development", "release"}
+SOURCE_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
 
 
 def file_hash(path: Path) -> str:
@@ -37,6 +41,20 @@ def json_value_hash(value: object) -> str:
     """Hash one JSON value independently from unrelated settings in its file."""
     payload = json.dumps(value, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def text_value_hash(value: str) -> str:
+    """Hash one managed text value independently from its surrounding file."""
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _text_block(document: str, start_marker: str, end_marker: str) -> str | None:
+    """Return one complete marked block, rejecting missing or ambiguous markers."""
+    if document.count(start_marker) != 1 or document.count(end_marker) != 1:
+        return None
+    start = document.index(start_marker)
+    end = document.index(end_marker, start) + len(end_marker)
+    return document[start:end]
 
 
 def is_elefante_runtime_entry(value: object) -> bool:
@@ -108,11 +126,27 @@ def record_runtime_installation(
     data_root: Path,
     version: str,
     scope: str,
+    source_commit: str,
+    release_channel: str,
+    source_clean: bool,
     home: Path | None = None,
 ) -> Path:
     """Record the runtime identity that customer readiness must verify."""
     if scope not in {"customer", "developer"}:
         raise ValueError("runtime installation scope must be customer or developer")
+    if release_channel not in RELEASE_CHANNELS:
+        raise ValueError("runtime release channel must be candidate, development, or release")
+    if not SOURCE_COMMIT_PATTERN.fullmatch(source_commit):
+        if not (release_channel == "development" and source_commit == "unavailable"):
+            raise ValueError("runtime source commit must be a 40-character lowercase Git SHA")
+    if not isinstance(source_clean, bool):
+        raise ValueError("runtime source cleanliness must be boolean")
+    if scope == "customer" and (
+        release_channel not in {"candidate", "release"}
+        or source_commit == "unavailable"
+        or not source_clean
+    ):
+        raise ValueError("customer runtime requires clean candidate or release source provenance")
     target = manifest_path(home)
     target.parent.mkdir(parents=True, exist_ok=True)
     data = _load_manifest(target)
@@ -120,14 +154,22 @@ def record_runtime_installation(
         "app_root": str(Path(app_root).expanduser().resolve()),
         "data_root": str(Path(data_root).expanduser().resolve()),
         "scope": scope,
+        "source_clean": source_clean,
+        "source_commit": source_commit,
+        "release_channel": release_channel,
         "version": version,
     }
     _write_manifest(target, data)
     return target
 
 
-def read_runtime_installation(home: Path | None = None) -> dict[str, str] | None:
-    """Read a valid runtime identity without adopting malformed state."""
+def read_runtime_installation(home: Path | None = None) -> dict[str, str | bool] | None:
+    """Read basic runtime identity while preserving provenance for diagnosis.
+
+    Legacy schema-v2 manifests remain readable so repair and doctor can explain
+    the missing provenance instead of pretending the installation never existed.
+    New writes are strict schema-v3 identities.
+    """
     target = manifest_path(home)
     if not target.exists():
         return None
@@ -142,7 +184,11 @@ def read_runtime_installation(home: Path | None = None) -> dict[str, str] | None
         return None
     if runtime["scope"] not in {"customer", "developer"}:
         return None
-    return {key: runtime[key] for key in required}
+    result: dict[str, str | bool] = {key: runtime[key] for key in required}
+    for key in ("source_commit", "release_channel", "source_clean"):
+        if key in runtime:
+            result[key] = runtime[key]
+    return result
 
 
 def configured_surfaces(
@@ -171,6 +217,21 @@ def configured_surfaces(
                 document = json.loads(path.read_text(encoding="utf-8"))
                 current_entry = _json_entry(document, entry_path) if isinstance(entry_path, list) else None
                 matches = isinstance(entry_hash, str) and json_value_hash(current_entry) == entry_hash
+            elif details.get("kind") == "text-block":
+                start_marker = details.get("start_marker")
+                end_marker = details.get("end_marker")
+                block_hash = details.get("block_sha256")
+                document = path.read_text(encoding="utf-8")
+                current_block = (
+                    _text_block(document, start_marker, end_marker)
+                    if isinstance(start_marker, str) and isinstance(end_marker, str)
+                    else None
+                )
+                matches = (
+                    current_block is not None
+                    and isinstance(block_hash, str)
+                    and text_value_hash(current_block) == block_hash
+                )
             else:
                 matches = path.exists() and isinstance(expected, str) and file_hash(path) == expected
         except (OSError, json.JSONDecodeError):
@@ -194,6 +255,12 @@ def configured_surfaces(
             continue
         if current.returncode == 0 and configuration_hash(current.stdout) == expected:
             verified.add(details["surface"])
+    # Codex is customer-ready only when both its MCP registration and its
+    # installer-managed global Recall routing rule still verify.
+    codex_routing = "codex-recall-routing"
+    if "codex" in verified and codex_routing not in verified:
+        verified.remove("codex")
+    verified.discard(codex_routing)
     return verified
 
 
@@ -232,6 +299,40 @@ def record_emitted_json_entry(
     return target
 
 
+def record_emitted_text_block(
+    path: Path,
+    surface: str,
+    start_marker: str,
+    end_marker: str,
+    *,
+    created: bool,
+    leading_separator: str,
+    trailing_separator: str,
+    home: Path | None = None,
+) -> Path:
+    """Record one marked block inside a shared user-owned text file."""
+    target = manifest_path(home)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    data = _load_manifest(target)
+    document = path.read_text(encoding="utf-8")
+    block = _text_block(document, start_marker, end_marker)
+    if block is None:
+        raise RuntimeError(f"Cannot record missing or ambiguous text block in {path}")
+    data["files"][str(path.resolve())] = {
+        "block_sha256": text_value_hash(block),
+        "created": created,
+        "end_marker": end_marker,
+        "kind": "text-block",
+        "leading_separator": leading_separator,
+        "sha256": file_hash(path),
+        "start_marker": start_marker,
+        "surface": surface,
+        "trailing_separator": trailing_separator,
+    }
+    _write_manifest(target, data)
+    return target
+
+
 def is_unchanged_emitted_json_entry(
     path: Path,
     surface: str,
@@ -262,6 +363,60 @@ def is_unchanged_emitted_json_entry(
     )
 
 
+def is_unchanged_emitted_text_block(
+    path: Path,
+    surface: str,
+    start_marker: str,
+    end_marker: str,
+    home: Path | None = None,
+) -> bool:
+    """Return true only when the exact installer-owned marked block remains."""
+    if not emitted_text_block_recorded(
+        path, surface, start_marker, end_marker, home=home
+    ):
+        return False
+    target = manifest_path(home)
+    try:
+        data = _load_manifest(target)
+        details = data["files"].get(str(path.resolve()))
+        block = _text_block(path.read_text(encoding="utf-8"), start_marker, end_marker)
+    except (OSError, RuntimeError):
+        return False
+    return (
+        isinstance(details, dict)
+        and details.get("kind") == "text-block"
+        and details.get("surface") == surface
+        and details.get("start_marker") == start_marker
+        and details.get("end_marker") == end_marker
+        and isinstance(block, str)
+        and details.get("block_sha256") == text_value_hash(block)
+    )
+
+
+def emitted_text_block_recorded(
+    path: Path,
+    surface: str,
+    start_marker: str,
+    end_marker: str,
+    home: Path | None = None,
+) -> bool:
+    """Report whether the manifest owns this precise marked block location."""
+    target = manifest_path(home)
+    if not target.exists():
+        return False
+    try:
+        details = _load_manifest(target)["files"].get(str(path.resolve()))
+    except (OSError, RuntimeError):
+        return False
+    return (
+        isinstance(details, dict)
+        and details.get("kind") == "text-block"
+        and details.get("surface") == surface
+        and details.get("start_marker") == start_marker
+        and details.get("end_marker") == end_marker
+    )
+
+
 def write_json_atomically(path: Path, document: dict, *, indent: int = 2) -> None:
     """Replace a JSON configuration only after its complete serialization succeeds."""
     mode = path.stat().st_mode & 0o7777 if path.exists() else None
@@ -270,6 +425,24 @@ def write_json_atomically(path: Path, document: dict, *, indent: int = 2) -> Non
         with NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as stream:
             json.dump(document, stream, indent=indent)
             stream.write("\n")
+            temporary = Path(stream.name)
+        if mode is not None:
+            os.chmod(temporary, mode)
+        os.replace(temporary, path)
+    except Exception:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+        raise
+
+
+def write_text_atomically(path: Path, document: str) -> None:
+    """Replace a text file atomically while preserving its existing mode."""
+    mode = path.stat().st_mode & 0o7777 if path.exists() else None
+    temporary: Path | None = None
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as stream:
+            stream.write(document)
             temporary = Path(stream.name)
         if mode is not None:
             os.chmod(temporary, mode)
@@ -473,6 +646,37 @@ def _remove_json_entry(path: Path, details: dict, apply: bool) -> bool:
     return True
 
 
+def _remove_text_block(path: Path, details: dict, apply: bool) -> bool:
+    start_marker = details.get("start_marker")
+    end_marker = details.get("end_marker")
+    expected = details.get("block_sha256")
+    leading = details.get("leading_separator")
+    trailing = details.get("trailing_separator")
+    if not all(isinstance(value, str) for value in (start_marker, end_marker, expected, leading, trailing)):
+        return False
+    try:
+        document = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    block = _text_block(document, start_marker, end_marker)
+    if block is None or text_value_hash(block) != expected:
+        return False
+    start = document.index(start_marker)
+    end = start + len(block)
+    if document[max(0, start - len(leading)):start] != leading:
+        return False
+    if document[end:end + len(trailing)] != trailing:
+        return False
+    updated = document[:start - len(leading)] + document[end + len(trailing):]
+    if not apply:
+        return True
+    if details.get("created") and not updated:
+        path.unlink()
+    else:
+        write_text_atomically(path, updated)
+    return True
+
+
 def remove_unchanged_files(home: Path | None = None, apply: bool = False) -> tuple[list[Path], list[Path]]:
     """Remove only installer-owned files or entries that remain unchanged."""
     target = manifest_path(home)
@@ -483,16 +687,27 @@ def remove_unchanged_files(home: Path | None = None, apply: bool = False) -> tup
     removed, preserved = [], []
     for raw_path, details in list(files.items()):
         path = Path(raw_path)
-        expected = details.get("sha256") if isinstance(details, dict) else None
-        if not path.exists() or not expected or file_hash(path) != expected:
+        if not path.exists() or not isinstance(details, dict):
             preserved.append(path)
             continue
-        kind = details.get("kind", "file") if isinstance(details, dict) else ""
+        kind = details.get("kind", "file")
         if kind == "json-entry":
+            expected = details.get("sha256")
+            if not isinstance(expected, str) or file_hash(path) != expected:
+                preserved.append(path)
+                continue
             if not _remove_json_entry(path, details, apply):
                 preserved.append(path)
                 continue
+        elif kind == "text-block":
+            if not _remove_text_block(path, details, apply):
+                preserved.append(path)
+                continue
         elif kind == "file":
+            expected = details.get("sha256")
+            if not isinstance(expected, str) or file_hash(path) != expected:
+                preserved.append(path)
+                continue
             if apply:
                 path.unlink()
         else:

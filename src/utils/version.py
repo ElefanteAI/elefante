@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/utils/version.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Single source of truth for the runtime version string; enforces
 #           minimum Python version at startup.
 # ROLE    : Utils — imported by __init__.py and main.py. Do NOT use
@@ -17,22 +15,24 @@ from __future__ import annotations
 import sys
 
 
-SUPPORTED_PYTHON = (3, 11)
+SUPPORTED_PYTHON_MIN = (3, 11)
+SUPPORTED_PYTHON_MAX_EXCLUSIVE = (3, 14)
 
 
 def get_supported_python_message(found_version: tuple[int, int] | None = None) -> str:
     """Return the canonical runtime compatibility message."""
     major, minor = found_version or sys.version_info[:2]
     return (
-        "Elefante requires Python 3.11.x because Kuzu 0.11.3 is not supported on newer "
-        f"CPython runtimes. Found Python {major}.{minor}. Recreate .venv with python3.11 "
-        "and restart the server."
+        "Elefante requires Python 3.11, 3.12, or 3.13. "
+        f"Found Python {major}.{minor}. Recreate the environment with a supported "
+        "interpreter and restart Elefante."
     )
 
 
 def is_supported_python(found_version: tuple[int, int] | None = None) -> bool:
     """Return True only for the supported Elefante runtime."""
-    return (found_version or sys.version_info[:2]) == SUPPORTED_PYTHON
+    version = found_version or sys.version_info[:2]
+    return SUPPORTED_PYTHON_MIN <= version < SUPPORTED_PYTHON_MAX_EXCLUSIVE
 
 
 def ensure_supported_python(found_version: tuple[int, int] | None = None) -> None:

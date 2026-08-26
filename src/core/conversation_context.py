@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/core/conversation_context.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Searches conversation history for context-aware memory retrieval;
 #           enriches search results with recent conversational signals.
 # ROLE    : Core auxiliary — injected into retrieval pipeline when conversation
@@ -17,6 +15,7 @@ Enables the system to understand pronouns and recent context.
 """
 
 import asyncio
+import hashlib
 from typing import List, Optional, Set
 from uuid import UUID
 from datetime import datetime, timedelta
@@ -72,7 +71,7 @@ class ConversationSearcher:
         """
         self.logger.info(
             "Collecting conversation candidates",
-            query=query[:100],
+            query_sha256=hashlib.sha256(query.encode("utf-8")).hexdigest(),
             session_id=str(session_id),
             limit=limit
         )
@@ -163,7 +162,7 @@ class ConversationSearcher:
             )
             
             # Search with generic query to get conversation memories
-            # ChromaDB will return them sorted by relevance
+            # The configured vector store returns candidates in relevance order.
             search_results = await self.vector_store.search(
                 query="conversation message",  # Generic query
                 limit=self.max_window * 2,  # Get more for filtering
@@ -319,5 +318,3 @@ def get_conversation_searcher() -> ConversationSearcher:
     if _conversation_searcher is None:
         _conversation_searcher = ConversationSearcher()
     return _conversation_searcher
-
-

@@ -4,9 +4,13 @@
   <img src="docs/assets/Elefante Logo 1024 black 2.png" alt="Elefante" width="256">
 </p>
 
-**Elefante never forgets.**
+**Carry forward the context worth keeping.**
 
-AI agents start every conversation from zero. Your preferences, decisions, and discovered patterns don't carry over. Elefante gives any MCP-compatible agent a persistent, local memory layer — memories are stored, scored automatically, and surfaced at the right moment without being asked.
+AI sessions and providers often fail to carry forward the preferences,
+decisions, and discovered patterns that made earlier work productive. Elefante
+gives MCP-compatible agents a persistent, local second brain: durable memories
+remain inspectable across sessions, while retrieval selects context for the
+task at hand.
 
 **v2.12.3** — Current published release.
 
@@ -14,7 +18,7 @@ AI agents start every conversation from zero. Your preferences, decisions, and d
 ┌─────────────────────────────────────────────────────────────┐
 │ YOUR HOST (VS Code · Cursor · Codex · compatible MCP host)  │
 └────────────────────────┬────────────────────────────────────┘
-                         │ MCP stdio
+                         │ MCP HTTP / stdio bridge
 ┌────────────────────────▼────────────────────────────────────┐
 │ LAYER 1 · MCP PROTOCOL                                      │
 │ 16 tools · 2 prompts · Context Injection                    │
@@ -33,7 +37,7 @@ AI agents start every conversation from zero. Your preferences, decisions, and d
 └─────────────────────────────────────────────────────────────┘
 ```
 
-Every memory stored. Every context surfaced. Nothing forgotten.
+Durable context stays local and inspectable. Retrieval remains selective.
 
 ---
 
@@ -43,11 +47,11 @@ Elefante is a local-first persistent memory engine for AI agents, connected via 
 
 - **Stores** facts, preferences, decisions, code patterns, and tasks
 - **Searches** using hybrid retrieval — semantic vectors, knowledge graph, and session context
-- **Scores** every memory automatically using 5 retrieval signals (semantic match, concept overlap, co-activation, authority, temporal freshness) — no manual ratings
-- **Injects context** silently into every tool call — the agent gets relevant history without asking
+- **Ranks** retrieval candidates with 5 signals (semantic match, concept overlap, co-activation, authority, temporal freshness) — no manual importance rating
+- **Injects bounded context** on eligible tool calls; memory-heavy operations skip automatic context to avoid duplication
 - **Connects knowledge** through an entity-relationship graph
-- **Enforces quality** via a compliance gate: search before write, no duplicates
-- **Visualizes** brain health through a snapshot-driven dashboard
+- **Reduces context-free writes** with a search-before-write compliance gate and deterministic duplicate checks
+- **Visualizes** memory state and explicit relationships through a snapshot-driven dashboard
 
 The Elefante store runs locally with no Elefante product telemetry. Context you
 intentionally send to a connected AI client is governed by that provider's data
@@ -73,7 +77,7 @@ domain adviser. It is the local memory authority those systems can use.
 
 ### Layer 1 — MCP Protocol
 
-The interface between your IDE and the memory engine. 16 tools and 2 prompts let agents store, search, connect, and manage knowledge. A **Compliance Gate** prevents duplicates before they exist. **Context Injection** attaches relevant memories to every tool response. **Directives** enforce persistent behavioral rules that survive across sessions. **Token Intelligence** measures every response and tells the agent what each tool call costs — output tokens, protocol overhead, and signal ratio — so memory never becomes invisible bloat.
+The interface between your IDE and the memory engine. 16 tools and 2 prompts let agents store, search, connect, and manage knowledge. A **Compliance Gate** searches before memory writes and reduces redundant memories. **Context Injection** can attach relevant memories to eligible operations when a usable search signal exists. **Directives** can accompany normal product operations. **Token Intelligence** measures MCP tool responses and reports estimated output, protocol overhead, and signal ratio.
 
 Full tool reference → [docs/reference/tools.md](docs/reference/tools.md)
 IDE configuration → [docs/how-to/configure-ide.md](docs/how-to/configure-ide.md)
@@ -84,7 +88,7 @@ Two local storage layers work together:
 
 - **SQLite** — the dependency-free default vector store; it preserves complete memory JSON and float32 embeddings with deterministic exact-cosine retrieval.
 - **Kuzu** — a knowledge graph that tracks entities, relationships, and structural context.
-- **Behavioral Relevance** — a 5-signal scoring system that automatically surfaces the most useful memories. No manual importance ratings.
+- **Behavioral Relevance** — a 5-signal scoring system that ranks memory candidates. Retrieval frequency is not proof that a memory improved the task.
 
 Scoring details → [docs/reference/scoring.md](docs/reference/scoring.md)
 Architecture → [docs/reference/architecture.md](docs/reference/architecture.md)
@@ -105,19 +109,22 @@ Docker deployment → [docs/how-to/docker.md](docs/how-to/docker.md)
 
 ## Designed For
 
-Verified installer adapters currently cover VS Code, Cursor, Kiro, Gemini CLI,
-Claude Code, Codex, and OpenClaw. Other MCP-compatible clients can use the
-standard bridge contract, but are not marketed as verified integrations.
+Released adapter coverage currently includes VS Code, Cursor, Kiro, Gemini CLI,
+Claude Code, Codex, and OpenClaw. These integrations are compatible, not yet
+host-certified end to end. Other MCP-compatible clients can use the community
+bridge contract without becoming a supported integration claim.
 
 ---
 
-## One-Click Installation (Zero Config)
+## Release Installation
 
-**Requirements:** Python 3.11+ (tested up to 3.13). Git is only required for the source-checkout fallback path.
+**Requirements:** Python 3.11, 3.12, or 3.13. Release CI currently runs on
+Python 3.11; the installer accepts all three versions. Git is only required for
+the source-checkout fallback path.
 
-Our installer detects your OS, manages the repository virtual environment,
-installs the locked dependencies, initializes local graph and vector databases,
-and lets you select from the compatible hosts detected on the machine.
+Our installer detects your OS, creates a stable per-user customer runtime,
+installs the locked runtime dependencies, initializes local graph and vector
+databases, and connects every compatible host detected on the machine.
 
 **Release bundle (preferred):** Download `elefante-installer-<OS>.zip` from GitHub Releases and extract it, then:
 
@@ -145,29 +152,36 @@ If `.venv` already exists, the installer offers four paths:
 2. `.elefante-install-status.txt`
 3. `.elefante-install.log`
 
-For release bundles and the macOS DMG, those files live in the stable install root. For source-checkout installs, they live in the repo root. The installer prints their exact paths at startup and on failure.
+For release bundles, those files live in the stable install root. For
+source-checkout installs, they live in the repo root. The installer prints
+their exact paths at startup and on failure.
 
 ```bash
 # Source checkout fallback
 # macOS / Linux
 git clone https://github.com/ElefanteAI/elefante.git
 cd elefante
+git checkout v2.12.3
 chmod +x install.sh && ./install.sh
 
 # Windows
 git clone https://github.com/ElefanteAI/elefante.git
 cd elefante
+git checkout v2.12.3
 install.bat
 ```
 
-You possess full local control. The installer automatically bridges into your IDE and injects a single "Seed Memory" to prove the connection.
+The installer keeps the Elefante store under the user's local account, connects
+detected compatible hosts, and writes one harmless seed memory for connection
+verification.
 
 **The 60-Second Proof of Work:**
 1. Restart your IDE.
 2. Open your AI Chat (Copilot, Cursor, etc).
 3. Copy/paste exactly this question: 
    `What is my Elefante test passcode?`
-4. Watch the AI hit your local memory, cure its amnesia, and return the secret code.
+4. If the host does not search automatically, ask it explicitly to search
+   Elefante for the test passcode. The expected result is `Indigo-Echo`.
 
 *Looking for manual setup or deep technical details? See the [Full Installation Guide](docs/how-to/install.md).*
 
@@ -175,7 +189,7 @@ You possess full local control. The installer automatically bridges into your ID
 
 ## MCP Tools
 
-16 tools + 2 prompts. All names follow `elefante-PascalCase` convention.
+16 tools + 2 prompts. Tool names follow `elefante-PascalCase`; prompt names are `elefante-context` and `elefante-grounding`.
 
 | Category   | Tools                                                                                                                                   |
 | ---------- | --------------------------------------------------------------------------------------------------------------------------------------- |
@@ -193,7 +207,10 @@ Full reference with parameter schemas → [docs/reference/tools.md](docs/referen
 
 Elefante keeps durable architecture rules out of the live prompt by separating lightweight agent instructions from retrieved knowledge:
 
-1. **Keep the instruction file small.** Your `.cursorrules`, `copilot-instructions.md`, or equivalent should tell the agent to search Elefante before writing code or declaring work complete.
+1. **Keep the instruction file small.** Your `.cursorrules`,
+   `copilot-instructions.md`, or equivalent should tell the agent to search
+   Elefante when prior decisions, preferences, or project context may affect
+   the task.
 2. **Store durable rules in Elefante.** Architecture contracts, schemas, and team process belong in `specification` or `directive` memories rather than inside a giant prompt file.
 3. **Retrieve only what is relevant.** When the agent searches, Elefante surfaces the specific rule needed for the current task instead of injecting an entire handbook into every prompt.
 
@@ -208,7 +225,7 @@ Elefante keeps durable architecture rules out of the live prompt by separating l
 | Embeddings   | sentence-transformers (gte-base) |
 | Protocol     | MCP 1.28.1                       |
 | Dashboard    | React + TypeScript + Vite        |
-| Runtime      | Python 3.11                      |
+| Runtime      | Python 3.11–3.13                 |
 
 ---
 

@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_end_to_end.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PROVES  : Convenience entrypoint that delegates to verify_e2e_tests.py for
 #           backward compatibility with docs that referenced this original path.
 # RUN     : pytest tests/test_end_to_end.py -v  OR  python tests/test_end_to_end.py

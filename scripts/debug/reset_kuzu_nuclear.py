@@ -2,8 +2,6 @@
 # -*- coding: utf-8 -*-
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : reset_kuzu_nuclear.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Backup-and-remove the Kuzu graph database path only (file or dir)
 #           so the next init starts fresh without a full factory reset.
 # WHEN    : When Kuzu is corrupted and cannot be opened (e.g. schema mismatch
@@ -14,7 +12,6 @@
 # NOTES   : Always backup first (backup_elefante_data.py). This permanently
 #           removes all Kuzu relationship data — ChromaDB memories are untouched.
 #           Kuzu will be re-initialized on next server start.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Nuclear reset for the Kuzu database path.
 
@@ -118,4 +115,3 @@ if __name__ == "__main__":
 
     success = nuclear_reset_kuzu(apply=bool(args.apply), confirm=str(args.confirm))
     exit(0 if success else 1)
-

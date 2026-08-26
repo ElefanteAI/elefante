@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : verify_scoring_sandbox.py
-# VERSION : 2.7.1
-# CHANGED : 2026-04-16
 # PURPOSE : Seed 100 crafted memories in a disposable temp Elefante sandbox,
 #           verify the 5-signal retrieval contract plus dashboard-visible
 #           taxonomy, topology, lifecycle, and customer-demo coverage, then
@@ -14,7 +12,6 @@
 # NOTES   : Uses a child process with temp HOME/USERPROFILE to contain all
 #           import-time config writes and logs. Pass --keep-sandbox only for
 #           debugging a failed scenario.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Isolated 100-memory scoring plus dashboard-demo verifier for Elefante."""
 

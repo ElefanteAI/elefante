@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/models/query.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Query and search parameter models for MemorySearch and related tools.
 # ROLE    : Models — used by server.py to validate and deserialize search requests
 #           before passing to orchestrator.
@@ -124,6 +122,7 @@ class SearchFilters(BaseModel):
     
     # Project/file filters
     project: Optional[str] = None
+    workspace: Optional[str] = None
     file_path: Optional[str] = None
     
     # NEW: Conversation context filters
@@ -160,8 +159,9 @@ class SearchFilters(BaseModel):
             filters["related_entities"] = [str(e) for e in self.related_entities]
         if self.project:
             filters["project"] = self.project
+        if self.workspace:
+            filters["workspace"] = self.workspace
         if self.file_path:
             filters["file_path"] = self.file_path
             
         return filters
-

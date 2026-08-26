@@ -1,7 +1,7 @@
 ---
 PROTOCOL: memory-inspector
 INVOKE: elefante-memory-inspector
-PROTOCOL_VERSION: 2.10.0-pre
+PROTOCOL_VERSION: 2.12.2
 LOAD_WHEN: User asks "what do I have stored", "show me my memories", export request, audit, dashboard navigation, "find a memory about X".
 DIAGNOSTIC_QUESTION: "What memories exist that match this question, and what do they tell me about the system's state?"
 AUTHORITY: This file owns memory inspection. Read-only. Any write operation routes to `agents/memory-janitor.md` instead.
@@ -19,9 +19,9 @@ AUTHORITY: This file owns memory inspection. Read-only. Any write operation rout
 | "Show me everything tagged Y" | `elefante-Memory(action="search")` with category filter |
 | "What's connected to entity Z?" | `elefante-GraphQuery` for inbound + outbound edges |
 | "What did I store recently?" | `elefante-Memory(action="search")` with temporal-recency boost; or dashboard table sorted by `created_at` |
-| "Export everything for backup / audit" | `python scripts/pipeline/export_memories.py` |
-| "Inspect raw graph state" | `python scripts/privileged/inspect_memory_graph.py` (PRIVILEGED) |
-| "Health snapshot" | `python scripts/verify/verify_health.py` + dashboard at `http://127.0.0.1:8000` |
+| "Export everything for analysis" | `./.venv/bin/python scripts/pipeline/export_memories.py` (not a restorable backup) |
+| "Inspect raw graph state" | `./.venv/bin/python scripts/privileged/inspect_memory_graph.py` (PRIVILEGED) |
+| "Health snapshot" | `./.venv/bin/python scripts/verify/verify_health.py` + dashboard at `http://127.0.0.1:8000` |
 
 ## Search-First Discipline
 

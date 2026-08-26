@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_scoring.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PROVES  : ScoreNormalizer correctness, adaptive weight calculation, and
 #           behavioral vitality scores across heterogeneous sources.
 # RUN     : pytest tests/test_scoring.py -v
@@ -287,4 +285,3 @@ class TestScoreNormalizer:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

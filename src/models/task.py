@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/models/task.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Task and subtask models for the elefante-TaskCreate/Update/Graph tools.
 # ROLE    : Models — used by orchestrator and server for task lifecycle management.
 # TOUCHED : When adding new task states, priority levels, or task metadata fields.

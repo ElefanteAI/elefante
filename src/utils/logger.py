@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/utils/logger.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Structured JSON logging with file rotation; ELEFANTE_LOGGING_FORMAT
 #           env var switches between json and text output.
 # ROLE    : Utils — imported via get_logger(__name__) by every module.
@@ -233,4 +231,3 @@ def _init_default_logging():
 
 # Auto-initialize logging when module is imported
 _init_default_logging()
-

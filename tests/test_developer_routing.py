@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_developer_routing.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-16
 # PROVES  : Self-protocol verifier routing and contract: dashboard snapshot path
 #           resolution, large-payload stream sizing, protocol verification,
 #           and developer-process token-discipline guidance.
@@ -10,10 +8,14 @@
 #           self-protocol verification contract. Required before each release.
 # ─────────────────────────────────────────────────────────────────────────────
 from __future__ import annotations
+import ast
 import re
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import unquote
+
+import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,15 +25,40 @@ def _read(rel_path: str) -> str:
     return (ROOT / rel_path).read_text(encoding="utf-8")
 
 
+def test_task_and_memory_text_are_not_written_to_runtime_logs() -> None:
+    query_logging_paths = (
+        "src/core/orchestrator.py",
+        "src/core/vector_store.py",
+        "src/core/graph_store.py",
+        "src/core/scoring.py",
+        "src/core/conversation_context.py",
+    )
+    for rel_path in query_logging_paths:
+        source = _read(rel_path)
+        assert "query=query[:" not in source, rel_path
+    assert "arguments=arguments" not in _read("src/mcp/server.py")
+    assert "content[:50]" not in _read("src/core/orchestrator.py")
+
+
 def _current_version() -> str:
-    match = re.search(r'^__version__ = "([^"]+)"$', _read("src/__init__.py"), re.MULTILINE)
+    match = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', _read("src/__init__.py"), re.MULTILINE)
     assert match is not None
     return match.group(1)
 
 
+def _markdown_heading_slug(heading: str) -> str:
+    heading = re.sub(r"<[^>]+>", "", heading)
+    heading = re.sub(r"[`*_~]", "", heading).strip().lower()
+    heading = re.sub(r"[^\w\- ]", "", heading)
+    return re.sub(r" +", "-", heading)
+
 def _mcp_surface_counts() -> tuple[int, int]:
-    server = _read("src/mcp/server.py")
-    return server.count("types.Tool("), server.count("Prompt(")
+    tool_names, prompt_names = _mcp_surface_names()
+    # Task Intelligence is default-off and Recall is still an unreleased
+    # customer candidate. Public v2.12.3 documentation remains frozen.
+    tool_names.discard("elefante-TaskIntelligence")
+    tool_names.discard("elefante-Recall")
+    return len(tool_names), len(prompt_names)
 
 
 def _mcp_surface_names() -> tuple[set[str], set[str]]:
@@ -101,6 +128,51 @@ def test_active_user_and_runtime_routes_do_not_reference_retired_debug_docs() ->
         f"]({domain}.md" in lessons
         for domain in ("ai-behavior", "dashboard", "database", "installation", "memory")
     )
+
+
+def test_operational_docs_use_commands_supported_by_current_clis() -> None:
+    operational_paths = [
+        *sorted((ROOT / "docs/how-to").glob("*.md")),
+        *sorted((ROOT / "agents").glob("*.md")),
+        ROOT / "scripts/README.md",
+    ]
+    retired_forms = (
+        "restart_elefante.py --stop",
+        "restart_elefante.py --start",
+        "manage_lock.py --dry-run",
+        "manage_lock.py --release",
+        "restore_elefante_data.py <backup-path>",
+    )
+    violations = [
+        f"{path.relative_to(ROOT)}: {form}"
+        for path in operational_paths
+        for form in retired_forms
+        if form in path.read_text(encoding="utf-8")
+    ]
+    assert not violations, "\n".join(violations)
+
+
+def test_released_installer_record_is_not_active_task_context() -> None:
+    planning = _read("workspace/PLANNING.md")
+    proposals_index = _read("workspace/proposals/README.md")
+    tasks = _read("benchmarks/task_intelligence/tasks.json")
+
+    design_section = planning.split("### §4.2 In design", 1)[1].split("### §4.3", 1)[0]
+    shipped_section = planning.split("### §4.4 Shipped", 1)[1].split("### §4.5", 1)[0]
+    assert "installer-procedure.md" not in design_section
+    assert "Customer-global installer" in shipped_section
+    assert "RETAINED DESIGN RECORD" in proposals_index
+    assert "workspace/proposals/installer-procedure.md" not in tasks
+
+
+def test_four_laws_keep_retrieval_selective_and_project_grounded() -> None:
+    planning = _read("workspace/PLANNING.md")
+    vision = _read("docs/explanation/vision.md")
+    for document in (planning, vision):
+        assert "unrelated history" in document
+        assert "before a memory write" in document
+        assert "Project-specific claims" in document or "project-specific claims" in document
+    assert "A session is never new" not in planning
 
 
 def test_active_developer_routing_points_to_current_sources() -> None:
@@ -200,14 +272,266 @@ def test_active_tool_docs_match_current_mcp_surface() -> None:
     startup_guide = _read("docs/how-to/run-mcp-server.md")
     self_protocol = _read("docs/reference/self-protocol.md")
     verifier = _read("scripts/verify/verify_e2e_tests.py")
-    default_tool_count = tool_count - 1  # DashboardOpen is opt-in by design.
+    source_tool_names, _ = _mcp_surface_names()
+    source_tool_count = len(source_tool_names)
+    default_tool_count = source_tool_count - 1  # DashboardOpen is opt-in.
     assert f"Available MCP Tools: {tool_count}" in startup_guide
     assert "Available MCP Tools: 21" not in startup_guide
-    assert f"{default_tool_count}/{tool_count} tools" in verifier
-    assert f"{default_tool_count} of {tool_count} tools" in self_protocol
+    assert f"{default_tool_count}/{source_tool_count}" in verifier
+    assert f"{default_tool_count} of {source_tool_count}" in self_protocol
 
     assert "docs/technical/dashboard.md" not in readme
     assert "docs/how-to/view-dashboard.md" in readme
+
+    tool_names, prompt_names = _mcp_surface_names()
+    for name in sorted(tool_names | prompt_names):
+        assert name in spec_tools
+
+    server = _read("src/mcp/server.py")
+    assert '"min_similarity": {"type": "number", "default": 0.1' in server
+    assert 'args.get("min_similarity", 0.1)' in server
+    assert "default `0.1`" in spec_tools
+
+
+def test_current_release_version_matches_active_entrypoints() -> None:
+    version = _current_version()
+    active_release_docs = (
+        "AGENTS.md",
+        "README.md",
+        "docs/README.md",
+        "docs/explanation/vision.md",
+        "docs/reference/architecture.md",
+        "docs/reference/tools.md",
+        "workspace/PLANNING.md",
+    )
+
+    for path in active_release_docs:
+        assert f"v{version}" in _read(path), f"{path} does not name current release v{version}"
+
+
+def test_python_headers_do_not_claim_manual_product_versions() -> None:
+    """Runtime, test, and script banners must not duplicate package version state."""
+    violations: list[str] = []
+    for root in (ROOT / "src", ROOT / "scripts", ROOT / "tests"):
+        for path in root.rglob("*.py"):
+            text = path.read_text(encoding="utf-8")
+            for field in ("VERSION", "CHANGED", "LASTRUN"):
+                if re.search(rf"^# {field}\s*:", text, re.MULTILINE):
+                    violations.append(f"{path.relative_to(ROOT)}: manual {field} header")
+
+    assert not violations, "\n".join(violations)
+
+
+def test_integration_manifest_matches_released_host_selection_contract() -> None:
+    """Every installer host must have one explicit, honest manifest tier."""
+    manifest = yaml.safe_load(_read("agents/manifests/ide-integration.yaml"))
+    surfaces = manifest["surfaces"]
+    ids = [surface["id"] for surface in surfaces]
+    assert len(ids) == len(set(ids))
+
+    allowed_statuses = {"compatible", "partial", "community", "planned", "deprecated"}
+    invalid = [
+        f"{surface.get('id')}: {surface.get('status')}"
+        for surface in surfaces
+        if surface.get("status") not in allowed_statuses
+    ]
+    assert not invalid, "\n".join(invalid)
+
+    path_statuses = {"configured", "planned", "deprecated"}
+    nested_violations: list[str] = []
+    for surface in surfaces:
+        for group in ("in_repo", "user_home"):
+            for item in surface.get(group, []) or []:
+                if "installer_writes" in item and not isinstance(item["installer_writes"], bool):
+                    nested_violations.append(
+                        f"{surface['id']}:{group}:{item.get('path')}: installer_writes must be boolean"
+                    )
+                if group == "in_repo" and item.get("status") not in path_statuses:
+                    nested_violations.append(
+                        f"{surface['id']}:{group}:{item.get('path')}: invalid status {item.get('status')}"
+                    )
+    assert not nested_violations, "\n".join(nested_violations)
+
+    selection_module = ast.parse(_read("scripts/setup/host_selection.py"))
+    supported_hosts: tuple[str, ...] | None = None
+    for node in selection_module.body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == "SUPPORTED_HOSTS"
+            for target in node.targets
+        ):
+            supported_hosts = ast.literal_eval(node.value)
+            break
+    assert supported_hosts is not None
+
+    by_id = {surface["id"]: surface for surface in surfaces}
+    missing = set(supported_hosts).difference(by_id)
+    assert not missing, f"installer hosts absent from manifest: {sorted(missing)}"
+    for host in supported_hosts:
+        assert by_id[host]["status"] in {"compatible", "partial"}, host
+
+
+def test_released_docs_do_not_use_retired_memory_tool_names() -> None:
+    retired = re.compile(r"elefante-Memory(?:Add|Search|Update|Delete|Consolidate)\b")
+    violations: list[str] = []
+    paths = [ROOT / "README.md", ROOT / ".github" / "copilot-instructions.md"]
+    paths.extend(
+        path for path in (ROOT / "docs").rglob("*.md")
+        if "_archive" not in path.parts
+    )
+    paths.extend((ROOT / "agents").glob("*.md"))
+    for path in paths:
+        if retired.search(path.read_text(encoding="utf-8")):
+            violations.append(str(path.relative_to(ROOT)))
+    assert not violations, "\n".join(violations)
+
+
+def test_active_bug_guidance_uses_the_consolidated_memory_tool() -> None:
+    paths = (
+        "workspace/ISSUES.md",
+        "workspace/lessons.md",
+        "workspace/postmortems/ai-behavior.md",
+        "workspace/postmortems/dashboard.md",
+        "workspace/postmortems/database.md",
+        "workspace/postmortems/installation.md",
+        "workspace/postmortems/memory.md",
+    )
+    retired_names = (
+        "MemoryAdd",
+        "MemorySearch",
+        "MemoryGet",
+        "MemoryUpdate",
+        "MemoryDelete",
+        "MemoryConsolidate",
+    )
+    violations = [
+        f"{path}: {name}"
+        for path in paths
+        for name in retired_names
+        if name in _read(path)
+    ]
+    assert not violations, "\n".join(violations)
+
+
+def test_active_markdown_relative_links_resolve() -> None:
+    skip_parts = {"_archive", ".git", ".venv", "node_modules"}
+    violations: list[str] = []
+
+    for path in ROOT.rglob("*.md"):
+        if any(part in skip_parts for part in path.relative_to(ROOT).parts):
+            continue
+        text = path.read_text(encoding="utf-8")
+        for match in re.finditer(r"!?\[[^\]]*\]\(([^)]+)\)", text):
+            raw_target = match.group(1).strip()
+            if not raw_target or raw_target.startswith(("#", "http://", "https://", "mailto:")):
+                continue
+            target = raw_target.split("#", 1)[0].split(" ", 1)[0].strip("<>")
+            resolved = (path.parent / unquote(target)).resolve()
+            if not resolved.exists():
+                line = text.count("\n", 0, match.start()) + 1
+                violations.append(f"{path.relative_to(ROOT)}:{line}: {raw_target}")
+
+    assert not violations, "\n".join(violations)
+
+
+def test_active_markdown_internal_anchors_resolve() -> None:
+    skip_parts = {"_archive", ".git", ".venv", "node_modules"}
+    violations: list[str] = []
+
+    for path in ROOT.rglob("*.md"):
+        if any(part in skip_parts for part in path.relative_to(ROOT).parts):
+            continue
+        text = path.read_text(encoding="utf-8")
+        for match in re.finditer(r"!?\[[^\]]*\]\(([^)]+)\)", text):
+            raw_target = match.group(1).strip()
+            if raw_target.startswith(("http://", "https://", "mailto:")) or "#" not in raw_target:
+                continue
+            target, fragment = raw_target.split("#", 1)
+            resolved = (path.parent / unquote(target or path.name)).resolve()
+            if not resolved.exists() or resolved.suffix.lower() != ".md":
+                continue
+            target_text = resolved.read_text(encoding="utf-8")
+            anchors = set(re.findall(r'<a\s+id=["\']([^"\']+)', target_text, re.IGNORECASE))
+            anchors.update(
+                _markdown_heading_slug(heading)
+                for heading in re.findall(r"^#{1,6}\s+(.+?)\s*$", target_text, re.MULTILINE)
+            )
+            if unquote(fragment).lower() not in anchors:
+                line = text.count("\n", 0, match.start()) + 1
+                violations.append(f"{path.relative_to(ROOT)}:{line}: {raw_target}")
+
+    assert not violations, "\n".join(violations)
+
+
+def test_current_instruction_docs_do_not_reference_missing_repo_files() -> None:
+    paths = [
+        ROOT / "README.md",
+        ROOT / "AGENTS.md",
+        ROOT / "CONTRIBUTING.md",
+        *sorted((ROOT / "docs").rglob("*.md")),
+        *sorted((ROOT / "agents").rglob("*.md")),
+        *sorted((ROOT / "examples").rglob("*.md")),
+        ROOT / "scripts/README.md",
+    ]
+    path_pattern = re.compile(
+        r"`((?:src|scripts|tests|docs|agents|workspace|examples|benchmarks)/"
+        r"[^`\s#]+?\.(?:py|md|yaml|yml|json|sh|bat|ts|tsx))(?:#[^`]*)?`"
+    )
+    violations: list[str] = []
+    for document in paths:
+        if "_archive" in document.parts:
+            continue
+        text = document.read_text(encoding="utf-8")
+        for match in path_pattern.finditer(text):
+            reference = match.group(1).split("::", 1)[0]
+            if any(marker in reference for marker in ("<", ">", "*")):
+                continue
+            if not (ROOT / reference).exists():
+                line = text.count("\n", 0, match.start()) + 1
+                violations.append(f"{document.relative_to(ROOT)}:{line}: {reference}")
+    assert not violations, "\n".join(violations)
+
+
+def test_scoring_reference_matches_runtime_contract() -> None:
+    scoring_doc = _read("docs/reference/scoring.md")
+    memory_model = _read("src/models/memory.py")
+    cognitive_scoring = _read("src/core/retrieval.py")
+
+    for rate in ("0.002", "0.005", "0.008", "0.015", "0.025", "0.000"):
+        assert rate in scoring_doc
+    for weight in ("0.35 * vector", "0.30 * concept", "0.15 * coactivation", "0.10 * authority", "0.10 * temporal"):
+        assert weight in scoring_doc
+
+    assert "TYPE_DECAY_RATES" in memory_model
+    assert '"vector": 0.35' in cognitive_scoring
+    assert "automatic archive" not in scoring_doc.lower()
+    assert "5-10ms" not in scoring_doc
+    assert "does not yet update access history" in scoring_doc
+    assert "no runtime reinforcement is authorized" in scoring_doc
+
+
+def test_task_intelligence_docs_keep_release_and_learning_boundaries() -> None:
+    tools_doc = _read("docs/reference/tools.md")
+    proposal = _read("workspace/proposals/retrieval-effectiveness.md")
+    planning = _read("workspace/PLANNING.md")
+    orchestrator = _read("agents/orchestrator.md")
+    changelog = _read("CHANGELOG.md")
+
+    assert "absent from MCP discovery" in tools_doc
+    assert "ELEFANTE_TASK_INTELLIGENCE_ENABLED=1" in tools_doc
+    assert "ELEFANTE_TASK_INTELLIGENCE_PILOT=1" in tools_doc
+    assert "does not update ranking" in tools_doc
+    assert "proves the pipeline, not that Elefante improves diverse tasks" in proposal
+    assert "### Active acquisition loop" in proposal
+    assert "Continue the highest-value normal" in proposal
+    assert "if it abstains" in proposal
+    assert "Stop and wait for that task" not in proposal
+    assert "No second independent causal lift is proven" in planning
+    assert "### Task Intelligence acquisition boundary" in orchestrator
+    assert "Abstention is valid" in orchestrator
+    assert "Keep the tool session alive" in orchestrator
+    assert "do not count" in orchestrator
+    assert "unavailability is not a reason to stop product work" in orchestrator
+    assert "does not change ranking" in changelog
 
 
 def test_changelog_contract_is_synced_across_docs_and_embedded_rules() -> None:
@@ -432,6 +756,25 @@ def test_spec_tools_documents_prompt_arguments_and_conditional_context_contract(
     assert "`RELEVANT_CONTEXT` is conditional, not universal" in spec_tools
     assert "`topic` (required, string): What topic to retrieve context for." in spec_tools
     assert "This prompt performs a live hybrid memory search before returning content." in spec_tools
+
+
+def test_explicit_user_capture_contract_is_synced_across_loaded_surfaces() -> None:
+    surfaces = {
+        "codex installer guidance": _read("scripts/setup/configure_cli_agents.py"),
+        "customer MCP entrypoint": _read("src/mcp/server.py"),
+        "repository agent constitution": _read(".github/copilot-instructions.md"),
+        "tool reference": _read("docs/reference/tools.md"),
+    }
+
+    for name, document in surfaces.items():
+        assert "explicitly asks Elefante to remember" in document, name
+        assert "user_directed" in document, name
+        assert "descriptive prose" in document, name
+        assert "ranked" in document and "paraphrase" in document, name
+        assert "one verification question" in document, name
+        assert "stored" in document.lower() and "deliverable" in document.lower(), name
+        assert "ordinary conversation" in document, name
+        assert "secret" in document.lower(), name
 
 
 def test_scripts_readme_covers_live_script_inventory() -> None:

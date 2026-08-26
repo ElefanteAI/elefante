@@ -14,14 +14,14 @@ from pathlib import Path
 from typing import Any
 
 
-GENERATED_AT = "2026-07-26T18:00:00.000Z"
-PRODUCT_BASELINE = "v2.12.0"
+GENERATED_AT = "2026-08-05T18:00:00.000Z"
+PRODUCT_BASELINE = "v2.12.2"
 
 # id, title, description, type, topic, score, access_count, status, evidence
 MEMORIES = [
     ("daemon-assumption", "Multiple agent hosts can each own a memory process", "Independent stdio servers appear simple, but every process can become a competing database owner.", "note", "Runtime authority", 42, 2, "superseded", "workspace/ISSUES.md · GAP-025"),
     ("kuzu-evidence", "Kuzu is a single-writer graph store", "Concurrent database-owning clients create lock contention and make write origin impossible to trust.", "fact", "Runtime authority", 86, 19, "verified", "workspace/postmortems/memory.md · Issue 15"),
-    ("daemon-decision", "One loopback daemon owns memory", "A single local daemon owns storage, concurrency, migrations, and provenance for every compatible agent host.", "decision", "Runtime authority", 94, 28, "verified", "workspace/PLANNING.md · §1.3"),
+    ("daemon-decision", "One loopback daemon owns memory", "A single local daemon owns storage, concurrency, schema changes, and provenance for every compatible agent host.", "decision", "Runtime authority", 94, 28, "verified", "workspace/PLANNING.md · §1.3"),
     ("bridge-guard", "The stdio bridge carries provenance, not storage", "Stdio-only clients connect through a storage-free bridge; two concurrent bridges retain distinct Codex and Claude origins.", "specification", "Runtime authority", 97, 24, "verified", "tests/test_mcp_daemon.py · slow two-bridge proof"),
     ("dashboard-live-assumption", "A dashboard can query live stores for convenience", "Live hydration looked convenient but quietly gave the browser a second path into private memory state.", "note", "Trust boundary", 38, 1, "superseded", "workspace/postmortems/dashboard.md · Issue 11"),
     ("snapshot-evidence", "Browser convenience bypassed the read-only boundary", "Live graph hydration, semantic search, and browser refresh all crossed the snapshot contract.", "insight", "Trust boundary", 83, 12, "verified", "workspace/ISSUES.md · BUG-031"),
@@ -30,20 +30,20 @@ MEMORIES = [
     ("signal-thesis", "Every injected token must earn its place", "Elefante maximizes signal-per-token in the agent context window; feature count is not the product metric.", "specification", "Retrieval intelligence", 98, 31, "verified", "workspace/PLANNING.md · §1"),
     ("vector-signal", "Semantic similarity anchors retrieval", "Vector similarity carries 35 percent of the cognitive score and establishes a 70 percent semantic floor.", "fact", "Retrieval intelligence", 91, 17, "verified", "src/core/retrieval.py"),
     ("concept-signal", "Concept overlap recovers shared meaning", "Concept overlap contributes 30 percent, so related ideas can reinforce a result even when wording changes.", "fact", "Retrieval intelligence", 89, 15, "verified", "src/core/retrieval.py"),
-    ("coactivation-signal", "Memories retrieved together learn together", "Co-activation contributes 15 percent and persists across restarts, allowing repeated working context to become easier to recover.", "insight", "Retrieval intelligence", 92, 21, "verified", "src/core/retrieval.py · BUG-018"),
-    ("authority-signal", "Authority is earned, not manually declared", "Authority contributes 10 percent and reflects memory type, reinforcement, and actual use rather than a user-assigned importance slider.", "decision", "Retrieval intelligence", 88, 14, "verified", "src/core/retrieval.py"),
-    ("temporal-signal", "Fresh context receives a measured advantage", "Temporal freshness contributes 10 percent while durable specifications and directives retain their authority without generic score inflation.", "fact", "Retrieval intelligence", 84, 11, "verified", "src/core/retrieval.py"),
-    ("search-first", "Search before every write", "Elefante retrieves related knowledge before adding, updating, or deleting memory. Duplicate growth is blocked mechanically.", "directive", "Memory governance", 99, 34, "verified", "src/mcp/server.py · Compliance Gate"),
-    ("update-over-duplicate", "Update the existing truth instead of cloning it", "A near-match should be amended or superseded so future retrieval has one authoritative answer.", "preference", "Memory governance", 90, 18, "verified", "agents/memory-janitor.md"),
-    ("contradiction-policy", "Contradictions remain visible until resolved", "Conflicting memories are linked and surfaced; the newest grounded decision wins without erasing the path that produced it.", "specification", "Memory governance", 87, 13, "verified", "agents/memory-janitor.md"),
-    ("unknown-law", "If it is not grounded, the answer is UNKNOWN", "Grounding prevents confident invention when neither the memory system nor the workspace contains the requested fact.", "directive", "Memory governance", 98, 29, "verified", "workspace/PLANNING.md · Four Laws"),
+    ("coactivation-signal", "Co-activation records repeated working context", "Co-activation contributes 15 percent and persists across restarts. It measures retrieval history, not verified task usefulness.", "insight", "Retrieval intelligence", 92, 21, "verified", "src/core/retrieval.py · BUG-018"),
+    ("authority-signal", "Authority is computed, not manually declared", "Authority contributes 10 percent and reflects memory type, reinforcement state, and access history. It is a ranking signal, not proof of task benefit.", "decision", "Retrieval intelligence", 88, 14, "verified", "src/core/retrieval.py"),
+    ("temporal-signal", "Fresh context receives a measured advantage", "Temporal freshness contributes 10 percent. Specifications and directives have zero type decay, but freshness still affects their vitality.", "fact", "Retrieval intelligence", 84, 11, "verified", "src/core/retrieval.py"),
+    ("search-first", "Search before memory writes", "Elefante searches for related knowledge before add, update, delete, and consolidate actions. The gate and deterministic checks reduce redundant memories.", "directive", "Memory governance", 99, 34, "verified", "src/mcp/server.py · Compliance Gate"),
+    ("update-over-duplicate", "Update verified knowledge instead of cloning it", "A true duplicate should be amended or superseded. Materially conflicting claims remain separate and visible until resolved.", "preference", "Memory governance", 90, 18, "verified", "agents/memory-janitor.md"),
+    ("contradiction-policy", "Contradictions remain visible until resolved", "Conflicting memories are linked and surfaced. Recency and provenance inform review, but Elefante does not silently choose a winner.", "specification", "Memory governance", 87, 13, "verified", "agents/memory-janitor.md"),
+    ("unknown-law", "Project claims need current evidence", "Project-specific claims remain UNKNOWN when neither current memory nor the workspace provides evidence.", "directive", "Memory governance", 98, 29, "verified", "workspace/PLANNING.md · Four Laws"),
     ("stdout-law", "Stdout is reserved for JSON-RPC", "Any diagnostic text from an MCP-reachable code path goes to structured logs or stderr, never stdout.", "directive", "Memory governance", 95, 25, "verified", "agents/orchestrator.md · Five Gates"),
     ("sqlite-default", "Fresh stores use embedded SQLite vectors", "SQLite is the configured vector-store default for fresh installations; Kuzu remains the relationship graph.", "decision", "Storage", 92, 16, "verified", "src/utils/config.py"),
-    ("migration-parity", "Storage migration must prove parity before apply", "Dry-run migration verifies UUIDs, reconstructed metadata, float32 embeddings, and representative top-10 search overlap.", "specification", "Storage", 93, 18, "verified", "workspace/PLANNING.md · GAP-029"),
-    ("chroma-blocker", "The release lock still contains one ChromaDB advisory", "The embedded endpoint is not exposed, but the unresolved advisory keeps the Trust Release blocked until an authorized transition and clean audit.", "fact", "Storage", 80, 9, "active", "workspace/ISSUES.md · GAP-029"),
-    ("no-live-migration", "Never migrate a live store without explicit authority", "Apply requires a stopped system, an exact checksum-manifested backup, a new destination, and user authorization.", "directive", "Storage", 97, 26, "verified", "workspace/PLANNING.md · §2.4"),
+    ("runtime-lock", "Customer dependencies are exact and hash-locked", "The customer package installs only the runtime dependency contract verified for the release.", "specification", "Storage", 93, 18, "verified", "requirements-client.lock"),
+    ("dependency-audit", "Developer dependencies do not ship to customers", "Client-only packaging keeps tests, build tools, and development dependencies outside the installed runtime.", "fact", "Storage", 90, 9, "verified", "scripts/ci/verify_release_client.py"),
+    ("data-control", "Memory data changes remain under user control", "Elefante never silently converts or deletes an existing memory store; recovery operations are explicit and backup-gated.", "directive", "Storage", 97, 26, "verified", "docs/how-to/rollback.md"),
     ("source-provenance", "Every durable write records where it came from", "Source tuples distinguish host, transport, and installation so one shared memory authority remains auditable across agents.", "decision", "Host continuity", 94, 23, "verified", "workspace/PLANNING.md · GAP-025"),
-    ("host-tiers", "Compatibility is not certification", "Every host is labeled certified, compatible, or community. Elefante does not claim an integration that has not completed its lifecycle proof.", "specification", "Host continuity", 91, 17, "verified", "workspace/PLANNING.md · §1.3"),
+    ("host-tiers", "Compatibility is not certification", "Every host is labeled certified, compatible, preview, community, or planned. Elefante does not claim lifecycle proof it has not completed.", "specification", "Host continuity", 91, 17, "verified", "docs/how-to/configure-ide.md"),
     ("manifest-ownership", "Installers own exact entries, not whole files", "The install manifest records only Elefante-owned configuration so unrelated servers and later user edits survive upgrades and uninstall.", "decision", "Host continuity", 90, 15, "verified", "workspace/PLANNING.md · §2.2"),
     ("safe-uninstall", "User-modified configuration is preserved", "Uninstall removes only manifest-recorded entries whose hashes still match the emitted state.", "specification", "Host continuity", 93, 19, "verified", "workspace/PLANNING.md · §10.1"),
     ("one-memory-many-hosts", "Tools can change while project memory continues", "The daemon-and-bridge architecture separates durable project context from any one editor or agent host.", "insight", "Host continuity", 88, 14, "verified", "workspace/PLANNING.md · §1.3"),
@@ -79,10 +79,10 @@ DECISION_RELATIONSHIPS = (
     ("dashboard-live-assumption", "snapshot-evidence", "CHALLENGED_BY"),
     ("snapshot-evidence", "snapshot-decision", "LED_TO"),
     ("snapshot-decision", "loopback-guard", "GUARDED_BY"),
-    # Storage transition: blocker -> replacement -> parity proof -> operator guard.
-    ("chroma-blocker", "sqlite-default", "LED_TO"),
-    ("sqlite-default", "migration-parity", "GUARDED_BY"),
-    ("migration-parity", "no-live-migration", "ENFORCED_BY"),
+    # Customer storage: dependency evidence -> lock -> default -> data-control guard.
+    ("dependency-audit", "runtime-lock", "LED_TO"),
+    ("runtime-lock", "sqlite-default", "ENABLES"),
+    ("sqlite-default", "data-control", "GUARDED_BY"),
     # Memory governance: search first -> amend truth -> expose conflict -> refuse invention.
     ("search-first", "update-over-duplicate", "ENFORCES"),
     ("update-over-duplicate", "contradiction-policy", "GUARDED_BY"),
@@ -102,7 +102,7 @@ SEMANTIC_RELATIONSHIPS = (
     ("daemon-decision", "snapshot-decision", 0.91),
     ("snapshot-decision", "signal-thesis", 0.89),
     ("search-first", "source-first", 0.88),
-    ("no-live-migration", "backup-contract", 0.87),
+    ("data-control", "backup-contract", 0.87),
 )
 
 
@@ -199,7 +199,7 @@ def build_showcase_snapshot() -> dict[str, Any]:
             "synthetic_behavioral_metadata": True,
             "source_grounded_content": True,
             "contains_user_data": False,
-            "disclaimer": "Counts and access history demonstrate product behavior; they are not customer or performance claims.",
+            "disclaimer": "Counts and access history demonstrate the interface; they are not observed customer behavior or performance claims.",
         },
         "stats": {
             "total_nodes": len(nodes),

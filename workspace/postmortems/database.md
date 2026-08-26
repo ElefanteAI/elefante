@@ -1,10 +1,13 @@
 # Database Postmortems
 
-> **Domain:** Kuzu graph database & ChromaDB vector store.
+> **Domain:** Kuzu graph database and the configured vector store (SQLite by
+> default; legacy ChromaDB only when explicitly configured).
 > **Cross-refs:** BUG/GAP rows + verification commands live in [`../ISSUES.md`](../ISSUES.md). Reusable cross-bug rules live in [`../lessons.md`](../lessons.md).
 > **Format per entry:** Trigger / Root cause / Solution / Lesson.
 
 ---
+
+<a id="issue-1"></a>
 
 ## Issue #1: Reserved Word Collision [FIXED]
 
@@ -13,12 +16,16 @@
 **Solution:** Renamed column `properties` → `props` in `src/core/graph_store.py` schema definition.
 **Lesson:** Kuzu uses hybrid syntax. Test BOTH schema AND data operations against new column names — schema acceptance is not sufficient.
 
+<a id="issue-2"></a>
+
 ## Issue #2: Database Lock Persistence [FIXED, guarded]
 
 **Trigger:** Second live process attempts to open Kuzu while another process owns the path. `RuntimeError: Kuzu database is locked by another process.`
 **Root cause:** Kuzu access is single-owner across live processes. `read_only=True` does not enable cross-process sharing; it's for short-lived export/snapshot work. Old recovery guidance suggested deleting Kuzu's internal lockfile manually — wrong mental model.
 **Solution:** (1) Dashboard reads on `dashboard_snapshot.json`, never live Kuzu. (2) Snapshot export runs in short-lived subprocess with `GraphStore(..., read_only=True)`. (3) Global `GraphStore` released after each MCP tool call so Kuzu ownership stays transaction-scoped. (4) On contention, stop the competing process or wait for the current transaction; do NOT delete Kuzu's internal lockfile as a default recovery step.
 **Lesson:** Model Kuzu contention as short-lived process ownership, not as manual surgery on Kuzu's internal lockfile. `read_only=True` is for short-lived snapshot work, not a promise of live cross-process sharing.
+
+<a id="issue-3"></a>
 
 ## Issue #3: Database Path Format Change [FIXED]
 
@@ -27,12 +34,16 @@
 **Solution:** Removed eager `mkdir` from `config.py`. `src/core/graph_store.py` only creates the parent directory and removes legacy empty `kuzu_db/` directories before letting Kuzu materialize its own path (now a file under current contract).
 **Lesson:** Kuzu owns the database path. Never infer the final on-disk shape from old versions.
 
+<a id="issue-4"></a>
+
 ## Issue #4: Legacy Path-Shape Diagnosis Drift [FIXED, guarded]
 
 **Trigger:** Operators see `~/.elefante/data/kuzu_db` as a single file under current Kuzu contract; stale docs and destructive scripts treat that as corruption.
 **Root cause:** Filesystem-shape assumptions drifted after the runtime contract changed in Issue #3. `kuzu_db` was historically a directory tree; new contract materializes it as a file. The stale "file = corruption" assumption spread across tests, docs, and debug tools.
 **Solution:** (1) Guard the fresh path contract in maintained tests (`TestKuzuLockContract`). (2) Remove file-is-corruption logic from docs and destructive scripts. (3) Reset the Kuzu path only when init actually fails or data is known-bad.
 **Lesson:** Never classify corruption from filesystem shape alone. Verify the current runtime contract from source and a fresh init first.
+
+<a id="issue-5"></a>
 
 ## Issue #5: Duplicate Entity Creation [DOCUMENTED, design limitation]
 
@@ -41,12 +52,20 @@
 **Solution (not yet implemented):** `find_entity_by_name(name, type)` lookup before insert; reuse existing ID if found. Requires fuzzy name matching for typos/variations.
 **Lesson:** Entity deduplication requires fuzzy matching. Current impact is visualization-only — defer until usage demands it.
 
-## Issue #6: ChromaDB Schema vs Memory Model [DOCUMENTED]
+<a id="issue-6"></a>
+
+## Issue #6: Legacy ChromaDB Schema vs Memory Model [DOCUMENTED]
 
 **Trigger:** ChromaDB queries returning unexpected types or missing fields.
 **Root cause:** ChromaDB stores all 40+ memory fields flat in `metadata` dict; the Memory model expects typed direct attributes (`memory.score`, `memory.domain`). Direct `result["metadata"]["score"]` access is fragile across versions.
-**Solution:** Always use `MemoryModel.from_chromadb_result(result)` translation helper. Never read metadata directly in callers.
-**Lesson:** Always translate between storage format and domain objects via model helpers. Direct metadata access bypasses type coercion (strings → enums) and breaks on field renames.
+**Solution:** Current callers use the configured store's Memory-returning API;
+the legacy adapter reconstructs records through
+`VectorStore._reconstruct_memory()`. Do not parse backend metadata in callers.
+**Lesson:** Always translate between storage format and domain objects at the
+adapter boundary. Direct metadata access bypasses type coercion and breaks on
+field renames.
+
+<a id="issue-7"></a>
 
 ## Issue #7: Async Shutdown Race / QueryResult Lifetime Leak [BUG-001, FIXED, guarded]
 
@@ -56,6 +75,8 @@
 **Guards:** `tests/test_memory_persistence.py` includes a live MCP subprocess regression + static check that raw `self._conn.execute()` calls remain confined to `_initialize_schema()` and `_execute_query_sync()`. `scripts/verify/verify_e2e_tests.py` embeds the shutdown-race probe.
 **Lesson:** Native database objects need a single owner. If you close Kuzu transaction-scoped, no Kuzu work may survive the tool call. Trace the full lifecycle (query start → background task → tool return → `finally` close), not the symptoms one by one.
 
+<a id="issue-8"></a>
+
 ## Issue #8: Graph and Session Schema Contract Drift [FIXED, guarded]
 
 **Trigger:** `elefante-GraphConnect` fails creating `CREATED_IN` / `WORKS_ON` edges; `elefante-SessionsList` returns wrong shape.
@@ -64,6 +85,8 @@
 **Guards:** `TestGraphToolContract` creates real `CREATED_IN` and `WORKS_ON` edges + statically guards `SessionsList` query shape.
 **Lesson:** Graph tools must target the concrete node and relation-table schema that exists, not a generic mental model. Code-review plausibility is not a substitute for live-surface verification.
 
+<a id="issue-9"></a>
+
 ## Issue #9: GraphQuery Write Boundary Bypass [BUG-029, FIXED, guarded]
 
 **Trigger:** A client could send `CREATE`, `MERGE`, `SET`, or other mutations through `elefante-GraphQuery`, despite its retrieval-facing contract.
@@ -71,6 +94,8 @@
 **Solution:** Keep GraphStore available to trusted internal operations and enforce a read-only Cypher validator at the external MCP GraphQuery boundary. Mutations use explicit `elefante-GraphConnect`.
 **Guard:** `pytest tests/test_dashboard_serializer.py -k "graph_query_validator" -v`.
 **Lesson:** Enforce capability policy at the client boundary; enforcing it in a shared internal primitive silently breaks legitimate maintenance work.
+
+<a id="issue-10"></a>
 
 ## Issue #10: Fresh Runner Test Required a Retired Chroma Directory [BUG-036, FIXED, guarded]
 

@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : build_installer_bundle.py
-# VERSION : 2.12.1
-# CHANGED : 2026-08-04
 # PURPOSE : Build a downloadable Elefante installer bundle that carries a full
 #           payload plus a platform-specific, customer-legible entrypoint.
 # WHEN    : In CI after dashboard assets are built, or locally when validating
@@ -11,7 +9,6 @@
 #           [--output dist/elefante-installer-macOS.zip]
 # NOTES   : Requires src/dashboard/ui/dist/index.html to exist. It packages a
 #           repo-like payload without .git, .venv*, dist/, node_modules, or data artifacts.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Build a downloadable Elefante installer bundle."""
 
@@ -22,6 +19,7 @@ import json
 import os
 import re
 import stat
+import subprocess
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,6 +27,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 BOOTSTRAP_SCRIPT = Path("scripts/setup/bootstrap_release_bundle.py")
+BUILD_IDENTITY_FILE = "elefante-build.json"
 REQUIRED_PATHS = [
     Path("README.md"),
     Path("LICENSE"),
@@ -53,6 +52,7 @@ FILE_NAME_EXCLUDED = {
     ".elefante-install-status.txt",
     ".elefante-install-summary.txt",
     "install.log",
+    BUILD_IDENTITY_FILE,
 }
 SUFFIX_EXCLUDED = {".pyc", ".pyo"}
 PLATFORM_CHOICES = ["Linux", "macOS", "Windows"]
@@ -76,6 +76,30 @@ def detect_version(root_dir: Path) -> str:
     if match:
         return match.group(1)
     return "unknown"
+
+
+def source_identity(root_dir: Path) -> dict[str, object]:
+    """Describe a developer bundle without pretending it is a release."""
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=root_dir,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        dirty = bool(
+            subprocess.run(
+                ["git", "status", "--porcelain", "--untracked-files=no"],
+                cwd=root_dir,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return {"commit": "unavailable", "clean": False}
+    return {"commit": commit, "clean": not dirty}
 
 
 def validate_bundle_inputs(root_dir: Path) -> None:
@@ -125,7 +149,9 @@ def default_output_path(root_dir: Path, platform_name: str) -> Path:
     return root_dir / "dist" / f"elefante-installer-{platform_name}.zip"
 
 
-def build_manifest(*, platform_name: str, version: str) -> dict[str, object]:
+def build_manifest(
+    *, platform_name: str, version: str, source: dict[str, object]
+) -> dict[str, object]:
     entrypoints = {
         "Windows": ["Install Elefante.bat"],
         "macOS": ["Install Elefante.command", "install.sh"],
@@ -134,7 +160,10 @@ def build_manifest(*, platform_name: str, version: str) -> dict[str, object]:
     return {
         "product": "Elefante",
         "bundle_kind": "installer",
+        "release_profile": "developer",
+        "release_channel": "development",
         "platform": platform_name,
+        "source": source,
         "version": version,
         "payload_root": "payload/elefante",
         "entrypoints": entrypoints[platform_name],
@@ -269,8 +298,16 @@ def write_text_entry(
 def build_installer_bundle(root_dir: Path, *, platform_name: str, output_path: Path) -> Path:
     validate_bundle_inputs(root_dir)
     version = detect_version(root_dir)
+    source = source_identity(root_dir)
     bundle_dir = f"elefante-installer-{platform_name}"
-    manifest = build_manifest(platform_name=platform_name, version=version)
+    manifest = build_manifest(platform_name=platform_name, version=version, source=source)
+    build_identity = {
+        "schema_version": 1,
+        "version": version,
+        "source_commit": source["commit"],
+        "source_clean": source["clean"],
+        "release_channel": "development",
+    }
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     if output_path.exists():
@@ -310,6 +347,12 @@ def build_installer_bundle(root_dir: Path, *, platform_name: str, output_path: P
 
         bootstrap_bytes = (root_dir / BOOTSTRAP_SCRIPT).read_bytes()
         archive.writestr(f"{bundle_dir}/{BOOTSTRAP_SCRIPT.as_posix()}", bootstrap_bytes)
+
+        write_text_entry(
+            archive,
+            f"{bundle_dir}/payload/elefante/{BUILD_IDENTITY_FILE}",
+            json.dumps(build_identity, indent=2) + "\n",
+        )
 
         for rel_path in iter_payload_files(root_dir):
             source_path = root_dir / rel_path

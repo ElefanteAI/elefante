@@ -1,8 +1,8 @@
 """Test the DistillerEngine's JSON response parser in isolation (no LLM needed)."""
 import sys, os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from modules.distiller.engine import DistillerEngine
+from src.modules.distiller.engine import DistillerEngine
 
 # Build engine without __init__ (skip prompt loading)
 engine = DistillerEngine.__new__(DistillerEngine)

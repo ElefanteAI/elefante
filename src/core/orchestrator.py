@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/core/orchestrator.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Central intelligence layer: routes queries to vector/graph stores,
 #           applies intelligence-pipeline filters, enforces memory guards.
 # ROLE    : Core — highest-traffic module; every MCP tool call passes through here.
@@ -32,7 +30,7 @@ from datetime import datetime
 
 from src.models.memory import (
     Memory, MemoryType, MemoryMetadata, MemoryStatus,
-    DomainType, SourceType, TYPE_DECAY_RATES
+    DomainType, InjectionPolicy, RetentionPolicy, SourceType, TYPE_DECAY_RATES
 )
 from src.models.entity import Entity, EntityType, Relationship, RelationshipType
 from src.models.query import QueryMode, QueryPlan, SearchResult, SearchFilters
@@ -63,7 +61,7 @@ SYSTEM_SPECIFICATIONS = (
         "content": (
             "SDD Gate 2 leakage surface scan table specification for Elefante contributors. "
             "Every change must be checked against these leakage surfaces: MCP response contract, "
-            "ChromaDB write and read roundtrip, Kuzu schema and DML split, stdout purity, "
+            "configured vector-store write/read roundtrip, Kuzu schema and DML split, stdout purity, "
             "compliance gate state machine, dashboard snapshot contract, co-activation history, "
             "and documentation links. Reference docs: agents/orchestrator.md "
             "for the gate definition and workspace/ISSUES.md for issue routing."
@@ -78,9 +76,11 @@ SYSTEM_SPECIFICATIONS = (
         "content": (
             "SDD Gate 3 scoring formulas specification for Elefante contributors. Verify the behavioral "
             "relevance formula and the cognitive retrieval composite from source code, not from remembered "
-            "docs. Behavioral relevance: relevance = 0.5 * recency * freshness * reinforcement. Cognitive "
-            "retrieval composite: composite_score = 0.30 * vector_score + 0.20 * concept_score + 0.15 * "
-            "domain_score + 0.15 * coactivation_score + 0.10 * authority_score + 0.10 * temporal_score."
+            "docs. Temporal vitality = exp(-effective_decay_rate * days_created) * "
+            "exp(-0.005 * days_since_access), where effective_decay_rate = decay_rate / "
+            "(1 + 0.25 * ln(access_count + 1)). Cognitive retrieval composite = 0.35 * "
+            "vector_score + 0.30 * concept_score + 0.15 * coactivation_score + 0.10 * "
+            "authority_score + 0.10 * temporal_score. Retrieval exposure is not verified task utility."
         ),
         "tags": ["system", "sdd", "gate-3", "scoring", "specification"],
     },
@@ -124,7 +124,7 @@ class MemoryOrchestrator:
         Initialize orchestrator with database connections
         
         Args:
-            vector_store: ChromaDB vector store instance
+            vector_store: configured vector-store instance
             graph_store: Kuzu graph store instance
             embedding_service: Embedding generation service
         """
@@ -206,7 +206,7 @@ class MemoryOrchestrator:
         force_new: bool = False
     ) -> Optional[Memory]:
         """
-        Add a new memory via the 5-Step Pipeline.
+        Validate, enrich, deduplicate, persist, and graph-link a memory.
         
         Score is system-computed (starts at 100, decays with age).
         Decay rate is set automatically from memory_type.
@@ -214,12 +214,30 @@ class MemoryOrchestrator:
 
 
         # ==================================================================================
-        # STEP 1: PARSE & CLASSIFY
+        # STEP 1: PRIVACY + VALIDATE INPUT
         # ==================================================================================
+        from src.modules.distiller.privacy import PrivacyFilter
+
+        if metadata is not None and not isinstance(metadata, dict):
+            raise ValueError("metadata must be an object")
+        payload, privacy_redactions, privacy_types = PrivacyFilter().scrub_payload(
+            {
+                "content": content,
+                "tags": tags or [],
+                "entities": entities or [],
+                "metadata": dict(metadata or {}),
+            }
+        )
+        content = payload["content"]
+        tags = payload["tags"]
+        entities = payload["entities"]
+        metadata = payload["metadata"]
+        if privacy_redactions:
+            system_metadata = dict(metadata.get("system_metadata") or {})
+            system_metadata["privacy_redactions"] = privacy_redactions
+            system_metadata["privacy_redacted_types"] = privacy_types
+            metadata["system_metadata"] = system_metadata
         validate_memory_content(content)
-        
-        if metadata is None:
-            metadata = {}
 
         # Guardrail: block test-memory creation unless explicitly allowed.
         # Rationale: production memory graph should not accumulate E2E/persistence test artifacts.
@@ -320,7 +338,10 @@ class MemoryOrchestrator:
         # Agent-driven enrichment (Elefante never calls an LLM).
         action = metadata.get("action")
         if isinstance(action, str) and action.strip().upper() == "IGNORE":
-            self.logger.info(f"Memory ignored by agent instruction: {content[:50]}...")
+            self.logger.info(
+                "Memory ignored by agent instruction",
+                content_sha256=hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            )
             return None
 
         provided_title = metadata.get("title")
@@ -566,7 +587,19 @@ class MemoryOrchestrator:
             
             custom_metadata = {
                 k: v for k, v in metadata.items()
-                if k not in ["domain", "category", "confidence", "source"]
+                if k not in [
+                    "domain",
+                    "category",
+                    "confidence",
+                    "source",
+                    "project",
+                    "workspace",
+                    "retention_policy",
+                    "injection_policy",
+                    "scope",
+                    "trigger",
+                    "user_locked",
+                ]
             }
             
             # ==================================================================================
@@ -575,8 +608,8 @@ class MemoryOrchestrator:
             # ==================================================================================
             custom_metadata["processing_status"] = ProcessingStatus.RAW
             custom_metadata["ingested_at"] = datetime.utcnow().isoformat()
-            # Persist curated fields into custom_metadata so they become top-level Chroma fields
-            # in VectorStore.add_memory (title/summary are used by dashboard + dedup).
+            # Persist curated fields into custom_metadata for the configured vector
+            # backend; title and summary are also used by the dashboard and deduplication.
             custom_metadata["title"] = title
             custom_metadata["summary"] = summary_text
             # Cognitive Retrieval Fields
@@ -593,6 +626,17 @@ class MemoryOrchestrator:
                 category=category,
                 confidence=confidence,
                 source=SourceType(source),
+                project=metadata.get("project") or None,
+                workspace=metadata.get("workspace") or None,
+                retention_policy=metadata.get(
+                    "retention_policy", RetentionPolicy.MANAGED
+                ),
+                injection_policy=metadata.get(
+                    "injection_policy", InjectionPolicy.RANKED
+                ),
+                scope=metadata.get("scope") or None,
+                trigger=metadata.get("trigger") or [],
+                user_locked=bool(metadata.get("user_locked", False)),
                 # Cognitive retrieval fields
                 concepts=concepts,
                 surfaces_when=surfaces_when,
@@ -749,7 +793,7 @@ class MemoryOrchestrator:
         session_id: Optional[UUID] = None,
         return_debug: bool = False,
         apply_temporal_decay: bool = True,
-        reinforce_access: bool = True,
+        reinforce_access: bool = False,
         recent_memory_ids: Optional[list[str]] = None
     ) -> List[SearchResult]:
         """
@@ -773,6 +817,9 @@ class MemoryOrchestrator:
             session_id: Session UUID for conversation context
             return_debug: Return debug statistics with results
             apply_temporal_decay: Apply temporal strength scoring (default: True)
+            reinforce_access: Record explicit memory use after retrieval (default: False).
+                Retrieval is exposure; callers must opt in only after confirming that
+                returned memories informed a task.
             
         Returns:
             List[SearchResult]: Ranked search results
@@ -787,7 +834,7 @@ class MemoryOrchestrator:
         
         self.logger.info(
             "Searching memories (enhanced)",
-            query=query[:100],
+            query_sha256=hashlib.sha256(query.encode("utf-8")).hexdigest(),
             mode=mode.value,
             limit=limit,
             include_conversation=include_conversation,
@@ -931,17 +978,10 @@ class MemoryOrchestrator:
         co_activation_matrix: Optional[dict] = None
     ) -> List[SearchResult]:
         """
-        Apply V4 cognitive multi-signal scoring to search results.
-        
-        V5: Now attaches RetrievalExplanation to each result.
-        
-        Transforms raw vector scores into composite scores using:
-        - vector_similarity (0.30): Original ChromaDB score
-        - concept_overlap (0.20): Jaccard overlap with query concepts
-        - domain_match (0.15): Domain alignment
-        - co_activation (0.15): Retrieved-together history
-        - authority (0.10): Score + access patterns
-        - temporal (0.10): Recency and freshness
+        Apply current cognitive multi-signal scoring and attach its explanation.
+
+        Formula authority is src/core/retrieval.py; the human contract is
+        docs/reference/scoring.md. Do not duplicate weights here.
         """
         if not results:
             return results
@@ -1013,14 +1053,17 @@ class MemoryOrchestrator:
     
     async def record_coactivation(self, memory_ids: list[str]) -> None:
         """
-        Passive graph maintenance: Record co-activations of retrieved memories.
-        Maintains Hebbian learning edges in Kuzu based on MCP session usage.
+        Record co-activations for an explicitly acknowledged use event.
+
+        Retrieval results alone must never call this method.  The caller must
+        first establish that the selected memories informed the task.
         """
         if not memory_ids or len(memory_ids) < 2:
             return
             
         try:
-            # Validate that IDs still exist in ChromaDB before burning O(n^2)
+            # Validate that IDs still exist in the configured vector store before
+            # burning O(n^2) graph co-activation work.
             # graph queries.  Deleted/stale IDs are silently dropped.
             valid_ids = []
             for mid in set(memory_ids):
@@ -1049,7 +1092,7 @@ class MemoryOrchestrator:
                 
             self.logger.debug(f"Recorded co-activations for {len(pairs)} memory pairs.")
         except Exception as e:
-            self.logger.warning(f"Failed to record passive graph co-activations: {e}")
+            self.logger.warning(f"Failed to record explicit-use graph co-activations: {e}")
     
     async def _search_semantic(
         self,
@@ -2158,7 +2201,7 @@ class MemoryOrchestrator:
 
         Stores may expose either synchronous or asynchronous ``close`` methods.
         Supporting both keeps the orchestrator compatible with the existing
-        Kuzu/Chroma stores and the opt-in SQLite vector store.
+        Kuzu and the configured vector store (SQLite by default).
         """
         self.logger.info("closing_orchestrator_connections")
         failures: list[Exception] = []

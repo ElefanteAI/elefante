@@ -4,18 +4,25 @@ Thank you for your interest in contributing to Elefante!
 
 ## Development Philosophy
 
-> **SDD enforcement is now native inside Elefante (v2.2.1).** Six SDD gate directives are injected into every tool response unconditionally. Gate 4 (simulator) is mechanically enforced via `.git/hooks/pre-commit`. Human-readable reference: [`agents/orchestrator.md`](agents/orchestrator.md).
+> **Development follows the repository SDD protocol.** The maintained routing
+> tests enforce documented contracts; eligible developer-mode operations also
+> receive concise protocol guidance at runtime. The human-readable authority is
+> [`agents/orchestrator.md`](agents/orchestrator.md).
 
 **1. Cleanliness**: Leave the repo cleaner than you found it. No temp files, no dead code.
 **2. Memory First**: New features must be memory-aware. Use `elefante-grounding` prompt principles.
-**3. Behavioral Relevance**: We do not assign "importance" to memories manually. Scores (0-100) are computed by the system based on usage.
-**4. Token Efficiency**: Every token Elefante injects must earn its place. Wasted tokens — filler, redundant context, irrelevant memories — degrade the response. Quality per token is the metric.
+**3. Behavioral Relevance**: We do not assign "importance" manually. Memory
+scores are system-managed; creation starts at 100 and retrieval later combines
+semantic, concept, co-activation, authority, and temporal signals.
+**4. Token Efficiency**: Correctness comes first. Every injected token must
+still earn its place because filler, redundant context, and irrelevant memory
+can degrade the response.
 
 **For AI agents developing Elefante:** Read [`agents/orchestrator.md`](agents/orchestrator.md) — the single operational authority. It points to [`workspace/ISSUES.md`](workspace/ISSUES.md) for the Known Issues tracker.
 
 ## Code Standards
 
-- **Python 3.11+**
+- **Python 3.11, 3.12, or 3.13** (release CI currently uses 3.11)
 - **Type Hints**: Required for all new code.
 - **Naming**:
   - Tools: `elefante-PascalCase` (e.g., `elefante-Memory(action="add")`)
@@ -28,7 +35,7 @@ Thank you for your interest in contributing to Elefante!
 src/
   mcp/          # MCP Server & Tools
   core/         # Logic (Orchestrator, Vector/Graph stores, ETL, Retrieval)
-  models/       # Pydantic models (v2.10.0 schema)
+  models/       # Current Pydantic data models
   modules/      # Session Distiller
   dashboard/    # React/Vite app
   utils/        # Config, curation, logging
@@ -88,10 +95,10 @@ If the matching `CHANGELOG.md` entry already exists, the advisor can hand off to
 ### Manual bump (if you already know the version)
 
 ```bash
-# Bump version in all 25 files at once (Windows)
+# Bump every authoritative version declaration (Windows)
 .venv\Scripts\python.exe scripts\ci\bump_version.py 2.2.0
 
-# Bump version (macOS/Linux)
+# Bump every authoritative version declaration (macOS/Linux)
 .venv/bin/python scripts/ci/bump_version.py 2.2.0
 
 # Verify no file has drifted (exit code 1 = drift detected)
@@ -113,7 +120,10 @@ If the local repo version was advanced too far before anything was published, us
 - CHANGELOG.md entries must be written manually (it is a historical log, not a current-version declaration).
 - NEVER push a `v*` tag without a matching `CHANGELOG.md` entry.
 - GitHub release bodies are rendered from the matching CHANGELOG entry by `scripts/ci/render_release_notes.py`. If the changelog entry is weak, the release page will be weak.
-- If a new doc file has a version marker, ADD IT to `scripts/ci/bump_version.py` TARGETS before the next version bump.
+- Do not add public "current published release" claims to
+  `scripts/ci/bump_version.py`; package version can advance before publication.
+  Update those public claims only after the tag and assets exist, then run the
+  release-claim regression.
 
 **Semantic versioning (x.y.z):**
 - `x` — MAJOR: breaking changes requiring user action or migration

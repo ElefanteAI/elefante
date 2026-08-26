@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : export_memories.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Read-only export of the memory corpus for offline analysis.
 #           Merged from export_memories_json.py + export_memories_csv.py.
 # WHEN    : Before a surgical delete (--format json for before/after comparison).
@@ -14,7 +12,6 @@
 #           has no import path. Use backup_elefante_data.py for recovery. Content
 #           is truncated at 500 chars in CSV. --output is only valid for single-
 #           format runs; use --format all to emit both files simultaneously.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Export all Elefante memories to JSON and/or CSV for analysis only.
 

@@ -6,12 +6,16 @@
 
 ---
 
+<a id="issue-1"></a>
+
 ## Issue #1: Kuzu 0.11.x Path Breaking Change [FIXED]
 
 **Trigger:** Fresh install fails with `RuntimeError: Database path cannot be a directory`.
 **Root cause:** Kuzu 0.11.x stopped tolerating a pre-existing `kuzu_db/` directory; older Kuzu was permissive. `src/utils/config.py` eagerly called `KUZU_DIR.mkdir(exist_ok=True)` on import, breaking the new contract.
 **Solution:** Removed the eager `KUZU_DIR.mkdir` from `config.py`; `src/core/graph_store.py::_ensure_database_path` now removes any pre-existing directory before letting Kuzu create its own structure; `scripts/setup/install.py` adds a pre-flight check.
 **Lesson:** Read library changelogs before upgrading. Let libraries manage their own resources — eager directory creation is helpful only until it isn't.
+
+<a id="issue-2"></a>
 
 ## Issue #2: Missing Dependencies After Clone [DOCUMENTED]
 
@@ -20,12 +24,16 @@
 **Solution:** `install.sh` / `install.bat` / `scripts/setup/install.py` run pip install automatically — never assume the user did.
 **Lesson:** A user-facing installer must run dependency installation itself. Don't expect README compliance.
 
+<a id="issue-3"></a>
+
 ## Issue #3: Python Version Mismatch [DOCUMENTED]
 
 **Trigger:** Install fails with `ERROR: Package 'kuzu' requires a different Python: 3.9.7 not in '>=3.11'` or cryptic syntax errors from walrus / union types.
-**Root cause:** Elefante requires Python 3.11+ for `|` union syntax, walrus operator, and Kuzu/ChromaDB compatibility. Multiple Python versions on a system mask the wrong default.
-**Solution:** `scripts/setup/install.py` checks Python version explicitly and creates the venv with `python3.11 -m venv .venv`. README documents the requirement.
+**Root cause:** Elefante requires Python 3.11–3.13; older or newer interpreters are outside the installer contract. Multiple Python versions on a system can mask the selected executable.
+**Solution:** `scripts/setup/install.py` checks the exact supported range and creates the virtual environment with the compatible interpreter selected by the launcher. README documents the same range.
 **Lesson:** Specify Python version in requirements *and* fail fast in the installer. Cryptic syntax errors waste user time.
+
+<a id="issue-4"></a>
 
 ## Issue #4: Config Pre-creating Directories [FIXED]
 
@@ -34,12 +42,16 @@
 **Solution:** Lazy directory creation via `ensure_data_dirs()` called by code paths that need them. `KUZU_DIR` is never created by Elefante — Kuzu owns it.
 **Lesson:** Don't be helpful with directories libraries own. Eager-import side effects are landmines.
 
+<a id="issue-5"></a>
+
 ## Issue #5: Broken Venv Escape (Trapped Agent) [FIXED]
 
 **Trigger:** Agent runs in VS Code with corrupted `.venv`; `python scripts/setup/install.py` fails with ImportError / wrong-Python because the workspace interpreter is broken.
 **Root cause:** Circular dependency — the agent's Python execution uses the broken `.venv` and cannot fix itself from within. No escape hatch to system Python.
 **Solution:** Documented escape pattern: `subprocess.run(["/opt/homebrew/bin/python3.11", "-c", "..."])` with absolute path to system Python; alternative `#!/usr/bin/env python3.11` shebang in install scripts forces OS-level resolution.
 **Lesson:** When the agent's interpreter is the broken thing, an absolute system-Python subprocess is the only escape. Don't assume the workspace Python is healthy.
+
+<a id="issue-6"></a>
 
 ## Issue #6: IDE Holding Stale MCP Server Connections [DOCUMENTED]
 
@@ -48,12 +60,16 @@
 **Solution:** Mandatory IDE window reload after install or config change (Command Palette → Developer: Reload Window). Manual `pkill` of the zombie Python process if reload fails.
 **Lesson:** IDEs do not hot-reload MCP server configurations. Make the reload step explicit in install output.
 
+<a id="issue-7"></a>
+
 ## Issue #7: IBM Bob Non-Standard MCP Settings Path [DOCUMENTED]
 
 **Trigger:** Auto-config script reports "Configured VS Code successfully" but IBM Bob still shows no Elefante MCP server.
 **Root cause:** IBM Bob stores MCP settings at `~/.bob/settings/mcp_settings.json` (non-standard) — not the AppData/`%APPDATA%\Bob-IDE\...` path other IDEs use.
 **Solution:** `scripts/setup/configure_vscode_bob.py` checks both paths; manual fallback documented in [`../../docs/how-to/configure-ide.md`](../../docs/how-to/configure-ide.md).
 **Lesson:** IDE config paths are not standardized. Always grep the IDE's own dotfile dir first; never assume the AppData convention.
+
+<a id="issue-8"></a>
 
 ## Issue #8: CI Binary Build — Frontend Step Missing + Wrong Vite Output [FIXED v2.5.4]
 
@@ -62,6 +78,8 @@
 **Solution:** `elefante.spec` `datas` entry → `src/dashboard/ui/dist`. `build-binaries.yml` adds `setup-node@v4` + `npm ci` + `npm run build` in `src/dashboard/ui/` before the Python install step.
 **Lesson:** A CI pipeline that builds compiled artifacts must include every build step required to produce them. Gitignored build outputs do not exist in CI. Verify `outDir` against `vite.config.ts` / `webpack.config.js` before referencing in a build spec.
 
+<a id="issue-9"></a>
+
 ## Issue #9: GitHub Release Publish Failure After Successful Builds [FIXED v2.7.1]
 
 **Trigger:** All three platform builds succeed, but `Create GitHub Release` job fails. Release object exists with macOS + Windows assets; Linux asset missing.
@@ -69,12 +87,16 @@
 **Solution:** `scripts/ci/select_release_assets.py` runs between artifact download and release publish, filters assets above the cap, and writes uploaded vs skipped to step summary. Workflow keeps green when smaller assets are valid; oversized asset is reported, not poisonous.
 **Lesson:** Build-job success does not imply release-asset eligibility. Enforce platform upload quotas before publication or one oversized asset poisons the entire release job.
 
+<a id="issue-10"></a>
+
 ## Issue #10: DMG GUI Installer .app Broken — Multi-Edit Corruption [FIXED v2.8.1]
 
 **Trigger:** `Install Elefante.app` exits code 1; no GUI window. `IndentationError: unexpected indent` on `installer_gui.py:173`.
 **Root cause:** `scripts/ci/installer_gui.py` was patched 3+ times in a single session via overlapping string-replacement edits (chmod fix, dark→light palette swap, path display additions). Result: undefined `style`, orphaned kwargs, duplicate widget constructors, references to nonexistent palette keys. File was never committed — no git recovery possible.
 **Solution:** Rewrote the corrupted zone (~140 lines: `__init__` tail + `_build_ui`) from scratch as a coherent light-mode version. Verified by `py_compile`, AST structural check, DMG rebuild + diff, `.app` launch, full pytest.
 **Lesson:** After any multi-edit session on a single file, run `py_compile` BEFORE moving on. Test suite passing means nothing if the test suite doesn't import the file. Commit working states; don't leave critical files untracked across sessions.
+
+<a id="issue-11"></a>
 
 ## Issue #11: DMG Customer Surface Broken — Tk/Aqua Paint Failure [FIXED v2.9.0]
 
@@ -94,6 +116,8 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 
 **Lesson:** A live widget tree is not proof of a usable UI. Customer-facing desktop UI must be verified as pixels (screenshot), not as process state.
 
+<a id="issue-12"></a>
+
 ## Issue #12: Installer Seed-Memory Collision With Test-Memory Guard [FIXED v2.9.1]
 
 **Trigger:** Every fresh install fails at stage 3 (Database Initialization). `.elefante-install.log` shows `blocked_test_memory_submission` with `Matched conditions: tag 'test' present`.
@@ -101,12 +125,16 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 **Solution:** One-line change to seed payload: `tags=["seed", "passcode"]`. Content-search by "Indigo-Echo" still works.
 **Lesson:** Guards that protect a data surface must be tested on *both* positive AND negative paths at the exact call sites that use them. Two individually-correct surfaces with intersecting value spaces ship a broken interaction. The installer should propagate the underlying rejection reason into the summary, not surface a generic "stage failed."
 
+<a id="issue-13"></a>
+
 ## Issue #13: Installer Reuse Mode Fails When `pip` Missing From .venv [FIXED]
 
 **Trigger:** `.venv` has working Python 3.11 but install Step 2 fails with `No module named pip` and `Pip self-upgrade failed`.
 **Root cause:** Reuse path validated only that `.venv/bin/python` existed. A `uv venv --python 3.11`-created environment is valid Python but pip-less. `install_dependencies()` called `python -m pip ...` without verifying pip first.
 **Solution:** `scripts/setup/install.py::install_dependencies()` runs `python -m pip --version` before any dependency step; on failure, runs `python -m ensurepip --upgrade` and rechecks. Failure cites this entry directly.
 **Lesson:** A reusable virtual environment must be validated at the *tool* level, not just the interpreter level. `python` exists ≠ `pip` exists.
+
+<a id="issue-14"></a>
 
 ## Issue #14: Installer Bundle Build Walks `.venv*` Backups [FIXED]
 
@@ -117,6 +145,8 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 
 ---
 
+<a id="issue-15"></a>
+
 ## Issue #15: Test Manifest Leakage [BUG-032, FIXED, guarded]
 
 **Trigger:** Pre-migration inspection found `~/.elefante/install-manifest.json` containing only temporary `pytest-of-*` VS Code paths.
@@ -125,6 +155,8 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 **Guard:** `pytest tests/test_install_setup.py -k "manifest_home or transport_only_bridge" -v`.
 **Lesson:** A helper that writes ownership state must receive its state root explicitly. A temporary artifact path does not imply an isolated metadata path.
 
+<a id="issue-16"></a>
+
 ## Issue #16: Lock Freshness Check Floated Transitive Dependencies [BUG-035, FIXED, guarded]
 
 **Trigger:** PR #7's Python Quality job failed at `cmp requirements.lock ...` although the dashboard change did not modify Python requirements and the locked installation succeeded.
@@ -132,6 +164,8 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 **Solution:** Copy both `requirements.txt` and `requirements.lock` into the temporary directory before recompilation. `uv` now preserves valid transitive pins and changes the lock only when the declared requirements make that necessary.
 **Guard:** `pytest tests/test_release_pipeline.py -k "lock_freshness" -v` verifies the copy → compile → compare order; a clean temporary reproduction must compare byte-for-byte.
 **Lesson:** A lock-freshness gate must validate the existing lock, not ask the package index for today's preferred solution. Otherwise unrelated upstream releases make CI nondeterministic.
+
+<a id="issue-17"></a>
 
 ## Issue #17: Release Installer Launcher And First-Run UX Failure [BUG-037, FIXED, guarded]
 
@@ -142,6 +176,8 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 **Boundary:** The three published v2.11.1 installer assets were replaced under explicit storefront remediation authority on 2026-07-29. Their re-downloaded SHA-256 digests match the validated local archives; the macOS and Windows files remain launcher ZIPs, not signed native packages.
 **Lesson:** A release ZIP is a customer interface. Verification must decode and execute the exact downloaded entrypoint, not merely prove that an archive contains files with plausible names.
 
+<a id="issue-18"></a>
+
 ## Issue #18: Installer Dry-Run Mutated The Live Installation [BUG-038, FIXED, guarded]
 
 **Trigger:** Destination validation executed the downloaded macOS and Linux launchers with `--dry-run`. Both invocations moved the live `~/.elefante/app/current` installation to backups and placed the v2.11.1 payload before printing the delegated command.
@@ -149,6 +185,8 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 **Solution:** Build the delegated command first and return immediately for `--dry-run`; payload placement, backup creation, and subprocess execution now occur only after that branch. The original v2.9.2 installation was restored from the first backup, and validation payloads were quarantined without deletion.
 **Guard:** `pytest tests/test_installer_bundle.py -k "dry_run" -v` monkeypatches `place_payload` to fail if called and asserts an absent target stays absent. Artifact smoke uses an isolated `--install-root` and independently asserts it was not created.
 **Lesson:** A dry-run flag is a no-mutation transaction boundary, not a “skip the last command” option. Test the absence of every durable side effect.
+
+<a id="issue-19"></a>
 
 ## Issue #19: Initializer Reported Retired Chroma Path [BUG-039, FIXED, guarded]
 
@@ -158,6 +196,8 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 **Guard:** `pytest tests/test_install_setup.py -k "configured_storage_paths" -v`.
 **Lesson:** Backend selection and operator diagnostics must read the same configuration contract; a correct factory with stale initialization messages is still a broken install experience.
 
+<a id="issue-20"></a>
+
 ## Issue #20: Customer-Global Installation and Host Coverage [BUG-040, FIXED, guarded]
 
 **Trigger:** The first customer journey found Elefante running from a developer checkout with incomplete host coverage. A later real v2.12.2 repair installed the stable runtime but preserved older Codex and VS Code registrations because they predated installer ownership metadata; its final verifier also timed out while starting a separate direct server instead of testing the bridge customer hosts use.
@@ -166,16 +206,20 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 **Guard:** `pytest tests/test_installer_bundle.py tests/test_install_setup.py tests/test_installer_gui.py tests/test_mcp_handshake_verifier.py -q` covers release scope, stable host planning, safe legacy adoption, foreign same-name preservation, rollback, runtime identity, bridge selection, uncovered-host diagnostics, and the global macOS host surface. Live proof on 2026-08-05 completed a v2.12.2 repair with Codex, VS Code/Copilot, and Antigravity verified; `doctor --json` returned `customer_ready: true`; daemon health and the real bridge handshake passed.
 **Lesson:** “Global” is a verifiable customer invariant, not an install-path adjective. Upgrade safety needs both precise ownership and a narrow adoption path for known older product registrations, and readiness must test the transport customers actually run.
 
-## Issue #21: Customer Installer Leaked Developer Repository Material [BUG-041, FIXED locally, guarded]
+<a id="issue-21"></a>
+
+## Issue #21: Customer Installer Leaked Developer Repository Material [BUG-041, FIXED v2.12.2, guarded]
 
 **Trigger:** A first-customer macOS installation of the public v2.12 archive exposed the repository workspace, tests, migration and developer-only utilities, internal instructions, and the full development lock. The installed environment also carried test and lint packages that a customer never needs.
 **Root cause:** `build_installer_bundle.py` recursively copied nearly the whole repository, with only broad exclusion rules. Its installer always consumed `requirements.lock`, which combines runtime and development dependencies. The archive had a customer launcher but did not have a customer payload boundary.
 **Solution:** Release Client Candidate 1.0 has its own `requirements.client.txt` and hash-locked `requirements.client.lock`. Its cross-platform customer builder copies only explicit runtime source, installer/health scripts, prebuilt dashboard assets, and customer files. Its manifest selects the `client` installer profile, so `install.py` uses the runtime lock and skips repository-only agent-bootstrap validation. A separate verifier rejects unexpected archive paths, developer directories, development dependencies, invalid launchers, misleading timestamps, and invalid client metadata. The tagged-release workflow uses this builder on macOS, Windows, and Linux. The full developer installer remains available for diagnostics but cannot be published as the customer asset.
-**Guard:** `pytest tests/test_release_client_bundle.py tests/test_installer_bundle.py tests/test_install_setup.py -q`; generate the dashboard; run `python scripts/ci/build_release_client.py --output <zip>` then `python scripts/ci/verify_release_client.py --archive <zip>`; CI re-compiles and audits the client lock, builds/verifies the archive, performs a real fresh macOS install through the exact Finder launcher, requires customer-ready `doctor` output, and proves safe daemon/runtime unregistration.
-**Boundary:** This is a local validation lane for the upcoming v2.12.2 customer artifact. It does not replace the published v2.12.1 installers, change the website download, or authorize a release.
+**Guard:** `./.venv/bin/python -m pytest tests/test_release_client_bundle.py tests/test_installer_bundle.py tests/test_install_setup.py -q`; generate the dashboard; run `./.venv/bin/python scripts/ci/build_release_client.py --output <zip>` then `./.venv/bin/python scripts/ci/verify_release_client.py --archive <zip>`; CI re-compiles and audits the client lock, builds/verifies the archive, performs a real fresh macOS install through the exact Finder launcher, requires customer-ready `doctor` output, and proves safe daemon/runtime unregistration.
+**Boundary:** The customer-only artifact is the published v2.12.2 distribution. Development checkouts and their wider dependency/tooling surface remain separate.
 **Lesson:** A friendly launcher cannot make a repository snapshot into a customer product. The customer artifact must be allowlisted, profile-specific, and rejected automatically when any development surface leaks in.
 
-## Issue #22: Clean-Machine Installer Imported Product Dependencies Before Setup [BUG-042, FIXED locally, guarded]
+<a id="issue-22"></a>
+
+## Issue #22: Clean-Machine Installer Imported Product Dependencies Before Setup [BUG-042, FIXED v2.12.2, guarded]
 
 **Trigger:** The exact customer launcher on a fresh macOS runner placed the v2.12.2 payload, then crashed immediately with `ModuleNotFoundError: No module named 'pydantic'`.
 **Root cause:** `install.py` imported `src.__version__` at process startup. Importing `src` also imported Elefante models and `pydantic`, but the installer's dependency stage had not yet created the virtual environment or installed the client lock.
@@ -183,7 +227,9 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 **Guard:** `pytest tests/test_install_setup.py -k "entrypoint_starts_without_product_dependencies" -v` launches the installer help path with `python -S`, which disables site packages. The isolated macOS workflow then executes the full customer launcher and requires customer-ready `doctor` output.
 **Lesson:** An installer must bootstrap using only the standard library until it has installed its own dependency contract.
 
-## Issue #23: Client Health Required Developer SDD Baseline [BUG-043, FIXED locally, guarded]
+<a id="issue-23"></a>
+
+## Issue #23: Client Health Required Developer SDD Baseline [BUG-043, FIXED v2.12.2, guarded]
 
 **Trigger:** After the clean customer install successfully created its environment, installed dependencies, initialized storage, generated the dashboard, started the daemon, and completed host detection, final health verification reported `System Baseline: UNHEALTHY`.
 **Root cause:** `verify_health.py` always required Elefante's internal developer SDD directives and developer specification memories. The client runtime intentionally excludes those instructions and seeds only task-focused grounding, continuity, conflict, and secret-safety directives.
@@ -191,23 +237,85 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 **Guard:** `pytest tests/test_install_setup.py -k "client_health_checks_customer_baseline" -v`; the isolated macOS workflow requires the entire customer launcher and `doctor` readiness path to pass.
 **Lesson:** Product health must verify the product contract for the active runtime profile, not the development environment that produced it.
 
-## Issue #24: Release-Candidate Workflows Embedded The Previous Version [BUG-045, FIXED, guarded]
+<a id="issue-24"></a>
 
-**Trigger:** PR #26 bumped the package to v2.12.3. Both the Quality dashboard job and the standalone client-candidate job built an archive named for v2.12.2, then rejected the valid v2.12.3 manifest as a version mismatch.
-**Root cause:** The builder, verifier, and candidate workflows duplicated the current product version in candidate metadata, archive paths, artifact names, extraction commands, and the installed-version assertion. The version bumper intentionally updates package declarations only, so this hidden version state drifted on the first patch release. The first repair then used `from src import __version__` in pre-dependency jobs, recurring BUG-042 because importing `src` requires `pydantic`.
-**Solution:** Derive candidate metadata directly from the manifest product version. The standard-library release builder exposes `--print-version` without importing product modules. Each candidate lane resolves that value once, derives its archive path, carries it through workflow outputs, and compares the installed runtime against it. Regression coverage rejects the retired release literal and runs version discovery under `python -S`.
-**Guard:** `pytest tests/test_release_client_bundle.py tests/test_release_pipeline.py -q`; both GitHub candidate lanes must build and verify the version-bumped artifact.
-**Lesson:** Release automation must derive artifact identity from the package version through a pre-dependency-safe source. A release number copied into workflow paths is hidden version state; importing the product merely to read that state violates the installer bootstrap boundary.
+## Issue #24: Installed Runtime Version Did Not Identify Its Source [BUG-052, FIXED AGAIN in development]
+
+**Trigger:** A 2026-08-13 audit compared the installed runtime with published
+main and the Task Intelligence development branch. The installed
+`src/mcp/server.py` blob matched unreleased commit `7c705ca`, while
+`src/__init__.py` and `~/.elefante/install-manifest.json` reported `2.12.2`.
+The manifest contained no source commit or release channel.
+During the first exact-candidate attempt, GitHub Actions then exposed a second
+boundary error: the pull-request workflow used the default temporary merge
+checkout, so the archive truthfully embedded an ephemeral merge SHA rather than
+the durable reviewed branch-head SHA. Installation was stopped before mutation.
+During the v2.12.3 publication gate, both candidate lanes exposed a third
+recurrence: archive paths, candidate metadata, and installed-version assertions
+still embedded v2.12.2. The first repair imported dependency-backed `src` before
+runner setup, recurring BUG-042.
+**Root cause:** Runtime identity records only the semantic version, application
+root, data root, and customer/developer scope. That is sufficient when every
+build with a version is byte-equivalent to the release, but it cannot distinguish
+published, development, or candidate code built from different commits.
+The candidate workflow also assumed `GITHUB_SHA` always meant the reviewed
+source commit; for a `pull_request` event it denotes GitHub's temporary merge
+commit.
+Candidate automation also copied the semantic version into workflow state
+instead of deriving it through a pre-dependency-safe source.
+**Impact:** Installed-path evidence can be attributed to the wrong release;
+`doctor` can report a truthful semantic version but an incomplete build
+identity; development features may appear published. This does not prove that
+any external customer received the development build.
+**Solution:** Customer archives now contain the source identity twice at
+different boundaries: publication metadata in `installer-manifest.json` and an
+installed `elefante-build.json` inside the payload. The verifier and bootstrap
+require them to match before host mutation; `install.py` records version, source
+commit, source cleanliness, and channel in schema-v3 ownership state; `doctor`
+compares that state with the installed payload and rejects missing, legacy,
+dirty, development-channel, version-mismatched, or commit-mismatched customer
+identity. Developer bundles declare `development`; known-good rollback is a
+normal reinstall whose older payload identity replaces the newer record.
+Candidate artifact jobs now resolve one `SOURCE_COMMIT`: the pull-request head
+SHA for PRs and `github.sha` for tags, pushes, and manual runs. They check out
+that exact commit before building and compare the installed identity with the
+same value. Candidate checksum manifests are generated from inside `dist/`, so
+they remain valid after GitHub strips the upload directory.
+The standard-library release builder exposes `--print-version` without importing
+product modules; each candidate lane resolves it once and carries it through
+archive names, metadata, extraction, and installed-runtime assertions.
+**Guard:** Focused installer, release-client, doctor, and workflow tests cover
+candidate/release versus development, malformed and legacy identity, archive
+drift, delegated-install drift, upgrade, repair, and known-good reinstall. The
+macOS candidate workflow additionally requires the installed source commit to
+equal `SOURCE_COMMIT`. Workflow regressions require both candidate producers to
+use the same durable checkout rule and require the standalone artifact checksum
+to use a portable basename. Version regressions reject the retired release
+literal and run discovery under `python -S`. The existing live installation was
+not replaced.
+**Lesson:** A semantic version identifies a release contract, not arbitrary code
+built after that release. Reproducible product evidence requires version plus
+source provenance and channel. Release automation must derive that version from
+a standard-library-safe source rather than duplicate it in workflow paths.
+
+**Exact-candidate evidence:** PR head
+`b05d794078c7121c6da009d7fe6e0ded322b721f` passed the dedicated hosted-macOS
+fresh install, health, and uninstall job plus the macOS, Windows, and Linux
+package builds. Downloaded `SHA256SUMS` verifies without path rewriting; the
+archive manifest and payload identity both report that full SHA and clean
+candidate status; the Finder launcher remains executable; and a local dry run
+left its target absent. The existing live runtime was not replaced.
 
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
-The five most-recurring rules from the issues above:
+Recurring rules from the issues above:
 
 1. **Read error messages literally** — "cannot be a directory" means don't pre-create. Issue #1.
 2. **Library changelogs first** — version bumps break things. Issues #1, #4.
 3. **Don't be helpful with resources libraries own** — eager mkdir, eager validation, eager state setup. Issues #1, #4.
 4. **A live process is not a working UI** — pixels are the only proof. Issue #11.
 5. **Test both positive and negative guard paths** — guards interact silently. Issue #12.
+6. **Bind customer evidence to durable build identity** — version, source commit, channel, and cleanliness must agree from archive through installed runtime. Issue #24.
 
 Distill any new repeating rule into `../lessons.md`. Postmortems hold the bug-specific narrative; `lessons.md` holds the cross-bug edge.
 

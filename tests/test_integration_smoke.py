@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_integration_smoke.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PROVES  : End-to-end integration smoke test (10x battery) — exercises memory
 #           CRUD, search, graph, and directive operations in sequence.
 # RUN     : pytest tests/test_integration_smoke.py -v

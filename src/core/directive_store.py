@@ -1,20 +1,19 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/core/directive_store.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
-# PURPOSE : Persistent always-on behavioral constraints; separate from memories
-#           and injected into every tool response regardless of query relevance.
-# ROLE    : Core — directives are injected by server.py on every MCP response.
+# PURPOSE : Persistent behavioral constraints stored separately from memories
+#           and injected into normal product-operation responses.
+# ROLE    : Core — server.py injects directives on its normal response path;
+#           management responses use a minimal path.
 # TOUCHED : When changing directive persistence, injection rules, or the
 #           elefante-DirectiveAdd/Remove/List tool contracts.
 # ─────────────────────────────────────────────────────────────────────────────
 """
-Directive Store — Persistent, always-on behavioral constraints.
+Directive Store — persistent behavioral constraints.
 
 Directives are NOT memories. They do not compete on similarity scores.
-They are unconditional rules injected into every MCP tool response,
-ensuring the agent sees them at the decision boundary — the last thing
-read before acting on results.
+Active directives are injected into normal product-operation responses.
+System, dashboard, and directive-management responses use a minimal path and
+do not recursively inject them.
 
 Storage: ~/.elefante/data/directives.json (simple JSON file).
 Loaded once at server init, cached in memory, persisted on mutation.
@@ -45,7 +44,7 @@ SYSTEM_DIRECTIVE_DEFINITIONS = (
     ),
     (
         "system-sdd-gate-2",
-        "SDD Gate 2: Scan leakage surfaces before shipping: MCP response contract, ChromaDB roundtrip, Kuzu schema and DML, stdout purity, compliance gate, dashboard snapshot, co-activation history, and documentation links.",
+        "SDD Gate 2: Scan leakage surfaces before shipping: MCP response contract, configured vector-store roundtrip, Kuzu schema and DML, stdout purity, compliance gate, dashboard snapshot, co-activation history, and documentation links.",
     ),
     (
         "system-sdd-gate-3",
@@ -53,7 +52,7 @@ SYSTEM_DIRECTIVE_DEFINITIONS = (
     ),
     (
         "system-sdd-gate-4",
-        "SDD Gate 4: Run health_check.py, verify_mcp_handshake.py, and targeted regression coverage before claiming completion.",
+        "SDD Gate 4: Run scripts/verify/verify_health.py, scripts/verify/verify_mcp_handshake.py, and targeted regression coverage before claiming completion.",
     ),
     (
         "system-sdd-stdout-purity",
@@ -65,7 +64,7 @@ SYSTEM_DIRECTIVE_DEFINITIONS = (
     ),
     (
         "system-elefante-tool-contract",
-        "ELEFANTE Tool Contract: Read ENTRYPOINT_SEQUENCE_READ_THIS_FIRST, MANDATORY_PROTOCOLS_READ_THIS_FIRST, DIRECTIVES, and RELEVANT_CONTEXT on every tool response.",
+        "ELEFANTE Tool Contract: Read any ENTRYPOINT_SEQUENCE_READ_THIS_FIRST, MANDATORY_PROTOCOLS_READ_THIS_FIRST, DIRECTIVES, and RELEVANT_CONTEXT blocks present in a tool response; RELEVANT_CONTEXT and policy blocks are conditional.",
     ),
     (
         "system-elefante-minimal-patch",
@@ -90,6 +89,10 @@ SYSTEM_DIRECTIVE_DEFINITIONS = (
 )
 
 CLIENT_SYSTEM_DIRECTIVE_DEFINITIONS = (
+    (
+        "system-client-critical-thinking",
+        "ELEFANTE Critical Thinking: Agreement is not evidence. Identify the governing objective, inspect current evidence, state material uncertainty or contradictions, test the strongest competing explanation, and choose the smallest change that addresses the root cause. Do not claim improvement without a measured comparison.",
+    ),
     (
         "system-client-grounding",
         "ELEFANTE Grounding: Use stored memory and current task evidence for project-specific claims; identify material uncertainty instead of guessing.",
@@ -208,7 +211,7 @@ class DirectiveStore:
     def get_active_texts(self) -> List[str]:
         """Return the content strings of all active directives.
 
-        This is the method called on every tool response injection.
+        This is called when the server builds a normal response injection.
         It should be fast — just a list comprehension over cached objects.
         """
         return [d.content for d in self._all_directives() if d.active]

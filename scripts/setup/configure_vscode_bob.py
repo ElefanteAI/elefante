@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : configure_vscode_bob.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Write VS Code mcp.json (and clean settings.json duplicates) to wire
 #           Elefante as an MCP server for VS Code and Bob IDE. Called by install.py.
 # WHEN    : Initial VS Code/Bob IDE setup, or after moving the repo to a new path.
@@ -11,7 +9,6 @@
 # NOTES   : Writes to .vscode/mcp.json and removes settings.json duplicates.
 #           If you see two Elefante entries in VS Code, this script is the fix —
 #           it detects and removes the settings.json-based duplicate.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Automatic VS Code/Bob MCP configuration.
 

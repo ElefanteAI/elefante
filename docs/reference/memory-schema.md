@@ -1,125 +1,119 @@
 # Memory Schema
 
+This reference describes the current `Memory` and `MemoryMetadata` models in
+`src/models/memory.py`. The governance fields below are implemented on the
+development branch but are not part of the published v2.12.3 client contract.
 
-This document is the normative specification for Elefante's memory metadata schema. It covers the V4 cognitive retrieval fields and V5 knowledge topology fields.
+## Memory
 
----
+| Field | Type | Meaning |
+|---|---|---|
+| `id` | UUID | Generated memory identity |
+| `content` | string, 1–10,000 characters | Durable memory text |
+| `metadata` | `MemoryMetadata` | Classification, provenance, lifecycle, and scoring inputs |
+| `embedding` | optional float list | Populated by the embedding service; stored explicitly |
+| `related_entities` | UUID list | Graph entity references |
+| `similarity_score` | optional float | Populated on retrieval |
+| `relevance_score` | optional float | Populated on retrieval |
 
-## V4: Cognitive Retrieval Fields
+## Metadata groups
 
-V4 added enrichment fields for concept retrieval, dashboard inspection, and
-forward-compatible trigger metadata. The current retriever uses `concepts`,
-but does not score `surfaces_when` or the stored `authority_score` field.
+### Identity and classification
 
-### New Metadata Fields
+- `created_at`, `created_by`
+- `domain`: `work`, `personal`, `learning`, `project`, `reference`, or `system`
+- `category`
+- `memory_type`: `fact`, `decision`, `preference`, `insight`, `note`,
+  `conversation`, `specification`, or `directive`
 
-| Field             | Type       | Purpose                                        | Auto-populated |
-| ----------------- | ---------- | ---------------------------------------------- | -------------- |
-| `concepts`        | `string[]` | 3-5 key terms used by concept-overlap retrieval | Yes            |
-| `surfaces_when`   | `string[]` | Stored trigger metadata for inspection and future proactive surfacing; not a current ranking signal | Yes |
-| `authority_score` | `float`    | Stored compatibility/dashboard field; the current retriever derives authority from vitality and access count | Yes |
+### Retrieval inputs
 
-### Concept Extraction
+- `score`: integer `0–100`; defaults to 100 and is system-managed
+- `confidence`: float `0.0–1.0`; defaults to 0.7
+- `tags`, `keywords`, `entities`
+- `concepts`: deterministic or agent-supplied key terms
+- `surfaces_when`: stored query-pattern metadata for inspection and future
+  proactive surfacing; not a current ranking signal
+- `authority_score`: stored compatibility/dashboard field in the range
+  `0.0–1.0`; current retrieval derives authority from vitality and access count
 
-**File**: `src/utils/curation.py` → `extract_concepts()`
+`compute_authority_score()` returns `1.0` for specification/directive types.
+Other types combine current score (0.35), access frequency (0.25), creation
+freshness (0.20), and access freshness (0.20). Retrieval later combines
+authority with four other signals; see [`scoring.md`](scoring.md).
 
-Deterministic keyword extraction (no LLM):
+### Relationships and lifecycle
 
-- Removes stop words
-- Boosts technical terms (python, docker, elefante, etc.)
-- Weights by position (early words score higher)
-- Returns top 5 concepts
+- `status`, `relationship_type`, `parent_id`
+- `related_memory_ids`, `conflict_ids`
+- `supersedes_id`, `superseded_by_id`
+- `version`, `deprecated`, `archived`, `summary`
 
-```python
-content = "Always use absolute paths in Elefante to avoid errors"
-concepts = extract_concepts(content)
-# → ['elefante', 'always', 'absolute', 'paths', 'avoid']
-```
+Deprecated and archived memories are excluded from normal semantic results.
 
-### Surfaces When
+### Governance (development extension)
 
-**File**: `src/utils/curation.py` → `infer_surfaces_when()`
+- `retention_policy`: managed, permanent, or ephemeral
+- `injection_policy`: ranked, triggered, or always
+- `scope`: optional project, workspace, or task scope
+- `trigger`: up to 20 phrases for triggered delivery
+- `user_locked`: explicit user authority that protects the memory from
+  automated refinery lifecycle changes
 
-Generates candidate query patterns for future proactive surfacing. The values
-are persisted and shown in the dashboard, but are not a current ranking signal:
+Defaults are managed, ranked, no scope, no triggers, and unlocked.
+Always-inject is fail-closed unless user_locked is true. Governance is applied
+before Task Intelligence ranking; protected duplicates are not silently
+archived. Ephemeral is currently declarative—automatic expiry is not
+implemented. Invocation authority and causal task utility remain separate
 
-| Content Pattern           | Generated Triggers                            |
-| ------------------------- | --------------------------------------------- |
-| "how to", "why"           | Question patterns                             |
-| "error", "fix", "bug"     | `{concept} error`, `{concept} problem`        |
-| "always", "never", "must" | `{concept} best practice`, `how to {concept}` |
-| "config", "setup"         | `{concept} setup`, `{concept} configuration`  |
+### Provenance
 
-### Authority Score
+- `source`, `source_detail`, `source_reliability`, `verified`
+- `session_id`, `author`
+- `project`, `workspace`, `file_path`, `line_number`, `url`, `location`
 
-**File**: `src/utils/curation.py` → `compute_authority_score()`
+Transport Source provenance also exists in the graph for installed multi-host
+workflows. Provenance indicates origin; it does not by itself prove truth.
 
-Legacy enrichment score stored for compatibility and dashboard inspection:
+### Temporal fields
 
-```python
-authority = (
-    0.35 × (relevance_score / 100) +     # System-computed behavioral relevance
-    0.25 × log(access_count) / log(50) +  # Usage frequency
-    0.20 × exp(-0.007 × days_since_created) +  # Creation freshness
-    0.20 × exp(-0.05 × days_since_accessed)    # Access recency
-)
-```
+- `last_accessed`, `last_modified`, `access_count`. Ordinary retrieval and the
+  development Task Intelligence `record_use` ledger do not update access.
+- `decay_rate`, `reinforcement_factor`
 
-The current retrieval authority signal is computed at query time from stored
-behavioral vitality and access count. See [`scoring.md`](scoring.md).
+Type decay is assigned when a Memory is constructed. Specifications and
+directives have zero type decay, but freshness still affects vitality. The
+exact formula is in [`scoring.md`](scoring.md).
 
-### Dashboard Edges
+### Extension fields
 
-V4 adds **SHARES_CONCEPT** edges to the dashboard:
+- `custom_metadata`: extension/application data
+- `system_metadata`: Elefante-managed data such as token density
 
-| Edge Type           | Meaning                                 |
-| ------------------- | --------------------------------------- |
-| `SHARES_CONCEPT`    | Two memories share at least one concept |
-| `CO_TOPIC`          | Share same topic (existing)             |
-| `CO_RING`           | Share same ring (existing)              |
-| `CO_KNOWLEDGE_TYPE` | Share same knowledge type (existing)    |
+Callers must not treat arbitrary custom metadata as a released query or
+lifecycle contract.
 
----
+## ETL enrichment
 
-## V5: Knowledge Topology
+`elefante-ETLProcess` selects raw records for agent enrichment.
+`elefante-ETLClassify` currently accepts and persists:
 
-V5 adds a queryable knowledge topology so the dashboard can present a higher-level map (rings, topics, and types) without speculative metadata.
+- one-line `summary`
+- optional `concepts`
+- optional `surfaces_when`
 
-### Topology Rings
+It does not accept ring, topic, or knowledge-type fields. Older V5 topology
+language is historical and not part of the live MCP schema.
 
-Rings define hierarchy depth:
+## Serialization
 
-| Ring | Meaning |
-|------|---------|
-| `core` | Identity and foundational principles/laws |
-| `domain` | Broad areas of life/work/projects |
-| `topic` | Subject clusters (coding standards, workflow, tools) |
-| `leaf` | Individual memories (facts, preferences, decisions) |
+SQLite stores the complete versioned Memory JSON and explicit float32
+embedding. The legacy ChromaDB adapter flattens metadata and reconstructs typed
+fields on read. Adding a field requires round-trip tests for every supported
+configured backend and the customer backup/restore path.
 
-### Knowledge Types
+## Related documentation
 
-`law`, `principle`, `preference`, `method`, `fact`, `decision`, `insight`
-
-### Topics
-
-`coding-standards`, `communication`, `workflow`, `agent-behavior`, `tools-environment`, `collaboration`, `general`
-
-### Relationship Types
-
-| Type | Meaning |
-|------|---------|
-| `OWNED_BY` | Memory belongs to a domain entity |
-| `BELONGS_TO` | Entity is part of a group/project |
-| `DERIVES_FROM` | Knowledge derived from another source |
-| `CONTRADICTS` | Two memories contradict each other |
-| `SUPERSEDES` | Newer memory replaces older one |
-| `REQUIRES` | One memory depends on another |
-| `IMPLEMENTS` | Memory implements a specification |
-
----
-
-## See Also
-
-- [`scoring.md`](scoring.md) — Temporal decay and reinforcement system
-- [`architecture.md`](architecture.md) — Triple-layer brain design
-- [`tools.md`](tools.md) — API reference
+- [`architecture.md`](architecture.md)
+- [`scoring.md`](scoring.md)
+- [`tools.md`](tools.md)

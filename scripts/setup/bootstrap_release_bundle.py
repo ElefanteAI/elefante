@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : bootstrap_release_bundle.py
-# VERSION : 2.7.2
-# CHANGED : 2026-04-16
 # PURPOSE : Place a shipped Elefante installer bundle into a stable install
 #           location, then delegate the real install work to scripts/setup/install.py.
 # WHEN    : Running a downloadable Elefante installer bundle outside a source checkout.
@@ -10,7 +8,6 @@
 #           [--venv-mode ask|fresh|backup|reuse|abort] [--dry-run]
 # NOTES   : Does not duplicate dependency, database, or IDE setup logic. It only
 #           copies the payload into a durable path and hands off to install.py.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Bootstrap a shipped Elefante installer bundle into a stable install root."""
 
@@ -20,6 +17,7 @@ import argparse
 import datetime
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -28,6 +26,7 @@ from pathlib import Path
 
 DEFAULT_BUNDLE_ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_FILE_NAME = "installer-manifest.json"
+BUILD_IDENTITY_FILE_NAME = "elefante-build.json"
 PAYLOAD_RELATIVE_ROOT = Path("payload") / "elefante"
 INSTALL_SCRIPT_RELATIVE_PATH = Path("scripts") / "setup" / "install.py"
 INSTALL_LOG_FILE_NAME = ".elefante-install.log"
@@ -37,6 +36,9 @@ VENV_CHOICES = ["ask", "fresh", "backup", "reuse", "abort"]
 RELEASE_PROFILE_DEVELOPER = "developer"
 RELEASE_PROFILE_CLIENT = "client"
 RELEASE_PROFILES = {RELEASE_PROFILE_DEVELOPER, RELEASE_PROFILE_CLIENT}
+RELEASE_CHANNELS = {"candidate", "development", "release"}
+SEMVER_PATTERN = re.compile(r"\d+\.\d+\.\d+")
+SOURCE_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
 SUPPORTED_PYTHON_MIN = (3, 11)
 SUPPORTED_PYTHON_MAX = (3, 14)
 
@@ -178,6 +180,7 @@ def ensure_bundle_layout(bundle_root: Path, *, release_profile: str) -> Path:
     )
     required_paths = [
         payload_root,
+        payload_root / BUILD_IDENTITY_FILE_NAME,
         payload_root / INSTALL_SCRIPT_RELATIVE_PATH,
         *dependency_files,
         bundle_root / "scripts" / "setup" / "bootstrap_release_bundle.py",
@@ -190,6 +193,59 @@ def ensure_bundle_layout(bundle_root: Path, *, release_profile: str) -> Path:
         )
 
     return payload_root
+
+
+def load_build_identity(
+    bundle_root: Path,
+    manifest: dict[str, object],
+    *,
+    release_profile: str,
+) -> dict[str, object]:
+    """Validate that archive metadata and the payload identify the same build."""
+    identity_path = get_payload_root(bundle_root) / BUILD_IDENTITY_FILE_NAME
+    try:
+        identity = json.loads(identity_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError("Installer payload has invalid build identity") from error
+    if not isinstance(identity, dict) or identity.get("schema_version") != 1:
+        raise ValueError("Installer payload has unsupported build identity")
+
+    version = identity.get("version")
+    commit = identity.get("source_commit")
+    clean = identity.get("source_clean")
+    channel = identity.get("release_channel")
+    if not isinstance(version, str) or not SEMVER_PATTERN.fullmatch(version):
+        raise ValueError("Installer payload has invalid semantic version identity")
+    if not isinstance(clean, bool) or channel not in RELEASE_CHANNELS:
+        raise ValueError("Installer payload has invalid source provenance")
+    if not isinstance(commit, str) or not (
+        SOURCE_COMMIT_PATTERN.fullmatch(commit)
+        or (channel == "development" and commit == "unavailable")
+    ):
+        raise ValueError("Installer payload has invalid source commit identity")
+
+    source = manifest.get("source")
+    expected_channel = (
+        manifest.get("publication_status")
+        if release_profile == RELEASE_PROFILE_CLIENT
+        else manifest.get("release_channel")
+    )
+    if (
+        manifest.get("version") != version
+        or not isinstance(source, dict)
+        or source.get("commit") != commit
+        or source.get("clean") is not clean
+        or expected_channel != channel
+    ):
+        raise ValueError("Installer archive and payload build identities do not match")
+
+    if release_profile == RELEASE_PROFILE_CLIENT and (
+        channel not in {"candidate", "release"}
+        or not SOURCE_COMMIT_PATTERN.fullmatch(commit)
+        or clean is not True
+    ):
+        raise ValueError("Customer installer requires clean identified candidate or release source")
+    return identity
 
 
 def build_backup_dir(install_root: Path) -> Path:
@@ -265,6 +321,7 @@ def build_install_command(
     python_executable: str,
     venv_mode: str,
     release_profile: str = RELEASE_PROFILE_DEVELOPER,
+    build_identity: dict[str, object] | None = None,
     verbose: bool = False,
     hosts: list[str] | None = None,
 ) -> list[str]:
@@ -281,8 +338,21 @@ def build_install_command(
         "--venv-mode",
         venv_mode,
         "--installation-scope",
-        "customer",
+        "customer" if release_profile == RELEASE_PROFILE_CLIENT else "developer",
     ]
+    if build_identity is not None:
+        cmd.extend(
+            [
+                "--expected-version",
+                str(build_identity["version"]),
+                "--source-commit",
+                str(build_identity["source_commit"]),
+                "--release-channel",
+                str(build_identity["release_channel"]),
+            ]
+        )
+        if build_identity.get("source_clean") is True:
+            cmd.append("--source-clean")
     if release_profile == RELEASE_PROFILE_CLIENT:
         cmd.extend(["--release-profile", RELEASE_PROFILE_CLIENT])
     if verbose:
@@ -332,6 +402,11 @@ def main() -> None:
     try:
         release_profile = get_release_profile(manifest)
         payload_root = ensure_bundle_layout(bundle_root, release_profile=release_profile)
+        build_identity = load_build_identity(
+            bundle_root,
+            manifest,
+            release_profile=release_profile,
+        )
     except (FileNotFoundError, ValueError) as exc:
         print(f"ERROR: {exc}")
         raise SystemExit(1) from exc
@@ -356,6 +431,8 @@ def main() -> None:
         print(f"Bundle Platform: {manifest['platform']}")
     if release_profile == RELEASE_PROFILE_CLIENT:
         print("Release Profile: Client (runtime-only payload)")
+    print(f"Release Channel: {build_identity['release_channel']}")
+    print(f"Source Commit: {str(build_identity['source_commit'])[:12]}")
     print(f"Bundle Root: {bundle_root}")
     print(f"Payload Root: {payload_root}")
     print(f"Install Root: {install_root}")
@@ -366,6 +443,7 @@ def main() -> None:
         python_executable=install_python,
         venv_mode=args.venv_mode,
         release_profile=release_profile,
+        build_identity=build_identity,
         verbose=args.verbose,
         hosts=args.host,
     )

@@ -17,17 +17,22 @@ on:
       - "scripts/setup/install.py"
       - "src/**"
       - "tests/test_release_client_bundle.py"
+      - "tests/test_release_pipeline.py"
   workflow_dispatch:
 
 jobs:
   macos-client-candidate:
     name: Build clean macOS client candidate
     runs-on: macos-latest
+    env:
+      SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
     permissions:
       contents: read
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SOURCE_COMMIT }}
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
@@ -71,9 +76,10 @@ jobs:
       - name: Build and verify client candidate
         run: |
           archive="${{ steps.release_metadata.outputs.archive }}"
+          archive_name="$(basename "$archive")"
           python scripts/ci/build_release_client.py --platform macOS --publication-status candidate --output "$archive"
           python scripts/ci/verify_release_client.py --archive "$archive" --require-clean-source --expected-publication-status candidate --expected-platform macOS
-          shasum -a 256 "$archive" > dist/SHA256SUMS
+          (cd dist && shasum -a 256 "$archive_name" > SHA256SUMS)
       - name: Prove a fresh macOS customer installation
         shell: bash
         run: |
@@ -96,6 +102,7 @@ jobs:
             "$install_root/scripts/lifecycle/doctor.py" --json > "$doctor_report"
           python - "$doctor_report" "$install_root" "${{ steps.release_metadata.outputs.version }}" <<'PY'
           import json
+          import os
           import sys
           from pathlib import Path
 
@@ -105,6 +112,9 @@ jobs:
           assert report["customer_ready"] is True, report
           assert report["installation"]["scope"] == "customer", report
           assert report["installation"]["version"] == sys.argv[3], report
+          assert report["installation"]["release_channel"] == "candidate", report
+          assert report["installation"]["source_commit"] == os.environ["SOURCE_COMMIT"], report
+          assert report["installation"]["source_clean"] is True, report
           assert report["installation"]["app_root"] == expected_root, report
           assert report["host_coverage"]["uncovered"] == [], report
           PY
