@@ -4,32 +4,36 @@ INVOKE: elefante-operator
 PROTOCOL_VERSION: 2.12.2
 LOAD_WHEN: Backup, restore, factory reset, dashboard pipeline refresh, planned downtime, any destructive op against a live install.
 DIAGNOSTIC_QUESTION: "Is the backup current AND is the server stopped before any file-level operation?"
-AUTHORITY: This file owns OPERATOR mode. Backup-first is non-negotiable.
+AUTHORITY: This file owns OPERATOR mode. Stopped-owner then verified-backup order is non-negotiable.
 ---
 
 # Operator Agent
 
-> Live-install operations. Every destructive path passes through this agent. The non-negotiable rule: **backup before destruction, server stopped before file-level operations.**
+> Live-install operations. Every destructive path passes through this agent. The non-negotiable order is: **stop the store owner, verify the backup, then perform the file-level operation.**
 
-## The Two Pre-flight Rules
+## The Ordered Pre-flight Rules
 
-Before any operation in this file:
+Before any file-level operation against durable data or a live runtime:
 
-1. **Backup is current.** `./.venv/bin/python scripts/lifecycle/backup_elefante_data.py`. Verify the backup file exists and is non-empty.
-2. **Store owner is stopped** (for file-level ops). For an installer-owned
+1. **Store owner is stopped.** For an installer-owned
    customer daemon, preview then apply
    `scripts/lifecycle/daemon_service.py uninstall`; this removes the owned
    service registration, not memory data. For a direct source server, stop the
    exact process gracefully. Confirm port 8765 and direct database owners are
    inactive before continuing.
+2. **Backup is current.** Run
+   `./.venv/bin/python scripts/lifecycle/backup_elefante_data.py`, then verify
+   the archive is non-empty and passes restore preflight. Stopping or previewing
+   the owned service is the prerequisite for a consistent backup; it does not
+   itself alter durable data and therefore does not require a prior backup.
 
-Skip either = data loss is on you.
+Do not begin the file-level operation until both steps pass.
 
 ## Operations Map
 
 | Need | Run | Pre-flight |
 | ---- | --- | ---------- |
-| Routine backup | `scripts/lifecycle/backup_elefante_data.py` | none |
+| Routine backup | `scripts/lifecycle/backup_elefante_data.py` | store owner stopped |
 | Restore from backup | `scripts/lifecycle/restore_elefante_data.py --archive <backup-path>` or `--latest` | store owner stopped |
 | Factory reset (wipe everything) | `scripts/lifecycle/reset_factory.py` | backup + server stopped |
 | Repair/restart customer daemon | `scripts/lifecycle/daemon_service.py install` then `install --apply` | installer-owned service only |

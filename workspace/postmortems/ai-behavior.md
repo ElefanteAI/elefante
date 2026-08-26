@@ -173,12 +173,13 @@
 
 <a id="issue-19"></a>
 
-## Issue #19: Installed Memory Was Available but a Normal Question Did Not Recall It [BUG-051, FIXED, guarded]
+## Issue #19: Installed Memory Was Available but a Normal Question Did Not Recall It [BUG-051, RUNTIME FIXED, HOST REATTACH OPEN]
 
 **Trigger:** A clean Codex session answered `UNKNOWN` even though Elefante was globally installed and the requested durable fact existed. An explicit Recall then requested approval; after approval was removed, selection still rejected the direct fact and successful output wasted context on internal wrappers.
-**Root cause:** Four contracts were incorrectly treated as one: host registration, retrieval routing, safe tool authorization, and answer selection. The selector also reused an implementation-actionability threshold for factual questions, while the generic response decorator ignored Recall's narrow customer purpose.
-**Solution:** Keep registration separate, add one manifest-owned reversible global Codex routing block, declare Recall read-only/idempotent/non-destructive/closed-world, allow a strong `direct_answer` to bypass only the implementation-actionability threshold, and return a seven-field Recall payload without internal wrappers. Rebuild and install the exact customer archive, then prove the journey in an empty directory with Codex JSON events.
-**Lesson:** Availability is not use. A customer memory path is complete only when the host routes a normal question, invokes safely, selects answer-bearing evidence, and returns less context than it saves.
+After the exact repaired candidate was installed on 2026-08-26, installed doctor and a new direct stdio bridge both proved 17 tools and read-only `status=supplied`, while the already-open Codex task still returned its pre-upgrade HTTP 404. A fresh ephemeral Codex process initialized another bridge but hung before any model or tool event and was terminated at the bound.
+**Root cause:** Five contracts were incorrectly treated as one: host registration, retrieval routing, safe tool authorization, answer selection, and live-client attachment. The selector also reused an implementation-actionability threshold for factual questions, while the generic response decorator ignored Recall's narrow customer purpose. A correct runtime replacement does not retroactively replace the MCP connection cached by an already-open task.
+**Solution:** Keep registration separate, add one manifest-owned reversible global Codex routing block, declare Recall read-only/idempotent/non-destructive/closed-world, allow a strong `direct_answer` to bypass only the implementation-actionability threshold, and return a seven-field Recall payload without internal wrappers. Rebuild and install the exact customer archive, then use the Codex MCP Restart action before proving the journey in a clean normal question with Codex JSON events.
+**Lesson:** Availability is not use, and runtime readiness is not host reattachment. A customer memory path is complete only when the active host has attached to the current server, routes a normal question, invokes safely, selects answer-bearing evidence, and returns less context than it saves.
 
 <a id="issue-20"></a>
 

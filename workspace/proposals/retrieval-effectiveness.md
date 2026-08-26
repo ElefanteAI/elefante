@@ -1007,7 +1007,7 @@ deployment occurred.
   `customer_ready=true` while the real Recall invocation returned HTTP `404`.
   The local tests prove the candidate repair, not the installed runtime.
 
-#### Exact local candidate artifact — verified, not installed
+#### Exact local candidate artifact — verified and installed locally
 
 - The implementation candidate is local commit
   `8b7cc5ba43b33b8c62cc80412359227ad8d2e9d9`. Its customer manifest and embedded
@@ -1018,14 +1018,31 @@ deployment occurred.
   with clean-source, candidate-channel, and macOS-platform requirements. Its
   SHA-256 is
   `2a8ca1cce8598d5dd4e72e4e3ba95455115a0eebffa42af9c06e5263a9da8041`.
-- A second clean build was byte-identical and produced the same SHA-256. The
-  archive was not installed, so this proves deterministic packaging and
-  provenance—not live customer readiness or Recall behavior.
+- A second clean build was byte-identical and produced the same SHA-256. At the
+  prior closure this proved deterministic packaging and provenance, not live
+  customer readiness or Recall behavior.
+- The exact archive was installed at 2026-08-26 17:08:48 EDT after the owned
+  daemon was stopped. The data backup
+  `/Users/jay/.elefante/backups/elefante_data_backup_20260826_210611.zip`
+  passed checksum, ZIP integrity, and restore preflight; its SHA-256 is
+  `18f44bb0822677cd06501e06f95f09470378f73def98ad37d90041cd90bf8826`.
+  The previous runtime remains at
+  `/Users/jay/.elefante/app/current.backup.20260826_170620`.
+- Installed `doctor` now reports the exact candidate identity, 17 tools,
+  read-only Recall annotations, `probe_status=supplied`, `recall.ready=true`,
+  and `customer_ready=true`. An independent new stdio bridge reports the same
+  17-tool/read-only/supplied result.
+- End-to-end Codex acceptance remains open. This already-open task retains its
+  pre-upgrade MCP session and still returns HTTP 404. A fresh ephemeral Codex
+  process initialized a new bridge but emitted no model or tool event before
+  the bounded run was terminated. The Codex MCP Restart action and one normal
+  `What is my Elefante test passcode?` event remain required before declaring
+  customer acceptance.
 
-Local-only commit formation and exact artifact verification are complete.
-Installation, one clean normal-question Codex Recall event, push, PR update,
-remote merge, release, and deployment remain outside this development closure;
-representative multi-task outcome lift remains separate and unproven.
+Local implementation, exact artifact verification, and recoverable local
+installation are complete. One reattached normal-question Codex Recall event,
+push, PR update, remote merge, release, and deployment remain outside this
+closure; representative multi-task outcome lift remains separate and unproven.
 
 ### 15.2 Token-financial operating rules
 

@@ -239,7 +239,7 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 
 <a id="issue-24"></a>
 
-## Issue #24: Installed Runtime Version Did Not Identify Its Source [BUG-052, FIXED AGAIN in development]
+## Issue #24: Installed Runtime Version Did Not Identify Its Source [BUG-052, FIXED AGAIN, local candidate installed]
 
 **Trigger:** A 2026-08-13 audit compared the installed runtime with published
 main and the Task Intelligence development branch. The installed
@@ -291,8 +291,9 @@ macOS candidate workflow additionally requires the installed source commit to
 equal `SOURCE_COMMIT`. Workflow regressions require both candidate producers to
 use the same durable checkout rule and require the standalone artifact checksum
 to use a portable basename. Version regressions reject the retired release
-literal and run discovery under `python -S`. The existing live installation was
-not replaced.
+literal and run discovery under `python -S`. At the original development
+closure the live installation was not replaced; the later operator acceptance
+installed only the exact verified candidate after a stopped-daemon backup gate.
 **Lesson:** A semantic version identifies a release contract, not arbitrary code
 built after that release. Reproducible product evidence requires version plus
 source provenance and channel. Release automation must derive that version from
@@ -304,7 +305,17 @@ fresh install, health, and uninstall job plus the macOS, Windows, and Linux
 package builds. Downloaded `SHA256SUMS` verifies without path rewriting; the
 archive manifest and payload identity both report that full SHA and clean
 candidate status; the Finder launcher remains executable; and a local dry run
-left its target absent. The existing live runtime was not replaced.
+left its target absent.
+
+**Local installation evidence:** Candidate commit
+`8b7cc5ba43b33b8c62cc80412359227ad8d2e9d9` produced the independently verified
+macOS archive with SHA-256
+`2a8ca1cce8598d5dd4e72e4e3ba95455115a0eebffa42af9c06e5263a9da8041`.
+After a stopped-daemon data backup and restore preflight, the installer moved
+the previous runtime to `current.backup.20260826_170620`. Installed `doctor`
+reports version 2.12.3, clean candidate channel, and that exact source commit;
+payload and runtime file hashes agree. This proves installed identity, not
+representative task lift or successful reattachment of every already-open host.
 
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
