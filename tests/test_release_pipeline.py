@@ -26,6 +26,13 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _current_version() -> str:
+    source = (ROOT / "src/__init__.py").read_text(encoding="utf-8")
+    match = re.search(r'^__version__ = "([^"]+)"$', source, re.MULTILINE)
+    assert match is not None
+    return match.group(1)
+
+
 def _load_module(path: Path, name: str):
     spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
@@ -126,12 +133,13 @@ def test_release_documentation_audit_passes_for_repo_history():
 
 def test_published_release_can_render_public_notes():
     module = _load_module(ROOT / "scripts/ci/render_release_notes.py", "render_published_notes")
+    current_version = _current_version()
 
-    assert "2.12.2" not in module.release_candidate_versions(
+    assert current_version not in module.release_candidate_versions(
         (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     )
-    module.validate_release_documentation("2.12.2")
-    assert "## [2.12.2] - 2026-08-05" in module.render_release_notes("2.12.2")
+    module.validate_release_documentation(current_version)
+    assert f"## [{current_version}] -" in module.render_release_notes(current_version)
 
 
 def test_version_sync_tracks_release_identifiers_without_rewriting_history():
@@ -152,7 +160,7 @@ def test_version_sync_tracks_release_identifiers_without_rewriting_history():
     assert not any(path.startswith("workspace/postmortems/") for path in targets)
     assert module.GLOB_TARGETS == []
 
-    assert "v2.12.2" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert f"v{_current_version()}" in (ROOT / "README.md").read_text(encoding="utf-8")
 
 
 def test_version_advisor_accepts_candidate_changelog_entries():

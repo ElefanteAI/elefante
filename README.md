@@ -8,7 +8,7 @@
 
 AI agents start every conversation from zero. Your preferences, decisions, and discovered patterns don't carry over. Elefante gives any MCP-compatible agent a persistent, local second brain — memories are stored, scored automatically, and surfaced at the right moment without being asked.
 
-**v2.12.2** — Current published release.
+**v2.12.3** — Current published release.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -116,7 +116,7 @@ The bootstrap places Elefante in a stable install root before it starts setup:
 - macOS / Linux: `~/.elefante/app/current`
 - Windows: `%LOCALAPPDATA%\Elefante\app\current`
 
-Signed and notarized native macOS packaging is Upcoming. The verified v2.12.2 customer path is the macOS ZIP launcher above.
+Signed and notarized native macOS packaging is Upcoming. The verified v2.12.3 customer path is the macOS ZIP launcher above.
 
 If `.venv` already exists, the installer offers four paths:
 

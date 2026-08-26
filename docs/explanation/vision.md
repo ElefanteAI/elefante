@@ -1,6 +1,6 @@
 # Elefante Vision
 
-> Product explanation · Current published version: v2.12.2
+> Product explanation · Current published version: v2.12.3
 
 ## The Thesis
 
