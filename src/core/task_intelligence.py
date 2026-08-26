@@ -656,6 +656,7 @@ class TaskBriefCompiler:
         query_text = " ".join([request.task, *request.success_criteria])
         query_counts = self._canonical_term_counts(query_text)
         query_terms = set(query_counts)
+        minimum_text_matches = min(2, len(query_terms))
         anchor_terms = {term for term, count in query_counts.items() if count >= 2}
         query_intent = CognitiveRetriever.infer_intent(query_text)
         for result in candidates:
@@ -741,7 +742,7 @@ class TaskBriefCompiler:
             }
             signals["direct_answer"] = float(
                 semantic >= 0.78
-                and len(matched_terms) >= (1 if len(query_terms) <= 4 else 2)
+                and len(matched_terms) >= minimum_text_matches
                 and float(signals["query_coverage"]) >= 0.25
             )
             positive_signals = [
@@ -794,7 +795,7 @@ class TaskBriefCompiler:
             return True
         signals = item.retrieval_signals or {}
         query_term_count = int(signals.get("query_terms", 0))
-        minimum_matches = 1 if query_term_count <= 4 else 2
+        minimum_matches = min(2, query_term_count)
         strong_location_match = (
             max(
                 float(signals.get("path", 0.0)),

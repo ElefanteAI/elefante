@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import re
 import sys
@@ -29,6 +30,9 @@ from scripts.setup.install_manifest import (  # noqa: E402
     configured_surfaces,
     manifest_path,
     read_runtime_installation,
+)
+from scripts.verify.verify_mcp_handshake import (  # noqa: E402
+    inspect_recall_capability,
 )
 
 
@@ -114,6 +118,16 @@ def _integration_summary(matrix_path: Path) -> tuple[dict[str, list[str]], list[
     }, []
 
 
+def _inspect_recall(repo_root: Path, venv_python: Path) -> dict[str, Any]:
+    """Run one bounded read-only capability probe through the customer bridge."""
+    return asyncio.run(
+        inspect_recall_capability(
+            root=repo_root,
+            python_executable=str(venv_python),
+        )
+    )
+
+
 def build_report(
     *,
     repo_root: Path = REPO_ROOT,
@@ -121,6 +135,7 @@ def build_report(
     service_inspector: Callable[[Path], dict[str, str | bool]] = service_status,
     host_detector: Callable[..., set[str]] = detect_supported_hosts,
     surface_inspector: Callable[[Path], set[str]] = configured_surfaces,
+    recall_inspector: Callable[[Path, Path], dict[str, Any]] = _inspect_recall,
 ) -> dict:
     """Build a complete read-only readiness report suitable for people and agents."""
     home = home or Path.home()
@@ -157,6 +172,55 @@ def build_report(
     if daemon.get("service_file_ownership") == "modified_or_untracked":
         diagnostics.append("daemon_service_user_managed")
     customer_diagnostics: list[str] = []
+    recall_required = "codex-recall-routing" in manifest.get(
+        "configured_surfaces",
+        [],
+    )
+    recall_report: dict[str, Any] = {
+        "required": recall_required,
+        "handshake_ready": None,
+        "tool_count": None,
+        "tool_present": None,
+        "annotations_read_only": None,
+        "probe_status": None,
+        "probe_read_only": None,
+        "ready": None,
+        "diagnostic": None,
+    }
+    if recall_required:
+        if not venv_python.exists():
+            recall_report.update(
+                {
+                    "handshake_ready": False,
+                    "ready": False,
+                    "diagnostic": "recall_probe_runtime_missing",
+                }
+            )
+        else:
+            try:
+                inspected = recall_inspector(repo_root, venv_python)
+            except (OSError, RuntimeError, ValueError, TypeError):
+                inspected = {
+                    "handshake_ready": False,
+                    "recall_ready": False,
+                    "diagnostic": "recall_probe_failed",
+                }
+            for source_key, target_key in (
+                ("handshake_ready", "handshake_ready"),
+                ("tool_count", "tool_count"),
+                ("tool_present", "tool_present"),
+                ("annotations_read_only", "annotations_read_only"),
+                ("probe_status", "probe_status"),
+                ("probe_read_only", "probe_read_only"),
+                ("recall_ready", "ready"),
+                ("diagnostic", "diagnostic"),
+            ):
+                if source_key in inspected:
+                    recall_report[target_key] = inspected[source_key]
+        if recall_report["ready"] is not True:
+            customer_diagnostics.append(
+                str(recall_report["diagnostic"] or "recall_probe_failed")
+            )
     if runtime_installation is None:
         customer_diagnostics.append("runtime_installation_unrecorded")
     else:
@@ -215,6 +279,8 @@ def build_report(
                         customer_diagnostics.append("runtime_build_identity_mismatch")
     if uncovered_hosts:
         customer_diagnostics.append("detected_hosts_unconfigured")
+    if recall_required and "codex" not in verified_surfaces:
+        customer_diagnostics.append("codex_recall_routing_unverified")
     runtime_ready = not diagnostics
     return {
         "schema_version": 2,
@@ -235,6 +301,7 @@ def build_report(
             "uncovered": uncovered_hosts,
         },
         "integrations": integrations,
+        "recall": recall_report,
         "diagnostics": diagnostics,
         "customer_diagnostics": customer_diagnostics,
     }
@@ -260,6 +327,9 @@ def _render_text(report: dict) -> str:
             "uncovered_hosts=" + ",".join(report["host_coverage"]["uncovered"]),
             "compatible_hosts=" + ",".join(report["integrations"]["compatible"]),
             "community_hosts=" + ",".join(report["integrations"]["community"]),
+            f"recall_required={report['recall']['required']}",
+            f"recall_ready={report['recall']['ready']}",
+            f"recall_probe_status={report['recall']['probe_status'] or 'not-run'}",
             "diagnostics=" + ",".join(report["diagnostics"] or ["none"]),
             "customer_diagnostics=" + ",".join(report["customer_diagnostics"] or ["none"]),
         ]

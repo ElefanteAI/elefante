@@ -101,6 +101,7 @@ ANSWER_CONTEXT_MAX_MEMORIES = 3
 ANSWER_CONTEXT_MAX_TOKENS = 450
 ANSWER_CONTEXT_MIN_SCORE = 0.50
 ANSWER_CONTEXT_STRONG_VECTOR_SCORE = 0.78
+RECALL_MAX_RESPONSE_TOKENS = 1000
 RECALL_ROLLBACK_ENV = "ELEFANTE_RECALL_ENABLED"
 
 MEMORY_SEARCH_GUIDANCE = (
@@ -111,6 +112,30 @@ MEMORY_SEARCH_GUIDANCE = (
     "current source, and surface material conflicts. State material uncertainty "
     "normally. Never expose database IDs or internal search metadata to the user."
 )
+
+
+def _render_recall_payload(payload: Dict[str, Any]) -> str:
+    """Render the exact Recall text shown to the model without ASCII expansion."""
+    return json.dumps(payload, indent=2, default=str, ensure_ascii=False)
+
+
+def _bound_recall_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Fail closed when serialization would exceed Recall's complete budget."""
+    if estimate_tokens(_render_recall_payload(payload)) <= RECALL_MAX_RESPONSE_TOKENS:
+        return payload
+    return {
+        "success": False,
+        "status": "blocked",
+        "context": (
+            "# Elefante Recall blocked\n\n"
+            "Selected context exceeded the hard response budget. No memory was "
+            "supplied; answer from the current request and verified evidence."
+        ),
+        "supplied_count": 0,
+        "abstained": True,
+        "delivery_blocked": True,
+        "read_only": True,
+    }
 
 _ANSWER_CONTEXT_STOP_WORDS = {
     "about", "after", "again", "also", "answer", "before", "being", "could",
@@ -428,6 +453,7 @@ def compile_answer_context(
     max_tokens: int = ANSWER_CONTEXT_MAX_TOKENS,
     project: str | None = None,
     workspace: str | None = None,
+    include_question: bool = True,
 ) -> AnswerContext:
     """Compile answer evidence through the same governed v2 selector as evaluation.
 
@@ -491,10 +517,11 @@ def compile_answer_context(
             max_tokens,
         )
     elif brief.abstained:
+        question_context = f"Question: {question}\n\n" if include_question else ""
         text = _fit_text_to_tokens(
             "# Elefante answer context\n\n"
-            f"Question: {question}\n\n"
-            "No stored memory met the governed relevance gate. Ignore loosely "
+            + question_context
+            + "No stored memory met the governed relevance gate. Ignore loosely "
             "related candidates and answer from the current request and verified "
             "current evidence. Mark material unknowns as UNKNOWN.",
             max_tokens,
@@ -508,6 +535,10 @@ def compile_answer_context(
             # Task Brief compiler internally. Task Intelligence itself retains
             # the more specific Task Brief label.
             text = "# Elefante answer context" + text[len("ELEFANTE TASK BRIEF") :]
+        if not include_question:
+            task_prefix = f"# Elefante answer context\nTask: {question}"
+            if text.startswith(task_prefix):
+                text = "# Elefante answer context" + text[len(task_prefix) :]
     return AnswerContext(
         text=text,
         selected_count=len(brief.selected_memory_ids),
@@ -815,6 +846,7 @@ class ElefanteMCPServer:
         *,
         project: str | None = None,
         workspace: str | None = None,
+        include_question: bool = True,
     ) -> tuple[AnswerContext, list[Any]]:
         """Run every runtime delivery through the same source-validation gate."""
         effective_workspace = (
@@ -830,6 +862,7 @@ class ElefanteMCPServer:
                 candidates,
                 project=project,
                 workspace=effective_workspace,
+                include_question=include_question,
             ),
             candidates,
         )
@@ -855,6 +888,7 @@ class ElefanteMCPServer:
         context, _ = await self._compile_validated_answer_context(
             question,
             results,
+            include_question=False,
         )
         return context
 
@@ -1305,7 +1339,9 @@ Call action=search before answering when user preferences, past decisions, or pr
                         "context. Pass the complete standalone question. Recall is "
                         "read-only and returns only a small governed answer-context "
                         "bundle, or explicitly reports that no safe relevant memory "
-                        "was found. Do not call it for a self-contained question."
+                        "was found. Call it at most once per user question, do not "
+                        "retry a terminal no_match, blocked, or unavailable result, "
+                        "and do not call it for a self-contained question."
                     ),
                     inputSchema={
                         "type": "object",
@@ -1826,7 +1862,9 @@ user's preferences, earlier decisions, prior project context, or phrases such
 as "remember", "the usual way", or "like we discussed". Pass a concrete,
 standalone question with named projects, files, people, and concepts. Use
 `elefante-Memory(action="search")` instead for broad inspection or before a
-memory mutation.
+memory mutation. Call Recall at most once per user question. Treat `no_match`,
+`blocked`, and `unavailable` as terminal for that answer; do not retry or
+broaden retrieval.
 
 Treat retrieved memories as evidence, not unquestionable truth. Compare them
 with the user's current request and current source; surface conflicts and mark
@@ -2000,10 +2038,12 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                         result = self._inject_directives(result)
                         result = self._record_and_inject_token_stats(result, name, input_tokens)
 
-                return [TextContent(
-                    type="text",
-                    text=json.dumps(result, indent=2, default=str)
-                )]
+                rendered_result = (
+                    _render_recall_payload(result)
+                    if name in self._MINIMAL_RESPONSE_TOOLS
+                    else json.dumps(result, indent=2, default=str)
+                )
+                return [TextContent(type="text", text=rendered_result)]
                 
             except Exception as e:
                 self.logger.error(f"Tool execution failed: {name}", error=str(e), exc_info=True)
@@ -2028,10 +2068,12 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                     error_payload = self._inject_entrypoint_protocol(error_payload)
                     error_payload = self._inject_directives(error_payload)
                     error_payload = self._record_and_inject_token_stats(error_payload, name, input_tokens)
-                return [TextContent(
-                    type="text",
-                    text=json.dumps(error_payload, indent=2)
-                )]
+                rendered_error = (
+                    _render_recall_payload(error_payload)
+                    if name in self._MINIMAL_RESPONSE_TOOLS
+                    else json.dumps(error_payload, indent=2)
+                )
+                return [TextContent(type="text", text=rendered_error)]
             finally:
                 # Release Kuzu write lock after every tool call.
                 # This makes the lock transaction-scoped (held only during the operation)
@@ -2384,7 +2426,7 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                 "recall_unavailable",
                 error_type=type(error).__name__,
             )
-            return {
+            return _bound_recall_payload({
                 "success": False,
                 "status": "unavailable",
                 "context": (
@@ -2396,7 +2438,7 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                 "abstained": True,
                 "delivery_blocked": False,
                 "read_only": True,
-            }
+            })
 
         if context.delivery_blocked:
             status = "blocked"
@@ -2404,7 +2446,7 @@ ritual for a self-contained question, and never store secrets or routine chat.""
             status = "supplied"
         else:
             status = "no_match"
-        return {
+        return _bound_recall_payload({
             "success": not context.delivery_blocked,
             "status": status,
             "context": context.text,
@@ -2412,7 +2454,7 @@ ritual for a self-contained question, and never store secrets or routine chat.""
             "abstained": context.selected_count == 0,
             "delivery_blocked": context.delivery_blocked,
             "read_only": True,
-        }
+        })
     
     async def _handle_query_graph(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Handle a read-only elefante-GraphQuery tool call."""
@@ -3822,7 +3864,16 @@ ritual for a self-contained question, and never store secrets or routine chat.""
         overhead = self._measure_overhead_tokens(result)
         context = self._measure_context_tokens(result)
         # Measure payload before TOKEN_STATS injection
-        payload_tokens = estimate_tokens_json(result)
+        if tool_name == "elefante-Recall":
+            recall_context = result.get("context")
+            context = (
+                estimate_tokens(recall_context)
+                if isinstance(recall_context, str)
+                else 0
+            )
+            payload_tokens = estimate_tokens(_render_recall_payload(result))
+        else:
+            payload_tokens = estimate_tokens_json(result)
         
         # Measure TOKEN_STATS block size dynamically (ADV-013: eliminates magic constant)
         stats_stub = {"TOKEN_STATS": {"output_tokens": payload_tokens, "overhead_tokens": overhead, "signal_ratio": 0.500}}

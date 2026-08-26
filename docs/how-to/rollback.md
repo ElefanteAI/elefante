@@ -66,7 +66,7 @@ For a developer checkout:
 4. Use a separate worktree or detached checkout for the known-good tag; do not
    rewrite the branch containing current work.
 
-The currently published release is v2.12.2. A future rollback target must be
+The currently published release is v2.12.3. A future rollback target must be
 selected from actual published tags, not copied from this document.
 
 ## 4. Verify

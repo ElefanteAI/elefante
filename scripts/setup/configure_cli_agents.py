@@ -35,8 +35,8 @@ CODEX_GUIDANCE_SURFACE = "codex-recall-routing"
 CODEX_GUIDANCE_BLOCK = f"""{CODEX_GUIDANCE_START}
 ## Elefante memory
 
-- Before answering a question that may depend on stored preferences, prior decisions, or project context, call `elefante-Recall` with the complete question.
-- If Recall reports `no_match`, `blocked`, or `unavailable`, do not invent prior context; continue from current evidence or say that the prior context is unavailable.
+- Before answering a question that may depend on stored preferences, prior decisions, or project context, call `elefante-Recall` at most once with the complete question. Skip it for a self-contained question.
+- Treat `no_match`, `blocked`, and `unavailable` as terminal for that answer: do not retry or broaden retrieval. Continue from current evidence or say that prior context is unavailable; never invent it.
 - When the user explicitly asks Elefante to remember something across sessions or declares a project decision canonical or non-negotiable, first call `elefante-Memory` with `action="search"` for the exact concept. Update an equivalent memory only when the user is correcting it; otherwise add one concise durable record with `invocation_mode="user_directed"`.
 - Leave `scope` unset unless the user or current host provides an exact project, workspace, or task identifier; never put descriptive prose in `scope`. Prefer ranked delivery when relevant paraphrases should work. Use `injection_policy="triggered"` only when literal trigger phrases are intentionally required; never choose it merely to pass one verification question. Set `user_locked=true` or permanent retention only when the user explicitly requests that protection.
 - After a successful write, call `elefante-Recall` with one likely future question. A stored receipt is not proof that the memory is deliverable. Never infer a memory request from ordinary conversation, and never store passwords, API keys, access tokens, or other secrets. Report the actual write and verification results.
@@ -265,9 +265,6 @@ def configure_cli_host(
         if old_add is not None:
             runner(old_add, capture_output=True, text=True, check=False)
         return "failed"
-    record_host_command(
-        key, host, get, add, remove, registered.stdout, home=home
-    )
     if host == "codex":
         guidance_home = codex_home or (home / ".codex" if home is not None else None)
         guidance = configure_codex_guidance(
@@ -275,7 +272,25 @@ def configure_cli_host(
             manifest_home=home,
         )
         if guidance not in {"configured", "updated", "already-present"}:
+            try:
+                removed = runner(remove, capture_output=True, text=True, check=False)
+            except OSError:
+                return "partial"
+            if removed.returncode != 0:
+                return "partial"
+            if old_add is not None:
+                try:
+                    restored = runner(
+                        old_add, capture_output=True, text=True, check=False
+                    )
+                except OSError:
+                    return "partial"
+                if restored.returncode != 0:
+                    return "partial"
             return "failed"
+    record_host_command(
+        key, host, get, add, remove, registered.stdout, home=home
+    )
     return "updated" if old_add is not None else "configured"
 
 

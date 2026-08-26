@@ -27,7 +27,7 @@ Run top-down. Each step is faster but narrower. `install.py` already runs steps 
 | Step | Script | Proves |
 | ---- | ------ | ------ |
 | 1    | `verify/verify_health.py` | Paths, imports, config load. No DB, no server. |
-| 2    | `verify/verify_mcp_handshake.py` | The customer stdio bridge reaches the local daemon and answers a real JSON-RPC initialize. |
+| 2    | `verify/verify_mcp_handshake.py` | The CLI proves a real customer JSON-RPC initialize; its reusable doctor path also verifies live Recall capability without exposing context. |
 | 3    | `verify/verify_e2e_tests.py` | Full live tool/prompt surface in an isolated temp install — the **self-protocol** (see [`docs/reference/self-protocol.md`](../docs/reference/self-protocol.md)). |
 
 If step 1 fails, step 2 cannot help. Do not skip steps.
@@ -62,7 +62,7 @@ If step 1 fails, step 2 cannot help. Do not skip steps.
 | `configure_vscode_bob.py` | Adds the Elefante bridge entry to VS Code/Bob configuration, refreshing only installer-owned entries and preserving user configuration. | Initial VS Code/Bob setup or after moving the repo. |
 | `configure_antigravity.py` | Adds the Elefante bridge entry to `~/.gemini/antigravity/mcp_config.json`. | Initial Antigravity setup or after moving the repo. |
 | `configure_cursor_kiro.py` | Detects Cursor and Kiro user directories, then adds their Elefante bridge entries without touching absent hosts. | Initial Cursor/Kiro setup or after moving the repo. |
-| `configure_cli_agents.py` | Uses the native Claude Code and Codex MCP CLIs to register the bridge and fingerprint the host-owned registration. For Codex it also installs one marked, reversible global Recall-routing block without replacing user guidance. | Initial Claude Code/Codex setup or after moving the repo. |
+| `configure_cli_agents.py` | Uses native Claude Code and Codex MCP CLIs to register the bridge and fingerprint host-owned state. For Codex it installs one marked Recall-routing block in the active guidance path, preserves user text, and rolls back only its new or prior owned registration if guidance fails. | Initial Claude Code/Codex setup or after moving the repo. |
 | `host_selection.py` | Defines the canonical installer host IDs, labels, and adapter-family routing shared by CLI and native installer flows. | Imported by installer entrypoints; not run directly. |
 | `install_manifest.py` | Internal helper that atomically tracks whole files, owned JSON entries, commands, and marked text blocks emitted by Elefante installers. Uninstall removes only unchanged owned material. | Imported by setup emitters; not run directly. |
 | `init_databases.py` | Initializes the configured SQLite vector store and Kuzu schema without re-running the full installer. | After a durable-store reset. |
@@ -89,7 +89,7 @@ See the Installation Verification Ladder above for steps 1–3. Other verifiers:
 | `backfill_memory_provenance.py` | Adds explicit `legacy` provenance to memories created before the daemon. Dry-run by default; `--apply` persists. | After reviewing migration candidates, before treating provenance as complete. |
 | `migrate_chroma_to_sqlite.py` | Copies ChromaDB to an isolated snapshot, stages SQLite, and verifies UUID/metadata/embedding/search parity. Dry-run uses temporary storage; `--apply` requires an exact verified backup and `STOPPED` confirmation, leaves Chroma and configuration unchanged, and reserves a new destination without replacing any existing path. | Before replacing ChromaDB because of GAP-029; run dry-run first, then inspect its JSON proof before authorizing apply. |
 | `daemon_service.py` | Renders and manages a launchd, systemd-user, or Task Scheduler user daemon. Dry-run by default; `--apply` writes or removes only Elefante's unchanged service definition. | Install, inspect, or remove the shared local daemon service. |
-| `doctor.py` | Read-only report of runtime health, installer ownership, configured surfaces, declared integration tiers, and the installed version/source-commit/release-channel identity. Customer readiness fails on legacy, dirty, or mismatched provenance. `--json` never exposes host commands or values. | Diagnose readiness before configuring an IDE or after an upgrade, repair, or rollback. |
+| `doctor.py` | Read-only report of runtime health, installer ownership, configured surfaces, declared integration tiers, and installed provenance. When the installer owns Codex Recall routing, customer readiness also requires the active guidance path, verified Codex registration, and live Recall capability with safe annotations and a bounded read-only status; `--json` never exposes host commands, values, or recalled context. | Diagnose readiness before configuring an IDE or after an upgrade, repair, or rollback. |
 | `uninstall_elefante.py` | Stops an unchanged Elefante daemon service, then removes only unchanged Elefante-owned files or JSON entries from the install manifest. Dry-run by default; modified or missing configuration is preserved. | Safely remove Elefante's emitted IDE configuration. |
 
 ## `scripts/pipeline/` — Extracts & Snapshots

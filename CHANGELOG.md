@@ -13,6 +13,10 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Customer readiness can now inspect the live MCP bridge for the Recall tool,
+  its read-only annotations, and one bounded read-only status without exposing
+  recalled context. A built-customer-archive regression prevents Recall routing
+  from shipping ahead of the runtime tool it names.
 - Added an unreleased, default-on `elefante-Recall` customer path that accepts
   one standalone question and returns only bounded governed answer context or an
   explicit abstention. It requires no development flags and has a local
@@ -39,6 +43,14 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Recall guidance now limits retrieval to one contextual call per user question
+  and treats terminal abstention/unavailability as a signal to continue from
+  current evidence rather than retrying or broadening retrieval.
+- Recall no longer echoes the question in its response, preserves multilingual
+  Unicode instead of expanding it into ASCII escapes, and fails closed when the
+  complete seven-field response would exceed 1,000 heuristic tokens. Its hidden
+  in-memory ledger measures the exact returned payload and context without
+  exposing `TOKEN_STATS`.
 - Task Intelligence evaluation now reports accepted outcomes per million total
   tokens, counting input (including cached input) plus output. Failed outcomes
   contribute zero value, acceptance regression cannot be hidden by cheaper
@@ -64,13 +76,22 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Customer readiness no longer accepts an installer-owned Recall block in a
+  base `AGENTS.md` when a later non-empty `AGENTS.override.md` masks it.
+- Codex setup now records registration ownership only after managed Recall
+  guidance succeeds. A guidance failure removes a new owned registration or
+  restores the prior unchanged owned registration, and reports `partial` when
+  rollback itself cannot finish.
 - Recall no longer treats an intrinsic `constraint`, `decision`, `failure`, or
   `safeguard` label as sufficient evidence that a memory applies to the current
   question. Role-based delivery now requires substantial question-term
   coverage; otherwise the memory needs a strong direct answer or explicit
   structural/task-specific evidence. A user-locked, scoped, ranked directive
   can additionally guide a semantically strong decision question in that named
-  scope. Loosely related process memories still abstain.
+  scope. Text-only evidence for a multi-term question must match at least two
+  distinct question terms, so a repeated project name alone cannot promote
+  generic process guidance as a direct answer. Genuine one-term facts remain
+  eligible. Loosely related process memories still abstain.
 - A healthy global runtime no longer depends on the model guessing when to use
   memory in Codex. A normal question that can depend on durable preferences,
   decisions, or project context now routes through `elefante-Recall` before the

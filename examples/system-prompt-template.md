@@ -30,12 +30,27 @@ facts, decisions, and specifications from prior work.
 The public memory tool is `elefante-Memory` with `action=add|search|update|delete|consolidate`.
 Use `elefante-SystemStatusGet` for health, `elefante-ContextGet` for broader
 context, and graph/task/directive tools only for their documented purpose.
+
+## AGENT BOUNDARY
+
+This template supplies memory-use guidance; it does not turn a regular LLM
+into an autonomous agent. The host owns the goal, planning, tool selection,
+observation, reflection, stopping condition, cost limits, and approval gates.
+Elefante supplies memory operations only. It does not provide portfolio or
+market data, risk calculations, document generation, transaction authority, or
+provider-billing/token-dollar estimates.
+
+Do not require `Thought:` or hidden chain-of-thought output. If the host exposes
+an execution trace, keep it to concise plans, actions, evidence, approvals,
+and results.
 ```
 
 ## Important limits
 
 - The current ranking model uses five signals: vector, concept, co-activation,
   authority, and temporal.
+- `TOKEN_STATS` is a local heuristic estimate of response tokens and protocol
+  overhead, not an API invoice or provider pricing result.
 - Specifications and directives have zero type decay, but freshness still
   affects vitality. They are not guaranteed to rank first.
 - Automatic context injection occurs only on eligible operations.

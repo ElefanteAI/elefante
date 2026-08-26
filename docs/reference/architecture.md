@@ -79,7 +79,7 @@ that a memory improved the downstream task.
 
 ## Response behavior
 
-- Every tool response includes heuristic `TOKEN_STATS`.
+- Every tool in the published v2.12.3 surface includes heuristic `TOKEN_STATS`.
 - Normal memory, graph, context, session, ETL, and task operations also receive
   entrypoint/pitfall blocks and active directives.
 - `RELEVANT_CONTEXT` is supplementary and conditional. It is skipped for
@@ -88,6 +88,13 @@ that a memory improved the downstream task.
   [`tools.md`](tools.md) are explicitly enabled.
 - System, dashboard, and directive-management tools use a minimal management
   response.
+
+The unreleased customer candidate adds `elefante-Recall`. Recall intentionally
+returns a minimal payload and keeps its token accounting internal. Its shared
+selector admits at most 12 candidates, three memories, and 450 heuristic
+context tokens; the complete pretty Unicode response is capped at 1,000
+heuristic tokens and fails closed instead of truncating evidence. This candidate
+contract is not part of the published v2.12.3 architecture.
 
 See [`token-intelligence.md`](token-intelligence.md) and
 [`tools.md`](tools.md).
@@ -105,10 +112,10 @@ See [`token-intelligence.md`](token-intelligence.md) and
 
 ## Development-only work
 
-Task Intelligence evaluation, governed retention/injection fields, automatic
-forgetting, expanded host certification, and proactive conflict surfacing are
-not part of the v2.12.3 released architecture unless a later changelog and
-reference document say otherwise.
+Recall/readiness hardening, Task Intelligence evaluation, governed
+retention/injection fields, automatic forgetting, expanded host certification,
+and proactive conflict surfacing are not part of the v2.12.3 released
+architecture unless a later changelog and reference document say otherwise.
 
 ## Source authorities
 

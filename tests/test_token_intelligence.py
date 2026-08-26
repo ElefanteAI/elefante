@@ -288,6 +288,39 @@ class TestMCPServerTokenIntegration:
         assert server._token_ledger.call_count == 3
         assert server._token_ledger.total_input_tokens == 150
 
+    def test_recall_ledger_counts_exact_hidden_payload_and_context(self):
+        from src.mcp.server import ElefanteMCPServer
+
+        server = ElefanteMCPServer()
+        context = "記" * 200
+        result = {
+            "success": True,
+            "status": "supplied",
+            "context": context,
+            "supplied_count": 1,
+            "abstained": False,
+            "delivery_blocked": False,
+            "read_only": True,
+        }
+        expected_output = estimate_tokens(
+            json.dumps(result, indent=2, default=str, ensure_ascii=False)
+        )
+
+        returned = server._record_and_inject_token_stats(
+            result,
+            "elefante-Recall",
+            37,
+            include_in_payload=False,
+        )
+
+        assert returned is result
+        assert "TOKEN_STATS" not in returned
+        assert server._token_ledger.call_count == 1
+        assert server._token_ledger.total_input_tokens == 37
+        assert server._token_ledger.total_output_tokens == expected_output
+        assert server._token_ledger.total_context_tokens == estimate_tokens(context)
+        assert server._token_ledger.total_overhead_tokens == 0
+
 
 # ============================================================================
 # ADV-004: Multilingual token estimation

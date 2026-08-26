@@ -4,15 +4,17 @@
 
 ## The Thesis
 
-Elefante is a local-first persistent memory engine for AI agents. It maximizes
-signal per token by carrying durable decisions, preferences, facts, and lessons
-across sessions without making one model provider the owner of that memory.
+Elefante is a local-first persistent memory engine for AI agents. It carries
+durable decisions, preferences, facts, and lessons across sessions without
+making one model provider the owner of that memory. Retrieval is designed to
+keep injected context selective; downstream task-value improvement is measured
+separately and is not a released guarantee.
 
 Every new AI session otherwise starts from zero. The user repeats context, the
 agent rediscovers decisions, and the context window fills with history instead
 of the evidence needed for the next action. Elefante provides a persistent,
-inspectable memory layer so an agent can retrieve the smallest useful context
-at the moment of work.
+inspectable memory layer—a local second brain—so an agent can retrieve the
+smallest useful context at the moment of work.
 
 ## Role in the Agent Loop
 
@@ -26,15 +28,17 @@ Goal → Perceive → Plan → Act with tools → Observe → Update → Repeat
 ```
 
 The agent remains responsible for its goal, plan, tool choice, reflection,
-stopping condition, and approval gates. Elefante supports **Perceive** by
-retrieving relevant durable knowledge and **Update** by preserving verified
-facts, preferences, constraints, evidence, decisions, and lessons.
+stopping condition, cost limits, and approval gates. Elefante supports
+**Perceive** by retrieving relevant durable knowledge and **Update** through
+explicit memory operations that preserve verified facts, preferences,
+constraints, evidence, decisions, and lessons.
 
 For example, a financial-advisory agent could orchestrate portfolio data, risk
 calculations, market sources, and client documents while Elefante carries the
 client's durable constraints and prior decisions across sessions. This is an
 architectural example, not a claim that Elefante supplies financial advice,
-market data, calculations, or permission to execute consequential actions.
+market data, calculations, document generation, transaction authority,
+provider-billing estimates, or permission to execute consequential actions.
 
 Private model reasoning is also outside the memory contract. Integrations
 should preserve concise plans, actions, evidence, approvals, and results—not

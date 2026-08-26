@@ -24,9 +24,10 @@ The development branch also contains one default-off tool,
 sets `ELEFANTE_TASK_INTELLIGENCE_ENABLED=1`. This does not change the published
 v2.12.3 contract.
 
-The unreleased customer candidate adds one default-on, read-only tool,
-`elefante-Recall`. It requires no development flags. Published v2.12.3
-installers still expose the documented 16-tool surface.
+The unreleased customer candidate in this checkout adds one default-on,
+read-only tool, `elefante-Recall`. It requires no development flags, but it is
+not part of v2.12.3; published v2.12.3 installers expose the documented
+16-tool surface.
 
 - **Tools** read, write, or inspect the system.
 - **Prompts** inject grounding or pre-fetched memory context into the model. They are not tools.
@@ -34,8 +35,12 @@ installers still expose the documented 16-tool surface.
 
 **Critical workflow rule**:
 
-- Call `elefante-Recall` before answering when stored preferences, decisions, or
-  project context could materially change the answer.
+- When `elefante-Recall` is listed by the connected surface, call it at most once
+  per user question when stored preferences, decisions, or project context could
+  materially change the answer. Skip it for a self-contained question. Treat
+  `no_match`, `blocked`, and `unavailable` as terminal for that answer; do not
+  retry or broaden retrieval. On published v2.12.3, use targeted
+  `elefante-Memory(action="search", ...)` instead.
 - Call `elefante-Memory(action="search", ...)` before `elefante-Memory(action="add"|"update"|"delete", ...)` or `elefante-GraphConnect`.
 - When the user explicitly asks Elefante to remember information across sessions
   or declares a project decision canonical or non-negotiable, search the exact
@@ -47,8 +52,9 @@ installers still expose the documented 16-tool surface.
   use descriptive prose. Prefer ranked delivery when relevant paraphrases should
   work. Use a triggered policy only when literal phrases are intentionally
   required; never choose it merely to pass one verification question. After
-  writing, call `elefante-Recall` with one likely future question;
-  a stored receipt is not proof that the memory is deliverable.
+  writing, call `elefante-Recall` with one likely future question when that
+  development tool is available; otherwise use a read-only memory search. A
+  stored receipt is not proof that the memory is deliverable.
 
 **Tool response contract**:
 
@@ -56,7 +62,10 @@ installers still expose the documented 16-tool surface.
   `status`, `context`, `supplied_count`, `abstained`, `delivery_blocked`, and
   `read_only`. Internal protocol, directive, entrypoint, and `TOKEN_STATS`
   wrappers are not sent to the answering model; Elefante still records its
-  token accounting locally.
+  token accounting locally. Recall does not echo the current question in its
+  response. Its governed context remains capped at 450 heuristic tokens, and
+  the complete pretty Unicode response is capped at 1,000 heuristic tokens; an
+  encoded response that cannot fit fails closed without a memory body.
 - Other tool responses include `TOKEN_STATS`. Normal memory, graph, context,
   session, ETL, and task operations also receive the entrypoint, pitfall, and
   active-directive blocks. System, dashboard, and directive-management tools
@@ -74,7 +83,9 @@ installers still expose the documented 16-tool surface.
   and is skipped
   for memory-heavy or management tools. It contains a bounded rendered context,
   selected memory IDs, selection reasons, and governance warnings.
-- `TOKEN_STATS` is injected into every non-Recall tool response. It tells the agent what each tool call costs in tokens. Fields:
+- `TOKEN_STATS` is injected into every non-Recall tool response. It reports
+  Elefante's local heuristic estimate of each call's token size; it is not a
+  provider pricing API, invoice estimate, or dollar-cost calculation. Fields:
   - `output_tokens` (int): Total tokens in the response, including protocol overhead and the TOKEN_STATS block itself.
   - `overhead_tokens` (int): Tokens consumed by protocol injection (MANDATORY_PROTOCOLS, DIRECTIVES, ENTRYPOINT_SEQUENCE) plus TOKEN_STATS itself. Not content the agent requested.
   - `signal_ratio` (float, 0.0-1.0): Fraction of output that is actual payload. `1.0` = zero overhead, `0.0` = all overhead. Higher is better.
@@ -89,7 +100,7 @@ installers still expose the documented 16-tool surface.
 #### `elefante-Recall`
 
 **Status**: Unreleased customer candidate. Default-on in the candidate source;
-not present in published v2.12.2 installers.
+not present in published v2.12.3 installers.
 
 **Purpose**: Give an answering agent the smallest governed durable context for
 one question without exposing the broad search or mutation interface.
@@ -105,7 +116,8 @@ one question without exposing the broad search or mutation interface.
 - `status="supplied"`: One to three memories were supplied within a 450-token
   context budget.
 - `status="no_match"`: No memory passed the relevance and governance gates.
-- `status="blocked"`: Required governed context could not be delivered safely.
+- `status="blocked"`: Governed context could not be delivered safely within a
+  mandatory-governance or complete-response budget.
 - `status="unavailable"`: Local retrieval failed; the agent must continue from
   the current request and verified current evidence without inventing history.
 
@@ -113,6 +125,9 @@ Recall is read-only. It does not create a compliance receipt, increment access
 counts, record declared use, mutate ranking, expose memory UUIDs, or require the
 development Task Intelligence flags. The context prompt and Recall share the
 same retrieval, current-source validation, governed selection, and budget path.
+The answering host already owns the question, so Recall does not echo it in the
+returned context. Call Recall at most once for that user question; a terminal
+status is evidence to continue from current sources, not a retry instruction.
 Its MCP annotations declare `readOnlyHint=true`, `destructiveHint=false`,
 `idempotentHint=true`, and `openWorldHint=false`, so compatible hosts do not ask
 for mutation approval.
@@ -121,7 +136,11 @@ The customer installer also adds a marked Recall-routing block to Codex's active
 global guidance file (`AGENTS.override.md` when it is non-empty, otherwise
 `AGENTS.md`). Existing user text is preserved. The install manifest owns only
 that exact block; uninstall removes it only while unchanged and preserves a
-user-edited block for review.
+user-edited block for review. Configuration rolls back a newly added or prior
+installer-owned Codex registration when managed guidance fails, and reports
+`partial` if that rollback cannot finish. Customer readiness additionally
+requires that the active guidance path, Codex registration, live Recall tool,
+read-only annotations, and one bounded read-only probe all verify.
 
 **Rollback**: Set `ELEFANTE_RECALL_ENABLED=0` in the local daemon environment
 and restart Elefante. The tool disappears from discovery and direct calls fail
@@ -173,7 +192,7 @@ closed; the existing broad memory search and prompts remain unchanged.
 - Use `specification` for durable architecture or contract truths. Use
   `directive` for behavioral rules. Use `note` only for short-lived context.
   Governance fields are a development extension and are not in the published
-  v2.12.2 client contract.
+  v2.12.3 client contract.
 
 **Example**:
 
@@ -242,7 +261,7 @@ closed; the existing broad memory search and prompts remain unchanged.
 
 ##### `action="record_use"` — explicit use acknowledgement
 
-**Status**: Development extension; not part of the published v2.12.2 client
+**Status**: Development extension; not part of the published v2.12.3 client
 contract until a release explicitly includes it.
 
 **Purpose**: Tell Elefante which memories delivered by a Task Intelligence trace
@@ -339,7 +358,7 @@ the metadata ledger; it does not update ranking, access counts, or co-activation
 #### `elefante-TaskIntelligence`
 
 **Status**: Default-off development surface. It is not part of the published
-v2.12.2 client. Enable discovery with
+v2.12.3 client. Enable discovery with
 `ELEFANTE_TASK_INTELLIGENCE_ENABLED=1`. Context delivery remains independently
 disabled unless `ELEFANTE_TASK_INTELLIGENCE_PILOT=1` is also set, and pilot
 delivery requires `profile=v2`. The v1 profile remains shadow-only rollback

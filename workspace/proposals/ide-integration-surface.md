@@ -1,7 +1,8 @@
 # IDE and Agent Integration Surface
 
 > **Status:** PARTIALLY IMPLEMENTED. The v2.12.2 customer-global runtime and
-> detected-host adapters are released. Additional host certification,
+> detected-host adapters are retained in the current v2.12.3 release. Additional
+> host certification,
 > extension-managed surfaces, and automated documentation-drift inspection are
 > Upcoming without a promised version or date.
 

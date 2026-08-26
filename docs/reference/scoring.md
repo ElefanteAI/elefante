@@ -88,10 +88,13 @@ Do not compare this display score directly with retrieval relevance.
 
 ## Reinforcement and configuration boundary
 
-The memory model defaults `reinforcement_factor` to `0.25`. Configuration also
-exposes `default_reinforcement_factor: 0.1`, but that setting is not wired into
-normal memory creation. Callers must not claim that the configurable default
-controls runtime reinforcement.
+The memory model currently defaults `reinforcement_factor` to `0.25`. The
+configuration model also exposes `default_reinforcement_factor: 0.1`, but that
+setting is not wired into normal memory creation. Until that implementation gap
+is closed, documentation and callers must not claim the configurable default
+controls runtime reinforcement. The current Task Intelligence ledger is an
+observational boundary only; no runtime reinforcement is authorized from its
+declared-use or outcome events.
 
 ## Consolidation and lifecycle
 
@@ -104,12 +107,15 @@ elefante-Memory(action="consolidate")
 
 The default is a dry run. With `force=true`, it canonicalizes duplicate groups
 and recoverably archives non-winning duplicates. It does not call an LLM and
-does not automatically delete memories based on age or vitality.
+does not automatically archive memories merely because they are old or have a
+low score. A general age-based consolidation job, configurable consolidation
+threshold, and automatic resurrection are not implemented.
 
 The development governance extension applies scope, trigger, retention, and
-user-authority gates before Task Intelligence ranking. Protected memories are
-not silently archived. Those fields are not part of the published v2.12.3
-customer contract until released.
+user-authority gates before Task Intelligence ranking. Scope and trigger gates
+run before ranking, locked `always` memories are reserved, and protected
+memories are not silently archived by the refinery. These fields are not part
+of the published v2.12.3 customer contract until released.
 
 ## Verification
 

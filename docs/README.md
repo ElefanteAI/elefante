@@ -45,7 +45,7 @@ the mismatch rather than normalizing it.
 | [`rollback.md`](how-to/rollback.md) | Backup + restore |
 | [`docker.md`](how-to/docker.md) | Docker deployment |
 | [`kuzu-troubleshooting.md`](how-to/kuzu-troubleshooting.md) | Kuzu reserved words, locking, troubleshooting |
-| [`agent-handoff.md`](how-to/agent-handoff.md) | Autonomous agent integration |
+| [`agent-handoff.md`](how-to/agent-handoff.md) | Connect an existing agent host |
 
 ## Explanation (`explanation/`) — WHY
 

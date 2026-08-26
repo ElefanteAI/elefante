@@ -262,6 +262,8 @@ async def test_recall_surface_is_default_on_and_has_operator_rollback(
     assert recall.annotations.destructiveHint is False
     assert recall.annotations.idempotentHint is True
     assert recall.annotations.openWorldHint is False
+    assert "at most once" in recall.description
+    assert "self-contained" in recall.description
     assert "elefante-TaskIntelligence" not in default_names
     assert len(default_names) == 17
 
@@ -287,6 +289,27 @@ async def test_recall_surface_is_default_on_and_has_operator_rollback(
     assert "ENTRYPOINT_SEQUENCE_READ_THIS_FIRST" not in payload
     assert "DIRECTIVES" not in payload
     assert "TOKEN_STATS" not in payload
+
+
+@pytest.mark.asyncio
+async def test_grounding_prompt_limits_recall_to_one_contextual_call() -> None:
+    from mcp.types import GetPromptRequest, GetPromptRequestParams
+
+    server = ElefanteMCPServer()
+    handler = server.server.request_handlers[GetPromptRequest]
+    response = await handler(
+        GetPromptRequest(
+            params=GetPromptRequestParams(
+                name="elefante-grounding",
+                arguments={},
+            )
+        )
+    )
+    guidance = response.root.messages[0].content.text
+
+    assert "at most once" in guidance
+    assert "self-contained question" in guidance
+    assert "do not retry" in guidance
 
 
 @pytest.mark.asyncio
@@ -328,6 +351,89 @@ async def test_recall_call_boundary_keeps_customer_payload_minimal(monkeypatch) 
 
 
 @pytest.mark.asyncio
+async def test_recall_serializes_multilingual_context_without_ascii_expansion(
+    monkeypatch,
+) -> None:
+    server = ElefanteMCPServer()
+    multilingual_context = "記" * 900
+
+    async def recall(_arguments):
+        return {
+            "success": True,
+            "status": "supplied",
+            "context": multilingual_context,
+            "supplied_count": 1,
+            "abstained": False,
+            "delivery_blocked": False,
+            "read_only": True,
+        }
+
+    monkeypatch.setattr(server, "_handle_recall", recall)
+    handler = server.server.request_handlers[mcp_types.CallToolRequest]
+    response = await handler(
+        mcp_types.CallToolRequest(
+            params=mcp_types.CallToolRequestParams(
+                name="elefante-Recall",
+                arguments={"question": "What prior multilingual decision applies?"},
+            )
+        )
+    )
+    rendered = response.root.content[0].text
+
+    assert "記" in rendered
+    assert "\\u8a18" not in rendered
+    assert estimate_tokens(rendered) <= 500
+
+
+@pytest.mark.asyncio
+async def test_recall_no_match_does_not_echo_a_maximum_length_question(
+    monkeypatch,
+) -> None:
+    class Orchestrator:
+        async def search_memories(self, **_kwargs):
+            return []
+
+    server = ElefanteMCPServer()
+    monkeypatch.setattr(server, "_get_orchestrator", lambda: _async_value(Orchestrator()))
+    question = "x" * 1000
+
+    response = await server._handle_recall({"question": question})
+    rendered = json.dumps(response, indent=2, ensure_ascii=False)
+
+    assert response["status"] == "no_match"
+    assert question not in response["context"]
+    assert estimate_tokens(rendered) <= 128
+
+
+@pytest.mark.asyncio
+async def test_recall_fails_closed_when_complete_response_exceeds_hard_budget(
+    monkeypatch,
+) -> None:
+    server = ElefanteMCPServer()
+
+    async def oversized_context(_question):
+        return SimpleNamespace(
+            text="\x00" * 1578,
+            selected_count=1,
+            delivery_blocked=False,
+        )
+
+    monkeypatch.setattr(server, "_recall_answer_context", oversized_context)
+
+    response = await server._handle_recall(
+        {"question": "Which previously stored decision applies?"}
+    )
+    rendered = json.dumps(response, indent=2, ensure_ascii=False)
+
+    assert response["status"] == "blocked"
+    assert response["success"] is False
+    assert response["supplied_count"] == 0
+    assert response["delivery_blocked"] is True
+    assert "\x00" not in response["context"]
+    assert estimate_tokens(rendered) <= 1000
+
+
+@pytest.mark.asyncio
 async def test_recall_returns_only_bounded_governed_context_without_internal_ids(
     monkeypatch,
 ) -> None:
@@ -355,15 +461,15 @@ async def test_recall_returns_only_bounded_governed_context_without_internal_ids
     server = ElefanteMCPServer()
     monkeypatch.setattr(server, "_get_orchestrator", lambda: _async_value(Orchestrator()))
 
-    response = await server._handle_recall(
-        {"question": "What did we decide about global installation across IDEs?"}
-    )
+    question = "What did we decide about global installation across IDEs?"
+    response = await server._handle_recall({"question": question})
 
     assert response["success"] is True
     assert response["status"] == "supplied"
     assert response["supplied_count"] == 1
     assert response["read_only"] is True
     assert "one global runtime" in response["context"]
+    assert question not in response["context"]
     assert "Cognitive retrieval" not in response["context"]
     assert estimate_tokens(response["context"]) <= 450
     rendered = json.dumps(response)

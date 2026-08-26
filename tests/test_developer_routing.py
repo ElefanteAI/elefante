@@ -40,8 +40,9 @@ def test_task_and_memory_text_are_not_written_to_runtime_logs() -> None:
     assert "content[:50]" not in _read("src/core/orchestrator.py")
 
 
-def _current_version() -> str:
-    match = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', _read("src/__init__.py"), re.MULTILINE)
+def _published_version() -> str:
+    """Read the newest published release from the changelog, not dev source."""
+    match = re.search(r'^## \[(\d+\.\d+\.\d+)\] - ', _read("CHANGELOG.md"), re.MULTILINE)
     assert match is not None
     return match.group(1)
 
@@ -51,6 +52,7 @@ def _markdown_heading_slug(heading: str) -> str:
     heading = re.sub(r"[`*_~]", "", heading).strip().lower()
     heading = re.sub(r"[^\w\- ]", "", heading)
     return re.sub(r" +", "-", heading)
+
 
 def _mcp_surface_counts() -> tuple[int, int]:
     tool_names, prompt_names = _mcp_surface_names()
@@ -194,9 +196,9 @@ def test_active_developer_routing_points_to_current_sources() -> None:
 
 def test_living_plan_tracks_the_released_product_and_separate_client_candidate() -> None:
     planning = _read("workspace/PLANNING.md")
-    current_version = _current_version()
 
-    assert f"## §2 Released Product: v{current_version} Memory Intelligence" in planning
+    version = _published_version()
+    assert f"## §2 Released Product: v{version} Memory Intelligence" in planning
     assert "### §3.1 v2.11.1 — Shipped baseline" in planning
     assert "### §3.2 v2.12.0 — Released" in planning
     assert "### §3.3 v2.12.2 — Released customer package" in planning
@@ -207,10 +209,10 @@ def test_living_plan_tracks_the_released_product_and_separate_client_candidate()
     assert "| OB4 |" not in planning
     assert "| OB5 |" not in planning
     assert "source-grounded" in planning
-    assert f"**PUBLISHED_PRODUCT:** v{current_version} is live." in planning
+    assert f"**PUBLISHED_PRODUCT:** v{version} is live." in planning
     assert "**PUBLICATION_STATUS:**" in planning
     assert "checksum-verified" in planning
-    assert f"v{current_version} is merged to `main`" not in planning
+    assert f"v{version} is merged to `main`" not in planning
 
 
 def test_active_scoring_reference_matches_runtime_contract() -> None:
@@ -294,7 +296,7 @@ def test_active_tool_docs_match_current_mcp_surface() -> None:
 
 
 def test_current_release_version_matches_active_entrypoints() -> None:
-    version = _current_version()
+    version = _published_version()
     active_release_docs = (
         "AGENTS.md",
         "README.md",
@@ -597,7 +599,7 @@ def test_readme_and_planning_docs_capture_installer_recovery_and_learning_bounda
 
 def test_active_release_claims_avoid_stale_version_promises() -> None:
     """Active entrypoints must not present completed release targets as future."""
-    current_version = _current_version()
+    current_version = _published_version()
     active_paths = (
         "AGENTS.md",
         "README.md",
@@ -649,6 +651,40 @@ def test_active_release_claims_avoid_stale_version_promises() -> None:
     assert not violations, "\n".join(violations)
 
 
+def test_active_development_docs_separate_version_from_release_identity() -> None:
+    """A matching semver must not present candidate behavior as published."""
+    current_version = _published_version()
+    tests_readme = _read("tests/README.md")
+    proposal = _read("workspace/proposals/retrieval-effectiveness.md")
+    architecture = _read("docs/reference/architecture.md")
+    token_reference = _read("docs/reference/token-intelligence.md")
+
+    assert f"active developer source declaration {current_version}" in tests_readme
+    assert "active development source declaration 2.12.2" not in tests_readme
+    assert "Published customer release: v2.12.3." in proposal
+    assert "declares 2.12.3; provenance" in proposal
+    assert "remains 2.12.2 on the unreleased" not in proposal
+    for text in (architecture, token_reference):
+        normalized = " ".join(text.split())
+        assert "unreleased customer candidate" in normalized
+        assert "not part of the published v2.12.3" in normalized
+
+
+def test_issue_tracker_ids_and_summary_are_nonredundant() -> None:
+    issues = _read("workspace/ISSUES.md")
+    issue_ids = re.findall(r"^\| ((?:BUG|GAP)-\d{3}) \|", issues, re.MULTILINE)
+
+    assert issue_ids
+    assert len(issue_ids) == len(set(issue_ids))
+
+    bug_ids = sorted(issue_id for issue_id in issue_ids if issue_id.startswith("BUG-"))
+    gap_ids = sorted(issue_id for issue_id in issue_ids if issue_id.startswith("GAP-"))
+    expected_summary = (
+        f"{len(bug_ids)} BUG records through {bug_ids[-1]} + {len(gap_ids)} GAPs"
+    )
+    assert expected_summary in issues
+
+
 def test_product_explanation_keeps_the_agent_and_memory_boundaries_separate() -> None:
     readme = _read("README.md").replace("\n", " ")
     vision = _read("docs/explanation/vision.md").replace("\n", " ")
@@ -660,7 +696,10 @@ def test_product_explanation_keeps_the_agent_and_memory_boundaries_separate() ->
 
     assert "The agent owns the goal, plan, tools, and stopping decision." in readme
     assert "Elefante is not an LLM, an agent runtime, or a domain adviser." in readme
+    assert readme.count("## How It Works") == 1
     assert "architectural example, not a claim" in vision
+    assert "not a released guarantee" in vision
+    assert "local second brain" in vision
     assert "not hidden chain-of-thought" in vision
 
 
@@ -775,6 +814,40 @@ def test_explicit_user_capture_contract_is_synced_across_loaded_surfaces() -> No
         assert "stored" in document.lower() and "deliverable" in document.lower(), name
         assert "ordinary conversation" in document, name
         assert "secret" in document.lower(), name
+
+
+def test_recall_cost_and_release_contract_is_synced_across_loaded_surfaces() -> None:
+    server = _read("src/mcp/server.py")
+    installer = _read("scripts/setup/configure_cli_agents.py")
+    tools_doc = _read("docs/reference/tools.md")
+    token_doc = _read("docs/reference/token-intelligence.md")
+    architecture = _read("docs/reference/architecture.md")
+    self_protocol = _read("docs/reference/self-protocol.md")
+    orchestrator = _read("agents/orchestrator.md")
+    issues = _read("workspace/ISSUES.md")
+    scripts_index = _read("scripts/README.md")
+
+    for name, document in {
+        "server": server,
+        "installer": installer,
+        "tool reference": tools_doc,
+        "orchestrator": orchestrator,
+    }.items():
+        assert "at most once" in document, name
+        assert "self-contained question" in document, name
+
+    assert "RECALL_MAX_RESPONSE_TOKENS = 1000" in server
+    assert "450-token" in tools_doc
+    assert "1,000" in tools_doc
+    assert "does not echo" in tools_doc
+    assert "pretty Unicode" in token_doc
+    assert "provider usage" in token_doc
+    assert "1,000" in architecture
+    assert "1,000" in self_protocol
+    assert "unreleased" in tools_doc.lower()
+    assert "published v2.12.3 installers" in tools_doc
+    assert "1,000" in issues
+    assert "live Recall capability" in scripts_index
 
 
 def test_scripts_readme_covers_live_script_inventory() -> None:

@@ -1,6 +1,6 @@
 # Elefante Agent Examples
 
-> Applies to v2.12.2 · Audience: agents connected through MCP
+> Applies to v2.12.3 · Audience: agents connected through MCP
 
 | File | Question answered |
 |---|---|

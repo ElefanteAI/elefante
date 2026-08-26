@@ -37,7 +37,28 @@ task at hand.
 └─────────────────────────────────────────────────────────────┘
 ```
 
-Durable context stays local and inspectable. Retrieval remains selective.
+The durable store stays local and inspectable. Retrieval remains selective.
+
+## How It Works
+
+The agent owns the goal, plan, tools, and stopping decision. Elefante participates
+at two points in that loop: it can retrieve durable context before the agent
+plans, and its memory tools let the agent preserve verified outcomes after it
+acts.
+
+```text
+Goal → Perceive → Plan → Act → Observe → Update → Repeat
+          ↑                              ↓
+     retrieve context              preserve outcomes
+          └──────────── Elefante ────────────┘
+```
+
+Elefante is not an LLM, an agent runtime, or a domain adviser. Financial
+advisory and consulting are valid examples of a host agent carrying durable
+client constraints and decisions, but Elefante supplies no portfolio data,
+risk calculations, market-data service, document generator, transaction
+authority, or provider-billing estimate. It is the local memory authority those
+systems can use.
 
 ---
 
@@ -57,27 +78,9 @@ The Elefante store runs locally with no Elefante product telemetry. Context you
 intentionally send to a connected AI client is governed by that provider's data
 policy.
 
----
-
-## How It Works
-
-The agent owns the goal, plan, tools, and stopping decision. Elefante participates
-at two points in that loop: it retrieves durable context before the agent plans,
-then preserves verified outcomes after the agent acts.
-
-```text
-Goal → Perceive → Plan → Act → Observe → Update → Repeat
-          ↑                              ↓
-     retrieve context              preserve outcomes
-          └──────────── Elefante ────────────┘
-```
-
-This boundary is deliberate: Elefante is not an LLM, an agent runtime, or a
-domain adviser. It is the local memory authority those systems can use.
-
 ### Layer 1 — MCP Protocol
 
-The interface between your IDE and the memory engine. 16 tools and 2 prompts let agents store, search, connect, and manage knowledge. A **Compliance Gate** searches before memory writes and reduces redundant memories. **Context Injection** can attach relevant memories to eligible operations when a usable search signal exists. **Directives** can accompany normal product operations. **Token Intelligence** measures MCP tool responses and reports estimated output, protocol overhead, and signal ratio.
+The interface between your IDE and the memory engine. 16 tools and 2 prompts let agents store, search, connect, and manage knowledge. A **Compliance Gate** searches before memory writes and reduces redundant memories. **Context Injection** can attach relevant memories to eligible operations when a usable search signal exists. **Directives** can accompany normal product operations. **Token Intelligence** measures MCP tool responses and reports estimated output tokens, protocol overhead, and signal ratio; it does not calculate provider billing or dollar cost.
 
 Full tool reference → [docs/reference/tools.md](docs/reference/tools.md)
 IDE configuration → [docs/how-to/configure-ide.md](docs/how-to/configure-ide.md)

@@ -5,11 +5,11 @@
 
 Elefante estimates the token size and protocol overhead of MCP calls. The
 numbers are local heuristics for operational feedback; they are not provider
-billing totals or exact model-token counts.
+billing totals, dollar-cost estimates, or exact model-token counts.
 
 ## Per-call response
 
-Every tool response includes:
+Every tool in the published v2.12.3 surface includes:
 
 ```json
 {
@@ -27,8 +27,18 @@ Every tool response includes:
 - `signal_ratio`: estimated non-overhead share of the response, clamped to
   `0.0–1.0`.
 
+The unreleased customer candidate adds `elefante-Recall`. It intentionally
+returns a minimal payload and keeps token accounting internal rather than
+exposing `TOKEN_STATS` in that response. For Recall, the development ledger
+measures the input arguments, exact pretty Unicode payload shown to the model,
+and returned `context` separately. Failed, unavailable, and blocked calls still
+count as spend. The response does not echo the question, keeps governed context
+within 450 heuristic tokens, and fails closed if the complete response would
+exceed 1,000 heuristic tokens. This candidate behavior is not part of the
+published v2.12.3 tool surface.
 `RELEVANT_CONTEXT` is measured separately in the in-memory session ledger. It
-is default-off, conditional, and is not counted as static protocol overhead.
+is default-off in the development pilot, conditional, and is not counted as
+static protocol overhead.
 
 ## Estimation method
 
@@ -70,6 +80,13 @@ returned to the caller and is not persisted as a billing or analytics record.
 The memory record persists `content_tokens` and `token_density` in its system
 metadata. Website analytics and model-provider token accounting are separate
 systems.
+
+For financial comparisons, count observed input plus output for every completed
+attempt, including failures, retries, and unpaired early-stop work. Cached input
+is a subset of input and must not be added twice. Elefante's estimates are not
+provider usage: exact dollar cost remains unknown unless the provider supplies
+actual uncached input, cached input, and output usage and those values are
+multiplied by current rates.
 
 ## Verification
 

@@ -1,7 +1,7 @@
 # Memory Ingestion Contract
 
 This page documents the released `MemoryOrchestrator.add_memory()` behavior in
-v2.12.2. Elefante is LLM-free: the caller decides what is worth storing and may
+v2.12.3. Elefante is LLM-free: the caller decides what is worth storing and may
 provide classification metadata; Elefante validates, enriches, persists, and
 links the record deterministically.
 

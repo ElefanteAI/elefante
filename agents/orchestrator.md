@@ -59,6 +59,11 @@ uses it as part of the lifecycle rather than as a separate benchmark ritual:
 If the tool is absent or disabled, continue the normal lifecycle using Recall
 and canonical sources; unavailability is not a reason to stop product work.
 
+For ordinary answer-time continuity, call Recall at most once per user question
+only when prior context could matter. Skip a self-contained question. Treat
+`no_match`, `blocked`, and `unavailable` as terminal for that answer; do not
+retry or broaden retrieval to force a memory.
+
 **The Five Gates (below) and the Documentation Skill (below) are not separate protocols.** They are detailed implementations of step 5 (WRITE) and step 8 (VERIFY). Read them once, internalize, then return to the lifecycle as the operational sequence.
 
 ## The Five Gates

@@ -232,6 +232,8 @@ def configured_surfaces(
                     and isinstance(block_hash, str)
                     and text_value_hash(current_block) == block_hash
                 )
+                if matches and details.get("surface") == "codex-recall-routing":
+                    matches = _codex_guidance_path_is_active(path)
             else:
                 matches = path.exists() and isinstance(expected, str) and file_hash(path) == expected
         except (OSError, json.JSONDecodeError):
@@ -262,6 +264,25 @@ def configured_surfaces(
         verified.remove("codex")
     verified.discard(codex_routing)
     return verified
+
+
+def _codex_guidance_path_is_active(path: Path) -> bool:
+    """Return whether ``path`` is the Codex guidance file with live precedence."""
+    if path.name == "AGENTS.override.md":
+        try:
+            return bool(path.read_text(encoding="utf-8").strip())
+        except OSError:
+            return False
+    if path.name != "AGENTS.md":
+        return False
+    override = path.with_name("AGENTS.override.md")
+    try:
+        return not (
+            override.exists()
+            and bool(override.read_text(encoding="utf-8").strip())
+        )
+    except OSError:
+        return False
 
 
 def record_emitted_json_entry(
