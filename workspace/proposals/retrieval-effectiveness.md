@@ -1032,10 +1032,15 @@ deployment occurred.
   read-only Recall annotations, `probe_status=supplied`, `recall.ready=true`,
   and `customer_ready=true`. An independent new stdio bridge reports the same
   17-tool/read-only/supplied result.
-- End-to-end Codex acceptance remains open. This already-open task retains its
-  pre-upgrade MCP session and still returns HTTP 404. A fresh ephemeral Codex
-  process initialized a new bridge but emitted no model or tool event before
-  the bounded run was terminated. The Codex MCP Restart action and one normal
+- End-to-end Codex acceptance remains open. This already-open task retained its
+  pre-upgrade MCP session and returned HTTP 404. A fresh ephemeral Codex process
+  initialized a new bridge but emitted no model or tool event before the
+  bounded run was terminated. One later, pre-documented graceful `TERM` removed
+  only the stale task bridge; Codex did not respawn it, and the single
+  post-change Recall event returned `Transport closed` while installed doctor
+  and daemon health remained green. The CLI exposes no MCP restart command, so
+  process termination is not a supported substitute. Codex Settings → MCP
+  servers → Elefante → Restart and one normal
   `What is my Elefante test passcode?` event remain required before declaring
   customer acceptance.
 
