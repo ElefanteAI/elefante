@@ -605,10 +605,12 @@ One local question lift exists; representative lift does not.
 
 ## 15. Recall-first development program — plan before code
 
-**Status:** DEVELOPMENT COMPLETE; CUSTOMER ACCEPTANCE PENDING. No source implementation begins under this program until
-the package being entered has its dependency, rollback, and acceptance proof
-identified below. This sequence implements the user's Recall-first direction
-without turning the dirty development checkout into an unbounded feature pass.
+**Status:** DEVELOPMENT COMPLETE; LOCAL INSTALLED-CANDIDATE ACCEPTANCE PASSED;
+REPRESENTATIVE LIFT UNPROVEN. No source implementation begins under this
+program until the package being entered has its dependency, rollback, and
+acceptance proof identified below. This sequence implements the user's
+Recall-first direction without turning the dirty development checkout into an
+unbounded feature pass.
 
 **Classification:** BUG-051 owns end-to-end Recall routing; GAP-053 owns the
 difference between broadly relevant and decision-changing memory; GAP-055 owns
@@ -1032,22 +1034,26 @@ deployment occurred.
   read-only Recall annotations, `probe_status=supplied`, `recall.ready=true`,
   and `customer_ready=true`. An independent new stdio bridge reports the same
   17-tool/read-only/supplied result.
-- End-to-end Codex acceptance remains open. This already-open task retained its
-  pre-upgrade MCP session and returned HTTP 404. A fresh ephemeral Codex process
-  initialized a new bridge but emitted no model or tool event before the
-  bounded run was terminated. One later, pre-documented graceful `TERM` removed
-  only the stale task bridge; Codex did not respawn it, and the single
-  post-change Recall event returned `Transport closed` while installed doctor
-  and daemon health remained green. The CLI exposes no MCP restart command, so
-  process termination is not a supported substitute. Codex Settings → MCP
-  servers → Elefante → Restart and one normal
-  `What is my Elefante test passcode?` event remain required before declaring
-  customer acceptance.
+- Local installed-candidate Codex acceptance passed. This already-open task
+  first retained its pre-upgrade MCP session and returned HTTP 404. A fresh
+  ephemeral Codex process initialized a new bridge but emitted no model or tool
+  event before the bounded run was terminated. One later, pre-documented
+  graceful `TERM` removed only the stale task bridge; the immediate Recall event
+  returned `Transport closed` while installed doctor and daemon health remained
+  green. Without another mutation, Codex then spawned replacement bridge PID
+  `58597` under the same app-server. Exactly one post-respawn normal question,
+  `What is my Elefante test passcode?`, returned `isError=false`,
+  `status=supplied`, `supplied_count=2`, `read_only=true`, and context containing
+  the expected test fact. The observed context length was 673 characters, not a
+  provider-token or billing measurement. Manual bridge termination remains an
+  undocumented diagnostic; Codex Settings → MCP servers → Elefante → Restart is
+  still the supported customer path.
 
-Local implementation, exact artifact verification, and recoverable local
-installation are complete. One reattached normal-question Codex Recall event,
-push, PR update, remote merge, release, and deployment remain outside this
-closure; representative multi-task outcome lift remains separate and unproven.
+Local implementation, exact artifact verification, recoverable local
+installation, and one reattached normal-question Codex Recall event are
+complete. Push, PR update, remote merge, release, and deployment remain outside
+this closure; representative multi-task outcome lift remains separate and
+unproven.
 
 ### 15.2 Token-financial operating rules
 
