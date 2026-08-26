@@ -6,7 +6,7 @@
 
 **Elefante never forgets.**
 
-AI agents start every conversation from zero. Your preferences, decisions, and discovered patterns don't carry over. Elefante gives any MCP-compatible agent a persistent, local second brain — memories are stored, scored automatically, and surfaced at the right moment without being asked.
+AI agents start every conversation from zero. Your preferences, decisions, and discovered patterns don't carry over. Elefante gives any MCP-compatible agent a persistent, local memory layer — memories are stored, scored automatically, and surfaced at the right moment without being asked.
 
 **v2.12.3** — Current published release.
 
@@ -56,6 +56,20 @@ policy.
 ---
 
 ## How It Works
+
+The agent owns the goal, plan, tools, and stopping decision. Elefante participates
+at two points in that loop: it retrieves durable context before the agent plans,
+then preserves verified outcomes after the agent acts.
+
+```text
+Goal → Perceive → Plan → Act → Observe → Update → Repeat
+          ↑                              ↓
+     retrieve context              preserve outcomes
+          └──────────── Elefante ────────────┘
+```
+
+This boundary is deliberate: Elefante is not an LLM, an agent runtime, or a
+domain adviser. It is the local memory authority those systems can use.
 
 ### Layer 1 — MCP Protocol
 
