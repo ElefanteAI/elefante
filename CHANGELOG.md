@@ -32,6 +32,9 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Unrelated user-owned servers with the same name remain untouched.
 - Installation now proves the same stdio bridge and local daemon path used by
   customer IDEs, with enough startup time for a cold local runtime.
+- Release-candidate tooling and workflows now derive manifest identity, archive
+  names, and installation checks from the package version instead of embedding
+  the previous release number or importing product dependencies before setup.
 
 ## [2.12.2] - 2026-08-05
 
