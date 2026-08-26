@@ -11,11 +11,13 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.12.3] - 2026-08-25
+
 ### Fixed
 
-- Active release documentation now identifies v2.12.2 as published and
-  checksum-verified without falsely describing the mutable GitHub release
-  object as immutable.
+- Active release documentation now derives publication claims from verified
+  tag and checksum evidence without falsely describing the mutable GitHub
+  release object as immutable.
 - The scoring reference now matches the shipped behavioral-vitality formula,
   five-signal retrieval weights, vector floor, intent-gated authority boost,
   and implemented dry-run-first consolidation behavior.
