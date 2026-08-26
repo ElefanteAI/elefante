@@ -325,6 +325,21 @@ def test_active_release_claims_avoid_stale_version_promises() -> None:
     assert not violations, "\n".join(violations)
 
 
+def test_product_explanation_keeps_the_agent_and_memory_boundaries_separate() -> None:
+    readme = _read("README.md").replace("\n", " ")
+    vision = _read("docs/explanation/vision.md").replace("\n", " ")
+
+    for text in (readme, vision):
+        assert "Goal → Perceive → Plan → Act" in text
+        assert "retrieve" in text
+        assert "verified outcomes" in text
+
+    assert "The agent owns the goal, plan, tools, and stopping decision." in readme
+    assert "Elefante is not an LLM, an agent runtime, or a domain adviser." in readme
+    assert "architectural example, not a claim" in vision
+    assert "not hidden chain-of-thought" in vision
+
+
 def test_developer_process_docs_enforce_question_first_token_discipline() -> None:
     orchestrator_doc = _read("agents/orchestrator.md")
     best_practices = _read("workspace/lessons.md")
