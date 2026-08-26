@@ -1,6 +1,6 @@
 # Elefante User Documentation
 
-> **v2.12.1** · Published user documentation. The GitHub release and installers
+> **v2.12.2** · Published user documentation. The GitHub release and installers
 > are public.
 
 Use this index to install, configure, operate, and understand the released
@@ -22,6 +22,7 @@ draft contracts are intentionally outside this user-documentation surface.
 | [`architecture.md`](reference/architecture.md) | System design, triple-layer brain, retrieval workflow |
 | [`tools.md`](reference/tools.md) | MCP tool reference (16 tools, 2 prompts) — full schemas |
 | [`scoring.md`](reference/scoring.md) | 5-signal cognitive scoring (vector / concept / co-activation / authority / temporal) |
+| [`scoring-full.md`](reference/_archive/scoring-full.md) | Historical scoring page preserved before BUG-044 correction; not the current contract |
 | [`ingestion.md`](reference/ingestion.md) | 5-step pipeline (Extract → Classify → Integrity → Write → Reinforce) |
 | [`memory-schema.md`](reference/memory-schema.md) | V4 cognitive fields + V5 knowledge topology |
 | [`dashboard-snapshot.md`](reference/dashboard-snapshot.md) | Dashboard JSON schema |

@@ -1,6 +1,6 @@
 ---
 status: living
-last_updated: 2026-08-05
+last_updated: 2026-08-25
 audience: developer-agents
 authority: state + roadmap + features + aspect-plans for Elefante development
 related:
@@ -73,13 +73,13 @@ The non-negotiable product shape is:
 | Privacy boundary | Dashboard and local APIs bind loopback by default; no wildcard CORS; documented proxy/auth responsibility | Guarded locally; dashboard and daemon boundary tests pass |
 | Write authority | Retrieval surfaces cannot mutate memory/graph state; writes use explicit, observable tools | Guarded locally; GraphQuery mutation regressions pass |
 | Data integrity | One-writer daemon, Source provenance, migration + rollback proof | Runtime and isolated recovery proofs pass. Legacy-store migrations remain stopped, backup-gated support operations and are not a fresh-install requirement. |
-| Quality | Full suite collects cleanly; targeted regressions and frontend build are green in CI | Local v2.12 release-candidate proof is green: 267 fast tests passed (4 legacy-backend skips, 1 slow test deselected), the isolated slow two-bridge proof passed, the dashboard built, and the maintained release-critical Ruff gate passed. The exact candidate SHA must still receive green GitHub checks before publication. |
+| Quality | Full suite collects cleanly; targeted regressions and frontend build are green in CI | Published v2.12.2 exact-tag proof is green: 300 tests passed (1 slow test deselected), the isolated slow two-bridge proof passed, the 46/46 self-protocol passed, and the dashboard built. |
 | Compatibility | Every advertised host has a tested install, reconnect, concurrent-use, upgrade, and uninstall path | In progress — Claude Code, Codex, Gemini CLI, OpenClaw, VS Code, Cursor, and Kiro bridge emission and safe uninstall are tested. An isolated native Codex CLI round trip proves configure, upgrade, user-replacement preservation, and installer-owned removal without touching real user configuration; a separate slow runtime proof runs two real bridge processes concurrently through one daemon with distinct Codex/Claude provenance. Agent Zero is a documented community path; actual host-driven reconnect and certification remain unproven. |
 | Supply chain | Runtime dependency contract is exact; high-severity production dependency findings are resolved or release-blocked | The production lock no longer contains ChromaDB. The strict hash-locked audit reports no known vulnerabilities, closing stale GAP-029. Release archives now require a verified `SHA256SUMS` manifest. |
 
 ---
 
-## §2 Released Product: v2.12.1 Memory Intelligence
+## §2 Released Product: v2.12.2 Memory Intelligence
 
 ### §2.1 Outcome
 
@@ -107,14 +107,14 @@ loopback-only, redacted snapshot-only, and read-only.
 | Work | Current proof |
 |------|---------------|
 | Visual acceptance | The source-grounded dashboard showcase and canonical branding are complete. The website received desktop/mobile dark/light, reduced-motion, and Matrix-state browser evidence before production deployment. |
-| Regression proof | v2.12.1 is the published release. The upcoming v2.12.2 client candidate completed a real isolated macOS install, health check, daemon startup, MCP handshake, runtime registration, and clean uninstall. Full quality and dependency checks plus macOS, Windows, and Linux package builds are green on exact candidate SHA `d5f8a99`. |
-| Durable handoff | PR #17 merged the clean v2.12.2 customer product into `main` at `e0489f0`; detailed candidate evidence remains available on GitHub. |
-| Publication | **AUTHORIZED 2026-08-05** — GitHub release `v2.12.1` and its installers remain public while the reviewed `v2.12.2` authorization marker performs immutable tag and release publication. The website cannot promote v2.12.2 until its published assets and checksums are independently verified. |
+| Regression proof | v2.12.2 is the published release. The exact tag passed 300 automated tests with one isolated slow proof deselected and then passed separately; the self-protocol passed 46/46; the dashboard build and production dependency audits passed. |
+| Durable handoff | GitHub release v2.12.2 points to tag commit `e84a8b5`; the customer artifacts and `SHA256SUMS` were independently re-downloaded and verified on 2026-08-25. |
+| Publication | **PUBLISHED 2026-08-05** — v2.12.2 and its macOS, Windows, and Linux customer installers are public. The tag and checksums provide reproducible identity; the GitHub release object is mutable and must not be described as immutable. |
 
 ### §2.4 Approval gates
 
-The v2.12.2 release is explicitly authorized through the reviewed marker. The
-following production operations remain intentionally controlled:
+The v2.12.2 publication is complete. The following production operations remain
+intentionally controlled:
 
 1. Apply provenance or vector-store migrations to live user data.
 2. Tag or publish any other release, deploy unrelated changes, spend money, or
@@ -142,9 +142,9 @@ Rejected alternatives remain closed without new evidence:
 ### §2.6 Resume verdict
 
 - **RESUME_SAFE:** YES — active state is here; defects/capability gaps are in [`workspace/ISSUES.md`](../workspace/ISSUES.md); integration truth is in [`agents/manifests/ide-integration.yaml`](../agents/manifests/ide-integration.yaml).
-- **PUBLISHED_PRODUCT:** v2.12.1 remains live and unchanged.
-- **CANDIDATE:** v2.12.2 is merged to `main` at `e0489f0`; immutable publication and website promotion remain.
-- **PUBLICATION_AUTHORIZED:** YES — the owner authorized v2.12.2 after PR #17's exact-SHA gates passed; `.github/release-requests/v2.12.2` is the auditable trigger. This authorization does not cover unrelated deployment or live-data mutation.
+- **PUBLISHED_PRODUCT:** v2.12.2 is live.
+- **PUBLICATION_STATUS:** Published, tagged, and checksum-verified. The GitHub release object is not immutable.
+- **LIVE_RUNTIME:** Installation or upgrade of a user's local runtime remains a separate operator action; repository publication does not mutate it.
 
 ---
 
@@ -166,19 +166,14 @@ the dashboard work does not waive them.
 - Platform-specific launchers and non-mutating dry-run behavior
 - SQLite-vector/Kuzu default architecture with a clean production lock
 
-### §3.3 Release Client Candidate 1.0 — upcoming v2.12.2 validation lane
+### §3.3 v2.12.2 — Released customer package
 
-- Separate customer-only macOS, Windows, and Linux archives sourced from current `main`
+- Customer-only macOS, Windows, and Linux archives
 - Separate hash-locked runtime dependency set; no test, lint, or build tooling
 - Standard-library-only installer bootstrap until the client dependency lock is installed
 - Explicit archive allowlist plus verifier that rejects developer material
-- Branch-only macOS workflow uploads a private validation artifact and checksum;
-  it cannot create a GitHub Release or alter the public website
-- The same fresh macOS runner must extract the ZIP through `ditto`, execute the
-  customer launcher without `--dry-run`, pass `doctor` with customer readiness
-  and v2.12.2 runtime identity, then safely unregister the daemon and runtime
-- No claim of public availability until a clean download, installer, release asset,
-  checksum, and customer-flow verification all pass
+- Fresh macOS install, health, daemon, MCP handshake, and uninstall proof
+- Published checksums for independent artifact verification
 
 ### §3.4 Upcoming (no release or date commitment)
 
@@ -537,6 +532,10 @@ This section is the chronological record of curation events, decisions, and abso
 
 | Date | Event | Driver | Measurement |
 |------|-------|--------|-------------|
+| 2026-08-25 | **v2.12.3 publication authorized on PR #26.** The audited release marker permits the main-branch workflow to create the exact annotated tag and dispatch the multi-platform release only after merge. | Owner explicitly authorized the surgical v2.12.3 patch publication; direct manual tagging would bypass the repository control plane. | Release-authorization, client-bundle, pipeline, routing, version-sync, and release-note tests pass locally. The marker has no effect before merge; all PR checks remain mandatory. |
+| 2026-08-25 | **BUG-045 release-candidate version drift fixed and guarded.** The client builder/verifier derive candidate identity from the manifest version; the standard-library builder exposes dependency-free version discovery; Quality and standalone client-candidate workflows carry that value through archive and installation checks. | PR #26 correctly bumped the package to v2.12.3, but candidate metadata and two CI lanes still encoded v2.12.2. The first repair then imported dependency-backed `src` before runner setup, recurring BUG-042. | Focused client-bundle and workflow regressions pass, dependency-free version discovery runs under `python -S`, and both edited workflows parse as valid YAML. GitHub rerun remains the publication gate. |
+| 2026-08-25 | **v2.12.3 patch candidate prepared.** The candidate contains the guarded BUG-040 customer-repair hardening and BUG-044 release/capability truth corrections already accumulated after v2.12.2. Task Intelligence remains internal shadow evaluation infrastructure and is not promoted as a public capability. | Owner authorized the surgical resolution after the post-v2.12.2 audit: publish the verified fixes without expanding product scope. | The repository advisor classified the release as PATCH; `bump_version.py` updated the six version-bearing declarations to 2.12.3 and `--check` reported full agreement. The maintained Python suite and isolated slow bridge proof passed; release-note validation, scoped Ruff, diff hygiene, dashboard production build, and npm audit also passed. Publication remains pending. |
+| 2026-08-25 | **BUG-044 release-contract truth drift fixed and guarded.** Active entrypoints now identify v2.12.2 as the published product; scoring documentation is derived from the shipped vitality and five-signal retrieval implementations; `surfaces_when` is explicitly stored non-ranking metadata; dashboard search is labeled snapshot-only; Distiller examples use the executable repository-root module path; the vulnerable transitive dashboard development dependency is updated. The superseded scoring page is preserved verbatim before distillation. | A whole-product audit found that passing tests froze stale release and capability claims instead of checking the actual published tag and execution paths. | 332 automated tests passed with one isolated slow proof deselected; the slow two-bridge proof passed separately; self-protocol passed 46/46; dashboard production build and full/production npm audits passed with zero vulnerabilities. Rendered localhost acceptance showed `3 snapshot results for "daemon"`, no semantic-search claim, and zero browser console errors. No user data, live runtime, GitHub release, remote branch, or deployment changed. |
 | 2026-08-05 | **Task Intelligence preliminary holdout failed the promotion gate.** PR #21 merged the deterministic shadow compiler and capped paired evaluator into `main` at `fa04f2b`; exact-commit Quality, dependency audit, dashboard, clean macOS candidate, and macOS/Windows/Linux package checks are green. One paired repetition then ran across all 12 frozen holdout tasks. The remaining two repetitions were stopped because there was no correctness signal. The used holdout is now diagnostic and cannot serve as fresh promotion evidence after tuning. | The product promise is measurable task improvement, so a tied result must stop promotion even when context cost falls. Inspection showed broad, generic documentation often displaced precise task-local implementation evidence. | Baseline: 1/12 passed. Task Brief: 1/12 passed. Lift: 0.0 points; paired 95% interval `[0, 0]`; total input -16.3%; uncached input +2.9%; duration -1.9%; 24 runs, 7,946,987 total input tokens, 6,882,048 cached, 1,064,939 uncached, and 83,921 output. Cost gate passed; effectiveness and promotion gates failed. No public MCP surface, automatic injection, website claim, or client pilot was added. Next: redesign task-local source retrieval on calibration, then freeze a new answer-isolated holdout. |
 | 2026-08-05 | **Task Intelligence Phase 0 and shadow Phase 1 completed.** The 18-task no-Brief calibration baseline is frozen at 6/18 passes with `gpt-5.6-terra`, low reasoning, and the exact local Codex CLI/prompt profile. A deterministic internal Task Brief compiler now filters lifecycle, trust, scope, and score; surfaces conflicts; preserves provenance; enforces 450/750/300 stage budgets, eight evidence items, and one graph hop; and disables read-side memory reinforcement. The paired holdout runner uses local-only GTE embeddings from pre-fix evidence, seeded order, hard token caps, metadata-only outcomes, and an automated clustered-confidence promotion report. | The product objective is measurable task improvement, so implementation must be judged against acceptance tests rather than retrieval volume or persuasive examples. | Calibration: 6/18 passed; 4,971,429 input tokens, 4,329,216 cached, 642,213 uncached, and 54,096 output. A real shadow Brief selected 8 provenance-bearing items in 771 estimated tokens with zero mutations. Twenty focused evaluator/compiler/report tests and the standalone benchmark verifier pass. Phase 2 holdout remains untouched until this evaluator is committed and green; there is no public MCP surface, automatic injection, release claim, or website change. |
 | 2026-08-05 | **BUG-040 live-upgrade recurrence repaired and guarded.** The public v2.12.2 package installed one stable runtime but could not adopt genuine pre-manifest Elefante registrations, leaving Codex and VS Code bound to a deleted checkout. Customer scope now adopts only entries structurally identified by an Elefante MCP module, preserves foreign same-name servers, and retains rollback. The installer handshake now tests the actual stdio bridge and daemon instead of cold-starting a separate direct server. | Owner required global memory across every IDE and customer-first end-to-end proof on the real machine. | Live repair completed with installer state `COMPLETED`; `doctor --json` reported v2.12.2 customer scope, `customer_ready: true`, and Codex, VS Code/Copilot, and Antigravity all verified; daemon health and real bridge handshake passed. Focused regression suite is the merge gate. |

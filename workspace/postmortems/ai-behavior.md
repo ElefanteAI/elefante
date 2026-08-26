@@ -93,11 +93,18 @@
 **Active candidates pending (broader surface):** (a) pre-edit hook requiring `BUG-NNN | new` classification before any Edit/Write call; (b) maintained transcript-scanning verifier.
 **Lesson:** An agent constitution loaded once at session start is a passive protocol. Every doc edit starts at Known Issues. No exceptions. Active guards beat prose at the moment of action.
 
+## Issue #13: Release-Contract Truth Drift [BUG-044, FIXED guarded]
+
+**Trigger:** A whole-product audit found v2.12.2 publicly released while active entrypoints and their tests still declared v2.12.1; the scoring reference documented retired formulas and nonexistent modules; dashboard and ETL copy promised semantics absent from their execution paths.
+**Root cause:** Release and feature-truth checks asserted hand-maintained literals instead of testing the current shipped contract. Passing CI therefore preserved the stale state rather than detecting it.
+**Solution:** Reconciled release entrypoints with the published tag, replaced scoring prose from the source formulas, labeled dashboard search as snapshot-only, marked `surfaces_when` as stored non-ranking metadata, corrected the Distiller module path, and extended maintained regressions across all affected surfaces.
+**Lesson:** Contract tests must reject obsolete claims, not merely freeze yesterday's claim. Publication truth, source behavior, UI language, and reference documentation must agree.
+
 ---
 
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
-The recurring rules from these 12 issues:
+The recurring rules from these 13 issues:
 
 1. **STATE → DO → VERIFY in the same response** — analysis without action is entertainment. Issues #1, #4.
 2. **Trigger words require proof** — "done" / "ready" / "fixed" must include verification output. Issue #2.
@@ -106,6 +113,7 @@ The recurring rules from these 12 issues:
 5. **Differentiate "slow" from "hung"** — timeouts cannot fix deadlocks. Issue #9.
 6. **Broadest scope for behavioral instructions** — system-level injection, not workspace-level file presence. Issue #10.
 7. **Every export needs a documented import** — exportable ≠ restorable. Issue #11.
+8. **Guard current truth, not stale literals** — release, source, UI, and docs must agree. Issue #13.
 
 Distill any new repeating rule into `../lessons.md`. Postmortems hold the bug-specific narrative; `lessons.md` holds the cross-bug edge.
 

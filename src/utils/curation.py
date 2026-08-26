@@ -260,7 +260,10 @@ def extract_concepts(content: str, max_concepts: int = 5) -> list[str]:
 
 def infer_surfaces_when(content: str, concepts: list[str]) -> list[str]:
     """
-    Generate query patterns that should surface this memory.
+    Generate candidate query patterns for future proactive surfacing.
+
+    The current retriever stores and displays these values but does not use
+    them as a ranking signal.
     
     Based on content structure and extracted concepts.
     """

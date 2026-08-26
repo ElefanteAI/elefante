@@ -117,10 +117,10 @@ def test_active_developer_routing_points_to_current_sources() -> None:
 def test_living_plan_tracks_the_released_product_and_separate_client_candidate() -> None:
     planning = _read("workspace/PLANNING.md")
 
-    assert "## §2 Released Product: v2.12.1 Memory Intelligence" in planning
+    assert "## §2 Released Product: v2.12.2 Memory Intelligence" in planning
     assert "### §3.1 v2.11.1 — Shipped baseline" in planning
     assert "### §3.2 v2.12.0 — Released" in planning
-    assert "### §3.3 Release Client Candidate 1.0" in planning
+    assert "### §3.3 v2.12.2 — Released customer package" in planning
     assert "## §2 Active Release: v2.10.0" not in planning
     assert "## §2 Active Release: v2.12.0" not in planning
     assert "### §3.2 v2.12.0 — Active release candidate" not in planning
@@ -128,8 +128,49 @@ def test_living_plan_tracks_the_released_product_and_separate_client_candidate()
     assert "| OB4 |" not in planning
     assert "| OB5 |" not in planning
     assert "source-grounded" in planning
-    assert "**PUBLISHED_PRODUCT:** v2.12.1 remains live and unchanged." in planning
-    assert "**PUBLICATION_AUTHORIZED:** YES" in planning
+    assert "**PUBLISHED_PRODUCT:** v2.12.2 is live." in planning
+    assert "**PUBLICATION_STATUS:**" in planning
+    assert "checksum-verified" in planning
+    assert "v2.12.2 is merged to `main`" not in planning
+
+
+def test_active_scoring_reference_matches_runtime_contract() -> None:
+    scoring = _read("docs/reference/scoring.md")
+
+    assert "effective_decay_rate = decay_rate / (1 + reinforcement_factor * ln(access_count + 1))" in scoring
+    assert "vitality = exp(-effective_decay_rate * days_since_created) * exp(-0.005 * days_since_access)" in scoring
+    assert "vector similarity | `0.35`" in scoring
+    assert "concept overlap | `0.30`" in scoring
+    assert "co-activation | `0.15`" in scoring
+    assert "authority | `0.10`" in scoring
+    assert "temporal | `0.10`" in scoring
+    assert "70% of the vector score" in scoring
+    assert "`+0.30`" in scoring
+    assert "The consolidation module does not exist" not in scoring
+    assert "elefante-Memory(action=\"consolidate\")" in scoring
+
+
+def test_etl_trigger_metadata_is_not_claimed_as_a_live_ranking_signal() -> None:
+    server = _read("src/mcp/server.py")
+    tools = _read("docs/reference/tools.md")
+    schema = _read("docs/reference/memory-schema.md")
+    model = _read("src/models/memory.py")
+
+    for text in (server, tools, schema, model):
+        assert "not a current ranking signal" in text
+
+    assert "**surfaces_when**: Query patterns that should trigger this memory (optional, improves search)" not in server
+    assert "- surfaces_when: Query patterns that should trigger this memory" not in server
+    assert '"description": "Query patterns that should trigger this memory"' not in server
+
+
+def test_distiller_documentation_uses_repo_root_module_path() -> None:
+    distiller_init = _read("src/modules/distiller/__init__.py")
+    distiller_main = _read("src/modules/distiller/__main__.py")
+
+    for text in (distiller_init, distiller_main):
+        assert "python -m modules.distiller" not in text
+        assert "python -m src.modules.distiller" in text
 
 
 def test_active_tool_docs_match_current_mcp_surface() -> None:
@@ -246,6 +287,8 @@ def test_active_release_claims_avoid_stale_version_promises() -> None:
         r"active release candidate:\s*\**v2\.12\.0",
         r"v2\.12\.0\*{0,2}\s*(?:—|-)\s*release candidate",
         r"v2\.12\.0\*{0,2}\s+release candidate",
+        r"current published (?:release|version):?\s*\**v2\.12\.1",
+        r"\*\*v2\.12\.1\*\*\s*(?:—|-)\s*current published release",
     )
 
     violations = []

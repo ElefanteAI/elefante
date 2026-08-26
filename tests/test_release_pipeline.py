@@ -127,11 +127,11 @@ def test_release_documentation_audit_passes_for_repo_history():
 def test_published_release_can_render_public_notes():
     module = _load_module(ROOT / "scripts/ci/render_release_notes.py", "render_published_notes")
 
-    assert "2.12.1" not in module.release_candidate_versions(
+    assert "2.12.2" not in module.release_candidate_versions(
         (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     )
-    module.validate_release_documentation("2.12.1")
-    assert "## [2.12.1] - 2026-08-04" in module.render_release_notes("2.12.1")
+    module.validate_release_documentation("2.12.2")
+    assert "## [2.12.2] - 2026-08-05" in module.render_release_notes("2.12.2")
 
 
 def test_version_sync_tracks_release_identifiers_without_rewriting_history():
@@ -152,7 +152,7 @@ def test_version_sync_tracks_release_identifiers_without_rewriting_history():
     assert not any(path.startswith("workspace/postmortems/") for path in targets)
     assert module.GLOB_TARGETS == []
 
-    assert "v2.12.1" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "v2.12.2" in (ROOT / "README.md").read_text(encoding="utf-8")
 
 
 def test_version_advisor_accepts_candidate_changelog_entries():
@@ -274,7 +274,8 @@ def test_quality_workflow_enforces_release_candidate_gates():
     workflow = (ROOT / ".github/workflows/quality.yml").read_text(encoding="utf-8")
 
     assert "python scripts/ci/bump_version.py --check" in workflow
-    assert "from src import __version__" in workflow
+    assert "build_release_client.py --print-version" in workflow
+    assert "from src import __version__" not in workflow
     assert "scripts/ci/render_release_notes.py" in workflow
     assert "python -m pytest tests -m slow -q" in workflow
     assert "python -m ruff check" in workflow
@@ -285,6 +286,8 @@ def test_quality_workflow_enforces_release_candidate_gates():
     assert "requirements.client.lock" in workflow
     assert "scripts/ci/build_release_client.py" in workflow
     assert "scripts/ci/verify_release_client.py" in workflow
+    assert 'archive="$RUNNER_TEMP/elefante-v${version}-rc.1-macOS.zip"' in workflow
+    assert "v2.12.2-rc.1" not in workflow
     assert "requirements.client.lock" in workflow
     assert "pypa/gh-action-pip-audit@" in workflow
 
@@ -303,11 +306,16 @@ def test_release_client_candidate_workflow_is_validation_only():
     assert "--publication-status candidate" in workflow
     assert "--expected-publication-status candidate" in workflow
     assert "name: Prove a fresh macOS customer installation" in workflow
-    assert 'ditto -x -k dist/elefante-v2.12.2-rc.1-macOS.zip' in workflow
+    assert "id: release_metadata" in workflow
+    assert "build_release_client.py --print-version" in workflow
+    assert "from src import __version__" not in workflow
+    assert "steps.release_metadata.outputs.archive" in workflow
+    assert "steps.release_metadata.outputs.version" in workflow
+    assert "v2.12.2-rc.1" not in workflow
     assert '"$bundle_root/Install Elefante.command" --venv-mode fresh --verbose' in workflow
     assert '"$install_root/scripts/lifecycle/doctor.py" --json' in workflow
     assert 'report["customer_ready"] is True' in workflow
-    assert 'report["installation"]["version"] == "2.12.2"' in workflow
+    assert 'report["installation"]["version"] == sys.argv[3]' in workflow
     assert '"$install_root/scripts/lifecycle/uninstall_elefante.py" --apply' in workflow
     assert "if manifest_path.exists():" in workflow
     assert "softprops/action-gh-release" not in workflow

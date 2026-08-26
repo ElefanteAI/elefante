@@ -13,11 +13,11 @@ Module Structure:
     __main__.py  — CLI entry point
 
 Usage:
-    python -m modules.distiller list
-    python -m modules.distiller search "OpenClaw"
-    python -m modules.distiller distill latest --dry-run
-    python -m modules.distiller distill all
-    python -m modules.distiller stats
+    python -m src.modules.distiller list
+    python -m src.modules.distiller search "OpenClaw"
+    python -m src.modules.distiller distill latest --dry-run
+    python -m src.modules.distiller distill all
+    python -m src.modules.distiller stats
 """
 
 from .models import (

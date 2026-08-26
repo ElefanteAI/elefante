@@ -62,11 +62,18 @@ jobs:
           require-hashes: true
           internal-be-careful-extra-flags: --disable-pip
           no-deps: true
+      - name: Resolve product version
+        id: release_metadata
+        run: |
+          version="$(python scripts/ci/build_release_client.py --print-version)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "archive=dist/elefante-v${version}-rc.1-macOS.zip" >> "$GITHUB_OUTPUT"
       - name: Build and verify client candidate
         run: |
-          python scripts/ci/build_release_client.py --platform macOS --publication-status candidate --output dist/elefante-v2.12.2-rc.1-macOS.zip
-          python scripts/ci/verify_release_client.py --archive dist/elefante-v2.12.2-rc.1-macOS.zip --require-clean-source --expected-publication-status candidate --expected-platform macOS
-          shasum -a 256 dist/elefante-v2.12.2-rc.1-macOS.zip > dist/SHA256SUMS
+          archive="${{ steps.release_metadata.outputs.archive }}"
+          python scripts/ci/build_release_client.py --platform macOS --publication-status candidate --output "$archive"
+          python scripts/ci/verify_release_client.py --archive "$archive" --require-clean-source --expected-publication-status candidate --expected-platform macOS
+          shasum -a 256 "$archive" > dist/SHA256SUMS
       - name: Prove a fresh macOS customer installation
         shell: bash
         run: |
@@ -78,7 +85,7 @@ jobs:
           doctor_report="$RUNNER_TEMP/elefante-doctor.json"
 
           mkdir -p "$package_root"
-          ditto -x -k dist/elefante-v2.12.2-rc.1-macOS.zip "$package_root"
+          ditto -x -k "${{ steps.release_metadata.outputs.archive }}" "$package_root"
           test -x "$bundle_root/Install Elefante.command"
           test ! -e "$install_root"
 
@@ -87,7 +94,7 @@ jobs:
           test -x "$install_root/.venv/bin/python"
           "$install_root/.venv/bin/python" \
             "$install_root/scripts/lifecycle/doctor.py" --json > "$doctor_report"
-          python - "$doctor_report" "$install_root" <<'PY'
+          python - "$doctor_report" "$install_root" "${{ steps.release_metadata.outputs.version }}" <<'PY'
           import json
           import sys
           from pathlib import Path
@@ -97,7 +104,7 @@ jobs:
           assert report["ready"] is True, report
           assert report["customer_ready"] is True, report
           assert report["installation"]["scope"] == "customer", report
-          assert report["installation"]["version"] == "2.12.2", report
+          assert report["installation"]["version"] == sys.argv[3], report
           assert report["installation"]["app_root"] == expected_root, report
           assert report["host_coverage"]["uncovered"] == [], report
           PY
@@ -121,8 +128,8 @@ jobs:
       - name: Upload validation artifact only
         uses: actions/upload-artifact@v7
         with:
-          name: elefante-v2.12.2-rc.1-macOS
+          name: elefante-v${{ steps.release_metadata.outputs.version }}-rc.1-macOS
           path: |
-            dist/elefante-v2.12.2-rc.1-macOS.zip
+            ${{ steps.release_metadata.outputs.archive }}
             dist/SHA256SUMS
           retention-days: 14

@@ -1,6 +1,6 @@
 """
 Elefante Session Distiller — CLI Entry Point
-Usage: python -m modules.distiller [OPTIONS]
+Usage: python -m src.modules.distiller [OPTIONS]
 
 Commands:
   list      List recent chat sessions across all workspaces

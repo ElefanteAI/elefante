@@ -10,7 +10,6 @@ import stat
 import zipfile
 from pathlib import Path, PurePosixPath
 
-CANDIDATE_VERSION = "v2.12.2-rc.1"
 CLIENT_CANDIDATE_LANE = "Release Client Candidate 1.0"
 PLATFORM_CHOICES = ("Linux", "macOS", "Windows")
 PUBLICATION_STATUSES = ("candidate", "release")
@@ -221,15 +220,11 @@ def validate_release_client_archive(
         if not re.fullmatch(r"\d+\.\d+\.\d+", version):
             raise ValueError("Client bundle manifest lacks a semantic product version")
         if publication_status == "candidate":
-            if manifest.get("candidate") != CANDIDATE_VERSION:
+            expected_candidate = f"v{version}-rc.1"
+            if manifest.get("candidate") != expected_candidate:
                 raise ValueError("Invalid client candidate version")
             if manifest.get("candidate_lane") != CLIENT_CANDIDATE_LANE:
                 raise ValueError("Invalid client candidate lane")
-            candidate_base = CANDIDATE_VERSION.removeprefix("v").split("-rc.", 1)[0]
-            if version != candidate_base:
-                raise ValueError(
-                    "Client candidate version does not match product version"
-                )
         elif "candidate" in manifest or "candidate_lane" in manifest:
             raise ValueError("Released customer installer contains candidate metadata")
 

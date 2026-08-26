@@ -45,7 +45,7 @@ jobs:
       - name: Verify release contracts
         run: |
           python scripts/ci/bump_version.py --check
-          version="$(python -c 'from src import __version__; print(__version__)')"
+          version="$(python scripts/ci/build_release_client.py --print-version)"
           python scripts/ci/render_release_notes.py "$version" --validate-only
           python -m ruff check \
             scripts/ci/generate_release_checksums.py \
@@ -82,8 +82,10 @@ jobs:
       - name: Build and verify the clean macOS client candidate
         working-directory: .
         run: |
-          python scripts/ci/build_release_client.py --platform macOS --publication-status candidate --output "$RUNNER_TEMP/elefante-v2.12.2-rc.1-macOS.zip"
-          python scripts/ci/verify_release_client.py --archive "$RUNNER_TEMP/elefante-v2.12.2-rc.1-macOS.zip" --require-clean-source --expected-publication-status candidate --expected-platform macOS
+          version="$(python scripts/ci/build_release_client.py --print-version)"
+          archive="$RUNNER_TEMP/elefante-v${version}-rc.1-macOS.zip"
+          python scripts/ci/build_release_client.py --platform macOS --publication-status candidate --output "$archive"
+          python scripts/ci/verify_release_client.py --archive "$archive" --require-clean-source --expected-publication-status candidate --expected-platform macOS
 
   dependency-audit:
     name: Production Dependency Audit

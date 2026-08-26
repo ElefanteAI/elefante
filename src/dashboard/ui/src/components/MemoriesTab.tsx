@@ -103,7 +103,7 @@ export function MemoriesTab() {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Semantic search... (2+ characters)"
+              placeholder="Snapshot search... (2+ characters)"
               className="w-full pl-10 pr-10 py-3 bg-slate-900/60 border border-slate-700/60 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50"
             />
             {isSearching && (
@@ -122,7 +122,7 @@ export function MemoriesTab() {
           </div>
           {mode === 'search' && query.trim().length >= 2 && (
             <div className="mt-2 text-xs text-slate-500">
-              {isSearching ? 'Searching...' : `${results.length} semantic results for "${query}"`}
+              {isSearching ? 'Searching...' : `${results.length} snapshot results for "${query}"`}
             </div>
           )}
         </div>

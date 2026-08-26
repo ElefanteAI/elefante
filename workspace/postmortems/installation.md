@@ -191,6 +191,14 @@ This is the **quality-per-token path for installer UX bugs**: customer-visible p
 **Guard:** `pytest tests/test_install_setup.py -k "client_health_checks_customer_baseline" -v`; the isolated macOS workflow requires the entire customer launcher and `doctor` readiness path to pass.
 **Lesson:** Product health must verify the product contract for the active runtime profile, not the development environment that produced it.
 
+## Issue #24: Release-Candidate Workflows Embedded The Previous Version [BUG-045, FIXED, guarded]
+
+**Trigger:** PR #26 bumped the package to v2.12.3. Both the Quality dashboard job and the standalone client-candidate job built an archive named for v2.12.2, then rejected the valid v2.12.3 manifest as a version mismatch.
+**Root cause:** The builder, verifier, and candidate workflows duplicated the current product version in candidate metadata, archive paths, artifact names, extraction commands, and the installed-version assertion. The version bumper intentionally updates package declarations only, so this hidden version state drifted on the first patch release. The first repair then used `from src import __version__` in pre-dependency jobs, recurring BUG-042 because importing `src` requires `pydantic`.
+**Solution:** Derive candidate metadata directly from the manifest product version. The standard-library release builder exposes `--print-version` without importing product modules. Each candidate lane resolves that value once, derives its archive path, carries it through workflow outputs, and compares the installed runtime against it. Regression coverage rejects the retired release literal and runs version discovery under `python -S`.
+**Guard:** `pytest tests/test_release_client_bundle.py tests/test_release_pipeline.py -q`; both GitHub candidate lanes must build and verify the version-bumped artifact.
+**Lesson:** Release automation must derive artifact identity from the package version through a pre-dependency-safe source. A release number copied into workflow paths is hidden version state; importing the product merely to read that state violates the installer bootstrap boundary.
+
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
 The five most-recurring rules from the issues above:

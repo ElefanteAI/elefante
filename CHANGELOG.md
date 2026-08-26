@@ -11,13 +11,30 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.12.3] - 2026-08-25
+
 ### Fixed
 
+- Active release documentation now derives publication claims from verified
+  tag and checksum evidence without falsely describing the mutable GitHub
+  release object as immutable.
+- The scoring reference now matches the shipped behavioral-vitality formula,
+  five-signal retrieval weights, vector floor, intent-gated authority boost,
+  and implemented dry-run-first consolidation behavior.
+- Dashboard memory search now identifies itself as snapshot search instead of
+  promising semantic search that the read-only browser endpoint does not run.
+- ETL descriptions now distinguish retrieval concepts from `surfaces_when`
+  metadata, which is stored but is not a current ranking signal.
+- Session Distiller examples now use the repository-root module path that
+  actually runs.
 - Customer repairs now replace pre-manifest Elefante host registrations only
   when their command structurally identifies an older Elefante MCP runtime.
   Unrelated user-owned servers with the same name remain untouched.
 - Installation now proves the same stdio bridge and local daemon path used by
   customer IDEs, with enough startup time for a cold local runtime.
+- Release-candidate tooling and workflows now derive manifest identity, archive
+  names, and installation checks from the package version instead of embedding
+  the previous release number or importing product dependencies before setup.
 
 ## [2.12.2] - 2026-08-05
 
