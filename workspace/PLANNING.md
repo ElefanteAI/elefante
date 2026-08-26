@@ -73,13 +73,13 @@ The non-negotiable product shape is:
 | Privacy boundary | Dashboard and local APIs bind loopback by default; no wildcard CORS; documented proxy/auth responsibility | Guarded locally; dashboard and daemon boundary tests pass |
 | Write authority | Retrieval surfaces cannot mutate memory/graph state; writes use explicit, observable tools | Guarded locally; GraphQuery mutation regressions pass |
 | Data integrity | One-writer daemon, Source provenance, migration + rollback proof | Runtime and isolated recovery proofs pass. Legacy-store migrations remain stopped, backup-gated support operations and are not a fresh-install requirement. |
-| Quality | Full suite collects cleanly; targeted regressions and frontend build are green in CI | Published v2.12.2 exact-tag proof is green: 300 tests passed (1 slow test deselected), the isolated slow two-bridge proof passed, the 46/46 self-protocol passed, and the dashboard built. |
+| Quality | Full suite collects cleanly; targeted regressions and frontend build are green in CI | Published v2.12.3 merge proof is green: 327 tests passed, 5 skipped, and 1 slow test deselected; the isolated slow two-bridge proof and all customer-candidate/platform build lanes passed. |
 | Compatibility | Every advertised host has a tested install, reconnect, concurrent-use, upgrade, and uninstall path | In progress — Claude Code, Codex, Gemini CLI, OpenClaw, VS Code, Cursor, and Kiro bridge emission and safe uninstall are tested. An isolated native Codex CLI round trip proves configure, upgrade, user-replacement preservation, and installer-owned removal without touching real user configuration; a separate slow runtime proof runs two real bridge processes concurrently through one daemon with distinct Codex/Claude provenance. Agent Zero is a documented community path; actual host-driven reconnect and certification remain unproven. |
 | Supply chain | Runtime dependency contract is exact; high-severity production dependency findings are resolved or release-blocked | The production lock no longer contains ChromaDB. The strict hash-locked audit reports no known vulnerabilities, closing stale GAP-029. Release archives now require a verified `SHA256SUMS` manifest. |
 
 ---
 
-## §2 Released Product: v2.12.2 Memory Intelligence
+## §2 Released Product: v2.12.3 Memory Intelligence
 
 ### §2.1 Outcome
 
@@ -107,13 +107,13 @@ loopback-only, redacted snapshot-only, and read-only.
 | Work | Current proof |
 |------|---------------|
 | Visual acceptance | The source-grounded dashboard showcase and canonical branding are complete. The website received desktop/mobile dark/light, reduced-motion, and Matrix-state browser evidence before production deployment. |
-| Regression proof | v2.12.2 is the published release. The exact tag passed 300 automated tests with one isolated slow proof deselected and then passed separately; the self-protocol passed 46/46; the dashboard build and production dependency audits passed. |
-| Durable handoff | GitHub release v2.12.2 points to tag commit `e84a8b5`; the customer artifacts and `SHA256SUMS` were independently re-downloaded and verified on 2026-08-25. |
-| Publication | **PUBLISHED 2026-08-05** — v2.12.2 and its macOS, Windows, and Linux customer installers are public. The tag and checksums provide reproducible identity; the GitHub release object is mutable and must not be described as immutable. |
+| Regression proof | v2.12.3 is the published release. PR #26 passed 327 automated tests with 5 skips and one isolated slow proof deselected; the slow proof, dashboard, dependency audit, clean-customer candidate, and macOS/Windows/Linux build lanes passed. |
+| Durable handoff | GitHub release v2.12.3 points to merge commit `5a6bb1b`; all three customer installers were independently re-downloaded and verified against the published `SHA256SUMS`. |
+| Publication | **PUBLISHED 2026-08-26 UTC** — v2.12.3 and its macOS, Windows, and Linux customer installers are public. The tag and checksums provide reproducible identity; the GitHub release object is mutable and must not be described as immutable. |
 
 ### §2.4 Approval gates
 
-The v2.12.2 publication is complete. The following production operations remain
+The v2.12.3 publication is complete. The following production operations remain
 intentionally controlled:
 
 1. Apply provenance or vector-store migrations to live user data.
@@ -142,7 +142,7 @@ Rejected alternatives remain closed without new evidence:
 ### §2.6 Resume verdict
 
 - **RESUME_SAFE:** YES — active state is here; defects/capability gaps are in [`workspace/ISSUES.md`](../workspace/ISSUES.md); integration truth is in [`agents/manifests/ide-integration.yaml`](../agents/manifests/ide-integration.yaml).
-- **PUBLISHED_PRODUCT:** v2.12.2 is live.
+- **PUBLISHED_PRODUCT:** v2.12.3 is live.
 - **PUBLICATION_STATUS:** Published, tagged, and checksum-verified. The GitHub release object is not immutable.
 - **LIVE_RUNTIME:** Installation or upgrade of a user's local runtime remains a separate operator action; repository publication does not mutate it.
 
@@ -175,7 +175,14 @@ the dashboard work does not waive them.
 - Fresh macOS install, health, daemon, MCP handshake, and uninstall proof
 - Published checksums for independent artifact verification
 
-### §3.4 Upcoming (no release or date commitment)
+### §3.4 v2.12.3 — Released patch
+
+- Customer-repair adoption accepts only structurally verified older Elefante registrations and preserves foreign same-name servers
+- Release and capability entrypoints synchronized with shipped behavior
+- Release-candidate identity derived from the package manifest rather than a previous-version literal
+- macOS, Windows, and Linux installers independently checksum-verified after publication
+
+### §3.5 Upcoming (no release or date commitment)
 
 - Expanded `elefante doctor` verification
 - Automated integration-manifest drift checks
@@ -532,6 +539,7 @@ This section is the chronological record of curation events, decisions, and abso
 
 | Date | Event | Driver | Measurement |
 |------|-------|--------|-------------|
+| 2026-08-25 | **v2.12.3 published and independently verified.** PR #26 merged to `main`; the protected release workflow created annotated tag `v2.12.3`, published the GitHub release, and attached the three customer installers plus `SHA256SUMS`. | Complete the owner-authorized surgical patch through the repository control plane and close the active release state with public evidence. | PR gates passed; the publication workflow passed; all three downloaded installers matched the published checksum manifest. Active release surfaces now identify v2.12.3 while historical v2.12.2 records remain unchanged. |
 | 2026-08-25 | **v2.12.3 publication authorized on PR #26.** The audited release marker permits the main-branch workflow to create the exact annotated tag and dispatch the multi-platform release only after merge. | Owner explicitly authorized the surgical v2.12.3 patch publication; direct manual tagging would bypass the repository control plane. | Release-authorization, client-bundle, pipeline, routing, version-sync, and release-note tests pass locally. The marker has no effect before merge; all PR checks remain mandatory. |
 | 2026-08-25 | **BUG-045 release-candidate version drift fixed and guarded.** The client builder/verifier derive candidate identity from the manifest version; the standard-library builder exposes dependency-free version discovery; Quality and standalone client-candidate workflows carry that value through archive and installation checks. | PR #26 correctly bumped the package to v2.12.3, but candidate metadata and two CI lanes still encoded v2.12.2. The first repair then imported dependency-backed `src` before runner setup, recurring BUG-042. | Focused client-bundle and workflow regressions pass, dependency-free version discovery runs under `python -S`, and both edited workflows parse as valid YAML. GitHub rerun remains the publication gate. |
 | 2026-08-25 | **v2.12.3 patch candidate prepared.** The candidate contains the guarded BUG-040 customer-repair hardening and BUG-044 release/capability truth corrections already accumulated after v2.12.2. Task Intelligence remains internal shadow evaluation infrastructure and is not promoted as a public capability. | Owner authorized the surgical resolution after the post-v2.12.2 audit: publish the verified fixes without expanding product scope. | The repository advisor classified the release as PATCH; `bump_version.py` updated the six version-bearing declarations to 2.12.3 and `--check` reported full agreement. The maintained Python suite and isolated slow bridge proof passed; release-note validation, scoped Ruff, diff hygiene, dashboard production build, and npm audit also passed. Publication remains pending. |

@@ -23,6 +23,12 @@ def _read(rel_path: str) -> str:
     return (ROOT / rel_path).read_text(encoding="utf-8")
 
 
+def _current_version() -> str:
+    match = re.search(r'^__version__ = "([^"]+)"$', _read("src/__init__.py"), re.MULTILINE)
+    assert match is not None
+    return match.group(1)
+
+
 def _mcp_surface_counts() -> tuple[int, int]:
     server = _read("src/mcp/server.py")
     return server.count("types.Tool("), server.count("Prompt(")
@@ -116,8 +122,9 @@ def test_active_developer_routing_points_to_current_sources() -> None:
 
 def test_living_plan_tracks_the_released_product_and_separate_client_candidate() -> None:
     planning = _read("workspace/PLANNING.md")
+    current_version = _current_version()
 
-    assert "## §2 Released Product: v2.12.2 Memory Intelligence" in planning
+    assert f"## §2 Released Product: v{current_version} Memory Intelligence" in planning
     assert "### §3.1 v2.11.1 — Shipped baseline" in planning
     assert "### §3.2 v2.12.0 — Released" in planning
     assert "### §3.3 v2.12.2 — Released customer package" in planning
@@ -128,10 +135,10 @@ def test_living_plan_tracks_the_released_product_and_separate_client_candidate()
     assert "| OB4 |" not in planning
     assert "| OB5 |" not in planning
     assert "source-grounded" in planning
-    assert "**PUBLISHED_PRODUCT:** v2.12.2 is live." in planning
+    assert f"**PUBLISHED_PRODUCT:** v{current_version} is live." in planning
     assert "**PUBLICATION_STATUS:**" in planning
     assert "checksum-verified" in planning
-    assert "v2.12.2 is merged to `main`" not in planning
+    assert f"v{current_version} is merged to `main`" not in planning
 
 
 def test_active_scoring_reference_matches_runtime_contract() -> None:
@@ -266,6 +273,7 @@ def test_readme_and_planning_docs_capture_installer_recovery_and_learning_bounda
 
 def test_active_release_claims_avoid_stale_version_promises() -> None:
     """Active entrypoints must not present completed release targets as future."""
+    current_version = _current_version()
     active_paths = (
         "AGENTS.md",
         "README.md",
@@ -275,6 +283,17 @@ def test_active_release_claims_avoid_stale_version_promises() -> None:
         "docs/reference/tools.md",
         "agents/manifests/ide-integration.yaml",
     )
+    current_claims = {
+        "AGENTS.md": (
+            f"**v{current_version}** is the latest published release.",
+            f"Current published release: **v{current_version}**.",
+        ),
+        "README.md": (f"**v{current_version}** — Current published release.",),
+        "docs/README.md": (f"> **v{current_version}** · Published user documentation.",),
+        "docs/explanation/vision.md": (
+            f"> Product explanation · Current published version: v{current_version}",
+        ),
+    }
     stale_patterns = (
         r"currently at \*\*v2\.(?:9|10)",
         r"current:\s*\*\*v2\.(?:9|10)",
@@ -291,7 +310,12 @@ def test_active_release_claims_avoid_stale_version_promises() -> None:
         r"\*\*v2\.12\.1\*\*\s*(?:—|-)\s*current published release",
     )
 
-    violations = []
+    violations = [
+        f"{path}: missing current release claim -> {claim}"
+        for path, claims in current_claims.items()
+        for claim in claims
+        if claim not in _read(path)
+    ]
     for path in active_paths:
         text = _read(path)
         for pattern in stale_patterns:
