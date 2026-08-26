@@ -1007,10 +1007,25 @@ deployment occurred.
   `customer_ready=true` while the real Recall invocation returned HTTP `404`.
   The local tests prove the candidate repair, not the installed runtime.
 
-Local-only commit formation and an exact provenance-bound customer archive are
-the next gates. Installation, one clean normal-question Codex Recall event,
-push, PR update, merge, release, and deployment remain outside this development
-closure; representative multi-task outcome lift remains separate and unproven.
+#### Exact local candidate artifact — verified, not installed
+
+- The implementation candidate is local commit
+  `8b7cc5ba43b33b8c62cc80412359227ad8d2e9d9`. Its customer manifest and embedded
+  `elefante-build.json` agree on version 2.12.3, clean source, candidate channel,
+  and that exact full source commit.
+- The maintained builder produced
+  `dist/elefante-installer-macOS-8b7cc5b.zip`. The independent verifier passed
+  with clean-source, candidate-channel, and macOS-platform requirements. Its
+  SHA-256 is
+  `2a8ca1cce8598d5dd4e72e4e3ba95455115a0eebffa42af9c06e5263a9da8041`.
+- A second clean build was byte-identical and produced the same SHA-256. The
+  archive was not installed, so this proves deterministic packaging and
+  provenance—not live customer readiness or Recall behavior.
+
+Local-only commit formation and exact artifact verification are complete.
+Installation, one clean normal-question Codex Recall event, push, PR update,
+remote merge, release, and deployment remain outside this development closure;
+representative multi-task outcome lift remains separate and unproven.
 
 ### 15.2 Token-financial operating rules
 
