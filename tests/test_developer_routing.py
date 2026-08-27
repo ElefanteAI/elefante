@@ -562,6 +562,32 @@ def test_changelog_contract_is_synced_across_docs_and_embedded_rules() -> None:
     assert "scripts/ci/bump_version.py" in orchestrator
 
 
+def test_changelog_has_one_active_unreleased_section() -> None:
+    changelog = _read("CHANGELOG.md")
+    assert re.findall(r"^## \[Unreleased\]$", changelog, re.MULTILINE) == [
+        "## [Unreleased]"
+    ]
+
+
+def test_value_evidence_docs_do_not_regress_to_pre_slice_status() -> None:
+    planning_current = _read("workspace/PLANNING.md").split(
+        "## §10 Journal", 1
+    )[0]
+    task = _read("workspace/proposals/retrieval-effectiveness.md")
+    session = _read("workspace/proposals/session-intelligence.md")
+    session_compact = " ".join(session.split())
+    proposal_index = _read("workspace/proposals/README.md")
+
+    assert "Draft; not implemented or released" not in planning_current
+    assert "The immediate authorized move after this plan is R0" not in task
+    assert "Until that join is implemented" not in task
+    assert "and the session-metrics pipeline remains unbuilt" not in session_compact
+    assert "automatic normal-host session-metrics pipeline remains unbuilt" in (
+        session_compact
+    )
+    assert "PARTIALLY IMPLEMENTED IN DEVELOPMENT" in proposal_index
+
+
 def test_debug_feedback_loop_docs_are_linked() -> None:
     issues = _read("workspace/ISSUES.md")
     orchestrator_doc = _read("agents/orchestrator.md")
@@ -726,6 +752,67 @@ def test_developer_process_docs_enforce_question_first_token_discipline() -> Non
     assert "quality per token" in best_practices.lower()
 
     assert "Full Signal Injection" in spec_vision
+
+
+def test_developer_value_contract_is_single_and_synchronized() -> None:
+    """Developer value/time must extend the existing three planes, not drift."""
+    planning = _read("workspace/PLANNING.md")
+    session = _read("workspace/proposals/session-intelligence.md")
+    task = _read("workspace/proposals/retrieval-effectiveness.md")
+    token = _read("docs/reference/token-intelligence.md")
+    issues = _read("workspace/ISSUES.md")
+    planning_compact = " ".join(planning.split())
+    session_compact = " ".join(session.split())
+    task_compact = " ".join(task.split())
+    token_compact = " ".join(token.split())
+
+    for name, document in {
+        "living plan": planning,
+        "Session Intelligence": session,
+        "Task Intelligence": task,
+    }.items():
+        assert "accepted value" in document, name
+        assert "total workflow time" in document, name
+        assert "same value in less" in document or "same accepted value in less" in document, name
+        assert "accepted value per total token" in document, name
+
+    for required_clock in (
+        "invocation_duration_ms",
+        "workflow_elapsed_ms",
+        "active_developer_time_ms",
+    ):
+        assert required_clock in session
+
+    for decision_class in (
+        "Developer-value lift",
+        "Workflow-time lift",
+        "Quality-first trade",
+        "Token-only lift",
+        "No lift / harm",
+        "Inconclusive",
+    ):
+        assert decision_class in session
+
+    assert "There is no universal cross-task productivity score" in session_compact
+    assert "does not create a fourth value engine" in session_compact
+    assert "raw events never auto-promote into semantic Memory" in session_compact
+    assert "existing summary CLI opens both ledgers read-only" in session_compact
+    assert "delivered-memory IDs, declared-use events, and outcome" in session_compact
+    assert "### Definition of done" in session
+    assert session.count("**US-DV-") == 10
+    for task_id in range(8):
+        assert f"**DVC-{task_id} " in session
+
+    assert "local value-evidence slice now supplies the missing workflow extension" in task_compact
+    assert "productivity result is `inconclusive`" in task_compact
+    assert "Measure workflow speed, not response theater" in task_compact
+
+    assert "maintained Codex runner emits metadata-only attempt evidence" in planning_compact
+    assert "implemented join binds the existing Task Intelligence trace" in planning_compact
+
+    assert "cannot by themselves support a claim" in token_compact
+    assert "not part of the published" in token_compact
+    assert "LOCAL VALUE-EVIDENCE SLICE IMPLEMENTED; NATURAL LIFT AND PRODUCT CAPABILITY OPEN" in issues
 
 
 def test_installer_docs_route_bug_020_through_screenshot_first_verification() -> None:

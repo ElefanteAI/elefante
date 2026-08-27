@@ -1,5 +1,6 @@
 """Promotion-report tests for Task Intelligence evaluation."""
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -60,6 +61,73 @@ def _record(task_id: str, condition: str, repeat: int, passed: bool) -> dict:
             "acceptance_exit_code": 0 if passed else 1,
         },
         "repeat": repeat,
+    }
+
+
+def _digest(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _live_trial_record(
+    task_id: str,
+    task_class: str,
+    condition: str,
+    *,
+    passed: bool,
+    repeat: int = 1,
+) -> dict:
+    treatment = condition == "treatment"
+    return {
+        "trial_schema_version": 1,
+        "experiment_id": f"natural-{task_id}",
+        "task_id": task_id,
+        "task_class": task_class,
+        "repeat": repeat,
+        "condition": condition,
+        "question_sha256": _digest(f"question:{task_id}"),
+        "acceptance_rubric_sha256": _digest(f"binary-rubric:{task_id}"),
+        "acceptance_scale": "binary",
+        "prompt_sha256": _digest(f"identical-prompt:{task_id}"),
+        "system_instructions_sha256": _digest("fixed-system-instructions"),
+        "held_constant_environment_sha256": _digest("fixed-environment"),
+        "tools_without_elefante_sha256": _digest("fixed-non-elefante-tools"),
+        "source_state_sha256": _digest("fixed-source-state"),
+        "model": "gpt-5.6-sol",
+        "model_version": "exact-version",
+        "reasoning": "max",
+        "run_seed": 20260827,
+        "elefante_available": treatment,
+        "recall_calls": 1 if treatment else 0,
+        "recall_status": "supplied" if treatment else "not-available",
+        "recall_context_tokens": 120 if treatment else 0,
+        "recall_context_token_source": (
+            "model-tokenizer" if treatment else "not-applicable"
+        ),
+        "input_tokens": 600 if treatment else 900,
+        "cached_input_tokens": 250 if treatment else 400,
+        "output_tokens": 80 if treatment else 100,
+        "retries": 0 if treatment else 1,
+        "duration_ms": 900 if treatment else 1200,
+        "token_count_source": "provider-actual",
+        "latency_source": "monotonic-clock",
+        "usage_scope": "all-observed-attempts",
+        "acceptance_passed": passed,
+        "quality": {
+            "correctness": passed,
+            "relevance": passed,
+            "decision_usefulness": passed,
+            "hallucination_control": passed,
+        },
+        "task_origin": "user-request",
+        "independently_arising": True,
+        "evidence_previously_consumed": False,
+        "memory_evidence_sha256": _digest(f"pre-existing-memory:{task_id}"),
+        "memory_created_at_utc": "2026-08-01T12:00:00Z",
+        "task_observed_at_utc": "2026-08-27T13:00:00Z",
+        "preregistered_at_utc": "2026-08-27T13:01:00Z",
+        "run_started_at_utc": (
+            "2026-08-27T13:03:00Z" if treatment else "2026-08-27T13:02:00Z"
+        ),
     }
 
 
@@ -497,3 +565,321 @@ def test_v2_report_loader_does_not_mix_frozen_v1_outcomes(tmp_path) -> None:
     )
 
     assert len(records) == 2
+
+
+def test_live_trial_1_requires_preregistered_exact_question_and_binary_rubric() -> None:
+    record = _live_trial_record(
+        "natural-finance-001", "financial-advisory", "control", passed=True
+    )
+
+    assert benchmark.validate_live_outcome_trial_record(record) == []
+
+    invalid_question = {**record, "question_sha256": "mutable-question"}
+    assert "question_sha256 must be SHA-256" in (
+        benchmark.validate_live_outcome_trial_record(invalid_question)
+    )
+
+    invalid_rubric = {**record, "acceptance_rubric_sha256": "mutable-rubric"}
+    assert "acceptance_rubric_sha256 must be SHA-256" in (
+        benchmark.validate_live_outcome_trial_record(invalid_rubric)
+    )
+
+    non_binary = {**record, "acceptance_scale": "five-point"}
+    assert "acceptance_scale must be binary" in (
+        benchmark.validate_live_outcome_trial_record(non_binary)
+    )
+
+    premature_registration = {
+        **record,
+        "preregistered_at_utc": "2026-08-27T12:59:00Z",
+    }
+    assert "preregistration cannot precede natural task observation" in (
+        benchmark.validate_live_outcome_trial_record(premature_registration)
+    )
+
+    late_registration = {
+        **record,
+        "preregistered_at_utc": "2026-08-27T13:04:00Z",
+    }
+    assert "preregistration must precede the run" in (
+        benchmark.validate_live_outcome_trial_record(late_registration)
+    )
+
+
+def test_live_trial_2_matches_chats_with_only_elefante_availability_changed() -> None:
+    control = _live_trial_record(
+        "natural-finance-001", "financial-advisory", "control", passed=True
+    )
+    treatment = _live_trial_record(
+        "natural-finance-001", "financial-advisory", "treatment", passed=True
+    )
+
+    assert benchmark.validate_live_outcome_trial_pair(control, treatment) == []
+
+    drift_cases = {
+        "prompt_sha256": _digest("different prompt"),
+        "system_instructions_sha256": _digest("different instructions"),
+        "held_constant_environment_sha256": _digest("different environment"),
+        "tools_without_elefante_sha256": _digest("different tools"),
+        "source_state_sha256": _digest("different source state"),
+        "model": "different-model",
+        "model_version": "different-version",
+        "reasoning": "different-reasoning",
+        "run_seed": 7,
+    }
+    for field, value in drift_cases.items():
+        drifted = {**treatment, field: value}
+        assert f"matched pair differs in {field}" in (
+            benchmark.validate_live_outcome_trial_pair(control, drifted)
+        )
+
+    no_match = {
+        **treatment,
+        "recall_status": "no_match",
+        "recall_context_tokens": 0,
+        "recall_context_token_source": "not-applicable",
+    }
+    no_delivery = report.summarize_live_outcome_trials([control, no_match])
+    assert no_delivery["recall_delivery_complete"] is False
+    assert no_delivery["decision"] == "REJECT"
+    assert "treatment-memory-not-supplied" in no_delivery["rejection_reasons"]
+
+
+def test_live_trial_3_records_complete_nonduplicative_cost_accounting() -> None:
+    control = _live_trial_record(
+        "natural-finance-001", "financial-advisory", "control", passed=True
+    )
+    treatment = _live_trial_record(
+        "natural-finance-001", "financial-advisory", "treatment", passed=True
+    )
+
+    result = report.summarize_live_outcome_trials([control, treatment])
+
+    assert result["costs"]["control"] == {
+        "input_tokens": 900,
+        "cached_input_tokens": 400,
+        "output_tokens": 100,
+        "recall_context_tokens": 0,
+        "retries": 1,
+        "duration_ms": 1200,
+        "total_tokens": 1000,
+    }
+    assert result["costs"]["treatment"] == {
+        "input_tokens": 600,
+        "cached_input_tokens": 250,
+        "output_tokens": 80,
+        "recall_context_tokens": 120,
+        "retries": 0,
+        "duration_ms": 900,
+        "total_tokens": 680,
+    }
+    assert result["observed_total_tokens"] == 1680
+    assert result["cached_and_recall_tokens_are_subsets"] is True
+
+    unpaired = _live_trial_record(
+        "natural-unpaired-002", "operations", "treatment", passed=False
+    )
+    incomplete = report.summarize_live_outcome_trials(
+        [control, treatment, unpaired]
+    )
+    assert incomplete["protocol_complete"] is False
+    assert incomplete["decision"] == "INCONCLUSIVE"
+    assert incomplete["costs"]["treatment"]["total_tokens"] == 1360
+    assert incomplete["paired_costs"]["treatment"]["total_tokens"] == 680
+    assert incomplete["observed_total_tokens"] == 2360
+
+    double_counted_recall = {**treatment, "recall_context_tokens": 601}
+    assert "recall_context_tokens cannot exceed input_tokens" in (
+        benchmark.validate_live_outcome_trial_record(double_counted_recall)
+    )
+
+    estimated_recall = {
+        **treatment,
+        "recall_context_token_source": "estimated",
+    }
+    assert "supplied Recall requires an exact token source" in (
+        benchmark.validate_live_outcome_trial_record(estimated_recall)
+    )
+
+
+def test_live_trial_4_scores_quality_and_blocks_unsafe_acceptance() -> None:
+    control = _live_trial_record(
+        "natural-finance-001", "financial-advisory", "control", passed=False
+    )
+    control["quality"] = {
+        "correctness": True,
+        "relevance": True,
+        "decision_usefulness": False,
+        "hallucination_control": True,
+    }
+    treatment = _live_trial_record(
+        "natural-finance-001", "financial-advisory", "treatment", passed=True
+    )
+
+    result = report.summarize_live_outcome_trials([control, treatment])
+
+    assert result["quality_passes"]["control"] == {
+        "correctness": 1,
+        "relevance": 1,
+        "decision_usefulness": 0,
+        "hallucination_control": 1,
+    }
+    assert result["quality_passes"]["treatment"] == {
+        "correctness": 1,
+        "relevance": 1,
+        "decision_usefulness": 1,
+        "hallucination_control": 1,
+    }
+
+    unsafe_acceptance = {
+        **treatment,
+        "quality": {**treatment["quality"], "hallucination_control": False},
+    }
+    assert "accepted outcome requires all quality dimensions to pass" in (
+        benchmark.validate_live_outcome_trial_record(unsafe_acceptance)
+    )
+
+
+def test_live_trial_5_calculates_accepted_task_value_per_total_token() -> None:
+    control = _live_trial_record(
+        "natural-finance-001", "financial-advisory", "control", passed=True
+    )
+    treatment = _live_trial_record(
+        "natural-finance-001", "financial-advisory", "treatment", passed=True
+    )
+    treatment.update(
+        {
+            "input_tokens": 400,
+            "cached_input_tokens": 200,
+            "output_tokens": 100,
+            "recall_context_tokens": 100,
+        }
+    )
+
+    result = report.summarize_live_outcome_trials([control, treatment])
+
+    assert result["accepted_task_value"] == {"control": 1, "treatment": 1}
+    assert result["accepted_task_value_per_total_token"] == {
+        "control": 0.001,
+        "treatment": 0.002,
+    }
+    assert result["accepted_outcomes_per_million_total_tokens"] == {
+        "control": 1000.0,
+        "treatment": 2000.0,
+    }
+    assert result["token_intelligence_lift_per_million_total_tokens"] == 1000.0
+
+
+def test_live_trial_6_rejects_cost_without_value_and_any_acceptance_regression() -> None:
+    control = _live_trial_record(
+        "natural-finance-001", "financial-advisory", "control", passed=True
+    )
+    treatment = _live_trial_record(
+        "natural-finance-001", "financial-advisory", "treatment", passed=True
+    )
+    treatment.update(
+        {
+            "input_tokens": 1200,
+            "cached_input_tokens": 500,
+            "output_tokens": 200,
+        }
+    )
+
+    costly = report.summarize_live_outcome_trials([control, treatment])
+
+    assert costly["higher_cost_without_accepted_value_gain"] is True
+    assert costly["decision"] == "REJECT"
+    assert "higher-cost-without-accepted-value-gain" in costly["rejection_reasons"]
+
+    regressed = _live_trial_record(
+        "natural-finance-001", "financial-advisory", "treatment", passed=False
+    )
+    regressed.update(
+        {
+            "input_tokens": 100,
+            "cached_input_tokens": 50,
+            "output_tokens": 20,
+            "recall_context_tokens": 50,
+        }
+    )
+    regression = report.summarize_live_outcome_trials([control, regressed])
+
+    assert regression["acceptance_regression"] is True
+    assert regression["decision"] == "REJECT"
+    assert "acceptance-regression" in regression["rejection_reasons"]
+
+    offsetting_records = [
+        _live_trial_record(
+            "natural-improvement-002", "operations", "control", passed=False
+        ),
+        _live_trial_record(
+            "natural-improvement-002", "operations", "treatment", passed=True
+        ),
+        _live_trial_record(
+            "natural-regression-003", "product-decision", "control", passed=True
+        ),
+        _live_trial_record(
+            "natural-regression-003", "product-decision", "treatment", passed=False
+        ),
+    ]
+    offsetting = report.summarize_live_outcome_trials(offsetting_records)
+
+    assert offsetting["acceptance_regression"] is False
+    assert offsetting["token_intelligence_lift_per_million_total_tokens"] > 0
+    assert offsetting["decision"] == "REJECT"
+    assert offsetting["local_signal_gate"] is False
+    assert "blocking-pair-rejection" in offsetting["rejection_reasons"]
+    assert any(
+        pair["rejection_reason"] == "acceptance-regression"
+        for pair in offsetting["pair_decisions"]
+    )
+
+
+def test_live_trial_7_requires_multiple_natural_tasks_before_a_product_claim() -> None:
+    first_pair = [
+        _live_trial_record(
+            "natural-finance-001", "financial-advisory", condition, passed=True
+        )
+        for condition in ("control", "treatment")
+    ]
+
+    one_task = report.summarize_live_outcome_trials(first_pair)
+
+    assert one_task["local_signal_gate"] is True
+    assert one_task["product_claim_evidence_gate"] is False
+    assert "insufficient-natural-task-clusters" in one_task["product_claim_blockers"]
+
+    records = list(first_pair)
+    for task_id, task_class in (
+        ("natural-operator-002", "operations"),
+        ("natural-product-003", "product-decision"),
+    ):
+        records.extend(
+            _live_trial_record(task_id, task_class, condition, passed=True)
+            for condition in ("control", "treatment")
+        )
+
+    multi_task = report.summarize_live_outcome_trials(records)
+
+    assert multi_task["task_cluster_count"] == 3
+    assert multi_task["task_class_count"] == 3
+    assert multi_task["product_claim_evidence_gate"] is True
+    assert multi_task["public_claim_authorized"] is False
+
+    manufactured = {**first_pair[0], "task_origin": "benchmark-authored"}
+    assert "task_origin must be naturally occurring" in (
+        benchmark.validate_live_outcome_trial_record(manufactured)
+    )
+
+    reused = {**first_pair[0], "evidence_previously_consumed": True}
+    assert "previously consumed evidence is ineligible" in (
+        benchmark.validate_live_outcome_trial_record(reused)
+    )
+
+    late_memory = {
+        **first_pair[0],
+        "memory_created_at_utc": "2026-08-27T13:00:01Z",
+    }
+    assert "eligible memory must predate the task" in (
+        benchmark.validate_live_outcome_trial_record(late_memory)
+    )

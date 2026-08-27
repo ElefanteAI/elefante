@@ -12,7 +12,7 @@ import subprocess
 import sys
 import tempfile
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -70,6 +70,81 @@ STAGE_TRACE_FIELDS = {
     "change_digest",
     "acceptance_status",
     "acceptance_exit_code",
+}
+LIVE_OUTCOME_TRIAL_FIELDS = {
+    "trial_schema_version",
+    "experiment_id",
+    "task_id",
+    "task_class",
+    "repeat",
+    "condition",
+    "question_sha256",
+    "acceptance_rubric_sha256",
+    "acceptance_scale",
+    "prompt_sha256",
+    "system_instructions_sha256",
+    "held_constant_environment_sha256",
+    "tools_without_elefante_sha256",
+    "source_state_sha256",
+    "model",
+    "model_version",
+    "reasoning",
+    "run_seed",
+    "elefante_available",
+    "recall_calls",
+    "recall_status",
+    "recall_context_tokens",
+    "recall_context_token_source",
+    "input_tokens",
+    "cached_input_tokens",
+    "output_tokens",
+    "retries",
+    "duration_ms",
+    "token_count_source",
+    "latency_source",
+    "usage_scope",
+    "acceptance_passed",
+    "quality",
+    "task_origin",
+    "independently_arising",
+    "evidence_previously_consumed",
+    "memory_evidence_sha256",
+    "memory_created_at_utc",
+    "task_observed_at_utc",
+    "preregistered_at_utc",
+    "run_started_at_utc",
+}
+LIVE_OUTCOME_TRIAL_HASH_FIELDS = {
+    "question_sha256",
+    "acceptance_rubric_sha256",
+    "prompt_sha256",
+    "system_instructions_sha256",
+    "held_constant_environment_sha256",
+    "tools_without_elefante_sha256",
+    "source_state_sha256",
+    "memory_evidence_sha256",
+}
+LIVE_OUTCOME_TRIAL_QUALITY_FIELDS = {
+    "correctness",
+    "relevance",
+    "decision_usefulness",
+    "hallucination_control",
+}
+LIVE_OUTCOME_TRIAL_MATCHED_FIELDS = LIVE_OUTCOME_TRIAL_FIELDS - {
+    "condition",
+    "elefante_available",
+    "recall_calls",
+    "recall_status",
+    "recall_context_tokens",
+    "recall_context_token_source",
+    "input_tokens",
+    "cached_input_tokens",
+    "output_tokens",
+    "retries",
+    "duration_ms",
+    "acceptance_passed",
+    "quality",
+    "run_started_at_utc",
 }
 
 if str(ROOT) not in sys.path:
@@ -556,6 +631,242 @@ def validate_outcome_record(record: dict[str, Any]) -> list[str]:
                 errors.append("Brief stage_trace must contain Brief evidence")
             if trace["delivery_status"] == "delivered" and selected == 0:
                 errors.append("delivered stage_trace requires selected memories")
+    return errors
+
+
+def _parse_live_trial_utc_timestamp(
+    record: dict[str, Any], field: str, errors: list[str]
+) -> datetime | None:
+    value = record.get(field)
+    if not isinstance(value, str) or not value:
+        errors.append(f"{field} must be a UTC ISO-8601 timestamp")
+        return None
+    normalized = f"{value[:-1]}+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        errors.append(f"{field} must be a UTC ISO-8601 timestamp")
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() != timezone.utc.utcoffset(None):
+        errors.append(f"{field} must be a UTC ISO-8601 timestamp")
+        return None
+    return parsed
+
+
+def validate_live_outcome_trial_record(record: dict[str, Any]) -> list[str]:
+    """Validate one metadata-only natural-task control or treatment run.
+
+    Cached and Recall-context tokens are observable subsets of provider input.
+    They are recorded for diagnosis but never added again to total token cost.
+    """
+    errors = [
+        f"{field} is not an allowed live-trial metadata field"
+        for field in sorted(set(record) - LIVE_OUTCOME_TRIAL_FIELDS)
+    ]
+    errors.extend(
+        f"missing required live-trial field: {field}"
+        for field in sorted(LIVE_OUTCOME_TRIAL_FIELDS - set(record))
+    )
+    if record.get("trial_schema_version") != 1:
+        errors.append("trial_schema_version must be 1")
+    for field in ("experiment_id", "task_id", "task_class", "model"):
+        if not isinstance(record.get(field), str) or not record[field].strip():
+            errors.append(f"{field} must be a non-empty string")
+    for field in ("model_version", "reasoning"):
+        if not isinstance(record.get(field), str) or not record[field].strip():
+            errors.append(f"{field} must be a non-empty string")
+    for field in LIVE_OUTCOME_TRIAL_HASH_FIELDS:
+        value = record.get(field)
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+            errors.append(f"{field} must be SHA-256")
+
+    if record.get("acceptance_scale") != "binary":
+        errors.append("acceptance_scale must be binary")
+    if not isinstance(record.get("acceptance_passed"), bool):
+        errors.append("acceptance_passed must be boolean")
+    repeat = record.get("repeat")
+    if not isinstance(repeat, int) or isinstance(repeat, bool) or repeat < 1:
+        errors.append("repeat must be a positive integer")
+    run_seed = record.get("run_seed")
+    if not isinstance(run_seed, int) or isinstance(run_seed, bool) or run_seed < 0:
+        errors.append("run_seed must be a non-negative integer")
+
+    quality = record.get("quality")
+    if not isinstance(quality, dict):
+        errors.append("quality must be an object")
+    else:
+        unexpected = set(quality) - LIVE_OUTCOME_TRIAL_QUALITY_FIELDS
+        missing = LIVE_OUTCOME_TRIAL_QUALITY_FIELDS - set(quality)
+        errors.extend(
+            f"quality.{field} is not allowed" for field in sorted(unexpected)
+        )
+        errors.extend(
+            f"quality missing required field: {field}" for field in sorted(missing)
+        )
+        for field in sorted(LIVE_OUTCOME_TRIAL_QUALITY_FIELDS & set(quality)):
+            if not isinstance(quality[field], bool):
+                errors.append(f"quality.{field} must be boolean")
+        if record.get("acceptance_passed") is True and not all(
+            quality.get(field) is True for field in LIVE_OUTCOME_TRIAL_QUALITY_FIELDS
+        ):
+            errors.append("accepted outcome requires all quality dimensions to pass")
+
+    for field in (
+        "recall_calls",
+        "recall_context_tokens",
+        "input_tokens",
+        "cached_input_tokens",
+        "output_tokens",
+        "retries",
+    ):
+        value = record.get(field)
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            errors.append(f"{field} must be a non-negative integer")
+    duration = record.get("duration_ms")
+    if not isinstance(duration, int) or isinstance(duration, bool) or duration <= 0:
+        errors.append("duration_ms must be a positive integer")
+    input_tokens = record.get("input_tokens")
+    cached_tokens = record.get("cached_input_tokens")
+    output_tokens = record.get("output_tokens")
+    recall_tokens = record.get("recall_context_tokens")
+    if (
+        isinstance(cached_tokens, int)
+        and not isinstance(cached_tokens, bool)
+        and isinstance(input_tokens, int)
+        and not isinstance(input_tokens, bool)
+        and cached_tokens > input_tokens
+    ):
+        errors.append("cached_input_tokens cannot exceed input_tokens")
+    if (
+        isinstance(recall_tokens, int)
+        and not isinstance(recall_tokens, bool)
+        and isinstance(input_tokens, int)
+        and not isinstance(input_tokens, bool)
+        and recall_tokens > input_tokens
+    ):
+        errors.append("recall_context_tokens cannot exceed input_tokens")
+    if (
+        isinstance(input_tokens, int)
+        and not isinstance(input_tokens, bool)
+        and isinstance(output_tokens, int)
+        and not isinstance(output_tokens, bool)
+        and input_tokens + output_tokens <= 0
+    ):
+        errors.append("input_tokens plus output_tokens must be positive")
+
+    if record.get("token_count_source") != "provider-actual":
+        errors.append("token_count_source must be provider-actual")
+    if record.get("latency_source") != "monotonic-clock":
+        errors.append("latency_source must be monotonic-clock")
+    if record.get("usage_scope") != "all-observed-attempts":
+        errors.append("usage_scope must include all observed attempts")
+
+    condition = record.get("condition")
+    available = record.get("elefante_available")
+    recall_calls = record.get("recall_calls")
+    recall_status = record.get("recall_status")
+    recall_token_source = record.get("recall_context_token_source")
+    if not isinstance(available, bool):
+        errors.append("elefante_available must be boolean")
+    if condition == "control":
+        if available is not False:
+            errors.append("control requires Elefante to be unavailable")
+        if recall_calls != 0 or recall_status != "not-available":
+            errors.append("control must record no Recall call")
+        if recall_tokens != 0:
+            errors.append("control must record zero Recall-context tokens")
+        if recall_token_source != "not-applicable":
+            errors.append("control Recall-context token source must be not-applicable")
+    elif condition == "treatment":
+        if available is not True:
+            errors.append("treatment requires Elefante to be available")
+        if recall_calls != 1:
+            errors.append("treatment must record exactly one Recall call")
+        if recall_status not in {"supplied", "no_match", "blocked", "unavailable"}:
+            errors.append("treatment recall_status is invalid")
+        if recall_status == "supplied" and not (
+            isinstance(recall_tokens, int)
+            and not isinstance(recall_tokens, bool)
+            and recall_tokens > 0
+        ):
+            errors.append("supplied Recall requires positive Recall-context tokens")
+        if recall_status == "supplied" and recall_token_source not in {
+            "model-tokenizer",
+            "provider-attributed",
+        }:
+            errors.append("supplied Recall requires an exact token source")
+        if recall_status in {"no_match", "blocked", "unavailable"} and (
+            recall_tokens != 0
+        ):
+            errors.append("unsupplied Recall requires zero Recall-context tokens")
+        if (
+            recall_status in {"no_match", "blocked", "unavailable"}
+            and recall_token_source != "not-applicable"
+        ):
+            errors.append(
+                "unsupplied Recall-context token source must be not-applicable"
+            )
+    else:
+        errors.append("condition must be control or treatment")
+
+    if record.get("task_origin") not in {"user-request", "external-event"}:
+        errors.append("task_origin must be naturally occurring")
+    if record.get("independently_arising") is not True:
+        errors.append("task must be independently arising")
+    if record.get("evidence_previously_consumed") is not False:
+        errors.append("previously consumed evidence is ineligible")
+
+    memory_created = _parse_live_trial_utc_timestamp(
+        record, "memory_created_at_utc", errors
+    )
+    task_observed = _parse_live_trial_utc_timestamp(
+        record, "task_observed_at_utc", errors
+    )
+    preregistered = _parse_live_trial_utc_timestamp(
+        record, "preregistered_at_utc", errors
+    )
+    run_started = _parse_live_trial_utc_timestamp(
+        record, "run_started_at_utc", errors
+    )
+    if memory_created is not None and task_observed is not None:
+        if memory_created >= task_observed:
+            errors.append("eligible memory must predate the task")
+    if task_observed is not None and preregistered is not None:
+        if task_observed > preregistered:
+            errors.append(
+                "preregistration cannot precede natural task observation"
+            )
+    if preregistered is not None and run_started is not None:
+        if preregistered >= run_started:
+            errors.append("preregistration must precede the run")
+    return errors
+
+
+def validate_live_outcome_trial_pair(
+    first: dict[str, Any], second: dict[str, Any]
+) -> list[str]:
+    """Require a matched control/treatment pair with one intervention only."""
+    errors: list[str] = []
+    conditions = {first.get("condition"), second.get("condition")}
+    if conditions != {"control", "treatment"}:
+        errors.append("matched pair requires one control and one treatment")
+        control = first
+        treatment = second
+    else:
+        by_condition = {first["condition"]: first, second["condition"]: second}
+        control = by_condition["control"]
+        treatment = by_condition["treatment"]
+    errors.extend(
+        f"control: {error}"
+        for error in validate_live_outcome_trial_record(control)
+    )
+    errors.extend(
+        f"treatment: {error}"
+        for error in validate_live_outcome_trial_record(treatment)
+    )
+    for field in sorted(LIVE_OUTCOME_TRIAL_MATCHED_FIELDS):
+        if control.get(field) != treatment.get(field):
+            errors.append(f"matched pair differs in {field}")
     return errors
 
 

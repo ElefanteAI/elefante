@@ -1,6 +1,6 @@
 ---
 status: living
-last_updated: 2026-08-26
+last_updated: 2026-08-27
 audience: developer-agents
 authority: state + roadmap + features + aspect-plans for Elefante development
 related:
@@ -21,13 +21,16 @@ related:
 
 ## §1 Vision
 
-**Elefante is a local memory authority that maximizes accepted task quality per
-total token.**
+**Elefante is a local memory authority that helps an AI-assisted developer
+deliver more accepted value in the same total workflow time, or the same
+accepted value in less time, while maximizing accepted value per total token.**
 
-Every AI agent runs on the same physics: a finite context window where every token either raises the probability of a correct answer or dilutes it. Most workflows lose by injecting noise — restated history, irrelevant retrievals, polite filler, stale assumptions. Elefante wins by injecting only the tokens with the highest decision-value at the moment of action.
+Every AI agent runs on the same physics: a finite context window where every token either raises the probability of a correct answer or dilutes it. Most workflows lose by injecting noise — restated history, irrelevant retrievals, polite filler, stale assumptions. Elefante wins by injecting only the tokens with the highest decision-value at the moment of action. Token efficiency is a means; the developer outcome is accepted work across the complete path to acceptance, including retries, corrections, tools, waits, and rework.
 
 **The product is one sentence:** *Elefante gives each task the smallest governed
-set of durable context that measurably improves accepted value per total token.*
+set of durable context that measurably delivers more accepted developer value
+in the same or less total workflow time, or the same value in less time, while
+preserving accepted value per total token.*
 
 User-facing definition: *"Elefante is a persistent second brain for AI agents."*
 
@@ -36,8 +39,9 @@ User-facing definition: *"Elefante is a persistent second brain for AI agents."*
 1. **Continuity** — Relevant durable context can carry across sessions; a new task is not forced to inherit unrelated history.
 2. **Compliance** — Search before a memory write so existing knowledge is reused or amended instead of duplicated.
 3. **Grounding** — Project-specific claims require current memory or workspace evidence; otherwise they are UNKNOWN.
-4. **Task Intelligence** — Retrieved context must improve accepted task value
-   per total token. A failed task has zero value, however cheaply it fails.
+4. **Task Intelligence** — Retrieved context must improve accepted developer
+   value versus total workflow time and preserve accepted value per total token.
+   A failed task has zero value, however fast or cheaply it fails.
 
 Laws 1–3 protect continuity and truth; Law 4 defines the product outcome.
 
@@ -194,9 +198,10 @@ verification methods, not product priorities.
 
 | Priority | Customer outcome | Current state | Exit gate |
 |----------|------------------|---------------|-----------|
-| **P0 — Improve one real memory-dependent task** | The governed memory bundle increases accepted task value per total token against the source-only path | A real fresh-session decision question now has a bounded local signal: the pre-existing canonical mission produced 3/3 accepted answers while the no-memory control returned `UNKNOWN` in 0/3. Model-free controls select only the mission on its paraphrase and abstain on the unrelated GitHub issue screen. On that same mission question, selective Recall and full-store injection both produced an accepted answer, but selective Recall used 14,912 total tokens versus 15,420 for all six records. This remains one task and not representative product proof. | Reproduce on a second independently arising task with a different pre-existing decision-changing memory, then use the maintained evaluator before any promotion claim. |
-| **P1 — Generalize without losing trust** | Benefit repeats across independent task classes without privacy, authority, scope, contradiction, token, or latency failure | No one-task result establishes representative benefit | Repeat on an independent task, then use a fresh powered design only if both local signals survive |
-| **P2 — Ship a recoverable customer capability** | Supported hosts receive the proven behavior with clear diagnostics and rollback | BUG-052 provenance is guarded in development. Exact candidate `b05d794` passed a fresh hosted-macOS install, health check, uninstall, portable checksum verification, and independent manifest/payload source-identity verification. Published v2.12.3 and the current local install do not include that unreleased development contract; later behavior remains unreleased. | Replace the legacy local runtime only under explicit install authority, then require separate merge/release authority. |
+| **P0 — Freeze the Developer Value Contract** | Value, quality floors, total workflow time, token economics, evidence, privacy, learning, and claim classes have one inspectable definition | COMPLETE FOR BOUNDED LOCAL DEVELOPMENT — the owner explicitly authorized completion of one value-evidence vertical slice under DVC-0 on 2026-08-27, and synthetic fixtures enforce the frozen contract. This is not formal legal/privacy approval or customer telemetry authority. | Closed for this slice; re-open before any installed collection, changed purpose/data inventory, remote reporting, or public claim. |
+| **P1 — Prove one real memory-dependent workflow** | The governed memory bundle produces more accepted value in the same/less total workflow time, or the same value in less time, without trust, quality, or token-financial regression | MEASUREMENT SLICE READY / FIELD RESULT OPEN — the local producer, event/control store, exact clocks, provenance-bound Task Intelligence join, and read-only baseline/task-pair Signal Card are implemented. R5 remains unentered because no eligible pre-existing decision-changing memory arose. | On the next naturally arising eligible task, pre-register and run the matched pair through this path; stop on any trust, quality, workflow-time, or token-financial regression. |
+| **P2 — Generalize without losing trust** | Benefit repeats across independent task classes without privacy, authority, scope, contradiction, quality, workflow-time, or token regression | No one-task result establishes representative benefit | Require distinct natural task classes, stable configuration, complete evidence, and a positive task-clustered lower bound before any product claim. |
+| **P3 — Ship a recoverable customer capability** | Supported hosts receive the proven behavior with clear diagnostics, inspection, deletion, and rollback | At the 2026-08-27 pre-push audit, local candidate source `8b7cc5b` was installed and reported customer readiness, 17 tools, and a supplied read-only Recall probe. This proves installed candidate transport/capability, not developer-value lift. Published v2.12.3 remains unchanged. | Complete DVC-4 through DVC-7 and installed-artifact acceptance, then require separate PR, merge, release, website, and deployment authority. |
 
 ### §3.6 Upcoming (no release or date commitment)
 
@@ -208,7 +213,7 @@ verification methods, not product priorities.
 - Usage intelligence
 - Portable import and team synchronization
 
-### §3.6 What does NOT justify v3.0.0
+### §3.7 What does NOT justify v3.0.0
 
 This plan stays on v2.x deliberately. v3.0.0 only justified by:
 
@@ -232,15 +237,15 @@ a release or date promise.
 - **E. Multi-Modal & Platform** — Multi-Modal Memory (concept); additional host certification (see §3.3); Agent Zero remains a documented community path
 - **F. Distribution Packaging** — Branded macOS DMG (build script done; CI wired; signing credentials pending); Branded Windows EXE (not built); Manual Fallback Path (shipped — `install.sh`/`install.bat`)
 
-### §4.2 In design (status: draft PRD)
+### §4.2 In design or development (status: unreleased)
 
 Each row links to the full PRD. **Authority:** the linked file is the source of truth for the PRD body; this table indexes by status.
 
 | Feature | PRD | Status |
 |---------|-----|--------|
 | Host integration surface (daemon, adapters, ownership schema) | [`workspace/proposals/ide-integration-surface.md`](../workspace/proposals/ide-integration-surface.md) | Shared runtime and verified detected-host coverage implemented; additional adapters and certification upcoming |
-| Session intelligence (local token-financial usage signals) | [`workspace/proposals/session-intelligence.md`](../workspace/proposals/session-intelligence.md) | DRAFT — owner-directed token-financial companion thesis curated; Phase 0 purpose, consent, evidence, retention, deletion, and Signal Card contract must be accepted before implementation. It reuses semantic Memory for durable user meaning and Task Intelligence for outcome evidence; no duplicate usefulness system or public claim. |
-| Task Intelligence (eligible task → failed-stage diagnosis → one causal repair → behavioral outcome) | [`workspace/proposals/retrieval-effectiveness.md`](../workspace/proposals/retrieval-effectiveness.md) | RECALL-FIRST DEVELOPMENT COMPLETE / LOCAL INSTALLED-CANDIDATE ACCEPTANCE PASSED — R0 through R4 and R6 development closure pass; R4 required no selector change. R5 was correctly not entered because no pre-existing decision-changing memory was supplied, so representative lift remains unproven. The local v2.12.3 candidate at source `8b7cc5b` reports 17 tools, read-only Recall, and customer readiness; this Codex task's reattached normal-question event returned `status=supplied`, two governed memories, and the expected test fact. Push, PR update, remote merge, version formation, promotion, and publication remain separately gated; published v2.12.3 is unchanged. |
+| Session intelligence (local developer-value and token-financial signals) | [`workspace/proposals/session-intelligence.md`](../workspace/proposals/session-intelligence.md) | LOCAL VALUE-EVIDENCE VERTICAL SLICE IMPLEMENTED — DVC-0 was frozen under explicit owner authorization for this opt-in local development slice; a versioned fresh-store metadata path, exact clocks, Codex provider-usage adapter, provenance-bound Task Intelligence join, and read-only Value Baseline/task-pair Signal Card path exist. Automatic host instrumentation, schema upgrades, broader cards, governed learning, natural R5 proof, installed capability, public claim, and release remain open. |
+| Task Intelligence (eligible task → failed-stage diagnosis → one causal repair → behavioral outcome) | [`workspace/proposals/retrieval-effectiveness.md`](../workspace/proposals/retrieval-effectiveness.md) | RECALL-FIRST DEVELOPMENT COMPLETE / LOCAL INSTALLED-CANDIDATE ACCEPTANCE PASSED — R0 through R4 and R6 development closure pass; R4 required no selector change. R5 was correctly not entered because no pre-existing decision-changing memory was supplied, so representative lift remains unproven. At the 2026-08-27 pre-push audit, the local v2.12.3 candidate at source `8b7cc5b` reported 17 tools, read-only Recall, and customer readiness; this Codex task's reattached normal-question event returned `status=supplied`, two governed memories, and the expected test fact. PR update, remote merge, version formation, promotion, and publication remain separately gated; published v2.12.3 is unchanged. |
 | Memory identity | [`workspace/proposals/memory-identity.md`](../workspace/proposals/memory-identity.md) | DEFERRED DESIGN REFERENCE — no schema implementation unless Task Intelligence evidence first proves a state/scope failure and local benefit from resolution |
 
 ### §4.3 Released design record
@@ -335,21 +340,37 @@ v2.10.0 journal and changelog; reopen only with new user or retrieval evidence.
 
 ### §5.1 Active blockers
 
-- Task Intelligence has evaluation infrastructure but no demonstrated increase
-  in accepted task value per total token across a representative multi-task
-  corpus.
+- Task Intelligence has an executable seven-part natural-task guard but no
+  demonstrated developer-value/time lift or accepted-value-per-token lift across
+  a representative multi-task corpus.
+- The local slice now records bounded invocation duration and a separate
+  monotonic elapsed-to-terminal workflow clock, but no normal host automatically
+  owns the full user workflow boundary yet. Active developer time remains
+  optional and `unknown` unless independently sourced.
+- The pre-registered multi-unit value contract, hard floors, and Task
+  Intelligence value-bound outcome are implemented for explicit local
+  development evidence. No natural eligible task has populated a claim-bearing
+  pair, and one pair would remain only a local signal.
+- The maintained Codex runner emits metadata-only attempt evidence and the
+  existing summary CLI renders the joined card read-only. Only one complete
+  provider usage event is accepted as actual; missing, malformed, or multiple
+  events fail closed as `unknown`.
+- The implemented join binds the existing Task Intelligence trace, delivery,
+  declared use, workflow facts, value outcome, and exact provenance digest.
+  Recall status plus a memory hash remains insufficient causal attribution.
 - No second independent causal lift is proven. A real release-candidate
   validation task arose naturally, but Task Intelligence correctly abstained:
   both pre-existing records were too generic to change that task. After the
   source-provenance defect was verified, one managed task-local invariant was
   captured for future work; it cannot be reused retroactively as lift evidence.
-- Default Task Brief injection remains blocked until the evaluation proves benefit without unacceptable token cost or regressions.
+- Default Task Brief injection remains blocked until the evaluation proves
+  benefit without unacceptable trust, quality, workflow-time, or token cost
+  regressions.
 - Governance and Task Intelligence lifecycle behavior are implemented only in
   unreleased development. The published v2.12.3 client remains unchanged.
-- BUG-052 is fixed again in development. Exact candidate `b05d794` has agreeing
-  archive, payload, installed runtime, and `doctor` provenance plus a portable
-  checksum; the current installed runtime remains legacy because this machine
-  was not silently upgraded.
+- At the 2026-08-27 pre-push audit, the installed local candidate was healthy at source `8b7cc5b` and
+  exposes read-only Recall, but it has no Session Intelligence event store or
+  representative outcome proof. Published v2.12.3 remains a separate identity.
 
 ### §5.2 Performance / efficiency improvements
 
@@ -363,14 +384,23 @@ v2.10.0 journal and changelog; reopen only with new user or retrieval evidence.
 
 ### §5.3 Planned optimization work
 
-- Run the exact sealed real-memory calibration pair only after deterministic
-  preflight is green and with explicit cumulative token caps.
+- Re-open the DVC-0 authority gate before changing the authorized purpose, field
+  inventory, retention, deletion, privacy, or claim contract, or before any
+  installed/background collection.
+- Extend the implemented local slice only through existing DVC ownership:
+  schema-upgrade fixtures and automatic normal-host workflow boundaries first,
+  then the remaining session/weekly inspection cards. Do not create another
+  ledger or report path.
+- Run the next naturally arising real-memory pair only after deterministic
+  preflight is green and with explicit cumulative time and token caps.
 - Add independently reviewed real-memory tasks from different task classes;
   never reuse the consumed preliminary holdout for promotion.
-- Measure black-box acceptance, retries, corrections, total input-plus-output
-  token cost, latency, privacy, and failure stage independently; compare the
-  combined accepted-value-per-total-token result only within frozen paired
-  tasks.
+- Measure pre-registered accepted value, hard quality floors, retries,
+  corrections, rework, total input-plus-output token cost, invocation latency,
+  full workflow elapsed time, optional sourced active-developer time, privacy,
+  and failure stage independently. Compare value/time and value/token only
+  within frozen paired tasks; label higher value with higher workflow time a
+  quality-first trade, not productivity.
 - Keep the 17th development tool and pilot delivery default-off until a fresh
   representative holdout demonstrates net task improvement.
 
@@ -505,6 +535,9 @@ This section is the chronological record of curation events, decisions, and abso
 
 | Date | Event | Driver | Measurement |
 |------|-------|--------|-------------|
+| 2026-08-27 | **One complete local value-evidence vertical slice was implemented without creating another outcome authority or reporting path.** The existing Codex evaluator now emits metadata-only attempt evidence; an explicit opt-in, versioned local Session Intelligence store records frozen value contracts, separate monotonic clocks, retries/corrections/rework, exact usage provenance, retention, and user controls; WorkflowRun joins to the existing Task Intelligence trace by opaque ID plus verified provenance, question, and rubric digests; and the existing summary CLI opens both stores read-only to render an honest Value Baseline or matched-task Signal Card. The card distinguishes value lift, workflow-time lift, quality-first trade, token-only lift, harm, and inconclusive evidence, and never promotes one task into a product claim. | The owner authorized completion of the next milestone as one value-evidence vertical slice. The implementation deliberately stops before automatic host collection, semantic-memory learning, installed runtime change, or field claims. | The affected Session/Task ledger, producer, evaluator, and report suite passes 102/102; the producer emits no raw message content, ambiguous or timed-out provider usage fails to `unknown`, non-boolean acceptance is rejected, pre-registered contracts survive process restarts, deletion/retention removes contracts only when their workflows no longer reference them, read-only reporting leaves both databases unchanged, and synthetic pair fixtures prove response speed cannot masquerade as workflow productivity. At this pre-publication verification checkpoint, the fixtures remained protocol evidence only: no naturally arising eligible R5 task, provider-billed live pair, representative lift, durable-memory write, installed-runtime/host change, PR update, merge, release, website change, or deployment occurred. |
+| 2026-08-27 | **The Developer Value Contract was reconciled into the existing three planes without creating a fourth score, ledger, PRD, or event path.** Governed Memory owns goals and constraints; Session Intelligence now specifies pre-registered value units, hard quality floors, invocation/workflow/active-human clocks, token and rate provenance, decision classes, Signal Cards, retention/deletion, milestone fact review, DVC-0 through DVC-7, and ten developer user stories; Task Intelligence remains the outcome and causal authority. The strict productivity result is more accepted value in the same or less total workflow time, or the same value in less time. Higher value with higher time is a labeled quality-first trade, and token finance remains a separate required efficiency view. | The owner required Elefante to prove that it helps a developer deliver more value in the same time or the same value in less time, while allowing slower responses for better accuracy, making incremental memory learning governed and measurable, and reusing all prior work. Read-only architecture review rejected a redundant fourth plane and exposed that current `duration_ms`, provider labels, and the isolated synthetic live report do not yet prove a complete developer workflow. | Three bounded Luna audits and primary source review converged on the same gaps. Fresh routing and Task Intelligence suites pass 44/44 and 62/62; the 32-task benchmark manifest reports zero errors and remains diagnostic-only; scoped Ruff and whitespace pass. Read-only doctor at `2026-08-27T10:36:39-04:00` reports the installed v2.12.3 candidate at source `8b7cc5b`, customer readiness, 17 tools, and a supplied Recall probe. At that earlier design-only checkpoint, Phase 0 was ready for owner review but not accepted, and no event store, provider ingest, workflow instrumentation, natural R5 task, product claim, durable-memory mutation, runtime/host change, commit, push, PR update, merge, release, website change, or deployment had occurred. |
+| 2026-08-27 | **The seven-part live outcome measurement plan became an executable fail-closed contract without entering R5.** The existing evaluator now binds the exact question and binary rubric before either run, requires identical prompt/system/source/model/reasoning/non-Elefante-tool state across control and treatment, records provider-actual input/cached/output plus exactly attributed Recall-context/retry/latency, scores correctness/relevance/decision usefulness/hallucination control, computes accepted value per total token, rejects unsupplied Recall, cost without value, or any acceptance/quality regression, and blocks one-task product evidence. Cached and Recall tokens remain reported input subsets rather than duplicate cost. | The proposed live demo could otherwise change prompts, hide retry spend, credit a `no_match` treatment, reward cheap failure, or turn one favorable task into a product claim. | Seven numbered contract regressions pass. The affected Task Intelligence verifier/report/evaluation set passes 62/62 and scoped Ruff plus whitespace pass. Fixtures are synthetic metadata: no model run, natural R5 task, product-lift claim, durable-memory access or mutation, installed-runtime/host change, push, PR update, merge, release, website change, or deployment occurred. |
 | 2026-08-26 | **The surgical bridge recycle produced delayed Codex reattachment and a passing live Recall event.** One graceful `TERM` removed only stale stdio bridge PID `24229`, the eight-hour-old child of Codex app-server PID `22073`; the immediate post-change Recall correctly failed `Transport closed`. Without another mutation, Codex later spawned bridge PID `58597` under the same app-server, and exactly one post-respawn normal question returned `status=supplied`, `supplied_count=2`, `read_only=true`, and the expected test fact. | The repaired candidate was healthy through its own doctor and a new direct bridge, but this task retained the MCP session created before installation. The pre-documented diagnostic isolated that host-session boundary. The delayed respawn proves this host can supervise a replacement, but manual child termination remains an undocumented diagnostic rather than customer guidance; OpenAI's supported path remains the MCP Restart action. | Preflight at `2026-08-26T17:34:15-04:00` and final checks preserved installed v2.12.3 candidate source `8b7cc5b`, healthy daemon PID `55811`, public `origin/main` `14fda301`, PR #25 open/draft/DIRTY at `d9aefb1e`, original 49-path dirty-tree fingerprint `cd285fad...8df`, and website source/live `d4e1f321` at v2.12.3. Doctor still reports 17 tools, read-only `probe_status=supplied`, and `customer_ready=true`. The returned context was 673 characters; that is a transport-size observation, not a provider-token or billing claim. No outcome trial, representative-lift claim, memory mutation, daemon/app restart, configuration rewrite, push, PR update, merge, release, or deployment occurred. |
 | 2026-08-26 | **The provenance-bound Recall candidate was installed locally; runtime proof is green and Codex reattachment remains open.** The installer stopped the owned daemon, preserved a fresh checksum-verified data backup and the complete prior runtime, installed the exact clean candidate at the stable customer path, refreshed the installer-owned hosts, and restarted the loopback daemon. The candidate fixes the false-ready doctor by making live Recall capability part of customer readiness. | The owner rejected HTTP-404 Recall as an acceptable stopping state. The smallest trustworthy repair was the already verified customer archive, not a hand-patched installed file. | Installed identity: v2.12.3, candidate, clean source `8b7cc5ba43b33b8c62cc80412359227ad8d2e9d9`. Doctor and an independent direct bridge report 17 tools, read-only Recall annotations, `status=supplied`, and `customer_ready=true`. Backup: `/Users/jay/.elefante/backups/elefante_data_backup_20260826_210611.zip`, SHA-256 `18f44bb0822677cd06501e06f95f09470378f73def98ad37d90041cd90bf8826`; prior runtime: `/Users/jay/.elefante/app/current.backup.20260826_170620`. Acceptance is not closed: this already-open Codex task still uses its pre-upgrade MCP session and returns HTTP 404; the fresh ephemeral Codex run initialized a new bridge but hung before any model/tool event and was terminated after the bound. Official client MCP Restart plus one normal-question proof remains required. No memory deletion, restore, migration, push, PR update, merge, release, website change, or deployment occurred. |
 | 2026-08-26 | **PR #25 development reconciled locally with v2.12.3 and formed as a provenance-bound candidate.** The now-DIRTY remote PR was not rewritten. Instead, current `origin/main` and the exact PR head were merged in an isolated worktree, the preserved 49-path development package was reconciled by source authority, duplicate/stale documentation claims were guarded, Session Intelligence was committed separately, and the governed Recall candidate was committed locally. | The owner authorized surgical implementation but required stop-on-drift, Recall-first value, token-financial discipline, documentation before development, and no acceptance claim without real proof. | Local commits: merge `46f5ef8`, Session Intelligence `8adc74f`, implementation `8b7cc5b`. Affected lane: 263 passed, one deselected. Full fast collection: 500 passed, four explicit legacy-backend skips, one slow deselection; the slow bridge test passed separately. Self-protocol: 48/48 in disposable HOME/data. Dashboard build and both npm audits pass with zero vulnerabilities; version, release, YAML, compilation, benchmark, and diff gates pass. The exact clean macOS candidate is `dist/elefante-installer-macOS-8b7cc5b.zip`, SHA-256 `2a8ca1cce8598d5dd4e72e4e3ba95455115a0eebffa42af9c06e5263a9da8041`; a second build was byte-identical. At that pre-install closure, installed acceptance remained negative because legacy doctor readiness disagreed with the real HTTP-404 Recall event. No eligible pre-existing memory existed, so no outcome trial or lift claim was fabricated. No push, PR update, installation, host change, durable-memory mutation, remote merge, release, or deployment occurred. |
@@ -647,13 +680,13 @@ This section is the chronological record of curation events, decisions, and abso
 | BUG/GAP count tracked | **50 BUG records through BUG-052 + 7 GAPs** | `workspace/ISSUES.md` | Tracked |
 | BUG recurrence rate (pre-distillation) | known per-row in `ISSUES.md` | `workspace/ISSUES.md` Recurrence column | Tracked |
 | BUG recurrence rate after current guards | `UNKNOWN` — needs sustained traffic across sessions | future `ISSUES.md` recurrence updates | Not measured |
-| Documentation guard | 36 tests pass | `tests/test_developer_routing.py` | Verified 2026-08-13 |
-| Full fast regression suite | 458 passed, 4 legacy-backend skips, 1 slow test deselected; isolated slow proof passed | §10 GAP-054 journal entry | Verified 2026-08-13 |
+| Documentation guard | 46 tests pass | `tests/test_developer_routing.py` | Verified 2026-08-27 |
+| Full regression suite | 535 passed, 4 explicit legacy-backend skips, 1 slow test deselected | current exact-tree pytest run | Verified 2026-08-27 |
 | Task Intelligence evaluation corpus | 9 reviewed black-box canaries; 23 historical tasks ineligible; tasks 031 and 032 are consumed sealed-memory diagnostics | `workspace/proposals/retrieval-effectiveness.md` | Infrastructure verified; promotion blocked |
-| Task Intelligence outcome lift | Task 032 stopped at treatment 0/3 and control 0/2; no valid representative multi-task lift exists | `workspace/proposals/retrieval-effectiveness.md` | Not demonstrated; promotion blocked |
+| Task Intelligence outcome lift | One narrow historical mission-task correctness signal exists, but the current natural R5 gate was not entered and no representative multi-task lift exists | `workspace/proposals/retrieval-effectiveness.md` | Local signal only; promotion blocked |
 | Token cost per `elefante-Memory(action="search")` | `TOKEN_STATS` is available per response; aggregate product effect is not measured | `src/mcp/server.py` | Partial |
-| Token-financial companion | Phase 0 product, purpose, evidence, privacy, and user-control contract is drafted; no persistent usage ledger, provider-usage ingest, dollar-cost authority, or enterprise training surface exists | `workspace/proposals/session-intelligence.md` | Draft; not implemented or released |
-| Website production state | Live commit `d4e1f321e646d04d19df7b5ec9e9942951eca83e`, product version 2.12.3; production and online release-manifest verifiers pass | §2.3 and current production proof | Verified 2026-08-26 |
+| Token-financial companion | DVC-0 is frozen under explicit owner authorization for one opt-in local development slice; its fresh-store metadata path, exact clocks, provider-attempt adapter, Task Intelligence join, and read-only baseline/task-pair cards exist. Automatic host collection, schema upgrades, installed capability, broader cards, natural R5 proof, and dollar-cost/product authority remain open | `workspace/proposals/session-intelligence.md` | Development slice only; not released |
+| Website production state | Live commit `d4e1f321e646d04d19df7b5ec9e9942951eca83e`, product version 2.12.3; production and online release-manifest verifiers pass | §2.3 and current production proof | Verified 2026-08-27 |
 
 Unknown and partial rows are explicit evidence gaps, not inferred success.
 

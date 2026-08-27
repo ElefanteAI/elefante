@@ -1,16 +1,16 @@
 # North Star / Implementation PRD: Task Intelligence
 
-> Status: NORTH STAR — METRIC ALIGNED; FIRST BOUNDED FEASIBILITY EXPERIMENT
-> COMPLETE (`STOP`)
+> Status: NORTH STAR — RECALL-FIRST DEVELOPMENT AND LOCAL VALUE-EVIDENCE SLICE
+> COMPLETE; NATURAL R5 AND REPRESENTATIVE LIFT OPEN
 >
 > Product state: governed Recall, Task Brief v2, evaluation, and a metadata-only
 > outcome ledger exist in unreleased development. Representative task lift is
 > not proven.
 >
-> Canonical role: this file owns the Task Intelligence objective, the immediate
-> experiment, its evidence gates, and the boundary to later product work.
+> Canonical role: this file owns the Task Intelligence objective, its evidence
+> gates, the natural R5 continuation, and the boundary to later product work.
 >
-> Task 032 implementation baseline: `7c705ca03371771be68460afb270fe0998f30231`.
+> Historical Task 032 implementation baseline: `7c705ca03371771be68460afb270fe0998f30231`.
 > Current reconciliation line: `agent/task-intelligence-reconcile-v2123`;
 > verify its exact HEAD before work.
 > Published customer release: v2.12.3. The active development source also
@@ -23,8 +23,10 @@
 A future developer starts here, not from the conversation that produced this
 PRD.
 
-- The objective is accepted: maximize accepted task quality per total token on
-  eligible memory-dependent tasks.
+- The objective is accepted: on eligible memory-dependent tasks, prove more
+  accepted developer value in the same or less total workflow time, or the same
+  value in less time, while keeping accepted value per total token as the
+  resource-efficiency gate.
 - The existing infrastructure is not the missing proof. Do not rebuild Recall,
   Task Brief v2, governance, the evaluator, or the outcome ledger.
 - Do not rerun the consumed holdout, task 031, or the historical 20/30-task
@@ -48,9 +50,10 @@ planning index in the same change. Do not silently route around it.
 
 ## 1. North Star
 
-> **For an eligible memory-dependent task, Elefante must maximize accepted task
-> quality per total token by supplying the smallest safe set of applicable
-> durable memories.**
+> **For an eligible memory-dependent task, Elefante must supply the smallest
+> safe set of applicable durable memories that produces more accepted developer
+> value in the same or less total workflow time, or the same accepted value in
+> less time, while preserving accepted value per total token.**
 
 A task may be a question, decision, plan, code change, or validation action.
 Persistence, retrieval, lower token use, and agent acknowledgement are not the
@@ -65,17 +68,31 @@ difficulty. Paired fields include complete pairs only; `observed_total_tokens`
 also exposes every completed run, including unpaired work that caused an early
 stop.
 
+That implemented proxy is necessary but not yet the full developer-value
+contract. The current evaluator's `duration_ms` is a bounded run duration. It is
+not automatically elapsed-to-acceptance for a complete developer workflow and
+never proves active human time. The canonical value-unit, clock, decision-class,
+and privacy design lives in
+[`session-intelligence.md` §3.4](session-intelligence.md#34-developer-value-and-workflow-time-contract).
+The join now exists in the explicit local development slice, but no eligible R5
+pair has used and validated it. Until that happens, Task Intelligence can report
+token efficiency and bounded causal task evidence but cannot claim developer
+productivity.
+
 Priority order:
 
 1. privacy, user authority, scope correctness, and recoverability;
-2. accepted task value per total token;
-3. retries, corrections, latency, and other outcome diagnostics;
-4. retrieval and delivery diagnostics.
+2. accepted developer value versus total workflow time;
+3. accepted task value per total token;
+4. retries, corrections, latency, and other outcome diagnostics;
+5. retrieval and delivery diagnostics.
 
-A cheaper failure remains zero value. With accepted value preserved, fewer total
-tokens are a real improvement; with accepted value increased, extra tokens are
-justified only when the paired value-per-token result improves. No efficiency
-result compensates for a trust violation.
+A cheaper failure remains zero value. With accepted value preserved, less total
+workflow time is the direct developer win and fewer total tokens are a resource
+win. More accepted value that also takes more total workflow time is a
+quality-first trade, not a productivity claim. With accepted value increased,
+extra tokens are justified only when the paired value-per-token result improves.
+No efficiency result compensates for a trust violation.
 
 ## 2. Current truth
 
@@ -163,7 +180,8 @@ public Recall MCP surface.
 
 ### Out of scope
 
-- persistent schema or migration;
+- persistent schema or migration inside this original causal-repair experiment;
+  the later Session Intelligence development store is a separate bounded slice;
 - automatic memory creation, rewriting, reinforcement, or deletion;
 - a new MCP tool or public response field;
 - a second compiler, evaluator, or usefulness ledger;
@@ -273,7 +291,8 @@ Every allowed repair must:
 - preserve memory IDs, provenance, governance, conflict, and token limits;
 - preserve exact current behavior when disabled;
 - default off;
-- add no persistent schema in this experiment.
+- add no persistent schema in this original causal-repair experiment; the later
+  Session Intelligence development store remains a separate ownership boundary.
 
 ### Repair routing
 
@@ -456,7 +475,9 @@ three treatment repeats are bound and observable.
 
 - The experiment flag defaults off.
 - Feature-off behavior remains the current v2 path.
-- No persistent schema or live store changes exist to undo.
+- This original causal-repair experiment made no persistent schema or live-store
+  change. The later Session Intelligence development store has its own explicit
+  opt-in, retention, deletion, reset, and rollback controls.
 - Evaluation uses disposable repository state and a sanitized sealed fixture.
 - Failed workspaces and immutable outcomes remain available for diagnosis.
 - Revert the single repair commit to remove the experiment; do not rewrite
@@ -606,11 +627,10 @@ One local question lift exists; representative lift does not.
 ## 15. Recall-first development program — plan before code
 
 **Status:** DEVELOPMENT COMPLETE; LOCAL INSTALLED-CANDIDATE ACCEPTANCE PASSED;
-REPRESENTATIVE LIFT UNPROVEN. No source implementation begins under this
-program until the package being entered has its dependency, rollback, and
-acceptance proof identified below. This sequence implements the user's
-Recall-first direction without turning the dirty development checkout into an
-unbounded feature pass.
+REPRESENTATIVE LIFT UNPROVEN. Each completed package entered only after its
+dependency, rollback, and acceptance proof were identified below. This sequence
+implements the user's Recall-first direction without turning the dirty
+development checkout into an unbounded feature pass.
 
 **Classification:** BUG-051 owns end-to-end Recall routing; GAP-053 owns the
 difference between broadly relevant and decision-changing memory; GAP-055 owns
@@ -628,7 +648,7 @@ mutation, installation, merge, release, or deployment.
 | **R2 — Recall-aware readiness** | Make readiness verify the capability the host was instructed to use: MCP initializes, `tools/list` contains Recall, annotations are read-only, and one bounded Recall probe returns `supplied`, `no_match`, or governed `blocked`. Missing tool, transport failure, or `404` is not customer-ready. | R1 | Deterministic doctor tests cover present, absent, disabled, `404`, and safe abstention; the probe performs no write and exposes no memory body in diagnostics. |
 | **R3 — Token-financial response contract** | Measure and minimize Recall request, context, protocol, retry, and failure cost without weakening relevance or governance. Preserve the compact customer payload and keep accounting metadata internal. | R2 | Supplied and positive-control answers retain behavior; `no_match`, `blocked`, and `unavailable` are bounded; no internal IDs, directives, entrypoint wrappers, or `TOKEN_STATS` block enter the Recall payload. |
 | **R4 — Relevance and abstention hardening** | Repair only a reproduced retrieval or selection failure. Deliver memory only when it contains discriminative task evidence; preserve one-term facts, governing paths, source-currentness, conflict, privacy, and token limits. | R3 | The first failed causal stage has a failing regression first; false-positive, positive-control, determinism, no-mutation, and hard-budget tests pass. |
-| **R5 — Independent outcome proof** | Compare selective Recall with a source-only control on the next independently arising eligible task whose decision-changing memory predates the task. Do not invent a task or reuse consumed evidence. | R4 and a naturally eligible task | At most three pre-registered pairs; black-box acceptance and all observed spend are bound. A failed outcome has zero value. One task cannot authorize promotion. |
+| **R5 — Independent outcome proof** | Compare selective Recall with a source-only control on the next independently arising eligible task whose decision-changing memory predates the task. Do not invent a task or reuse consumed evidence. | R4 and a naturally eligible task | At most three pre-registered pairs; the exact question, binary acceptance rubric, matched environment, four quality dimensions, and all observed spend are bound. Before a productivity claim, the §3.4 task-value and full-workflow clock extension must also be bound. A failed outcome has zero value. One task cannot authorize promotion. |
 | **R6 — Customer closure** | Synchronize shipped reference, installer guidance, release verification, changelog, and rollback only after R1–R5 establish the behavior they describe. | Required preceding package gates | Documentation routing and release-client verification pass; commit, install, merge, tag, release, and deploy remain separately authorized operations. |
 
 Packages are entered one at a time. A package that fails its exit gate stops the
@@ -654,8 +674,9 @@ more model calls, or a weaker judge.
 - Current ceilings are 1,000 question characters, 12 retrieval candidates,
   three delivered memories, and 450 heuristic context tokens.
 
-R0 passes. R1 is the next package; no product source, installed runtime, host
-configuration, durable memory, or remote state changed during the baseline.
+At that baseline checkpoint, R0 passed and R1 was the next package; no product
+source, installed runtime, host configuration, durable memory, or remote state
+changed during the baseline.
 
 #### R1 result — customer Recall surface parity
 
@@ -671,8 +692,9 @@ configuration, durable memory, or remote state changed during the baseline.
   contract test passes; the complete nine-test release-client suite passed
   before the new guard and will be rerun at closure.
 
-R1 passes. R2 is next. No installed runtime, host configuration, durable
-memory, provider model, remote branch, release, or deployment changed.
+At the R1 checkpoint, R1 passed and R2 was next. No installed runtime, host
+configuration, durable memory, provider model, remote branch, release, or
+deployment changed.
 
 #### R2 decision and subpackage split — Recall-aware readiness
 
@@ -838,8 +860,9 @@ or evaluation prompts.
 - Focused source, prompt, installer-preservation, and real built-customer-archive
   assertions pass: 4 passed; compilation and whitespace checks pass.
 
-R3a passes. R3b is next. No tool was called twice, no provider evaluation ran,
-and no installed guidance, live host, memory, or remote state changed.
+At that checkpoint, R3a passed and R3b was next. No tool was called twice, no
+provider evaluation ran, and no installed guidance, live host, memory, or remote
+state changed.
 
 ##### R3b result — bounded response serialization
 
@@ -876,10 +899,13 @@ memory data changed.
   token-intelligence suite passes: 40 passed; compilation and whitespace checks
   pass.
 
-R3c passes. R3d is next. These totals are process-local estimates, reset with
-the server, and are neither provider usage nor a dollar-cost calculation.
+At the R3c checkpoint, R3c passed and R3d was next. These totals are
+process-local estimates, reset with the server, and are neither provider usage
+nor a dollar-cost calculation.
 
 ##### R3d result — canonical contract reconciliation
+
+At that R3d checkpoint:
 
 - The tool, token-intelligence, architecture, self-protocol, orchestrator,
   Copilot, script-index, issue, and changelog surfaces now agree on the one-call
@@ -888,10 +914,10 @@ the server, and are neither provider usage nor a dollar-cost calculation.
 - The references continue to state that published v2.12.3 exposes 16 tools and
   that Recall is an unreleased customer candidate in this checkout. Development
   proof is not rewritten as an installed or published claim.
-- A cross-document regression binds those claims to the source constants and
-  installed-flow descriptions. It passes, and the full documentation-routing
-  suite passes: 38 passed; link, anchor, inventory, release-boundary, and
-  whitespace checks are included.
+- A cross-document regression bound those claims to the source constants and
+  installed-flow descriptions. The then-current documentation-routing suite
+  passed 38 tests; link, anchor, inventory, release-boundary, and whitespace
+  checks were included. Current closure proof is recorded in `PLANNING.md` §10.2.
 
 R3 passes. No provider evaluation was needed: the repaired serialization path
 reduced the measured CJK response from 1,587 to 475 heuristic tokens while
@@ -929,6 +955,69 @@ instructions, and read-only audits—not a treatment memory—drove the work.
 Creating a retrospective memory or reusing prior consumed evidence would violate
 R5's pre-registration rule. Therefore no R5 treatment/control model run starts,
 no acceptance outcome is relabelled, and representative lift remains unproven.
+
+#### R5 measurement guard — implemented without entering R5
+
+The maintained evaluator now rejects an outcome trial unless all seven parts of
+the measurement contract are observable:
+
+1. SHA-256 bindings freeze the exact question and binary acceptance rubric
+   before either run starts.
+2. The control and treatment bind identical prompt, system instructions, source
+   state, non-Elefante tools, model, version, reasoning, seed, and held-constant
+   environment. The only intervention is Elefante availability and the
+   resulting Recall event.
+3. Provider-actual input, cached input, and output plus exact-tokenizer or
+   provider-attributed Recall context, retry count, and monotonic latency cover
+   all observed attempts. Cached input and Recall context are reported subsets
+   of input, never added twice.
+4. Correctness, relevance, decision usefulness, and hallucination control are
+   binary scored. An accepted outcome requires all four to pass; task-specific
+   acceptance may still fail for an additional rubric criterion.
+5. Accepted task value is one for acceptance and zero for failure, divided by
+   input plus output tokens and also reported per million total tokens.
+6. Acceptance or quality regression fails closed. A treatment that did not
+   supply Recall context cannot receive causal credit. Higher treatment cost
+   without accepted-value gain is an explicit rejection, and zero-value cheap
+   failure cannot count as improvement. Any blocking pair rejects the aggregate
+   local-signal decision even when gains elsewhere make aggregate totals look
+   positive.
+7. The record must prove a naturally arising task, pre-existing memory, unused
+   evidence, and pre-run registration. One task can produce only a local signal;
+   multi-task evidence additionally requires stable configuration, distinct task
+   classes, and a positive task-clustered lower bound. Even that evidence does
+   not authorize a public claim by itself.
+
+The seven numbered regressions in `tests/test_task_intelligence_report.py` use
+synthetic metadata only. They prove the measurement guard, not Elefante outcome
+lift, and they do not manufacture an R5-eligible task.
+
+The original live-trial guard still records one bounded `duration_ms` per
+evaluation outcome, but the local value-evidence slice now supplies the missing
+workflow extension through Session Intelligence. Before an R5 pair can classify
+developer-value lift or workflow-time lift, it must use that maintained path and
+bind:
+
+1. the hashed value-unit contract and any user-asserted weights;
+2. exact full-workflow start and stop events covering retries, corrections,
+   tools, waits, and rework;
+3. separate invocation, workflow-elapsed, and optional active-developer clocks
+   with measurement provenance; and
+4. the matched decision class from Session Intelligence §3.4.
+
+The implemented slice records those facts in explicit opt-in local development
+stores, joins them to Task Intelligence by opaque trace ID plus verified
+provenance digest, and renders the result through the existing summary CLI in
+read-only mode. If any field, delivery/use fact, provider-actual attempt, or
+complete pair is absent, the productivity result is `inconclusive` even when the
+existing accepted-value-per-token result is positive. A slower bounded run may
+still improve the total workflow by preventing rework; a faster bounded run
+cannot stand in for that proof.
+
+This is synthetic protocol proof, not R5 entry or lift. No independently arising
+eligible task supplied pre-existing decision-changing memory during the slice,
+so no treatment/control model pair was manufactured and the R5 eligibility
+decision above remains unchanged.
 
 R6 may perform development closure and exact-archive construction tests. A real
 replacement installation and normal-question Codex event remain separately
@@ -981,7 +1070,7 @@ At that prior checkpoint, no commit, push, merge, version bump, archive
 installation, host reconfiguration, durable-memory access/mutation, release, or
 deployment occurred.
 
-#### Current v2.12.3 reconciliation closure — verified pre-commit tree
+#### Pre-install v2.12.3 reconciliation checkpoint — historical tree evidence
 
 - Current `origin/main` at
   `14fda301b9c2c8f027a52bd1ffa23c36950f9da3` and PR #25 head at
@@ -1005,7 +1094,8 @@ deployment occurred.
 - Ruff reports the same 13 `src/mcp/server.py` import-order/unused-import
   findings on the merge baseline and the reconciled tree; no changed line adds
   a lint finding. All changed Python files compile and diff hygiene passes.
-- Installed acceptance remains negative: installed v2.12.3 still reports
+- At this pre-install checkpoint, installed acceptance remained negative:
+  installed v2.12.3 reported
   `customer_ready=true` while the real Recall invocation returned HTTP `404`.
   The local tests prove the candidate repair, not the installed runtime.
 
@@ -1051,9 +1141,9 @@ deployment occurred.
 
 Local implementation, exact artifact verification, recoverable local
 installation, and one reattached normal-question Codex Recall event are
-complete. Push, PR update, remote merge, release, and deployment remain outside
-this closure; representative multi-task outcome lift remains separate and
-unproven.
+complete. Publishing this reconciliation branch is source handoff only; it does
+not update PR #25, merge, release, or deploy the candidate. Representative
+multi-task outcome lift remains separate and unproven.
 
 ### 15.2 Token-financial operating rules
 
@@ -1088,21 +1178,29 @@ unproven.
    tools, success criteria, timeout, and approval policy constant. Report both
    complete-pair efficiency and all observed spend so early stopping cannot hide
    cost.
+9. **Measure workflow speed, not response theater.** Keep invocation duration,
+   elapsed-to-acceptance, and optional active developer time separate. A better
+   result that takes more total workflow time is an explicit quality-first trade;
+   a productivity claim requires more value in the same or less time, or the
+   same value in less time.
 
-### 15.3 Planned write ownership
+### 15.3 Write ownership and current continuation
 
 - R1 owns the released MCP/artifact surface and its focused tests.
 - R2 owns doctor/handshake readiness and installer-owned host-routing tests.
 - R3 owns Recall payload and token-accounting tests; it does not add provider
   pricing to the product.
-- R4 owns selector changes only after a specific failure is reproduced; the
-  existing dirty `src/core/task_intelligence.py` and
-  `tests/test_task_intelligence.py` must be preserved until that gate is reached.
-- R5 uses the maintained evaluator and metadata-only ledger. It creates no new
+- R4 owned selector changes only after a specific failure was reproduced. Its
+  current screen passed without a selector mutation.
+- R5 uses the maintained evaluator and metadata-only ledger. The implemented
+  local Session Intelligence slice now supplies the provenance-bound workflow
+  join and read-only Signal Card path. R5 creates no new
   benchmark harness and writes no raw prompt, memory body, response, or source
-  diff into the outcome store.
+  diff into either store.
 - R6 owns documentation and release verification only after behavior is proven.
 
-The immediate authorized move after this plan is R0 read-only baseline proof,
-then R1. No installed runtime, durable memory, host configuration, or remote
-surface is part of the development write set.
+R0 through R4 and the development portion of R6 are complete. The next valid
+outcome move is R5 only when a naturally arising eligible task has a pre-existing
+decision-changing memory; do not manufacture that evidence. Automatic host
+instrumentation, durable-memory mutation, installed-runtime replacement, PR
+changes, merge, release, and deployment remain separate authorization domains.

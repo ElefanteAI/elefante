@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import sqlite3
 import threading
 from datetime import datetime, timedelta, timezone
@@ -22,6 +23,8 @@ from src.utils.config import get_config
 
 TRACE_ACTIVE_HOURS = 24
 LEDGER_RETENTION_DAYS = 30
+_SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
+_OUTCOME_KEY_RE = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}\Z")
 
 
 class TaskIntelligenceLedgerError(ValueError):
@@ -49,31 +52,122 @@ def _json_ids(values: Iterable[str]) -> str:
     return json.dumps(sorted(dict.fromkeys(str(value) for value in values)))
 
 
+def task_trace_provenance_digest(provenance: dict[str, str]) -> str:
+    """Hash the exact provenance tuple used to bind a cross-store reference."""
+    return canonical_digest(
+        {
+            field: str(provenance.get(field, ""))
+            for field in ("tool", "instance_id", "session_id", "transport")
+        }
+    )
+
+
+def _boolean_result_map(value: Any, field: str) -> dict[str, bool] | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict) or not value:
+        raise TaskIntelligenceLedgerError(f"{field} must be a non-empty object")
+    normalized: dict[str, bool] = {}
+    for raw_key, result in value.items():
+        key = str(raw_key)
+        if _OUTCOME_KEY_RE.fullmatch(key) is None:
+            raise TaskIntelligenceLedgerError(
+                f"{field} keys must be lowercase bounded identifiers"
+            )
+        if not isinstance(result, bool):
+            raise TaskIntelligenceLedgerError(f"{field}.{key} must be boolean")
+        normalized[key] = result
+    return dict(sorted(normalized.items()))
+
+
 class TaskIntelligenceLedger:
     """SQLite-backed trace ledger with session binding and exact idempotency."""
 
-    def __init__(self, path: Path | str | None = None) -> None:
+    def __init__(
+        self, path: Path | str | None = None, *, read_only: bool = False
+    ) -> None:
         default_path = (
             Path(get_config().elefante.data_dir) / "task_intelligence.sqlite3"
         )
         self.path = Path(path or default_path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._read_only = read_only
+        if read_only:
+            if not self.path.is_file():
+                raise TaskIntelligenceLedgerError(
+                    "Read-only Task Intelligence ledger does not exist."
+                )
+        else:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
+        connection_target = (
+            f"file:{self.path.resolve()}?mode=ro" if read_only else str(self.path)
+        )
         self._connection = sqlite3.connect(
-            self.path,
+            connection_target,
             timeout=5,
             check_same_thread=False,
+            uri=read_only,
         )
         self._connection.row_factory = sqlite3.Row
-        self._connection.execute("PRAGMA journal_mode=WAL")
+        if read_only:
+            self._connection.execute("PRAGMA query_only=ON")
+        else:
+            self._connection.execute("PRAGMA journal_mode=WAL")
         self._connection.execute("PRAGMA foreign_keys=ON")
         self._connection.execute("PRAGMA busy_timeout=5000")
-        self._initialize_schema()
-        try:
-            os.chmod(self.path, 0o600)
-        except OSError:
-            pass
-        self.prune()
+        if read_only:
+            self._verify_read_only_schema()
+        else:
+            self._initialize_schema()
+            try:
+                os.chmod(self.path, 0o600)
+            except OSError:
+                pass
+            self.prune()
+
+    def _require_writable(self) -> None:
+        if self._read_only:
+            raise TaskIntelligenceLedgerError(
+                "Task Intelligence ledger is open read-only."
+            )
+
+    def _verify_read_only_schema(self) -> None:
+        required = {
+            "task_traces": {
+                "trace_id",
+                "caller_tool",
+                "caller_instance_id",
+                "caller_session_id",
+                "transport",
+                "delivered_ids_json",
+            },
+            "task_use_events": {
+                "event_id",
+                "trace_id",
+                "memory_ids_json",
+                "retracted_at_utc",
+            },
+            "task_outcomes": {
+                "trace_id",
+                "accepted",
+                "task_value_contract_sha256",
+                "quality_floor_results_json",
+                "value_unit_results_json",
+                "retracted_at_utc",
+            },
+        }
+        for table, columns in required.items():
+            observed = {
+                row[1]
+                for row in self._connection.execute(
+                    f"PRAGMA table_info({table})"
+                ).fetchall()
+            }
+            missing = columns - observed
+            if missing:
+                raise TaskIntelligenceLedgerError(
+                    f"Read-only Task Intelligence schema is missing {table}: {sorted(missing)}"
+                )
 
     def _initialize_schema(self) -> None:
         with self._lock, self._connection:
@@ -132,6 +226,10 @@ class TaskIntelligenceLedger:
                     input_tokens INTEGER,
                     output_tokens INTEGER,
                     failure_category TEXT,
+                    outcome_schema_version INTEGER NOT NULL DEFAULT 1,
+                    task_value_contract_sha256 TEXT,
+                    quality_floor_results_json TEXT,
+                    value_unit_results_json TEXT,
                     created_at_utc TEXT NOT NULL,
                     retracted_at_utc TEXT
                 );
@@ -152,12 +250,31 @@ class TaskIntelligenceLedger:
                 self._connection.execute(
                     "ALTER TABLE task_outcomes ADD COLUMN retracted_at_utc TEXT"
                 )
+            migrations = {
+                "outcome_schema_version": (
+                    "ALTER TABLE task_outcomes ADD COLUMN outcome_schema_version "
+                    "INTEGER NOT NULL DEFAULT 1"
+                ),
+                "task_value_contract_sha256": (
+                    "ALTER TABLE task_outcomes ADD COLUMN task_value_contract_sha256 TEXT"
+                ),
+                "quality_floor_results_json": (
+                    "ALTER TABLE task_outcomes ADD COLUMN quality_floor_results_json TEXT"
+                ),
+                "value_unit_results_json": (
+                    "ALTER TABLE task_outcomes ADD COLUMN value_unit_results_json TEXT"
+                ),
+            }
+            for column, statement in migrations.items():
+                if column not in outcome_columns:
+                    self._connection.execute(statement)
 
     def close(self) -> None:
         with self._lock:
             self._connection.close()
 
     def prune(self, *, now: datetime | None = None) -> int:
+        self._require_writable()
         cutoff = _iso((now or _utc_now()) - timedelta(days=LEDGER_RETENTION_DAYS))
         with self._lock, self._connection:
             cursor = self._connection.execute(
@@ -198,6 +315,7 @@ class TaskIntelligenceLedger:
         token_budget: int,
         now: datetime | None = None,
     ) -> dict[str, Any]:
+        self._require_writable()
         created = now or _utc_now()
         # Long-running daemons must enforce retention continuously, not only at
         # process start.
@@ -273,7 +391,8 @@ class TaskIntelligenceLedger:
         now: datetime | None = None,
     ) -> dict[str, Any]:
         current = now or _utc_now()
-        self.prune(now=current)
+        if not self._read_only:
+            self.prune(now=current)
         row = self._trace(trace_id)
         expected = self._provenance_fields(provenance)
         observed = (
@@ -307,6 +426,7 @@ class TaskIntelligenceLedger:
         idempotency_key: str,
         now: datetime | None = None,
     ) -> dict[str, Any]:
+        self._require_writable()
         trace = self.validate_trace(
             trace_id,
             provenance=provenance,
@@ -379,6 +499,7 @@ class TaskIntelligenceLedger:
         event_id: str,
         now: datetime | None = None,
     ) -> dict[str, Any]:
+        self._require_writable()
         self.validate_trace(
             trace_id, provenance=provenance, require_active=False, now=now
         )
@@ -413,6 +534,7 @@ class TaskIntelligenceLedger:
         outcome: dict[str, Any],
         now: datetime | None = None,
     ) -> dict[str, Any]:
+        self._require_writable()
         self.validate_trace(trace_id, provenance=provenance, now=now)
         if not isinstance(idempotency_key, str) or not idempotency_key.strip():
             raise TaskIntelligenceLedgerError("idempotency_key is required.")
@@ -420,9 +542,46 @@ class TaskIntelligenceLedger:
             raise TaskIntelligenceLedgerError(
                 "idempotency_key must contain at most 256 characters."
             )
-        key_digest = sha256_text(idempotency_key)
-        payload_digest = canonical_digest(outcome)
+        contract_sha256 = outcome.get("task_value_contract_sha256")
+        quality_results = _boolean_result_map(
+            outcome.get("quality_floor_results"), "quality_floor_results"
+        )
+        value_results = _boolean_result_map(
+            outcome.get("value_unit_results"), "value_unit_results"
+        )
+        if contract_sha256 is not None:
+            if (
+                not isinstance(contract_sha256, str)
+                or _SHA256_RE.fullmatch(contract_sha256) is None
+            ):
+                raise TaskIntelligenceLedgerError(
+                    "task_value_contract_sha256 must be SHA-256"
+                )
+            if quality_results is None or value_results is None:
+                raise TaskIntelligenceLedgerError(
+                    "value-bound outcomes require quality and value-unit results"
+                )
+        elif quality_results is not None or value_results is not None:
+            raise TaskIntelligenceLedgerError(
+                "quality and value-unit results require a task-value contract"
+            )
         accepted = outcome.get("accepted")
+        if accepted is not None and not isinstance(accepted, bool):
+            raise TaskIntelligenceLedgerError("accepted must be boolean or null")
+        if accepted is True and quality_results is not None and not all(
+            quality_results.values()
+        ):
+            raise TaskIntelligenceLedgerError(
+                "accepted outcome requires every hard quality floor to pass"
+            )
+        normalized_outcome = {
+            **outcome,
+            "outcome_schema_version": 2 if contract_sha256 is not None else 1,
+            "quality_floor_results": quality_results,
+            "value_unit_results": value_results,
+        }
+        key_digest = sha256_text(idempotency_key)
+        payload_digest = canonical_digest(normalized_outcome)
         accepted_db = None if accepted is None else int(bool(accepted))
         with self._lock, self._connection:
             prior = self._connection.execute(
@@ -443,9 +602,11 @@ class TaskIntelligenceLedger:
                 INSERT INTO task_outcomes (
                     trace_id, idempotency_sha256, payload_sha256, status,
                     accepted, evidence_source, retries, corrections, duration_ms,
-                    input_tokens, output_tokens, failure_category, created_at_utc,
-                    retracted_at_utc
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+                    input_tokens, output_tokens, failure_category,
+                    outcome_schema_version, task_value_contract_sha256,
+                    quality_floor_results_json, value_unit_results_json,
+                    created_at_utc, retracted_at_utc
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
                 """,
                 (
                     trace_id,
@@ -460,6 +621,18 @@ class TaskIntelligenceLedger:
                     outcome.get("input_tokens"),
                     outcome.get("output_tokens"),
                     outcome.get("failure_category"),
+                    normalized_outcome["outcome_schema_version"],
+                    contract_sha256,
+                    (
+                        json.dumps(quality_results, separators=(",", ":"))
+                        if quality_results is not None
+                        else None
+                    ),
+                    (
+                        json.dumps(value_results, separators=(",", ":"))
+                        if value_results is not None
+                        else None
+                    ),
                     _iso(now or _utc_now()),
                 ),
             )
@@ -472,6 +645,7 @@ class TaskIntelligenceLedger:
         provenance: dict[str, str],
         now: datetime | None = None,
     ) -> dict[str, Any]:
+        self._require_writable()
         self.validate_trace(
             trace_id, provenance=provenance, require_active=False, now=now
         )
@@ -512,6 +686,8 @@ class TaskIntelligenceLedger:
                 """
                 SELECT status, accepted, evidence_source, retries, corrections,
                        duration_ms, input_tokens, output_tokens, failure_category,
+                       outcome_schema_version, task_value_contract_sha256,
+                       quality_floor_results_json, value_unit_results_json,
                        created_at_utc, retracted_at_utc
                 FROM task_outcomes WHERE trace_id = ?
                 """,
@@ -544,15 +720,74 @@ class TaskIntelligenceLedger:
             outcome_dict = dict(outcome)
             if outcome_dict["accepted"] is not None:
                 outcome_dict["accepted"] = bool(outcome_dict["accepted"])
+            outcome_dict["quality_floor_results"] = (
+                json.loads(outcome_dict.pop("quality_floor_results_json"))
+                if outcome_dict["quality_floor_results_json"] is not None
+                else None
+            )
+            outcome_dict["value_unit_results"] = (
+                json.loads(outcome_dict.pop("value_unit_results_json"))
+                if outcome_dict["value_unit_results_json"] is not None
+                else None
+            )
             outcome_dict["retracted"] = outcome_dict.pop("retracted_at_utc") is not None
             public_trace["outcome"] = outcome_dict
         else:
             public_trace["outcome"] = None
         return public_trace
 
+    def inspect_reference(
+        self,
+        trace_id: str,
+        *,
+        expected_provenance_sha256: str,
+        expected_task_sha256: str,
+        expected_criteria_sha256: str,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Resolve an internal cross-store reference without copying provenance.
+
+        Session Intelligence stores only this digest beside the opaque trace ID.
+        The join fails closed when the source trace is missing, retracted, or
+        belongs to a different tool instance/session/transport tuple.
+        """
+        if _SHA256_RE.fullmatch(str(expected_provenance_sha256)) is None:
+            raise TaskIntelligenceLedgerError(
+                "Task trace provenance reference must be SHA-256."
+            )
+        for value, field in (
+            (expected_task_sha256, "task"),
+            (expected_criteria_sha256, "criteria"),
+        ):
+            if _SHA256_RE.fullmatch(str(value)) is None:
+                raise TaskIntelligenceLedgerError(
+                    f"Task trace {field} reference must be SHA-256."
+                )
+        row = self._trace(trace_id)
+        provenance = {
+            "tool": row["caller_tool"],
+            "instance_id": row["caller_instance_id"],
+            "session_id": row["caller_session_id"],
+            "transport": row["transport"],
+        }
+        if task_trace_provenance_digest(provenance) != expected_provenance_sha256:
+            raise TaskIntelligenceLedgerError(
+                "Task trace provenance reference does not match the source ledger."
+            )
+        if row["task_sha256"] != expected_task_sha256:
+            raise TaskIntelligenceLedgerError(
+                "Task trace task reference does not match the frozen question."
+            )
+        if row["criteria_sha256"] != expected_criteria_sha256:
+            raise TaskIntelligenceLedgerError(
+                "Task trace criteria reference does not match the frozen rubric."
+            )
+        return self.inspect(trace_id, provenance=provenance, now=now)
+
     def summary(self) -> dict[str, Any]:
         """Return local observational metrics without asserting causal lift."""
-        self.prune()
+        if not self._read_only:
+            self.prune()
         with self._lock:
             rows = self._connection.execute(
                 """

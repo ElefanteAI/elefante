@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
@@ -13,6 +14,7 @@ from src.core.task_intelligence_ledger import (
     TaskIntelligenceLedger,
     TaskIntelligenceLedgerError,
     canonical_digest,
+    task_trace_provenance_digest,
 )
 from src.mcp.server import ElefanteMCPServer
 from src.models.memory import Memory, MemoryMetadata, MemoryType
@@ -26,6 +28,10 @@ PROVENANCE = {
     "transport": "streamable-http",
     "cwd": "/repo/elefante",
 }
+TRACE_TASK = "Fix the private customer installer failure without exposing secrets"
+TRACE_CRITERIA = ["Installer launches"]
+TRACE_TASK_SHA256 = hashlib.sha256(TRACE_TASK.encode("utf-8")).hexdigest()
+TRACE_CRITERIA_SHA256 = canonical_digest(TRACE_CRITERIA)
 
 
 @pytest.mark.asyncio
@@ -60,8 +66,8 @@ def _trace(
     return ledger.create_trace(
         provenance=PROVENANCE,
         invocation_mode="workflow_managed",
-        task="Fix the private customer installer failure without exposing secrets",
-        success_criteria=["Installer launches"],
+        task=TRACE_TASK,
+        success_criteria=TRACE_CRITERIA,
         task_id="customer-installer-42",
         project="elefante",
         workspace="/repo/elefante",
@@ -103,6 +109,28 @@ def test_ledger_stores_hashes_not_task_text_and_enforces_session(tmp_path) -> No
     with pytest.raises(TaskIntelligenceLedgerError, match="different tool instance"):
         ledger.validate_trace(trace["trace_id"], provenance=wrong_session)
     ledger.close()
+
+
+def test_read_only_ledger_resolves_references_without_mutating(tmp_path) -> None:
+    path = tmp_path / "task-ledger.sqlite3"
+    writable = TaskIntelligenceLedger(path)
+    trace = _trace(writable, delivered=[str(uuid4())])
+    writable.close()
+    digest_before = hashlib.sha256(path.read_bytes()).hexdigest()
+
+    ledger = TaskIntelligenceLedger(path, read_only=True)
+    inspected = ledger.inspect_reference(
+        trace["trace_id"],
+        expected_provenance_sha256=task_trace_provenance_digest(PROVENANCE),
+        expected_task_sha256=TRACE_TASK_SHA256,
+        expected_criteria_sha256=TRACE_CRITERIA_SHA256,
+    )
+    assert inspected["trace_id"] == trace["trace_id"]
+    with pytest.raises(TaskIntelligenceLedgerError, match="open read-only"):
+        _trace(ledger, delivered=[])
+    ledger.close()
+
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == digest_before
 
 
 def test_new_trace_prunes_rows_past_retention_in_long_running_daemon(tmp_path) -> None:
@@ -222,6 +250,137 @@ def test_outcome_is_metadata_only_exactly_idempotent_and_trace_expires(
             trace["trace_id"],
             provenance=PROVENANCE,
             now=created + timedelta(hours=24, minutes=1),
+        )
+    ledger.close()
+
+
+def test_value_bound_outcome_keeps_hashed_contract_and_boolean_results_only(
+    tmp_path,
+) -> None:
+    path = tmp_path / "task-ledger.sqlite3"
+    ledger = TaskIntelligenceLedger(path)
+    trace = _trace(ledger, delivered=[])
+    contract_sha256 = canonical_digest({"contract": "frozen"})
+    outcome = {
+        "status": "succeeded",
+        "accepted": True,
+        "evidence_source": "test",
+        "retries": 0,
+        "corrections": 0,
+        "duration_ms": 250,
+        "input_tokens": 100,
+        "output_tokens": 30,
+        "failure_category": None,
+        "task_value_contract_sha256": contract_sha256,
+        "quality_floor_results": {
+            "authority": True,
+            "correctness": True,
+            "decision_usefulness": True,
+            "hallucination_control": True,
+            "privacy": True,
+            "relevance": True,
+        },
+        "value_unit_results": {"accepted-change": True},
+    }
+    ledger.record_outcome(
+        trace_id=trace["trace_id"],
+        provenance=PROVENANCE,
+        idempotency_key="value-outcome-1",
+        outcome=outcome,
+    )
+
+    inspected = ledger.inspect(trace["trace_id"], provenance=PROVENANCE)["outcome"]
+    assert inspected["outcome_schema_version"] == 2
+    assert inspected["task_value_contract_sha256"] == contract_sha256
+    assert inspected["quality_floor_results"] == outcome["quality_floor_results"]
+    assert inspected["value_unit_results"] == outcome["value_unit_results"]
+    referenced = ledger.inspect_reference(
+        trace["trace_id"],
+        expected_provenance_sha256=task_trace_provenance_digest(PROVENANCE),
+        expected_task_sha256=TRACE_TASK_SHA256,
+        expected_criteria_sha256=TRACE_CRITERIA_SHA256,
+    )
+    assert referenced["outcome"]["task_value_contract_sha256"] == contract_sha256
+    with pytest.raises(TaskIntelligenceLedgerError, match="does not match"):
+        ledger.inspect_reference(
+            trace["trace_id"],
+            expected_provenance_sha256=canonical_digest({"wrong": "provenance"}),
+            expected_task_sha256=TRACE_TASK_SHA256,
+            expected_criteria_sha256=TRACE_CRITERIA_SHA256,
+        )
+
+    connection = sqlite3.connect(path)
+    columns = {
+        row[1]
+        for row in connection.execute("PRAGMA table_info(task_outcomes)").fetchall()
+    }
+    dump = "\n".join(connection.iterdump())
+    connection.close()
+    assert {
+        "outcome_schema_version",
+        "task_value_contract_sha256",
+        "quality_floor_results_json",
+        "value_unit_results_json",
+    }.issubset(columns)
+    assert "frozen" not in dump
+    ledger.close()
+
+
+def test_value_bound_outcome_rejects_missing_contract_or_failed_hard_floor(
+    tmp_path,
+) -> None:
+    ledger = TaskIntelligenceLedger(tmp_path / "task-ledger.sqlite3")
+    missing_contract = _trace(ledger, delivered=[])
+    with pytest.raises(TaskIntelligenceLedgerError, match="require a task-value"):
+        ledger.record_outcome(
+            trace_id=missing_contract["trace_id"],
+            provenance=PROVENANCE,
+            idempotency_key="missing-contract",
+            outcome={
+                "status": "succeeded",
+                "accepted": True,
+                "evidence_source": "test",
+                "quality_floor_results": {"correctness": True},
+            },
+        )
+
+    failed_floor = _trace(ledger, delivered=[])
+    with pytest.raises(TaskIntelligenceLedgerError, match="every hard quality"):
+        ledger.record_outcome(
+            trace_id=failed_floor["trace_id"],
+            provenance=PROVENANCE,
+            idempotency_key="failed-floor",
+            outcome={
+                "status": "succeeded",
+                "accepted": True,
+                "evidence_source": "test",
+                "task_value_contract_sha256": canonical_digest(
+                    {"contract": "failed-floor"}
+                ),
+                "quality_floor_results": {
+                    "correctness": False,
+                    "privacy": True,
+                },
+                "value_unit_results": {"accepted-change": True},
+            },
+        )
+
+    non_boolean = _trace(ledger, delivered=[])
+    with pytest.raises(TaskIntelligenceLedgerError, match="boolean or null"):
+        ledger.record_outcome(
+            trace_id=non_boolean["trace_id"],
+            provenance=PROVENANCE,
+            idempotency_key="non-boolean-accepted",
+            outcome={
+                "status": "succeeded",
+                "accepted": 1,
+                "evidence_source": "test",
+                "task_value_contract_sha256": canonical_digest(
+                    {"contract": "non-boolean"}
+                ),
+                "quality_floor_results": {"correctness": False},
+                "value_unit_results": {"accepted-change": True},
+            },
         )
     ledger.close()
 

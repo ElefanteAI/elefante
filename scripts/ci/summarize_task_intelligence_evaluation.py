@@ -20,17 +20,46 @@ COMPARISON_CONDITIONS = {
     "standard": ("baseline", "task-brief"),
     "memory-component": ("source-brief", "memory-brief"),
 }
+LIVE_TRIAL_CONDITIONS = ("control", "treatment")
+LIVE_TRIAL_PRODUCT_MINIMUM_TASK_CLUSTERS = 3
+LIVE_TRIAL_PRODUCT_MINIMUM_TASK_CLASSES = 3
+LIVE_TRIAL_GLOBAL_MATCH_FIELDS = (
+    "model",
+    "model_version",
+    "reasoning",
+    "run_seed",
+    "system_instructions_sha256",
+    "held_constant_environment_sha256",
+    "tools_without_elefante_sha256",
+    "source_state_sha256",
+    "token_count_source",
+    "latency_source",
+    "usage_scope",
+)
 
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.ci.run_task_intelligence_baseline import configuration_id  # noqa: E402
+from src.core.session_intelligence import (  # noqa: E402
+    SessionIntelligenceError,
+    SessionIntelligenceStore,
+    build_value_baseline_card,
+    build_value_signal_card,
+)
 from src.core.task_intelligence import TaskBriefProfile  # noqa: E402
+from src.core.task_intelligence_ledger import (  # noqa: E402
+    TaskIntelligenceLedger,
+    TaskIntelligenceLedgerError,
+)
 from scripts.ci.verify_task_intelligence_benchmark import (  # noqa: E402
+    LIVE_OUTCOME_TRIAL_QUALITY_FIELDS,
     acceptance_test_sha256,
     manifest_promotion_readiness,
     task_promotion_validity,
     task_contract_sha256,
+    validate_live_outcome_trial_pair,
+    validate_live_outcome_trial_record,
     validate_manifest,
     validate_outcome_record,
 )
@@ -66,6 +95,333 @@ def _clustered_interval(
         values = [value for task_id in sampled for value in differences[task_id]]
         estimates.append(sum(values) / len(values))
     return _percentile(estimates, 0.025), _percentile(estimates, 0.975)
+
+
+def summarize_value_evidence(
+    *,
+    session_intelligence_db: Path,
+    task_intelligence_db: Path | None = None,
+    comparison_id: str | None = None,
+    baseline: bool = False,
+) -> dict[str, Any]:
+    """Render one non-persisted Signal Card from local evidence, read-only."""
+    if baseline and (task_intelligence_db is not None or comparison_id is not None):
+        raise ValueError(
+            "value baseline cannot also select a Task Intelligence comparison"
+        )
+    if not baseline and (task_intelligence_db is None or comparison_id is None):
+        raise ValueError(
+            "matched value evidence requires task DB and comparison ID"
+        )
+    with SessionIntelligenceStore(
+        session_intelligence_db, read_only=True
+    ) as session_store:
+        if baseline:
+            return build_value_baseline_card(session_store)
+        task_ledger = TaskIntelligenceLedger(task_intelligence_db, read_only=True)
+        try:
+            return build_value_signal_card(
+                session_store,
+                task_ledger,
+                comparison_id=str(comparison_id),
+            )
+        finally:
+            task_ledger.close()
+
+
+def summarize_live_outcome_trials(
+    records: list[dict[str, Any]],
+    *,
+    minimum_task_clusters: int = LIVE_TRIAL_PRODUCT_MINIMUM_TASK_CLUSTERS,
+    minimum_task_classes: int = LIVE_TRIAL_PRODUCT_MINIMUM_TASK_CLASSES,
+) -> dict[str, Any]:
+    """Summarize natural-task pairs under the Recall-only intervention contract."""
+    validation_errors = [
+        f"record[{index}]: {error}"
+        for index, record in enumerate(records)
+        for error in validate_live_outcome_trial_record(record)
+    ]
+    if validation_errors:
+        raise ValueError("; ".join(validation_errors))
+
+    pairs: dict[tuple[str, str, int], dict[str, dict[str, Any]]] = defaultdict(dict)
+    for record in records:
+        key = (record["experiment_id"], record["task_id"], record["repeat"])
+        condition = record["condition"]
+        if condition in pairs[key]:
+            raise ValueError(
+                "duplicate live-trial condition: "
+                f"{record['experiment_id']}:{record['task_id']}:"
+                f"r{record['repeat']}:{condition}"
+            )
+        pairs[key][condition] = record
+
+    incomplete_pairs = [
+        f"{experiment_id}:{task_id}:r{repeat}"
+        for (experiment_id, task_id, repeat), pair in sorted(pairs.items())
+        if set(pair) != set(LIVE_TRIAL_CONDITIONS)
+    ]
+    complete_pairs = {
+        key: pair
+        for key, pair in pairs.items()
+        if set(pair) == set(LIVE_TRIAL_CONDITIONS)
+    }
+    pair_validation_errors = [
+        f"{experiment_id}:{task_id}:r{repeat}: {error}"
+        for (experiment_id, task_id, repeat), pair in sorted(complete_pairs.items())
+        for error in validate_live_outcome_trial_pair(
+            pair["control"], pair["treatment"]
+        )
+    ]
+    if pair_validation_errors:
+        raise ValueError("; ".join(pair_validation_errors))
+
+    protocol_complete = bool(records) and not incomplete_pairs
+    observed_by_condition = {
+        condition: [record for record in records if record["condition"] == condition]
+        for condition in LIVE_TRIAL_CONDITIONS
+    }
+    paired_by_condition = {
+        condition: [
+            pair[condition] for _key, pair in sorted(complete_pairs.items())
+        ]
+        for condition in LIVE_TRIAL_CONDITIONS
+    }
+
+    def cost_summary(condition_records: list[dict[str, Any]]) -> dict[str, int]:
+        result = {
+            field: sum(record[field] for record in condition_records)
+            for field in (
+                "input_tokens",
+                "cached_input_tokens",
+                "output_tokens",
+                "recall_context_tokens",
+                "retries",
+                "duration_ms",
+            )
+        }
+        result["total_tokens"] = result["input_tokens"] + result["output_tokens"]
+        return result
+
+    costs = {
+        condition: cost_summary(observed_by_condition[condition])
+        for condition in LIVE_TRIAL_CONDITIONS
+    }
+    paired_costs = {
+        condition: cost_summary(paired_by_condition[condition])
+        for condition in LIVE_TRIAL_CONDITIONS
+    }
+    accepted_value = {
+        condition: sum(
+            int(record["acceptance_passed"])
+            for record in paired_by_condition[condition]
+        )
+        for condition in LIVE_TRIAL_CONDITIONS
+    }
+    accepted_value_per_token = {
+        condition: (
+            accepted_value[condition] / paired_costs[condition]["total_tokens"]
+            if paired_costs[condition]["total_tokens"] > 0
+            else 0.0
+        )
+        for condition in LIVE_TRIAL_CONDITIONS
+    }
+    accepted_per_million = {
+        condition: 1_000_000 * accepted_value_per_token[condition]
+        for condition in LIVE_TRIAL_CONDITIONS
+    }
+    quality_passes = {
+        condition: {
+            field: sum(
+                int(record["quality"][field])
+                for record in paired_by_condition[condition]
+            )
+            for field in sorted(LIVE_OUTCOME_TRIAL_QUALITY_FIELDS)
+        }
+        for condition in LIVE_TRIAL_CONDITIONS
+    }
+    quality_regression_dimensions = [
+        field
+        for field in sorted(LIVE_OUTCOME_TRIAL_QUALITY_FIELDS)
+        if quality_passes["treatment"][field] < quality_passes["control"][field]
+    ]
+
+    pair_decisions: list[dict[str, Any]] = []
+    token_intelligence_differences: dict[str, list[float]] = defaultdict(list)
+    for (_experiment_id, task_id, repeat), pair in sorted(complete_pairs.items()):
+        control = pair["control"]
+        treatment = pair["treatment"]
+        control_value = int(control["acceptance_passed"])
+        treatment_value = int(treatment["acceptance_passed"])
+        control_tokens = control["input_tokens"] + control["output_tokens"]
+        treatment_tokens = treatment["input_tokens"] + treatment["output_tokens"]
+        control_efficiency = 1_000_000 * control_value / control_tokens
+        treatment_efficiency = 1_000_000 * treatment_value / treatment_tokens
+        token_intelligence_differences[task_id].append(
+            treatment_efficiency - control_efficiency
+        )
+        regressed_quality = sorted(
+            field
+            for field in LIVE_OUTCOME_TRIAL_QUALITY_FIELDS
+            if control["quality"][field] and not treatment["quality"][field]
+        )
+        reason: str | None = None
+        if treatment["recall_status"] != "supplied":
+            reason = "treatment-memory-not-supplied"
+        elif treatment_value < control_value:
+            reason = "acceptance-regression"
+        elif regressed_quality:
+            reason = "quality-regression"
+        elif treatment_tokens > control_tokens and treatment_value <= control_value:
+            reason = "higher-cost-without-accepted-value-gain"
+        elif treatment_efficiency <= control_efficiency:
+            reason = "no-accepted-value-per-token-lift"
+        pair_decisions.append(
+            {
+                "task_id": task_id,
+                "repeat": repeat,
+                "control_accepted_value": control_value,
+                "treatment_accepted_value": treatment_value,
+                "control_total_tokens": control_tokens,
+                "treatment_total_tokens": treatment_tokens,
+                "quality_regression_dimensions": regressed_quality,
+                "token_intelligence_lift_per_million_total_tokens": round(
+                    treatment_efficiency - control_efficiency, 6
+                ),
+                "decision": "LOCAL SIGNAL" if reason is None else "REJECT",
+                "rejection_reason": reason,
+            }
+        )
+
+    blocking_pair_rejection = any(
+        pair["rejection_reason"]
+        in {
+            "acceptance-regression",
+            "quality-regression",
+            "higher-cost-without-accepted-value-gain",
+            "treatment-memory-not-supplied",
+        }
+        for pair in pair_decisions
+    )
+
+    acceptance_regression = accepted_value["treatment"] < accepted_value["control"]
+    higher_cost_without_value = (
+        paired_costs["treatment"]["total_tokens"]
+        > paired_costs["control"]["total_tokens"]
+        and accepted_value["treatment"] <= accepted_value["control"]
+    )
+    token_intelligence_lift = (
+        accepted_per_million["treatment"] - accepted_per_million["control"]
+    )
+    recall_delivery_complete = bool(complete_pairs) and all(
+        pair["treatment"]["recall_status"] == "supplied"
+        for pair in complete_pairs.values()
+    )
+    rejection_reasons: list[str] = []
+    if not recall_delivery_complete:
+        rejection_reasons.append("treatment-memory-not-supplied")
+    if acceptance_regression:
+        rejection_reasons.append("acceptance-regression")
+    if quality_regression_dimensions:
+        rejection_reasons.append("quality-regression")
+    if higher_cost_without_value:
+        rejection_reasons.append("higher-cost-without-accepted-value-gain")
+    if token_intelligence_lift <= 0:
+        rejection_reasons.append("no-accepted-value-per-token-lift")
+    if blocking_pair_rejection:
+        rejection_reasons.append("blocking-pair-rejection")
+    local_signal_gate = protocol_complete and not rejection_reasons
+    decision = (
+        "LOCAL SIGNAL"
+        if local_signal_gate
+        else "REJECT"
+        if protocol_complete
+        else "INCONCLUSIVE"
+    )
+
+    task_ids = {
+        task_id for (_experiment_id, task_id, _repeat) in complete_pairs
+    }
+    task_classes = {
+        pair["control"]["task_class"] for pair in complete_pairs.values()
+    }
+    configuration_stable = all(
+        len({record[field] for record in records}) <= 1
+        for field in LIVE_TRIAL_GLOBAL_MATCH_FIELDS
+    )
+    interval = _clustered_interval(
+        token_intelligence_differences,
+        seed=records[0]["run_seed"] if records else 0,
+    )
+    product_claim_blockers: list[str] = []
+    if not protocol_complete:
+        product_claim_blockers.append("incomplete-or-unmatched-protocol")
+    if not local_signal_gate:
+        product_claim_blockers.append("local-signal-gate-failed")
+    if len(task_ids) < minimum_task_clusters:
+        product_claim_blockers.append("insufficient-natural-task-clusters")
+    if len(task_classes) < minimum_task_classes:
+        product_claim_blockers.append("insufficient-task-class-coverage")
+    if not configuration_stable:
+        product_claim_blockers.append("cross-task-configuration-drift")
+    if blocking_pair_rejection:
+        product_claim_blockers.append("blocking-pair-rejection")
+    if interval is None:
+        product_claim_blockers.append("clustered-interval-unavailable")
+    elif interval[0] <= 0:
+        product_claim_blockers.append("non-positive-clustered-lower-bound")
+
+    return {
+        "trial_schema_version": 1,
+        "record_count": len(records),
+        "complete_pairs": len(complete_pairs),
+        "incomplete_pairs": incomplete_pairs,
+        "protocol_complete": protocol_complete,
+        "task_cluster_count": len(task_ids),
+        "task_class_count": len(task_classes),
+        "costs": costs,
+        "paired_costs": paired_costs,
+        "observed_total_tokens": sum(
+            costs[condition]["total_tokens"]
+            for condition in LIVE_TRIAL_CONDITIONS
+        ),
+        "cached_and_recall_tokens_are_subsets": True,
+        "total_token_formula": "input_tokens + output_tokens",
+        "accepted_task_value": accepted_value,
+        "accepted_task_value_per_total_token": {
+            condition: round(accepted_value_per_token[condition], 12)
+            for condition in LIVE_TRIAL_CONDITIONS
+        },
+        "accepted_outcomes_per_million_total_tokens": {
+            condition: round(accepted_per_million[condition], 6)
+            for condition in LIVE_TRIAL_CONDITIONS
+        },
+        "quality_passes": quality_passes,
+        "quality_regression_dimensions": quality_regression_dimensions,
+        "recall_delivery_complete": recall_delivery_complete,
+        "acceptance_regression": acceptance_regression,
+        "higher_cost_without_accepted_value_gain": higher_cost_without_value,
+        "token_intelligence_lift_per_million_total_tokens": round(
+            token_intelligence_lift, 6
+        ),
+        "token_intelligence_95_percent_ci_per_million_total_tokens": (
+            [round(interval[0], 6), round(interval[1], 6)]
+            if interval is not None
+            else None
+        ),
+        "pair_decisions": pair_decisions,
+        "rejection_reasons": rejection_reasons,
+        "decision": decision,
+        "local_signal_gate": local_signal_gate,
+        "cross_task_configuration_stable": configuration_stable,
+        "product_claim_minimum_task_clusters": minimum_task_clusters,
+        "product_claim_minimum_task_classes": minimum_task_classes,
+        "product_claim_blockers": product_claim_blockers,
+        "product_claim_evidence_gate": not product_claim_blockers,
+        # Evidence sufficiency never grants publication authority by itself.
+        "public_claim_authorized": False,
+        "raw_transcripts_stored": False,
+    }
 
 
 def load_records(
@@ -597,7 +953,70 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--require-complete", action="store_true")
     parser.add_argument("--require-decision", action="store_true")
     parser.add_argument("--require-promotion", action="store_true")
+    parser.add_argument(
+        "--session-intelligence-db",
+        type=Path,
+        help="Read-only Session Intelligence database for a value Signal Card",
+    )
+    parser.add_argument(
+        "--task-intelligence-db",
+        type=Path,
+        help="Read-only Task Intelligence ledger joined by a matched Signal Card",
+    )
+    parser.add_argument(
+        "--comparison-id",
+        help="Matched control/treatment comparison UUID for a value Signal Card",
+    )
+    parser.add_argument(
+        "--value-baseline",
+        action="store_true",
+        help="Render honest first-use value evidence without claiming lift",
+    )
+    parser.add_argument(
+        "--require-value-signal",
+        action="store_true",
+        help="Fail unless the rendered card contains a complete local signal",
+    )
     args = parser.parse_args(argv)
+
+    value_mode = any(
+        (
+            args.session_intelligence_db is not None,
+            args.task_intelligence_db is not None,
+            args.comparison_id is not None,
+            args.value_baseline,
+            args.require_value_signal,
+        )
+    )
+    if value_mode:
+        if args.session_intelligence_db is None:
+            print(
+                json.dumps(
+                    {"errors": ["value evidence requires --session-intelligence-db"]},
+                    indent=2,
+                )
+            )
+            return 2
+        try:
+            report = summarize_value_evidence(
+                session_intelligence_db=args.session_intelligence_db,
+                task_intelligence_db=args.task_intelligence_db,
+                comparison_id=args.comparison_id,
+                baseline=args.value_baseline,
+            )
+        except (
+            SessionIntelligenceError,
+            TaskIntelligenceLedgerError,
+            ValueError,
+        ) as error:
+            print(json.dumps({"errors": [str(error)]}, indent=2))
+            return 2
+        print(json.dumps(report, indent=2, sort_keys=True))
+        if args.require_value_signal and not report.get("claim_boundary", {}).get(
+            "local_signal", False
+        ):
+            return 3
+        return 0
 
     verification = validate_manifest(args.manifest, ROOT)
     if verification["errors"]:

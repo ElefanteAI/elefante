@@ -37,6 +37,10 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Added a session-bound local audit ledger that stores hashes, identifiers,
   counts, and bounded outcome metadata instead of task text, prompts, memory
   bodies, or comments. Declared use is reversible and does not change ranking.
+- Added an explicit opt-in local Session Intelligence evidence store and
+  read-only Signal Card path that joins provider usage and complete workflow
+  clocks to provenance-bound Task Intelligence outcomes without storing raw
+  prompts, responses, memory bodies, source diffs, or hidden reasoning.
 - Added a digest-sealed real-memory calibration fixture and model-free preflight
   that proves base/fix judge behavior, exact memory selection, deterministic
   rendering, budget compliance, and leakage safety before evaluation spend.
@@ -128,15 +132,16 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   tool-response context now share the complete current-source validation and
   governed-selection pipeline. Digest-stale locked evidence fails closed rather
   than being injected through a secondary delivery path.
-- Active user, developer, agent, proposal, example, and embedded MCP
-  documentation now agrees with the v2.12.3 release, SQLite/Kuzu default,
-  16-tool/2-prompt surface, conditional context injection, and implemented
-  scoring/lifecycle behavior. Broken paths and obsolete release-candidate,
-  migration, and legacy-tool guidance were removed or labeled historical;
-  customer commands now target the installed runtime, and Task Intelligence no
-  longer retrieves a retained pre-release installer design as current guidance.
-  Regression checks now guard release versions, relative links, tool names,
-  manifest types, Python compatibility, command forms, and scoring claims.
+- Active released-product documentation agrees on the v2.12.3 release,
+  SQLite/Kuzu default, 16-tool/2-prompt surface, conditional context injection,
+  and implemented scoring/lifecycle behavior. Developer and proposal surfaces
+  explicitly separate additional unreleased candidate/development behavior.
+  Broken paths and obsolete migration or legacy-tool guidance were removed or
+  labeled historical; customer commands target the installed runtime, and Task
+  Intelligence no longer retrieves a retained pre-release installer design as
+  current guidance. Regression checks guard release versions, relative links,
+  tool names, manifest types, Python compatibility, command forms, and scoring
+  claims.
 - Customer build identity now binds archive metadata, installed payload,
   ownership state, and `doctor` to the same semantic version, clean source
   commit, and candidate/release channel. Legacy, dirty, development-channel,
@@ -1658,12 +1663,6 @@ This release focused on reducing migration risk by validating candidate embeddin
 ### Notes
 
 - The embedding model upgrade itself is documented in **v1.3.0**.
-
----
-
-## [Unreleased]
-
-_No unreleased changes._
 
 ---
 

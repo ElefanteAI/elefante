@@ -88,6 +88,15 @@ provider usage: exact dollar cost remains unknown unless the provider supplies
 actual uncached input, cached input, and output usage and those values are
 multiplied by current rates.
 
+These resource totals do not define accepted developer value or measure the
+complete path from task start to acceptance. Per-call duration, model-run
+duration, token count, and `signal_ratio` cannot by themselves support a claim
+that Elefante helps a developer deliver more value in the same time or the same
+value in less time. One explicit opt-in local development slice now implements
+that contract across Session Intelligence and Task Intelligence, but it is not
+automatic host instrumentation, representative lift, or part of the published
+v2.12.3 Token Intelligence surface.
+
 ## Verification
 
 ```bash

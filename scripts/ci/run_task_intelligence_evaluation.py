@@ -17,7 +17,7 @@ import tempfile
 from collections import Counter
 from datetime import datetime
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Callable
 from uuid import NAMESPACE_URL, uuid5
 
 import numpy as np
@@ -1138,6 +1138,7 @@ def execute_trial(
     timeout_seconds: int,
     keep_failures: bool,
     brief_profile: TaskBriefProfile = TaskBriefProfile.V1,
+    evidence_sink: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     task = item["task"]
     condition = item["condition"]
@@ -1180,6 +1181,7 @@ def execute_trial(
             reasoning=reasoning,
             timeout_seconds=timeout_seconds,
             prompt=prompt,
+            evidence_sink=evidence_sink,
         )
         baseline.require_successful_agent_invocation(
             exit_code=agent_exit,
@@ -1456,6 +1458,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTCOMES)
     parser.add_argument("--workspace-root", type=Path, default=DEFAULT_WORKSPACES)
+    parser.add_argument("--session-intelligence-db", type=Path)
+    parser.add_argument("--session-intelligence-session-id")
+    parser.add_argument("--session-intelligence-workflow-id")
     parser.add_argument("--timeout-seconds", type=int, default=1800)
     parser.add_argument("--max-runs", type=int)
     parser.add_argument("--max-total-input-tokens", type=int)
@@ -1561,6 +1566,26 @@ def main(argv: list[str] | None = None) -> int:
             brief_profile=brief_profile,
         ).exists()
     ]
+    try:
+        evidence_config = baseline.session_intelligence_evidence_config(
+            database=args.session_intelligence_db,
+            session_id=args.session_intelligence_session_id,
+            workflow_id=args.session_intelligence_workflow_id,
+            pending_runs=len(pending),
+        )
+    except ValueError as error:
+        print(
+            json.dumps(
+                {
+                    "pending_runs": len(pending),
+                    "execute": args.execute,
+                    "error": str(error),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 2
     estimate = len(pending) * args.estimated_input_tokens_per_run
     uncached_estimate = len(pending) * args.estimated_uncached_input_tokens_per_run
     evaluation_policy = manifest.get("evaluation_policy", {})
@@ -1595,6 +1620,7 @@ def main(argv: list[str] | None = None) -> int:
         "diagnostic_task_ids": diagnostic_task_ids,
         "sealed_memory_fixture_task_ids": fixture_task_ids,
         "sealed_memory_fixture_errors": fixture_errors,
+        "session_intelligence_evidence": evidence_config is not None,
     }
     if args.preflight:
         if not fixture_task_ids:
@@ -1762,84 +1788,115 @@ def main(argv: list[str] | None = None) -> int:
                     for task_id, brief in condition_briefs.items()
                 }
             )
+    evidence_store: baseline.SessionIntelligenceStore | None = None
+    evidence_sink: Callable[[dict[str, Any]], None] | None = None
+    if evidence_config is not None:
+        expected_condition = (
+            "control"
+            if pending[0]["condition"] in {"baseline", "source-brief"}
+            else "treatment"
+        )
+        try:
+            evidence_store, evidence_sink = (
+                baseline.open_session_intelligence_evidence_sink(
+                    evidence_config,
+                    expected_condition=expected_condition,
+                )
+            )
+        except (baseline.SessionIntelligenceError, ValueError) as error:
+            print(
+                json.dumps(
+                    {**summary, "error": str(error)}, indent=2, sort_keys=True
+                )
+            )
+            return 2
+
     args.workspace_root.mkdir(parents=True, exist_ok=True)
     results: list[dict[str, Any]] = []
     total_input = 0
     total_cached = 0
     total_output = 0
-    for item in pending:
-        result = execute_trial(
-            item,
-            brief=briefs[(item["task_id"], item["condition"])]
-            if item["condition"] != "baseline"
-            else None,
-            output_dir=args.output_dir,
-            workspace_root=args.workspace_root,
-            model=args.model,
-            reasoning=args.reasoning,
-            run_seed=args.run_seed,
-            timeout_seconds=args.timeout_seconds,
-            keep_failures=args.keep_failures,
-            brief_profile=brief_profile,
-        )
-        results.append(result)
-        total_input += result["input_tokens"]
-        total_cached += result["cached_input_tokens"]
-        total_output += result["output_tokens"]
-        if total_input > limits[0] or total_input - total_cached > limits[1]:
-            print(
-                json.dumps(
-                    {
-                        **summary,
-                        "results": results,
-                        "error": "cumulative token cap exceeded; remaining runs were not started",
-                    },
-                    indent=2,
-                    sort_keys=True,
-                )
-            )
-            return 3
-        early_stop = (
-            memory_component_stop_status(
-                plan,
+    try:
+        for item in pending:
+            result = execute_trial(
+                item,
+                brief=briefs[(item["task_id"], item["condition"])]
+                if item["condition"] != "baseline"
+                else None,
                 output_dir=args.output_dir,
+                workspace_root=args.workspace_root,
                 model=args.model,
                 reasoning=args.reasoning,
                 run_seed=args.run_seed,
+                timeout_seconds=args.timeout_seconds,
+                keep_failures=args.keep_failures,
                 brief_profile=brief_profile,
+                evidence_sink=evidence_sink,
             )
-            if args.comparison == "memory-component" and not args.condition
-            else None
-        )
-        if early_stop is not None:
-            remaining = sum(
-                not _outcome_path(
-                    args.output_dir,
-                    planned,
+            results.append(result)
+            total_input += result["input_tokens"]
+            total_cached += result["cached_input_tokens"]
+            total_output += result["output_tokens"]
+            if total_input > limits[0] or total_input - total_cached > limits[1]:
+                print(
+                    json.dumps(
+                        {
+                            **summary,
+                            "results": results,
+                            "error": (
+                                "cumulative token cap exceeded; remaining runs "
+                                "were not started"
+                            ),
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+                return 3
+            early_stop = (
+                memory_component_stop_status(
+                    plan,
+                    output_dir=args.output_dir,
                     model=args.model,
                     reasoning=args.reasoning,
                     run_seed=args.run_seed,
                     brief_profile=brief_profile,
-                ).exists()
-                for planned in plan
-            )
-            print(
-                json.dumps(
-                    {
-                        **summary,
-                        "results": results,
-                        "early_stop": early_stop,
-                        "remaining_runs_not_started": remaining,
-                        "actual_input_tokens": total_input,
-                        "actual_cached_input_tokens": total_cached,
-                        "actual_uncached_input_tokens": total_input - total_cached,
-                        "actual_output_tokens": total_output,
-                    },
-                    indent=2,
-                    sort_keys=True,
                 )
+                if args.comparison == "memory-component" and not args.condition
+                else None
             )
-            return 0
+            if early_stop is not None:
+                remaining = sum(
+                    not _outcome_path(
+                        args.output_dir,
+                        planned,
+                        model=args.model,
+                        reasoning=args.reasoning,
+                        run_seed=args.run_seed,
+                        brief_profile=brief_profile,
+                    ).exists()
+                    for planned in plan
+                )
+                print(
+                    json.dumps(
+                        {
+                            **summary,
+                            "results": results,
+                            "early_stop": early_stop,
+                            "remaining_runs_not_started": remaining,
+                            "actual_input_tokens": total_input,
+                            "actual_cached_input_tokens": total_cached,
+                            "actual_uncached_input_tokens": total_input - total_cached,
+                            "actual_output_tokens": total_output,
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+                return 0
+    finally:
+        if evidence_store is not None:
+            evidence_store.close()
     print(
         json.dumps(
             {

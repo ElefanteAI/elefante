@@ -1,7 +1,7 @@
 # Elefante Test Suite
 
 > **Scope:** active developer source declaration 2.12.3; current public release v2.12.3; provenance and channel keep unreleased surfaces separate
-> **Last Updated:** 2026-08-26
+> **Last Updated:** 2026-08-27
 
 ## Quick Reference
 
@@ -49,7 +49,8 @@ Use the existing tests in this file before writing any ad hoc validation script.
 | [test_memory_persistence.py](test_memory_persistence.py) | Memories persist, current Kuzu path/lock contract stays truthful, GraphStore close barrier works, live MCP shutdown regression stays alive | Without this, users lose memories, get routed through stale Kuzu recovery advice, or crash the server |
 | [test_memory_guard.py](test_memory_guard.py) | `[test]` tagged memories blocked by default | Prevents test data polluting real memory DB |
 | [test_autonomous_coactivation.py](test_autonomous_coactivation.py) | Legacy explicit reinforcement behavior, read-only retrieval boundary, built-in directive baseline, system specification bootstrap, entrypoint response-contract guard | Prevents retrieval exposure from mutating memory history and protects the embedded directive/specification baseline |
-| [test_task_intelligence_ledger.py](test_task_intelligence_ledger.py) | Session-bound prepare/use/outcome traces, metadata-only storage, idempotency, retraction, shadow default, and pilot kill switch | Prevents observational Task Intelligence data from leaking content, crossing sessions, or silently changing ranking |
+| [test_task_intelligence_ledger.py](test_task_intelligence_ledger.py) | Session-bound prepare/use/value-outcome traces, metadata-only storage, provenance-verified read-only references, idempotency, retraction, shadow default, and pilot kill switch | Prevents observational Task Intelligence data from leaking content, crossing sessions, or silently changing ranking |
+| [test_session_intelligence.py](test_session_intelligence.py) | Explicit opt-in local evidence store, schema/privacy/retention/deletion controls, separate invocation/workflow clocks, provider usage adapter, Task Intelligence join, read-only baseline/task-pair Signal Cards, and fail-closed value decisions | Prevents response-speed theater, ambiguous token labels, raw-content persistence, or one synthetic pair from becoming a developer-value/product claim |
 | [test_mcp_daemon.py](test_mcp_daemon.py) | Shared-daemon transport, governed answer delivery, authority, source-digest validation, and live runtime contracts | Prevents prompt, search, or opt-in delivery from bypassing governance or current-source checks |
 
 ### UNIT TESTS (Run during development)
@@ -67,10 +68,10 @@ Use the existing tests in this file before writing any ad hoc validation script.
 | [test_installer_bundle.py](test_installer_bundle.py) | Release-bundle bootstrap install root placement, delegated installer command wiring, and archive contents | When changing `scripts/setup/bootstrap_release_bundle.py` or `scripts/ci/build_installer_bundle.py` |
 | [test_install_setup.py](test_install_setup.py) | Installer state, daemon service, MCP host adapters, safe uninstall ownership, and seed-memory guard | When changing `scripts/setup/` or `scripts/lifecycle/` installer paths |
 | [test_task_intelligence_benchmark.py](test_task_intelligence_benchmark.py) | Historical task provenance, acceptance nodes, split isolation, leakage scanning, metadata-only outcomes, and fail-closed behavioral promotion readiness | When changing the Task Intelligence SDD, benchmark manifest, or evaluator |
-| [test_task_intelligence_baseline.py](test_task_intelligence_baseline.py) | Historical snapshot isolation, hidden acceptance boundaries, model-profile outcome isolation, resume behavior, and cumulative token caps | When changing the no-Brief baseline runner |
+| [test_task_intelligence_baseline.py](test_task_intelligence_baseline.py) | Historical snapshot isolation, hidden acceptance boundaries, model-profile outcome isolation, metadata-only Codex usage production, ambiguous-event abstention, resume behavior, and cumulative token caps | When changing the no-Brief baseline runner or value-evidence producer |
 | [test_task_intelligence.py](test_task_intelligence.py) | V1 reproducibility plus v2 lifecycle/scope/trust, independent relevance, abstention, conflict, provenance, stage, graph, and non-mutation contracts | When changing the Task Brief compiler or service |
 | [test_task_intelligence_evaluation.py](test_task_intelligence_evaluation.py) | Pre-fix source isolation, lineage, declared-context preservation, source/stage diversity, sealed-fixture determinism, paired order, contract-bound outcome paths, and prompt leakage boundaries | When changing paired evaluation or retrieval audit |
-| [test_task_intelligence_report.py](test_task_intelligence_report.py) | Protocol completeness, profile and task-contract isolation, clustered confidence, resource limits, stale-outcome rejection, and behavioral-contract promotion gate | When changing outcome reporting or promotion thresholds |
+| [test_task_intelligence_report.py](test_task_intelligence_report.py) | Protocol completeness, profile and task-contract isolation, clustered confidence, resource limits, stale-outcome rejection, seven-part natural-task guard, and behavioral-contract promotion gate | When changing outcome reporting, Signal Card inputs, or promotion thresholds |
 
 ### INTEGRATION (Run before release)
 
@@ -91,6 +92,8 @@ tests/
 ├── test_memory_persistence.py   <- CRITICAL
 ├── test_memory_guard.py         <- CRITICAL
 ├── test_autonomous_coactivation.py <- CRITICAL
+├── test_task_intelligence_ledger.py <- CRITICAL (metadata-only outcome authority)
+├── test_session_intelligence.py <- CRITICAL (local value-evidence store)
 ├── test_developer_routing.py    <- Unit test (developer process routing)
 ├── test_scoring.py              <- Unit test
 ├── test_refinery.py             <- Unit test
@@ -100,6 +103,10 @@ tests/
 ├── test_backup_restore.py        <- Unit test (backup and restore safety)
 ├── test_installer_bundle.py     <- Unit test (installer bundle)
 ├── test_install_setup.py        <- Unit test (install.py)
+├── test_task_intelligence_benchmark.py <- Unit test (evaluation contract)
+├── test_task_intelligence_baseline.py <- Unit test (baseline and usage producer)
+├── test_task_intelligence_evaluation.py <- Unit test (paired evaluator)
+├── test_task_intelligence_report.py <- Unit test (outcome and claim gates)
 ├── test_integration_smoke.py    <- Integration
 ├── test_end_to_end.py           <- Convenience shim → manual/test_end_to_end.py
 │

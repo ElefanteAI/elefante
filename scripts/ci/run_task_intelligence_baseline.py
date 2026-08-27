@@ -15,8 +15,10 @@ import sys
 import tarfile
 import tempfile
 import time
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Callable
+from uuid import UUID
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -36,6 +38,10 @@ from scripts.ci.verify_task_intelligence_benchmark import (  # noqa: E402
     task_promotion_validity,
     validate_manifest,
     validate_outcome_record,
+)
+from src.core.session_intelligence import (  # noqa: E402
+    SessionIntelligenceError,
+    SessionIntelligenceStore,
 )
 
 
@@ -146,9 +152,15 @@ def prepare_workspace(repo_root: Path, task: dict[str, Any], workspace: Path) ->
             raise RuntimeError(f"workspace initialization failed: {' '.join(command)}")
 
 
-def parse_codex_usage(stdout: str) -> dict[str, int]:
-    """Extract aggregate usage without retaining agent messages or tool events."""
-    usage = {"input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 0}
+def parse_codex_usage(stdout: str) -> dict[str, Any]:
+    """Extract one complete provider usage event without retaining messages.
+
+    A single ``turn.completed`` event is the only source contract currently
+    proven by this runner. Multiple events are not summed or treated as
+    cumulative because the stream does not declare those semantics. They fail
+    closed as unknown instead of manufacturing provider-actual totals.
+    """
+    events: list[dict[str, Any]] = []
     for line in stdout.splitlines():
         try:
             event = json.loads(line)
@@ -156,13 +168,34 @@ def parse_codex_usage(stdout: str) -> dict[str, int]:
             continue
         if event.get("type") != "turn.completed" or not isinstance(event.get("usage"), dict):
             continue
-        details = event["usage"]
-        usage = {
-            "input_tokens": int(details.get("input_tokens", 0)),
-            "cached_input_tokens": int(details.get("cached_input_tokens", 0)),
-            "output_tokens": int(details.get("output_tokens", 0)),
-        }
-    return usage
+        events.append(event["usage"])
+    unknown = {
+        "input_tokens": None,
+        "cached_input_tokens": None,
+        "output_tokens": None,
+        "usage_source": "unknown",
+        "usage_scope": "unavailable",
+        "usage_event_count": len(events),
+    }
+    if len(events) != 1:
+        return unknown
+    details = events[0]
+    values: dict[str, int] = {}
+    for field in ("input_tokens", "cached_input_tokens", "output_tokens"):
+        value = details.get(field)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            return unknown
+        values[field] = value
+    if values["cached_input_tokens"] > values["input_tokens"]:
+        return unknown
+    if values["input_tokens"] + values["output_tokens"] <= 0:
+        return unknown
+    return {
+        **values,
+        "usage_source": "provider-actual",
+        "usage_scope": "single-complete-turn",
+        "usage_event_count": 1,
+    }
 
 
 def _codex_version(executable: str) -> str:
@@ -180,7 +213,8 @@ def run_codex_baseline(
     reasoning: str,
     timeout_seconds: int,
     prompt: str | None = None,
-) -> tuple[int, dict[str, int], int, str, str]:
+    evidence_sink: Callable[[dict[str, Any]], None] | None = None,
+) -> tuple[int, dict[str, Any], int, str, str]:
     executable = shutil.which("codex")
     if not executable:
         raise RuntimeError("codex executable is unavailable")
@@ -217,40 +251,242 @@ def run_codex_baseline(
     for name in list(environment):
         if name.startswith("ELEFANTE_") or name in {"PYTHONPATH", "ANONYMIZED_TELEMETRY"}:
             environment.pop(name, None)
-    started = time.monotonic()
-    result = subprocess.run(
-        command,
-        cwd=workspace,
-        input="",
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=timeout_seconds,
-        env=environment,
-    )
-    duration_ms = round((time.monotonic() - started) * 1000)
+    started_at_utc = datetime.now(timezone.utc)
+    started_monotonic_ns = time.monotonic_ns()
+    try:
+        result = subprocess.run(
+            command,
+            cwd=workspace,
+            input="",
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout_seconds,
+            env=environment,
+        )
+    except subprocess.TimeoutExpired:
+        finished_monotonic_ns = time.monotonic_ns()
+        if evidence_sink is not None:
+            evidence_sink(
+                {
+                    "event_schema_version": 1,
+                    "started_at_utc": started_at_utc,
+                    "finished_at_utc": datetime.now(timezone.utc),
+                    "started_monotonic_ns": started_monotonic_ns,
+                    "finished_monotonic_ns": finished_monotonic_ns,
+                    "status": "error",
+                    "result_count": 0,
+                    "provider": "openai",
+                    "model": model,
+                    "usage": {
+                        "input_tokens": None,
+                        "cached_input_tokens": None,
+                        "output_tokens": None,
+                        "usage_source": "unknown",
+                        "usage_scope": "unavailable",
+                        "usage_event_count": 0,
+                    },
+                    "raw_content_included": False,
+                }
+            )
+        raise
+    finished_monotonic_ns = time.monotonic_ns()
+    finished_at_utc = datetime.now(timezone.utc)
+    duration_ms = max(1, (finished_monotonic_ns - started_monotonic_ns) // 1_000_000)
+    usage = parse_codex_usage(result.stdout)
+    if evidence_sink is not None:
+        evidence_sink(
+            {
+                "event_schema_version": 1,
+                "started_at_utc": started_at_utc,
+                "finished_at_utc": finished_at_utc,
+                "started_monotonic_ns": started_monotonic_ns,
+                "finished_monotonic_ns": finished_monotonic_ns,
+                "status": "success" if result.returncode == 0 else "error",
+                "result_count": int(result.returncode == 0),
+                "provider": "openai",
+                "model": model,
+                "usage": usage,
+                "raw_content_included": False,
+            }
+        )
     stderr_tail = "\n".join(result.stderr.splitlines()[-5:])
     stdout_tail = "\n".join(result.stdout.splitlines()[-5:]) if result.returncode else ""
     diagnostic = "\n".join(part for part in (stderr_tail, stdout_tail) if part)[-2000:]
     return (
         result.returncode,
-        parse_codex_usage(result.stdout),
+        usage,
         duration_ms,
         _codex_version(executable),
         diagnostic,
     )
 
 
+def record_codex_attempt_evidence(
+    store: SessionIntelligenceStore,
+    *,
+    session_id: str,
+    workflow_id: str,
+    evidence: dict[str, Any],
+) -> dict[str, Any]:
+    """Append one evaluator attempt without retaining its prompt or response."""
+    if evidence.get("event_schema_version") != 1:
+        raise ValueError("unsupported Codex attempt evidence schema")
+    if evidence.get("raw_content_included") is not False:
+        raise ValueError("Codex attempt evidence must exclude raw content")
+    usage = evidence.get("usage")
+    if not isinstance(usage, dict):
+        raise ValueError("Codex attempt evidence requires usage metadata")
+    usage_source = usage.get("usage_source", "unknown")
+    provider_actual = usage_source == "provider-actual"
+    return store.append_invocation(
+        session_id=session_id,
+        workflow_id=workflow_id,
+        invocation_kind="model-attempt",
+        client_name="codex",
+        tool_name="model-attempt",
+        started_at_utc=evidence["started_at_utc"],
+        finished_at_utc=evidence["finished_at_utc"],
+        started_monotonic_ns=evidence["started_monotonic_ns"],
+        finished_monotonic_ns=evidence["finished_monotonic_ns"],
+        status=evidence["status"],
+        result_count=evidence["result_count"],
+        usage_source=usage_source if provider_actual else "unknown",
+        usage_scope="provider-workflow",
+        provider=evidence.get("provider") if provider_actual else None,
+        model=evidence.get("model") if provider_actual else None,
+        input_tokens=usage.get("input_tokens") if provider_actual else None,
+        cached_input_tokens=(
+            usage.get("cached_input_tokens") if provider_actual else None
+        ),
+        output_tokens=usage.get("output_tokens") if provider_actual else None,
+        recall_context_tokens=0 if provider_actual else None,
+    )
+
+
+def session_intelligence_evidence_config(
+    *,
+    database: Path | None,
+    session_id: str | None,
+    workflow_id: str | None,
+    pending_runs: int,
+) -> dict[str, Any] | None:
+    """Validate the explicit one-run binding without opening or creating a store."""
+    values = (database, session_id, workflow_id)
+    if not any(value is not None for value in values):
+        return None
+    if any(value is None for value in values):
+        raise ValueError(
+            "Session Intelligence evidence requires database, session ID, and "
+            "workflow ID together"
+        )
+    if pending_runs != 1:
+        raise ValueError(
+            "Session Intelligence evidence requires exactly one pending run"
+        )
+    try:
+        normalized_session = str(UUID(str(session_id)))
+        normalized_workflow = str(UUID(str(workflow_id)))
+    except ValueError as error:
+        raise ValueError(
+            "Session Intelligence session and workflow IDs must be UUIDs"
+        ) from error
+    return {
+        "database": Path(database),
+        "session_id": normalized_session,
+        "workflow_id": normalized_workflow,
+    }
+
+
+def _validate_session_intelligence_binding(
+    store: SessionIntelligenceStore,
+    *,
+    session_id: str,
+    workflow_id: str,
+    expected_condition: str,
+) -> None:
+    workflow = store.inspect_workflow(workflow_id)
+    if workflow["session_id"] != session_id:
+        raise SessionIntelligenceError(
+            "Session Intelligence workflow belongs to a different session"
+        )
+    if workflow["condition"] != expected_condition:
+        raise SessionIntelligenceError(
+            "Session Intelligence workflow condition does not match this run"
+        )
+    if workflow["finished_at_utc"] is not None:
+        raise SessionIntelligenceError(
+            "Session Intelligence workflow is already finished"
+        )
+    session = next(
+        (
+            item
+            for item in store.export_snapshot()["sessions"]
+            if item["session_id"] == session_id
+        ),
+        None,
+    )
+    if session is None:
+        raise SessionIntelligenceError("unknown Session Intelligence session")
+    if session["ended_at_utc"] is not None:
+        raise SessionIntelligenceError(
+            "Session Intelligence session is already ended"
+        )
+
+
+def open_session_intelligence_evidence_sink(
+    config: dict[str, Any],
+    *,
+    expected_condition: str,
+) -> tuple[SessionIntelligenceStore, Callable[[dict[str, Any]], None]]:
+    """Open one pre-registered local workflow after a read-only preflight."""
+    database = Path(config["database"])
+    if not database.is_file():
+        raise SessionIntelligenceError(
+            "Session Intelligence evidence database does not exist"
+        )
+    binding = {
+        "session_id": str(config["session_id"]),
+        "workflow_id": str(config["workflow_id"]),
+        "expected_condition": expected_condition,
+    }
+    with SessionIntelligenceStore(database, read_only=True) as preflight:
+        _validate_session_intelligence_binding(preflight, **binding)
+    store = SessionIntelligenceStore(database, enabled=True)
+    try:
+        _validate_session_intelligence_binding(store, **binding)
+    except Exception:
+        store.close()
+        raise
+
+    def sink(evidence: dict[str, Any]) -> None:
+        record_codex_attempt_evidence(
+            store,
+            session_id=binding["session_id"],
+            workflow_id=binding["workflow_id"],
+            evidence=evidence,
+        )
+
+    return store, sink
+
+
 def require_successful_agent_invocation(
-    *, exit_code: int, usage: dict[str, int], diagnostic: str
+    *, exit_code: int, usage: dict[str, Any], diagnostic: str
 ) -> None:
     """Reject infrastructure failures before they can become task outcomes."""
-    if exit_code == 0 and usage.get("input_tokens", 0) > 0:
+    input_tokens = usage.get("input_tokens")
+    if (
+        exit_code == 0
+        and usage.get("usage_source") == "provider-actual"
+        and isinstance(input_tokens, int)
+        and input_tokens > 0
+    ):
         return
     detail = diagnostic.strip() or "no CLI diagnostic"
     raise RuntimeError(
         "Codex evaluator failed before a measurable task attempt: "
-        f"exit={exit_code}, input_tokens={usage.get('input_tokens', 0)}; {detail}"
+        f"exit={exit_code}, input_tokens={input_tokens}, "
+        f"usage_source={usage.get('usage_source', 'unknown')}; {detail}"
     )
 
 
@@ -466,6 +702,7 @@ def execute_trial(
     reasoning: str,
     timeout_seconds: int,
     keep_failures: bool,
+    evidence_sink: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     task = plan_item["task"]
     repeat = plan_item["repeat"]
@@ -499,6 +736,7 @@ def execute_trial(
             reasoning=reasoning,
             timeout_seconds=timeout_seconds,
             prompt=prompt,
+            evidence_sink=evidence_sink,
         )
         require_successful_agent_invocation(
             exit_code=agent_exit,
@@ -591,6 +829,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTCOMES)
     parser.add_argument("--workspace-root", type=Path, default=DEFAULT_WORKSPACES)
+    parser.add_argument("--session-intelligence-db", type=Path)
+    parser.add_argument("--session-intelligence-session-id")
+    parser.add_argument("--session-intelligence-workflow-id")
     parser.add_argument("--timeout-seconds", type=int, default=1800)
     parser.add_argument("--max-runs", type=int)
     parser.add_argument("--max-total-input-tokens", type=int)
@@ -627,6 +868,26 @@ def main(argv: list[str] | None = None) -> int:
             reasoning=args.reasoning,
         ).exists()
     ]
+    try:
+        evidence_config = session_intelligence_evidence_config(
+            database=args.session_intelligence_db,
+            session_id=args.session_intelligence_session_id,
+            workflow_id=args.session_intelligence_workflow_id,
+            pending_runs=len(pending),
+        )
+    except ValueError as error:
+        print(
+            json.dumps(
+                {
+                    "pending_runs": len(pending),
+                    "execute": args.execute,
+                    "error": str(error),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 2
     estimate = len(pending) * args.estimated_input_tokens_per_run
     uncached_estimate = len(pending) * args.estimated_uncached_input_tokens_per_run
     diagnostic_task_ids = sorted(
@@ -646,6 +907,7 @@ def main(argv: list[str] | None = None) -> int:
         "estimated_uncached_input_tokens": uncached_estimate,
         "execute": args.execute,
         "diagnostic_task_ids": diagnostic_task_ids,
+        "session_intelligence_evidence": evidence_config is not None,
     }
     if not args.execute:
         print(json.dumps(summary, indent=2, sort_keys=True))
@@ -688,45 +950,72 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({**summary, **limits, "error": "estimated execution exceeds a cumulative token cap"}, indent=2, sort_keys=True))
         return 2
 
+    evidence_store: SessionIntelligenceStore | None = None
+    evidence_sink: Callable[[dict[str, Any]], None] | None = None
+    if evidence_config is not None:
+        try:
+            evidence_store, evidence_sink = open_session_intelligence_evidence_sink(
+                evidence_config,
+                expected_condition="control",
+            )
+        except (SessionIntelligenceError, ValueError) as error:
+            print(
+                json.dumps(
+                    {**summary, "error": str(error)}, indent=2, sort_keys=True
+                )
+            )
+            return 2
+
     args.workspace_root.mkdir(parents=True, exist_ok=True)
     results: list[dict[str, Any]] = []
     total_input = 0
     total_cached = 0
     total_output = 0
-    for item in pending:
-        result = execute_trial(
-            ROOT,
-            item,
-            output_dir=args.output_dir,
-            workspace_root=args.workspace_root,
-            model=args.model,
-            reasoning=args.reasoning,
-            timeout_seconds=args.timeout_seconds,
-            keep_failures=args.keep_failures,
-        )
-        results.append(result)
-        total_input += result["input_tokens"]
-        total_cached += result["cached_input_tokens"]
-        total_output += result["output_tokens"]
-        total_uncached = total_input - total_cached
-        if total_input > args.max_total_input_tokens or total_uncached > args.max_total_uncached_input_tokens:
-            print(
-                json.dumps(
-                    {
-                        **summary,
-                        **limits,
-                        "results": results,
-                        "actual_input_tokens": total_input,
-                        "actual_cached_input_tokens": total_cached,
-                        "actual_uncached_input_tokens": total_uncached,
-                        "actual_output_tokens": total_output,
-                        "error": "cumulative token cap exceeded; remaining runs were not started",
-                    },
-                    indent=2,
-                    sort_keys=True,
-                )
+    try:
+        for item in pending:
+            result = execute_trial(
+                ROOT,
+                item,
+                output_dir=args.output_dir,
+                workspace_root=args.workspace_root,
+                model=args.model,
+                reasoning=args.reasoning,
+                timeout_seconds=args.timeout_seconds,
+                keep_failures=args.keep_failures,
+                evidence_sink=evidence_sink,
             )
-            return 3
+            results.append(result)
+            total_input += result["input_tokens"]
+            total_cached += result["cached_input_tokens"]
+            total_output += result["output_tokens"]
+            total_uncached = total_input - total_cached
+            if (
+                total_input > args.max_total_input_tokens
+                or total_uncached > args.max_total_uncached_input_tokens
+            ):
+                print(
+                    json.dumps(
+                        {
+                            **summary,
+                            **limits,
+                            "results": results,
+                            "actual_input_tokens": total_input,
+                            "actual_cached_input_tokens": total_cached,
+                            "actual_uncached_input_tokens": total_uncached,
+                            "actual_output_tokens": total_output,
+                            "error": (
+                                "cumulative token cap exceeded; remaining runs "
+                                "were not started"
+                            ),
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+                return 3
+    finally:
+        if evidence_store is not None:
+            evidence_store.close()
     print(
         json.dumps(
             {

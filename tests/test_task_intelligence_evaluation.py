@@ -189,7 +189,10 @@ def test_treatment_trial_records_retrieval_delivery_execution_and_acceptance(
     )
     fixed_path = "scripts/setup/bootstrap_release_bundle.py"
 
-    def fake_agent(workspace, _task_value, **_kwargs):
+    evidence: list[dict] = []
+
+    def fake_agent(workspace, _task_value, **kwargs):
+        kwargs["evidence_sink"]({"attempt": "recorded"})
         fixed_source = evaluation.baseline._git_bytes(
             ROOT,
             "show",
@@ -198,7 +201,14 @@ def test_treatment_trial_records_retrieval_delivery_execution_and_acceptance(
         (workspace / fixed_path).write_bytes(fixed_source)
         return (
             0,
-            {"input_tokens": 100, "cached_input_tokens": 40, "output_tokens": 20},
+            {
+                "input_tokens": 100,
+                "cached_input_tokens": 40,
+                "output_tokens": 20,
+                "usage_source": "provider-actual",
+                "usage_scope": "single-complete-turn",
+                "usage_event_count": 1,
+            },
             250,
             "codex-test",
             "",
@@ -228,6 +238,7 @@ def test_treatment_trial_records_retrieval_delivery_execution_and_acceptance(
         timeout_seconds=60,
         keep_failures=False,
         brief_profile=TaskBriefProfile.V2,
+        evidence_sink=evidence.append,
     )
     record = json.loads(Path(result["outcome"]).read_text(encoding="utf-8"))
     trace = record["stage_trace"]
@@ -241,6 +252,7 @@ def test_treatment_trial_records_retrieval_delivery_execution_and_acceptance(
     assert trace["execution_status"] == "changed"
     assert trace["acceptance_status"] == "passed"
     assert evaluation.validate_outcome_record(record) == []
+    assert evidence == [{"attempt": "recorded"}]
 
 
 def test_source_candidates_diversify_files(monkeypatch, tmp_path) -> None:

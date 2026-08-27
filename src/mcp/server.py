@@ -1374,7 +1374,7 @@ Call action=search before answering when user preferences, past decisions, or pr
 
 - `action=prepare` — compile a bounded Task Brief. Defaults to profile=v1 and delivery_mode=shadow, which returns metadata only. Pilot delivery also requires the local `ELEFANTE_TASK_INTELLIGENCE_PILOT=1` kill-switch flag.
 - `action=record_use` — record only delivered IDs that actually informed the task. Requires the same live trace/session and an idempotency key. This records declared use without changing ranking weights.
-- `action=record_outcome` — append one metadata-only task outcome. No task text, prompts, memory bodies, or comments are stored.
+- `action=record_outcome` — append one metadata-only task outcome. An optional frozen task-value contract hash may bind boolean hard-floor and value-unit results. No task text, prompts, memory bodies, source diffs, or comments are stored.
 - `action=inspect` — inspect the local metadata-only trace.
 - `action=summary` — show observational runtime aggregates without claiming causal lift.
 - `action=retract_use` — user-directed reversal of a declared-use event.
@@ -1421,6 +1421,23 @@ This development surface does not claim causal task improvement. Keep pilot deli
                             "failure_category": {
                                 "type": ["string", "null"],
                                 "enum": ["retrieval", "selection", "delivery", "execution", "validation", "environment", "unknown", None],
+                            },
+                            "task_value_contract_sha256": {
+                                "type": "string",
+                                "pattern": "^[0-9a-f]{64}$",
+                                "description": "Frozen developer-value contract digest; never the task text.",
+                            },
+                            "quality_floor_results": {
+                                "type": "object",
+                                "minProperties": 1,
+                                "additionalProperties": {"type": "boolean"},
+                                "description": "Boolean results for pre-registered hard-floor identifiers.",
+                            },
+                            "value_unit_results": {
+                                "type": "object",
+                                "minProperties": 1,
+                                "additionalProperties": {"type": "boolean"},
+                                "description": "Boolean results for pre-registered value-unit identifiers.",
                             },
                         },
                         "required": ["action"],
@@ -2886,6 +2903,11 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                 "input_tokens": self._bounded_outcome_integer(args, "input_tokens", 10_000_000),
                 "output_tokens": self._bounded_outcome_integer(args, "output_tokens", 10_000_000),
                 "failure_category": failure_category,
+                "task_value_contract_sha256": args.get(
+                    "task_value_contract_sha256"
+                ),
+                "quality_floor_results": args.get("quality_floor_results"),
+                "value_unit_results": args.get("value_unit_results"),
             }
             result = self._get_task_intelligence_ledger().record_outcome(
                 trace_id=str(trace_id),
