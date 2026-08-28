@@ -1,0 +1,20 @@
+# Elefante v2.13.0 release authorization
+
+Authorized: 2026-08-28
+Purpose: Publish the governed intelligence product surfaces, Recall-first
+customer contract, local intelligence ledgers, integration adapters, and
+professional user/developer documentation prepared in PR #25.
+Source changes: PR #25
+
+Publication requirements:
+- Every maintained version declaration and the dated changelog entry resolve
+  to 2.13.0.
+- PR #25 quality, dashboard, dependency audit, customer-bundle, and platform
+  build gates are green at the exact merge commit before publication.
+- The published customer surface contains 17 tools and 2 prompts; the
+  developer-only Task Intelligence tool remains default-off.
+- Task Intelligence is described as evaluation infrastructure and no
+  representative multi-task outcome-lift claim is made.
+- Release assets carry release provenance and pass independent SHA-256
+  verification after publication.
+- Published historical tags remain immutable.

@@ -1,6 +1,6 @@
 # Elefante Architecture
 
-> **Release:** v2.12.3 · **Status:** released product contract
+> **Release:** v2.13.0 · **Status:** released product contract
 
 Elefante is a local persistent-memory service for AI agents. It stores semantic
 memory and explicit relationships, exposes them through MCP, and keeps the
@@ -73,8 +73,8 @@ exclusive database-lock contract.
 4. Deprecated and archived memories are removed from normal results.
 5. The result is returned with a compliance stamp and compact payload.
 
-The development checkout also has a bounded literal-trigger extension on the
-existing search path. When a caller supplies `surface_context` (or the query
+The released search path also supports bounded literal-trigger delivery. When a
+caller supplies `surface_context` (or the query
 itself is used as context), one read-only scan considers only memories with
 `injection_policy=triggered`, requires a case-insensitive literal match, and
 adds at most three results. Scope, lifecycle, source-trust, conflict, and
@@ -103,10 +103,8 @@ that a memory improved the downstream task.
   instead of truncating evidence.
 - Normal memory, graph, context, session, ETL, and task operations also receive
   entrypoint/pitfall blocks and active directives.
-- `RELEVANT_CONTEXT` is supplementary and conditional. It is skipped for
-  memory-heavy and management tools, requires a usable signal in the call, and
-  is disabled unless all three development pilot flags documented in
-  [`tools.md`](tools.md) are explicitly enabled.
+- The default customer profile does not inject automatic tool-response context.
+  Recall and the context prompt provide explicit bounded answer delivery.
 - System, dashboard, and directive-management tools use a minimal management
   response.
 
@@ -128,26 +126,39 @@ See [`token-intelligence.md`](token-intelligence.md) and
 - Migration of an existing legacy store is explicit, stopped-runtime,
   backup-gated support work.
 
-## Development-only work
+## Optional v2.13 local surfaces
 
-Task Intelligence evaluation, governed retention/injection fields, automatic
-forgetting, expanded host certification, Smart Update/Merge, host event
-adapters, Session Intelligence, Team Sync, and multi-modal attachments are not
-part of the v2.12.3 released architecture unless a later changelog and
-reference document say otherwise. The active developer checkout contains a
-conservative explicit-proposition conflict detector, dry-run-first reversible
-conflict repair, typed privacy-scrubbed host event ingress, an opt-in foreground
-Distiller watcher, a consent-gated metadata-only usage ledger and Signal Card
-snapshot, signed scope-bound additive Team Sync bundles, and local
-content-addressed media descriptors. These remain unreleased development
-behavior. Ambiguous conflicts require a user-selected winner. The watcher
-processes changed session files serially and does not persist insights without
-explicit `--store`.
-Known stored-conflict warnings and the bounded literal-trigger extension
-described above are development-only and are not evidence of Task Intelligence
-outcome lift. The `/events/surface` adapter is read-only and does not persist
-host content. The `/events/usage` adapter persists only typed metadata after
-explicit purpose consent.
+- **Conflict repair:** a deterministic detector classifies only explicit
+  same-proposition polarity or value contradictions. Ambiguous language
+  abstains. `elefante-Memory(action="resolve")` is dry-run-first, keeps both
+  records recoverable, and requires a user-selected winner when authority does
+  not identify one.
+- **Host event ingress:** `/events/surface` accepts bounded, privacy-scrubbed
+  file, terminal-error, and conversation envelopes, runs the same read-only
+  governed selector, and does not persist the event body. Hosts must opt in and
+  send the event; Elefante does not silently intercept activity.
+- **Session Distiller:** foreground `--watch` mode processes changed supported
+  session files serially and stores nothing unless `--store` is supplied.
+- **Session Intelligence:** a separate consent-gated SQLite ledger accepts
+  typed provider-actual or estimated usage metadata through its CLI or
+  `/events/usage`. It supports dated rate cards, outcome records, Signal Cards,
+  aggregate training hypotheses, retention, export, and deletion. Prompts,
+  transcripts, responses, hidden reasoning, and credentials are invalid input.
+- **Team Sync:** signed, exact-scope local bundles export only an explicit
+  memory-ID allowlist. Imports are additive, dry-run-first, conflict-withholding,
+  and backup-gated for non-empty stores. Elefante provides no cloud transport.
+- **Media attachments:** bounded local image, audio, and video files live in a
+  private content-addressed store with integrity metadata and text descriptions.
+  Elefante performs no OCR, transcription, model analysis, or network upload.
+
+## Developer-only boundary
+
+The default-off Task Intelligence tool, causal evaluation ledger, benchmark,
+and automatic tool-response context pilot are developer surfaces. They have not
+established representative multi-task outcome lift and are not part of the
+17-tool customer profile. Automatic age-based forgetting, a background
+Distiller service, cloud Team Sync transport, and vendor certification of host
+adapters are also not shipped claims.
 
 ## Source authorities
 

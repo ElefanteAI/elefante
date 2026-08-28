@@ -1,5 +1,9 @@
 # scripts/
 
+> **Audience:** developers, release engineers, and support operators. Customer
+> procedures live in `docs/how-to/`; this catalog documents the implementation
+> and verification entrypoints behind them.
+
 Direct operator entrypoints. Logic that belongs to the runtime lives in `src/`. Anything a human, CI job, or packaging flow runs directly lives here.
 
 ## Philosophy

@@ -17,7 +17,7 @@ layout, read [`agent-handoff.md`](agent-handoff.md) first.
 ## Use a released source tag
 
 If your Docker environment can reach GitHub, clone and check out the released
-v2.12.3 tag. `main` is a development branch and is not the customer release
+v2.13.0 tag. `main` is a development branch and is not the customer release
 contract.
 
 If your destination folder already contains `.a0proj/`, do not use `git clone <url> .` (git refuses cloning into a non-empty directory).
@@ -75,8 +75,8 @@ Use one of these two safe patterns instead.
 cd /a0/usr/projects/elefante
 git clone --depth 1 https://github.com/ElefanteAI/elefante elefante-repo-files
 cd elefante-repo-files
-git fetch --depth 1 origin tag v2.12.3
-git checkout --detach v2.12.3
+git fetch --depth 1 origin tag v2.13.0
+git checkout --detach v2.13.0
 docker compose up -d --build
 ```
 
@@ -90,7 +90,7 @@ cd /a0/usr/projects/elefante
 # Initialize git in-place (safe when .a0proj exists)
 git init
 git remote add origin https://github.com/ElefanteAI/elefante || true
-git fetch --depth 1 origin tag v2.12.3
+git fetch --depth 1 origin tag v2.13.0
 git checkout --detach FETCH_HEAD
 
 docker compose up -d --build

@@ -1,9 +1,9 @@
 # Elefante Agent Tutorial
 
-> **Release:** v2.12.3
+> **Release:** v2.13.0
 > **Audience:** AI agents connected through MCP
 
-Elefante exposes 16 tools and 2 lowercase prompts. Tools use
+Elefante exposes 17 customer tools and 2 lowercase prompts. Tools use
 `elefante-PascalCase`; prompts are `elefante-context` and
 `elefante-grounding`.
 
@@ -14,7 +14,15 @@ can preload the runtime and set the logical mode, but normal operations use
 transaction-scoped storage ownership; it does not reserve a session-wide
 database lock.
 
-## 2. Search when prior context matters
+## 2. Recall when prior context matters
+
+Call `elefante-Recall` at most once with the complete standalone question.
+Treat `no_match`, `blocked`, and `unavailable` as terminal for that answer. Do
+not retry with broader wording, and do not call Recall for a self-contained
+question.
+
+Use `elefante-Memory(action="search")` when you need broader inspection or are
+preparing a write:
 
 Call `elefante-Memory` with:
 
@@ -66,8 +74,8 @@ second copy of existing memory.
 
 - SQLite vectors plus Kuzu are the released default; legacy ChromaDB is only an
   explicitly configured support path.
-- `RELEVANT_CONTEXT` may be appended to eligible operations. It is
-  supplementary and not proof that the memory helped.
+- `RELEVANT_CONTEXT` is disabled in the customer profile. Recall and the
+  context prompt are the explicit bounded delivery paths.
 - Specifications and directives have zero type decay, but freshness still
   affects vitality.
 - When memory conflicts with current source or a newer verified fact, explain

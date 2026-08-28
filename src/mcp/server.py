@@ -1769,7 +1769,7 @@ This returns raw memories that need agent enrichment. YOU must analyze each one 
 Enrichment fields:
 - **summary**: One-line description of what this memory is about
 - **concepts**: 3-5 key terms for graph edges and retrieval (optional, improves search)
-- **surfaces_when**: Query patterns that should trigger this memory (optional, improves search)
+- **surfaces_when**: Stored trigger metadata for inspection and future proactive surfacing; not a current ranking signal
 
 Flow:
 1. Call elefante-ETLProcess(limit=5) → Get raw memories
@@ -1803,9 +1803,9 @@ Required fields:
 - memory_id: From elefante-ETLProcess
 - summary: One-line description (max 200 chars)
 
-Optional fields (improve retrieval quality):
+Optional enrichment fields:
 - concepts: 3-5 key terms for graph edges
-- surfaces_when: Query patterns that should trigger this memory""",
+- surfaces_when: Stored trigger metadata for inspection and future proactive surfacing; not a current ranking signal""",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -1825,7 +1825,7 @@ Optional fields (improve retrieval quality):
                             "surfaces_when": {
                                 "type": "array",
                                 "items": {"type": "string"},
-                                "description": "Query patterns that should trigger this memory"
+                                "description": "Stored trigger metadata for inspection and future proactive surfacing; not a current ranking signal"
                             }
                         },
                         "required": ["memory_id", "summary"]
@@ -3971,7 +3971,7 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                 "success": True,
                 "count": len(raw_memories),
                 "memories": raw_memories,
-                "instructions": "Analyze each memory and call elefante-ETLClassify with your enrichment. Required: summary (one-line). Optional: concepts (3-5 key terms), surfaces_when (query patterns)."
+                "instructions": "Analyze each memory and call elefante-ETLClassify with your enrichment. Required: summary (one-line). Optional: concepts (3-5 retrieval terms), surfaces_when (stored trigger metadata; not a current ranking signal)."
             }
         
         # include_stats (absorbs former elefante-ETLProcess (include_stats=true))

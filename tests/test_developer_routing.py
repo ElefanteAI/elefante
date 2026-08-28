@@ -41,8 +41,14 @@ def test_task_and_memory_text_are_not_written_to_runtime_logs() -> None:
 
 
 def _published_version() -> str:
-    """Read the newest published release from the changelog, not dev source."""
+    """Read the newest published release from the changelog."""
     match = re.search(r'^## \[(\d+\.\d+\.\d+)\] - ', _read("CHANGELOG.md"), re.MULTILINE)
+    assert match is not None
+    return match.group(1)
+
+
+def _current_version() -> str:
+    match = re.search(r'^__version__ = "([^"]+)"$', _read("src/__init__.py"), re.MULTILINE)
     assert match is not None
     return match.group(1)
 
@@ -56,10 +62,9 @@ def _markdown_heading_slug(heading: str) -> str:
 
 def _mcp_surface_counts() -> tuple[int, int]:
     tool_names, prompt_names = _mcp_surface_names()
-    # Task Intelligence is default-off and Recall is still an unreleased
-    # customer candidate. Public v2.12.3 documentation remains frozen.
+    # Task Intelligence remains default-off and developer-only. Recall is part
+    # of the default customer profile beginning with v2.13.0.
     tool_names.discard("elefante-TaskIntelligence")
-    tool_names.discard("elefante-Recall")
     return len(tool_names), len(prompt_names)
 
 
@@ -196,12 +201,13 @@ def test_active_developer_routing_points_to_current_sources() -> None:
 
 def test_living_plan_tracks_the_released_product_and_separate_client_candidate() -> None:
     planning = _read("workspace/PLANNING.md")
-
+    current_version = _current_version()
     version = _published_version()
-    assert f"## §2 Released Product: v{version} Customer-Global Memory Intelligence" in planning
+    assert current_version == version
+    assert f"## §2 Release Contract: v{version}" in planning
     assert "### §3.1 v2.11.1 — Shipped baseline" in planning
     assert "### §3.2 v2.12.0 — Released" in planning
-    assert f"### §3.3 Release Client Candidate 1.0 — released through v{version}" in planning
+    assert "### §3.3" in planning
     assert "## §2 Active Release: v2.10.0" not in planning
     assert "## §2 Active Release: v2.12.0" not in planning
     assert "### §3.2 v2.12.0 — Active release candidate" not in planning
@@ -209,8 +215,47 @@ def test_living_plan_tracks_the_released_product_and_separate_client_candidate()
     assert "| OB4 |" not in planning
     assert "| OB5 |" not in planning
     assert "source-grounded" in planning
-    assert f"**PUBLISHED_PRODUCT:** v{version}, public GitHub tag and checksummed platform assets." in planning
-    assert "**PUBLICATION_AUTHORITY:** no unused authorization." in planning
+    assert f"**RELEASE_TARGET:** v{version}" in planning
+    assert "**PUBLICATION_AUTHORITY:** owner authorization covers this core release only." in planning
+
+
+def test_active_scoring_reference_matches_runtime_contract() -> None:
+    scoring = _read("docs/reference/scoring.md")
+
+    assert "effective_decay_rate = decay_rate / (1 + reinforcement_factor * ln(access_count + 1))" in scoring
+    assert "vitality = exp(-effective_decay_rate * days_since_created) * exp(-0.005 * days_since_access)" in scoring
+    assert "vector similarity | `0.35`" in scoring
+    assert "concept overlap | `0.30`" in scoring
+    assert "co-activation | `0.15`" in scoring
+    assert "authority | `0.10`" in scoring
+    assert "temporal | `0.10`" in scoring
+    assert "70% of the vector score" in scoring
+    assert "`+0.30`" in scoring
+    assert "The consolidation module does not exist" not in scoring
+    assert "elefante-Memory(action=\"consolidate\")" in scoring
+
+
+def test_etl_trigger_metadata_is_not_claimed_as_a_live_ranking_signal() -> None:
+    server = _read("src/mcp/server.py")
+    tools = _read("docs/reference/tools.md")
+    schema = _read("docs/reference/memory-schema.md")
+    model = _read("src/models/memory.py")
+
+    for text in (server, tools, schema, model):
+        assert "not a current ranking signal" in text
+
+    assert "**surfaces_when**: Query patterns that should trigger this memory (optional, improves search)" not in server
+    assert "- surfaces_when: Query patterns that should trigger this memory" not in server
+    assert '"description": "Query patterns that should trigger this memory"' not in server
+
+
+def test_distiller_documentation_uses_repo_root_module_path() -> None:
+    distiller_init = _read("src/modules/distiller/__init__.py")
+    distiller_main = _read("src/modules/distiller/__main__.py")
+
+    for text in (distiller_init, distiller_main):
+        assert "python -m modules.distiller" not in text
+        assert "python -m src.modules.distiller" in text
 
 
 def test_active_tool_docs_match_current_mcp_surface() -> None:
@@ -220,8 +265,8 @@ def test_active_tool_docs_match_current_mcp_surface() -> None:
     tool_count, prompt_count = _mcp_surface_counts()
 
     assert f"{tool_count} tools · {prompt_count} prompts" in readme
-    assert f"{tool_count} tools + {prompt_count} prompts" in readme
-    assert f"({tool_count} tools, {prompt_count} prompts)" in docs_index
+    assert f"{tool_count} tools" in docs_index
+    assert f"{prompt_count} prompts" in docs_index
     assert f"**{tool_count} tools**" in spec_tools
     assert f"**{prompt_count} prompts**" in spec_tools
 
@@ -245,8 +290,10 @@ def test_active_tool_docs_match_current_mcp_surface() -> None:
     assert "docs/how-to/view-dashboard.md" in readme
 
     tool_names, prompt_names = _mcp_surface_names()
-    for name in sorted(tool_names | prompt_names):
+    public_names = (tool_names - {"elefante-TaskIntelligence"}) | prompt_names
+    for name in sorted(public_names):
         assert name in spec_tools
+    assert "elefante-TaskIntelligence" not in spec_tools
 
     server = _read("src/mcp/server.py")
     assert '"min_similarity": {"type": "number", "default": 0.1' in server
@@ -477,10 +524,11 @@ def test_task_intelligence_docs_keep_release_and_learning_boundaries() -> None:
     orchestrator = _read("agents/orchestrator.md")
     changelog = _read("CHANGELOG.md")
 
-    assert "absent from MCP discovery" in tools_doc
-    assert "ELEFANTE_TASK_INTELLIGENCE_ENABLED=1" in tools_doc
-    assert "ELEFANTE_TASK_INTELLIGENCE_PILOT=1" in tools_doc
-    assert "does not update ranking" in tools_doc
+    assert "elefante-TaskIntelligence" not in tools_doc
+    assert "absent from MCP discovery" in proposal
+    assert "ELEFANTE_TASK_INTELLIGENCE_ENABLED=1" in proposal
+    assert "ELEFANTE_TASK_INTELLIGENCE_PILOT=1" in proposal
+    assert "does not update ranking" in proposal
     assert "proves the pipeline, not that Elefante improves diverse tasks" in proposal
     assert "### Active acquisition loop" in proposal
     assert "Continue the highest-value normal" in proposal
@@ -558,6 +606,7 @@ def test_readme_and_planning_docs_capture_installer_recovery_and_learning_bounda
 
 def test_active_release_claims_avoid_stale_version_promises() -> None:
     """Active entrypoints must not present completed release targets as future."""
+    current_version = _current_version()
     active_paths = (
         "AGENTS.md",
         "README.md",
@@ -567,6 +616,17 @@ def test_active_release_claims_avoid_stale_version_promises() -> None:
         "docs/reference/tools.md",
         "agents/manifests/ide-integration.yaml",
     )
+    current_claims = {
+        "AGENTS.md": (
+            f"**v{current_version}** is the latest published release.",
+            f"Current published release: **v{current_version}**.",
+        ),
+        "README.md": (f"**v{current_version}** — Current published release.",),
+        "docs/README.md": (f"> **v{current_version}** · Published user documentation.",),
+        "docs/explanation/vision.md": (
+            f"> Product explanation · Current published version: v{current_version}",
+        ),
+    }
     stale_patterns = (
         r"currently at \*\*v2\.(?:9|10)",
         r"current:\s*\*\*v2\.(?:9|10)",
@@ -579,9 +639,16 @@ def test_active_release_claims_avoid_stale_version_promises() -> None:
         r"active release candidate:\s*\**v2\.12\.0",
         r"v2\.12\.0\*{0,2}\s*(?:—|-)\s*release candidate",
         r"v2\.12\.0\*{0,2}\s+release candidate",
+        r"current published (?:release|version):?\s*\**v2\.12\.1",
+        r"\*\*v2\.12\.1\*\*\s*(?:—|-)\s*current published release",
     )
 
-    violations = []
+    violations = [
+        f"{path}: missing current release claim -> {claim}"
+        for path, claims in current_claims.items()
+        for claim in claims
+        if claim not in _read(path)
+    ]
     for path in active_paths:
         text = _read(path)
         for pattern in stale_patterns:
@@ -628,7 +695,8 @@ def test_developer_process_docs_enforce_question_first_token_discipline() -> Non
     assert "smallest maintained proof" in best_practices
     assert "quality per token" in best_practices.lower()
 
-    assert "Full Signal Injection" in spec_vision
+    assert "Task Intelligence" in spec_vision
+    assert "representative multi-task outcome lift" in spec_vision
 
 
 def test_installer_docs_route_bug_020_through_screenshot_first_verification() -> None:
@@ -659,7 +727,7 @@ def test_self_protocol_docs_are_linked() -> None:
     tests_readme = _read("tests/README.md")
     protocol_doc = _read("docs/reference/self-protocol.md")
 
-    assert "self-protocol.md" in docs_index
+    assert "self-protocol.md" not in docs_index
     assert "verify_e2e_tests.py" in protocol_doc
     assert "--with-dashboard-open" in protocol_doc
     assert "self-protocol" in scripts_readme
@@ -747,8 +815,8 @@ def test_recall_cost_and_release_contract_is_synced_across_loaded_surfaces() -> 
     assert "provider usage" in token_doc
     assert "1,000" in architecture
     assert "1,000" in self_protocol
-    assert "unreleased" in tools_doc.lower()
-    assert "published v2.12.3 installers" in tools_doc
+    assert "Released and default-on in v2.13.0" in tools_doc
+    assert "published v2.12.3 installers" not in tools_doc
     assert "1,000" in issues
     assert "live Recall capability" in scripts_index
 

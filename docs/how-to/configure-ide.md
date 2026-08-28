@@ -1,6 +1,6 @@
 # Connect IDEs and Agent Hosts
 
-**Applies to:** v2.12.3
+**Applies to:** v2.13.0
 
 The release installer is the configuration authority. It detects compatible
 hosts and connects all of them to one user-level Elefante daemon. Rerun the
@@ -49,31 +49,15 @@ that still matches the recorded installer fingerprint.
 | Planned | Windsurf, Cline, Roo, Kilo, Aider, Kiro Skills/Steering | No released integration claim |
 | Certified | None | Requires real-host install, reconnect, upgrade, and uninstall evidence |
 
-Do not infer support from a host name appearing in development files. The
-machine-readable developer inventory is
-`agents/manifests/ide-integration.yaml`; its verification dates are not host
-certification.
+Do not infer support from a host name appearing in source or planning files.
+Only the tier table above and a current installer/doctor result define the
+customer claim.
 
 ## Adapter-managed hosts
 
-Customers normally use the release installer. These commands are for source
-developers and support diagnostics:
-
-```bash
-./.venv/bin/python scripts/setup/configure_vscode_bob.py
-./.venv/bin/python scripts/setup/configure_cursor_kiro.py --host cursor
-./.venv/bin/python scripts/setup/configure_cursor_kiro.py --host kiro
-./.venv/bin/python scripts/setup/configure_cursor_kiro.py --host gemini
-./.venv/bin/python scripts/setup/configure_antigravity.py
-./.venv/bin/python scripts/setup/configure_cli_agents.py --host claude-code
-./.venv/bin/python scripts/setup/configure_cli_agents.py --host codex
-./.venv/bin/python scripts/setup/configure_cli_agents.py --host openclaw
-./.venv/bin/python scripts/setup/configure_additional_hosts.py --host zed
-./.venv/bin/python scripts/setup/configure_additional_hosts.py --host continue
-```
-
-Each adapter detects its host before writing. The customer installer does not
-create host directories merely to make detection succeed.
+Customers use the release installer; individual adapter scripts are a developer
+and support surface. Each adapter detects its host before writing. The installer
+does not create host directories merely to make detection succeed.
 
 Zed receives one `context_servers.elefante` JSON entry in its user settings.
 Continue receives a dedicated `~/.continue/mcpServers/elefante.yaml` block, so
@@ -112,8 +96,9 @@ create the MCP connection. Keep that guidance small:
 
 ```text
 Search Elefante when the task may depend on prior preferences, decisions, or
-project context. Treat retrieved memories as evidence candidates, surface
-conflicts, and store only durable information after searching first.
+project context. Call elefante-Recall at most once with the complete question.
+Treat retrieved memories as evidence candidates and surface conflicts. Store
+only explicitly requested durable information, after searching first.
 ```
 
 Do not demand a memory search for every self-contained question, and do not
@@ -129,15 +114,9 @@ store every conversation. The maintained repository example is
    ```
 
 2. Restart the host.
-3. Confirm it lists Elefante's 16 tools and 2 prompts.
+3. Confirm it lists Elefante's 17 tools and 2 prompts.
 4. Call `elefante-System(action="status")`.
 5. Run a read-only memory search.
-
-From a source checkout, also run:
-
-```bash
-./.venv/bin/python scripts/verify/verify_mcp_handshake.py
-```
 
 If one host shows different memories, it is probably connected to a different
 runtime. Repair the customer installation; do not copy databases between

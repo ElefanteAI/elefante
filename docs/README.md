@@ -1,69 +1,61 @@
 # Elefante User Documentation
 
-> **v2.12.3** · Published user documentation. The GitHub release and installers
-> are public.
+> **v2.13.0** · Published user documentation. 17 tools, 2 prompts.
 
-Use this index to install, configure, operate, and understand the released
-Elefante product. Development plans, bugs, postmortems, release procedures, and
-draft contracts are intentionally outside this user-documentation surface.
+This index covers the released customer product: installation, configuration,
+operation, and public behavior. Developer plans, experiments, release mechanics,
+postmortems, and internal evaluation are maintained outside this user surface.
 
-| Folder | Type | Question it answers | When to read |
-|--------|------|---------------------|--------------|
-| [`reference/`](reference/) | **SPEC** — what the system IS | "What is the contract?" | Looking up a frozen contract |
-| [`how-to/`](how-to/) | **OPS** — what to DO | "How do I accomplish X?" | Performing a task |
-| [`explanation/`](explanation/) | **CONCEPT** — WHY | "Why does this exist?" | Understanding design |
+## Start here
 
----
+| Goal | Guide |
+|---|---|
+| Install, upgrade, repair, or uninstall | [Install Elefante](how-to/install.md) |
+| Connect an IDE or CLI agent | [Configure a host](how-to/configure-ide.md) |
+| Verify the MCP service manually | [Run the MCP server](how-to/run-mcp-server.md) |
+| Inspect memory safely | [View the dashboard](how-to/view-dashboard.md) |
+| Back up or restore local data | [Backup and rollback](how-to/rollback.md) |
 
-## Reference (`reference/`) — what the system IS
+Released compatible adapters cover VS Code, Cursor, Kiro, Gemini CLI, Claude
+Code, Codex, OpenClaw, Zed, and Continue. Compatible means Elefante owns the
+adapter and contract tests; it does not mean vendor certification. See
+[Configure a host](how-to/configure-ide.md) for preview and community tiers.
 
-| Doc | Contract |
-|-----|----------|
-| [`architecture.md`](reference/architecture.md) | System design, triple-layer brain, retrieval workflow |
-| [`tools.md`](reference/tools.md) | MCP tool reference (16 tools, 2 prompts) — full schemas |
-| [`scoring.md`](reference/scoring.md) | 5-signal cognitive scoring (vector / concept / co-activation / authority / temporal) |
-| [`ingestion.md`](reference/ingestion.md) | Validated write, deduplication, persistence, graph links, and optional agent ETL |
-| [`memory-schema.md`](reference/memory-schema.md) | Released memory metadata, lifecycle, provenance, and persistence contract |
-| [`dashboard-snapshot.md`](reference/dashboard-snapshot.md) | Dashboard JSON schema |
-| [`self-protocol.md`](reference/self-protocol.md) | Whole-system MCP self-protocol verification contract |
-| [`token-intelligence.md`](reference/token-intelligence.md) | Token-budget layer (TOKEN_STATS, type budgets, density warnings) — shipped v2.5.0 |
+## Reference: what the product is
 
-Source authority for every reference is the released implementation in `src/`.
-Documentation drift is a defect; when source and documentation disagree, report
-the mismatch rather than normalizing it.
+| Document | Contract |
+|---|---|
+| [Architecture](reference/architecture.md) | Local daemon, MCP transports, SQLite vectors, Kuzu graph, dashboard, and optional intelligence ledgers |
+| [Tools and prompts](reference/tools.md) | Public MCP surface (17 tools, 2 prompts), parameters, results, and safety rules |
+| [Memory schema](reference/memory-schema.md) | Classification, provenance, governance, lifecycle, conflicts, and local media attachments |
+| [Scoring](reference/scoring.md) | Behavioral vitality and five-signal retrieval scoring |
+| [Ingestion](reference/ingestion.md) | Search-before-write, validation, persistence, graph links, and ETL |
+| [Dashboard snapshot](reference/dashboard-snapshot.md) | Redacted, read-only browser data contract |
+| [Token Intelligence](reference/token-intelligence.md) | Local response estimates and the boundary with provider-actual Session Intelligence |
 
-## How-to (`how-to/`) — what to DO
+## How-to: what to do
 
-| Doc | Procedure |
-|-----|-----------|
-| [`install.md`](how-to/install.md) | Customer installation, verification, repair, and source-path boundary |
-| [`configure-ide.md`](how-to/configure-ide.md) | IDE and CLI-agent MCP setup (VS Code, Cursor, Bob, Antigravity, Kiro, Gemini CLI, Claude Code, Codex, OpenClaw) |
-| [`run-mcp-server.md`](how-to/run-mcp-server.md) | Manual server startup + handshake verification |
-| [`view-dashboard.md`](how-to/view-dashboard.md) | Dashboard launch + verification |
-| [`restart.md`](how-to/restart.md) | Graceful restart, lock cleanup, force-kill |
-| [`rollback.md`](how-to/rollback.md) | Backup + restore |
-| [`docker.md`](how-to/docker.md) | Docker deployment |
-| [`kuzu-troubleshooting.md`](how-to/kuzu-troubleshooting.md) | Kuzu reserved words, locking, troubleshooting |
-| [`agent-handoff.md`](how-to/agent-handoff.md) | Connect an existing agent host |
+| Document | Procedure |
+|---|---|
+| [Install Elefante](how-to/install.md) | Customer installation, checksum verification, health proof, repair, upgrade, and uninstall |
+| [Configure a host](how-to/configure-ide.md) | Supported, preview, and community host paths |
+| [Run the MCP server](how-to/run-mcp-server.md) | Manual startup and handshake verification |
+| [View the dashboard](how-to/view-dashboard.md) | Snapshot refresh, Retrieval Explanation, Signal Cards, and troubleshooting |
+| [Restart](how-to/restart.md) | Graceful restart and lock-safe recovery |
+| [Backup and rollback](how-to/rollback.md) | Checksummed binary backup and restore |
+| [Docker](how-to/docker.md) | Loopback-safe container operation |
+| [Kuzu troubleshooting](how-to/kuzu-troubleshooting.md) | Graph locking, reserved words, and recovery |
+| [Agent handoff](how-to/agent-handoff.md) | Connect an existing MCP-capable agent |
 
-## Explanation (`explanation/`) — WHY
+## Explanation: why it works this way
 
-| Doc | Concept |
-|-----|---------|
-| [`vision.md`](explanation/vision.md) | Thesis, Four Laws, released architecture, and product boundary |
+| Document | Concept |
+|---|---|
+| [Product vision](explanation/vision.md) | Persistent memory boundary, Four Laws, local-first trust model, and agent-loop role |
 
----
+## Documentation boundary
 
-## Documentation boundaries
-
-- **`reference/` is for what the system IS.** It may include a narrow command
-  that verifies the documented contract.
-- **`how-to/` is for procedures.** Goal-oriented steps with only the context
-  needed to perform them safely.
-- **`explanation/` is for WHY.** Design rationale, philosophy, and product
-  boundaries rather than operational instructions.
-- **Developer state is not user documentation.** Drafts, bugs, postmortems, and
-  release procedures are maintained separately and are not linked from this
-  index.
-
-A file in the wrong folder is a structural bug. The forbidden-pattern guard (`tests/test_developer_routing.py`) catches some drift; type purity is enforced by code review.
+- **User documentation** states only the released customer contract.
+- **Developer documentation** begins at [the repository entrypoint](../AGENTS.md).
+- Source and tagged artifacts are authoritative. If documentation disagrees
+  with executable behavior, report the mismatch; do not silently reinterpret it.

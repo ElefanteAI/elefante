@@ -1,4 +1,4 @@
-# Usage Guide & API Reference (v2.12.3)
+# MCP Tools and Prompts (v2.13.0)
 
 ## 1. Natural Language Interaction
 
@@ -16,18 +16,9 @@ Once connected to your IDE, use natural language to interact with Elefante. The 
 
 ## 2. Current MCP Surface
 
-Elefante exposes **16 tools** and **2 prompts**. Memory operations use one
+Elefante exposes **17 tools** and **2 prompts** in the default customer profile.
+Memory operations use one
 `elefante-Memory` tool with an action discriminator.
-
-The development branch also contains one default-off tool,
-`elefante-TaskIntelligence`. It is absent from MCP discovery unless the operator
-sets `ELEFANTE_TASK_INTELLIGENCE_ENABLED=1`. This does not change the published
-v2.12.3 contract.
-
-The unreleased customer candidate in this checkout adds one default-on,
-read-only tool, `elefante-Recall`. It requires no development flags, but it is
-not part of v2.12.3; published v2.12.3 installers expose the documented
-16-tool surface.
 
 - **Tools** read, write, or inspect the system.
 - **Prompts** inject grounding or pre-fetched memory context into the model. They are not tools.
@@ -39,8 +30,7 @@ not part of v2.12.3; published v2.12.3 installers expose the documented
   per user question when stored preferences, decisions, or project context could
   materially change the answer. Skip it for a self-contained question. Treat
   `no_match`, `blocked`, and `unavailable` as terminal for that answer; do not
-  retry or broaden retrieval. On published v2.12.3, use targeted
-  `elefante-Memory(action="search", ...)` instead.
+  retry or broaden retrieval.
 - Call `elefante-Memory(action="search", ...)` before `elefante-Memory(action="add"|"update"|"delete", ...)` or `elefante-GraphConnect`.
 - When the user explicitly asks Elefante to remember information across sessions
   or declares a project decision canonical or non-negotiable, search the exact
@@ -52,9 +42,8 @@ not part of v2.12.3; published v2.12.3 installers expose the documented
   use descriptive prose. Prefer ranked delivery when relevant paraphrases should
   work. Use a triggered policy only when literal phrases are intentionally
   required; never choose it merely to pass one verification question. After
-  writing, call `elefante-Recall` with one likely future question when that
-  development tool is available; otherwise use a read-only memory search. A
-  stored receipt is not proof that the memory is deliverable.
+  writing, call `elefante-Recall` with one likely future question. A stored
+  receipt is not proof that the memory is deliverable.
 
 **Tool response contract**:
 
@@ -71,20 +60,13 @@ not part of v2.12.3; published v2.12.3 installers expose the documented
   active-directive blocks. System, dashboard, and directive-management tools
   return through a minimal management path and do not receive those recursive
   policy blocks.
-- Automatic `RELEVANT_CONTEXT` delivery is off by default. Development pilots
-  require all three local flags:
-  `ELEFANTE_TASK_INTELLIGENCE_ENABLED=1`,
-  `ELEFANTE_TASK_INTELLIGENCE_PILOT=1`, and
-  `ELEFANTE_TASK_CONTEXT_ON_TOOL_CALL=1`.
 - `ENTRYPOINT_SEQUENCE_READ_THIS_FIRST` is environment-specific. Developer
   runtimes receive repository-debug routing; customer runtimes receive a short
   memory-use and secret-handling sequence.
-- When explicitly enabled, `RELEVANT_CONTEXT` is conditional, not universal,
-  and is skipped
-  for memory-heavy or management tools. It contains a bounded rendered context,
-  selected memory IDs, selection reasons, governance warnings, and (when
-  applicable) a conflict count plus ID-free conflict warnings. A warning-only
-  context never selects either side of a known conflict.
+- The customer profile does not enable automatic tool-response context. Recall
+  and the context prompt are the explicit bounded answer-delivery paths.
+- `RELEVANT_CONTEXT` is conditional, not universal. It remains disabled in the
+  customer profile and is not a substitute for Recall or the context prompt.
 - `TOKEN_STATS` is injected into every non-Recall tool response. It reports
   Elefante's local heuristic estimate of each call's token size; it is not a
   provider pricing API, invoice estimate, or dollar-cost calculation. Fields:
@@ -101,8 +83,7 @@ not part of v2.12.3; published v2.12.3 installers expose the documented
 
 #### `elefante-Recall`
 
-**Status**: Unreleased customer candidate. Default-on in the candidate source;
-not present in published v2.12.3 installers.
+**Status**: Released and default-on in v2.13.0.
 
 **Purpose**: Give an answering agent the smallest governed durable context for
 one question without exposing the broad search or mutation interface.
@@ -124,8 +105,8 @@ one question without exposing the broad search or mutation interface.
   the current request and verified current evidence without inventing history.
 
 Recall is read-only. It does not create a compliance receipt, increment access
-counts, record declared use, mutate ranking, expose memory UUIDs, or require the
-development Task Intelligence flags. The context prompt and Recall share the
+counts, record declared use, mutate ranking, expose memory UUIDs, or require any
+opt-in evaluation flags. The context prompt and Recall share the
 same retrieval, current-source validation, governed selection, and budget path.
 The answering host already owns the question, so Recall does not echo it in the
 returned context. Call Recall at most once for that user question; a terminal
@@ -150,7 +131,10 @@ closed; the existing broad memory search and prompts remain unchanged.
 
 #### `elefante-Memory`
 
-**Purpose**: Single discriminated entry point for all persistent memory operations. The `action` parameter selects the operation: `add`, `search`, `record_use`, `update`, `resolve`, `delete`, or `consolidate`.
+**Purpose**: Single discriminated entry point for persistent memory operations.
+The normal customer actions are `add`, `search`, `update`, `resolve`, `delete`,
+and `consolidate`. The source schema reserves `record_use` for the default-off
+developer evaluation profile; it is not a normal customer operation.
 
 **Why one tool, not five**: Five separate memory tools forced agents to pre-classify intent before naming a tool. Consolidation moves that branch into a parameter, reduces five memory entries to one, and lets one schema document the later additive actions too. Atomic-swapped at v2.10.0 / 2026-05-02 — no overlap window, no aliases.
 
@@ -162,7 +146,8 @@ closed; the existing broad memory search and prompts remain unchanged.
 
 **Common parameter**:
 
-- `action` (required, string): One of `add`, `search`, `record_use`, `update`, `resolve`, `delete`, or `consolidate`.
+- `action` (required, string): One of `add`, `search`, `update`, `resolve`,
+  `delete`, or `consolidate` for normal customer operation.
 
 ##### `action="add"` — store a new memory
 
@@ -182,13 +167,13 @@ closed; the existing broad memory search and prompts remain unchanged.
   `mime_type`, `width`, `height`, and `duration_ms`. Files are limited to 25 MiB
   each and never trigger OCR, transcription, captioning, or network upload.
 - `metadata` (optional, object): Additional structured metadata.
-- retention_policy (optional): managed, permanent, or ephemeral. Ephemeral is
-  declarative in the development extension; automatic expiry is not implemented.
-- injection_policy (optional): ranked, triggered, or always. Always requires
-  user_locked=true.
-- scope (optional): Project, workspace, or task scope.
-- trigger (optional): Up to 20 phrases for triggered delivery.
-- user_locked (optional): Explicit user authority; automated refinery cleanup
+- `retention_policy` (optional): `managed`, `permanent`, or `ephemeral`.
+  Automatic ephemeral expiry is not implemented.
+- `injection_policy` (optional): `ranked`, `triggered`, or `always`. `always`
+  requires `user_locked=true`.
+- `scope` (optional): Exact project, workspace, or task identifier.
+- `trigger` (optional): Up to 20 literal phrases for triggered delivery.
+- `user_locked` (optional): Explicit user authority; automated refinery cleanup
   does not archive or weaken a protected memory.
 - `force_new` (optional, boolean, default `false`): Always create a new record and bypass deduplication.
 
@@ -198,8 +183,7 @@ closed; the existing broad memory search and prompts remain unchanged.
 - `force_new=true` should be rare. It skips title deduplication, preference merge, and high-similarity redundancy checks.
 - Use `specification` for durable architecture or contract truths. Use
   `directive` for behavioral rules. Use `note` only for short-lived context.
-  Governance fields are a development extension and are not in the published
-  v2.12.3 client contract.
+  Governance fields are part of the v2.13.0 customer contract.
 
 **Example**:
 
@@ -282,42 +266,6 @@ closed; the existing broad memory search and prompts remain unchanged.
 }
 ```
 
-##### `action="record_use"` — explicit use acknowledgement
-
-**Status**: Development extension; not part of the published v2.12.3 client
-contract until a release explicitly includes it.
-
-**Purpose**: Tell Elefante which memories delivered by a Task Intelligence trace
-actually informed the task. This writes only a reversible declared-use event to
-the metadata ledger; it does not update ranking, access counts, or co-activation.
-
-**Parameters**:
-
-- `trace_id` (required, UUID): A live trace returned by
-  `elefante-TaskIntelligence(action="prepare")` in the same tool session.
-- `memory_ids` (required, string[]): One to eight UUIDs from that trace's
-  `delivered_memory_ids`.
-- `idempotency_key` (required, string): Retry-safe event key.
-
-**Important**:
-
-- Do not call this merely because a memory was returned or displayed.
-- The action records declared use; it does not prove that the memory improved
-  the task outcome.
-- Inactive memories (deprecated, archived, or superseded) are rejected.
-- A trace expires after 24 hours and cannot cross a tool instance or session.
-
-**Example**:
-
-```json
-{
-  "action": "record_use",
-  "trace_id": "4bb9ff35-a8e8-48b6-867f-ff77834d85a2",
-  "memory_ids": ["7f4e2f76-5d15-4bb0-a64b-8aa8a4d85d1b"],
-  "idempotency_key": "task-42-use-1"
-}
-```
-
 ##### `action="update"` — amend an existing memory in place
 
 **Why this exists**: If a stored fact is wrong or outdated, the system should correct the record, not bury the error under another memory.
@@ -330,8 +278,8 @@ the metadata ledger; it does not update ranking, access counts, or co-activation
 - `archived` (optional, boolean): Archive the memory.
 - `supersedes_id` (optional, string): UUID of the older memory this one replaces.
 - `tags` (optional, string[]): Replacement tags.
-- retention_policy, injection_policy, scope, trigger, user_locked (optional):
-  Development governance fields with the same meanings as action=add.
+- `retention_policy`, `injection_policy`, `scope`, `trigger`, `user_locked`
+  (optional): Governance fields with the same meanings as `action="add"`.
 
 **Important**:
 
@@ -402,49 +350,6 @@ instead of an arbitrary timestamp or type winner.
 
 - Start with `force=false`.
 - Use this for maintenance, not for routine single-memory edits.
-
----
-
-### Development Task Intelligence Surface
-
-#### `elefante-TaskIntelligence`
-
-**Status**: Default-off development surface. It is not part of the published
-v2.12.3 client. Enable discovery with
-`ELEFANTE_TASK_INTELLIGENCE_ENABLED=1`. Context delivery remains independently
-disabled unless `ELEFANTE_TASK_INTELLIGENCE_PILOT=1` is also set, and pilot
-delivery requires `profile=v2`. The v1 profile remains shadow-only rollback
-behavior.
-
-**Purpose**: Prepare the smallest governed evidence set for one task while
-keeping retrieval, delivery, declared use, and outcome as separate facts.
-
-**Actions**:
-
-- `prepare`: Build a v1 or v2 bounded Task Brief. `delivery_mode="shadow"`
-  returns metadata only; `pilot` may return the rendered context and evidence.
-- `record_use`: Record a same-session, trace-bound declared-use event for a
-  subset of delivered IDs. It does not change ranking.
-- `record_outcome`: Record metadata-only status, acceptance, retries,
-  corrections, duration, token counts, and failure category.
-- `inspect` / `summary`: Inspect one trace or observational aggregates. Summary
-  explicitly does not claim causal improvement.
-- `retract_use` / `retract_outcome`: Reverse an event without deleting the
-  underlying memory.
-
-**Privacy and safety**:
-
-- The local ledger stores hashes, UUIDs, counts, and bounded outcome metadata;
-  it does not store task text, prompts, memory bodies, form values, or comments.
-- Traces accept use/outcome events for 24 hours. Ledger rows are pruned after 30
-  days.
-- Trace provenance is bound to the originating tool, instance, session, and
-  transport. Delivered IDs are the maximum set that can be acknowledged.
-- Shadow mode is the safe default. Removing either Task Intelligence flag stops
-  direct pilot delivery. Removing `ELEFANTE_TASK_CONTEXT_ON_TOOL_CALL` stops
-  automatic tool-response delivery while leaving explicit pilot calls available.
-
----
 
 ### Knowledge Graph Operations
 
@@ -601,7 +506,7 @@ keeping retrieval, delivery, declared use, and outcome as separate facts.
 
 **Purpose**: Fetch raw memories that still need agent enrichment.
 
-**Why this exists**: Elefante stores memory first, then lets an agent enrich retrieval quality later with summary and trigger patterns.
+**Why this exists**: Elefante stores memory first, then lets an agent add a summary, retrieval concepts, and trigger metadata later.
 
 **Parameters**:
 
@@ -618,14 +523,14 @@ keeping retrieval, delivery, declared use, and outcome as separate facts.
 
 **Purpose**: Submit agent-written enrichment for a memory returned by `ETLProcess`.
 
-**Why this exists**: Retrieval improves only if the agent supplies usable summaries, concepts, and trigger phrases.
+**Why this exists**: Agent enrichment adds usable summaries and retrieval concepts while preserving trigger metadata for inspection and future proactive surfacing.
 
 **Parameters**:
 
 - `memory_id` (required, string): Memory UUID from `ETLProcess`.
 - `summary` (required, string): One-line summary, max 200 characters.
 - `concepts` (optional, string[]): Key terms for graph edges and retrieval.
-- `surfaces_when` (optional, string[]): Query patterns that should trigger this memory later.
+- `surfaces_when` (optional, string[]): Stored trigger metadata for inspection and future proactive surfacing; not a current ranking signal.
 
 **Important**:
 

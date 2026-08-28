@@ -1,76 +1,82 @@
-# Memory Scoring and Lifecycle
+# Memory Vitality and Retrieval Scoring
 
-This reference describes the behavior implemented in the current source. It
-separates four concepts that must not be conflated:
+Elefante keeps four concepts separate:
 
-- **Vitality** estimates how active a memory is over time.
-- **Retrieval relevance** ranks candidates for a query.
-- **Trust** is supplied by memory type, provenance, lifecycle, and user policy.
-- **Utility** means evidence that the memory improved a task outcome. Retrieval
-  or repeated exposure alone does not prove utility.
+1. **Behavioral vitality** estimates how durable a memory remains over time.
+2. **Retrieval relevance** ranks candidates for one search query.
+3. **Trust** comes from provenance, lifecycle, type, scope, and user policy.
+4. **Utility** requires evidence that a memory improved a task outcome.
 
-## Temporal vitality
+Neither score is supplied by the agent, and retrieval or repeated exposure alone
+does not prove utility.
 
-`MemoryMetadata.calculate_relevance_score()` returns vitality in the range
-`0.0–1.0`:
+---
 
-```text
-effective_decay_rate = decay_rate / (1 + 0.25 * ln(access_count + 1))
-recency_factor       = exp(-effective_decay_rate * days_since_created)
-freshness_factor     = exp(-0.005 * days_since_last_access)
-vitality             = recency_factor * freshness_factor
-```
+## Behavioral vitality
 
-The default type decay rates are:
-
-| Memory type | Daily type decay |
-|---|---:|
-| `preference` | 0.002 |
-| `decision`, `fact` | 0.005 |
-| `insight` | 0.008 |
-| `note` | 0.015 |
-| `conversation` | 0.025 |
-| `specification`, `directive` | 0.000 |
-
-Specifications and directives have zero **type** decay, but the freshness
-factor still lowers their vitality when they have not been accessed. They are
-therefore not mathematically immutable or guaranteed to rank first.
-
-Access slows type decay logarithmically. Retrieval is now read-only: a search or
-automatic context delivery does not increment access or create co-activation.
-The development `record_use` path writes a reversible declared-use event to the
-Task Intelligence ledger. It does not yet update access history,
-co-activation, or ranking. That separation prevents observational pilot data
-from silently changing retrieval before causal benefit is established.
-
-## Retrieval ranking
-
-Fresh SQLite searches use semantic similarity plus vitality when temporal
-scoring is enabled:
+The canonical implementation is `Memory.calculate_relevance_score()` in
+[`src/models/memory.py`](../../src/models/memory.py).
 
 ```text
-initial_score = 0.70 * semantic_similarity + 0.30 * vitality
+effective_decay_rate = decay_rate / (1 + reinforcement_factor * ln(access_count + 1))
+vitality = exp(-effective_decay_rate * days_since_created) * exp(-0.005 * days_since_access)
 ```
 
-The orchestrator then computes the cognitive score:
+The result is bounded to `[0, 1]` and stored as an integer from 0 to 100.
+Authorized access history slows age-based decay; it cannot raise vitality above
+100. A memory's last-access time adds a gentle freshness penalty.
+
+| Memory type | Daily decay rate | Approximate half-life |
+|---|---:|---:|
+| `preference` | `0.002` | 347 days |
+| `decision`, `fact` | `0.005` | 139 days |
+| `insight` | `0.008` | 87 days |
+| `note` | `0.015` | 46 days |
+| `conversation` | `0.025` | 28 days |
+| `specification`, `directive` | `0.000` | no type decay |
+
+Specifications and directives still receive the separate last-access freshness
+factor. They are not mathematically immutable or guaranteed to rank first.
+
+Normal MCP retrieval is read-only and does not yet update access history or
+create co-activation. The default customer profile exposes no reinforcement
+write; no runtime reinforcement is authorized. Developer declared-use events
+remain a separate reversible ledger and do not change ranking.
+
+## Cognitive retrieval
+
+The canonical implementation is `CognitiveRetriever` in
+[`src/core/retrieval.py`](../../src/core/retrieval.py).
+
+| Signal | Weight | Meaning |
+|---|---:|---|
+| vector similarity | `0.35` | semantic similarity between query and memory |
+| concept overlap | `0.30` | overlap between extracted query and memory concepts |
+| co-activation | `0.15` | prior authorized co-use with recent memories |
+| authority | `0.10` | behavioral vitality plus access history |
+| temporal | `0.10` | recent creation and access freshness |
 
 ```text
-score = 0.35 * vector
-      + 0.30 * concept
-      + 0.15 * coactivation
-      + 0.10 * authority
-      + 0.10 * temporal
+cognitive_without_coactivation =
+    0.35 * vector_similarity
+  + 0.30 * concept_overlap
+  + 0.10 * authority
+  + 0.10 * temporal
+
+score = max(0.70 * vector_similarity, cognitive_without_coactivation)
+score = min(1.0, score + 0.15 * coactivation)
 ```
 
-The vector component has a `0.70` floor before weighting. A `+0.30`
-specification/directive boost applies only when the analyzed query has system
-intent. These five signals rank likely relevance; they do not establish that a
-result caused a better task outcome.
+The floor preserves at least 70% of the vector score so sparse metadata cannot
+erase a strong semantic match. Positive co-activation is added afterward.
+Specifications and directives receive a gated `+0.30` boost only when query
+analysis identifies system intent such as a rule, architecture, requirement,
+or compliance question.
 
-Development-only literal-trigger results are marked separately from this
-five-signal score. They require an explicit `surface_context` match on a memory
-with `injection_policy="triggered"`, use a bounded explicit-trigger score for
-delivery, and do not update access history or graph state.
+Literal-trigger results are a separate path. They require an explicit file,
+terminal-error, conversation, or query context that matches a memory with
+`injection_policy="triggered"`. The path returns at most three governed matches
+and does not update access history or graph state.
 
 ## Dashboard score
 
@@ -82,45 +88,49 @@ dashboard_score = 0.50 * vitality
                 + 0.25 * engagement
 ```
 
-Do not compare this score directly with a retrieval score. They answer
+Do not compare dashboard score directly with retrieval score. They answer
 different questions.
 
 ## Reinforcement and configuration boundary
 
-The memory model currently defaults `reinforcement_factor` to `0.25`. The
-configuration model also exposes `default_reinforcement_factor: 0.1`, but that
-setting is not wired into normal memory creation. Until that implementation gap
-is closed, documentation and callers must not claim the configurable default
-controls runtime reinforcement. The current Task Intelligence ledger is an
-observational boundary only; no runtime reinforcement is authorized from its
-declared-use or outcome events.
+The memory model defaults `reinforcement_factor` to `0.25`. The configuration
+model also exposes `default_reinforcement_factor: 0.1`, but that setting is not
+wired into normal memory creation. Callers must not claim that the configurable
+default controls runtime reinforcement until that gap is closed.
 
-## Lifecycle behavior
+## Consolidation and lifecycle
 
-Elefante does **not** automatically archive memories merely because they are
-old or have a low score. The current refinery can canonicalize duplicates,
-merge redundant memories, and archive the redundant records recoverably. A
-general age-based consolidation job, configurable consolidation threshold, and
-automatic resurrection are not implemented.
+Deterministic consolidation is implemented by `MemoryRefinery` in
+[`src/core/refinery.py`](../../src/core/refinery.py) and exposed through:
 
-Future memory governance is specified separately in the developer proposal. A
-user-enforced memory may require retention or delivery; managed memories may
-become dormant or archived. Governance is applied before task-specific ranking.
-The development branch now enforces the first bounded contract: scope and
-trigger gates run before ranking, locked `always` memories are reserved, and
-protected memories are not silently archived by the refinery. These fields are
-not presented as part of the published v2.12.3 client until released.
+```text
+elefante-Memory(action="consolidate")
+```
+
+The default is a dry run. Passing `force=true` applies canonical namespace/key
+updates and recoverably archives non-winning duplicates as redundant and
+superseded. Consolidation does not call an LLM and does not delete memories
+merely because they are old or have low vitality.
+
+Retention, scope, trigger, and user-lock governance run before task-specific
+ranking. Protected memories are not silently archived. Automatic ephemeral
+expiry and general age-based pruning are not implemented.
 
 ## Verification
 
-- `tests/test_scoring.py` verifies score arithmetic and key ranking behavior.
-- `tests/test_autonomous_coactivation.py` verifies multi-signal behavior.
-- `tests/test_refinery.py` verifies current duplicate/refinery behavior.
-- Task Intelligence evaluation and governance remain unshipped developer work;
-  retrieval activity must not be presented as task-outcome evidence.
+```bash
+pytest tests/test_scoring.py tests/test_autonomous_coactivation.py \
+  tests/test_refinery.py tests/test_proactive_surfacing.py -q
+```
+
+These tests cover bounded vitality, type decay, reinforcement, multi-signal
+ranking, intent-gated authority, co-activation, consolidation, and triggered
+read-only delivery. Task Intelligence outcome evaluation is separate; retrieval
+activity must not be presented as proof of task lift.
 
 ## Related documentation
 
-- [`architecture.md`](architecture.md) — system architecture
-- [`memory-schema.md`](memory-schema.md) — memory data model
-- [`tools.md`](tools.md) — MCP surface
+- [Memory schema](memory-schema.md)
+- [MCP tools](tools.md)
+- [Architecture](architecture.md)
+- [Archived superseded scoring reference](_archive/scoring-full.md)

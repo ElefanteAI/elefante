@@ -34,9 +34,9 @@ payload shown to the model, and returned `context` separately. Failed,
 unavailable, and blocked calls still count as spend. The response does not echo
 the question, keeps governed context within 450 heuristic tokens, and fails
 closed if the complete response would exceed 1,000 heuristic tokens.
-`RELEVANT_CONTEXT` is measured separately in the in-memory session ledger. It
-is default-off in the development pilot, conditional, and is not counted as
-static protocol overhead.
+Any explicitly enabled tool-response context is measured separately in the
+in-memory session ledger and is not counted as static protocol overhead. The
+default customer profile uses Recall or the context prompt instead.
 
 ## Estimation method
 
@@ -68,7 +68,7 @@ The default for an unknown type is 300. These budgets are advisory and do not
 prove memory quality. A concise but wrong memory is still harmful; a longer
 memory may be justified when it materially improves a task.
 
-## Session ledger
+## MCP response ledger
 
 `elefante-SystemStatusGet` exposes accumulated estimated input, output,
 overhead, and context tokens for the current server instance. The ledger is
@@ -78,6 +78,20 @@ returned to the caller and is not persisted as a billing or analytics record.
 The memory record persists `content_tokens` and `token_density` in its system
 metadata. Website analytics and model-provider token accounting are separate
 systems.
+
+## Optional persistent Session Intelligence
+
+v2.13.0 adds a separate, consent-gated, metadata-only SQLite ledger operated by
+`scripts/pipeline/session_intelligence.py` or the loopback `/events/usage`
+endpoint. It can retain provider-actual or estimated usage provenance, bounded
+outcome records, dated rate cards, Signal Cards, and aggregate training
+hypotheses. It rejects prompts, transcripts, responses, hidden reasoning, and
+credentials.
+
+Estimated usage never becomes provider-actual usage. Dollar cost remains
+`UNKNOWN` unless an event contains provider-actual token counts and a matching
+dated rate card is registered. Consent, export, retention, and deletion are
+explicit per purpose.
 
 For financial comparisons, count observed input plus output for every completed
 attempt, including failures, retries, and unpaired early-stop work. Cached input

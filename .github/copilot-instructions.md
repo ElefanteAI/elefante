@@ -16,11 +16,10 @@ when the request may depend on:
 Pass the complete standalone question with named projects, files, people, and
 concepts. Call Recall at most once per user question. Treat `no_match`,
 `blocked`, and `unavailable` as terminal for that answer; do not retry or
-broaden retrieval. Recall returns only a bounded governed context or abstains. On the
-published v2.12.3 surface, where Recall is not exposed, use
-`elefante-Memory(action="search")` for targeted retrieval and broad inspection,
-and before memory mutations. Do not fetch memory for a self-contained question
-that cannot benefit from prior context.
+broaden retrieval. Recall returns only bounded governed context or abstains.
+Use `elefante-Memory(action="search")` for targeted retrieval, broad inspection,
+and the required search before a memory mutation. Do not fetch memory for a
+self-contained question that cannot benefit from prior context.
 
 ## How to reason with results
 
@@ -51,9 +50,7 @@ workspace, or task identifier is known; never use descriptive prose. Prefer
 ranked delivery when relevant paraphrases should work. Use a triggered policy
 only when literal phrases are intentionally required; never choose it merely to
 pass one verification question. After writing, use `elefante-Recall` with one
-likely future question when that development tool is available; otherwise run
-a read-only `elefante-Memory(action="search")` check. Stored is not proof of
-deliverable.
+likely future question. Stored is not proof of deliverable.
 
 - `add`: a new decision, preference, verified fact, reusable insight, or
   durable specification.
@@ -63,8 +60,8 @@ deliverable.
   before applying it.
 
 Do not store secrets, raw credentials, speculative conclusions, routine chat,
-or every interaction. User-directed retention has priority. Automatic user
-locks and mandatory injection policies are not part of the v2.12.3 runtime.
+or every interaction. User-directed retention and mandatory-governance fields
+have priority over autonomous maintenance.
 
 ## Choose the memory type deliberately
 
@@ -94,12 +91,11 @@ calculator, document generator, transaction authority, or provider-billing API.
 
 ## Current MCP surface
 
-Published Elefante v2.12.3 exposes 16 tools and 2 prompts. The unreleased
-customer candidate adds the default-on, read-only `elefante-Recall` path; it is
-not a published release claim.
+Published Elefante v2.13.0 exposes 17 customer tools and 2 prompts. The source
+also contains a default-off developer-only Task Intelligence evaluation tool;
+do not present it as part of the customer surface or as proof of outcome lift.
 
-- Memory: `elefante-Memory` (published); `elefante-Recall` (unreleased
-  development candidate only)
+- Memory: `elefante-Recall`, `elefante-Memory`
 - Context and graph: `elefante-ContextGet`, `elefante-GraphQuery`,
   `elefante-GraphConnect`
 - Sessions and tasks: `elefante-SessionsList`, `elefante-TaskCreate`,

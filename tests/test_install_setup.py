@@ -239,8 +239,10 @@ def test_isolated_package_wheel_preserves_src_runtime_contract(tmp_path):
 def test_readme_and_install_guide_match_current_runtime_and_host_contract():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     install_guide = (ROOT / "docs/how-to/install.md").read_text(encoding="utf-8")
+    normalized_install_guide = " ".join(install_guide.split())
     run_guide = (ROOT / "docs/how-to/run-mcp-server.md").read_text(encoding="utf-8")
     docs_index = (ROOT / "docs/README.md").read_text(encoding="utf-8")
+    normalized_docs_index = " ".join(docs_index.split())
     scripts_index = (ROOT / "scripts/README.md").read_text(encoding="utf-8")
 
     assert "mcp==1.28.1" in _runtime_requirements()
@@ -250,20 +252,21 @@ def test_readme_and_install_guide_match_current_runtime_and_host_contract():
         assert "1.23.1" not in document
     for host in ("Gemini CLI", "Claude Code", "Codex", "OpenClaw"):
         assert host in install_guide
-        assert host in docs_index
+        assert host in normalized_docs_index
     for adapter in (
         "configure_vscode_bob.py",
         "configure_cursor_kiro.py",
         "configure_antigravity.py",
         "configure_cli_agents.py",
     ):
-        assert adapter in install_guide
+        assert adapter not in install_guide
+        assert adapter in scripts_index
     assert "transport-only" in run_guide
     assert "one durable store owner" in run_guide
     assert "configured embedded vector store" in scripts_index
     assert "SQLite snapshot support remains" not in scripts_index
-    assert "configured embedded vector store" in install_guide
-    assert "explicitly configured in `config.yaml`" in install_guide
+    assert "Fresh installations use SQLite vectors plus Kuzu" in install_guide
+    assert "Explicit paths in `config.yaml` remain authoritative" in normalized_install_guide
     assert "would contain its own recovery directory" in scripts_index
 
 

@@ -1,6 +1,6 @@
 # View the Local Dashboard
 
-**Applies to:** v2.12.3
+**Applies to:** v2.13.0
 
 The dashboard is a loopback-only, read-only view of
 `dashboard_snapshot.json`. It never opens the live vector store or Kuzu.
@@ -38,9 +38,15 @@ For a customer daemon, use `elefante-DashboardOpen(refresh=true)` instead.
 - **Briefing:** selects a durable current memory and may show a grounded
   assumption -> evidence -> decision -> guard trail when explicit graph edges
   exist.
-- **Memories:** searches and sorts records present in the snapshot.
+- **Memories:** searches and sorts records present in the snapshot. Selecting a
+  search result opens Retrieval Explanation with only the score, source,
+  lifecycle, conflict, and relationship evidence carried by that snapshot;
+  unavailable signals are labeled unavailable.
 - **Connections:** shows topic/distribution views and explicit graph
   relationships.
+- **Session Intelligence:** when the user has explicitly granted consent and
+  generated a safe Session Intelligence snapshot, the Overview displays its
+  current Signal Card. The panel stays empty when consent or evidence is absent.
 
 Snapshot search is lexical. It is not the same as MCP semantic and graph
 retrieval. The UI must not invent reasoning paths or per-query score signals
@@ -60,7 +66,19 @@ Expected health payload:
 {"status":"ok","service":"elefante-dashboard"}
 ```
 
-The read-only endpoints are `/api/graph`, `/api/search`, and `/api/stats`.
+The read-only endpoints are `/api/graph`, `/api/search`, `/api/stats`, and
+`/api/session-intelligence`.
+
+To create or refresh the optional metadata-only Session Intelligence snapshot:
+
+```bash
+./.venv/bin/python scripts/pipeline/session_intelligence.py status
+./.venv/bin/python scripts/pipeline/session_intelligence.py snapshot
+```
+
+Grant consent and ingest typed usage through the same CLI before expecting a
+Signal Card. The ledger rejects prompts, transcripts, responses, hidden
+reasoning, and credentials; see `--help` for the purpose-specific commands.
 
 ## Troubleshooting
 

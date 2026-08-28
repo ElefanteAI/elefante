@@ -4,314 +4,200 @@
   <img src="docs/assets/Elefante Logo 1024 black 2.png" alt="Elefante" width="256">
 </p>
 
-**Carry forward the context worth keeping.**
+**A private, persistent second brain for the AI tools you already use.**
 
-AI sessions and providers often fail to carry forward the preferences,
-decisions, and discovered patterns that made earlier work productive. Elefante
-gives MCP-compatible agents a persistent, local second brain: durable memories
-remain inspectable across sessions, while retrieval selects context for the
-task at hand.
+Elefante stores durable preferences, decisions, facts, constraints, and lessons
+on your machine, then supplies a small governed subset when an agent needs prior
+context. It is an MCP memory engine—not an LLM, agent runtime, chat product, or
+cloud memory service.
 
-**v2.12.3** — Current published release.
+**v2.13.0** — Current published release.
 
+17 tools · 2 prompts · Python 3.11–3.13 · MCP 1.28.1
+
+## What a user can do
+
+- Recall relevant prior context with one bounded, read-only `elefante-Recall`
+  call. Irrelevant or unsafe candidates produce an explicit abstention.
+- Store, search, amend, archive, consolidate, and resolve durable memories with
+  search-before-write protection and user-governed retention rules.
+- Connect memories to entities and relationships in a local knowledge graph.
+- Attach bounded local image, audio, and video files. Elefante stores and
+  integrity-checks them locally; it does not perform OCR, transcription, model
+  analysis, or network upload.
+- Inspect memory health, relationships, retrieval evidence, usage summaries,
+  and Signal Cards in a loopback-only, snapshot-driven dashboard.
+- Run the Session Distiller in the foreground, including an opt-in watch mode
+  for new or changed supported chat-session files.
+- Exchange an explicit allowlist of memories through signed, scope-bound local
+  Team Sync bundles. Elefante provides the bundle contract, not a cloud sync
+  transport.
+- Opt into a separate metadata-only Session Intelligence ledger for provider
+  usage, rate-card-backed cost calculation, outcome records, Signal Cards, and
+  aggregate training hypotheses. Unknown usage or pricing remains `UNKNOWN`.
+- Feed bounded file, terminal-error, or conversation event envelopes to the
+  local `/events/surface` endpoint for literal-trigger retrieval. Elefante does
+  not silently intercept host activity or persist the event body.
+
+## How it works
+
+```text
+MCP host
+   │  local HTTP or storage-free stdio bridge
+   ▼
+Elefante daemon ── governed retrieval ── SQLite vectors
+   │                                  └─ Kuzu relationships
+   └─ redacted snapshot ───────────────► local dashboard
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ YOUR HOST (VS Code · Cursor · Codex · compatible MCP host)  │
-└────────────────────────┬────────────────────────────────────┘
-                         │ MCP HTTP / stdio bridge
-┌────────────────────────▼────────────────────────────────────┐
-│ LAYER 1 · MCP PROTOCOL                                      │
-│ 16 tools · 2 prompts · Context Injection                    │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-┌────────────────────────▼────────────────────────────────────┐
-│ LAYER 2 · INTELLIGENCE ENGINE                               │
-│ Orchestrator · 5-signal scoring · Hybrid Memory             │
-│ (SQLite vectors + Kuzu graph)                               │
-└────────────────────────┬────────────────────────────────────┘
-                         │ snapshot.json
-┌────────────────────────▼────────────────────────────────────┐
-│ LAYER 3 · DASHBOARD                                         │
-│ Read-only briefing of what should shape the next answer     │
-│ http://127.0.0.1:8000                                       │
-└─────────────────────────────────────────────────────────────┘
-```
-
-Durable context stays local and inspectable. Retrieval remains selective.
-
-## How It Works
-
-The agent owns the goal, plan, tools, and stopping decision. Elefante participates
-at two points in that loop: it can retrieve durable context before the agent
-plans, and its memory tools let the agent preserve verified outcomes after it
-acts.
 
 ```text
 Goal → Perceive → Plan → Act → Observe → Update → Repeat
           ↑                              ↓
-     retrieve context              preserve outcomes
+     retrieve context              preserve verified outcomes
           └──────────── Elefante ────────────┘
 ```
 
-Elefante is not an LLM, an agent runtime, or a domain adviser. Financial
-advisory and consulting are valid examples of a host agent carrying durable
-client constraints and decisions, but Elefante supplies no portfolio data,
-risk calculations, market-data service, document generator, transaction
-authority, or provider-billing estimate.
+The agent owns the goal, plan, tools, and stopping decision. Elefante
+participates at two points: it retrieves durable context before or during a
+task, and it preserves verified outcomes when the user or workflow explicitly
+asks it to write. Elefante is not an LLM, an agent runtime, or a domain adviser.
 
----
+Normal retrieval is read-only. Search exposure does not reinforce ranking or
+prove that a memory improved a task. Conflicting evidence is withheld until it
+is resolved; Smart Merge is dry-run-first and requires explicit authority when
+there is no unambiguous protected winner.
 
-## What It Does
+## Install
 
-Elefante is a local-first persistent memory engine for AI agents, connected via the [Model Context Protocol](https://modelcontextprotocol.io/) (MCP).
+Download the matching `elefante-installer-<OS>.zip` and `SHA256SUMS` from the
+[latest GitHub release](https://github.com/ElefanteAI/elefante/releases/latest),
+verify the checksum, extract the archive, then use its single platform launcher:
 
-- **Stores** facts, preferences, decisions, code patterns, and tasks
-- **Searches** using hybrid retrieval — semantic vectors, knowledge graph, and session context
-- **Ranks** retrieval candidates with 5 signals (semantic match, concept overlap, co-activation, authority, temporal freshness) — no manual importance rating
-- **Injects bounded context** on eligible tool calls; memory-heavy operations skip automatic context to avoid duplication
-- **Connects knowledge** through an entity-relationship graph
-- **Reduces context-free writes** with a search-before-write compliance gate and deterministic duplicate checks
-- **Visualizes** memory state and explicit relationships through a snapshot-driven dashboard
+- macOS: open `Install Elefante.command`. If macOS asks for confirmation,
+  Control-click it, choose **Open**, then choose **Open** again. Administrator
+  access and Terminal commands are not required.
+- Windows: open `Install Elefante.bat`
+- Linux: run `chmod +x install.sh && ./install.sh`
 
-The Elefante store runs locally with no Elefante product telemetry. Context you
-intentionally send to a connected AI client is governed by that provider's data
-policy.
+The installer creates one stable per-user runtime and one local data root, then
+connects every detected compatible host it can verify.
 
----
+- macOS/Linux runtime: `~/.elefante/app/current`
+- Windows runtime: `%LOCALAPPDATA%\Elefante\app\current`
 
-## How It Works
+ZIP installers are the universal release contract. A signed/notarized macOS
+DMG or Authenticode-verified Windows EXE is published only when the release
+workflow completes credential-gated notarization or Authenticode verification;
+an unsigned native package is never substituted as a release asset.
 
-### Layer 1 — MCP Protocol
+For source installation, repair, checksum commands, and uninstall details, see
+the [installation guide](docs/how-to/install.md).
 
-The interface between your IDE and the memory engine. 16 tools and 2 prompts let agents store, search, connect, and manage knowledge. A **Compliance Gate** searches before memory writes and reduces redundant memories. **Context Injection** can attach relevant memories to eligible operations when a usable search signal exists. **Directives** can accompany normal product operations. **Token Intelligence** measures MCP tool responses and reports estimated output tokens, protocol overhead, and signal ratio; it does not itself calculate provider billing or dollar cost.
-
-The development checkout also includes opt-in **Session Intelligence**: a
-metadata-only local SQLite ledger, loopback provider-usage ingress, versioned
-rate-card authority, Signal Cards, aggregate anti-surveillance training
-hypotheses, retention/export/delete controls, and a snapshot-only dashboard
-panel. It is off by default. Exact money remains `UNKNOWN` unless
-provider-actual usage and the matching dated rate card are both present.
-
-Full tool reference → [docs/reference/tools.md](docs/reference/tools.md)
-IDE configuration → [docs/how-to/configure-ide.md](docs/how-to/configure-ide.md)
-
-### Layer 2 — Intelligence Engine
-
-Two local storage layers work together:
-
-- **SQLite** — the dependency-free default vector store; it preserves complete memory JSON and float32 embeddings with deterministic exact-cosine retrieval.
-- **Kuzu** — a knowledge graph that tracks entities, relationships, and structural context.
-- **Behavioral Relevance** — a 5-signal scoring system that ranks memory candidates. Retrieval frequency is not proof that a memory improved the task.
-
-Scoring details → [docs/reference/scoring.md](docs/reference/scoring.md)
-Architecture → [docs/reference/architecture.md](docs/reference/architecture.md)
-
-### Layer 3 — Dashboard
-
-A read-only Memory Intelligence briefing, served from a redacted snapshot so the agent stays fast and the browser never owns your stores:
-
-- A decision briefing that can show old assumption → evidence → decision → enforced guard
-- Searchable, sortable memory inspection with source and lifecycle context
-- Topic, distribution, and knowledge-connection views
-- A carbon, tusk, copper, brass, clay, and sage interface built around information state—not generic AI gradients
-
-Dashboard details → [docs/how-to/view-dashboard.md](docs/how-to/view-dashboard.md)
-Docker deployment → [docs/how-to/docker.md](docs/how-to/docker.md)
-
----
-
-## Designed For
-
-Released adapter coverage currently includes VS Code, Cursor, Kiro, Gemini CLI,
-Claude Code, Codex, and OpenClaw. These integrations are compatible, not yet
-host-certified end to end. Other MCP-compatible clients can use the community
-bridge contract without becoming a supported integration claim.
-
----
-
-## Release Installation
-
-**Requirements:** Python 3.11, 3.12, or 3.13. Release CI currently runs on
-Python 3.11; the installer accepts all three versions. Git is only required for
-the source-checkout fallback path.
-
-Our installer detects your OS, creates a stable per-user customer runtime,
-installs the locked runtime dependencies, initializes local graph and vector
-databases, and connects every compatible host detected on the machine.
-
-**Release bundle (preferred):** Download `elefante-installer-<OS>.zip` from GitHub Releases and extract it, then:
-
-- **macOS:** double-click `Install Elefante.command`. If macOS asks for confirmation, Control-click the file, choose **Open**, then choose **Open** again. Administrator access and Terminal commands are not required.
-- **Windows:** double-click `Install Elefante.bat`.
-- **Linux:** run `chmod +x install.sh && ./install.sh`.
-
-The bootstrap places Elefante in a stable install root before it starts setup:
-
-- macOS / Linux: `~/.elefante/app/current`
-- Windows: `%LOCALAPPDATA%\Elefante\app\current`
-
-The verified v2.12.3 customer path remains the ZIP launchers above. The
-development CI can additionally build a branded macOS DMG and branded Windows
-EXE, but it uploads publication-class artifacts only after successful
-credential-gated notarization or Authenticode verification; no unsigned native
-artifact is substituted for a signed release asset.
-
-If `.venv` already exists, the installer offers four paths:
-
-- Delete existing `.venv` and install fresh (default)
-- Backup existing `.venv` and install fresh
-- Reuse existing `.venv`
-- Abort installation
-
-**If installation fails:** read the persisted installer files in this order:
+**If installation fails:** read the persisted recovery files in this order:
 
 1. `.elefante-install-summary.txt`
 2. `.elefante-install-status.txt`
 3. `.elefante-install.log`
 
-For release bundles, those files live in the stable install root. For
-source-checkout installs, they live in the repo root. The installer prints
-their exact paths at startup and on failure.
+The installer prints their exact location. Do not delete the data root or edit
+host configuration by guesswork.
+
+## Verify the installation
+
+Restart the host, then ask:
+
+```text
+What is my Elefante test passcode?
+```
+
+The installer creates one harmless seed memory; the expected answer is
+`Indigo-Echo`. If the host does not route the question automatically, ask it to
+call `elefante-Recall` once.
+
+The installed runtime also provides a read-only doctor:
 
 ```bash
-# Source checkout fallback
-# macOS / Linux
-git clone https://github.com/ElefanteAI/elefante.git
-cd elefante
-git checkout v2.12.3
-chmod +x install.sh && ./install.sh
-
-# Windows
-git clone https://github.com/ElefanteAI/elefante.git
-cd elefante
-git checkout v2.12.3
-install.bat
+cd ~/.elefante/app/current
+./.venv/bin/python scripts/lifecycle/doctor.py --json
 ```
 
-The installer keeps the Elefante store under the user's local account, connects
-detected compatible hosts, and writes one harmless seed memory for connection
-verification.
+A customer-ready installation reports `customer_ready=true` and identifies any
+detected host that was not connected or verified.
 
-**The 60-Second Proof of Work:**
-1. Restart your IDE.
-2. Open your AI Chat (Copilot, Cursor, etc).
-3. Copy/paste exactly this question: 
-   `What is my Elefante test passcode?`
-4. If the host does not search automatically, ask it explicitly to search
-   Elefante for the test passcode. The expected result is `Indigo-Echo`.
+## Host coverage
 
-*Looking for manual setup or deep technical details? See the [Full Installation Guide](docs/how-to/install.md).*
+The v2.13.0 installer has ownership-safe, contract-tested adapters for VS Code
+Copilot, Claude Code, Cursor, Kiro, Continue, Zed, Gemini CLI, Codex, and
+OpenClaw. These integrations are **compatible**, not vendor-certified.
 
----
+IBM Bob and Antigravity remain preview integrations because their full host
+lifecycle has not been independently certified. Agent Zero remains a documented
+community path. Planned hosts are not advertised as supported.
 
-## MCP Tools
+## Public MCP surface
 
-16 tools + 2 prompts. Tool names follow `elefante-PascalCase`; prompt names are `elefante-context` and `elefante-grounding`.
+The default customer profile exposes 17 tools + 2 prompts.
 
-| Category   | Tools                                                                                                                                   |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Memory     | `elefante-Memory` (actions: `add` · `search` · `update` · `delete` · `consolidate`)                                                |
-| Graph      | `elefante-GraphConnect`, `elefante-GraphQuery`                                                                                      |
-| Context    | `elefante-ContextGet`, `elefante-SessionsList`                                                                                      |
-| Tasks      | `elefante-TaskCreate`, `elefante-TaskUpdate`, `elefante-TaskGraph`                                                                |
-| ETL        | `elefante-ETLProcess`, `elefante-ETLClassify`                                                                                       |
-| Directives | `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove`                                                     |
-| System     | `elefante-System`, `elefante-SystemStatusGet`, `elefante-DashboardOpen`                                                           |
+| Area | Surface |
+|---|---|
+| Recall | `elefante-Recall` |
+| Memory | `elefante-Memory` |
+| Graph | `elefante-GraphConnect`, `elefante-GraphQuery` |
+| Context | `elefante-ContextGet`, `elefante-SessionsList` |
+| Tasks | `elefante-TaskCreate`, `elefante-TaskUpdate`, `elefante-TaskGraph` |
+| ETL | `elefante-ETLProcess`, `elefante-ETLClassify` |
+| Directives | `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove` |
+| System | `elefante-System`, `elefante-SystemStatusGet`, `elefante-DashboardOpen` |
+| Prompts | `elefante-context`, `elefante-grounding` |
 
-Full reference with parameter schemas → [docs/reference/tools.md](docs/reference/tools.md)
+See the [tool and prompt reference](docs/reference/tools.md) for parameters,
+result contracts, and safety rules.
 
-## Specification And Directive Retrieval
+## Privacy and product boundaries
 
-Elefante keeps durable architecture rules out of the live prompt by separating lightweight agent instructions from retrieved knowledge:
-
-1. **Keep the instruction file small.** Your `.cursorrules`,
-   `copilot-instructions.md`, or equivalent should tell the agent to search
-   Elefante when prior decisions, preferences, or project context may affect
-   the task.
-2. **Store durable rules in Elefante.** Architecture contracts, schemas, and team process belong in `specification` or `directive` memories rather than inside a giant prompt file.
-3. **Retrieve only what is relevant.** When the agent searches, Elefante surfaces the specific rule needed for the current task instead of injecting an entire handbook into every prompt.
-
----
-
-## Tech Stack
-
-| Purpose      | Technology                       |
-| ------------ | -------------------------------- |
-| Vector store | SQLite (exact cosine)            |
-| Graph store  | Kuzu 0.11.3                      |
-| Embeddings   | sentence-transformers (gte-base) |
-| Protocol     | MCP 1.28.1                       |
-| Dashboard    | React + TypeScript + Vite        |
-| Runtime      | Python 3.11–3.13                 |
-
----
-
-## Repo Structure
-
-```
-src/              Core engine, MCP server, dashboard
-docs/             Stable reference, how-to, and explanation
-workspace/        Living plan, issues, postmortems, proposals
-agents/           Developer constitution and specialist protocols
-examples/         Agent tutorial and integration patterns
-tests/            Unit, integration, and verification tests
-scripts/          Setup, deployment, and maintenance tools
-```
-
----
+- Memory, graph, media, Session Intelligence, and dashboard data stay local by
+  default. Elefante has no product telemetry.
+- The daemon and dashboard bind to loopback. Exposing either over a network is
+  an operator decision that requires a separately authenticated boundary.
+- Context intentionally sent to an AI host remains subject to that provider's
+  policy.
+- Token estimates are local heuristics. Dollar cost is authoritative only when
+  provider-actual usage and a matching dated rate card are both present.
+- Task Intelligence evaluation exists for developers, remains default-off, and
+  has not established representative multi-task outcome lift. It is not part
+  of the 17-tool customer profile or a public performance claim.
 
 ## Documentation
 
-Three audiences, three surfaces:
+Elefante keeps user and developer documentation separate.
 
-| Audience | Start here |
-| -------- | ---------- |
-| **Using Elefante** as a memory engine | [docs/README.md](docs/README.md) |
-| **Building or debugging Elefante** itself | [AGENTS.md](AGENTS.md) → [agents/orchestrator.md](agents/orchestrator.md) |
-| **Loading an agent protocol** at the moment of failure | [agents/](agents/) |
+### User documentation
 
-### Agent dispatch (load when this happens)
+- [User documentation index](docs/README.md)
+- [Install and repair](docs/how-to/install.md)
+- [Configure a host](docs/how-to/configure-ide.md)
+- [Tool reference](docs/reference/tools.md)
+- [Architecture](docs/reference/architecture.md)
+- [Dashboard](docs/how-to/view-dashboard.md)
 
-| Symptom | Load |
-| ------- | ---- |
-| Building a feature, debugging Elefante itself | [agents/orchestrator.md](agents/orchestrator.md) |
-| Any `elefante-Memory(action="add"\|"update"\|"delete")` | [agents/memory-janitor.md](agents/memory-janitor.md) |
-| "What do I have stored?", export, audit | [agents/memory-inspector.md](agents/memory-inspector.md) |
-| Install failed, broken venv, repair | [agents/installer.md](agents/installer.md) |
-| MCP tools missing in IDE, server stuck | [agents/restarter.md](agents/restarter.md) |
-| Backup, restore, factory reset, restart | [agents/operator.md](agents/operator.md) |
-| Version bump, CHANGELOG, tag, release | [agents/release-manager.md](agents/release-manager.md) |
-| Line of attack is suspect (RESEARCH mode) | [agents/researcher.md](agents/researcher.md) |
-| Need to retune the rules themselves | [agents/puppeteer.md](agents/puppeteer.md) (`PRIVILEGED` only) |
+### Developer documentation
 
-### Product reference
+- [Repository entrypoint](AGENTS.md)
+- [Developer constitution](agents/orchestrator.md)
+- [Living product plan](workspace/PLANNING.md)
+- [Issue and gap ledger](workspace/ISSUES.md)
+- [Script catalog](scripts/README.md)
+- [Test catalog](tests/README.md)
+- [Release history](CHANGELOG.md)
 
-- [Tool reference](docs/reference/tools.md) — parameter schemas for all 16 tools and 2 prompts
-- [Behavioral Relevance](docs/reference/scoring.md) — how automatic scoring works
-- [Installation](docs/how-to/install.md) — step-by-step setup
-- [Architecture](docs/reference/architecture.md) — system design
-- [Dashboard](docs/how-to/view-dashboard.md) — visualization and health monitoring
-- [Docker](docs/how-to/docker.md) — containerized deployment
-- [Debugging](workspace/ISSUES.md) — known issues tracker, compendium routing, and verification commands
+Developer plans, experiments, postmortems, and release procedures do not define
+the shipped customer contract. Current source, tagged artifacts, and exact-head
+release verification remain authoritative.
 
-## Release Notes
+## License
 
-Every tagged Elefante release is documented in three places:
+Elefante is licensed under the [Business Source License 1.1](LICENSE), which
+converts to Apache 2.0 on 2029-02-10. During the business-source period, do not
+describe the project as open source.
 
-- [GitHub Releases](https://github.com/ElefanteAI/elefante/releases) — packaged binaries and release-specific notes
-- [CHANGELOG.md](CHANGELOG.md) — the full historical ledger
-- [README.md](README.md) — the current product surface, install path, and docs map
-
-Release bodies are rendered from the matching `CHANGELOG.md` entry in CI, so new tags do not ship with empty GitHub release pages. `CHANGELOG.md` is the authoritative historical record for older releases as well, including legacy GitHub release pages that predate rendered release bodies.
-
-Do not cut or push a `v*` tag until its matching `CHANGELOG.md` entry exists.
-
----
-
-## Contributing & License
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-**License:** [Business Source License 1.1](LICENSE) — free for non-competitive use. Converts to Apache 2.0 on 2029-02-10.
-
-[Changelog](CHANGELOG.md) · [Full Documentation](docs/README.md)
+[Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [GitHub Releases](https://github.com/ElefanteAI/elefante/releases)

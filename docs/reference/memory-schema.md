@@ -1,8 +1,7 @@
 # Memory Schema
 
-This reference describes the current `Memory` and `MemoryMetadata` models in
-`src/models/memory.py`. The governance fields below are implemented on the
-development branch but are not part of the published v2.12.3 client contract.
+This reference describes the released v2.13.0 `Memory` and `MemoryMetadata`
+models in `src/models/memory.py`.
 
 ## Memory
 
@@ -28,14 +27,15 @@ development branch but are not part of the published v2.12.3 client contract.
 
 ### Retrieval inputs
 
+| Field             | Type       | Purpose                                        | Auto-populated |
+| ----------------- | ---------- | ---------------------------------------------- | -------------- |
+| `concepts`        | `string[]` | 3-5 key terms used by concept-overlap retrieval | Yes            |
+| `surfaces_when`   | `string[]` | Literal hints for explicitly triggered delivery; not a current ranking signal | Yes |
+| `authority_score` | `float`    | Stored compatibility/dashboard field; the current retriever derives authority from vitality and access count | Yes |
+
 - `score`: integer `0–100`; defaults to 100 and is system-managed
 - `confidence`: float `0.0–1.0`; defaults to 0.7
 - `tags`, `keywords`, `entities`
-- `concepts`: deterministic or agent-supplied key terms
-- `surfaces_when`: query patterns used as retrieval hints; they become an
-  explicit literal-surfacing trigger only when the memory opts into
-  `injection_policy="triggered"`
-- `authority_score`: float `0.0–1.0`
 
 `compute_authority_score()` returns `1.0` for specification/directive types.
 Other types combine current score (0.35), access frequency (0.25), creation
@@ -51,7 +51,7 @@ authority with four other signals; see [`scoring.md`](scoring.md).
 
 Deprecated and archived memories are excluded from normal semantic results.
 
-### Governance (development extension)
+### Governance
 
 - `retention_policy`: managed, permanent, or ephemeral
 - `injection_policy`: ranked, triggered, or always
@@ -62,12 +62,12 @@ Deprecated and archived memories are excluded from normal semantic results.
 
 Defaults are managed, ranked, no scope, no triggers, and unlocked.
 Always-inject is fail-closed unless user_locked is true. Governance is applied
-before Task Intelligence ranking; protected duplicates are not silently
+before task-specific ranking; protected duplicates are not silently
 archived. Ephemeral is currently declarative—automatic expiry is not
 implemented. Invocation authority and causal task utility remain separate
 operation/evaluation concerns.
 
-The development proactive-surfacing path accepts an explicit query, file,
+The released proactive-surfacing path accepts an explicit query, file,
 terminal-error, or conversation context and checks literal `trigger` plus
 `surfaces_when` phrases only for `injection_policy="triggered"` memories. It
 returns at most three read-only matches, skips inactive, conflicted, stale-source,
@@ -81,7 +81,7 @@ semantic retriever.
 Governed answer delivery separately reports a bounded warning when a candidate
 has a stored conflict relationship or contradictory status. The conflicted
 candidate is withheld, neither side is treated as authoritative, and the
-warning omits internal memory IDs. The development branch also has a
+warning omits internal memory IDs. The released runtime also has a
 conservative explicit-proposition semantic detector and
 `elefante-Memory(action="resolve")`. Resolve is dry-run-first, consolidates
 equivalent assertions, requires a user-selected winner for ambiguous conflicts,
@@ -99,8 +99,8 @@ workflows. Provenance indicates origin; it does not by itself prove truth.
 
 ### Temporal fields
 
-- `last_accessed`, `last_modified`, `access_count`. Ordinary retrieval and the
-  development Task Intelligence `record_use` ledger do not update access.
+- `last_accessed`, `last_modified`, `access_count`. Ordinary retrieval does not
+  update access; the default customer profile has no runtime reinforcement path.
 - `decay_rate`, `reinforcement_factor`
 
 Type decay is assigned when a Memory is constructed. Specifications and

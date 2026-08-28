@@ -256,7 +256,7 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Trigger:** A scoring system uses multiple signals with weights, or a feature that writes data and reads it back for ranking/filtering.
 - **Rule:** For every scored signal, trace the write path (where values are set at storage time) and the read path (where values are consumed at query time). If the value spaces don't intersect, the signal is dysfunctional regardless of its weight.
 - **Why:** A signal whose write-side enum (`DomainType.REFERENCE`) can never match its read-side inference (`None`/`"work"`/`"personal"`) produces a constant or penalty — 15% of weight budget wasted. An unconditional override (+0.30 for specs) that ignores query intent creates a ranking monopoly. Volatile state (`[]` on restart) makes a signal zero at cold start.
-- **Proof:** BUG-016 — domain signal write→read mismatch proved in `retrieval.py:138-148` vs `memory.py:128`. BUG-017 — spec override at `retrieval.py:301` dominates all queries (3 real ARAA queries returned same top 4 specs). BUG-018 (historical) — the former co-activation read path required `_session_retrieval_history`, which reset at restart; the current exposure/use contract is BUG-046. See [postmortems/memory.md](postmortems/memory.md#issue-11) and [postmortems/ai-behavior.md](postmortems/ai-behavior.md#issue-15).
+- **Proof:** BUG-016 — domain signal write→read mismatch proved in `retrieval.py:138-148` vs `memory.py:128`. BUG-017 — spec override at `retrieval.py:301` dominates all queries (3 real ARAA queries returned same top 4 specs). BUG-018 (historical) — the former co-activation read path required `_session_retrieval_history`, which reset at restart; the current exposure/use contract is BUG-048. See [postmortems/memory.md](postmortems/memory.md#issue-11) and [postmortems/ai-behavior.md](postmortems/ai-behavior.md#issue-16).
 - **Avoid:** Assuming a multi-signal system works because it is documented. Documentation describes the design, not the runtime behavior. Only a source trace with real queries proves intersection.
 
 ---
@@ -373,7 +373,7 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Proof:** [postmortems/dashboard.md Issue #12](postmortems/dashboard.md#issue-12) and [ISSUES.md](ISSUES.md) BUG-033 row.
 - **Avoid:** Assuming that an active listener on port 8000 is running code from the current workspace directory.
 
-### Judge Observable Outcomes, Not Hidden Patch Shape (BUG-044)
+### Judge Observable Outcomes, Not Hidden Patch Shape (BUG-046)
 
 - **Trigger:** A benchmark uses a historical repair test to judge whether an agent solved a task.
 - **Rule:** Promotion tests must assert a stated CLI, API, filesystem, or browser outcome. Track judge validity, retrieval, selection, delivery, execution, and acceptance as separate gates; missing measurements are `UNKNOWN`, not zero.
@@ -381,7 +381,7 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Proof:** [postmortems/ai-behavior.md Issue #13](postmortems/ai-behavior.md#issue-13), [../scripts/ci/verify_task_intelligence_benchmark.py](../scripts/ci/verify_task_intelligence_benchmark.py), and [../tests/test_task_intelligence_benchmark.py](../tests/test_task_intelligence_benchmark.py).
 - **Avoid:** Calling a test behavioral because a manifest says so; treating retrieval hit-rate or delivered memory IDs as outcome proof; cherry-picking one run; or recording unavailable retry/correction data as zero.
 
-### Automation Cannot Grant Itself User Authority (BUG-047)
+### Automation Cannot Grant Itself User Authority (BUG-049)
 
 - **Trigger:** An agent or workflow can write retention, injection, lock, archive, or delete fields on a user's durable memory.
 - **Rule:** Treat user-directed and workflow-managed mutations as different authority classes. Automation may work inside user policy, but cannot create, weaken, archive, or permanently delete protected policy on its own.
@@ -389,7 +389,7 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Proof:** [postmortems/memory.md Issue #16](postmortems/memory.md#issue-16), `tests/test_mcp_daemon.py`, and `tests/test_refinery.py`.
 - **Avoid:** Inferring authority from the requested value, or making permanent deletion the default forgetting operation.
 
-### Prove The Whole Evidence Path Before Claiming Intelligence (BUG-048)
+### Prove The Whole Evidence Path Before Claiming Intelligence (BUG-050)
 
 - **Trigger:** Retrieval metrics improve, a memory appears in a prompt, or one answer looks better.
 - **Rule:** Keep invocation, retrieval, selection, delivery, declared use, execution, and observable outcome as separate traceable facts. Deterministic preflight validates the pipe; only paired behavioral outcomes establish lift.
@@ -397,7 +397,7 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Proof:** [postmortems/ai-behavior.md Issue #16](postmortems/ai-behavior.md#issue-16), `tests/test_task_intelligence_ledger.py`, and the sealed fixture preflight.
 - **Avoid:** Treating similarity, access count, delivery, declared use, lower token cost, or one successful task as causal proof.
 
-### Bind And Preserve Evaluation Truth Before Spending Again (BUG-049)
+### Bind And Preserve Evaluation Truth Before Spending Again (BUG-051)
 
 - **Trigger:** A Task Intelligence run fails, or its task, judge, or evidence selector changes.
 - **Rule:** Preserve the failed workspace; bind outcomes to the complete task contract; inspect the selected target, ownership chain, and safeguard; and verify that every judge convention is disclosed by the frozen task or base before another model run.

@@ -1,6 +1,6 @@
 # Run and Verify the Elefante MCP Runtime
 
-**Applies to:** v2.12.3
+**Applies to:** v2.13.0
 
 The released customer topology is one user-level daemon as the **one durable store owner**, plus a **transport-only** stdio bridge for each IDE or agent
 host. Direct database-owning MCP subprocesses are a developer compatibility
@@ -31,7 +31,7 @@ Run customer doctor for runtime, daemon, ownership, and host coverage:
 On Windows, use the equivalent runtime under
 `%LOCALAPPDATA%\Elefante\app\current` and `.venv\Scripts\python.exe`.
 
-If health or host coverage fails, rerun the same v2.12.3 platform installer.
+If health or host coverage fails, rerun the same v2.13.0 platform installer.
 Do not configure a second daemon or point one host at a source checkout.
 
 ## Developer source runtime
@@ -95,10 +95,12 @@ From a source checkout:
 ./.venv/bin/python scripts/ci/list_mcp_tools.py
 ```
 
-The current inventory is:
+The source inventory contains one default-off developer evaluation tool in
+addition to the customer profile:
 
 ```text
-Available MCP Tools: 16
+Available MCP Tools: 18 (source declarations)
+Available MCP Tools: 17 (default customer discovery)
 Available MCP Prompts: 2
 ```
 

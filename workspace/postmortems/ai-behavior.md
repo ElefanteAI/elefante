@@ -119,79 +119,88 @@
 
 <a id="issue-13"></a>
 
-## Issue #13: Task Intelligence Judge Encoded Hidden Implementation Shape [BUG-044, MITIGATED, guarded]
+## Issue #13: Release-Contract Truth Drift [BUG-044, FIXED guarded]
+
+**Trigger:** A whole-product audit found v2.12.2 publicly released while active entrypoints and their tests still declared v2.12.1; the scoring reference documented retired formulas and nonexistent modules; dashboard and ETL copy promised semantics absent from their execution paths.
+**Root cause:** Release and feature-truth checks asserted hand-maintained literals instead of testing the current shipped contract. Passing CI therefore preserved the stale state rather than detecting it.
+**Solution:** Reconciled release entrypoints with the published tag, replaced scoring prose from the source formulas, labeled dashboard search as snapshot-only, marked `surfaces_when` as stored non-ranking metadata, corrected the Distiller module path, and extended maintained regressions across all affected surfaces.
+**Lesson:** Contract tests must reject obsolete claims, not merely freeze yesterday's claim. Publication truth, source behavior, UI language, and reference documentation must agree.
+
+<a id="issue-14"></a>
+
+## Issue #14: Task Intelligence Judge Encoded Hidden Implementation Shape [BUG-046, MITIGATED, guarded]
 
 **Trigger:** Source-grounded v2 retrieval reached relevant repair files and reduced one pilot's token/time cost, but both conditions failed an implementation-coupled hidden test. Eight valid black-box canaries now replace that judge class. Controlled results still do not show repeatable correctness lift: two tasks tied at 3/3, one harder pair failed in both conditions, and the only 0/3 to 2/3 restore signal exceeded the latency gate and came from one task cluster.
 **Root cause:** The first judge required undisclosed patch shape. The repaired experiment then exposed separate failures: retrieval hit-rate is only navigation, delivery does not prove use, a broad memory directive may not supply the task-specific facts needed for execution, and the runner falsely encoded unmeasured retries/corrections as zero. Long workspace paths and inherited agent configuration also caused zero-token infrastructure failures that could be mistaken for task failures.
 **Solution:** Preserve historical outcomes as diagnostic-only; bind behavioral canaries to exact base/known-good refs and fixture digests; self-test every eligible judge at both refs; isolate evaluator configuration; keep baseline-only screening independent from Task Brief construction; abort non-measurable CLI invocations; use short temp workspaces; represent unmeasured data as unknown; record judge, retrieval, selection, delivery, execution, and acceptance metadata; block invalid-judge execution by default; and block promotion until enough independently reviewed black-box tasks show causal outcome improvement.
 **Lesson:** A valid judge, relevant retrieval, memory selection, memory delivery, agent use, correct execution, and acceptance are distinct gates. Do not promote on a proxy, a single favorable run, or a memory that was merely present.
 
-<a id="issue-14"></a>
+<a id="issue-15"></a>
 
-## Issue #14: Search Ranking Was Mistaken for Answer Context [BUG-045, FIXED AGAIN, guarded]
+## Issue #15: Search Ranking Was Mistaken for Answer Context [BUG-047, FIXED AGAIN, guarded]
 
 **Trigger:** `elefante-context` initially injected the raw top five search hits, and normal search told the agent that every result was authoritative. On 2026-08-14, a live replacement-task screen exposed a recurrence: Recall supplied unrelated SDD/developer-etiquette constraints for three real GitHub product questions instead of abstaining. A live positive control then caught the first repair rejecting the canonical mission on a paraphrased question. On 2026-08-15, the independently requested task `use Elefante to improve Elefante` exposed a narrower recurrence: generic Developer Etiquette was selected when `Elefante` was the only distinct matched term.
 **Root cause:** Retrieval and answer delivery were initially treated as one operation. The first v2 guard counted an intrinsic evidence role (`constraint`, `decision`, `failure`, or `safeguard`) as both independent relevance and a question-specific action anchor; one live false positive matched only 3 of 28 task terms (10.7%) but passed because it was classified as a constraint. Replacing that error with one absolute lexical threshold overfit the negative case and discarded an explicitly user-enforced governing directive. The remaining short-query path still treated one of three distinct terms as both a direct answer and a role-text anchor; repeating the product name raised its apparent coverage without adding task evidence.
 **Solution:** Keep broad search for exploration and one fail-closed answer selector for delivery. Text-only evidence for a multi-term question now requires at least two distinct matched terms before it can become a direct answer or ordinary role-text anchor. One-term factual questions remain eligible, and explicit path, graph, mandatory-governance, or semantically strong user-locked scoped-directive anchors retain their separate bounded paths. Broad search remains inspectable, while always-inject policy remains governed separately.
 **Lesson:** A retrieved role or project identity is not proof of task applicability, but explicit user governance is also not ordinary ranking metadata. Test false-positive abstention, genuine one-term facts, and the intended user-enforced decision path together.
 
-<a id="issue-15"></a>
+<a id="issue-16"></a>
 
-## Issue #15: Retrieval Exposure Was Mistaken for Memory Use [BUG-046, FIXED in development, guarded]
+## Issue #16: Retrieval Exposure Was Mistaken for Memory Use [BUG-048, FIXED in development, guarded]
 
 **Trigger:** Ordinary MCP search and automatic context delivery appended retrieved IDs to session history, persisted co-activation, and incremented access metadata through the normal orchestrator path. Repeated exposure could therefore change future ranking without evidence that an agent used the memory or that the task improved.
 **Root cause:** Candidate discovery, delivery, declared use, and task outcome were collapsed into one behavioral feedback signal. This contaminated both memory lifecycle behavior and Task Intelligence evaluation.
 **Solution:** Search now defaults to non-reinforcing and the MCP search/automatic context paths explicitly disable access mutation. Legacy exposure history is discarded rather than reused as use evidence. The development-only `record_use` boundary accepts only active IDs delivered by the same live Task Intelligence trace and writes a reversible event to a separate metadata ledger. It does not change access history, co-activation, or ranking.
 **Lesson:** Retrieval is exposure; declared use is a separate event; neither is proof of task utility. Evaluation must attribute improvement to observable outcomes, not search frequency.
 
-<a id="issue-16"></a>
+<a id="issue-17"></a>
 
-## Issue #16: Task Intelligence Stopped at Retrieval [BUG-048, INFRASTRUCTURE FIXED, effectiveness open]
+## Issue #17: Task Intelligence Stopped at Retrieval [BUG-050, INFRASTRUCTURE FIXED, effectiveness open]
 
 **Trigger:** The Task Brief compiler could select evidence and the evaluator could score historical repairs, but no production invocation tied a host task to delivery, declared use, outcome, inspection, retraction, and the exact durable memory being tested.
 **Root cause:** Offline evaluation, runtime delivery, and learning signals were separate partial systems. A retrieved memory could look persuasive without proof that it was the reviewed record, reached the agent, stayed within budget, or changed an observable outcome.
 **Solution:** Add one default-off Task Intelligence MCP surface with independent pilot delivery, a session-bound metadata-only ledger, idempotent use/outcome events, retraction, and no ranking mutation. Bind a sealed export of a real durable memory to an independently reviewed black-box base/fix canary; preflight now proves exact selection, deterministic rendering, hard budget, no hidden-answer leakage, and zero model calls before evaluation spend.
 **Lesson:** A production intelligence loop needs provenance from invocation through outcome. Deterministic preflight proves the pipe; only controlled paired outcomes can prove lift.
 
-<a id="issue-17"></a>
+<a id="issue-18"></a>
 
-## Issue #17: Evaluation Lost Causal Truth Between Retrieval and Judge [BUG-049, FIXED, guarded]
+## Issue #18: Evaluation Lost Causal Truth Between Retrieval and Judge [BUG-051, FIXED, guarded]
 
 **Trigger:** A real-memory treatment received the right modules and changed only the public doctor CLI, yet failed because the judge used an undisclosed `~/.bob` convention. Earlier diagnostics also discarded failed workspaces, could reuse filenames after task changes, and let repeated implementation chunks crowd out validation evidence.
 **Root cause:** The evaluator treated candidate rank, task identity, preserved failure evidence, and judge validity as separate conveniences instead of one immutable causal contract. A nearby symbol or hidden environment convention could therefore dominate the verdict.
 **Solution:** Preserve failed workspaces by default; bind schema-v3 outcomes to the complete task contract; keep broad source candidates but reserve declared-context chunks, diverse ownership files, and later stages; classify tests as safeguards; expose selected source paths in preflight; and require every judge convention to exist in the frozen task or base. The corrected canary still fails on base and passes on the known fix, and the preserved treatment patch passes it without another model run.
 **Lesson:** Before spending another run, prove that the brief contains the target, ownership chain, and safeguard, and that the judge tests only disclosed behavior. A verdict without those properties is evaluator evidence, not product evidence.
 
-<a id="issue-18"></a>
+<a id="issue-19"></a>
 
-## Issue #18: Runtime Delivery Skipped Current-Source Validation [BUG-050, FIXED, guarded]
+## Issue #19: Runtime Delivery Skipped Current-Source Validation [BUG-052, FIXED, guarded]
 
 **Trigger:** A digest-stale user-locked memory was blocked by the explicit Task Brief but delivered by normal search context, the context prompt, and opt-in tool-response context.
 **Root cause:** Runtime paths shared the ranking compiler but not the service step that cloned candidates and compared source-file digests. Selector parity was mistaken for full delivery-pipeline parity.
 **Solution:** Centralize candidate cloning and source annotation in `TaskBriefService.prepare_candidates`; route all answer-delivery paths through one server boundary before compilation; regress every public delivery path with the same digest-mismatch case.
 **Lesson:** A governed selector is only as safe as its complete preprocessing chain. Runtime and evaluation must share validation, selection, and budget boundaries—not only ranking code.
 
-<a id="issue-19"></a>
+<a id="issue-20"></a>
 
-## Issue #19: Installed Memory Was Available but a Normal Question Did Not Recall It [BUG-051, FIXED, guarded]
+## Issue #20: Installed Memory Was Available but a Normal Question Did Not Recall It [BUG-053, FIXED, guarded]
 
 **Trigger:** A clean Codex session answered `UNKNOWN` even though Elefante was globally installed and the requested durable fact existed. An explicit Recall then requested approval; after approval was removed, selection still rejected the direct fact and successful output wasted context on internal wrappers.
 **Root cause:** Four contracts were incorrectly treated as one: host registration, retrieval routing, safe tool authorization, and answer selection. The selector also reused an implementation-actionability threshold for factual questions, while the generic response decorator ignored Recall's narrow customer purpose.
 **Solution:** Keep registration separate, add one manifest-owned reversible global Codex routing block, declare Recall read-only/idempotent/non-destructive/closed-world, allow a strong `direct_answer` to bypass only the implementation-actionability threshold, and return a seven-field Recall payload without internal wrappers. Rebuild and install the exact customer archive, then prove the journey in an empty directory with Codex JSON events.
 **Lesson:** Availability is not use. A customer memory path is complete only when the host routes a normal question, invokes safely, selects answer-bearing evidence, and returns less context than it saves.
 
-<a id="issue-20"></a>
+<a id="issue-21"></a>
 
-## Issue #20: Relevant Memory Did Not Supply the Decisive Task Evidence [GAP-053, OPEN]
+## Issue #21: Relevant Memory Did Not Supply the Decisive Task Evidence [GAP-053, OPEN]
 
 **Trigger:** Task 032's sealed installation-contract memory was retrieved, selected, and delivered in every treatment, yet treatment accepted 0/3. The two completed source-only controls also failed.
 **Root cause:** Semantic relevance was mistaken for decision value. The memory described global runtime architecture and host coverage, but the black-box task required a real public `elefante-Recall` MCP surface; all five preserved patches changed routing or installer files and omitted that API.
 **Solution:** Reject task 032's tested memory component and preserve its `STOP`. Before another model run, require a different task whose prior memory contributes one specific decision-relevant fact absent from the source-only Brief, then prove that difference in deterministic preflight. The evaluator now compares source-only and memory Briefs directly and stops redundant controls after a bound treatment 0/3.
 **Lesson:** A memory should be selected because it changes the next task action, not because it is topically related. Retrieval, selection, and delivery are healthy only when the evidence portfolio contains the missing decision input.
 
-<a id="issue-21"></a>
+<a id="issue-22"></a>
 
-## Issue #21: Recall-Only Workflow Had No Durable Decision Supply [GAP-054, FIXED in development]
+## Issue #22: Recall-Only Workflow Had No Durable Decision Supply [GAP-054, FIXED in development]
 
 **Trigger:** After Task 032 stopped, a model-free search for a different eligible memory-task pair returned `no_match`. The live customer store contained five records: one synthetic passcode, two unverified related specifications, and two contradictory records; it did not contain Elefante's user-declared canonical mission.
 **Root cause:** The installed Codex guidance actively routed prior-context questions through Recall but had no active rule for an explicit user request to remember something across sessions. It also treated a successful write as sufficient even though governance can make a stored record ineligible; availability, capture, deliverability, and outcome had been collapsed into “memory exists.”
@@ -199,18 +208,18 @@
 **Proof:** The live store initially had five unrelated or unsuitable records and the complete candidate-selection question returned `no_match`. Pilot memory `0b27fa62-d459-4029-a390-391305ab555d` was then stored. Raw retrieval ranked it first, but the first Recall rejected its descriptive scope and supplied a loose developer specification; after the same record's scope was corrected to literal `elefante`, Recall supplied only the canonical mission. This proves capture and deliverability, not a better task outcome.
 **Lesson:** Recall cannot improve a later task when the workflow never captured the decision, and `stored` does not mean `deliverable`. Safe capture is an explicit, closed-loop causal stage; it is not automatic conversation harvesting and it is not evidence of task lift.
 
-<a id="issue-22"></a>
+<a id="issue-23"></a>
 
-## Issue #22: Evaluator Separated Task Value From Overall Token Cost [GAP-055, FIXED in development]
+## Issue #23: Evaluator Separated Task Value From Overall Token Cost [GAP-055, FIXED in development]
 
 **Trigger:** The product objective was restated as intelligence per overall token, but the paired report measured acceptance and retries as effectiveness while using input-token growth only as a secondary cost ceiling; output tokens were omitted from the gate.
 **Root cause:** Outcome quality and token cost were evaluated in separate gates instead of one paired value measure. This could recognize correctness lift without showing its overall-token efficiency and could not recognize equal accepted value delivered with reliably fewer total tokens.
 **Solution:** Define the current observable value proxy as one unit for a black-box accepted outcome and zero for failure; define total tokens as input, including cached input, plus output. Report accepted outcomes per million tokens and a task-clustered difference from complete pairs, while separately reporting all observed spend so early-stop work is not hidden. The gate requires at least one treatment acceptance, no acceptance-count regression, and a 95% lower bound above zero; historical consumed evidence remains non-promotable.
 **Lesson:** Measure accepted value and complete cost together. Cheap failure is zero intelligence, and raw ratios across unrelated task mixes are not comparable evidence.
 
-<a id="issue-23"></a>
+<a id="issue-24"></a>
 
-## Issue #23: Declarative Triggers Had No Delivery Path [GAP-056, FIXED in development]
+## Issue #24: Declarative Triggers Had No Delivery Path [GAP-056, FIXED in development]
 
 **Trigger:** `trigger` and `surfaces_when` metadata could describe when a memory should matter, but no runtime path examined an explicit file, terminal-error, or conversation context. A caller had to guess a semantic query and could miss an exact opt-in reminder.
 **Root cause:** The schema hint was passive. Adding automatic host interception would cross the local memory authority boundary and introducing another semantic retriever would duplicate the existing search contract, so no bounded delivery surface had been wired.
@@ -222,7 +231,7 @@
 
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
-The recurring rules from these 23 issues:
+The recurring rules from these 24 issues:
 
 1. **STATE → DO → VERIFY in the same response** — analysis without action is entertainment. Issues #1, #4.
 2. **Trigger words require proof** — "done" / "ready" / "fixed" must include verification output. Issue #2.
@@ -231,17 +240,18 @@ The recurring rules from these 23 issues:
 5. **Differentiate "slow" from "hung"** — timeouts cannot fix deadlocks. Issue #9.
 6. **Broadest scope for behavioral instructions** — system-level injection, not workspace-level file presence. Issue #10.
 7. **Every export needs a documented import** — exportable ≠ restorable. Issue #11.
-8. **Judge observable outcomes, not hidden patch shape** — an invalid acceptance test can erase real improvement or reward overfitting. Issue #13.
-9. **Separate discovery from answer delivery** — broad retrieval can find useful material, but only a bounded, question-specific evidence set belongs in an answer. Issue #14.
-10. **Separate exposure from use** — retrieval and delivery cannot reinforce memory or co-activation before a caller explicitly acknowledges use. Issue #15.
-11. **Prove the whole evidence path** — bind invocation, selected memory, delivery, declared use, and outcome before attributing benefit. Issue #16.
-12. **Bind and preserve evaluation truth** — task, judge, evidence portfolio, failed workspace, and verdict must remain one inspectable contract. Issue #17.
-13. **Share the complete delivery pipeline** — preprocessing, source validation, selection, and budgets must be identical across runtime paths. Issue #18.
-14. **Prove the normal-question journey** — registration, routing, authorization, selection, and payload economy are separate gates. Issue #19.
-15. **Select for decision value, not topical similarity** — a relevant memory that cannot change the next action is context cost, not Task Intelligence. Issue #20.
-16. **Capture and verify before depending on Recall** — explicit user-directed durable decisions need a governed write plus one future-question delivery check before a later task can depend on them. Issue #21.
-17. **Measure accepted value against complete token cost** — input-only savings and cheap failures cannot establish intelligence per overall token. Issue #22.
-18. **Treat declarative triggers as opt-in delivery gates** — a stored trigger is not permission for broad automatic injection; require explicit context, literal matching, bounded output, and the same governance/privacy gates as normal delivery. Issue #23.
+8. **Guard current truth, not stale literals** — release, source, UI, and docs must agree. Issue #13.
+9. **Judge observable outcomes, not hidden patch shape** — an invalid acceptance test can erase real improvement or reward overfitting. Issue #14.
+10. **Separate discovery from answer delivery** — broad retrieval can find useful material, but only a bounded, question-specific evidence set belongs in an answer. Issue #15.
+11. **Separate exposure from use** — retrieval and delivery cannot reinforce memory or co-activation before a caller explicitly acknowledges use. Issue #16.
+12. **Prove the whole evidence path** — bind invocation, selected memory, delivery, declared use, and outcome before attributing benefit. Issue #17.
+13. **Bind and preserve evaluation truth** — task, judge, evidence portfolio, failed workspace, and verdict must remain one inspectable contract. Issue #18.
+14. **Share the complete delivery pipeline** — preprocessing, source validation, selection, and budgets must be identical across runtime paths. Issue #19.
+15. **Prove the normal-question journey** — registration, routing, authorization, selection, and payload economy are separate gates. Issue #20.
+16. **Select for decision value, not topical similarity** — a relevant memory that cannot change the next action is context cost, not Task Intelligence. Issue #21.
+17. **Capture and verify before depending on Recall** — explicit user-directed durable decisions need a governed write plus one future-question delivery check before a later task can depend on them. Issue #22.
+18. **Measure accepted value against complete token cost** — input-only savings and cheap failures cannot establish intelligence per overall token. Issue #23.
+19. **Treat declarative triggers as opt-in delivery gates** — a stored trigger is not permission for broad automatic injection; require explicit context, literal matching, bounded output, and the same governance/privacy gates as normal delivery. Issue #24.
 
 Distill any new repeating rule into `../lessons.md`. Postmortems hold the bug-specific narrative; `lessons.md` holds the cross-bug edge.
 

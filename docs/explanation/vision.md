@@ -1,6 +1,6 @@
 # Elefante Vision
 
-> Product explanation · Current published version: v2.12.3
+> Product explanation · Current published version: v2.13.0
 
 ## The Thesis
 
@@ -11,7 +11,7 @@ across sessions without making one model provider the owner of that memory.
 Every new AI session otherwise starts from zero. The user repeats context, the
 agent rediscovers decisions, and the context window fills with history instead
 of the evidence needed for the next action. Elefante provides a persistent,
-inspectable second brain so an agent can retrieve the smallest useful context
+inspectable memory layer so an agent can retrieve the smallest useful context
 at the moment of work.
 
 ## Role in the Agent Loop
@@ -51,8 +51,9 @@ HTTP or a storage-free bridge, depending on the host.
 The store remains on the user's machine. Context the user intentionally sends
 to a connected AI client is governed by that provider's data policy.
 
-The dashboard reads a redacted local snapshot. It explains memory freshness,
-lifecycle state, sources, and explicit decision relationships
+The dashboard reads redacted local snapshots. It explains memory freshness,
+lifecycle state, sources, retrieval evidence, optional Session Intelligence
+Signal Cards, and explicit decision relationships
 without giving the browser authority to query or mutate the live store.
 
 ## The Four Laws
@@ -63,8 +64,11 @@ without giving the browser authority to query or mutate the live store.
    reused or amended instead of duplicated.
 3. **Grounding** — project-specific claims need current memory or workspace
    evidence; otherwise they are unknown.
-4. **Full Signal Injection** — injected context must improve the next answer;
-   irrelevant memory is noise.
+4. **Task Intelligence** — retrieved context should improve accepted task value
+   per total token; failed or irrelevant context has no intelligence value.
+
+The fourth law is the product objective, not a current performance claim.
+Elefante has not yet established representative multi-task outcome lift.
 
 ## Product Boundary
 

@@ -135,7 +135,7 @@ reversible rather than always active. (Cross-bug with ai-behavior #6.)
 **Lesson:** State that should persist across restarts must persist to disk, not memory. Co-activation is a multi-session signal; treating it as in-process state is a category error.
 
 **Current contract note (2026-08-08):** This historical repair is superseded by
-BUG-046 for normal operation. Retrieval IDs are no longer treated as use
+BUG-048 for normal operation. Retrieval IDs are no longer treated as use
 evidence. The development `record_use` event is observational and does not
 populate ranking history or co-activation input.
 
@@ -160,7 +160,7 @@ populate ranking history or co-activation input.
 
 <a id="issue-16"></a>
 
-## Issue #16: Memory Governance Had No Authority Boundary [BUG-047, FIXED in development]
+## Issue #16: Memory Governance Had No Authority Boundary [BUG-049, FIXED in development]
 
 **Trigger:** A workflow-managed call could assert permanent or user-locked policy, later automation could change that protected record, refinery cleanup could archive it, and normal delete permanently removed data.
 **Root cause:** Storage metadata described retention and injection preferences, but mutation authority and forgetting semantics were not enforced at the MCP and maintenance boundaries.

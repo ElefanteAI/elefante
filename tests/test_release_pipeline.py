@@ -24,6 +24,13 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _current_version() -> str:
+    source = (ROOT / "src/__init__.py").read_text(encoding="utf-8")
+    match = re.search(r'^__version__ = "([^"]+)"$', source, re.MULTILINE)
+    assert match is not None
+    return match.group(1)
+
+
 def _load_module(path: Path, name: str):
     spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
@@ -124,12 +131,13 @@ def test_release_documentation_audit_passes_for_repo_history():
 
 def test_published_release_can_render_public_notes():
     module = _load_module(ROOT / "scripts/ci/render_release_notes.py", "render_published_notes")
+    current_version = _current_version()
 
-    assert "2.12.1" not in module.release_candidate_versions(
+    assert current_version not in module.release_candidate_versions(
         (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     )
-    module.validate_release_documentation("2.12.1")
-    assert "## [2.12.1] - 2026-08-04" in module.render_release_notes("2.12.1")
+    module.validate_release_documentation(current_version)
+    assert f"## [{current_version}] -" in module.render_release_notes(current_version)
 
 
 def test_version_sync_tracks_release_identifiers_without_rewriting_history():
@@ -154,14 +162,10 @@ def test_version_sync_tracks_release_identifiers_without_rewriting_history():
         r'__version__\s*=\s*"([^"]+)"',
         (ROOT / "src" / "__init__.py").read_text(encoding="utf-8"),
     ).group(1)
-    # The active checkout may carry an unreleased package version while the
-    # README intentionally names the separately published release.  Verify
-    # both declarations on their own surfaces instead of forcing a candidate
-    # source version into public documentation.
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     assert f"## [{source_version}]" in changelog
-    assert "**v2.12.3** — Current published release." in readme
+    assert f"**v{source_version}** — Current published release." in readme
 
 
 def test_version_advisor_accepts_candidate_changelog_entries():
@@ -246,15 +250,16 @@ def test_release_publication_requires_the_exact_source_version_tag(tmp_path):
 
 def test_readme_uses_the_verified_macos_customer_launcher():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    release_section = readme.split("**Release bundle (preferred):**", 1)[1].split(
-        "If `.venv` already exists", 1
+    release_section = readme.split("## Install", 1)[1].split(
+        "## Verify the installation", 1
     )[0]
+    normalized_release_section = " ".join(release_section.split())
 
     assert "Install Elefante.command" in release_section
     assert "Control-click" in release_section
-    assert "Administrator access and Terminal commands are not required." in release_section
+    assert "Administrator access and Terminal commands are not required." in normalized_release_section
     assert "run the top-level `install.sh` or `install.bat`" not in release_section
-    assert "https://github.com/ElefanteAI/elefante.git" in readme
+    assert "[installation guide](docs/how-to/install.md)" in release_section
 
 
 def test_release_checksums_are_deterministic_and_detect_tampering(tmp_path):
@@ -324,7 +329,8 @@ def test_quality_workflow_enforces_release_candidate_gates():
     workflow = (ROOT / ".github/workflows/quality.yml").read_text(encoding="utf-8")
 
     assert "python scripts/ci/bump_version.py --check" in workflow
-    assert "from src import __version__" in workflow
+    assert "build_release_client.py --print-version" in workflow
+    assert "from src import __version__" not in workflow
     assert "scripts/ci/render_release_notes.py" in workflow
     assert "python -m pytest tests -m slow -q" in workflow
     assert "python -m ruff check" in workflow
@@ -335,6 +341,8 @@ def test_quality_workflow_enforces_release_candidate_gates():
     assert "requirements.client.lock" in workflow
     assert "scripts/ci/build_release_client.py" in workflow
     assert "scripts/ci/verify_release_client.py" in workflow
+    assert 'archive="$RUNNER_TEMP/elefante-v${version}-rc.1-macOS.zip"' in workflow
+    assert "v2.12.2-rc.1" not in workflow
     assert "requirements.client.lock" in workflow
     assert "pypa/gh-action-pip-audit@" in workflow
 
@@ -353,17 +361,22 @@ def test_release_client_candidate_workflow_is_validation_only():
     assert "--publication-status candidate" in workflow
     assert "--expected-publication-status candidate" in workflow
     assert "name: Prove a fresh macOS customer installation" in workflow
-    assert 'ditto -x -k dist/elefante-v2.12.2-rc.1-macOS.zip' in workflow
+    assert "id: release_metadata" in workflow
+    assert "build_release_client.py --print-version" in workflow
+    assert "from src import __version__" not in workflow
+    assert "steps.release_metadata.outputs.archive" in workflow
+    assert "steps.release_metadata.outputs.version" in workflow
+    assert "v2.12.2-rc.1" not in workflow
     assert '"$bundle_root/Install Elefante.command" --venv-mode fresh --verbose' in workflow
     assert '"$install_root/scripts/lifecycle/doctor.py" --json' in workflow
     assert 'report["customer_ready"] is True' in workflow
-    assert 'report["installation"]["version"] == "2.12.2"' in workflow
+    assert 'report["installation"]["version"] == sys.argv[3]' in workflow
     assert 'report["installation"]["release_channel"] == "candidate"' in workflow
     assert "SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}" in workflow
     assert "ref: ${{ env.SOURCE_COMMIT }}" in workflow
     assert 'report["installation"]["source_commit"] == os.environ["SOURCE_COMMIT"]' in workflow
     assert 'report["installation"]["source_clean"] is True' in workflow
-    assert "(cd dist && shasum -a 256 elefante-v2.12.2-rc.1-macOS.zip > SHA256SUMS)" in workflow
+    assert 'shasum -a 256 "$archive" > dist/SHA256SUMS' in workflow
     assert '"tests/test_release_pipeline.py"' in workflow
     assert '"$install_root/scripts/lifecycle/uninstall_elefante.py" --apply' in workflow
     assert "if manifest_path.exists():" in workflow

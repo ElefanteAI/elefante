@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
@@ -46,6 +48,30 @@ def _create_client_source(root_dir: Path, builder) -> None:
         target = root_dir / relative_path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text("print('runtime script')\n", encoding="utf-8")
+
+
+def test_builder_prints_version_without_product_dependencies(tmp_path):
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    builder_path = ROOT / "scripts/ci/build_release_client.py"
+    builder = _load_module(builder_path, "build_release_client_version")
+    _create_client_source(source_root, builder)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-S",
+            str(builder_path),
+            "--root-dir",
+            str(source_root),
+            "--print-version",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    assert result.stdout.strip() == "2.12.2"
 
 
 def _build(builder, source_root: Path, output_path: Path, platform: str = "macOS"):
@@ -109,7 +135,7 @@ def test_build_release_client_contains_only_customer_runtime(
 
     assert manifest["release_profile"] == "client"
     assert manifest["version"] == "2.12.2"
-    assert manifest["candidate"] == "v2.12.2-rc.1"
+    assert manifest["candidate"] == f"v{manifest['version']}-rc.1"
     assert manifest["candidate_lane"] == "Release Client Candidate 1.0"
     assert manifest["publication_status"] == "candidate"
     assert manifest["platform"] == platform

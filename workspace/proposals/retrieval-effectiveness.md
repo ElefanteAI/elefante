@@ -517,7 +517,7 @@ The repair earns only the next experiment:
 2. then test multiple task classes with a pre-registered powered design;
 3. only after representative lift, design persistent identity or runtime
    integration if the proven mechanism requires it;
-4. close BUG-052 before installed-candidate evidence or any release claim;
+4. close BUG-054 before installed-candidate evidence or any release claim;
 5. complete customer artifact, host, privacy, rollback, and release gates under
    separate explicit authority.
 
@@ -634,12 +634,26 @@ the package being entered has its dependency, rollback, and acceptance proof
 identified below. This sequence implements the user's Recall-first direction
 without turning the dirty development checkout into an unbounded feature pass.
 
-**Classification:** BUG-051 owns end-to-end Recall routing; GAP-053 owns the
+**Classification:** BUG-053 owns end-to-end Recall routing; GAP-053 owns the
 difference between broadly relevant and decision-changing memory; GAP-055 owns
 accepted task value per total token. The packages reuse the existing Recall,
 Task Brief v2, governance, evaluator, and outcome ledger. They do not authorize
 a second retrieval system, automatic full-store injection, live-memory
 mutation, installation, merge, release, or deployment.
+
+### Developer-only activation and rollback
+
+- `elefante-TaskIntelligence` is absent from MCP discovery unless the developer
+  sets `ELEFANTE_TASK_INTELLIGENCE_ENABLED=1`.
+- Pilot context delivery additionally requires
+  `ELEFANTE_TASK_INTELLIGENCE_PILOT=1`; automatic tool-response delivery also
+  requires `ELEFANTE_TASK_CONTEXT_ON_TOOL_CALL=1`.
+- Removing any required flag fails closed. The v2.13.0 customer profile excludes
+  the Task Intelligence tool and rejects customer configuration that attempts
+  to enable it.
+- Retrieval exposure and trace-bound `record_use` remain separate facts.
+  Declared use does not update ranking, access history, or co-activation and is
+  not proof of task improvement.
 
 ### 15.1 Ordered development packages
 
@@ -922,7 +936,7 @@ retaining the same selected context, and all other proofs were model-free.
 #### R4 entry — relevance and abstention screen before repair
 
 R4 begins with no authorized selector edit. The current Task Brief selector and
-its tests already contain uncommitted BUG-045 hardening owned by the existing
+its tests already contain uncommitted BUG-047 hardening owned by the existing
 developer checkout. First run the registered false-positive and positive-control
 tests plus the shared Recall/answer-context slice. If they pass, R4 closes as a
 no-change verification; no threshold is moved merely to create activity. If one
@@ -931,7 +945,7 @@ touching `src/core/task_intelligence.py`.
 
 ##### R4 result — no new selector repair
 
-- All seven pre-registered BUG-045 negative and positive controls pass, including
+- All seven pre-registered BUG-047 negative and positive controls pass, including
   generic constraint rejection, project-name-only rejection, governing
   directive preservation, question-specific anchors, multi-term direct answers,
   and one-term factual answers.

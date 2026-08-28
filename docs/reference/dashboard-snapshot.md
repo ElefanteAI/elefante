@@ -6,6 +6,9 @@ This document defines the **required** and **optional** fields for the dashboard
 
 - The dashboard server reads from: `DATA_DIR/dashboard_snapshot.json`
 - In typical installs, `DATA_DIR` resolves to `~/.elefante/data`.
+- Optional Session Intelligence uses the separate
+  `DATA_DIR/session_intelligence_snapshot.json`; it is never folded into the
+  memory graph snapshot.
 
 ## Top-level schema
 
@@ -154,14 +157,23 @@ The dashboard is a read-only memory-inspection surface with three views:
   permits, presents its evolution as old assumption → evidence → decision →
   enforced guard.
 - **Memories** provides snapshot-local search, sorting, metadata, and related
-  memory inspection.
+  memory inspection. When a memory is opened from search, Retrieval Explanation
+  reports its lexical match, returned rank, configured storage source, health,
+  and explicit relationship evidence. It labels absent evidence instead of
+  inventing a five-signal semantic explanation.
 - **Connections** presents topic and distribution views plus a Decision Graph.
   The graph derives explorable reasoning trails only from explicit
   memory-to-memory edges, names their relationships, and explains the selected
   memory from its redacted source grounding. It must not invent topic-ring,
   hub-spoke, or arbitrary sequential topology. Semantic links may be counted as
   cross-topic bridges but remain secondary to grounded decision and safeguard
-  relationships.
+relationships.
+
+The optional Session Intelligence panel reads only
+`session_intelligence_snapshot.json` through `/api/session-intelligence`. It
+renders a Signal Card only when explicit consent and derived metadata are
+present; otherwise it shows the disabled state. The dashboard cannot grant
+consent or ingest usage.
 
 The carbon, tusk, copper, brass, clay, and sage palette communicates hierarchy
 and state. It is not a scoring model. The UI must not invent per-query

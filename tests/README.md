@@ -1,7 +1,7 @@
 # Elefante Test Suite
 
-> **Scope:** active developer source declaration 2.12.2; current public release v2.12.3
-> **Last Updated:** 2026-08-26
+> **Scope:** v2.13.0 developer and release verification
+> **Last Updated:** 2026-08-28
 
 ## Quick Reference
 
@@ -34,7 +34,7 @@ pytest tests/test_integration_smoke.py -v
 ./.venv/bin/python scripts/ci/summarize_task_intelligence_evaluation.py
 ```
 
-The shipped self-protocol runs against an isolated temporary Elefante home/data directory so it validates the live MCP workflow without polluting the user's durable memory store. It explicitly enables the default-off Task Intelligence development surface and verifies 17/18 development tools plus both prompts; `--with-dashboard-open` is opt-in because that tool binds fixed port 8000 and is not fully self-contained. Normal public v2.12.3 discovery remains 16 tools; the unreleased customer candidate exposes 17 by default because Recall is enabled while Task Intelligence remains default-off.
+The self-protocol runs against an isolated temporary Elefante home/data directory so it validates the live MCP workflow without polluting the user's durable memory store. It explicitly enables the default-off Task Intelligence development surface and verifies 17/18 source tools plus both prompts; `--with-dashboard-open` is opt-in because that tool binds fixed port 8000 and is not fully self-contained. The v2.13.0 customer profile exposes 17 tools and 2 prompts because Recall is enabled while Task Intelligence remains default-off.
 
 Use the existing tests in this file before writing any ad hoc validation script. If a listed test no longer reflects current behavior, update that test first. Parallel scratch tests are noise unless the existing suite cannot express the failure mode.
 

@@ -22,7 +22,6 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 CLIENT_CANDIDATE_LANE = "Release Client Candidate 1.0"
-CANDIDATE_VERSION = "v2.12.2-rc.1"
 PLATFORM_CHOICES = ("Linux", "macOS", "Windows")
 PUBLICATION_STATUSES = ("candidate", "release")
 FALLBACK_ARCHIVE_TIMESTAMP = (2026, 8, 5, 12, 0, 0)
@@ -212,7 +211,7 @@ def build_manifest(
         },
     }
     if publication_status == "candidate":
-        manifest["candidate"] = CANDIDATE_VERSION
+        manifest["candidate"] = f"v{manifest['version']}-rc.1"
         manifest["candidate_lane"] = CLIENT_CANDIDATE_LANE
     return manifest
 
@@ -471,12 +470,20 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--output", help="Output ZIP path")
     parser.add_argument("--root-dir", help="Override the Elefante repository root")
+    parser.add_argument(
+        "--print-version",
+        action="store_true",
+        help="Print the package version without importing product dependencies",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     root_dir = Path(args.root_dir).expanduser().resolve() if args.root_dir else ROOT_DIR
+    if args.print_version:
+        print(source_version(root_dir))
+        return
     output_path = (
         Path(args.output).expanduser().resolve()
         if args.output

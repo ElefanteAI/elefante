@@ -11,8 +11,14 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-08-28
+
 ### Added
 
+- Added default-on, read-only `elefante-Recall`, bringing the customer profile
+  to 17 tools and 2 prompts. Recall returns one bounded seven-field result,
+  abstains when evidence is irrelevant or unsafe, and is wired through
+  reversible Codex guidance plus customer-readiness verification.
 - Added a dry-run-first portable JSON memory importer. It validates the full
   export before writing, preserves memory IDs and metadata, regenerates vectors
   with the configured local embedding model, rejects existing-ID collisions,
@@ -26,7 +32,8 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Explicitly triggered memories can now surface through the existing search and
   Recall path when a literal trigger appears in the query or supplied
   `surface_context`. The bounded path preserves lifecycle, scope, source-trust,
-  conflict, and privacy gates and never mutates access or graph state.
+  conflict, and privacy gates, does not change ranking, and never mutates access
+  or graph state.
 - Governed answer context now reports a bounded warning when a relevant candidate
   has a stored unresolved conflict or contradictory status. Conflicted evidence
   remains withheld, neither side is chosen automatically, and the warning does
@@ -43,7 +50,7 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Added the dashboard Retrieval Explanation panel. It renders only snapshot
   evidence actually present for a memory and labels unavailable scoring details
   instead of inventing a hidden five-signal breakdown.
-- Expanded development `doctor` output with redacted integration-contract drift
+- Expanded `doctor` output with redacted integration-contract drift
   diagnostics, malformed-manifest handling, and customer-readiness blocking for
   installer-owned non-ready surfaces.
 - Added typed, bounded, privacy-scrubbed file, terminal-error, and conversation
@@ -64,7 +71,14 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and never sent through OCR, transcription, a model, or a network by Elefante.
 - Added ownership-safe Zed and Continue adapters with read-only detection,
   unrelated-setting preservation, exact emitted-state fingerprints, and safe
-  uninstall. They are development-compatible, not externally certified.
+  uninstall. They are compatible, not externally certified.
+- Added archive and installed-payload source identity. The installer, ownership
+  manifest, bootstrap, verifier, and `doctor` now agree on semantic version,
+  exact clean source commit, and candidate/release channel before customer
+  readiness can pass.
+- Added credential-gated macOS signing and notarization for branded DMG
+  publication. Unsigned DMGs remain validation artifacts and cannot substitute
+  for release assets.
 - Added branded Windows EXE preparation/build verification and credential-gated
   Authenticode CI publication. Unsigned EXEs remain validation artifacts and
   cannot substitute for release assets.
@@ -115,126 +129,6 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Release-candidate tooling and workflows now derive manifest identity, archive
   names, and installation checks from the package version instead of embedding
   the previous release number or importing product dependencies before setup.
-
-### Added
-
-- Added an unreleased, default-on `elefante-Recall` customer path that accepts
-  one standalone question and returns only bounded governed answer context or an
-  explicit abstention. It requires no development flags and has a local
-  `ELEFANTE_RECALL_ENABLED=0` rollback switch. Recall is declared read-only,
-  idempotent, non-destructive, and closed-world to compatible MCP hosts.
-- Added reversible account-level Codex routing during customer installation.
-  Elefante appends one manifest-owned block to the active global `AGENTS.md`
-  file, preserves all user content, and removes only its unchanged block during
-  uninstall.
-- Added an opt-in Task Intelligence v2 shadow profile with source-grounded
-  evidence, file/line/symbol lineage, action-value gates, conflict exclusion,
-  explicit abstention, and a maintained retrieval diagnostic.
-- Added a customer critical-thinking directive: agreement is not evidence,
-  uncertainty must remain explicit, and improvement requires measurement.
-- Added a default-off `elefante-TaskIntelligence` development surface for
-  bounded prepare, trace-bound declared use, metadata-only outcome, inspection,
-  and retraction. Pilot delivery requires a second independent local flag.
-- Added a session-bound local audit ledger that stores hashes, identifiers,
-  counts, and bounded outcome metadata instead of task text, prompts, memory
-  bodies, or comments. Declared use is reversible and does not change ranking.
-- Added a digest-sealed real-memory calibration fixture and model-free preflight
-  that proves base/fix judge behavior, exact memory selection, deterministic
-  rendering, budget compliance, and leakage safety before evaluation spend.
-
-### Changed
-
-- Task Intelligence evaluation now reports accepted outcomes per million total
-  tokens, counting input (including cached input) plus output. Failed outcomes
-  contribute zero value, acceptance regression cannot be hidden by cheaper
-  execution, and only a positive task-clustered paired lower bound can make
-  token intelligence an effectiveness path. Complete-pair efficiency and all
-  observed spend are reported separately so early-stop work is not hidden.
-  Historical consumed evidence remains diagnostic-only.
-- The reversible global Codex memory block now handles explicit cross-session
-  remember requests as well as Recall: it searches first, writes only concise
-  user-directed durable records, requires explicit authority for locks or
-  permanent retention, refuses secrets, and never infers capture from ordinary
-  conversation. Exact scope and triggered-delivery rules are explicit, and one
-  likely future question must pass Recall before the write is called deliverable.
-- Customer grounding now routes answer-time continuity through the simple
-  read-only Recall tool while retaining broad `elefante-Memory(action="search")`
-  for inspection and search-before-write compliance.
-- The historical Task Intelligence benchmark is now explicitly diagnostic-only.
-  Promotion fails closed until tasks provide behavioral acceptance contracts
-  and rollback refs; v1 remains the default reproducible profile.
-- Unreleased memory mutations now distinguish user-directed authority from
-  workflow-managed automation. Forgetting archives by default; permanent or
-  protected deletion requires explicit user confirmation.
-
-### Fixed
-
-- Recall no longer treats an intrinsic `constraint`, `decision`, `failure`, or
-  `safeguard` label as sufficient evidence that a memory applies to the current
-  question. Role-based delivery now requires substantial question-term
-  coverage; otherwise the memory needs a strong direct answer or explicit
-  structural/task-specific evidence. A user-locked, scoped, ranked directive
-  can additionally guide a semantically strong decision question in that named
-  scope. Text-only evidence for a multi-term question must match at least two
-  distinct question terms, so a repeated project name alone cannot promote
-  generic process guidance as a direct answer. Genuine one-term facts remain
-  eligible. Loosely related process memories still abstain.
-- A healthy global runtime no longer depends on the model guessing when to use
-  memory in Codex. A normal question that can depend on durable preferences,
-  decisions, or project context now routes through `elefante-Recall` before the
-  answer; no Elefante-specific wording or approval prompt is required.
-- Strong factual memories that directly answer a question are no longer
-  rejected for lacking implementation-only signals such as file paths or code
-  symbols. All independent relevance, lifecycle, conflict, privacy, and source
-  gates still apply.
-- Recall responses no longer carry internal protocol, directive, entrypoint, or
-  token-stat wrappers. The customer boundary returns only seven fields while
-  token accounting remains local to Elefante.
-- Public answer context no longer exposes internal memory UUIDs inherited from
-  the development Task Brief renderer; stable evidence labels are used instead.
-- Question-time memory delivery now distinguishes broad search candidates from
-  answer-bearing evidence. The `elefante-context` prompt injects only a small,
-  active, conflict-free, secret-safe set. Selection requires a question-specific
-  action anchor plus independent semantic, concept, or graph corroboration; it
-  abstains when nothing directly applies. Normal memory search exposes the same
-  selection as result numbers and reasons.
-- Retrieval and automatic context delivery are now read-only with respect to
-  access history and co-activation. Legacy exposure history is discarded, and
-  explicit `record_use` accepts only active IDs delivered by the same live Task
-  Intelligence trace. It records observational evidence without reinforcing
-  access history, co-activation, or ranking.
-- Protected memories can no longer be silently weakened by workflow automation
-  or archived by refinery maintenance. Search and bounded context now retain
-  provenance, lifecycle, conflict, scope, and current-source state, while secret
-  shaped content is scrubbed before storage or withheld from legacy reads.
-- Task Intelligence diagnostics now preserve failed workspaces by default,
-  bind schema-v3 outcomes to the complete task contract, keep declared source
-  context and validation safeguards inside the bounded evidence portfolio, and
-  reject undisclosed judge conventions through base/fix canary verification.
-- Normal search context, the context prompt, explicit Task Briefs, and opt-in
-  tool-response context now share the complete current-source validation and
-  governed-selection pipeline. Digest-stale locked evidence fails closed rather
-  than being injected through a secondary delivery path.
-- Active user, developer, agent, proposal, example, and embedded MCP
-  documentation now agrees with the v2.12.2 release, SQLite/Kuzu default,
-  16-tool/2-prompt surface, conditional context injection, and implemented
-  scoring/lifecycle behavior. Broken paths and obsolete release-candidate,
-  migration, and legacy-tool guidance were removed or labeled historical;
-  customer commands now target the installed runtime, and Task Intelligence no
-  longer retrieves a retained pre-release installer design as current guidance.
-  Regression checks now guard release versions, relative links, tool names,
-  manifest types, Python compatibility, command forms, and scoring claims.
-- Customer repairs now replace pre-manifest Elefante host registrations only
-  when their command structurally identifies an older Elefante MCP runtime.
-  Unrelated user-owned servers with the same name remain untouched.
-- Installation now proves the same stdio bridge and local daemon path used by
-  customer IDEs, with enough startup time for a cold local runtime.
-- Customer build identity now binds archive metadata, installed payload,
-  ownership state, and `doctor` to the same semantic version, clean source
-  commit, and candidate/release channel. Legacy, dirty, development-channel,
-  or mismatched customer runtimes fail readiness instead of allowing
-  development behavior to masquerade as a published release.
-
 ## [2.12.2] - 2026-08-05
 
 ### Changed

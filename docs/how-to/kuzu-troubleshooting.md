@@ -1,6 +1,6 @@
 # Troubleshoot Kuzu Safely
 
-**Applies to:** v2.12.3
+**Applies to:** v2.13.0
 
 Kuzu stores Elefante's entities and relationships. The normal customer runtime
 has one daemon owner; IDE bridges never open Kuzu directly.
@@ -80,7 +80,7 @@ Never assume `~/.elefante/data/kuzu_db` when configuration says otherwise.
 
 `scripts/debug/reset_kuzu_nuclear.py` rebuilds graph state from an explicitly
 configured legacy ChromaDB store. It is not the recovery route for the default
-SQLite/Kuzu customer runtime. Do not run it against a fresh v2.12.3
+SQLite/Kuzu customer runtime. Do not run it against a fresh v2.13.0
 installation.
 
 ## Verification
