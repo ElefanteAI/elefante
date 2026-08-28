@@ -370,12 +370,15 @@ def test_release_client_candidate_workflow_is_validation_only():
     assert '"$bundle_root/Install Elefante.command" --venv-mode fresh --verbose' in workflow
     assert '"$install_root/scripts/lifecycle/doctor.py" --json' in workflow
     assert 'report["customer_ready"] is True' in workflow
-    assert 'report["installation"]["version"] == sys.argv[3]' in workflow
+    assert 'report["installation"]["version"] == sys.argv[2]' in workflow
     assert 'report["installation"]["release_channel"] == "candidate"' in workflow
     assert "SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}" in workflow
     assert "ref: ${{ env.SOURCE_COMMIT }}" in workflow
     assert 'report["installation"]["source_commit"] == os.environ["SOURCE_COMMIT"]' in workflow
     assert 'report["installation"]["source_clean"] is True' in workflow
+    assert '"app_root" not in report["installation"]' in workflow
+    assert '"data_root" not in report["installation"]' in workflow
+    assert 'report["installation"]["app_root"]' not in workflow
     assert 'shasum -a 256 "$archive" > dist/SHA256SUMS' in workflow
     assert '"tests/test_release_pipeline.py"' in workflow
     assert '"$install_root/scripts/lifecycle/uninstall_elefante.py" --apply' in workflow

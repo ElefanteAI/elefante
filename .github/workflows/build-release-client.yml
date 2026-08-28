@@ -99,22 +99,22 @@ jobs:
           test -x "$install_root/.venv/bin/python"
           "$install_root/.venv/bin/python" \
             "$install_root/scripts/lifecycle/doctor.py" --json > "$doctor_report"
-          python - "$doctor_report" "$install_root" "${{ steps.release_metadata.outputs.version }}" <<'PY'
+          python - "$doctor_report" "${{ steps.release_metadata.outputs.version }}" <<'PY'
           import json
           import os
           import sys
           from pathlib import Path
 
           report = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-          expected_root = str(Path(sys.argv[2]).resolve())
           assert report["ready"] is True, report
           assert report["customer_ready"] is True, report
           assert report["installation"]["scope"] == "customer", report
-          assert report["installation"]["version"] == sys.argv[3], report
+          assert report["installation"]["version"] == sys.argv[2], report
           assert report["installation"]["release_channel"] == "candidate", report
           assert report["installation"]["source_commit"] == os.environ["SOURCE_COMMIT"], report
           assert report["installation"]["source_clean"] is True, report
-          assert report["installation"]["app_root"] == expected_root, report
+          assert "app_root" not in report["installation"], report
+          assert "data_root" not in report["installation"], report
           assert report["host_coverage"]["uncovered"] == [], report
           PY
 
