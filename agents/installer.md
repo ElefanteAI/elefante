@@ -1,7 +1,7 @@
 ---
 PROTOCOL: installer
 INVOKE: elefante-installer
-PROTOCOL_VERSION: 2.10.0-pre
+PROTOCOL_VERSION: 2.12.2
 LOAD_WHEN: Fresh install, broken venv, install failure, repair request, "install.sh failed", "install.bat failed", `.elefante-install-summary.txt` reports failure.
 DIAGNOSTIC_QUESTION: "What state is broken in the install pipeline, and which of the four venv paths does it call for?"
 AUTHORITY: This file owns the install protocol. Inline install troubleshooting in README/docs is forwarding only.
@@ -33,14 +33,16 @@ When `.venv` exists, the installer offers four choices. Pick by symptom:
 | Venv is healthy; only configs failed | **Reuse existing** |
 | Need to halt without changes | **Abort** |
 
-Never delete a `.venv.broken.*` without a `### Removed` CHANGELOG entry per `agents/memory-janitor.md`.
+Keep `.venv.broken.*` until the repaired environment is verified. Removing a
+local backup requires explicit scope and a clear operator report, not a product
+changelog entry.
 
 ## Failure Routing
 
 | Symptom | Route |
 | ------- | ----- |
-| Wrong Python version detected | Verify Python 3.11+ on PATH; rerun `scripts/setup/install.py` |
-| ChromaDB / Kuzu init failed | `scripts/setup/init_databases.py` (idempotent) |
+| Wrong Python version detected | Verify Python 3.11, 3.12, or 3.13 on PATH; rerun `scripts/setup/install.py` |
+| SQLite / Kuzu initialization failed | `scripts/setup/init_databases.py` (idempotent); legacy ChromaDB only when explicitly configured |
 | IDE not picking up MCP server | Hand off to `agents/restarter.md` |
 | DMG install GUI broken | Check `scripts/ci/installer_gui.py`; see BUG-020 in `workspace/ISSUES.md` |
 | AppKit installer (macOS) fails | Fall back to legacy Python/Tk path documented in `scripts/setup/install.py` |

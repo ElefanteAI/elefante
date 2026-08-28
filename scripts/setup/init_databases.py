@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : init_databases.py
-# VERSION : 2.7.2
-# CHANGED : 2026-04-16
 # PURPOSE : Initialize or re-verify the configured vector store and Kuzu schema without
 #           running the full installer; safe bootstrap safety check.
 # WHEN    : After a Kuzu reset or vector-store recovery, to re-initialize the
@@ -12,7 +10,6 @@
 # NOTES   : Idempotent — safe to re-run on already-initialized databases (will
 #           verify, not double-initialize). Called automatically by install.py;
 #           use this standalone only when you need DB init without a full reinstall.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """
 Database initialization script for Elefante
@@ -241,4 +238,3 @@ async def main():
 if __name__ == "__main__":
     exit_code = asyncio.run(main())
     sys.exit(exit_code)
-

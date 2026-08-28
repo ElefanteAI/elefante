@@ -5,7 +5,7 @@ A dual-database memory system combining embedded semantic search
 with structured knowledge graphs (Kuzu) for comprehensive AI memory.
 """
 
-__version__ = "2.12.3"
+__version__ = "2.13.0"
 __author__ = "Elefante Contributors"
 
 # LAW #1 ENFORCEMENT: Do NOT import orchestrator at package level

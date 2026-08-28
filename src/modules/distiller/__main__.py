@@ -14,13 +14,18 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-from datetime import datetime
 
-from .scanner import SessionScanner
+from .scanner import (
+    DEFAULT_WATCH_INTERVAL,
+    MAX_WATCH_INTERVAL,
+    MIN_WATCH_INTERVAL,
+    SessionScanner,
+)
 from .parser import ChatParser
 from .privacy import PrivacyFilter
 from .tracker import SessionTracker
-from .models import InsightType
+
+logger = logging.getLogger("elefante.distiller.cli")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -132,6 +137,25 @@ def cmd_distill(args) -> int:
             print(f"WARNING: Cannot connect to Elefante memory: {e}")
             print("Insights will be printed but not stored.")
 
+    if getattr(args, "watch", False):
+        if args.target not in ("latest", "all"):
+            print(
+                "Watch mode observes all newly changed sessions; use target 'latest' or 'all'.",
+                file=sys.stderr,
+            )
+            return 2
+        return _watch_sessions(
+            scanner,
+            parser,
+            privacy,
+            tracker,
+            engine=engine,
+            ingester=ingester,
+            dry_run=args.dry_run,
+            export=args.export,
+            interval=getattr(args, "interval", DEFAULT_WATCH_INTERVAL),
+        )
+
     # Determine target
     if args.target == "latest":
         sessions = scanner.list_sessions(limit=1)
@@ -166,6 +190,57 @@ def cmd_distill(args) -> int:
             target_path = match[0].file_path
         _distill_one(target_path, parser, privacy, tracker,
                       engine=engine, ingester=ingester, dry_run=args.dry_run, export=args.export)
+
+    return 0
+
+
+def _watch_sessions(
+    scanner: SessionScanner,
+    parser: ChatParser,
+    privacy: PrivacyFilter,
+    tracker: SessionTracker,
+    engine=None,
+    ingester=None,
+    dry_run: bool = False,
+    export: str | None = None,
+    interval: float = DEFAULT_WATCH_INTERVAL,
+) -> int:
+    """Process changed sessions serially until the user stops the watcher."""
+    print(
+        f"Watching for changed sessions (poll interval: {interval:g}s; press Ctrl-C to stop)..."
+    )
+
+    try:
+        for info in scanner.watch(interval=interval):
+            try:
+                result = _distill_one(
+                    info.file_path,
+                    parser,
+                    privacy,
+                    tracker,
+                    engine=engine,
+                    ingester=ingester,
+                    dry_run=dry_run,
+                    export=export,
+                )
+            except Exception:
+                # One malformed, concurrently deleted, or otherwise broken
+                # session must not stop processing later sessions.
+                logger.exception(
+                    "Live watch failed for session %s (%s)",
+                    info.session_id,
+                    info.file_path,
+                )
+                continue
+
+            if result == "error":
+                logger.error(
+                    "Live watch could not process session %s (%s)",
+                    info.session_id,
+                    info.file_path,
+                )
+    except KeyboardInterrupt:
+        print("\nLive watch stopped.", file=sys.stderr)
 
     return 0
 
@@ -207,7 +282,7 @@ def _distill_one(
         print(f"  Workspace: {ws}")
         print(f"  Turns: {session.turn_count}")
         print(f"  Hash: {session.content_hash}")
-        print(f"  Preview:")
+        print("  Preview:")
         for i, turn in enumerate(session.turns[:3], 1):
             preview = turn.user_text[:80].replace("\n", " ")
             print(f"    Turn {i}: {preview}...")
@@ -240,7 +315,7 @@ def _distill_one(
                             "error_fix": "E", "workflow": "W"}.get(ins.insight_type.value, "?")
                     print(f"    [{icon}] {ins.content[:90]}")
             else:
-                print(f"  No insights (session was all noise)")
+                print("  No insights (session was all noise)")
 
             # Store insights in Elefante memory
             if ingester and insights:
@@ -251,7 +326,7 @@ def _distill_one(
 
         except ConnectionError as e:
             print(f"  LLM unavailable: {e}")
-            print(f"  Falling back to raw archive only.")
+            print("  Falling back to raw archive only.")
         except Exception as e:
             print(f"  Distillation error: {e}")
             import traceback
@@ -259,7 +334,7 @@ def _distill_one(
     else:
         md = session.to_markdown()
         print(f"  Parsed: {session.session_id[:12]}... ({session.turn_count} turns, {len(md)} chars)")
-        print(f"  (No LLM engine — use --engine ollama|openai|anthropic to distill)")
+        print("  (No LLM engine — use --engine ollama|openai|anthropic to distill)")
 
     # Mark as processed
     tracker.mark_processed(session.session_id, session.content_hash, insights_count=len(insights))
@@ -308,11 +383,36 @@ def _build_parser() -> argparse.ArgumentParser:
                     help="Store insights into Elefante memory")
     di.add_argument("--export", help="Export parsed sessions as markdown to this directory")
     di.add_argument("--dry-run", action="store_true", help="Show what would be processed without storing")
+    di.add_argument(
+        "--watch",
+        action="store_true",
+        help="Watch all session files and process each new or changed session",
+    )
+    di.add_argument(
+        "--interval",
+        "--poll-interval",
+        dest="interval",
+        type=_parse_watch_interval,
+        default=DEFAULT_WATCH_INTERVAL,
+        metavar="SECONDS",
+        help=(
+            "Polling interval for --watch ("
+            f"{MIN_WATCH_INTERVAL:g}-{MAX_WATCH_INTERVAL:g} seconds)"
+        ),
+    )
 
     # stats
     sub.add_parser("stats", help="Show processing statistics")
 
     return p
+
+
+def _parse_watch_interval(value: str) -> float:
+    """Argparse adapter for the scanner's bounded polling interval."""
+    try:
+        return SessionScanner.validate_watch_interval(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
 if __name__ == "__main__":

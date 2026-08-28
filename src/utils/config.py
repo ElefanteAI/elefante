@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/utils/config.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Load config.yaml with env var overrides; single source of truth
 #           for all Elefante configuration at runtime.
 # ROLE    : Utils — imported by virtually every other module via get_config().
@@ -181,6 +179,8 @@ class Config:
     
     _instance: Optional['Config'] = None
     _config: Optional[ElefanteConfig] = None
+    _config_source_path: Optional[Path] = None
+    _config_source_from_env: bool = False
     
     def __new__(cls):
         """Singleton pattern"""
@@ -204,10 +204,13 @@ class Config:
         load_dotenv()
         
         # Determine config file path
+        source_from_env = config_path is None and 'ELEFANTE_CONFIG_PATH' in os.environ
         if config_path is None:
             config_path = os.getenv('ELEFANTE_CONFIG_PATH', 'config.yaml')
         
-        config_file = Path(config_path)
+        config_file = Path(config_path).expanduser().resolve()
+        self._config_source_path = config_file
+        self._config_source_from_env = source_from_env
         
         # Load YAML configuration
         if config_file.exists():
@@ -237,7 +240,7 @@ class Config:
         """Derive vector/graph storage paths from elefante.data_dir when unset.
 
         This keeps `ELEFANTE_DATA_DIR` and/or `config.yaml` consistent with
-        ChromaDB and Kuzu default locations.
+        configured vector-store and Kuzu locations.
         """
         data_dir_path = Path(str(config_dict.get('data_dir') or DATA_DIR))
         config_dict['data_dir'] = str(data_dir_path)
@@ -386,6 +389,24 @@ def get_config() -> Config:
     global _config_instance
     if _config_instance is None:
         _config_instance = Config()
+    else:
+        requested_path = Path(
+            os.getenv('ELEFANTE_CONFIG_PATH', 'config.yaml')
+        ).expanduser().resolve()
+        source_path = _config_instance._config_source_path
+        # Test harnesses, wrappers, and embedded callers can set the explicit
+        # config path after importing a module that already touched the
+        # singleton. Honor that explicit path without requiring callers to
+        # know about reload_config(). When the env override is removed after
+        # such a load, return to the normal config path as well.
+        if source_path != requested_path and (
+            'ELEFANTE_CONFIG_PATH' in os.environ
+            or _config_instance._config_source_from_env
+        ):
+            if 'ELEFANTE_CONFIG_PATH' in os.environ:
+                _config_instance.reload()
+            else:
+                _config_instance.reload(str(requested_path))
     return _config_instance
 
 

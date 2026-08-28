@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_factory_reset.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PROVES  : reset_factory.py safety gates: dry-run behavior, backup creation,
 #           confirmation gate, and correct data removal on apply.
 # RUN     : pytest tests/test_factory_reset.py -v
@@ -33,7 +31,7 @@ import pytest
 
 # Import the factory reset module under test
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.lifecycle.reset_factory import factory_reset, _targets, _backup_dir
+from scripts.lifecycle.reset_factory import factory_reset, _targets, _backup_dir, _configured_storage
 
 
 @pytest.fixture()
@@ -189,6 +187,24 @@ def test_reset_moves_opt_in_sqlite_and_graph_data_under_an_overridden_data_root(
     assert not kuzu_path.exists()
     sqlite_backup = next(path for path in backups.iterdir() if path.name.startswith("vector."))
     assert (sqlite_backup / "memories.sqlite3").read_text(encoding="utf-8") == "sqlite-vector-data"
+
+
+def test_reset_defaults_to_the_released_sqlite_vector_path(tmp_path):
+    data_dir = tmp_path / "fresh-data"
+
+    with patch.dict(
+        os.environ,
+        {
+            "ELEFANTE_DATA_DIR": str(data_dir),
+            "ELEFANTE_CONFIG_PATH": str(tmp_path / "missing-config.yaml"),
+        },
+        clear=True,
+    ):
+        resolved_data, vector_path, graph_path = _configured_storage()
+
+    assert resolved_data == data_dir.resolve()
+    assert vector_path == (data_dir / "vector").resolve()
+    assert graph_path == (data_dir / "kuzu_db").resolve()
 
 
 def test_reset_moves_custom_configured_vector_and_graph_paths(tmp_path):

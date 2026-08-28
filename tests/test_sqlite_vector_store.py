@@ -91,6 +91,11 @@ async def test_sqlite_vector_store_round_trips_metadata_and_retrieves_locally(tm
         content="The production database uses encrypted backups.",
         metadata=MemoryMetadata(
             tags=["security", "database"],
+            retention_policy="permanent",
+            injection_policy="always",
+            scope="global",
+            trigger=["database recovery"],
+            user_locked=True,
             custom_metadata={
                 "title": "Database backups",
                 "elefante_source": {"tool": "codex", "transport": "streamable-http"},
@@ -107,6 +112,11 @@ async def test_sqlite_vector_store_round_trips_metadata_and_retrieves_locally(tm
     assert recovered is not None
     assert recovered.metadata.tags == ["security", "database"]
     assert recovered.metadata.custom_metadata["elefante_source"]["tool"] == "codex"
+    assert recovered.metadata.retention_policy == "permanent"
+    assert recovered.metadata.injection_policy == "always"
+    assert recovered.metadata.scope == "global"
+    assert recovered.metadata.trigger == ["database recovery"]
+    assert recovered.metadata.user_locked is True
     assert [result.memory.id for result in matches] == [memory.id]
     assert matches[0].memory.embedding == [1.0, 0.0, 0.0]
     assert await store.find_by_title("Database backups") is not None
@@ -122,6 +132,7 @@ async def test_sqlite_vector_store_updates_filters_and_deletes_without_chromadb(
         metadata=MemoryMetadata(
             category="operations",
             project="elefante",
+            workspace="/repo/elefante",
             file_path="docs/migration.md",
             tags=["migration", "security"],
             score=65,
@@ -143,6 +154,7 @@ async def test_sqlite_vector_store_updates_filters_and_deletes_without_chromadb(
     filters = SearchFilters(
         category="operations",
         project="elefante",
+        workspace="/repo/elefante",
         file_path="docs/migration.md",
         tags=["migration", "verified"],
         min_score=70,
@@ -351,6 +363,10 @@ def test_export_pipeline_reads_the_configured_sqlite_store(tmp_path):
     assert documents == [memory.content]
     assert metadatas[0]["custom_metadata"]["title"] == "SQLite export contract"
     exported = __import__("json").loads(output.read_text(encoding="utf-8"))
+    assert exported["format"] == "elefante-memory-export"
+    assert exported["format_version"] == 1
+    assert exported["embeddings_included"] is False
+    assert exported["graph_included"] is False
     assert exported["vector_store_type"] == "sqlite"
     assert exported["vector_store_path"] == str(vector_directory)
     assert exported["memories"][0]["id"] == str(memory.id)
@@ -403,6 +419,18 @@ def test_dashboard_snapshot_pipeline_reads_the_configured_sqlite_store(tmp_path,
     assert snapshot["stats"]["memories"] == 1
     assert node["properties"]["source"] == "sqlite"
     assert node["properties"]["title"] == "SQLite dashboard contract"
+    assert node["properties"]["health_status"] == "healthy"
+    assert node["properties"]["health_reason"] == "current and connected"
+    assert node["properties"]["connection_count"] >= 1
+    assert snapshot["stats"]["health"]["counts"]["healthy"] == 1
+    assert snapshot["stats"]["usage"] == {
+        "total_accesses": 0,
+        "retrieved_memories": 0,
+        "never_retrieved": 1,
+        "retrieval_rate": 0,
+        "average_access_count": 0.0,
+        "max_access_count": 0,
+    }
 
 
 @pytest.mark.skipif(not CHROMADB_AVAILABLE, reason="legacy ChromaDB migration dependency absent")

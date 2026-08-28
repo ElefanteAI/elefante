@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_release_authorization.py
-# VERSION : 2.12.2
-# CHANGED : 2026-08-05
 # PROVES  : A reviewed release-request marker validates the package version,
 #           creates an immutable tag, and explicitly dispatches publication.
 # RUN     : pytest tests/test_release_authorization.py -v

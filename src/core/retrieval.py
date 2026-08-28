@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/core/retrieval.py
-# VERSION : 2.7.0
-# CHANGED : 2026-04-15
 # PURPOSE : Cognitive retrieval engine: ranked memory results with multi-signal
 #           scoring (semantic, temporal, access reinforcement).
 # ROLE    : Core query path — called by orchestrator for all MemorySearch ops.
@@ -18,6 +16,7 @@ Multi-signal scoring: vector + concepts + co-activation + authority + temporal.
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
@@ -121,6 +120,38 @@ class CognitiveRetriever:
             co_activation_matrix: {memory_id: {other_id: co_retrieval_count}}
         """
         self.co_activation_matrix = co_activation_matrix or {}
+
+    @staticmethod
+    def infer_intent(query: str) -> str:
+        """Classify the task intent with specific intents before generic learning."""
+        query_lower = str(query or "").casefold()
+        if any(
+            word in query_lower
+            for word in ("error", "bug", "fix", "problem", "issue")
+        ):
+            return "troubleshoot"
+        if any(
+            word in query_lower
+            for word in (
+                "spec",
+                "directive",
+                "rule",
+                "requirement",
+                "architecture",
+                "constraint",
+                "sdd",
+                "compliance",
+            )
+        ):
+            return "system"
+        if re.search(
+            r"\b(decide|choose|should|whether|which|criterion|criteria|priority|priorities|worth|govern|guide)\b",
+            query_lower,
+        ) or "matters most" in query_lower:
+            return "decide"
+        if any(word in query_lower for word in ("how", "learn", "what is", "explain")):
+            return "learn"
+        return "remember"
     
     def analyze_query(self, query: str, query_embedding: Optional[list[float]] = None) -> QueryAnalysis:
         """Extract signals from query."""
@@ -138,16 +169,7 @@ class CognitiveRetriever:
         elif any(w in query_lower for w in ["personal", "home", "family"]):
             domain = "personal"
         
-        # Infer intent
-        intent = "remember"  # default
-        if any(w in query_lower for w in ["error", "bug", "fix", "problem", "issue"]):
-            intent = "troubleshoot"
-        elif any(w in query_lower for w in ["spec", "directive", "rule", "requirement", "architecture", "constraint", "sdd", "compliance"]):
-            intent = "system"
-        elif any(w in query_lower for w in ["how", "learn", "what is", "explain"]):
-            intent = "learn"
-        elif any(w in query_lower for w in ["decide", "choose", "should i", "which"]):
-            intent = "decide"
+        intent = self.infer_intent(query)
         
         return QueryAnalysis(
             raw_query=query,

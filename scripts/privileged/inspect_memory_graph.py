@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : inspect_memory_graph.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Read-only semantic/temporal review of specific memories or backup
 #           JSONs from delete_memories_surgical.py; no writes to any database.
 # WHEN    : Before deciding which IDs to pass to delete_memories_surgical.py —
@@ -12,7 +10,6 @@
 # NOTES   : Read-only — no writes to any database. Uses Chroma kNN for semantic
 #           neighbor lookup (no external embedding calls). If a memory has no
 #           stored embedding, the semantic neighbor section will be empty.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Memory connectivity workbench (read-only).
 

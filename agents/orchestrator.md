@@ -1,7 +1,7 @@
 ---
 PROTOCOL: orchestrator
 INVOKE: elefante-orchestrator
-PROTOCOL_VERSION: 2.10.0-pre
+PROTOCOL_VERSION: 2.12.2
 LOAD_WHEN: Building or debugging Elefante itself (DEVELOPER mode).
 DIAGNOSTIC_QUESTION: "Am I changing src/, fixing a regression, or shipping a release?"
 AUTHORITY: AGENTS.md (universal entry, repo root) → README.md → this file → everything else.
@@ -14,23 +14,55 @@ You are building Elefante, not using it. End-user constitution: `.github/copilot
 
 ## The Elefante Workflow Lifecycle
 
-**Every session: linear top-to-bottom. No skipping. No reordering.** Steps 0–10 are the canonical agentic development cycle. Each step has one input, one action, one output. If any step is blocked, stop and name the blocker — do not skip ahead.
+Use this sequence for a state-changing Elefante development cycle. Read-only
+analysis stops after evidence and reporting; it must not manufacture memory,
+journal, or git mutations merely to complete a ritual. If a required step is
+blocked, name the blocker rather than pretending it ran.
 
 | # | Step | Action | Output | Skip cost |
 |---|------|--------|--------|-----------|
-| 0 | **ENGAGE** | `elefante-Memory(action="search")` for context relevant to today's task | Loaded directives + relevant memories | Re-deriving what's already known |
+| 0 | **ENGAGE** | For non-trivial repository work, search Elefante for relevant prior decisions; if unavailable, use the canonical workspace sources and report that boundary | Relevant evidence or explicit unavailability | Re-deriving what's already known |
 | 1 | **CLASSIFY** | Read `workspace/ISSUES.md`; match work against BUG/GAP row OR declare NEW | Stated classification (`BUG-NNN` \| `GAP-NNN` \| `new`) | Loop Step 1 violation (BUG-006 / BUG-026) |
-| 2 | **SEARCH** | Compliance Gate — search Elefante for similar memories before writing anything | Existing matches OR declared none | Duplicate memories; lessons fragmented |
+| 2 | **SEARCH** | Before a memory write, run the Compliance Gate for similar memories. Before a repository edit, search the canonical source and documentation surfaces. | Existing matches OR declared none | Duplicate memories; fragmented lessons; edits based on stale contracts |
 | 3 | **PROPOSE** | Draft the change mentally or on scratch. State Question / Proof / Result / Next | Diff intent declared | Premature execution; no verifiable hypothesis |
-| 4 | **ARCHIVE** | If distilling/cutting/deleting any file: copy verbatim to `<peer>/_archive/<name>-full.md` BEFORE the destructive op | Preserved original | BUG-027 violation (information loss) |
+| 4 | **PRESERVE** | Before destructive edits, confirm the original is recoverable from version control; archive only unique evidence that has no durable source, never duplicate tracked documents by ritual | Explicit rollback path | BUG-027 violation (information loss) |
 | 5 | **WRITE** | Author the change in its canonical home per Closed Surface Map (one home per question) | Edit/Write applied | Multiple homes for same fact; drift |
 | 6 | **INDEX** | Update the relevant index (`docs/README.md`, `workspace/ISSUES.md`, etc.) in the same change | Index reflects new state | Orphan files; navigation rot |
-| 7 | **INGEST** | `elefante-Memory(action="add")` for new lessons (`memory_type: rule`); `elefante-DirectiveAdd` for cross-cutting behavioral rules | Memory IDs / directive IDs returned | Producer-only emission; Layer 3 idle; recursive loop never closes |
-| 8 | **VERIFY** | Run `pytest tests/test_developer_routing.py` + targeted regression test + Elefante search verifying the new memory surfaces on a distinctive query | Guards green; retrieval confirmed | False "done" claim; broken contract |
-| 9 | **JOURNAL** | Append to `workspace/PLANNING.md §10` Journal with: date / event / driver / measurement | Journal entry recorded | Untraced session; metrics gap |
-| 10 | **CLOSE** | CLEAN (no temp files / commented code) → DOCS (CHANGELOG `### Added/Fixed/Changed/Removed` only) → VERSION (`scripts/ci/advise_version_bump.py` then `bump_version.py X.Y.Z` — never hand-edit) → COMMIT (one concern per commit) | Atomic commit shipped | Fatal — work cannot be claimed done |
+| 7 | **INGEST** | Only when the cycle produced a new durable, reusable lesson: search first, then store or update it. Do not ingest routine progress or duplicate documentation | Memory id, or explicit “no durable lesson” | Noise, duplication, or lost learning |
+| 8 | **VERIFY** | Run `./.venv/bin/python -m pytest tests/test_developer_routing.py` + targeted regression test + Elefante search verifying the new memory surfaces on a distinctive query | Guards green; retrieval confirmed | False "done" claim; broken contract |
+| 9 | **JOURNAL** | If product state, a decision, or a verified conclusion changed, update `workspace/PLANNING.md §10` with date / event / driver / measurement | Journal delta, or explicit “no state change” | Untraced material change |
+| 10 | **CLOSE** | CLEAN → DOCS → VERIFY; commit, VERSION, push, tag, merge, and deploy only within the active task's authority | Coherent verified result | Unsupported completion claim |
 
-**Discipline:** every cycle through 0→10 ends with INGEST + JOURNAL + COMMIT. Without all three, the loop has not closed and the work is not done. The journal records what worked; INGEST seeds the next cycle's prevention; COMMIT seals the change.
+**Discipline:** verification is mandatory for changed behavior. Ingestion and
+journaling are conditional on durable new knowledge or state; commits and all
+remote actions are conditional on authority. “No-op” records are noise, not
+proof of discipline.
+
+### Task Intelligence acquisition boundary
+
+When `elefante-TaskIntelligence` is discoverable, non-trivial repository work
+uses it as part of the lifecycle rather than as a separate benchmark ritual:
+
+1. Before execution, call `action="prepare"` once with the concrete task and
+   observable success criteria. Shadow is the default; pilot delivery requires
+   the explicit local kill switch and `profile="v2"`.
+2. Abstention is valid. Continue from current source/runtime evidence when no
+   memory meets the relevance and governance gates; never weaken selection just
+   to force context.
+3. Keep the tool session alive. Record only delivered IDs that actually informed
+   the work, then record one metadata-only outcome from user, host, or test
+   evidence before the trace expires.
+4. After verification, Step 7 may capture at most one absent, stable, reusable
+   fact. Search first, verify a likely future Recall question, and do not count
+   that post-task memory as evidence for the task that created it.
+
+If the tool is absent or disabled, continue the normal lifecycle using Recall
+and canonical sources; unavailability is not a reason to stop product work.
+
+For ordinary answer-time continuity, call Recall at most once per user question
+only when prior context could matter. Skip a self-contained question. Treat
+`no_match`, `blocked`, and `unavailable` as terminal for that answer; do not
+retry or broaden retrieval to force a memory.
 
 **The Five Gates (below) and the Documentation Skill (below) are not separate protocols.** They are detailed implementations of step 5 (WRITE) and step 8 (VERIFY). Read them once, internalize, then return to the lifecycle as the operational sequence.
 
@@ -48,11 +80,19 @@ CRITICAL (1, 4, 5) blocks merge. HIGH (2, 3) blocks release.
 
 You are not a feature shop. You are a memory janitor. Every act of work must leave the memory and documentation system cleaner than you found it. The mandate is embedded in process, not optional cleanup at the end.
 
-- **Delete with a record.** Removing a script, doc, file, or memory requires a `### Removed` entry in `CHANGELOG.md` naming the resolution: `resolved`, `superseded by X`, `abandoned`, `one-time task complete`. Deleting without a record is waste.
+- **Delete with a record.** Removing a released source-controlled script,
+  document, file, or public surface requires a `### Removed` entry in
+  `CHANGELOG.md` naming the resolution. Temporary artifacts and user-managed
+  memory deletions are not product changelog events; memory deletion keeps its
+  required operation-level audit reason.
 - **Create with a question.** Adding a script, doc, or memory requires recording the question it answers in the appropriate index (`scripts/README.md`, `docs/README.md`, or memory `category` + `summary`). Adding without a question is waste.
-- **Resolve, do not file.** When you notice a leak in passing — orphan file, undocumented entrypoint, stale link, duplicate memory — fix it inside the current task. Filing it for later is waste; the next agent will not find your note.
+- **Resolve when it is in scope.** Fix a discovered leak in the current task
+  when the repair is safe, authorized, and independently verifiable. Otherwise
+  record it in `workspace/ISSUES.md`; silently expanding scope is not rigor.
 
-Auto-loaded specialist on any `elefante-Memory(action="add"|"update"|"delete")`: `agents/memory-janitor.md`.
+Before any `elefante-Memory(action="add"|"update"|"delete")`, load
+`agents/memory-janitor.md` when the host supports specialist loading; otherwise
+apply its search, evidence, and deletion-reason rules directly.
 
 ## Documentation Skill
 
@@ -63,10 +103,10 @@ Every documentation change must answer **one question in one canonical place**. 
 | Event | Canonical home |
 |-------|----------------|
 | Universal agent entry | `AGENTS.md` (repo root) |
-| Vision / Four Laws | `workspace/PLANNING.md §1` (mirror in `docs/explanation/vision.md` until consolidation) |
+| Vision / Four Laws | Developer direction: `workspace/PLANNING.md §1`; released product explanation: `docs/explanation/vision.md` |
 | New idea | `workspace/PLANNING.md §4.1 Backlog` |
 | Accepted feature design (PRD) | `workspace/proposals/<name>.md`; routed by aspect in `workspace/PLANNING.md §4.2` |
-| Current release state | `workspace/PLANNING.md §2 Active Release` |
+| Current release state | `workspace/PLANNING.md §2 Released Product` |
 | Roadmap (multi-release) | `workspace/PLANNING.md §3` |
 | Optimization / Ops / Dev / UX plans | `workspace/PLANNING.md §5–§8` |
 | Bug or GAP | `workspace/ISSUES.md` |
@@ -78,7 +118,7 @@ Every documentation change must answer **one question in one canonical place**. 
 | IDE integration surface | `agents/manifests/ide-integration.yaml` |
 | Developer constitution + dispatch | this file (`agents/orchestrator.md`) |
 | Agent executable protocol | `agents/*.md` |
-| Claude Code-specific config | `.claude/README.md` + `.claude/settings.local.json` |
+| Claude Code integration contract | `agents/manifests/ide-integration.yaml` + `docs/how-to/configure-ide.md` |
 | End-user agent constitution | `.github/copilot-instructions.md` |
 
 ### Forbidden patterns
@@ -172,11 +212,13 @@ Mode authority is exclusive. Sliding modes is a violation. Declare mode at top o
 |---------|------|
 | Agent skips search, fakes completion, ignores rules | `workspace/postmortems/ai-behavior.md` |
 | Dashboard blank/stale/schema mismatch | `workspace/postmortems/dashboard.md` |
-| Kuzu / ChromaDB locks, corruption, races | `workspace/postmortems/database.md` |
+| Kuzu / configured vector-store locks, corruption, races | `workspace/postmortems/database.md` |
 | Install fails | `workspace/postmortems/installation.md` |
 | Memory scoring/export/schema drift/bloat | `workspace/postmortems/memory.md` |
 
-After every significant debugging session, append a post-mortem to the matching compendium.
+Append a postmortem only when debugging establishes a new root cause, repair,
+or recurrence-prevention lesson. Routine confirmation belongs in test output,
+not another documentation entry.
 
 ## DEVELOPER / RESEARCH routing
 
@@ -188,9 +230,9 @@ State the diagnostic question before running anything.
 | MCP stdio JSON-RPC alive? | `scripts/verify/verify_mcp_handshake.py` |
 | Full self-protocol E2E? | `scripts/verify/verify_e2e_tests.py` |
 | Specific path regressed? | targeted `pytest` from `tests/README.md` |
-| Tool surface drift vs `spec-tools.md`? | `scripts/ci/list_mcp_tools.py` |
+| Tool surface drift vs `docs/reference/tools.md`? | `scripts/ci/list_mcp_tools.py` |
 | Lock held / write hangs? | `scripts/debug/manage_lock.py` (dry-run first) |
-| Kuzu corrupted, ChromaDB intact? | `scripts/debug/reset_kuzu_nuclear.py` (after `backup_elefante_data.py`) |
+| Kuzu corrupted? | Verified backup/restore first; `scripts/debug/reset_kuzu_nuclear.py` is legacy-ChromaDB-only |
 | Need to retune governing behavior itself? | enter **PRIVILEGED**; load `agents/puppeteer.md`; state risk + rollback first |
 
 ## Closure Sequence
@@ -199,10 +241,16 @@ Spec: `docs/how-to/close-a-feature.md`. Operational summary:
 
 1. **CLEAN** — temp files, debug scripts, commented code, `.venv.broken.*`, status dumps. Gone.
 2. **DOCS** — affected specs + compendium entries + README + `CHANGELOG.md` (`### Added` / `### Fixed` / `### Changed` / `### Removed` only — no retired headings).
-3. **VERSION** — `python scripts/ci/advise_version_bump.py` then `python scripts/ci/bump_version.py <X.Y.Z>`. Never edit version strings by hand.
-4. **COMMIT** — one concern per commit. Push only after tests pass.
+3. **VERIFY** — run the maintained routing gate plus the targeted proof and
+   record exact results.
+4. **VERSION** — only for an approved release: run the advisor, apply the
+   approved SemVer through `bump_version.py`, then run `--check`.
+5. **COMMIT IF AUTHORIZED** — one concern per commit. Otherwise hand off the
+   verified diff explicitly as uncommitted. Push, tag, merge, or deploy only
+   within explicit authority and after required checks pass.
 
-Skip = fatal.
+Skipping CLEAN, required DOCS, or VERIFY is fatal. Conditional steps remain
+conditional; never invent authority or a durable lesson to satisfy the list.
 
 ## Where Things Live
 
@@ -223,7 +271,7 @@ Navigate to the source. Do not memorize.
 
 | Trigger | Load |
 |---------|------|
-| Any `elefante-Memory(action="add"\|"update"\|"delete")` | `agents/memory-janitor.md` (auto) |
+| Any `elefante-Memory(action="add"\|"update"\|"delete")` | `agents/memory-janitor.md` |
 | Install / repair / reinstall | `agents/installer.md` |
 | MCP tools not surfacing in IDE | `agents/restarter.md` |
 | Memory inspection / export / audit | `agents/memory-inspector.md` |
@@ -231,7 +279,7 @@ Navigate to the source. Do not memorize.
 | Backup / restore / factory reset | `agents/operator.md` |
 | Line of attack is suspect (RESEARCH mode) | `agents/researcher.md` |
 | Dangerous control-plane surgery | `agents/puppeteer.md` (`PRIVILEGED` only) |
-| IDE integration matrix drift / `ide-integration-matrix.yaml` audit | `agents/integration-inspector.md` |
+| IDE integration matrix drift / `agents/manifests/ide-integration.yaml` audit | `agents/integration-inspector.md` |
 
 ## Critical Thinking Is Flow Control
 

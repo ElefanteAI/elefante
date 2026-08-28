@@ -17,17 +17,22 @@ on:
       - "scripts/setup/install.py"
       - "src/**"
       - "tests/test_release_client_bundle.py"
+      - "tests/test_release_pipeline.py"
   workflow_dispatch:
 
 jobs:
   macos-client-candidate:
     name: Build clean macOS client candidate
     runs-on: macos-latest
+    env:
+      SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
     permissions:
       contents: read
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SOURCE_COMMIT }}
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
@@ -94,18 +99,22 @@ jobs:
           test -x "$install_root/.venv/bin/python"
           "$install_root/.venv/bin/python" \
             "$install_root/scripts/lifecycle/doctor.py" --json > "$doctor_report"
-          python - "$doctor_report" "$install_root" "${{ steps.release_metadata.outputs.version }}" <<'PY'
+          python - "$doctor_report" "${{ steps.release_metadata.outputs.version }}" <<'PY'
           import json
+          import os
           import sys
           from pathlib import Path
 
           report = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-          expected_root = str(Path(sys.argv[2]).resolve())
           assert report["ready"] is True, report
           assert report["customer_ready"] is True, report
           assert report["installation"]["scope"] == "customer", report
-          assert report["installation"]["version"] == sys.argv[3], report
-          assert report["installation"]["app_root"] == expected_root, report
+          assert report["installation"]["version"] == sys.argv[2], report
+          assert report["installation"]["release_channel"] == "candidate", report
+          assert report["installation"]["source_commit"] == os.environ["SOURCE_COMMIT"], report
+          assert report["installation"]["source_clean"] is True, report
+          assert "app_root" not in report["installation"], report
+          assert "data_root" not in report["installation"], report
           assert report["host_coverage"]["uncovered"] == [], report
           PY
 

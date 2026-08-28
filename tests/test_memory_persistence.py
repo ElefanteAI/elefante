@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_memory_persistence.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PROVES  : Memories are durably stored in the configured vector store and Kuzu
 #           without temporary scripts; graph/session schema contract and
 #           relationship property constraints.
@@ -31,7 +29,8 @@ from src.core.vector_store import VectorStore
 from src.core.sqlite_vector_store import SQLiteVectorStore
 from src.core.graph_store import GraphStore
 from src.models.entity import Entity, EntityType, Relationship, RelationshipType
-from src.models.query import QueryMode
+from src.models.memory import MemoryStatus
+from src.models.query import QueryMode, SearchResult
 
 
 def test_vector_store_uses_embedded_chroma_client_not_server_transport(tmp_path, monkeypatch):
@@ -122,6 +121,50 @@ class TestMemoryPersistence:
         assert len(results) > 0
         found = any(r.memory.content == test_content for r in results)
         assert found, "Memory not found in vector store after adding"
+
+    @pytest.mark.asyncio
+    async def test_contradiction_persists_conflicting_memory_id(self, orchestrator, monkeypatch):
+        """A detected contradiction remains inspectable after the write."""
+        class FixedEmbedding:
+            async def generate_embedding(self, _text):
+                return [1.0, 0.0, 0.0]
+
+        embedding = FixedEmbedding()
+        orchestrator.embedding_service = embedding
+        orchestrator.vector_store._embedding_service = embedding
+
+        existing = await orchestrator.add_memory(
+            content="The local daemon stores memory decisions.",
+            memory_type="fact",
+            metadata={"title": "Existing daemon storage"},
+        )
+        assert existing is not None
+
+        async def no_title_match(_title):
+            return None
+
+        async def contradictory_match(**_kwargs):
+            return [
+                SearchResult(
+                    memory=existing,
+                    score=0.80,
+                    vector_score=0.80,
+                    source="vector",
+                )
+            ]
+
+        monkeypatch.setattr(orchestrator.vector_store, "find_by_title", no_title_match)
+        monkeypatch.setattr(orchestrator.vector_store, "search", contradictory_match)
+
+        incoming = await orchestrator.add_memory(
+            content="The local daemon does not store memory decisions.",
+            memory_type="fact",
+            metadata={"title": "Incoming daemon storage"},
+        )
+
+        assert incoming is not None
+        assert incoming.metadata.status == MemoryStatus.CONTRADICTORY.value
+        assert incoming.metadata.conflict_ids == [existing.id]
     
     @pytest.mark.asyncio
     async def test_add_memory_persists_to_graph_store(self, orchestrator):
@@ -527,11 +570,13 @@ async def test_live_mcp_server_survives_shutdown_regression(tmp_path):
         assert "capabilities" in init
         await client.ensure_alive("post-initialize")
 
-        initial = await client.call_tool("elefante-Memory", {"action": "search", "query": shared_phrase, "limit": 5})
-        assert isinstance(initial, dict)
-        await client.ensure_alive("after initial search")
-
         for index in range(2):
+            search = await client.call_tool(
+                "elefante-Memory",
+                {"action": "search", "query": shared_phrase, "limit": 5},
+            )
+            assert search.get("success") is True, search
+            assert search.get("gate_status") == "UNLOCKED_ONCE_FOR_THIS_SESSION"
             response = await client.call_tool(
                 "elefante-Memory",
                 {"action": "add", 
@@ -561,11 +606,19 @@ async def test_live_mcp_server_survives_shutdown_regression(tmp_path):
         await client.ensure_alive("after status check")
 
         for memory_id in memory_ids:
+            search = await client.call_tool(
+                "elefante-Memory",
+                {"action": "search", "query": shared_phrase, "limit": 10},
+            )
+            assert search.get("success") is True, search
             response = await client.call_tool(
                 "elefante-Memory",
                 {"action": "delete", 
                     "memory_id": memory_id,
                     "reason": f"Cleanup for live MCP crash regression probe {token}",
+                    "delete_mode": "permanent",
+                    "invocation_mode": "user_directed",
+                    "confirm_permanent": True,
                 },
             )
             assert response.get("success", False), f"MemoryDelete failed for {memory_id}: {response}"

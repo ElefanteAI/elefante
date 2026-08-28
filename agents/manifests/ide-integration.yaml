@@ -1,9 +1,9 @@
 # Elefante — IDE / Agent Integration Matrix
 #
-# Single source of truth for every IDE / agent runtime that Elefante integrates with.
+# Single source of truth for released, preview, community, and planned host surfaces.
 # Used by:
 #   - agents/installer.md (which surfaces to detect-then-emit)
-#   - agents/integration-inspector.md (continuous doc-drift audit)
+#   - agents/integration-inspector.md (manual doc-drift audit)
 #   - docs/how-to/configure-ide.md (per-surface install reference)
 #   - tests/test_developer_routing.py (drift guards)
 #
@@ -11,12 +11,16 @@
 # Status field semantics:
 #   configured    — file present and active in this repo (or installer writes it at install time)
 #   compatible    — emitted against the documented host contract and covered by Elefante's adapter tests; not yet host-certified end-to-end
+#   partial       — installer output exists, but adapter or host-lifecycle proof is incomplete; shown as Preview
 #   community     — documented manual path; no Elefante-owned host lifecycle adapter yet
 #   planned       — surface exists per matrix but Elefante has not yet implemented integration
 #   deprecated    — was supported, now retired (kept for migration window)
 #
-# Last full re-verification: 2026-04-18 (snapshot from spec-ide-integration-surface.md §3).
-# Active integration-inspector run before a release cut will refresh verified_doc_hash for every row.
+# Verification is per row. A date proves only the cited contract review; it is
+# not host certification. `verified_doc_hash: pending` means no automated
+# vendor-document drift proof has been recorded.
+# `installer_writes` is always boolean. Write ownership belongs in
+# `documentation.install_authority`, not in that boolean field.
 
 schema_version: 1
 
@@ -65,22 +69,19 @@ surfaces:
       - https://code.visualstudio.com/docs/copilot/copilot-chat
     last_verified: 2026-04-18
     verified_doc_hash: pending  # Refreshed by integration-inspector before a release cut
+    status: compatible
 
   - id: claude-code
     kind: cli-agent
     in_repo:
-      - path: .claude/settings.local.json
-        purpose: Claude Code permission whitelist (WebFetch domains for documentation lookups)
-        status: configured
-        installer_writes: false
       - path: .claude/skills/
         purpose: Anthropic Skill v1 SKILL.md files
         status: planned
-        installer_writes: planned
+        installer_writes: false
     user_home:
       - path: ~/.claude.json
         purpose: Claude Code MCP server registration
-        installer_writes: scripts/setup/configure_cli_agents.py
+        installer_writes: true
     skill_paths:
       project:
         - .claude/skills/{name}/SKILL.md
@@ -100,10 +101,8 @@ surfaces:
       The native Claude CLI writes and removes the user-scoped MCP registration;
       Elefante records a fingerprint of `claude mcp get elefante` before it may
       unregister it. Existing user registrations are preserved.
-      Permission whitelist allows WebFetch to: bob.ibm.com, openclaw.ai, clawhub.ai,
-      kiro.dev, code.visualstudio.com, docs.openclaw.ai, docs.cursor.com.
       Full Skill v1 surface (.claude/skills/) is tracked in
-      workspace/proposals/ide-integration-surface.md §15.2.
+      workspace/proposals/ide-integration-surface.md as Upcoming.
 
   # ───────── Local (gitignored) installer-emitted files ─────────
 
@@ -111,18 +110,17 @@ surfaces:
     kind: ide
     in_repo:
       - path: .cursorrules
-        purpose: Cursor auto-load instructions (legacy format)
-        status: configured-locally-but-gitignored
-        installer_writes: true
+        purpose: Retired Cursor instruction format; retained only as design history
+        status: deprecated
+        installer_writes: false
         notes: |
-          Created by scripts/setup/install.py during installation.
-          Listed in .gitignore — visible at install time but not in repo.
-          Cursor has deprecated this format in favor of .cursor/rules/*.mdc;
-          the current plan migrates to the new format.
+          The released installer configures MCP only. It does not write this
+          legacy file. Any future instruction surface must use the current
+          vendor contract and pass a fresh review.
       - path: .cursor/rules/*.mdc
         purpose: Cursor rules (new format)
         status: planned
-        installer_writes: planned
+        installer_writes: false
     user_home:
       - path: ~/.cursor/mcp.json
         purpose: Cursor MCP server registration
@@ -152,17 +150,16 @@ surfaces:
     in_repo:
       - path: .windsurfrules
         purpose: Windsurf auto-load instructions
-        status: configured-locally-but-gitignored
-        installer_writes: true
-        notes: Listed in .gitignore.
+        status: planned
+        installer_writes: false
       - path: .windsurf/rules/*.md
         purpose: Windsurf rules (frontmatter format)
         status: planned
-        installer_writes: planned
+        installer_writes: false
     user_home:
       - path: ~/.codeium/windsurf/memories/global_rules.md
         purpose: Global Windsurf memories
-        installer_writes: planned
+        installer_writes: false
     skill_paths:
       project:
         - .windsurf/rules/*.md
@@ -176,6 +173,7 @@ surfaces:
       install_authority: planned
     last_verified: 2026-04-18
     verified_doc_hash: pending
+    status: planned
 
   # ───────── Planned integrations ─────────
 
@@ -185,7 +183,7 @@ surfaces:
     user_home:
       - path: ~/.bob/settings/mcp_settings.json
         purpose: IBM Bob MCP server registration (canonical path)
-        installer_writes: planned
+        installer_writes: true
     skill_paths:
       project:
         - .bob/skills/{name}/SKILL.md
@@ -197,12 +195,11 @@ surfaces:
       install_authority: scripts/setup/configure_vscode_bob.py  # also handles Bob detection
     last_verified: 2026-04-18
     verified_doc_hash: pending
-    status: planned
+    status: partial
     notes: |
-      Bob uses a non-standard config path (~/.bob/settings/mcp_settings.json) per
-      ops-installation-compendium.md Issue #7. The current installer script
-      (configure_vscode_bob.py) was extended after that bug; v2.11 daemon-mode
-      adapter consolidates the path knowledge into this matrix.
+      The installer detects Bob and writes the tested user-global MCP entry.
+      Full host-lifecycle proof is incomplete, so customer documentation keeps
+      Bob at Preview rather than Compatible.
 
   - id: kiro
     kind: ide
@@ -210,7 +207,7 @@ surfaces:
     user_home:
       - path: .kiro/settings/mcp.json
         purpose: Kiro MCP config (project-level)
-        installer_writes: planned
+        installer_writes: false
       - path: ~/.kiro/settings/mcp.json
         purpose: Kiro MCP config (global)
         installer_writes: true
@@ -296,6 +293,10 @@ surfaces:
 
   - id: continue
     kind: vscode-extension
+    user_home:
+      - path: ~/.continue/mcpServers/elefante.yaml
+        purpose: Dedicated Elefante MCP server block
+        installer_writes: true
     skill_paths:
       project:
         - .continue/rules/*.md
@@ -307,9 +308,18 @@ surfaces:
         - globs
         - alwaysApply
     documentation:
-      install_authority: planned
-    last_verified: 2026-04-18
-    status: planned
+      reference: docs/how-to/configure-ide.md
+      install_authority: scripts/setup/configure_additional_hosts.py
+    doc_urls:
+      - https://docs.continue.dev/customize/deep-dives/mcp
+      - https://docs.continue.dev/reference
+    last_verified: 2026-08-28
+    verified_doc_hash: pending
+    status: compatible
+    notes: |
+      Elefante writes one dedicated MCP block instead of parsing or rewriting
+      the user's main Continue YAML. The file is ownership-tracked and removed
+      only while its fingerprint still matches the emitted content.
 
   - id: zed
     kind: ide
@@ -328,19 +338,30 @@ surfaces:
       format: plain-md
     user_home:
       - path: ~/.config/zed/settings.json
-        purpose: Zed MCP server registration
-        installer_writes: planned
+        platform: macos-linux
+        purpose: Zed context_servers registration
+        installer_writes: true
+      - path: '%APPDATA%\Zed\settings.json'
+        platform: windows
+        purpose: Zed context_servers registration
+        installer_writes: true
     documentation:
-      install_authority: planned
-    last_verified: 2026-04-18
-    status: planned
+      reference: docs/how-to/configure-ide.md
+      install_authority: scripts/setup/configure_additional_hosts.py
+    doc_urls:
+      - https://zed.dev/docs/ai/mcp
+      - https://zed.dev/faq
+    last_verified: 2026-08-28
+    verified_doc_hash: pending
+    status: compatible
     notes: |
-      Zed auto-detects from a precedence list. The universal AGENTS.md (this repo's
-      new root-level file as of 2026-05-02) is the second item in the list; the
-      first (.rules) is not yet authored. Reading order matters.
+      The installer preserves unrelated settings and writes only
+      context_servers.elefante after Zed is detected. The exact JSON entry is
+      ownership-tracked for safe upgrade and uninstall. Zed's instruction-file
+      precedence remains independent from its MCP registration.
 
   - id: gemini
-    kind: cli-and-ide
+    kind: cli-agent
     skill_paths:
       project:
         - GEMINI.md
@@ -350,10 +371,7 @@ surfaces:
     user_home:
       - path: ~/.gemini/settings.json
         purpose: Gemini MCP servers (mcpServers key)
-        installer_writes: scripts/setup/configure_cursor_kiro.py
-      - path: ~/.gemini/antigravity/mcp_config.json
-        purpose: Antigravity-specific MCP config
-        installer_writes: scripts/setup/configure_antigravity.py
+        installer_writes: true
     documentation:
       reference: docs/how-to/configure-ide.md
       install_authority: scripts/setup/configure_cursor_kiro.py
@@ -364,9 +382,25 @@ surfaces:
     status: compatible
     notes: |
       Gemini CLI receives an exact mcpServers.elefante stdio-bridge entry only
-      when ~/.gemini already exists. The installer preserves every other server
-      and records exact-entry ownership for safe uninstall. Antigravity remains
-      a separate Gemini-family configuration surface.
+      when the CLI and ~/.gemini already exist. The installer preserves every
+      other server and records exact-entry ownership for safe uninstall.
+
+  - id: antigravity
+    kind: ide
+    user_home:
+      - path: ~/.gemini/antigravity/mcp_config.json
+        purpose: Antigravity MCP server registration
+        installer_writes: true
+    documentation:
+      reference: docs/how-to/configure-ide.md
+      install_authority: scripts/setup/configure_antigravity.py
+    last_verified: 2026-08-05
+    verified_doc_hash: pending
+    status: partial
+    notes: |
+      The installer detects the existing Antigravity directory and writes an
+      ownership-tracked MCP entry. Full external host-lifecycle certification
+      is incomplete, so this remains Preview.
 
   - id: codex
     kind: cli-agent
@@ -378,7 +412,7 @@ surfaces:
     user_home:
       - path: ~/.codex/config.toml
         purpose: Codex CLI MCP config
-        installer_writes: scripts/setup/configure_cli_agents.py
+        installer_writes: true
     documentation:
       reference: docs/how-to/configure-ide.md
       install_authority: scripts/setup/configure_cli_agents.py
@@ -400,7 +434,7 @@ surfaces:
     user_home:
       - path: .aider.conf.yml
         purpose: Aider config
-        installer_writes: planned
+        installer_writes: false
     documentation:
       install_authority: planned
     last_verified: 2026-04-18
@@ -416,7 +450,7 @@ surfaces:
     user_home:
       - path: ~/.openclaw/openclaw.json
         purpose: OpenClaw-managed outbound MCP server registry
-        installer_writes: manual-only
+        installer_writes: true
     documentation:
       reference: docs/how-to/configure-ide.md
       install_authority: scripts/setup/configure_cli_agents.py
@@ -444,21 +478,3 @@ surfaces:
       Its common Docker deployment changes the network and filesystem trust
       boundary, so Elefante intentionally does not write a host configuration
       until a container-safe lifecycle adapter is verified.
-
-# ───────── Convergence points (per spec §3) ─────────
-#
-# Three convergences make Phase 2 (v2.11) feasible at manageable cost:
-#
-#   1. SKILL.md (Anthropic Skill v1) is the emerging open standard:
-#      Claude Code, VS Code Copilot, IBM Bob, Kiro all read the same format.
-#      One authored skill serves four surfaces.
-#
-#   2. .claude/skills/ is a native shared namespace for Claude Code +
-#      VS Code Copilot. Documented, not a hack.
-#
-#   3. AGENTS.md at project root is auto-detected by Codex, Cursor (nested),
-#      VS Code Copilot, Cline, Roo, Kilo, and Zed. Seven surfaces covered
-#      by one root file.
-#
-# Without these convergences, the matrix would require ~16 separate adapters.
-# With them, Phase 2 collapses to ~6 write actions per detected surface set.

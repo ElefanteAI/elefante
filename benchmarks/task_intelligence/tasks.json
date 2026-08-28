@@ -5,6 +5,18 @@
   "source_repository": "ElefanteAI/elefante",
   "source_head": "e84a8b54155add7673aafa6ab712540a85fdfd73",
   "scope": "Coding tasks whose success depends on prior project constraints, architecture, or safeguards.",
+  "evaluation_policy": {
+    "status": "diagnostic-only",
+    "promotion_allowed": false,
+    "promotion_blockers": [
+      "implementation-coupled-acceptance",
+      "hidden-test-coupling",
+      "insufficient-failure-observability"
+    ],
+    "historical_outcomes_immutable": true,
+    "invalid_task_policy": "fail-closed",
+    "source_head_policy": "historical-only"
+  },
   "task_brief_budget": {
     "total_tokens": 1500,
     "stage_tokens": {
@@ -25,7 +37,7 @@
     "raw_transcripts_stored": false,
     "local_outcome_retention_days": 30,
     "run_seed": 20260805,
-    "maximum_treatment_input_increase_percent": 20,
+    "maximum_treatment_total_token_increase_percent": 20,
     "maximum_treatment_duration_increase_percent": 25
   },
   "baseline_configuration": {
@@ -89,7 +101,7 @@
       "base_ref": "278a5d45f76a7ec0ffced96a4453f25c01d3159e",
       "acceptance_ref": "f344753e80504aa0921f8f4c039f95c560e6afea",
       "acceptance_command": ["python", "-m", "pytest", "tests/test_install_setup.py::test_client_health_checks_customer_baseline_without_developer_sdd", "-q"],
-      "context_paths": ["workspace/proposals/installer-procedure.md", "docs/how-to/install.md", "scripts/README.md"],
+      "context_paths": ["docs/how-to/install.md", "scripts/README.md", "agents/manifests/ide-integration.yaml"],
       "forbidden_leakage_terms": []
     },
     {
@@ -100,8 +112,36 @@
       "success_criteria": ["The installer help path starts under Python isolated from site packages."],
       "base_ref": "1a580044bf967530b62fa31a7f83fd7c0feb777a",
       "acceptance_ref": "1ae7a481d93761e13883461fd0ad434f28ae28e3",
-      "acceptance_command": ["python", "-m", "pytest", "tests/test_install_setup.py::test_installer_entrypoint_starts_without_product_dependencies", "-q"],
-      "context_paths": ["workspace/proposals/installer-procedure.md", "docs/how-to/install.md", "scripts/README.md"],
+      "acceptance_command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_installer_clean_bootstrap_black_box.py::test_installer_help_starts_without_installed_product_dependencies", "-q"],
+      "acceptance_artifact": {
+        "source": "benchmark-fixture",
+        "path": "benchmarks/task_intelligence/acceptance/test_installer_clean_bootstrap_black_box.py",
+        "sha256": "79482b26fae7d9b9b703775d9ac2c27f8b94f1c2687316d53218fbbb582e2d61"
+      },
+      "acceptance_contract": {
+        "kind": "behavioral",
+        "promotion_eligible": true,
+        "observable_surface": ["documented installer help command", "process exit status"],
+        "acceptance": {
+          "command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_installer_clean_bootstrap_black_box.py::test_installer_help_starts_without_installed_product_dependencies", "-q"],
+          "assertions": [
+            "The installer help command starts successfully without site packages.",
+            "Startup does not fail because product dependencies are not installed yet."
+          ]
+        },
+        "rollback": {
+          "base_ref": "1a580044bf967530b62fa31a7f83fd7c0feb777a",
+          "restore_ref": "1ae7a481d93761e13883461fd0ad434f28ae28e3"
+        },
+        "adversarial_review": {
+          "status": "approved",
+          "implementation_coupling_found": false,
+          "reviewer": "ARAA primary review",
+          "reviewed_at": "2026-08-06",
+          "test_sha256": "79482b26fae7d9b9b703775d9ac2c27f8b94f1c2687316d53218fbbb582e2d61"
+        }
+      },
+      "context_paths": ["docs/how-to/install.md", "scripts/README.md", "agents/manifests/ide-integration.yaml"],
       "forbidden_leakage_terms": []
     },
     {
@@ -113,7 +153,7 @@
       "base_ref": "85b8c50056f7ae5056543c436bd2ca3dcc3331bc",
       "acceptance_ref": "8166259764656b40696acc584692452854e12c51",
       "acceptance_command": ["python", "-m", "pytest", "tests/test_install_setup.py::test_host_selection_keeps_adapter_families_isolated", "-q"],
-      "context_paths": ["workspace/proposals/installer-procedure.md", "docs/how-to/install.md", "scripts/README.md"],
+      "context_paths": ["docs/how-to/install.md", "scripts/README.md", "agents/manifests/ide-integration.yaml"],
       "forbidden_leakage_terms": []
     },
     {
@@ -125,7 +165,7 @@
       "base_ref": "85b8c50056f7ae5056543c436bd2ca3dcc3331bc",
       "acceptance_ref": "8166259764656b40696acc584692452854e12c51",
       "acceptance_command": ["python", "-m", "pytest", "tests/test_install_setup.py::test_vscode_adapter_filters_paths_to_selected_host", "-q"],
-      "context_paths": ["workspace/proposals/installer-procedure.md", "docs/how-to/install.md", "scripts/README.md"],
+      "context_paths": ["docs/how-to/install.md", "scripts/README.md", "agents/manifests/ide-integration.yaml"],
       "forbidden_leakage_terms": []
     },
     {
@@ -136,8 +176,36 @@
       "success_criteria": ["Dry-run never places the payload or creates the target installation path."],
       "base_ref": "85b8c50056f7ae5056543c436bd2ca3dcc3331bc",
       "acceptance_ref": "8166259764656b40696acc584692452854e12c51",
-      "acceptance_command": ["python", "-m", "pytest", "tests/test_installer_bundle.py::test_bundle_dry_run_never_places_payload", "-q"],
-      "context_paths": ["workspace/proposals/installer-procedure.md", "docs/how-to/install.md", "scripts/README.md"],
+      "acceptance_command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_installer_dry_run_black_box.py::test_installer_dry_run_does_not_create_install_destination", "-q"],
+      "acceptance_artifact": {
+        "source": "benchmark-fixture",
+        "path": "benchmarks/task_intelligence/acceptance/test_installer_dry_run_black_box.py",
+        "sha256": "1a7164c410bdbe66875719f61f189f4dbc65340254fe89a25c1b7f993759b13a"
+      },
+      "acceptance_contract": {
+        "kind": "behavioral",
+        "promotion_eligible": true,
+        "observable_surface": ["documented installer command", "filesystem mutation boundary"],
+        "acceptance": {
+          "command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_installer_dry_run_black_box.py::test_installer_dry_run_does_not_create_install_destination", "-q"],
+          "assertions": [
+            "The dry-run command exits successfully.",
+            "The requested global install destination and its parent remain absent."
+          ]
+        },
+        "rollback": {
+          "base_ref": "85b8c50056f7ae5056543c436bd2ca3dcc3331bc",
+          "restore_ref": "8166259764656b40696acc584692452854e12c51"
+        },
+        "adversarial_review": {
+          "status": "approved",
+          "implementation_coupling_found": false,
+          "reviewer": "ARAA primary review",
+          "reviewed_at": "2026-08-06",
+          "test_sha256": "1a7164c410bdbe66875719f61f189f4dbc65340254fe89a25c1b7f993759b13a"
+        }
+      },
+      "context_paths": ["docs/how-to/install.md", "scripts/README.md", "agents/manifests/ide-integration.yaml"],
       "forbidden_leakage_terms": []
     },
     {
@@ -149,55 +217,55 @@
       "base_ref": "f2b7865197210d88a9606763f49743029257b441",
       "acceptance_ref": "a3fbdd7c780c3cd31e1fe10e6a7fc896a10d4615",
       "acceptance_command": ["python", "-m", "pytest", "tests/test_release_pipeline.py::test_quality_lock_freshness_check_preserves_existing_transitive_pins", "-q"],
-      "context_paths": ["workspace/proposals/installer-procedure.md", "docs/how-to/install.md", "scripts/README.md"],
+      "context_paths": ["docs/how-to/install.md", "scripts/README.md", "agents/manifests/ide-integration.yaml"],
       "forbidden_leakage_terms": []
     },
     {
       "id": "install-uncovered-host-007",
       "task_class": "installation-and-distribution",
-      "split": "holdout",
+      "split": "calibration",
       "task_statement": "Make customer readiness fail closed and report a compatible host that is detected locally but not connected to the stable runtime.",
       "success_criteria": ["Doctor distinguishes runtime health from customer readiness and identifies uncovered host labels without secrets."],
       "base_ref": "58706ce372349b33b35de2e0a1d6c5d43911bf3a",
       "acceptance_ref": "a7d7e5aa69aad96602ded0e01b6d61b6f44e2bd7",
       "acceptance_command": ["python", "-m", "pytest", "tests/test_install_setup.py::test_doctor_reports_detected_but_unconfigured_customer_hosts", "-q"],
-      "context_paths": ["workspace/proposals/installer-procedure.md", "docs/how-to/install.md", "scripts/README.md"],
+      "context_paths": ["docs/how-to/install.md", "scripts/README.md", "agents/manifests/ide-integration.yaml"],
       "forbidden_leakage_terms": []
     },
     {
       "id": "install-bob-registry-008",
       "task_class": "installation-and-distribution",
-      "split": "holdout",
+      "split": "calibration",
       "task_statement": "Configure a detected Bob host through its user-global registry while preserving the one-runtime customer installation contract.",
       "success_criteria": ["A detected Bob installation receives a verifiable user-global Elefante registration."],
       "base_ref": "58706ce372349b33b35de2e0a1d6c5d43911bf3a",
       "acceptance_ref": "a7d7e5aa69aad96602ded0e01b6d61b6f44e2bd7",
       "acceptance_command": ["python", "-m", "pytest", "tests/test_install_setup.py::test_bob_adapter_creates_the_user_global_registry_for_a_detected_host", "-q"],
-      "context_paths": ["workspace/proposals/installer-procedure.md", "docs/how-to/install.md", "scripts/README.md"],
+      "context_paths": ["docs/how-to/install.md", "scripts/README.md", "agents/manifests/ide-integration.yaml"],
       "forbidden_leakage_terms": []
     },
     {
       "id": "install-runtime-identity-009",
       "task_class": "installation-and-distribution",
-      "split": "holdout",
+      "split": "calibration",
       "task_statement": "Persist stable customer runtime identity without discarding installer ownership records for already configured host surfaces.",
       "success_criteria": ["Runtime identity and existing owned surfaces survive one manifest update."],
       "base_ref": "58706ce372349b33b35de2e0a1d6c5d43911bf3a",
       "acceptance_ref": "a7d7e5aa69aad96602ded0e01b6d61b6f44e2bd7",
       "acceptance_command": ["python", "-m", "pytest", "tests/test_install_setup.py::test_install_manifest_records_customer_runtime_without_losing_owned_surfaces", "-q"],
-      "context_paths": ["workspace/proposals/installer-procedure.md", "docs/how-to/install.md", "scripts/README.md"],
+      "context_paths": ["docs/how-to/install.md", "scripts/README.md", "agents/manifests/ide-integration.yaml"],
       "forbidden_leakage_terms": []
     },
     {
       "id": "install-manifest-isolation-010",
       "task_class": "installation-and-distribution",
-      "split": "holdout",
+      "split": "calibration",
       "task_statement": "Prevent low-level IDE adapter tests from writing installer ownership into the real user home when no isolated manifest home is supplied.",
       "success_criteria": ["The adapter requires an explicit ownership-manifest home and tests remain isolated."],
       "base_ref": "188a39b3543784412b5154258d6b55b9595264bc",
       "acceptance_ref": "1fff5214586ad4f3a14fd4a6a7e04105205ffeed",
       "acceptance_command": ["python", "-m", "pytest", "tests/test_install_setup.py::test_vscode_adapter_requires_explicit_manifest_home", "-q"],
-      "context_paths": ["workspace/proposals/installer-procedure.md", "docs/how-to/install.md", "scripts/README.md"],
+      "context_paths": ["docs/how-to/install.md", "scripts/README.md", "agents/manifests/ide-integration.yaml"],
       "forbidden_leakage_terms": []
     },
     {
@@ -208,7 +276,35 @@
       "success_criteria": ["The graph endpoint serializes null-name nodes safely instead of returning an error."],
       "base_ref": "3266ff1ee7ae8c3ca64bac81ddb25b510fd8b89a",
       "acceptance_ref": "8fcba52af3cadd45bd4e0eebbe76f1a6f8771f14",
-      "acceptance_command": ["python", "-m", "pytest", "tests/test_dashboard_serializer.py::test_get_graph_handles_null_name_safely", "-q"],
+      "acceptance_command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_dashboard_null_graph_black_box.py::test_dashboard_graph_serializes_a_null_node_name", "-q"],
+      "acceptance_artifact": {
+        "source": "benchmark-fixture",
+        "path": "benchmarks/task_intelligence/acceptance/test_dashboard_null_graph_black_box.py",
+        "sha256": "b6c53deddf7966be3394d2464721a80dd6825d488c9c5490f620412126aac1f0"
+      },
+      "acceptance_contract": {
+        "kind": "behavioral",
+        "promotion_eligible": true,
+        "observable_surface": ["dashboard HTTP graph response"],
+        "acceptance": {
+          "command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_dashboard_null_graph_black_box.py::test_dashboard_graph_serializes_a_null_node_name", "-q"],
+          "assertions": [
+            "A snapshot node with a null name does not make the graph endpoint fail.",
+            "The HTTP response represents the missing display name as an empty string."
+          ]
+        },
+        "rollback": {
+          "base_ref": "3266ff1ee7ae8c3ca64bac81ddb25b510fd8b89a",
+          "restore_ref": "8fcba52af3cadd45bd4e0eebbe76f1a6f8771f14"
+        },
+        "adversarial_review": {
+          "status": "approved",
+          "implementation_coupling_found": false,
+          "reviewer": "ARAA primary review",
+          "reviewed_at": "2026-08-06",
+          "test_sha256": "b6c53deddf7966be3394d2464721a80dd6825d488c9c5490f620412126aac1f0"
+        }
+      },
       "context_paths": ["docs/reference/architecture.md", "docs/reference/scoring.md", "scripts/README.md"],
       "forbidden_leakage_terms": []
     },
@@ -340,7 +436,35 @@
       "success_criteria": ["Only explicitly configured origins are accepted by dashboard CORS handling."],
       "base_ref": "9e81833adb0eafd15e93a637bc8b88c21fef8bf1",
       "acceptance_ref": "188a39b3543784412b5154258d6b55b9595264bc",
-      "acceptance_command": ["python", "-m", "pytest", "tests/test_dashboard_serializer.py::test_dashboard_allows_only_explicit_origin_configuration", "-q"],
+      "acceptance_command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_dashboard_cors_black_box.py::test_dashboard_rejects_untrusted_origin_and_keeps_local_origin", "-q"],
+      "acceptance_artifact": {
+        "source": "benchmark-fixture",
+        "path": "benchmarks/task_intelligence/acceptance/test_dashboard_cors_black_box.py",
+        "sha256": "76bc88726aefa02a039207aebe9c7ab01f15d6b9fc1b7201788eed889a9b41e7"
+      },
+      "acceptance_contract": {
+        "kind": "behavioral",
+        "promotion_eligible": true,
+        "observable_surface": ["dashboard HTTP preflight response"],
+        "acceptance": {
+          "command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_dashboard_cors_black_box.py::test_dashboard_rejects_untrusted_origin_and_keeps_local_origin", "-q"],
+          "assertions": [
+            "An untrusted browser origin receives no CORS authorization.",
+            "The documented local dashboard origin remains authorized."
+          ]
+        },
+        "rollback": {
+          "base_ref": "9e81833adb0eafd15e93a637bc8b88c21fef8bf1",
+          "restore_ref": "188a39b3543784412b5154258d6b55b9595264bc"
+        },
+        "adversarial_review": {
+          "status": "approved",
+          "implementation_coupling_found": false,
+          "reviewer": "ARAA primary review",
+          "reviewed_at": "2026-08-06",
+          "test_sha256": "76bc88726aefa02a039207aebe9c7ab01f15d6b9fc1b7201788eed889a9b41e7"
+        }
+      },
       "context_paths": ["docs/reference/architecture.md", "docs/reference/tools.md", "agents/orchestrator.md"],
       "forbidden_leakage_terms": []
     },
@@ -364,7 +488,35 @@
       "success_criteria": ["Traversal-style ZIP members fail validation with the existing data untouched."],
       "base_ref": "9e81833adb0eafd15e93a637bc8b88c21fef8bf1",
       "acceptance_ref": "188a39b3543784412b5154258d6b55b9595264bc",
-      "acceptance_command": ["python", "-m", "pytest", "tests/test_backup_restore.py::test_restore_rejects_unsafe_zip_members_without_touching_data", "-q"],
+      "acceptance_command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_restore_path_black_box.py::test_restore_rejects_traversal_before_changing_customer_data", "-q"],
+      "acceptance_artifact": {
+        "source": "benchmark-fixture",
+        "path": "benchmarks/task_intelligence/acceptance/test_restore_path_black_box.py",
+        "sha256": "08114ad8d16ec3b89fd1512b987784cb8794dbcb8aa976acecc2ef71c30986e8"
+      },
+      "acceptance_contract": {
+        "kind": "behavioral",
+        "promotion_eligible": true,
+        "observable_surface": ["restore command exit status", "customer data filesystem"],
+        "acceptance": {
+          "command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_restore_path_black_box.py::test_restore_rejects_traversal_before_changing_customer_data", "-q"],
+          "assertions": [
+            "An archive containing a traversal path is rejected.",
+            "Existing customer data and paths outside the data directory remain unchanged."
+          ]
+        },
+        "rollback": {
+          "base_ref": "9e81833adb0eafd15e93a637bc8b88c21fef8bf1",
+          "restore_ref": "188a39b3543784412b5154258d6b55b9595264bc"
+        },
+        "adversarial_review": {
+          "status": "approved",
+          "implementation_coupling_found": false,
+          "reviewer": "ARAA primary review",
+          "reviewed_at": "2026-08-06",
+          "test_sha256": "08114ad8d16ec3b89fd1512b987784cb8794dbcb8aa976acecc2ef71c30986e8"
+        }
+      },
       "context_paths": ["docs/reference/architecture.md", "docs/reference/tools.md", "agents/orchestrator.md"],
       "forbidden_leakage_terms": []
     },
@@ -376,7 +528,43 @@
       "success_criteria": ["Tampered checksums and symlink entries are rejected before mutation."],
       "base_ref": "9e81833adb0eafd15e93a637bc8b88c21fef8bf1",
       "acceptance_ref": "188a39b3543784412b5154258d6b55b9595264bc",
-      "acceptance_command": ["python", "-m", "pytest", "tests/test_backup_restore.py::test_restore_rejects_symlinks_and_checksum_tampering_before_mutation", "-q"],
+      "acceptance_command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_restore_integrity_black_box.py::test_restore_rejects_symlink_and_checksum_tampering_before_mutation", "-q"],
+      "acceptance_artifact": {
+        "source": "benchmark-fixture",
+        "path": "benchmarks/task_intelligence/acceptance/test_restore_integrity_black_box.py",
+        "sha256": "8d466f8e72cf100922e4e302a10ae27981183247be21b9020fce257e0adc4b6c"
+      },
+      "acceptance_contract": {
+        "kind": "behavioral",
+        "promotion_eligible": true,
+        "observable_surface": ["restore command exit status", "customer data filesystem"],
+        "acceptance": {
+          "command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_restore_integrity_black_box.py::test_restore_rejects_symlink_and_checksum_tampering_before_mutation", "-q"],
+          "assertions": [
+            "Symlink archive entries are rejected before customer data changes.",
+            "Checksum tampering is rejected before customer data changes."
+          ]
+        },
+        "rollback": {
+          "base_ref": "9e81833adb0eafd15e93a637bc8b88c21fef8bf1",
+          "restore_ref": "188a39b3543784412b5154258d6b55b9595264bc"
+        },
+        "adversarial_review": {
+          "status": "approved",
+          "implementation_coupling_found": false,
+          "reviewer": "ARAA primary review",
+          "reviewed_at": "2026-08-06",
+          "test_sha256": "8d466f8e72cf100922e4e302a10ae27981183247be21b9020fce257e0adc4b6c"
+        }
+      },
+      "disclosed_memories": [
+        {
+          "id": "archive-restore-preflight-safety",
+          "provenance": "disclosed-golden-path",
+          "memory_type": "directive",
+          "content": "For any destructive archive restore, finish a read-only preflight before changing durable data. Reject absolute or traversal paths, symlinks, and duplicate members; verify the declared size and SHA-256 digest of every file; extract only into sibling staging; replace the live directory only after all checks pass; preserve the previous directory as the rollback path."
+        }
+      ],
       "context_paths": ["docs/reference/architecture.md", "docs/reference/tools.md", "agents/orchestrator.md"],
       "forbidden_leakage_terms": []
     },
@@ -388,7 +576,35 @@
       "success_criteria": ["Unsafe containment is rejected before reset or backup mutation."],
       "base_ref": "9e81833adb0eafd15e93a637bc8b88c21fef8bf1",
       "acceptance_ref": "188a39b3543784412b5154258d6b55b9595264bc",
-      "acceptance_command": ["python", "-m", "pytest", "tests/test_factory_reset.py::test_reset_refuses_a_configured_path_that_contains_the_recovery_directory", "-q"],
+      "acceptance_command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_factory_reset_containment_black_box.py::test_factory_reset_rejects_a_store_containing_its_recovery_directory", "-q"],
+      "acceptance_artifact": {
+        "source": "benchmark-fixture",
+        "path": "benchmarks/task_intelligence/acceptance/test_factory_reset_containment_black_box.py",
+        "sha256": "ee8ab07c246afc94737b96049e01d8263f6fe51bda075515c04ccefe3f7c69ab"
+      },
+      "acceptance_contract": {
+        "kind": "behavioral",
+        "promotion_eligible": true,
+        "observable_surface": ["factory-reset command exit status", "customer data filesystem"],
+        "acceptance": {
+          "command": ["python", "-m", "pytest", "benchmarks/task_intelligence/acceptance/test_factory_reset_containment_black_box.py::test_factory_reset_rejects_a_store_containing_its_recovery_directory", "-q"],
+          "assertions": [
+            "Factory reset rejects a configured store that contains its own recovery directory.",
+            "The existing customer state remains unchanged."
+          ]
+        },
+        "rollback": {
+          "base_ref": "9e81833adb0eafd15e93a637bc8b88c21fef8bf1",
+          "restore_ref": "188a39b3543784412b5154258d6b55b9595264bc"
+        },
+        "adversarial_review": {
+          "status": "approved",
+          "implementation_coupling_found": false,
+          "reviewer": "ARAA primary review",
+          "reviewed_at": "2026-08-06",
+          "test_sha256": "ee8ab07c246afc94737b96049e01d8263f6fe51bda075515c04ccefe3f7c69ab"
+        }
+      },
       "context_paths": ["docs/reference/architecture.md", "docs/reference/tools.md", "agents/orchestrator.md"],
       "forbidden_leakage_terms": []
     },
@@ -439,6 +655,158 @@
       "acceptance_command": ["python", "-m", "pytest", "tests/test_release_client_bundle.py::test_release_client_archive_is_reproducible", "-q"],
       "context_paths": ["docs/reference/architecture.md", "docs/reference/tools.md", "agents/orchestrator.md"],
       "forbidden_leakage_terms": []
+    },
+    {
+      "id": "install-uncovered-host-black-box-031",
+      "task_class": "installation-and-distribution",
+      "split": "calibration",
+      "task_statement": "Make the documented doctor CLI expose schema version 2 customer readiness and identify every compatible host detected locally but not connected to the stable runtime.",
+      "success_criteria": [
+        "The public doctor JSON uses canonical host IDs under host_coverage.detected, verified, and uncovered; customer_ready is false and customer_diagnostics contains detected_hosts_unconfigured when any detected host is uncovered.",
+        "A manifest claim counts as verified only while its current host configuration still matches; the acceptance test imports or patches no doctor internals."
+      ],
+      "base_ref": "58706ce372349b33b35de2e0a1d6c5d43911bf3a",
+      "acceptance_ref": "a7d7e5aa69aad96602ded0e01b6d61b6f44e2bd7",
+      "acceptance_command": [
+        "python",
+        "-m",
+        "pytest",
+        "benchmarks/task_intelligence/acceptance/test_doctor_host_coverage_black_box.py::test_doctor_cli_reports_a_detected_unconfigured_host",
+        "-q"
+      ],
+      "acceptance_artifact": {
+        "source": "benchmark-fixture",
+        "path": "benchmarks/task_intelligence/acceptance/test_doctor_host_coverage_black_box.py",
+        "sha256": "d7252c7674b6e1868283faa4e1438ab9c89df4adf73a077217d77300fd97c25d"
+      },
+      "acceptance_contract": {
+        "kind": "behavioral",
+        "promotion_eligible": true,
+        "observable_surface": [
+          "documented doctor CLI JSON",
+          "process exit status",
+          "customer host coverage"
+        ],
+        "acceptance": {
+          "command": [
+            "python",
+            "-m",
+            "pytest",
+            "benchmarks/task_intelligence/acceptance/test_doctor_host_coverage_black_box.py::test_doctor_cli_reports_a_detected_unconfigured_host",
+            "-q"
+          ],
+          "assertions": [
+            "The documented doctor CLI runs as a subprocess against an isolated user home.",
+            "All locally represented supported IDE and CLI hosts appear by canonical ID in the uncovered list.",
+            "A stale manifest claim does not move a host into the verified list.",
+            "Schema version 2 customer readiness fails closed without requiring implementation-private symbols."
+          ]
+        },
+        "rollback": {
+          "base_ref": "58706ce372349b33b35de2e0a1d6c5d43911bf3a",
+          "restore_ref": "a7d7e5aa69aad96602ded0e01b6d61b6f44e2bd7"
+        },
+        "adversarial_review": {
+          "status": "approved",
+          "implementation_coupling_found": false,
+          "reviewer": "ARAA primary review",
+          "reviewed_at": "2026-08-09",
+          "test_sha256": "d7252c7674b6e1868283faa4e1438ab9c89df4adf73a077217d77300fd97c25d"
+        }
+      },
+      "memory_fixture": {
+        "source": "sealed-durable-memory-export",
+        "path": "benchmarks/task_intelligence/fixtures/install-uncovered-host-031.memory.json",
+        "sha256": "f2bcbd3a3b8364958568fea15cdaf3a980f816954270a201947f1691e7c19bec",
+        "promotion_use": false
+      },
+      "context_paths": [
+        "docs/how-to/install.md",
+        "docs/how-to/configure-ide.md",
+        "scripts/lifecycle/doctor.py",
+        "scripts/setup/host_selection.py",
+        "scripts/setup/install_manifest.py"
+      ],
+      "forbidden_leakage_terms": []
+    },
+    {
+      "id": "install-codex-recall-routing-black-box-032",
+      "task_class": "installation-and-distribution",
+      "split": "calibration",
+      "task_statement": "Make a customer Codex installation consult Elefante before context-dependent work while preserving the user's existing global instructions and allowing safe uninstall to restore those instructions exactly.",
+      "success_criteria": [
+        "The documented Codex setup command registers the stable Elefante runtime and adds a global instruction to call elefante-Recall with the complete question before context-dependent work.",
+        "Existing user instructions remain byte-for-byte present after setup, and the documented uninstall command removes only the unchanged Elefante registration and instruction addition."
+      ],
+      "base_ref": "788e8aedd830297c628325696906e50d896f8715",
+      "acceptance_ref": "7c705ca03371771be68460afb270fe0998f30231",
+      "acceptance_command": [
+        "python",
+        "-m",
+        "pytest",
+        "benchmarks/task_intelligence/acceptance/test_codex_recall_routing_black_box.py::test_codex_setup_routes_recall_without_owning_user_instructions",
+        "-q"
+      ],
+      "acceptance_artifact": {
+        "source": "benchmark-fixture",
+        "path": "benchmarks/task_intelligence/acceptance/test_codex_recall_routing_black_box.py",
+        "sha256": "bd641d73bc34494e08228e508e793a69547a19862fe17712b1c71eeded74e9bc"
+      },
+      "acceptance_contract": {
+        "kind": "behavioral",
+        "promotion_eligible": true,
+        "observable_surface": [
+          "documented Codex setup command",
+          "Codex user-global instruction file",
+          "documented Elefante uninstall command",
+          "host registration state",
+          "live MCP tools/list response"
+        ],
+        "acceptance": {
+          "command": [
+            "python",
+            "-m",
+            "pytest",
+            "benchmarks/task_intelligence/acceptance/test_codex_recall_routing_black_box.py::test_codex_setup_routes_recall_without_owning_user_instructions",
+            "-q"
+          ],
+          "assertions": [
+            "The setup and uninstall commands run as subprocesses against an isolated user home and host-owned Codex CLI double.",
+            "Codex receives an inspectable Elefante registration and a user-global instruction to call elefante-Recall with the complete question.",
+            "The real Elefante stdio MCP surface exposes elefante-Recall as a read-only tool requiring a complete question.",
+            "Pre-existing user instructions survive setup unchanged.",
+            "Uninstall restores the original instruction file exactly and removes the unchanged Elefante registration."
+          ]
+        },
+        "rollback": {
+          "base_ref": "788e8aedd830297c628325696906e50d896f8715",
+          "restore_ref": "7c705ca03371771be68460afb270fe0998f30231"
+        },
+        "adversarial_review": {
+          "status": "approved",
+          "implementation_coupling_found": false,
+          "reviewer": "ARAA primary review",
+          "reviewed_at": "2026-08-13",
+          "test_sha256": "bd641d73bc34494e08228e508e793a69547a19862fe17712b1c71eeded74e9bc"
+        }
+      },
+      "memory_fixture": {
+        "source": "sealed-durable-memory-export",
+        "path": "benchmarks/task_intelligence/fixtures/install-codex-recall-routing-032.memory.json",
+        "sha256": "d278f31026c363d56fc559bd0bbf3f0945093e8405e2c8680e5c49f906655931",
+        "promotion_use": false
+      },
+      "context_paths": [
+        "docs/how-to/install.md",
+        "docs/how-to/configure-ide.md",
+        "scripts/setup/configure_cli_agents.py",
+        "scripts/setup/install_manifest.py",
+        "scripts/lifecycle/uninstall_elefante.py"
+      ],
+      "forbidden_leakage_terms": [
+        "CODEX_GUIDANCE_START",
+        "configure_codex_guidance"
+      ]
     }
   ]
 }

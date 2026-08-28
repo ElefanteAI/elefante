@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/core/embeddings.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Local sentence-transformers embedding service; no external API calls.
 # ROLE    : Core infrastructure — called by vector_store for all embedding ops.
 # TOUCHED : When changing the embedding model, batch size, or concurrency rules.

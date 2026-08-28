@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -107,6 +108,9 @@ def test_build_release_client_contains_only_customer_runtime(
     _create_client_source(source_root, builder)
     output_path = tmp_path / f"Elefante-{platform}.zip"
 
+    assert {path.as_posix() for path in builder.CLIENT_RUNTIME_SCRIPTS} == (
+        verifier.RUNTIME_SCRIPTS
+    )
     _build(builder, source_root, output_path, platform)
     verifier.validate_release_client_archive(
         output_path,
@@ -118,6 +122,9 @@ def test_build_release_client_contains_only_customer_runtime(
     with zipfile.ZipFile(output_path) as archive:
         names = set(archive.namelist())
         manifest = json.loads(archive.read(f"{bundle_root}/installer-manifest.json"))
+        build_identity = json.loads(
+            archive.read(f"{bundle_root}/payload/elefante/elefante-build.json")
+        )
         root_names = {
             name.removeprefix(f"{bundle_root}/")
             for name in names
@@ -134,8 +141,24 @@ def test_build_release_client_contains_only_customer_runtime(
     assert manifest["publication_status"] == "candidate"
     assert manifest["platform"] == platform
     assert manifest["customer_contract"]["includes_developer_workspace"] is False
+    assert build_identity == {
+        "schema_version": 1,
+        "version": manifest["version"],
+        "source_commit": manifest["source"]["commit"],
+        "source_clean": manifest["source"]["clean"],
+        "release_channel": manifest["publication_status"],
+    }
     assert launchers.issubset(root_names)
     assert f"{bundle_root}/payload/elefante/requirements.client.lock" in names
+    customer_commands = {
+        "scripts/setup/configure_additional_hosts.py",
+        "scripts/pipeline/import_memories.py",
+        "scripts/pipeline/session_intelligence.py",
+        "scripts/pipeline/team_sync.py",
+    }
+    assert {
+        f"{bundle_root}/payload/elefante/{path}" for path in customer_commands
+    } <= names
     assert f"{bundle_root}/payload/elefante/requirements.lock" not in names
     assert not any("/workspace/" in name for name in names)
     assert not any("/tests/" in name for name in names)
@@ -163,6 +186,44 @@ def test_release_client_verifier_rejects_leaked_developer_file(tmp_path):
         )
 
     with pytest.raises(ValueError, match="Developer material leaked"):
+        verifier.validate_release_client_archive(output_path)
+
+
+def test_release_client_verifier_rejects_payload_identity_drift(tmp_path):
+    builder = _load_module(
+        ROOT / "scripts/ci/build_release_client.py", "build_release_client_identity_module"
+    )
+    verifier = _load_module(
+        ROOT / "scripts/ci/verify_release_client.py", "verify_release_client_identity_module"
+    )
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    _create_client_source(source_root, builder)
+    output_path = tmp_path / "Elefante-RCC1.zip"
+    _build(builder, source_root, output_path)
+
+    identity_name = "elefante-installer-macOS/payload/elefante/elefante-build.json"
+    rewritten = tmp_path / "tampered.zip"
+    with zipfile.ZipFile(output_path) as source, zipfile.ZipFile(rewritten, "w") as target:
+        identity_info = source.getinfo(identity_name)
+        for info in source.infolist():
+            if info.filename != identity_name:
+                target.writestr(info, source.read(info.filename))
+        target.writestr(
+            identity_info,
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "version": "2.12.2",
+                    "source_commit": "b" * 40,
+                    "source_clean": True,
+                    "release_channel": "candidate",
+                }
+            ),
+        )
+    rewritten.replace(output_path)
+
+    with pytest.raises(ValueError, match="payload identity"):
         verifier.validate_release_client_archive(output_path)
 
 
@@ -226,3 +287,73 @@ def test_runtime_profile_infers_client_only_from_client_payload(tmp_path):
 
     (tmp_path / "requirements.lock").write_text("developer\n", encoding="utf-8")
     assert module.runtime_profile(root=tmp_path, environment={}) == "developer"
+
+
+def test_customer_configuration_cannot_enable_unreleased_task_intelligence():
+    builder = _load_module(
+        ROOT / "scripts/ci/build_release_client.py",
+        "build_release_client_feature_boundary",
+    )
+    customer_configuration = [
+        ROOT / "config.yaml",
+        *(ROOT / path for path in builder.CLIENT_RUNTIME_SCRIPTS),
+    ]
+    rendered = "\n".join(
+        path.read_text(encoding="utf-8") for path in customer_configuration
+    )
+
+    assert "ELEFANTE_TASK_INTELLIGENCE_ENABLED" not in rendered
+    assert "ELEFANTE_TASK_INTELLIGENCE_PILOT" not in rendered
+    assert "ELEFANTE_TASK_CONTEXT_ON_TOOL_CALL" not in rendered
+    assert '"elefante-TaskIntelligence"' not in rendered
+
+
+def test_customer_archive_carries_default_on_recall_contract(tmp_path):
+    """A Recall routing rule must never ship ahead of the runtime tool it names."""
+    builder = _load_module(
+        ROOT / "scripts/ci/build_release_client.py",
+        "build_release_client_recall_contract",
+    )
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    required_files = (
+        *builder.CLIENT_RUNTIME_FILES,
+        *builder.CLIENT_RUNTIME_SCRIPTS,
+        builder.BOOTSTRAP_SCRIPT,
+    )
+    for relative_path in required_files:
+        target = source_root / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / relative_path, target)
+    for source_path in (ROOT / "src").rglob("*.py"):
+        relative_path = source_path.relative_to(ROOT)
+        target = source_root / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, target)
+    dashboard_index = source_root / "src/dashboard/ui/dist/index.html"
+    dashboard_index.parent.mkdir(parents=True, exist_ok=True)
+    dashboard_index.write_text("<html></html>\n", encoding="utf-8")
+    output_path = tmp_path / "Elefante-Linux.zip"
+
+    _build(builder, source_root, output_path, "Linux")
+
+    bundle_root = "elefante-installer-Linux/payload/elefante"
+    with zipfile.ZipFile(output_path) as archive:
+        server_source = archive.read(
+            f"{bundle_root}/src/mcp/server.py"
+        ).decode("utf-8")
+        codex_guidance = archive.read(
+            f"{bundle_root}/scripts/setup/configure_cli_agents.py"
+        ).decode("utf-8")
+        customer_config = archive.read(
+            f"{bundle_root}/config.yaml"
+        ).decode("utf-8")
+
+    assert 'name="elefante-Recall"' in server_source
+    assert 'RECALL_ROLLBACK_ENV = "ELEFANTE_RECALL_ENABLED"' in server_source
+    assert "call `elefante-Recall`" in codex_guidance
+    assert "at most once" in codex_guidance
+    assert "self-contained question" in codex_guidance
+    assert "do not retry" in codex_guidance
+    assert "ELEFANTE_RECALL_ENABLED" not in customer_config
+    assert "ELEFANTE_RECALL_ENABLED=0" not in codex_guidance

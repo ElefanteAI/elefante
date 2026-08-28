@@ -12,12 +12,11 @@ Features:
 
 from __future__ import annotations
 
-import glob
 import json
 import logging
-import os
+import math
 import platform
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Generator, List, Optional
@@ -26,6 +25,13 @@ logger = logging.getLogger("elefante.distiller.scanner")
 
 # Max bytes to read when doing keyword search (prevents OOM on huge files)
 _KEYWORD_SCAN_CHUNK = 4 * 1024 * 1024  # 4 MB
+
+# Live mode is intentionally a foreground polling loop, not a daemon. Keep the
+# bounds conservative so a typo cannot create a busy loop or a practically
+# unresponsive watcher.
+DEFAULT_WATCH_INTERVAL = 30.0
+MIN_WATCH_INTERVAL = 0.1
+MAX_WATCH_INTERVAL = 60.0 * 60.0
 
 
 @dataclass
@@ -51,38 +57,7 @@ class SessionScanner:
 
     def list_sessions(self, limit: int = 50) -> List[SessionInfo]:
         """Return session metadata sorted by modification time (newest first)."""
-        sessions: List[SessionInfo] = []
-
-        if not self.root.exists():
-            logger.warning(f"Storage root does not exist: {self.root}")
-            return []
-
-        for ws_folder in self.root.iterdir():
-            if not ws_folder.is_dir():
-                continue
-            chat_dir = ws_folder / "chatSessions"
-            if not chat_dir.exists():
-                continue
-
-            workspace_id = ws_folder.name
-            workspace_name = self._resolve_workspace_name(ws_folder)
-
-            for fpath in chat_dir.iterdir():
-                if fpath.suffix not in (".json", ".jsonl"):
-                    continue
-                try:
-                    stat = fpath.stat()
-                    sessions.append(SessionInfo(
-                        file_path=str(fpath),
-                        session_id=fpath.stem,
-                        format=fpath.suffix.lstrip("."),
-                        workspace_id=workspace_id,
-                        workspace_name=workspace_name,
-                        size_bytes=stat.st_size,
-                        modified_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
-                    ))
-                except OSError as e:
-                    logger.warning(f"Cannot stat {fpath}: {e}")
+        sessions = list(self._iter_session_infos())
 
         sessions.sort(key=lambda s: s.modified_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
         return sessions[:limit]
@@ -103,28 +78,112 @@ class SessionScanner:
 
         return matches
 
-    def watch(self, interval: int = 30) -> Generator[SessionInfo, None, None]:
+    def watch(self, interval: float = DEFAULT_WATCH_INTERVAL) -> Generator[SessionInfo, None, None]:
         """
-        Yields SessionInfo objects for files that have been modified since last check.
-        Blocking generator — run in a background thread.
+        Yield metadata for new or changed session files.
+
+        The initial scan establishes a baseline and does not yield existing
+        files. Subsequent scans walk every session file rather than relying on
+        a recent-item cap, so a newly discovered file is not missed just
+        because older files already occupy the first 200 results. Only bounded
+        per-file metadata is retained, and paths that disappear are pruned.
+
+        This is a blocking foreground generator. The caller owns interruption
+        and decides whether to process each yielded session.
         """
         import time
-        known_mtimes: Dict[str, float] = {}
+
+        interval = self.validate_watch_interval(interval)
+        known_states: Dict[str, tuple[float, int]] = {}
 
         # Baseline
-        for info in self.list_sessions(limit=200):
-            known_mtimes[info.file_path] = info.modified_at.timestamp() if info.modified_at else 0
+        for info in self._iter_session_infos():
+            known_states[info.file_path] = self._watch_state(info)
 
         while True:
-            for info in self.list_sessions(limit=200):
-                mtime = info.modified_at.timestamp() if info.modified_at else 0
-                prev = known_mtimes.get(info.file_path, 0)
-                if mtime > prev:
-                    known_mtimes[info.file_path] = mtime
+            current_paths: set[str] = set()
+            for info in self._iter_session_infos():
+                current_paths.add(info.file_path)
+                state = self._watch_state(info)
+                previous = known_states.get(info.file_path)
+                known_states[info.file_path] = state
+                if previous is None or state != previous:
                     yield info
+
+            # Do not retain state for deleted sessions forever. The set and
+            # dictionary contain metadata only and are bounded by the current
+            # number of discovered session paths.
+            for path in set(known_states).difference(current_paths):
+                del known_states[path]
+
             time.sleep(interval)
 
+    @staticmethod
+    def validate_watch_interval(interval: float) -> float:
+        """Validate and normalize a live-mode polling interval in seconds."""
+        try:
+            value = float(interval)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("watch interval must be a finite number of seconds") from exc
+
+        if not math.isfinite(value) or not MIN_WATCH_INTERVAL <= value <= MAX_WATCH_INTERVAL:
+            raise ValueError(
+                f"watch interval must be between {MIN_WATCH_INTERVAL:g} and "
+                f"{MAX_WATCH_INTERVAL:g} seconds"
+            )
+        return value
+
     # ─── Private ──────────────────────────────────────────────────────────
+
+    def _iter_session_infos(self) -> Generator[SessionInfo, None, None]:
+        """Yield session metadata one file at a time without retaining a scan."""
+        if not self.root.exists():
+            logger.warning(f"Storage root does not exist: {self.root}")
+            return
+
+        try:
+            workspace_folders = self.root.iterdir()
+        except OSError as e:
+            logger.warning(f"Cannot enumerate storage root {self.root}: {e}")
+            return
+
+        for ws_folder in workspace_folders:
+            try:
+                if not ws_folder.is_dir():
+                    continue
+                chat_dir = ws_folder / "chatSessions"
+                if not chat_dir.is_dir():
+                    continue
+
+                workspace_id = ws_folder.name
+                workspace_name = self._resolve_workspace_name(ws_folder)
+                session_files = chat_dir.iterdir()
+            except OSError as e:
+                logger.warning(f"Cannot enumerate workspace {ws_folder}: {e}")
+                continue
+
+            for fpath in session_files:
+                if fpath.suffix not in (".json", ".jsonl"):
+                    continue
+                try:
+                    stat = fpath.stat()
+                    yield SessionInfo(
+                        file_path=str(fpath),
+                        session_id=fpath.stem,
+                        format=fpath.suffix.lstrip("."),
+                        workspace_id=workspace_id,
+                        workspace_name=workspace_name,
+                        size_bytes=stat.st_size,
+                        modified_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
+                    )
+                except OSError as e:
+                    logger.warning(f"Cannot stat {fpath}: {e}")
+
+    @staticmethod
+    def _watch_state(info: SessionInfo) -> tuple[float, int]:
+        """Return the bounded metadata used to detect a session change."""
+        mtime = info.modified_at.timestamp() if info.modified_at else 0.0
+        return mtime, info.size_bytes
 
     def _detect_root(self) -> Path:
         """Detect VS Code workspaceStorage path for the current OS."""

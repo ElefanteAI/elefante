@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from 'react';
 import { X, Clock, Tag, Layers, Brain, Star, Hash, Globe, User } from 'lucide-react';
-import type { MemoryNode } from '@/types';
+import type { MemoryHealthStatus, MemoryNode } from '@/types';
+import { RetrievalExplanation, type RetrievalEvidence } from '@/components/RetrievalExplanation';
 
 function formatRelativeTime(dateStr: string): string {
   const now = Date.now();
@@ -40,11 +41,12 @@ interface MemoryDetailPanelProps {
   onClose: () => void;
   relatedMemories?: MemoryNode[];
   onNavigateToMemory?: (id: string) => void;
-  health_status?: 'healthy'|'stale'|'at_risk'|'orphan';
+  health_status?: MemoryHealthStatus;
+  retrievalEvidence?: RetrievalEvidence;
 }
 
-const tooltipMap = {healthy: "Healthy", stale: "Stale - refresh", at_risk: "At risk - review", orphan: "Orphan - link"};
-const healthClasses = {
+const tooltipMap: Record<MemoryHealthStatus, string> = {healthy: "Healthy", stale: "Stale - refresh", at_risk: "At risk - review", orphan: "Orphan - link"};
+const healthClasses: Record<MemoryHealthStatus, string> = {
   healthy: 'text-emerald-300',
   stale: 'text-amber-300',
   at_risk: 'text-red-300',
@@ -87,7 +89,7 @@ function parseListValue(value: unknown): string[] {
   return [trimmed];
 }
 
-export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNavigateToMemory , health_status }: MemoryDetailPanelProps) {
+export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNavigateToMemory, health_status, retrievalEvidence }: MemoryDetailPanelProps) {
   // Escape to close
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') onClose();
@@ -108,6 +110,7 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNav
   const memoryType = p.memory_type ? formatLabel(String(p.memory_type)) : '-';
   const ring = p.ring ? formatLabel(String(p.ring)) : '-';
   const knowledgeType = p.knowledge_type ? formatLabel(String(p.knowledge_type)) : '-';
+  const healthStatus = health_status || p.health_status;
 
   return (
     <div className="fixed right-0 top-0 h-full w-[420px] bg-slate-900/98 backdrop-blur border-l border-slate-700/60 shadow-2xl z-50 flex flex-col overflow-hidden">
@@ -141,9 +144,9 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNav
                 </span>
               )}
             </div>
-              {health_status && (
-                <div className={`health-status text-[10px] elefante-mono uppercase tracking-wider ${healthClasses[health_status]}`} title={tooltipMap[health_status]}>
-                  {tooltipMap[health_status]}
+              {healthStatus && (
+                <div className={`health-status text-[10px] elefante-mono uppercase tracking-wider ${healthClasses[healthStatus]}`} title={tooltipMap[healthStatus]}>
+                  {tooltipMap[healthStatus]}
                 </div>
               )}
           </div>
@@ -165,6 +168,10 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNav
             <div className="text-xs uppercase tracking-wider text-slate-500 mb-1.5">Summary</div>
             <p className="text-sm text-slate-300 leading-relaxed">{p.summary}</p>
           </div>
+        )}
+
+        {retrievalEvidence && (
+          <RetrievalExplanation memory={memory} evidence={retrievalEvidence} />
         )}
 
         {/* Content */}
@@ -189,10 +196,17 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNav
               return `${Math.round(n)} / 100 — ${label}`;
             })() : '-'} />
             <MetaRow icon={<Hash size={12} />} label="Lifecycle" value={lifecycleStatus} />
+            <MetaRow icon={<Hash size={12} />} label="Health" value={healthStatus ? tooltipMap[healthStatus] : '-'} />
+            <MetaRow icon={<Hash size={12} />} label="Connections" value={p.connection_count != null ? String(p.connection_count) : '-'} />
             <MetaRow icon={<Hash size={12} />} label="Processing" value={processingStatus} />
             <MetaRow icon={<Globe size={12} />} label="Namespace" value={p.namespace || '-'} />
             <MetaRow icon={<User size={12} />} label="Source" value={p.source || '-'} />
           </div>
+          {p.health_reason && (
+            <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+              Health signal: {p.health_reason}
+            </p>
+          )}
         </div>
 
         {concepts.length > 0 && (

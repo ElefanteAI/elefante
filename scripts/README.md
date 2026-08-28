@@ -1,5 +1,9 @@
 # scripts/
 
+> **Audience:** developers, release engineers, and support operators. Customer
+> procedures live in `docs/how-to/`; this catalog documents the implementation
+> and verification entrypoints behind them.
+
 Direct operator entrypoints. Logic that belongs to the runtime lives in `src/`. Anything a human, CI job, or packaging flow runs directly lives here.
 
 ## Philosophy
@@ -27,7 +31,7 @@ Run top-down. Each step is faster but narrower. `install.py` already runs steps 
 | Step | Script | Proves |
 | ---- | ------ | ------ |
 | 1    | `verify/verify_health.py` | Paths, imports, config load. No DB, no server. |
-| 2    | `verify/verify_mcp_handshake.py` | The customer stdio bridge reaches the local daemon and answers a real JSON-RPC initialize. |
+| 2    | `verify/verify_mcp_handshake.py` | The CLI proves a real customer JSON-RPC initialize; its reusable doctor path also verifies live Recall capability without exposing context. |
 | 3    | `verify/verify_e2e_tests.py` | Full live tool/prompt surface in an isolated temp install — the **self-protocol** (see [`docs/reference/self-protocol.md`](../docs/reference/self-protocol.md)). |
 
 If step 1 fails, step 2 cannot help. Do not skip steps.
@@ -62,9 +66,10 @@ If step 1 fails, step 2 cannot help. Do not skip steps.
 | `configure_vscode_bob.py` | Adds the Elefante bridge entry to VS Code/Bob configuration, refreshing only installer-owned entries and preserving user configuration. | Initial VS Code/Bob setup or after moving the repo. |
 | `configure_antigravity.py` | Adds the Elefante bridge entry to `~/.gemini/antigravity/mcp_config.json`. | Initial Antigravity setup or after moving the repo. |
 | `configure_cursor_kiro.py` | Detects Cursor and Kiro user directories, then adds their Elefante bridge entries without touching absent hosts. | Initial Cursor/Kiro setup or after moving the repo. |
-| `configure_cli_agents.py` | Uses the native Claude Code and Codex MCP CLIs to register the bridge and fingerprint the host-owned registration. | Initial Claude Code/Codex setup or after moving the repo. |
+| `configure_cli_agents.py` | Uses native Claude Code and Codex MCP CLIs to register the bridge and fingerprint host-owned state. For Codex it installs one marked Recall-routing block in the active guidance path, preserves user text, and rolls back only its new or prior owned registration if guidance fails. | Initial Claude Code/Codex setup or after moving the repo. |
+| `configure_additional_hosts.py` | Detects Zed and Continue, writes only Zed's exact `context_servers.elefante` JSON entry or Continue's dedicated MCP block, and fingerprints emitted state for safe uninstall. | Initial Zed/Continue setup or after moving the runtime; use `--host` to constrain the detected adapter. |
 | `host_selection.py` | Defines the canonical installer host IDs, labels, and adapter-family routing shared by CLI and native installer flows. | Imported by installer entrypoints; not run directly. |
-| `install_manifest.py` | Internal helper that atomically tracks whole files and owned JSON entries emitted by Elefante installers. | Imported by setup emitters; not run directly. |
+| `install_manifest.py` | Internal helper that atomically tracks whole files, owned JSON entries, commands, and marked text blocks emitted by Elefante installers. Uninstall removes only unchanged owned material. | Imported by setup emitters; not run directly. |
 | `init_databases.py` | Initializes the configured SQLite vector store and Kuzu schema without re-running the full installer. | After a durable-store reset. |
 
 ## `scripts/verify/` — Proofs
@@ -85,11 +90,11 @@ See the Installation Verification Ladder above for steps 1–3. Other verifiers:
 | `restart_elefante.py` | Process-level restart with stale-lock cleanup and optional post-restart verification. | After `src/` changes that the live server needs to pick up. |
 | `backup_elefante_data.py` | Checksum-manifested zip backup of `~/.elefante/data`; excludes nested recovery archives. | **Stop Elefante, then run before any destructive operation.** |
 | `restore_elefante_data.py` | Dry-run-first checksum-verified restore; existing data is moved aside by default. | Undo accidental data loss or a factory reset. Stop Elefante first; inspect, then add `--apply`. |
-| `reset_factory.py` | Destructive full reset of configured/default ChromaDB, SQLite, and Kuzu durable-state locations with backup gates. | Last resort. Never for Kuzu-only or lock-only issues. It refuses a configuration that would contain its own recovery directory. |
+| `reset_factory.py` | Privileged, dry-run-first reset that moves configured/default vector and Kuzu stores into a timestamped recovery area. | Last resort or explicit privacy wipe. Never for Kuzu-only or lock-only issues. It refuses a configuration that would contain its own recovery directory. |
 | `backfill_memory_provenance.py` | Adds explicit `legacy` provenance to memories created before the daemon. Dry-run by default; `--apply` persists. | After reviewing migration candidates, before treating provenance as complete. |
 | `migrate_chroma_to_sqlite.py` | Copies ChromaDB to an isolated snapshot, stages SQLite, and verifies UUID/metadata/embedding/search parity. Dry-run uses temporary storage; `--apply` requires an exact verified backup and `STOPPED` confirmation, leaves Chroma and configuration unchanged, and reserves a new destination without replacing any existing path. | Before replacing ChromaDB because of GAP-029; run dry-run first, then inspect its JSON proof before authorizing apply. |
 | `daemon_service.py` | Renders and manages a launchd, systemd-user, or Task Scheduler user daemon. Dry-run by default; `--apply` writes or removes only Elefante's unchanged service definition. | Install, inspect, or remove the shared local daemon service. |
-| `doctor.py` | Read-only report of repository runtime, daemon health, installer ownership, configured surfaces, and declared integration tiers. `--json` is agent-friendly and never exposes host-registration commands, configuration locations, or values. | Diagnose readiness before configuring an IDE or after an upgrade. |
+| `doctor.py` | Read-only report of runtime health, installer ownership, configured surfaces, declared integration tiers, and installed provenance. When the installer owns Codex Recall routing, customer readiness also requires the active guidance path, verified Codex registration, and live Recall capability with safe annotations and a bounded read-only status; `--json` never exposes host commands, values, or recalled context. | Diagnose readiness before configuring an IDE or after an upgrade, repair, or rollback. |
 | `uninstall_elefante.py` | Stops an unchanged Elefante daemon service, then removes only unchanged Elefante-owned files or JSON entries from the install manifest. Dry-run by default; modified or missing configuration is preserved. | Safely remove Elefante's emitted IDE configuration. |
 
 ## `scripts/pipeline/` — Extracts & Snapshots
@@ -97,7 +102,10 @@ See the Installation Verification Ladder above for steps 1–3. Other verifiers:
 | Script | What it does | When to use it |
 | ------ | ------------ | -------------- |
 | `update_dashboard_data.py` | Reads the configured embedded vector store plus Kuzu and emits `dashboard_snapshot.json`; legacy Chroma remains readable when explicitly configured. | After bulk memory changes, or when the dashboard shows stale counts. Follow with `verify_dashboard_snapshot.py`. |
-| `export_memories.py` | Read-only JSON/CSV corpus export from the configured embedded vector store. `--format json\|csv\|all`; not a backup or restore format. | Before a surgical delete (before/after diff) or for offline analysis. |
+| `export_memories.py` | Read-only JSON/CSV corpus export from the configured embedded vector store. `--format json\|csv\|all`; JSON is a portable memory-migration source, while CSV remains analysis-only. Neither is a full backup. | Before a surgical delete (before/after diff), offline analysis, or a portable JSON migration. |
+| `import_memories.py` | Validates an export, detects ID collisions, regenerates embeddings with the configured local model, and performs additive writes only after an explicit `--apply --confirm-stopped STOPPED`; non-empty targets require a verified binary backup. Graph topology is not restored. | Preview a JSON migration first; stop the runtime, then apply with `--confirm-stopped STOPPED` and a verified backup when the target already contains data. |
+| `session_intelligence.py` | Explicit consent, provider/estimated usage and outcome ingest, versioned rate cards, Signal Cards, aggregate training hypotheses, metadata export, retention, deletion, and safe dashboard snapshot refresh for the separate local Session Intelligence ledger. | Use only after choosing exact purposes; the feature is off by default and raw prompts/transcripts are never valid input. |
+| `team_sync.py` | Creates, verifies, dry-runs, and imports signed exact-scope Team Sync bundles through a secure owner-only HMAC key file. Imports are additive, regenerate local embeddings, withhold conflicts, and require exact scope/STOPPED/verified-backup gates before a non-empty target is changed. | Share an explicit memory-ID allowlist through a user-chosen local transport; never pass the HMAC key as a CLI value. |
 
 ## `scripts/ci/` — Build & Release
 
@@ -107,20 +115,24 @@ Release flow: `advise_version_bump.py` → write CHANGELOG → `bump_version.py 
 | ------ | ------------ | -------------- |
 | `advise_version_bump.py` | Classifies staged diff as MAJOR/MINOR/PATCH. | Before writing the CHANGELOG entry. |
 | `bump_version.py` | Cascades the chosen version across runtime/package declarations. Published-release claims remain pinned until publication is verified. | After writing the CHANGELOG. Run `--check` after. |
-| `build_installer_bundle.py` | Builds the full developer/diagnostic installer bundle, including repository support material. | Developer validation only; never use this archive as a customer release asset. |
-| `build_release_client.py` | Builds the macOS, Windows, or Linux customer installer from a strict runtime allowlist: product source, required runtime scripts, prebuilt dashboard, and the client lock only. | This is the sole builder for customer candidates and tagged release installers. |
-| `verify_release_client.py` | Rejects a customer installer with developer workspace, tests, migration/support utilities, development tools, unexpected files, broken launcher permissions/bytes, misleading timestamps, or invalid platform/publication metadata. | Immediately after every customer installer build and before artifact upload. |
-| `verify_task_intelligence_benchmark.py` | Verifies the 30-task historical benchmark, calibration/holdout isolation, executable acceptance nodes, bounded Task Brief policy, and answer leakage controls. | Before any Task Intelligence baseline, Task Brief evaluation, or benchmark-fixture change. |
+| `build_installer_bundle.py` | Builds the full developer/diagnostic installer bundle, including repository support material and an explicit `development` build identity. | Developer validation only; never use this archive as a customer release asset. |
+| `build_release_client.py` | Builds the macOS, Windows, or Linux customer installer from a strict runtime allowlist and binds the payload to its version, clean source commit, and candidate/release channel. | This is the sole builder for customer candidates and tagged release installers. |
+| `prepare_windows_branding.py` | Wraps the canonical Elefante PNG pixels in a Windows ICO container and emits a semantic-version-bound PyInstaller version resource. | On a Windows build runner before `build_windows_installer.py`; it never redraws the brand asset. |
+| `build_windows_installer.py` | Builds a branded one-file Windows EXE wrapper around the maintained customer ZIP, validates PE structure, and requires verified Authenticode for candidate/release publication classes. | Windows CI after the customer ZIP passes its maintained verifier; unsigned output is local validation only. |
+| `resolve_release_publication.py` | Returns `release` only when the Git ref is the exact `v<source-version>` tag; branch, pull-request, and manual builds remain candidates. | Before building any customer artifact in the tagged-release workflow. |
+| `verify_release_client.py` | Rejects a customer installer with developer leakage, unexpected files, broken launchers, misleading timestamps, invalid publication metadata, dirty/unidentified source, or disagreement between archive and installed-payload identity. | Immediately after every customer installer build and before artifact upload. |
+| `verify_task_intelligence_benchmark.py` | Verifies the current 32-task diagnostic benchmark, calibration/holdout isolation, executable acceptance nodes, answer leakage, and behavioral acceptance/rollback readiness. | Before any Task Intelligence run; add `--require-promotion-ready` for a fail-closed promotion check. |
+| `audit_task_intelligence_retrieval.py` | Measures whether v2 pre-fix retrieval reaches historical repair files without using future content for selection. Diagnostic only; it cannot prove task improvement. | After changing v2 chunking or candidate ranking, on calibration only. |
 | `run_task_intelligence_baseline.py` | Runs isolated no-Brief calibration trials from one-commit historical snapshots; requires exact run counts and cumulative total/uncached token caps; separates outcomes by model configuration and stores metadata only. | Establish or resume the calibration baseline after the benchmark verifier passes. |
-| `run_task_intelligence_evaluation.py` | Runs seeded paired baseline/Task-Brief trials with the same Codex limits, local-only GTE retrieval, answer-isolated pre-fix evidence, and no raw transcripts. | Only from a committed evaluator after calibration; use holdout with the frozen seed and exact caps. |
-| `summarize_task_intelligence_evaluation.py` | Pairs local outcomes, reports task-class lift and clustered 95% confidence, applies token/latency limits, and fails closed on an incomplete protocol. | After paired runs; promotion requires `--require-complete --require-promotion`. |
+| `run_task_intelligence_evaluation.py` | Runs seeded paired no-Brief/Task-Brief or source-only/memory-component trials with identical reasoning rules, v1/v2 profile isolation, source-grounded local retrieval, deterministic sealed-fixture preflight, exact caps, contract-bound schema-v3 outcomes, failure-workspace preservation, and no raw transcripts. | Calibration only until a behavioral manifest is promotion-ready; inspect every preserved failure before another run and keep v1 as rollback. |
+| `summarize_task_intelligence_evaluation.py` | Pairs profile- and task-contract-isolated outcomes, reports complete-pair acceptance efficiency plus all observed input-and-output token spend, applies clustered 95% confidence and resource limits, and blocks cheap failures, acceptance regressions, stale evidence, or diagnostic-only evidence from promotion. | After paired runs; promotion additionally requires a verified behavioral manifest. |
 | `build_dmg.py` | Builds the branded macOS DMG. Uses Swift to compile `installer_app.swift` into `Install Elefante.app` when available; otherwise falls back to `installer_gui.py`. `--sign` for notarized releases. | In CI on a macOS runner after `build_release_client.py`. |
 | `installer_app.swift` | Native AppKit installer surface showing the compatible agent hosts connected automatically to the shared customer runtime. | Compiled by `build_dmg.py`; not run directly. |
 | `installer_gui.py` | Legacy Tk fallback installer surface bundled when Swift is unavailable. | Not run directly in the preferred path. |
 | `render_release_notes.py` | Renders GitHub release body from the matching `CHANGELOG.md` entry. | In CI before publishing a tagged release. |
 | `select_release_assets.py` | Filters artifacts against GitHub's per-file upload cap; emits workflow outputs. | In CI before `action-gh-release`. |
 | `generate_release_checksums.py` | Generates or verifies a deterministic, basename-sorted `SHA256SUMS` manifest for an exact set of release assets. | On each build runner for archive integrity smoke tests, then in the release job before publishing assets. |
-| `list_mcp_tools.py` | Reads `server.py` and prints the live MCP tool + prompt inventory. | After modifying `server.py` to verify spec-tools.md is in sync. |
+| `list_mcp_tools.py` | Reads `server.py` and prints the live MCP tool + prompt inventory. | After modifying `server.py` to verify `docs/reference/tools.md` is in sync. |
 | `bundle_docker_package.sh` | Tarball of the Docker bundle for environments without full repo access. | Distribution packaging. |
 
 ## `scripts/debug/` — Incident Response

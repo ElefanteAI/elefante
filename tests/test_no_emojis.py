@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_no_emojis.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PROVES  : No-emoji policy enforcement across shipped source/docs surfaces.
 #           Mirrors the logic of verify_emoji_policy.py but as a pytest test.
 # RUN     : pytest tests/test_no_emojis.py -v

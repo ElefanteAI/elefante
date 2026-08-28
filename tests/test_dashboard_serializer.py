@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_dashboard_serializer.py
-# VERSION : 2.11.0
-# CHANGED : 2026-07-26
 # PROVES  : Dashboard serialization correctness and launch safeguards; ensures
 #           Memory objects are converted to valid dashboard node/edge JSON.
 # RUN     : pytest tests/test_dashboard_serializer.py -v
@@ -19,18 +17,24 @@ import struct
 from pathlib import Path
 from types import SimpleNamespace
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
 import pytest
 
-from src.models.memory import Memory, MemoryMetadata, MemoryType
+from src.models.memory import HealthStatus, Memory, MemoryMetadata, MemoryStatus, MemoryType
+from src.mcp.server import ElefanteMCPServer
+from src.utils.curation import assess_health, assess_health_from_raw
 from src.utils.dashboard_serializer import (
     _derive_topic,
     _redact_secrets,
+    connection_counts_from_edges,
     compute_live_score,
     compute_live_score_from_raw,
+    health_summary_from_nodes,
     is_test_artifact,
     memory_to_dashboard_node,
+    usage_summary_from_nodes,
 )
 
 
@@ -105,6 +109,142 @@ def test_memory_to_dashboard_node_serializes_score_and_topic():
     assert node["properties"]["topic"] == "Code Style"
 
 
+def test_health_assessment_reads_metadata_fields_and_is_explainable():
+    now = datetime(2026, 8, 27, 12, 0, 0)
+    memory = Memory(
+        content="The current architecture decision is superseded.",
+        metadata=MemoryMetadata(
+            status=MemoryStatus.CONTRADICTORY,
+            conflict_ids=[uuid4()],
+            last_accessed=now - timedelta(days=120),
+        ),
+    )
+
+    assessment = assess_health(memory, connection_count=4, now=now)
+
+    assert assessment.status is HealthStatus.AT_RISK
+    assert assessment.reason == "has an unresolved contradiction"
+    assert assessment.days_since_access == 120
+    assert assessment.connection_count == 4
+
+
+@pytest.mark.parametrize(
+    ("last_accessed", "connection_count", "expected"),
+    [
+        (datetime(2026, 8, 27, 12, 0, 0) - timedelta(days=91), 2, HealthStatus.STALE),
+        (datetime(2026, 8, 27, 12, 0, 0), 0, HealthStatus.ORPHAN),
+        (datetime(2026, 8, 27, 12, 0, 0) - timedelta(days=1), 2, HealthStatus.HEALTHY),
+    ],
+)
+def test_health_assessment_applies_stale_orphan_and_healthy_rules(last_accessed, connection_count, expected):
+    memory = Memory(
+        content="A durable memory for health classification.",
+        metadata=MemoryMetadata(last_accessed=last_accessed),
+    )
+
+    assert assess_health(
+        memory,
+        connection_count,
+        now=datetime(2026, 8, 27, 12, 0, 0),
+    ).status is expected
+
+
+def test_raw_health_assessment_normalizes_timezone_and_status_values():
+    assessment = assess_health_from_raw(
+        {
+            "status": "new",
+            "conflict_ids": [],
+            "superseded_by_id": None,
+            "last_accessed": "2026-05-28T12:00:00+00:00",
+        },
+        connection_count=0,
+        now=datetime(2026, 8, 27, 12, 0, 0, tzinfo=timezone.utc),
+    )
+
+    assert assessment.status is HealthStatus.STALE
+    assert assessment.days_since_access == 91
+
+
+def test_connection_counts_use_unique_snapshot_neighbors():
+    counts = connection_counts_from_edges(
+        {"memory-1", "memory-2"},
+        [
+            {"from": "memory-1", "to": "entity-1"},
+            {"from": "memory-1", "to": "entity-1"},
+            {"source": "memory-1", "target": "memory-2"},
+            {"from": "memory-2", "to": "missing"},
+        ],
+        node_ids={"memory-1", "memory-2", "entity-1"},
+    )
+
+    assert counts == {"memory-1": 2, "memory-2": 1}
+
+
+def test_usage_summary_aggregates_snapshot_access_history():
+    summary = usage_summary_from_nodes(
+        [
+            {"id": "m1", "type": "memory", "properties": {"access_count": 4}},
+            {"id": "m2", "type": "memory", "properties": {"access_count": 0}},
+            {"id": "entity-1", "type": "entity", "properties": {"access_count": 99}},
+            {"id": "m3", "type": "memory", "properties": {"access_count": "bad"}},
+        ]
+    )
+
+    assert summary == {
+        "total_accesses": 4,
+        "retrieved_memories": 1,
+        "never_retrieved": 2,
+        "retrieval_rate": 33,
+        "average_access_count": 1.3,
+        "max_access_count": 4,
+    }
+
+
+def test_health_summary_is_deterministic_and_uses_snapshot_dimensions():
+    now = datetime(2026, 8, 27, 12, 0, 0, tzinfo=timezone.utc)
+    summary = health_summary_from_nodes(
+        [
+            {
+                "id": "m1",
+                "type": "memory",
+                "created_at": now.isoformat(),
+                "properties": {"topic": "code", "access_count": 2, "health_status": "healthy"},
+            },
+            {
+                "id": "m2",
+                "type": "memory",
+                "created_at": (now - timedelta(days=90)).isoformat(),
+                "properties": {"topic": "general", "access_count": 0, "health_status": "orphan"},
+            },
+            {"id": "entity-1", "type": "entity", "properties": {}},
+        ],
+        [{"from": "m1", "to": "entity-1"}],
+        now=now,
+    )
+
+    assert summary == {
+        "score": 50,
+        "freshness": 50,
+        "coverage": 50,
+        "usage": 50,
+        "connectivity": 50,
+        "counts": {"healthy": 1, "orphan": 1},
+    }
+
+
+def test_memory_to_dashboard_node_emits_canonical_health_fields():
+    node = memory_to_dashboard_node(
+        _sample_memory(),
+        connection_count=2,
+        now=datetime(2025, 6, 2, 12, 0, 0),
+    )
+
+    assert node is not None
+    assert node["properties"]["health_status"] == "healthy"
+    assert node["properties"]["health_reason"] == "current and connected"
+    assert node["properties"]["connection_count"] == 2
+
+
 def test_memory_to_dashboard_node_uses_explicit_configured_backend_label():
     node = memory_to_dashboard_node(_sample_memory(), vector_source="sqlite")
 
@@ -138,6 +278,51 @@ def test_dashboard_refresh_forces_restart_of_existing_server():
     assert "_kill_existing()" in server_source
     assert "already_running = False" in server_source
     assert "DASHBOARD_STARTED = False" in server_source
+
+
+@pytest.mark.asyncio
+async def test_live_dashboard_refresh_includes_usage_summary(monkeypatch, tmp_path):
+    from src.utils import config
+
+    memory = Memory(
+        content="Use SQLite for durable memory",
+        metadata=MemoryMetadata(
+            memory_type=MemoryType.DECISION,
+            access_count=5,
+        ),
+    )
+
+    class FakeVectorStore:
+        async def get_all(self, limit=1000, offset=0):
+            return [memory]
+
+    class EmptyGraphStore:
+        async def execute_query(self, query):
+            return []
+
+    orchestrator = SimpleNamespace(
+        vector_store=FakeVectorStore(),
+        graph_store=EmptyGraphStore(),
+    )
+    dashboard_server = ElefanteMCPServer()
+
+    async def fake_get_orchestrator():
+        return orchestrator
+
+    monkeypatch.setattr(dashboard_server, "_get_orchestrator", fake_get_orchestrator)
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+
+    result = await dashboard_server._refresh_dashboard_snapshot()
+
+    assert result["success"] is True
+    assert result["stats"]["usage"] == {
+        "total_accesses": 5,
+        "retrieved_memories": 1,
+        "never_retrieved": 0,
+        "retrieval_rate": 100,
+        "average_access_count": 5.0,
+        "max_access_count": 5,
+    }
 
 
 def test_dashboard_frontend_retries_stats_and_snapshot_fetches():
@@ -195,18 +380,34 @@ def test_showcase_snapshot_is_deterministic_grounded_and_contract_complete():
     assert snapshot == repeated
     assert snapshot["curation"] == {
         "purpose": "Elefante Memory Intelligence dashboard showcase",
-        "product_baseline": "v2.12.0",
+        "product_baseline": "v2.12.2",
         "deterministic": True,
         "synthetic_behavioral_metadata": True,
         "source_grounded_content": True,
         "contains_user_data": False,
-        "disclaimer": "Counts and access history demonstrate product behavior; they are not customer or performance claims.",
+        "disclaimer": "Counts and access history demonstrate the interface; they are not observed customer behavior or performance claims.",
     }
     assert snapshot["stats"] == {
         "total_nodes": 48,
         "memories": 37,
         "entities": 11,
         "edges": 95,
+        "health": {
+            "score": 89,
+            "freshness": 62,
+            "coverage": 100,
+            "usage": 100,
+            "connectivity": 100,
+            "counts": {"at_risk": 2, "healthy": 35},
+        },
+        "usage": {
+            "total_accesses": 709,
+            "retrieved_memories": 37,
+            "never_retrieved": 0,
+            "retrieval_rate": 100,
+            "average_access_count": 19.2,
+            "max_access_count": 36,
+        },
     }
 
     node_ids = {node["id"] for node in snapshot["nodes"]}
@@ -222,9 +423,13 @@ def test_showcase_snapshot_is_deterministic_grounded_and_contract_complete():
     memories = [node for node in snapshot["nodes"] if node["type"] == "memory"]
     assert all(memory["properties"]["evidence"] for memory in memories)
     assert all(memory["properties"]["namespace"] == "showcase" for memory in memories)
+    assert all(memory["properties"]["health_status"] in {"healthy", "at_risk"} for memory in memories)
+    assert all(memory["properties"]["health_reason"] for memory in memories)
+    assert all(memory["properties"]["connection_count"] >= 1 for memory in memories)
     corpus = json.dumps(snapshot).lower()
     assert "six signals" not in corpus
-    assert "chromadb holds semantic memories" not in corpus
+    assert "chromadb" not in corpus
+    assert "migration" not in corpus
 
     memory_relationships = {
         (edge["from"], edge["to"], edge["label"])
@@ -246,9 +451,9 @@ def test_showcase_snapshot_is_deterministic_grounded_and_contract_complete():
         ),
         ("demo:snapshot-evidence", "demo:snapshot-decision", "LED_TO"),
         ("demo:snapshot-decision", "demo:loopback-guard", "GUARDED_BY"),
-        ("demo:chroma-blocker", "demo:sqlite-default", "LED_TO"),
-        ("demo:sqlite-default", "demo:migration-parity", "GUARDED_BY"),
-        ("demo:migration-parity", "demo:no-live-migration", "ENFORCED_BY"),
+        ("demo:dependency-audit", "demo:runtime-lock", "LED_TO"),
+        ("demo:runtime-lock", "demo:sqlite-default", "ENABLES"),
+        ("demo:sqlite-default", "demo:data-control", "GUARDED_BY"),
     } <= memory_relationships
     semantic_relationships = [
         edge
@@ -334,7 +539,14 @@ async def test_dashboard_reads_and_searches_only_the_redacted_snapshot(monkeypat
     snapshot_path.write_text(
         """{
           "generated_at": "2026-07-22T12:00:00Z",
-          "stats": {"memories": 1, "entities": 0, "edges": 0, "total_nodes": 1},
+          "stats": {
+            "memories": 1,
+            "entities": 0,
+            "edges": 0,
+            "total_nodes": 1,
+            "health": {"counts": {"orphan": 1}},
+            "usage": {"total_accesses": 0, "retrieved_memories": 0, "never_retrieved": 1, "retrieval_rate": 0, "average_access_count": 0.0, "max_access_count": 0}
+          },
           "nodes": [
             {"id": "memory-1", "type": "memory", "name": "Python style", "description": "Use black for Python formatting", "properties": {"content": "Use black for Python formatting", "title": "Python style", "tags": "python,formatting", "topic": "Code Style", "access_count": 4}},
             {"id": "entity-1", "type": "entity", "name": "Python", "description": "language", "properties": {}}
@@ -375,6 +587,8 @@ async def test_dashboard_reads_and_searches_only_the_redacted_snapshot(monkeypat
     }
     assert "data_dir" not in stats["elefante"]
     assert "path" not in stats["snapshot"]
+    assert stats["snapshot"]["health"] == {"counts": {"orphan": 1}}
+    assert stats["snapshot"]["usage"]["never_retrieved"] == 1
 
 
 def test_dashboard_has_no_browser_triggered_snapshot_mutation_or_live_store_import():

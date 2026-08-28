@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE  : src/core/orchestrator.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : Central intelligence layer: routes queries to vector/graph stores,
 #           applies intelligence-pipeline filters, enforces memory guards.
 # ROLE    : Core — highest-traffic module; every MCP tool call passes through here.
@@ -26,26 +24,28 @@ import os
 import re
 import json
 from difflib import SequenceMatcher
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime
 
 from src.models.memory import (
     Memory, MemoryType, MemoryMetadata, MemoryStatus,
-    DomainType, SourceType, TYPE_DECAY_RATES
+    DomainType, InjectionPolicy, RetentionPolicy, SourceType, TYPE_DECAY_RATES
 )
 from src.models.entity import Entity, EntityType, Relationship, RelationshipType
 from src.models.query import QueryMode, QueryPlan, SearchResult, SearchFilters
 from src.core.vector_store import VectorStore, get_vector_store
 from src.core.graph_store import GraphStore, get_graph_store
 from src.core.embeddings import EmbeddingService, get_embedding_service
-from src.core.retrieval import CognitiveRetriever, MemoryCandidate, QueryAnalysis
+from src.core.retrieval import CognitiveRetriever, MemoryCandidate
+from src.core.conflict_detection import ConflictOutcome, assess_conflict
+from src.core.governance import governance_reason, matching_triggers
 from src.utils.logger import get_logger
 from src.utils.config import get_config
 from src.utils.validators import validate_memory_content, validate_uuid
 from src.utils.runtime_profile import is_client_runtime
 from src.core.etl import ProcessingStatus  # Only need status, classification is agent-driven
-from src.models.task import Task, TaskStatus
+from src.models.task import TaskStatus
 
 logger = get_logger(__name__)
 
@@ -53,6 +53,8 @@ logger = get_logger(__name__)
 # Below this threshold the hit is a keyword drag, not a true match.
 # (Theoretical composite max without coactivation signal is ~0.65-0.70.)
 REINFORCEMENT_THRESHOLD = 0.55
+SURFACE_SCAN_MAX_MEMORIES = 5000
+SURFACE_MAX_MEMORIES = 3
 
 SYSTEM_SPECIFICATIONS = (
     {
@@ -63,7 +65,7 @@ SYSTEM_SPECIFICATIONS = (
         "content": (
             "SDD Gate 2 leakage surface scan table specification for Elefante contributors. "
             "Every change must be checked against these leakage surfaces: MCP response contract, "
-            "ChromaDB write and read roundtrip, Kuzu schema and DML split, stdout purity, "
+            "configured vector-store write/read roundtrip, Kuzu schema and DML split, stdout purity, "
             "compliance gate state machine, dashboard snapshot contract, co-activation history, "
             "and documentation links. Reference docs: agents/orchestrator.md "
             "for the gate definition and workspace/ISSUES.md for issue routing."
@@ -78,9 +80,11 @@ SYSTEM_SPECIFICATIONS = (
         "content": (
             "SDD Gate 3 scoring formulas specification for Elefante contributors. Verify the behavioral "
             "relevance formula and the cognitive retrieval composite from source code, not from remembered "
-            "docs. Behavioral relevance: relevance = 0.5 * recency * freshness * reinforcement. Cognitive "
-            "retrieval composite: composite_score = 0.30 * vector_score + 0.20 * concept_score + 0.15 * "
-            "domain_score + 0.15 * coactivation_score + 0.10 * authority_score + 0.10 * temporal_score."
+            "docs. Temporal vitality = exp(-effective_decay_rate * days_created) * "
+            "exp(-0.005 * days_since_access), where effective_decay_rate = decay_rate / "
+            "(1 + 0.25 * ln(access_count + 1)). Cognitive retrieval composite = 0.35 * "
+            "vector_score + 0.30 * concept_score + 0.15 * coactivation_score + 0.10 * "
+            "authority_score + 0.10 * temporal_score. Retrieval exposure is not verified task utility."
         ),
         "tags": ["system", "sdd", "gate-3", "scoring", "specification"],
     },
@@ -124,7 +128,7 @@ class MemoryOrchestrator:
         Initialize orchestrator with database connections
         
         Args:
-            vector_store: ChromaDB vector store instance
+            vector_store: configured vector-store instance
             graph_store: Kuzu graph store instance
             embedding_service: Embedding generation service
         """
@@ -206,7 +210,7 @@ class MemoryOrchestrator:
         force_new: bool = False
     ) -> Optional[Memory]:
         """
-        Add a new memory via the 5-Step Pipeline.
+        Validate, enrich, deduplicate, persist, and graph-link a memory.
         
         Score is system-computed (starts at 100, decays with age).
         Decay rate is set automatically from memory_type.
@@ -214,12 +218,30 @@ class MemoryOrchestrator:
 
 
         # ==================================================================================
-        # STEP 1: PARSE & CLASSIFY
+        # STEP 1: PRIVACY + VALIDATE INPUT
         # ==================================================================================
+        from src.modules.distiller.privacy import PrivacyFilter
+
+        if metadata is not None and not isinstance(metadata, dict):
+            raise ValueError("metadata must be an object")
+        payload, privacy_redactions, privacy_types = PrivacyFilter().scrub_payload(
+            {
+                "content": content,
+                "tags": tags or [],
+                "entities": entities or [],
+                "metadata": dict(metadata or {}),
+            }
+        )
+        content = payload["content"]
+        tags = payload["tags"]
+        entities = payload["entities"]
+        metadata = payload["metadata"]
+        if privacy_redactions:
+            system_metadata = dict(metadata.get("system_metadata") or {})
+            system_metadata["privacy_redactions"] = privacy_redactions
+            system_metadata["privacy_redacted_types"] = privacy_types
+            metadata["system_metadata"] = system_metadata
         validate_memory_content(content)
-        
-        if metadata is None:
-            metadata = {}
 
         # Guardrail: block test-memory creation unless explicitly allowed.
         # Rationale: production memory graph should not accumulate E2E/persistence test artifacts.
@@ -320,7 +342,10 @@ class MemoryOrchestrator:
         # Agent-driven enrichment (Elefante never calls an LLM).
         action = metadata.get("action")
         if isinstance(action, str) and action.strip().upper() == "IGNORE":
-            self.logger.info(f"Memory ignored by agent instruction: {content[:50]}...")
+            self.logger.info(
+                "Memory ignored by agent instruction",
+                content_sha256=hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            )
             return None
 
         provided_title = metadata.get("title")
@@ -465,8 +490,6 @@ class MemoryOrchestrator:
         
         status = MemoryStatus.NEW
         related_id = None
-        contradiction_details = None
-        
         if similar_memories:
             best_match = similar_memories[0]
             
@@ -482,16 +505,18 @@ class MemoryOrchestrator:
             
             # Check for contradiction (High similarity but conflicting content)
             elif best_match.score >= 0.75:
-                is_contradiction = self._detect_contradiction(content, best_match.memory.content)
-                if is_contradiction:
+                conflict_assessment = assess_conflict(
+                    content,
+                    best_match.memory.content,
+                )
+                if conflict_assessment.outcome is ConflictOutcome.CONFLICT:
                     status = MemoryStatus.CONTRADICTORY
                     related_id = best_match.memory.id
-                    contradiction_details = {
-                        "conflicting_memory_id": str(best_match.memory.id),
-                        "conflicting_content": best_match.memory.content[:200],
-                        "similarity": best_match.score
-                    }
-                    self.logger.warning(f"CONTRADICTORY memory detected vs {best_match.memory.id}")
+                    self.logger.warning(
+                        "CONTRADICTORY memory detected",
+                        conflicting_memory_id=str(best_match.memory.id),
+                        reason=conflict_assessment.reason,
+                    )
                 else:
                     status = MemoryStatus.RELATED
                     related_id = best_match.memory.id
@@ -566,7 +591,19 @@ class MemoryOrchestrator:
             
             custom_metadata = {
                 k: v for k, v in metadata.items()
-                if k not in ["domain", "category", "confidence", "source"]
+                if k not in [
+                    "domain",
+                    "category",
+                    "confidence",
+                    "source",
+                    "project",
+                    "workspace",
+                    "retention_policy",
+                    "injection_policy",
+                    "scope",
+                    "trigger",
+                    "user_locked",
+                ]
             }
             
             # ==================================================================================
@@ -575,8 +612,8 @@ class MemoryOrchestrator:
             # ==================================================================================
             custom_metadata["processing_status"] = ProcessingStatus.RAW
             custom_metadata["ingested_at"] = datetime.utcnow().isoformat()
-            # Persist curated fields into custom_metadata so they become top-level Chroma fields
-            # in VectorStore.add_memory (title/summary are used by dashboard + dedup).
+            # Persist curated fields into custom_metadata for the configured vector
+            # backend; title and summary are also used by the dashboard and deduplication.
             custom_metadata["title"] = title
             custom_metadata["summary"] = summary_text
             # Cognitive Retrieval Fields
@@ -588,11 +625,27 @@ class MemoryOrchestrator:
             memory_metadata = MemoryMetadata(
                 memory_type=MemoryType(memory_type),
                 status=status,
+                conflict_ids=(
+                    [related_id]
+                    if status == MemoryStatus.CONTRADICTORY and related_id
+                    else []
+                ),
                 tags=tags or [],
                 domain=DomainType(domain) if domain else DomainType.REFERENCE,
                 category=category,
                 confidence=confidence,
                 source=SourceType(source),
+                project=metadata.get("project") or None,
+                workspace=metadata.get("workspace") or None,
+                retention_policy=metadata.get(
+                    "retention_policy", RetentionPolicy.MANAGED
+                ),
+                injection_policy=metadata.get(
+                    "injection_policy", InjectionPolicy.RANKED
+                ),
+                scope=metadata.get("scope") or None,
+                trigger=metadata.get("trigger") or [],
+                user_locked=bool(metadata.get("user_locked", False)),
                 # Cognitive retrieval fields
                 concepts=concepts,
                 surfaces_when=surfaces_when,
@@ -749,8 +802,9 @@ class MemoryOrchestrator:
         session_id: Optional[UUID] = None,
         return_debug: bool = False,
         apply_temporal_decay: bool = True,
-        reinforce_access: bool = True,
-        recent_memory_ids: Optional[list[str]] = None
+        reinforce_access: bool = False,
+        recent_memory_ids: Optional[list[str]] = None,
+        surface_context: Optional[str] = None,
     ) -> List[SearchResult]:
         """
         Search memories using semantic, structured, and/or conversation context with temporal decay
@@ -773,11 +827,20 @@ class MemoryOrchestrator:
             session_id: Session UUID for conversation context
             return_debug: Return debug statistics with results
             apply_temporal_decay: Apply temporal strength scoring (default: True)
+            reinforce_access: Record explicit memory use after retrieval (default: False).
+                Retrieval is exposure; callers must opt in only after confirming that
+                returned memories informed a task.
+            surface_context: Optional file, terminal-error, or conversation context
+                used for explicit literal-trigger surfacing. When omitted, the query
+                itself is used. This path is read-only and only considers memories
+                explicitly marked ``injection_policy=triggered``.
             
         Returns:
             List[SearchResult]: Ranked search results
         """
         validate_memory_content(query, min_length=1, max_length=1000)
+        if surface_context is not None:
+            validate_memory_content(surface_context, min_length=1, max_length=1000)
 
         # Extract conversation settings from filters if provided
         if filters:
@@ -787,7 +850,7 @@ class MemoryOrchestrator:
         
         self.logger.info(
             "Searching memories (enhanced)",
-            query=query[:100],
+            query_sha256=hashlib.sha256(query.encode("utf-8")).hexdigest(),
             mode=mode.value,
             limit=limit,
             include_conversation=include_conversation,
@@ -837,6 +900,30 @@ class MemoryOrchestrator:
             # Merge, normalize, and deduplicate results
             if include_conversation and include_stored and session_id:
                 results = await self._merge_and_deduplicate(results, query, session_id is not None, mode.value)
+
+            # An explicitly triggered memory may be useful even when its body
+            # is not semantically close enough to survive the vector threshold.
+            # Scan only the bounded literal-trigger path, keep it read-only, and
+            # merge the explanation into an existing hit instead of creating a
+            # second result for the same memory.
+            if include_stored:
+                triggered_results = await self._surface_triggered_memories(
+                    surface_context or query,
+                    filters=filters,
+                    limit=min(limit, SURFACE_MAX_MEMORIES),
+                )
+                by_memory_id = {str(result.memory.id): result for result in results}
+                for triggered in triggered_results:
+                    existing = by_memory_id.get(str(triggered.memory.id))
+                    if existing is None:
+                        results.append(triggered)
+                        by_memory_id[str(triggered.memory.id)] = triggered
+                    else:
+                        existing.surface_matches = list(
+                            dict.fromkeys(
+                                [*existing.surface_matches, *triggered.surface_matches]
+                            )
+                        )
             
             # =============================================================
             # COGNITIVE SCORING - Multi-signal re-ranking
@@ -876,6 +963,134 @@ class MemoryOrchestrator:
         except Exception as e:
             self.logger.error(f"Search failed: {e}", exc_info=True)
             raise
+
+    async def _surface_triggered_memories(
+        self,
+        context: str,
+        *,
+        filters: Optional[SearchFilters] = None,
+        limit: int = SURFACE_MAX_MEMORIES,
+    ) -> List[SearchResult]:
+        """Find explicitly opted-in literal-trigger memories without mutation.
+
+        This is the narrow proactive-surfacing path.  It is deliberately not a
+        second semantic retriever: only memories with
+        ``injection_policy=triggered`` are considered, and a declared literal
+        phrase must occur in the supplied file/error/conversation context.
+        Lifecycle, scope, source-trust, and privacy gates still apply.
+        """
+        if not context or limit <= 0:
+            return []
+
+        from src.modules.distiller.privacy import PrivacyFilter
+
+        matches: list[SearchResult] = []
+        try:
+            # The supported stores already implement bounded ``get_all``. One
+            # read keeps this additive path from re-materializing the corpus on
+            # every page while retaining a hard upper bound for large stores.
+            memories = await self.vector_store.get_all(
+                limit=SURFACE_SCAN_MAX_MEMORIES,
+                offset=0,
+                filters=filters,
+            )
+            for memory in memories[:SURFACE_SCAN_MAX_MEMORIES]:
+                metadata = memory.metadata
+                policy = getattr(
+                    getattr(metadata, "injection_policy", None),
+                    "value",
+                    getattr(metadata, "injection_policy", "ranked"),
+                )
+                if str(policy).casefold() != InjectionPolicy.TRIGGERED.value:
+                    continue
+                matched = matching_triggers(metadata, context)
+                if not matched:
+                    continue
+                status = str(
+                    getattr(
+                        getattr(metadata, "status", None),
+                        "value",
+                        getattr(metadata, "status", ""),
+                    )
+                ).casefold()
+                if (
+                    bool(getattr(metadata, "deprecated", False))
+                    or bool(getattr(metadata, "archived", False))
+                    or getattr(metadata, "superseded_by_id", None) is not None
+                    or bool(getattr(metadata, "conflict_ids", []))
+                    or status in {
+                        MemoryStatus.DEPRECATED.value,
+                        MemoryStatus.ARCHIVED.value,
+                        MemoryStatus.CONTRADICTORY.value,
+                    }
+                ):
+                    continue
+                current_source_state = str(
+                    (getattr(metadata, "custom_metadata", None) or {}).get(
+                        "current_source_state", ""
+                    )
+                ).casefold()
+                if current_source_state == "contradicted":
+                    continue
+                if getattr(metadata, "source_reliability", 0.0) < 0.5:
+                    continue
+                candidate = memory
+                if filters and filters.workspace:
+                    # Current-source validation mutates the inspected model
+                    # with an ephemeral annotation. Keep the store-backed
+                    # object untouched and share the Task Brief validator.
+                    from src.core.task_intelligence import TaskBriefService
+
+                    candidate = memory.model_copy(deep=True)
+                    await asyncio.to_thread(
+                        TaskBriefService._annotate_current_source,
+                        candidate,
+                        filters.workspace,
+                    )
+                    candidate_state = str(
+                        (candidate.metadata.custom_metadata or {}).get(
+                            "current_source_state", ""
+                        )
+                    ).casefold()
+                    if candidate_state == "contradicted":
+                        continue
+                metadata = candidate.metadata
+                if governance_reason(
+                    metadata,
+                    context,
+                    project=filters.project if filters else None,
+                    workspace=filters.workspace if filters else None,
+                ):
+                    continue
+                _, redactions, _ = PrivacyFilter().scrub_payload(
+                    {"content": candidate.content, "triggers": matched}
+                )
+                if redactions:
+                    continue
+                matches.append(
+                    SearchResult(
+                        memory=candidate,
+                        score=1.0,
+                        source="triggered",
+                        vector_score=None,
+                        surface_matches=matched,
+                    )
+                )
+        except Exception as error:
+            # Trigger surfacing is an additive enhancement.  A store that does
+            # not support listing must retain its normal search behavior.
+            self.logger.warning("Literal trigger surfacing unavailable: %s", error)
+            return []
+
+        matches.sort(
+            key=lambda result: (
+                -max((len(value) for value in result.surface_matches), default=0),
+                -result.memory.metadata.source_reliability,
+                -int(result.memory.metadata.verified),
+                str(result.memory.id),
+            )
+        )
+        return matches[:limit]
     
     def _create_query_plan(
         self,
@@ -931,17 +1146,10 @@ class MemoryOrchestrator:
         co_activation_matrix: Optional[dict] = None
     ) -> List[SearchResult]:
         """
-        Apply V4 cognitive multi-signal scoring to search results.
-        
-        V5: Now attaches RetrievalExplanation to each result.
-        
-        Transforms raw vector scores into composite scores using:
-        - vector_similarity (0.30): Original ChromaDB score
-        - concept_overlap (0.20): Jaccard overlap with query concepts
-        - domain_match (0.15): Domain alignment
-        - co_activation (0.15): Retrieved-together history
-        - authority (0.10): Score + access patterns
-        - temporal (0.10): Recency and freshness
+        Apply current cognitive multi-signal scoring and attach its explanation.
+
+        Formula authority is src/core/retrieval.py; the human contract is
+        docs/reference/scoring.md. Do not duplicate weights here.
         """
         if not results:
             return results
@@ -962,6 +1170,30 @@ class MemoryOrchestrator:
         for result in results:
             memory = result.memory
             metadata = memory.metadata if memory.metadata else {}
+
+            # Literal-trigger matches are an explicit governance signal, not a
+            # vector score. Preserve that distinction in both ranking and the
+            # explanation shown to the caller.
+            if result.surface_matches:
+                result.score = 1.0
+                result.vector_score = None
+                result.explanation = {
+                    "composite_score": 1.0,
+                    "signals": [
+                        {
+                            "name": "explicit_trigger",
+                            "score": 1.0,
+                            "weight": 1.0,
+                            "weighted": 1.0,
+                            "reason": "Configured literal surface trigger matched",
+                            "details": {
+                                "matched_triggers": list(result.surface_matches),
+                            },
+                        }
+                    ],
+                }
+                scored_results.append(result)
+                continue
             
             # Build MemoryCandidate from Memory object
             candidate = MemoryCandidate(
@@ -1013,14 +1245,17 @@ class MemoryOrchestrator:
     
     async def record_coactivation(self, memory_ids: list[str]) -> None:
         """
-        Passive graph maintenance: Record co-activations of retrieved memories.
-        Maintains Hebbian learning edges in Kuzu based on MCP session usage.
+        Record co-activations for an explicitly acknowledged use event.
+
+        Retrieval results alone must never call this method.  The caller must
+        first establish that the selected memories informed the task.
         """
         if not memory_ids or len(memory_ids) < 2:
             return
             
         try:
-            # Validate that IDs still exist in ChromaDB before burning O(n^2)
+            # Validate that IDs still exist in the configured vector store before
+            # burning O(n^2) graph co-activation work.
             # graph queries.  Deleted/stale IDs are silently dropped.
             valid_ids = []
             for mid in set(memory_ids):
@@ -1049,7 +1284,7 @@ class MemoryOrchestrator:
                 
             self.logger.debug(f"Recorded co-activations for {len(pairs)} memory pairs.")
         except Exception as e:
-            self.logger.warning(f"Failed to record passive graph co-activations: {e}")
+            self.logger.warning(f"Failed to record explicit-use graph co-activations: {e}")
     
     async def _search_semantic(
         self,
@@ -1346,8 +1581,6 @@ class MemoryOrchestrator:
             List of SearchResult objects from conversation
         """
         from src.core.conversation_context import get_conversation_searcher
-        from src.models.conversation import SearchCandidate
-        
         try:
             searcher = get_conversation_searcher()
             candidates = await searcher.collect_candidates(query, session_id, limit)
@@ -1381,7 +1614,7 @@ class MemoryOrchestrator:
                 results.append(result)
             
             self.logger.debug(
-                f"Conversation search completed",
+                "Conversation search completed",
                 session_id=str(session_id),
                 count=len(results)
             )
@@ -1553,10 +1786,13 @@ class MemoryOrchestrator:
                         if session_id:
                             # pattern: m, r (where r is list of rels, m is node)
                             # Actually Kuzu might return individual rows for paths
-                            if "m" in row: entities_to_process.append(row["m"])
+                            if "m" in row:
+                                entities_to_process.append(row["m"])
                         else:
-                            if "m" in row: entities_to_process.append(row["m"])
-                            if "related" in row: entities_to_process.append(row["related"])
+                            if "m" in row:
+                                entities_to_process.append(row["m"])
+                            if "related" in row:
+                                entities_to_process.append(row["related"])
                             
                         for entity in entities_to_process:
                             # Skip if already added
@@ -1569,12 +1805,12 @@ class MemoryOrchestrator:
                             if hasattr(entity, 'get') and entity.get('properties'):
                                 try:
                                     props = json.loads(entity.get('properties'))
-                                except:
+                                except (TypeError, ValueError):
                                     props = {}
                             elif isinstance(entity, dict) and 'properties' in entity and isinstance(entity['properties'], str):
                                 try:
                                     props = json.loads(entity['properties'])
-                                except:
+                                except (TypeError, ValueError):
                                     pass
                             
                             # Add to context
@@ -1692,14 +1928,14 @@ class MemoryOrchestrator:
                                     if isinstance(p_str, str):
                                         try:
                                             props = json.loads(p_str)
-                                        except:
+                                        except (TypeError, ValueError):
                                             pass
                                 else:
                                     p_str = getattr(entity, 'properties', None)
                                     if isinstance(p_str, str):
                                         try:
                                             props = json.loads(p_str)
-                                        except:
+                                        except (TypeError, ValueError):
                                             pass
                                             
                                 if e_id and str(e_id) not in [e["id"] for e in context["entities"]]:
@@ -1734,53 +1970,15 @@ class MemoryOrchestrator:
 
     def _detect_contradiction(self, new_content: str, existing_content: str) -> bool:
         """
-        Detect if new_content semantically contradicts existing_content.
-        Uses fast regex-based heuristics (no LLM call).
-        
-        Contradiction patterns:
-        1. Negation: "X is not Y" vs "X is Y"
-        2. Opposite sentiment: "I like X" vs "I don't like X"
-        3. Factual conflict: "X lives in A" vs "X lives in B"
+        Backward-compatible boolean facade over the pure conflict assessment.
+
+        Callers that need an explanation should use ``assess_conflict``
+        directly.  This method intentionally cannot mutate either memory.
         """
-        import re
-        
-        new_lower = new_content.lower()
-        existing_lower = existing_content.lower()
-        
-        # Pattern 1: Direct negation markers
-        negation_markers = [
-            r"\bnot\b", r"\bno\b", r"\bnever\b", r"\bdon't\b", r"\bdoesn't\b",
-            r"\bwon't\b", r"\bcan't\b", r"\bisn't\b", r"\baren't\b", r"\bwasn't\b",
-            r"\bweren't\b", r"\bshouldn't\b", r"\bwouldn't\b", r"\bcouldn't\b",
-            r"\bhate\b", r"\bdislike\b", r"\bavoid\b", r"\bstop\b", r"\bquit\b"
-        ]
-        
-        new_has_negation = any(re.search(p, new_lower) for p in negation_markers)
-        existing_has_negation = any(re.search(p, existing_lower) for p in negation_markers)
-        
-        # XOR: One has negation, other doesn't = potential contradiction
-        if new_has_negation != existing_has_negation:
-            # Extract subject to verify it's about the same thing
-            # Simple heuristic: check if they share significant words
-            new_words = set(re.findall(r'\b\w{4,}\b', new_lower))  # Words 4+ chars
-            existing_words = set(re.findall(r'\b\w{4,}\b', existing_lower))
-            
-            # Remove common stopwords
-            stopwords = {'that', 'this', 'with', 'from', 'have', 'been', 'were', 'will', 'would', 'could', 'should'}
-            new_words -= stopwords
-            existing_words -= stopwords
-            
-            overlap = new_words & existing_words
-            
-            # If significant overlap + negation difference = contradiction
-            if len(overlap) >= 2:
-                self.logger.debug(
-                    f"Contradiction detected via negation",
-                    overlap=list(overlap)[:5]
-                )
-                return True
-        
-        return False
+        return assess_conflict(
+            new_content,
+            existing_content,
+        ).outcome is ConflictOutcome.CONFLICT
 
     def _is_first_person_statement(self, content: str) -> bool:
         """
@@ -2158,7 +2356,7 @@ class MemoryOrchestrator:
 
         Stores may expose either synchronous or asynchronous ``close`` methods.
         Supporting both keeps the orchestrator compatible with the existing
-        Kuzu/Chroma stores and the opt-in SQLite vector store.
+        Kuzu and the configured vector store (SQLite by default).
         """
         self.logger.info("closing_orchestrator_connections")
         failures: list[Exception] = []

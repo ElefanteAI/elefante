@@ -273,6 +273,17 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 title: "Antigravity",
                 detected: appExists(["Antigravity.app"]) || pathExists(".gemini/antigravity")
             ),
+            HostOption(
+                id: "zed",
+                title: "Zed",
+                detected: appExists(["Zed.app"]) || pathExists(".config/zed")
+                    || commandExists(["zed"])
+            ),
+            HostOption(
+                id: "continue",
+                title: "Continue",
+                detected: pathExists(".continue") || commandExists(["cn"])
+            ),
         ]
     }
 

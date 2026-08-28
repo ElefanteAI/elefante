@@ -33,7 +33,7 @@ def requirements(section: str) -> list[str]:
 
 setup(
     name="elefante",
-    version="2.12.3",
+    version="2.13.0",
     author="Elefante Contributors",
     author_email="elefante@proton.me",
     description="Local AI Memory System with Vector and Graph Storage",
@@ -51,6 +51,8 @@ setup(
         "License :: Other/Proprietary License",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
     ],
     python_requires=">=3.11",
     install_requires=requirements("runtime"),

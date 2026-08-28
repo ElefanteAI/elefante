@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : restore_elefante_data.py
-# VERSION : 2.5.2
-# CHANGED : 2026-07-22
 # PURPOSE : Dry-run-first, checksum-verified restore of Elefante durable data.
 # WHEN    : After accidental data loss, a factory reset, or a storage migration.
 # USAGE   : python scripts/lifecycle/restore_elefante_data.py --latest [--apply]
 # NOTES   : Stop Elefante first. Existing data is moved aside by default; unsafe
 #           archive paths and checksum failures are rejected before any mutation.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Restore an Elefante data archive without trusting its zip contents.
 

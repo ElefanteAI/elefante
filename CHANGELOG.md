@@ -11,6 +11,100 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-08-28
+
+### Added
+
+- Added default-on, read-only `elefante-Recall`, bringing the customer profile
+  to 17 tools and 2 prompts. Recall returns one bounded seven-field result,
+  abstains when evidence is irrelevant or unsafe, and is wired through
+  reversible Codex guidance plus customer-readiness verification.
+- Added a dry-run-first portable JSON memory importer. It validates the full
+  export before writing, preserves memory IDs and metadata, regenerates vectors
+  with the configured local embedding model, rejects existing-ID collisions,
+  requires `--confirm-stopped STOPPED` plus a verified binary backup for
+  non-empty targets, and rolls back partial writes. It intentionally does not
+  restore graph topology.
+- Customer readiness can now inspect the live MCP bridge for the Recall tool,
+  its read-only annotations, and one bounded read-only status without exposing
+  recalled context. A built-customer-archive regression prevents Recall routing
+  from shipping ahead of the runtime tool it names.
+- Explicitly triggered memories can now surface through the existing search and
+  Recall path when a literal trigger appears in the query or supplied
+  `surface_context`. The bounded path preserves lifecycle, scope, source-trust,
+  conflict, and privacy gates, does not change ranking, and never mutates access
+  or graph state.
+- Governed answer context now reports a bounded warning when a relevant candidate
+  has a stored unresolved conflict or contradictory status. Conflicted evidence
+  remains withheld, neither side is chosen automatically, and the warning does
+  not expose internal memory IDs.
+- Added a conservative, deterministic semantic conflict detector for explicit
+  propositions plus dry-run-first reversible Smart Merge/repair. Ambiguous
+  language abstains; equivalent assertions consolidate, different scopes stay
+  separate, and true conflicts require explicit winner authority unless exactly
+  one side is protected. Partial two-record writes roll back.
+- Added an opt-in foreground Session Distiller watch mode with bounded polling,
+  complete session-file enumeration, deletion/recreation handling, serial
+  processing, and per-session error isolation. It does not store insights unless
+  `--store` is explicitly supplied.
+- Added the dashboard Retrieval Explanation panel. It renders only snapshot
+  evidence actually present for a memory and labels unavailable scoring details
+  instead of inventing a hidden five-signal breakdown.
+- Expanded `doctor` output with redacted integration-contract drift
+  diagnostics, malformed-manifest handling, and customer-readiness blocking for
+  installer-owned non-ready surfaces.
+- Added typed, bounded, privacy-scrubbed file, terminal-error, and conversation
+  envelopes for every integration-manifest host family, with a loopback
+  `/events/surface` endpoint that reuses governed read-only retrieval and does
+  not persist host content.
+- Added opt-in Session Intelligence: a persistent metadata-only SQLite ledger,
+  provider-actual versus estimated usage provenance, loopback `/events/usage`
+  ingestion, versioned rate-card authority, `UNKNOWN` cost discipline, Signal
+  Cards, aggregate anti-surveillance training hypotheses, retention/export/
+  deletion controls, operator CLI, and snapshot-only dashboard panel.
+- Added signed exact-scope Team Sync bundles and a dry-run-first local CLI.
+  Imports are additive, withhold identity or semantic conflicts, regenerate
+  local embeddings, require user-directed scope/STOPPED/verified-backup gates,
+  and roll back partial writes. No cloud transport is introduced.
+- Added local content-addressed image, audio, and video attachments for memories.
+  Media is bounded, private, integrity-checked, described for text-only hosts,
+  and never sent through OCR, transcription, a model, or a network by Elefante.
+- Added ownership-safe Zed and Continue adapters with read-only detection,
+  unrelated-setting preservation, exact emitted-state fingerprints, and safe
+  uninstall. They are compatible, not externally certified.
+- Added archive and installed-payload source identity. The installer, ownership
+  manifest, bootstrap, verifier, and `doctor` now agree on semantic version,
+  exact clean source commit, and candidate/release channel before customer
+  readiness can pass.
+- Added credential-gated macOS signing and notarization for branded DMG
+  publication. Unsigned DMGs remain validation artifacts and cannot substitute
+  for release assets.
+- Added branded Windows EXE preparation/build verification and credential-gated
+  Authenticode CI publication. Unsigned EXEs remain validation artifacts and
+  cannot substitute for release assets.
+
+### Changed
+
+- JSON exports now have a documented additive migration counterpart; CSV and
+  JSON remain distinct from the checksummed binary backup/restore path.
+- Recall guidance now limits retrieval to one contextual call per user question
+  and treats terminal abstention/unavailability as a signal to continue from
+  current evidence rather than retrying or broadening retrieval.
+- Recall no longer echoes the question in its response, preserves multilingual
+  Unicode instead of expanding it into ASCII escapes, and fails closed when the
+  complete seven-field response would exceed 1,000 heuristic tokens. Its hidden
+  in-memory ledger measures the exact returned payload and context without
+  exposing `TOKEN_STATS`.
+
+### Fixed
+
+- Customer readiness no longer accepts an installer-owned Recall block in a
+  base `AGENTS.md` when a later non-empty `AGENTS.override.md` masks it.
+- Codex setup now records registration ownership only after managed Recall
+  guidance succeeds. A guidance failure removes a new owned registration or
+  restores the prior unchanged owned registration, and reports `partial` when
+  rollback itself cannot finish.
+
 ## [2.12.3] - 2026-08-25
 
 ### Fixed
@@ -35,7 +129,6 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Release-candidate tooling and workflows now derive manifest identity, archive
   names, and installation checks from the package version instead of embedding
   the previous release number or importing product dependencies before setup.
-
 ## [2.12.2] - 2026-08-05
 
 ### Changed

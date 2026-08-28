@@ -7,12 +7,16 @@
 
 ---
 
+<a id="issue-1"></a>
+
 ## Issue #1: Kuzu Database Compatibility [FIXED]
 
 **Trigger:** `RuntimeError: Database path cannot be a directory` on first dashboard launch after Kuzu 0.11.x upgrade.
 **Root cause:** Same as database/installation #3 — Kuzu 0.11.x stopped tolerating pre-existing `kuzu_db/` directory. `config.py` was eagerly creating it.
 **Solution:** Removed `KUZU_DIR.mkdir(exist_ok=True)` from `config.py`. Added `_parse_buffer_size()` for `'512MB'` → bytes conversion in `graph_store.py`.
 **Lesson:** Version upgrades can break database formats. Always check changelogs.
+
+<a id="issue-2"></a>
 
 ## Issue #2: Stats Display Showing Zero [FIXED]
 
@@ -21,6 +25,8 @@
 **Solution:** `App.tsx` line 36 reads `stats.vector_store.total_memories`.
 **Lesson:** API working ≠ Dashboard working. Test the COMPLETE user experience — API in isolation passes while UI is broken.
 
+<a id="issue-3"></a>
+
 ## Issue #3: Memory Labels Missing [FIXED]
 
 **Trigger:** Green dots with no labels — user can't identify memories without hovering.
@@ -28,12 +34,16 @@
 **Solution:** `GraphCanvas.tsx` displays truncated labels (first 3 words) below each node by default; full description in tooltip on hover.
 **Lesson:** Technical correctness ≠ user satisfaction. Ask "what does the user NEED to see?" before declaring a feature done.
 
+<a id="issue-4"></a>
+
 ## Issue #4: Dashboard Shows 11 Instead of 71 [FIXED]
 
-**Trigger:** ChromaDB has 71 memories but dashboard shows 11.
-**Root cause:** `update_dashboard_data.py` queried Kuzu (entities, count 17) instead of ChromaDB (memories, count 71). Fundamental confusion between data stores. Wasted 30 min debugging `graph_service.py` (dead code, not used).
-**Solution:** Rewrote `scripts/pipeline/update_dashboard_data.py` to pull from ChromaDB: `vector_store._collection.get(include=["metadatas", "documents"])`.
-**Lesson:** ChromaDB = memories, Kuzu = entities — different purposes, different counts. Verify the DATA SOURCE before debugging the data flow. Verify a file is actually USED before debugging it.
+**Trigger:** The vector store had 71 memories but the dashboard showed an unrelated graph-node count.
+**Root cause:** `update_dashboard_data.py` queried Kuzu entities instead of the configured vector store's memory records. Time was also spent debugging unused `graph_service.py` code.
+**Solution:** The snapshot pipeline now reads memories through the configured vector-store path and relationships through Kuzu.
+**Lesson:** Vector records are memories; Kuzu carries entities and relationships. Verify the data source and that the inspected code is actually used before debugging the data flow.
+
+<a id="issue-5"></a>
 
 ## Issue #5: API Bypassed Snapshot File [FIXED]
 
@@ -42,6 +52,8 @@
 **Solution:** Endpoint reads `dashboard_snapshot.json` only — no live Kuzu query in the request path.
 **Lesson:** Fix BOTH producer AND consumer when debugging data flow. Trace data path end-to-end; never assume one fix propagates.
 
+<a id="issue-6"></a>
+
 ## Issue #6: V3 Metadata Display — 6-Layer Bug Chain [FIXED, historical]
 
 **Trigger:** All nodes show "FACT • General" / "5/10" importance despite varied V3 classification in DB.
@@ -49,12 +61,16 @@
 **Solution:** Six sequential fixes — expanded classifier patterns; added `layer`/`sublayer` to add and reconstruct paths; standalone migration script bypassing MCP cache; fixed both color and sidebar property paths.
 **Lesson:** Data flows through 8 layers (Classifier → add_memory → ChromaDB → reconstruct → Snapshot → API → Frontend → Sidebar). Verify at EACH layer, not just endpoints. When fixing property paths, grep for ALL occurrences. Long-running servers cache imports — restart after code changes. **V3 fields no longer exist; the methodology rule survives.**
 
+<a id="issue-7"></a>
+
 ## Issue #7: Phantom Dashboard — Daemon Thread Vaporized on MCP Exit [FIXED]
 
 **Trigger:** Agent reports "Dashboard opened at http://localhost:8000". User sees blank screen or `ERR_CONNECTION_REFUSED`.
 **Root cause:** Dashboard launched via `serve_dashboard_in_thread(port=port)` as a daemon thread. MCP clients (like Agent Zero) often spin up `src.mcp.server` for a single tool call and close stdio when done. Daemon threads die instantly with the parent process — the dashboard vaporized as soon as the MCP transient process exited.
 **Solution:** `_start_dashboard_and_open()` launches dashboard as detached background subprocess: `subprocess.Popen([sys.executable, "-m", "src.dashboard.server"], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)`.
 **Lesson:** Never bind long-living HTTP servers to daemon threads inside a transient/stateless worker process. Always detach into a true subprocess.
+
+<a id="issue-8"></a>
 
 ## Issue #8: Persistent Blank Dashboard on First Launch [BUG-003, FIXED, guarded]
 
@@ -64,6 +80,8 @@
 **Guard:** `tests/test_dashboard_serializer.py -k "dashboard"` verifies readiness wait + force-restart + frontend retry/backoff.
 **Lesson:** Never open the browser before the server is ready. When refreshing data, restart the server — a stale process cannot serve a new snapshot without restart.
 
+<a id="issue-9"></a>
+
 ## Issue #9: All Dashboard Scores Stuck at 100 [BUG-004, FIXED structurally]
 
 **Trigger:** Almost all dashboard memory scores show 100. Average 94.6. Real computed scores should range 54-94 with avg ~75.
@@ -71,6 +89,8 @@
 **Solution:** Single source of truth — `src/utils/dashboard_serializer.py` exports `compute_live_score(mem)`, `compute_live_score_from_raw(meta)`, and `memory_to_dashboard_node(mem)`. MCP server and standalone script both import from this module; ~50 LOC of inline serialization deleted from `server.py`. Verified: 0 memories at score 100, avg 75.3, min 54, max 94.
 **Guard:** `pytest tests/test_dashboard_serializer.py -v`.
 **Lesson:** Never trust stored scores. Scores are derived values — always compute them live from behavioral signals. Enforce this architecturally via a single shared serializer; documentation and rules are not enough when three code paths can drift.
+
+<a id="issue-10"></a>
 
 ## Issue #10: Dashboard Private Data Exposure [BUG-028, FIXED, guarded]
 
@@ -80,6 +100,8 @@
 **Guard:** `pytest tests/test_dashboard_serializer.py -k "loopback or cors" -v`.
 **Lesson:** A dashboard that can return private memories is a private service by default, not a public API with optional hardening.
 
+<a id="issue-11"></a>
+
 ## Issue #11: Dashboard Live-Store and Browser-Mutation Bypass [BUG-031, FIXED, guarded]
 
 **Trigger:** The dashboard was documented as a read-only snapshot viewer, but `/api/graph` hydrated values from ChromaDB, `/api/search` performed live semantic retrieval, and `/api/refresh` spawned the snapshot pipeline from a browser POST.
@@ -88,6 +110,8 @@
 **Guard:** `tests/test_dashboard_serializer.py` executes snapshot graph/search/stats responses and verifies no live-store import or browser refresh route remains; production UI build passes.
 **Lesson:** A read-only inspection boundary applies to every convenience endpoint, not only the primary page load. Browser UI should never gain database authority merely to make refresh convenient.
 
+<a id="issue-12"></a>
+
 ## Issue #12: Orphaned/Stale Dashboard Process from Trashed Directory [BUG-033, FIXED, guarded]
 
 **Trigger:** Browser requests to `http://127.0.0.1:8000/api/graph` returned `HTTP 500 Internal Server Error` even though the active workspace data snapshot was valid and test suite passed.
@@ -95,6 +119,8 @@
 **Solution:** Terminated the stale process (`kill -9 7219`), regenerated the data snapshot (`python scripts/pipeline/update_dashboard_data.py`), and launched the active workspace server (`.venv/bin/python -m src.dashboard.server`). Hardened `src/dashboard/server.py` node property formatting against `None` values and added process CWD verification checks.
 **Guard:** `pytest tests/test_dashboard_serializer.py -k "null_name or graph" -v`.
 **Lesson:** When diagnosing port binding issues or HTTP 500 errors, verify the running process's CWD (`lsof -p <PID> | grep cwd`) to ensure port ownership belongs to the active workspace rather than an orphaned daemon from a trashed or moved folder.
+
+<a id="issue-13"></a>
 
 ## Issue #13: Dashboard Header Emblem Was Clipped [BUG-034, FIXED, guarded]
 

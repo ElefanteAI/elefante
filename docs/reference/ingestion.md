@@ -1,88 +1,100 @@
-# Authoritative Ingestion Protocol
+# Memory Ingestion Contract
 
-**Target**: `src.core.orchestrator.MemoryOrchestrator`
+This page documents the released `MemoryOrchestrator.add_memory()` behavior in
+v2.13.0. Elefante is LLM-free: the caller decides what is worth storing and may
+provide classification metadata; Elefante validates, enriches, persists, and
+links the record deterministically.
 
-> **Philosophy**: The Agent is the **BRAIN**, not a scribe. We do not ask "should I add this?". We ingest, process, and structure information authoritatively.
+## Input
 
----
+`elefante-Memory(action="add")` accepts content, memory type, tags, optional
+entities, local media attachments, and metadata, plus `force_new`. Governance
+metadata can opt a memory into ranked, literal-triggered, or user-locked always delivery. A successful
+write requires a memory search earlier in the same MCP session; that compliance
+gate is enforced by the server before the orchestrator runs.
 
-## The 5-Step Pipeline
+The write path does not rewrite the caller's content or remove conversational
+language. Store one durable idea per memory when practical. If the agent should
+discard an item before storage, it may send `metadata.action="IGNORE"`.
 
-Every memory ingestion (`add_memory`) MUST pass through these five stages:
+## Write sequence
 
-1.  **EXTRACT (Parse)**
-    - **Goal**: Distill raw text into pure intent.
-    - **Action**: Remove conversational fluff ("I think...", "Maybe...").
+1. **Validate and guard.** Content must satisfy the memory model. Test-like
+   records are rejected unless `ELEFANTE_ALLOW_TEST_MEMORIES=1` is set.
+2. **Create identity.** A supplied title is retained; otherwise Elefante creates
+   a deterministic title. Without `force_new`, an existing record with the same
+   title and near-identical content is reinforced instead of duplicated. A
+   title collision with different content receives a short hash suffix.
+3. **Check related knowledge.** Preference reassertions may merge into a close
+   existing preference. Other close semantic matches can mark the new record as
+   related, redundant, or contradictory. Contradiction classification uses a
+   narrow deterministic parser for explicit
+   propositions and abstains on ambiguous language; it is still heuristic, not
+   proof that one statement is correct.
+4. **Enrich metadata.** Elefante creates or normalizes a summary, concepts,
+   `surfaces_when`, source provenance, authority input, and the type-specific
+   decay rate. New records start with `access_count=1` because creation counts
+   as the first use, and `processing_status="raw"`.
+5. **Persist and link.** The complete record and embedding are written to the
+   configured vector store. Kuzu receives the memory node, source provenance,
+   supplied entity links, concept links, and any detected relationship to an
+   existing memory.
 
-2.  **CLASSIFY**
-    - **Goal**: Assign structured metadata coordinates.
-    - **Input**: Content.
-    - **Output**: `memory_type`, `domain`, and topology fields (`ring`, `topic`, `knowledge_type`) via agent ETL classification.
-    - **Rule**: Never guess. If unsure, default to `memory_type=fact`, `domain=reference`.
+## Deduplication boundaries
 
-3.  **INTEGRITY (Logic-Level Deduplication)**
-    - **Goal**: Prevent "Bag of Dots" (redundancy).
-      - **Method**: Deterministic `Subject-Aspect-Qualifier` (SAQ) key generation.
-      - **Check**: Does an ACTIVE memory with this **canonical key** already exist (in the same namespace)? - **YES**: Trigger **Reinforcement Protocol**. - **NO**: Proceed to Creation.
+The immediate write path uses title equality, near-text comparison, semantic
+similarity, and a preference-specific merge. `force_new=true` bypasses those
+checks and should be rare.
 
-4.  **WRITE (Storage)**
-    - **Goal**: Persist to persistent storage.
-    - **Vector Store**: SQLite (complete memory JSON + float32 embeddings).
-    - **Graph Store**: Kuzu (Nodes + Edges).
-    - **Rule**: Atoms only. One concept per memory.
+Namespace and canonical-key grouping are separate consolidation behavior.
+`elefante-Memory(action="consolidate")` infers or honors those values and marks
+duplicate groups; ingestion does not promise a universal Subject-Aspect-
+Qualifier key or automatic supersession.
 
-5.  **REINFORCE (Hebbian Learning)**
-    - **Goal**: Strengthen active pathways.
-    - **Action**: New memories start with `access_count = 1` (not 0).
-    - **Action**: Re-visited memories get `access_count += 1` and `last_accessed = now()`.
-    - **Co-Activation**: Memories retrieved simultaneously within the same session organically form `CO_ACTIVATED` relationships in the Graph, mathematically boosting their co-retrieval odds in the future.
+## Agent-assisted ETL
 
----
+Every new record is usable immediately. The optional ETL pair improves its
+retrieval metadata without calling an internal model:
 
-## Canonical Key Generation (SAQ)
+1. `elefante-ETLProcess` returns raw records to the connected agent and marks
+   them `processing`.
+2. The agent analyzes the content.
+3. `elefante-ETLClassify` writes a summary, concepts, and `surfaces_when`, then
+   marks the record `processed`.
 
-The SAQ string is the canonical key for deduplication. It must follow the **SAQ Pattern**:
+`ring`, `topic`, and `knowledge_type` are not fields in the released memory or
+ETL contract.
 
-**Format**: `{Subject}-{Aspect}-{Qualifier}`
-**Max Length**: 30 chars
-**Banned Words**: "Really", "Very", "Favorite", "Update", "New"
+## Retrieval and reinforcement
 
-### Examples
+Search uses the stored semantic and graph signals described in
+[`scoring.md`](scoring.md). Retrieval and automatic context delivery are
+read-only: they do not increment access metadata or create co-activation.
+The released search path also accepts explicit `surface_context` for
+case-insensitive literal matching against `trigger` and `surfaces_when`; only
+`injection_policy="triggered"` memories can surface this way, and the result is
+bounded and subject to lifecycle, scope, trust, conflict, and privacy gates.
+The default-off developer evaluation profile can record a reversible,
+trace-bound acknowledgement for delivered IDs in a separate metadata ledger.
+That is declared use, not verified task utility; it does not change ranking or
+co-activation and is not a customer ingestion step.
 
-| Raw Content                      | Bad Title             | SAQ Title               |
-| :------------------------------- | :-------------------- | :---------------------- |
-| "I really prefer dark mode IDEs" | User-Pref-Dark        | `Self-Pref-DarkMode`    |
-| "The server listens on 0.0.0.0"  | Server-Config-Listens | `Server-Config-Binding` |
-| "Do not use relative paths"      | Rule-Path-Relative    | `Dev-Path-Absolute`     |
+The release also provides an opt-in foreground Distiller
+watch mode (`distill --watch`). It enumerates all session files, detects new or
+changed metadata, processes one session at a time, and isolates per-session
+errors. It is not a daemon and it does not persist insights unless `--store` is
+explicitly supplied.
 
----
+## Lifecycle limits
 
-## Logic-Level Deduplication (Reinforce vs Supersede)
+Type decay and freshness can lower ranking. Elefante does not currently archive
+ordinary memories automatically because they are old. Governance and triggered
+delivery are released; automatic ephemeral expiry remains unimplemented.
 
-The system distinguishes between **New Knowledge** and **Reinforced Knowledge**.
+## Source authority
 
-```python
-# Pseudo-code logic in Orchestrator (LLM-free)
-canonical_key = agent_or_rules_generate_saq(content)
-namespace = route_namespace(content, tags, source)
-
-active = vector_store.find_active_by_canonical_key(
-    canonical_key=canonical_key,
-    namespace=namespace,
-)
-
-if active is None:
-    return vector_store.add(content, canonical_key=canonical_key, namespace=namespace, ...)
-
-if hash(normalize(content)) == active.content_hash:
-    orchestrator.update_access(active.id)
-    return active.id
-
-# New version of same concept
-new_id = vector_store.add(content, canonical_key=canonical_key, namespace=namespace, supersedes_id=active.id, ...)
-vector_store.mark_superseded(active.id, superseded_by_id=new_id)
-return new_id
-```
-
-**Why this matters**:
-This prevents the "Bag of Dots" where 10 memories say "I like Python" in slightly different ways. Instead, we have **1 strong node** for "Python Preference".
+- Write behavior: `src/core/orchestrator.py`
+- Memory fields and decay rates: `src/models/memory.py`
+- Optional ETL: `src/core/etl.py`
+- Consolidation: `src/core/refinery.py`
+- MCP gate and schemas: `src/mcp/server.py`

@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_backup_restore.py
-# VERSION : 2.5.2
-# CHANGED : 2026-07-22
 # PROVES  : verified backup/restore preflight, path safety, integrity, and
 #           recoverable replacement behavior for the durable data directory.
 # RUN     : .venv/bin/python -m pytest tests/test_backup_restore.py -v

@@ -1,32 +1,19 @@
-# Elefante Agent Tutorial
+# Elefante Agent Examples
 
-> **For AI Agents** - Step-by-step MCP tool usage guide
+> Applies to v2.13.0 · Audience: agents connected through MCP
 
-## First-Time Setup
+| File | Question answered |
+|---|---|
+| [`AGENT_TUTORIAL.md`](AGENT_TUTORIAL.md) | How should an agent search, store, update, and interpret memory? |
+| [`system-prompt-template.md`](system-prompt-template.md) | What minimal guidance can a host use when no equivalent instruction surface exists? |
 
-When Elefante MCP is installed, run the tutorial:
+When prior context can affect an answer, start with one bounded, read-only
+`elefante-Recall` call containing the complete question. Use
+`elefante-Memory(action="search")` for broader inspection and before writes.
+`elefante-System(action="enable")` is optional logical-mode setup, not a
+prerequisite for every operation and not a session-wide database lock.
 
-```
-Call: elefante-System with action="enable"
-Then follow: examples/AGENT_TUTORIAL.md
-```
-
-## Files
-
-| File | Purpose |
-|------|---------|
-| `AGENT_TUTORIAL.md` | Step-by-step MCP tool guide for agents |
-| `system-prompt-template.md` | Paste-in prompt for non-workspace MCP clients (Claude Desktop, etc.) |
-
-## Quick Reference
-
-### Core Tools (in order of use)
-
-1. `elefante-System` (action="enable") - Enable before any operation
-2. `elefante-Memory(action="add")` - Store a memory
-3. `elefante-Memory(action="search")` - Retrieve memories
-4. `elefante-ContextGet` - Get session context
-5. `elefante-System` (action="disable") - Release locks when done
-
----
-
+Never start by adding a memory. Search first, then write only durable
+information when the task or user authorizes it. The complete 17-tool and
+2-prompt customer contract is in
+[`../docs/reference/tools.md`](../docs/reference/tools.md).

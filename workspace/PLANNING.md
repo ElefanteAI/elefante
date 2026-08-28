@@ -1,6 +1,6 @@
 ---
 status: living
-last_updated: 2026-08-25
+last_updated: 2026-08-28
 audience: developer-agents
 authority: state + roadmap + features + aspect-plans for Elefante development
 related:
@@ -11,7 +11,7 @@ related:
 
 # PLANNING — Elefante Developer Workspace
 
-> **Single living plan.** Vision · Active Release · Roadmap · Features · Optimization · Ops · Dev · UX · Meta-process.
+> **Single living plan.** Vision · Released Product · Roadmap · Features · Optimization · Ops · Dev · UX · Meta-process.
 >
 > Read top-to-bottom for full context. Jump to a section by aspect when in doubt.
 >
@@ -21,22 +21,25 @@ related:
 
 ## §1 Vision
 
-**Elefante is a Full Signal Injection layer for AI agents.**
+**Elefante is a local memory authority that maximizes accepted task quality per
+total token.**
 
 Every AI agent runs on the same physics: a finite context window where every token either raises the probability of a correct answer or dilutes it. Most workflows lose by injecting noise — restated history, irrelevant retrievals, polite filler, stale assumptions. Elefante wins by injecting only the tokens with the highest decision-value at the moment of action.
 
-**The product is one sentence:** *Elefante maximizes signal-per-token in the agent's context window.*
+**The product is one sentence:** *Elefante gives each task the smallest governed
+set of durable context that measurably improves accepted value per total token.*
 
 User-facing definition: *"Elefante is a persistent second brain for AI agents."*
 
 ### §1.1 The Four Laws (non-negotiable)
 
-1. **Continuity** — A session is never new; it is a continuation.
-2. **Compliance** — Search before writing. Ignorance is a choice, not a constraint.
-3. **Grounding** — If it's not in the brain or the workspace, it's UNKNOWN.
-4. **Full Signal Injection (Efficiency)** — Every token Elefante injects must measurably raise the probability of a correct answer. **Quality per token is the only metric.**
+1. **Continuity** — Relevant durable context can carry across sessions; a new task is not forced to inherit unrelated history.
+2. **Compliance** — Search before a memory write so existing knowledge is reused or amended instead of duplicated.
+3. **Grounding** — Project-specific claims require current memory or workspace evidence; otherwise they are UNKNOWN.
+4. **Task Intelligence** — Retrieved context must improve accepted task value
+   per total token. A failed task has zero value, however cheaply it fails.
 
-Laws 1–3 are mechanisms; Law 4 governs.
+Laws 1–3 protect continuity and truth; Law 4 defines the product outcome.
 
 ### §1.2 Non-Goals (anti-divagation anchor)
 
@@ -45,8 +48,8 @@ Elefante is **not**:
 1. A generic AI platform (no model hosting, no agent runtime, no orchestration framework).
 2. A chat product (never owns the conversation surface).
 3. A SaaS memory store (local-first is a law, not a phase).
-4. An observability product first (debugging dashboards are *outputs* of Full Signal Injection, never the thesis).
-5. A feature-count race (competes on signal-per-token).
+4. An observability product first (debugging dashboards support Task Intelligence; they are not the thesis).
+5. A feature-count race (task improvement must be measured, not inferred from feature count).
 6. A prompting framework.
 
 The released product boundary is summarized in
@@ -66,59 +69,68 @@ The non-negotiable product shape is:
 3. An install/uninstall/upgrade contract per host, with an explicit compatibility tier: **certified**, **compatible**, or **community**.
 4. No public-by-default data surface; local memory and graph data remain loopback-bound unless the user explicitly hardens a trusted deployment.
 
-### §1.4 Trust Release gates — no beta or commercial claim before proof
+### §1.4 Product trust gates — claims require current proof
 
-| Gate | Required proof | Current state (2026-07-30) |
+| Gate | Required proof | Current state (2026-08-28) |
 |------|----------------|-----------------------------|
-| Privacy boundary | Dashboard and local APIs bind loopback by default; no wildcard CORS; documented proxy/auth responsibility | Guarded locally; dashboard and daemon boundary tests pass |
-| Write authority | Retrieval surfaces cannot mutate memory/graph state; writes use explicit, observable tools | Guarded locally; GraphQuery mutation regressions pass |
-| Data integrity | One-writer daemon, Source provenance, migration + rollback proof | Runtime and isolated recovery proofs pass. Legacy-store migrations remain stopped, backup-gated support operations and are not a fresh-install requirement. |
-| Quality | Full suite collects cleanly; targeted regressions and frontend build are green in CI | Published v2.12.3 merge proof is green: 327 tests passed, 5 skipped, and 1 slow test deselected; the isolated slow two-bridge proof and all customer-candidate/platform build lanes passed. |
-| Compatibility | Every advertised host has a tested install, reconnect, concurrent-use, upgrade, and uninstall path | In progress — Claude Code, Codex, Gemini CLI, OpenClaw, VS Code, Cursor, and Kiro bridge emission and safe uninstall are tested. An isolated native Codex CLI round trip proves configure, upgrade, user-replacement preservation, and installer-owned removal without touching real user configuration; a separate slow runtime proof runs two real bridge processes concurrently through one daemon with distinct Codex/Claude provenance. Agent Zero is a documented community path; actual host-driven reconnect and certification remain unproven. |
-| Supply chain | Runtime dependency contract is exact; high-severity production dependency findings are resolved or release-blocked | The production lock no longer contains ChromaDB. The strict hash-locked audit reports no known vulnerabilities, closing stale GAP-029. Release archives now require a verified `SHA256SUMS` manifest. |
+| Privacy boundary | Dashboard and local APIs bind loopback by default; no wildcard CORS; documented proxy/auth responsibility | Guarded; dashboard, daemon, event-ingress, media, and Session Intelligence privacy tests pass |
+| Write authority | Retrieval cannot mutate memory or graph state; protected writes require explicit authority | Guarded; search, Recall, triggered delivery, conflict repair, Team Sync, and graph-write boundaries have negative and positive regressions |
+| Data integrity | One-writer daemon, source provenance, exact build identity, migration + rollback proof | Guarded in the v2.13.0 source candidate; legacy-store migration remains stopped, backup-gated support work |
+| Quality | Full suite, targeted regressions, frontend build, locks, packages, and exact-head CI are green | The integrated source passed 690 non-slow tests with 9 skips and 1 intentional deselection plus the dashboard production build before the final documentation pass; exact-head release gates remain mandatory |
+| Compatibility | Every advertised host has an ownership-safe adapter and honest tier | VS Code, Claude Code, Cursor, Kiro, Continue, Zed, Gemini CLI, Codex, and OpenClaw are contract-tested compatible; Bob and Antigravity are preview; Agent Zero is community; vendor certification remains open |
+| Supply chain | Runtime locks are exact; archives are checksummed and source-bound; native publication fails closed without signatures | Guarded by strict release-client verification, SHA256SUMS, source identity, credential-gated DMG notarization, and Authenticode verification |
 
 ---
 
-## §2 Released Product: v2.12.3 Memory Intelligence
+## §2 Release Contract: v2.13.0 Governed Memory Intelligence
 
 ### §2.1 Outcome
 
-**Make persistent memory legible as a decision advantage, not a database inventory.**
+**Give each task the smallest safe durable-memory bundle that can change the
+next decision, while keeping every write, conflict, cost, and source boundary
+inspectable.**
 
-The dashboard must answer one commercial product question in plain language:
-what durable knowledge should shape the next agent answer, and why should a
-developer trust it? The implementation remains inside the v2.11 trust boundary:
-loopback-only, redacted snapshot-only, and read-only.
+The release extends the customer product without claiming representative Task
+Intelligence lift. All new operational surfaces stay local, explicit,
+recoverable, and bounded.
 
-### §2.2 Included in the v2.12 release
+### §2.2 Included in v2.13.0
 
-| Surface | Evidence |
-|---------|----------|
-| Product story | Briefing identifies a current durable memory and explains its evolution as assumption → evidence → decision → guard when graph relationships support it |
-| Visual system | Exact repository emblem; carbon/tusk base with copper, brass, clay, and sage semantic states; no generic purple/cyan AI-gradient treatment |
-| Data truth | Production `from`/`to` edges and legacy `source`/`target` fixtures normalize at the frontend boundary; backend label derives from configured store |
-| Showcase | Deterministic 37-memory, 11-entity, 95-edge snapshot; every memory cites repository evidence; synthetic behavior is disclosed; user data is absent |
-| Trust boundary | Dashboard remains loopback-only, redacted snapshot-only, read-only, and undeployed |
-| Documentation | Snapshot reference, operator guide, script catalog, README, changelog, and this SDD/state record are synchronized |
-| Installer | Host-aware selection, platform-specific launchers, and non-mutating dry-run behavior |
+| Surface | Customer contract |
+|---|---|
+| Recall | Default-on read-only `elefante-Recall`; 17 customer tools + 2 prompts; one bounded call per contextual question; explicit abstention |
+| Governed memory | Retention, injection policy, exact scope, user locks, current-source validation, conservative conflict detection, and dry-run-first reversible `Memory(resolve)` |
+| Local media | Bounded content-addressed image/audio/video attachments with integrity metadata and no OCR, transcription, model call, or network upload |
+| Proactive ingress | Typed file, terminal-error, and conversation envelopes through loopback `/events/surface`; literal-trigger retrieval is read-only and the event body is not persisted |
+| Dashboard | Retrieval Explanation using only snapshot evidence plus an opt-in Session Intelligence Signal Card surface |
+| Session Intelligence | Consent-gated metadata-only ledger, provider-actual versus estimated provenance, dated rate cards, outcome records, Signal Cards, aggregate training hypotheses, export, retention, and deletion |
+| Distiller and Team Sync | Foreground opt-in Distiller watch mode and signed exact-scope local Team Sync bundles; no background daemon or cloud transport claim |
+| Host coverage | Ownership-safe Continue and Zed adapters join the compatible tier; vendor certification remains separate |
+| Distribution | Exact source provenance in archives and installed state; checksummed ZIPs; credential-gated notarized DMG and Authenticode EXE publication paths |
 
-### §2.3 Remaining closure work
+Task Intelligence remains developer-only, default-off, and excluded from the
+17-tool customer profile because representative multi-task lift is not proven.
+
+### §2.3 Current release state
 
 | Work | Current proof |
-|------|---------------|
-| Visual acceptance | The source-grounded dashboard showcase and canonical branding are complete. The website received desktop/mobile dark/light, reduced-motion, and Matrix-state browser evidence before production deployment. |
-| Regression proof | v2.12.3 is the published release. PR #26 passed 327 automated tests with 5 skips and one isolated slow proof deselected; the slow proof, dashboard, dependency audit, clean-customer candidate, and macOS/Windows/Linux build lanes passed. |
-| Durable handoff | GitHub release v2.12.3 points to merge commit `5a6bb1b`; all three customer installers were independently re-downloaded and verified against the published `SHA256SUMS`. |
-| Publication | **PUBLISHED 2026-08-26 UTC** — v2.12.3 and its macOS, Windows, and Linux customer installers are public. The tag and checksums provide reproducible identity; the GitHub release object is mutable and must not be described as immutable. |
+|---|---|
+| Source integration | Feature commit `aec2d33` is integrated with current public `main`; duplicate public/development issue IDs were reconciled without rewriting published BUG-044/045 history |
+| Local candidate proof | 690 non-slow tests passed with 9 skips and 1 intentional deselection before final documentation integration; dashboard build and the 32-task/9-canary diagnostic benchmark passed while `promotion_ready=false` |
+| Publication | **IN PROGRESS under explicit owner authorization.** Exact-head CI, PR merge, tag workflow, asset download, and checksum verification remain the release gates |
+| Installed runtime | Separate operator state. Publishing v2.13.0 does not replace the user's current installed runtime or mutate durable data |
+| Website | Separate product surface. No website deployment is authorized by this core release request |
 
 ### §2.4 Approval gates
 
-The v2.12.3 publication is complete. The following production operations remain
-intentionally controlled:
+The owner explicitly authorized commit, push, PR completion, merge, tag, and
+GitHub release publication for v2.13.0. The following remain outside that
+authority:
 
-1. Apply provenance or vector-store migrations to live user data.
-2. Tag or publish any other release, deploy unrelated changes, spend money, or
-   contact third parties.
+1. Replace or reconfigure the installed customer runtime.
+2. Apply another migration to durable user data.
+3. Deploy or rewrite the website.
+4. Spend money, rotate credentials, or contact third parties.
 
 ### §2.5 Scope guard
 
@@ -142,9 +154,12 @@ Rejected alternatives remain closed without new evidence:
 ### §2.6 Resume verdict
 
 - **RESUME_SAFE:** YES — active state is here; defects/capability gaps are in [`workspace/ISSUES.md`](../workspace/ISSUES.md); integration truth is in [`agents/manifests/ide-integration.yaml`](../agents/manifests/ide-integration.yaml).
-- **PUBLISHED_PRODUCT:** v2.12.3 is live.
-- **PUBLICATION_STATUS:** Published, tagged, and checksum-verified. The GitHub release object is not immutable.
+- **RELEASE_TARGET:** v2.13.0, with the customer contract listed in §2.2.
+- **PUBLISHED_PRODUCT:** v2.12.3 until the v2.13.0 tag workflow and independent asset verification complete.
+- **PUBLICATION_STATUS:** Owner-authorized and in progress; exact refs and assets remain unset until proven.
 - **LIVE_RUNTIME:** Installation or upgrade of a user's local runtime remains a separate operator action; repository publication does not mutate it.
+- **TASK_INTELLIGENCE:** representative multi-task lift and cross-class generalization are NOT PROVEN; the evaluation surface remains developer-only and default-off.
+- **PUBLICATION_AUTHORITY:** owner authorization covers this core release only. Website deployment and installed-runtime replacement remain separate operations.
 
 ---
 
@@ -182,23 +197,50 @@ the dashboard work does not waive them.
 - Release-candidate identity derived from the package manifest rather than a previous-version literal
 - macOS, Windows, and Linux installers independently checksum-verified after publication
 
-### §3.5 Upcoming (no release or date commitment)
+### §3.5 v2.13.0 — Governed intelligence release
 
-- Expanded `elefante doctor` verification
-- Automated integration-manifest drift checks
-- Additional host certification and adapters
-- Signed and notarized native packaging
-- Proactive memory surfacing and conflict detection
-- Usage intelligence
-- Portable import and team synchronization
+- Default-on bounded Recall and reversible Codex routing
+- Governed retention/injection/scope/user authority and reversible conflict repair
+- Local media attachments and typed opt-in host-event ingress
+- Dashboard Retrieval Explanation and optional Session Intelligence Signal Cards
+- Consent-gated persistent Session Intelligence with provider-actual provenance
+- Foreground Distiller watch mode and signed local Team Sync bundles
+- Continue and Zed compatible adapters
+- Source-bound installation identity and credential-gated native packaging
 
-### §3.4 What does NOT justify v3.0.0
+### §3.6 Evidence priorities after v2.13.0
+
+This order is customer-value weighted. Benchmark mechanics and randomization are
+verification methods, not product priorities.
+
+| Priority | Customer outcome | Current state | Exit gate |
+|----------|------------------|---------------|-----------|
+| **P0 — Improve one real memory-dependent task** | The governed memory bundle increases accepted task value per total token against the source-only path | LOCAL SIGNAL RECORDED / REPRESENTATIVE VERDICT NOT PROVEN — the pre-existing canonical mission produced the recorded bounded signal, but the 2026-08-28 closure task received `no_match` and is ineligible as a second pair. There is no code defect to relabel as lift. | Terminal for this closure. Reopen only on a naturally arising task with a different pre-existing decision-changing memory and frozen eligibility before execution. |
+| **P1 — Generalize without losing trust** | Benefit repeats across independent task classes without privacy, authority, scope, contradiction, token, or latency failure | NOT PROVEN / R5 NOT ENTERED — the maintained 32-task benchmark is diagnostic-only and no eligible independent second task exists. | Terminal for this closure. A future fresh task may reopen the evidence gate; consumed or retrospective evidence may not. |
+| **P2 — Ship a recoverable customer capability** | Supported hosts receive the proven behavior with clear diagnostics and rollback | IMPLEMENTED IN v2.13.0 SOURCE CONTRACT — exact source identity, customer readiness, reversible host ownership, bounded Recall, conflict repair, import, and rollback paths are guarded. Publication evidence remains in progress. | Exact-head CI, checksummed release assets, and a clean customer install/uninstall lane. Installed-runtime replacement remains separately authorized. |
+
+### §3.7 Upcoming (no release or date commitment)
+
+- Representative Task Intelligence lift on a naturally arising independent
+  task and later cross-class generalization, without reusing consumed evidence.
+- Real-host install/reconnect/upgrade/uninstall certification for compatible
+  adapters; compatibility alone is not certification.
+- Automatic host hooks only where a host exposes a documented, permissioned,
+  ownership-safe event API. The released endpoint remains explicit opt-in ingress.
+- Background Distiller service lifecycle only after ownership, consent,
+  resource, and rollback contracts are proven.
+- Any cloud Team Sync transport only under a new privacy, authentication,
+  authorization, conflict, and deletion design; v2.13.0 is local bundles only.
+- Automatic age-based forgetting only after protected-memory and recovery
+  behavior is independently validated.
+
+### §3.8 What does NOT justify v3.0.0
 
 This plan stays on v2.x deliberately. v3.0.0 only justified by:
 
-- A user-facing memory-contract break (MemoryAdd / MemorySearch argument or result-shape rewrite). **Not planned.**
+- A user-facing memory-contract break (`elefante-Memory` action arguments or result-shape rewrite). **Not planned.**
 - A data-model change that cannot be migrated in place. **Not planned.**
-- Removal of a transport with no deprecation window. v2.11's transport change ships with `--legacy-stdio` for one release — standard semver-minor.
+- Removal of a supported transport without a documented compatibility path. **Not planned.**
 
 ---
 
@@ -209,12 +251,20 @@ This plan stays on v2.x deliberately. v3.0.0 only justified by:
 This section is the source of truth for unshipped ideas. No item below carries
 a release or date promise.
 
-- **A. Memory Intelligence** — Memory Health Score (designed, not built); Potential Conflict Detection (designed, not built); Smart Update / Merge (concept only)
-- **B. Proactive Retrieval** — Proactive Memory Surfacing (`surfaces_when` field exists; surfacing logic not built); Retrieval Explanation UI (backend done v2.1; frontend 0%)
-- **C. Dashboard & Visualization** — Usage Intelligence aggregation remains unbuilt; the v2.12 Memory Intelligence briefing and visual-system redesign are implemented
-- **D. Session Distiller Expansion** — Live Mode (designed, not built); Team Sync API (concept)
-- **E. Multi-Modal & Platform** — Multi-Modal Memory (concept); additional host certification (see §3.3); Agent Zero remains a documented community path
-- **F. Distribution Packaging** — Branded macOS DMG (build script done; CI wired; signing credentials pending); Branded Windows EXE (not built); Manual Fallback Path (shipped — `install.sh`/`install.bat`)
+- **Representative Task Intelligence proof** — one fresh independent task with a
+  pre-existing decision-changing memory, followed by independently reviewed
+  tasks from other classes if the first gate passes.
+- **Host certification** — real-host lifecycle evidence for each compatible
+  adapter, including reconnect, upgrade, user override, and uninstall.
+- **Permissioned host hooks** — automatic event forwarding only for hosts with
+  a stable documented API and explicit user consent; never infer permission
+  from the local `/events/surface` endpoint.
+- **Background Distiller service** — ownership, resource caps, consent,
+  diagnostics, and rollback before any daemonized watcher.
+- **Remote Team Sync transport** — no implementation until authentication,
+  authorization, privacy, conflict, retention, and deletion contracts exist.
+- **Automatic forgetting** — no age-based archive policy until protected-memory
+  recovery and false-positive controls are proven.
 
 ### §4.2 In design (status: draft PRD)
 
@@ -222,13 +272,12 @@ Each row links to the full PRD. **Authority:** the linked file is the source of 
 
 | Feature | PRD | Status |
 |---------|-----|--------|
-| Phase 1 installer (downloadable bundle, stable install root) | [`workspace/proposals/installer-procedure.md`](../workspace/proposals/installer-procedure.md) | Released in v2.12.2; BUG-040 upgrade hardening in progress |
-| IDE integration surface (16 IDEs, daemon, Source schema) | [`workspace/proposals/ide-integration-surface.md`](../workspace/proposals/ide-integration-surface.md) | Shared runtime and verified detected-host coverage implemented; additional adapters and certification upcoming |
-| Session intelligence (privacy-respecting telemetry) | [`workspace/proposals/session-intelligence.md`](../workspace/proposals/session-intelligence.md) | DRAFT |
-| Task Intelligence Pipeline (bounded Task Briefs + controlled outcome evaluation) | [`workspace/proposals/retrieval-effectiveness.md`](../workspace/proposals/retrieval-effectiveness.md) | Preliminary holdout showed zero lift; returned to Phase 1 for task-local evidence redesign; no client or public surface |
-| Memory identity | [`workspace/proposals/memory-identity.md`](../workspace/proposals/memory-identity.md) | DRAFT |
+| Host integration surface (daemon, adapters, ownership schema) | [`workspace/proposals/ide-integration-surface.md`](../workspace/proposals/ide-integration-surface.md) | CORE SHIPPED IN v2.13.0 — shared runtime, detected-host coverage, ownership-safe adapters, Zed, and Continue are in the release contract; external certification and future adapters remain open |
+| Session intelligence (local token-financial usage signals) | [`workspace/proposals/session-intelligence.md`](../workspace/proposals/session-intelligence.md) | SHIPPED IN v2.13.0 — explicit consent, persistent metadata-only ledger, actual-versus-estimated provenance, loopback provider ingress, dated rate cards, `UNKNOWN` cost discipline, Signal Cards, aggregate anti-surveillance training hypotheses, retention/export/delete controls, and snapshot-only UI. No provider billing, employee ranking, or causal-value claim is inferred. |
+| Task Intelligence (eligible task → failed-stage diagnosis → one causal repair → behavioral outcome) | [`workspace/proposals/retrieval-effectiveness.md`](../workspace/proposals/retrieval-effectiveness.md) | DEVELOPER-ONLY / DEFAULT-OFF / REPRESENTATIVE LIFT NOT PROVEN — R5 was correctly not entered because no eligible independent second task with pre-existing decision-changing memory exists. The maintained 32-task benchmark is diagnostic-only; consumed or retrospective evidence cannot promote the feature. |
+| Memory identity | [`workspace/proposals/memory-identity.md`](../workspace/proposals/memory-identity.md) | DEFERRED DESIGN REFERENCE — no schema implementation unless Task Intelligence evidence first proves a state/scope failure and local benefit from resolution |
 
-### §4.3 Active (status: shipping)
+### §4.3 Released design record
 
 #### Memory Intelligence dashboard SDD — accepted implementation
 
@@ -292,11 +341,10 @@ boundary, edge, and showcase regressions; all three views rendered at a desktop
 viewport; Decision Graph trails and relationship labels visually inspected;
 exact emblem visually inspected; full Python/routing/emoji/diff checks green.
 
-**Next:** keep both draft PRs unmerged until the owner has reconciled the
-Vercel deployment source, prepared the Contact mail/CAPTCHA configuration, and
-explicitly authorized the core release. Publish the core tag and installers
-first; verify downloaded assets; then advance, merge, and deploy the exact
-green website candidate.
+**Next:** keep dashboard claims tied to released behavior. Task Intelligence
+remains development-only until a valid multi-task evaluation demonstrates
+outcome lift; website production state must be verified separately before any
+public claim is changed.
 
 ### §4.4 Shipped (status: shipped — link to reference)
 
@@ -304,10 +352,12 @@ green website candidate.
 |---------|------------|-----------|
 | Token Intelligence Layer (per-call TOKEN_STATS, type budgets, density warnings) | v2.5.0 | [`docs/reference/token-intelligence.md`](../docs/reference/token-intelligence.md) |
 | 5-signal scoring (vector / concept / co-activation / authority / temporal) | v2.7.0 (post BUG-016/017/018) | [`docs/reference/scoring.md`](../docs/reference/scoring.md) |
-| 16 MCP tools + 2 prompts | v2.10.0+ | [`docs/reference/tools.md`](../docs/reference/tools.md) |
+| 17 customer MCP tools + 2 prompts, including bounded Recall | v2.13.0 | [`docs/reference/tools.md`](../docs/reference/tools.md) |
 | Compliance Gate (search before write) | v2.0.0+ | [`docs/reference/architecture.md`](../docs/reference/architecture.md) §Compliance Gate |
 | Memory Intelligence dashboard with live-computed scores | v2.12.0 | [`docs/reference/dashboard-snapshot.md`](../docs/reference/dashboard-snapshot.md) |
-| Transaction-scoped Kuzu locking | v1.1.0 | [`docs/reference/architecture.md`](../docs/reference/architecture.md) §Transaction-Scoped Locking |
+| Customer-global installer, source-bound identity, and runtime-only platform archives | v2.12.2; source identity current in v2.13.0 | [`docs/how-to/install.md`](../docs/how-to/install.md) |
+| Governed memory, conflict repair, triggered event ingress, media attachments, Retrieval Explanation, Session Intelligence, Live Distiller, local Team Sync, Zed/Continue adapters, and native packaging gates | v2.13.0 | [`docs/reference/architecture.md`](../docs/reference/architecture.md) |
+| Transaction-scoped Kuzu locking | v1.1.0 | [`docs/reference/architecture.md`](../docs/reference/architecture.md) write path and trust boundary |
 
 ### §4.5 Rejected (status: rejected — do not re-litigate)
 
@@ -320,21 +370,43 @@ v2.10.0 journal and changelog; reopen only with new user or retrieval evidence.
 
 ### §5.1 Active blockers
 
-See the release blockers in §2.3.
+- Task Intelligence has evaluation infrastructure but no demonstrated increase
+  in accepted task value per total token across a representative multi-task
+  corpus.
+- No second independent causal lift is proven. A real release-candidate
+  validation task arose naturally, but Task Intelligence correctly abstained:
+  both pre-existing records were too generic to change that task. After the
+  source-provenance defect was verified, one managed task-local invariant was
+  captured for future work; it cannot be reused retroactively as lift evidence.
+- Default Task Brief injection remains blocked until the evaluation proves benefit without unacceptable token cost or regressions.
+- Governance, Recall, conflict repair, and source identity are in the v2.13.0
+  release contract. Task Intelligence evaluation remains developer-only.
+- BUG-054 is integrated into v2.13.0. The current installed runtime remains a
+  separate operator surface because this release task does not authorize a
+  silent local upgrade.
 
 ### §5.2 Performance / efficiency improvements
 
 | Area | Status | Reference |
 |------|--------|-----------|
-| Token-budget enforcement per memory type | SHIPPED v2.5.0 | `docs/reference/architecture.md` §Token Intelligence |
-| Co-activation persistence across restarts | SHIPPED v2.7.0 (BUG-018 fix) | `workspace/postmortems/memory.md` Issue #13 |
-| Smoothed vector baseline (composite_score floor) | SHIPPED v2.7.0 | `docs/reference/architecture.md` §Cognitive Multi-Signal Scoring |
-| Intent-gated specification override | SHIPPED v2.7.0 (BUG-017 fix) | `workspace/postmortems/memory.md` Issue #12 |
-| ChromaDB query-with-where workaround | SHIPPED v2.9.0 (BUG-022 fix) | `workspace/postmortems/memory.md` Issue #14 |
+| Token-budget enforcement per memory type | SHIPPED v2.5.0 | [`docs/reference/token-intelligence.md`](../docs/reference/token-intelligence.md) |
+| Co-activation persistence across restarts | Historical v2.7.0 foundation; current explicit-use boundary is unreleased development (BUG-048) | [`workspace/postmortems/ai-behavior.md`](postmortems/ai-behavior.md#issue-16) |
+| Smoothed vector baseline (composite-score floor) | SHIPPED v2.7.0 | [`docs/reference/scoring.md`](../docs/reference/scoring.md) |
+| Intent-gated specification override | SHIPPED v2.7.0 (BUG-017 fix) | [`workspace/postmortems/memory.md`](../workspace/postmortems/memory.md#issue-12) Issue #12 |
+| Legacy Chroma query-with-filter workaround | SHIPPED v2.9.0 (BUG-022 fix; legacy backend only) | [`workspace/postmortems/memory.md`](../workspace/postmortems/memory.md#issue-14) Issue #14 |
 
 ### §5.3 Planned optimization work
 
-(None during the Trust Release; correctness and release gates take priority.)
+- Run the exact sealed real-memory calibration pair only after deterministic
+  preflight is green and with explicit cumulative token caps.
+- Add independently reviewed real-memory tasks from different task classes;
+  never reuse the consumed preliminary holdout for promotion.
+- Measure black-box acceptance, retries, corrections, total input-plus-output
+  token cost, latency, privacy, and failure stage independently; compare the
+  combined accepted-value-per-total-token result only within frozen paired
+  tasks.
+- Keep the extra Task Intelligence tool and pilot delivery default-off until a fresh
+  representative holdout demonstrates net task improvement.
 
 ---
 
@@ -346,107 +418,34 @@ See the release blockers in §2.3.
 |---------|--------|-------|
 | Live provenance backfill | Dry-run proven; apply intentionally not run | Explicit user authorization |
 | Existing legacy Chroma-store transition | Isolated migration proof passes; no live legacy store was opened or changed | Explicit user authorization |
-| Release formation | Test-green uncommitted candidate | Version audit, cohesive commits, release authorization |
+| Release formation | v2.13.0 publication is owner-authorized and in progress | Exact-head CI, merge, tag workflow, downloaded assets, and checksum verification |
 
 ### §6.2 Operational improvements upcoming
 
-- `elefante doctor` extended scope for full self-protocol coverage
 - Host-driven certification runs for each advertised compatible adapter
+- Real credentialed notarized DMG and Authenticode EXE publication evidence
 
 ### §6.3 Operational reference (already shipped)
 
 - Backup: `scripts/lifecycle/backup_elefante_data.py`
 - Restore: `scripts/lifecycle/restore_elefante_data.py`
 - Restart: `scripts/lifecycle/restart_elefante.py`
-- Factory reset: `scripts/lifecycle/reset_factory.py`
+- Factory reset (developer/privileged operation; not included in customer archives): `scripts/lifecycle/reset_factory.py`
 
 Reference: [`docs/how-to/`](../docs/how-to/).
 
-### §6.4 Hermes integration (live 2026-05-02)
+### §6.4 Hermes integration — historical evidence only
 
-**Status:** Wired. The historical Hermes verification predated the 16-tool atomic surface consolidation; current inventory is source-derived by `scripts/ci/list_mcp_tools.py`.
+Hermes was tested as an MCP consumer on 2026-05-02, before Elefante's current
+daemon, customer-global installer, and consolidated 16-tool surface. Those
+commands, paths, provider settings, temporary verifiers, and runtime results are
+historical evidence in §10 and Git history—not current setup guidance.
 
-**Wiring (user-side, persistent in `~/.hermes/config.yaml`):**
-
-```yaml
-mcp_servers:
-  elefante:
-    command: /Volumes/OWC2TB/2026-M5/AI Projects/elefante/.venv/bin/python
-    args: [-m, src.mcp.server]
-    env:
-      PYTHONPATH: /Volumes/OWC2TB/2026-M5/AI Projects/elefante
-    enabled: true
-```
-
-**Why this shape:** stdio transport (no daemon yet — that ships v2.11.0 per §3.2). `PYTHONPATH` env satisfies `python -m src.mcp.server` from any CWD; no wrapper script needed (Documentation Skill: existing entry point sufficient).
-
-**Prerequisite installed:** `mcp` SDK pinned in Hermes's uv-managed venv (`uv pip install --python <hermes-venv>/bin/python mcp` → `mcp==1.27.0`). Hermes treats `mcp` as optional; without it, `hermes mcp test` raises `StdioServerParameters not defined`.
-
-**Known limitation (closes with v2.11.0):** stdio-per-client means every Hermes session spawns its own Elefante subprocess and competes with any IDE-attached instance for the Kuzu single-writer lock. This is **GAP-025** — closure is the v2.11.0 daemon work. Until then, run Hermes and IDE Elefante sessions sequentially, not concurrently.
-
-**Closes the loop:** Hermes is now Elefante's first non-IDE consumer. Every Hermes session reads/writes through the live MCP surface, exercising the Closed Surface Map under real load — the measurement that makes the v2.10.0 → v2.11.0 restructure decisions empirical, not imagined.
-
-**Verification command:** `cd hermes-agent && .venv/bin/hermes mcp test elefante` — must show all 20 `elefante-*` tools.
-
-#### §6.4.1 GAP-028 — Hermes LLM provider configuration (OPEN, user decision)
-
-**Tracked in:** [`workspace/ISSUES.md`](../workspace/ISSUES.md) GAP-028 row.
-
-**Current state (factual, from `hermes status`):**
-- `Model: (not set)` · `Provider: Auto` · `.env file: ✗ not found`
-- Native API keys checked: OpenRouter ✗ · OpenAI ✗ · NVIDIA ✗ · Z.AI/GLM ✗ · Kimi ✗ · StepFun ✗ · MiniMax ✗ · MiniMax-CN ✗ · Firecrawl ✗ · Tavily ✗ · Browser Use ✗ · Browserbase ✗
-- Until at least one is set, `hermes -z "..."` cannot invoke an LLM agent loop. Hermes is wired to Elefante (Layers 1+2) but cannot **engage** Elefante (Layer 3 from the Hermes side).
-
-**User intent (2026-05-02):** route certain tasks through DeepSeek.
-
-**Decision matrix — DeepSeek access paths:**
-
-| Path | How | Pros | Cons |
-|------|-----|------|------|
-| **A. Direct DeepSeek (Hermes-native, RECOMMENDED)** | Set `DEEPSEEK_API_KEY` in `~/.hermes/.env`; pick model: `deepseek-v4-pro` / `deepseek-v4-flash` / `deepseek-r1` / `deepseek-chat`. Hermes recognizes `DEEPSEEK_API_KEY` + `DEEPSEEK_BASE_URL` natively (verified in `hermes_cli/config.py` `OPTIONAL_ENV_VARS`). | Lowest latency; direct billing; native provider routing in Hermes; no middleman | Single-provider; pair with fallback if outage resilience matters |
-| **B. OpenRouter (multi-provider through one key)** | Set `OPENROUTER_API_KEY` in `~/.hermes/.env`; pick model: `deepseek/deepseek-chat` or `deepseek/deepseek-r1`. | One key, many models; built-in fallbacks; aggregate billing | Extra network hop; OpenRouter pricing markup |
-| **C. Hybrid — DeepSeek primary + OpenRouter fallback** | Both keys set; `~/.hermes/config.yaml` `fallback_providers:` lists OpenRouter | Best resilience; covers rate limits and DeepSeek outages | Two API keys to manage |
-
-**Task-routing options (which DeepSeek model for what):**
-
-| Task type | DeepSeek model | Why |
-|-----------|----------------|-----|
-| Long-context code reasoning | `deepseek-chat` (V3) | 128K context, strong on code |
-| Deep reasoning / planning | `deepseek-reasoner` (R1) | Reasoning trace; better at multi-step decomposition |
-| Cheap routine completion | `deepseek-chat` (V3) | Lowest $/M tokens in DeepSeek line |
-
-**Hermes task-routing mechanism (existing):** `~/.hermes/config.yaml` supports `fallback_providers:` for failover. Per-task model selection requires either (a) per-toolset model override (Hermes feature — verify in Hermes docs) or (b) explicit `--model` flag on each `hermes -z "…"` call. Pick A or C above; pin task→model mapping in CLI helper if needed.
-
-**User-side action to close GAP-028 (one paste, one verifier run):**
-
-State as of 2026-05-02 (already done by agent — no action needed):
-- `~/.hermes/.env` created (chmod 600) with `DEEPSEEK_API_KEY=` line ready for paste
-- `~/.hermes/config.yaml` set to `model: deepseek-v4-flash` (smaller / faster; user preference 2026-05-02)
-- `hermes status` confirms `Model: deepseek-v4-flash`, `Provider: DeepSeek`, `.env file exists`
-- Verifier script at `/tmp/elefante-gap-028-verify.py` (Layer 0+1+2+3 round-trip test)
-
-What you do — single edit + single verify:
-
-```bash
-# 1. Paste your DeepSeek API key into the existing line in ~/.hermes/.env
-#    Get key from: https://platform.deepseek.com/api_keys
-$EDITOR ~/.hermes/.env       # set DEEPSEEK_API_KEY=sk-... after the existing `=`
-
-# 2. (Optional) Swap model in ~/.hermes/config.yaml line 1:
-#    deepseek-v4-flash     (default — fastest, smallest, lower cost)
-#    deepseek-v4-pro       (best reasoning, higher cost)
-#    deepseek-r1 / deepseek-reasoner   (reasoning trace)
-#    deepseek-chat / deepseek-v3       (general)
-
-# 3. Verify the loop closes end-to-end
-cd "/Volumes/OWC2TB/2026-M5/AI Projects/hermes-agent"
-.venv/bin/python /tmp/elefante-gap-028-verify.py
-# Expected: Layer 0 PASS, Layer 1+2 PASS, Layer 3 PASS, "=== GAP-028: CLOSED ==="
-```
-
-**Acceptance for GAP-028 closure:** Verifier reports Layer 3 PASS — Hermes called `elefante-MemorySearch` and surfaced memory id `f1fb77f5` (the Workflow Lifecycle memory). At that point the recursive Hermes <-> Elefante loop is closed for the first time **from the Hermes side**, not just Claude Code.
-
-**Architect recommendation:** **Path A (Direct DeepSeek)** for first close — Hermes natively supports `DEEPSEEK_API_KEY`, lowest latency, no OpenRouter detour. Add Path C (hybrid) later only if outage resilience becomes a real concern.
+Current Hermes installation, provider configuration, compatibility, and runtime
+health are **UNKNOWN** until reverified. Do not advertise or configure Hermes
+from the 2026 snapshot. Current host claims come only from
+`agents/manifests/ide-integration.yaml`; current MCP inventory comes from
+`scripts/ci/list_mcp_tools.py`.
 
 ---
 
@@ -459,7 +458,7 @@ cd "/Volumes/OWC2TB/2026-M5/AI Projects/hermes-agent"
 
 ### §7.2 Active enforcement
 
-- [`tests/test_developer_routing.py`](../tests/test_developer_routing.py) — 18 tests passing; BUG-007 routing drift guards + BUG-026 forbidden-filename-pattern guard.
+- [`tests/test_developer_routing.py`](../tests/test_developer_routing.py) — BUG-007 routing drift, active-link, release-version, and BUG-026 forbidden-filename guards. Exact pass counts belong to the current verification run, not this plan.
 
 ### §7.3 Planned dev process improvements
 
@@ -477,7 +476,7 @@ cd "/Volumes/OWC2TB/2026-M5/AI Projects/hermes-agent"
 - Installer failure recovery routing — FIXED (BUG-019 / BUG-020 closure); persisted summary/status/log files surfaced in installer GUI
 - Dashboard blank-on-first-launch — FIXED v2.8.x (BUG-003); readiness wait + forced restart on refresh + frontend retry/backoff
 
-### §8.2 UX backlog (no canonical home until §4.1 backlog absorbs)
+### §8.2 UX backlog
 
 - Health indicators on graph nodes (idea)
 - Rich tooltips on signal hubs (idea)
@@ -485,7 +484,8 @@ cd "/Volumes/OWC2TB/2026-M5/AI Projects/hermes-agent"
 
 ### §8.3 Open UX decisions
 
-- Whether `docs/user/` should grow proactively or wait for v2.11+ (currently 35 LOC — almost empty)
+- Add user documentation only when a released workflow needs it; keep developer
+  plans and evidence out of `docs/`.
 
 ---
 
@@ -539,6 +539,32 @@ This section is the chronological record of curation events, decisions, and abso
 
 | Date | Event | Driver | Measurement |
 |------|-------|--------|-------------|
+| 2026-08-28 | **The fourteen-item unfinished-feature closure was driven to its truthful terminal state.** Twelve product slices are implemented in development: semantic conflict detection; reversible Smart Merge/repair; typed file, terminal-error, and conversation event ingress; Retrieval Explanation UI; opt-in persistent Session Intelligence with provider-actual usage, rate-card authority, Signal Cards, and aggregate training hypotheses; foreground Live Distiller; signed local Team Sync API/CLI; Zed and Continue adapters; local multi-modal attachments; branded Windows EXE and signed/notarized release workflow gates; and the current installed store's GAP-025 graph migration. Representative multi-task lift and P1 cross-class generalization are closed as **NOT PROVEN** evidence verdicts because no eligible independent task exists; no synthetic benchmark or code change was relabelled as product lift. | The owner required every item to reach an explicit terminal result instead of remaining in a vague pending bucket. The closure separates code completion, live data migration, external release/certification operations, and empirical product evidence. | Exact-tree proof: 678 fast tests passed, 4 skipped, 1 intentional deselection; focused combined feature suite 166 passed with 1 deselection; installer/host contracts 92/92; release/DMG/Windows contracts 36/36; routing/docs 38/38; Task Intelligence benchmark/report 23/23; isolated MCP self-protocol 48/48; dashboard production build, scoped Ruff, and `git diff --check` passed. Benchmark verifier: 32 tasks, 3 classes, 0 errors, 9 promotion-eligible diagnostics, `promotion_ready=false`. The live migration added five Memory entities and five source links after a verified backup and returned to customer-ready. No commit, push, merge, release, deployment, installed-runtime replacement, or host configuration mutation occurred. Native signing/notarization and real Zed/Continue certification remain external execution gates, not unfinished implementation claims. |
+| 2026-08-27 | **The multi-thread closure pass finished every safe code-only slice and left external gates explicit.** Luna Max independently audited retrieval explanation, conflict/repair, and operational packaging/host gaps. Development now includes a truthful snapshot-evidence Retrieval Explanation panel, dynamic explicit-config-path handling for dashboard isolation, backward-compatible developer installer dry runs while customer bundles remain identity-bound, deterministic Distiller smoke fixtures, clean server/import lint, and a credential-gated macOS DMG signing/notarization handoff that publishes no unsigned DMG. | The owner asked to tackle each outstanding feature or flag until the safe work was complete, while preserving the dirty checkout and not fabricating Task Intelligence lift, credentials, releases, or customer-data mutations. | Exact-tree proof: 554 non-slow tests passed, 9 skipped, 1 intentional deselection; sealed installer/dashboard acceptance 2/2; installer/release/DMG/config checks 43/43; isolated MCP self-protocol 48/48; dashboard UI production build passed; benchmark verifier reports 0 manifest errors, 9/32 promotion-eligible tasks, `diagnostic_only=true`, `promotion_ready=false`. No commit, push, merge, release, deployment, installed-runtime replacement, host mutation, or durable-data mutation occurred. Remaining gates are representative Task Intelligence lift, semantic conflict/repair contract, live Distiller lifecycle, Team Sync, provider-actual usage, host certification, Windows EXE, Apple signing credentials, and explicit existing-user provenance migration authority. |
+| 2026-08-27 | **The highest-evidence customer gaps were closed in development without promotion.** Memory Intelligence now emits deterministic health labels/reasons, persisted contradiction counterparts, snapshot graph degree, usage aggregates, and a validated local health score in both live refresh and the offline pipeline. The JSON memory export now has a guarded additive importer with dry-run-first validation, local embedding regeneration, ID-collision protection, stopped-runtime confirmation, verified-backup gating for non-empty stores, and rollback on partial writes. Bounded literal-trigger memory surfacing now runs through the existing search/Recall selection boundary when an explicit query or `surface_context` contains a configured trigger; known stored conflicts are withheld and surfaced as bounded warnings through answer delivery. | The owner asked to complete the most outstanding unfinished product features while preserving release and runtime boundaries. The selected slices are reversible, inspectable, testable, and do not require inventing Task Intelligence lift or mutating durable customer data. | Focused importer/proactive/conflict/routing suites: 132 passed, 1 deselected; importer regression: 11 passed; isolated self-protocol: 48/48; full fast suite: 545 passed, 9 skipped, 1 deselected, 4 known unrelated failures, and 1 manual-test collection error; UI production build passed. No commit, push, merge, release, deployment, installed-runtime replacement, host mutation, or durable-data mutation occurred. Remaining P0/P1 Task Intelligence lift, semantic conflict detection/automatic repair, host event adapters, provider-actual usage, live distiller, Team Sync, extra-host certification, and signed packaging remain gated or unbuilt. |
+| 2026-08-27 | **Final verification hardened the completed development slices.** The JSON importer now requires `--confirm-stopped STOPPED` before any apply write, and live dashboard refresh now includes its usage summary without a missing-symbol failure. | The final exact-tree audit added the safety guard and caught the live-refresh import defect before closure. | The focused importer/dashboard checks pass 12/12; the broader focused suite passes 143 with 1 deselected; the isolated real MCP self-protocol passes 48/48; the final fast suite reports 545 passed, 9 skipped, 1 deselected, 4 known unrelated failures, and 1 manual-test collection error. |
+| 2026-08-27 | **Three additional safe product gaps are now implemented in development.** The active checkout has a conservative explicit-proposition semantic conflict detector, an opt-in foreground Distiller watcher that enumerates all session files and isolates failures, and redacted `doctor` integration-manifest drift/readiness diagnostics. The published v2.12.3 client and installed customer runtime remain unchanged. | The owner asked to fix the outstanding product gaps while preserving the dirty checkout and the evidence boundary around Task Intelligence, automatic repair, host automation, provider usage, and release credentials. | Focused doctor/conflict/persistence proof: 43 passed, 1 skipped; doctor/install contract proof after internal-surface correction: 17 passed; Distiller live-mode proof: 17 passed; developer routing: 38 passed; corrected full non-slow suite: 580 passed, 9 skipped, 1 deselected; isolated MCP self-protocol: 48/48; benchmark verifier: 0 errors, 9/32 promotion-eligible, `diagnostic_only=true`, `promotion_ready=false`; `git diff --check`, compilation, and Ruff checks for all touched implementation/test files pass. No commit, push, merge, release, deployment, installed-runtime replacement, host mutation, or durable-data mutation occurred. |
+| 2026-08-26 | **The token-financial companion thesis was curated before implementation.** The existing Session Intelligence PRD now owns local usage facts and Signal Cards; governed semantic Memory owns durable user goals and constraints; Task Intelligence and `retrieval-effectiveness.md` remain the only authorities for accepted-value and causal outcome evidence. The draft adds an explicit user grooming loop, actual-versus-estimated evidence classes, typed provenance, versioned rate provenance, anti-overfit and anti-surveillance rules, a Canadian/EU privacy and consent gate, user access/deletion/export controls, and Phase 0 acceptance before real event persistence. | The owner identified the measured Recall response reductions as the shape of a larger local second-brain opportunity: understand a user's AI economics and return adoption or training signals, while explicitly asking not to overfit the three examples. | No runtime, event store, provider-usage ingest, website claim, release, or deployment changed. The exact Recall benchmark remains canonical in `retrieval-effectiveness.md §15.1`. A live search-before-write found no equivalent token-financial-companion memory; user-directed insight `bff45c38-0e60-4492-9c01-1b1bdacb1788` was stored and then amended in place after the grooming contract was finalized. A future grooming/location search retrieved it at rank 1 and confirmed both the loop and canonical path. The installed v2.12.3 surface still has 16 tools and no Recall, so governed Recall delivery remains unverified. |
+| 2026-08-15 | **BUG-047 short-query recurrence repaired using Elefante's own Recall output.** The independently requested task `use Elefante to improve Elefante` caused live Recall to supply generic Developer Etiquette. Replaying that record through the current development selector showed that the repeated product name was its only distinct lexical match, yet the candidate became both a direct answer and an actionable constraint. The shared v2 selector now requires two distinct text matches for multi-term questions while preserving one-term factual answers and explicit governing or structural paths. | Project identity identifies the subject, not the task-specific evidence needed to answer or act. One high semantic score plus a repeated name could still bypass the earlier long-query BUG-047 guard and spend context on generic process text. | The regression failed first with `direct_answer=1.0`, one of three distinct query terms matched, and the memory selected. After the repair, all 34 Task Brief compiler tests and 14 Recall/runtime answer-context tests pass. The installed runtime, live memory store, version, branch history, merge state, release, and deployment were not changed. |
+| 2026-08-14 | **Task acquisition became an active product loop instead of idle benchmark waiting.** A naturally arising exact-candidate validation task entered Task Intelligence before completion. The pilot omitted both generic pre-existing records and returned a 21-token abstention, so the task proceeded from repository and artifact evidence. After the durable-source defect was fixed and verified, one managed Elefante-scoped release invariant was captured, search-first, as memory `726655b2-4941-4602-a1ba-bdbb9ed66eae`; Recall supplied it for a matching future question. A model-free lifecycle check then delivered only that record, declared its use, and recorded a test-accepted outcome without changing ranking. | The prior wording incorrectly treated the lack of a benchmark task as a reason to stop working. Product work must continue; Elefante should abstain when memory is not discriminative, then retain only verified reusable task evidence for later independent use. | Initial trace `bc145b3c-87dd-48fe-a35a-71589483e113`: 0 delivered, 2 omitted, 21 estimated tokens. Delivery/outcome trace `61f1e713-5776-4bf1-a43b-3f9deecc7502`: 1/1 memory delivered and declared used, 217 estimated tokens, test-accepted outcome, zero ranking mutation. This proves the acquisition/delivery/ledger path, not causal lift: the memory was captured after the source task and the delivery check had no source-only control. |
+| 2026-08-14 | **BUG-054 candidate provenance recurrence repaired before installation.** The first newly downloaded green macOS candidate embedded GitHub's temporary pull-request merge SHA instead of the durable reviewed branch SHA; its checksum also named `dist/...`, which failed after artifact download flattened the directory. Installation stopped before changing the live runtime. Both downloadable candidate workflows now check out the PR head SHA (or `github.sha` outside PRs), and the dedicated candidate emits a portable checksum manifest. | Runtime identity is useful only when the recorded commit is durable and reproducible. GitHub's default PR checkout made the archive internally consistent but not a trustworthy exact-head customer candidate. | A failing workflow regression reproduced the missing durable-source contract, then passed after the repair. Local gates: 20 release-pipeline, 114 installer/release-focused, and 36 routing tests; workflow YAML and whitespace pass. Exact head `b05d794` then passed all seven required GitHub checks. The downloaded artifact's checksum verifies, both identity files report full SHA `b05d794078c7121c6da009d7fe6e0ded322b721f`, the Finder launcher is executable, the local dry run is non-mutating, and the hosted macOS job completed a fresh install, health check, and uninstall. The legacy live runtime was not replaced; no merge, version, release, or deployment changed. |
+| 2026-08-14 | **Selective Recall beat full-store injection on the same accepted mission answer, and a second future-task memory was captured without claiming lift.** One isolated Sol Max run received the one governed mission record; the paired arm received all six live records with lifecycle metadata. Two preliminary screens were discarded rather than repaired post hoc: one exposed the expected answer in its response choices, and one judge confused `controlled` with a no-memory `control`. | Full-store injection is a real competing policy, not a harmless superset: it spends tokens on test, stale, and contradictory records. The live inventory also proved that no second eligible decision memory existed, so more selector tuning could not create representative evidence. | Final frozen A/B: both arms returned the exact accepted criterion, selective Recall used 14,912 total tokens, and full-store injection used 15,420; selective saved 508 tokens (3.3% of the full arm) with no value loss. The read-only search found only the canonical mission eligible. The user's previously explicit evidence/critical-thinking/token-discipline protocol was then stored separately as protected ranked memory `6550d201-75a9-4de6-a7b4-bdb864836920`; fresh Recall supplied only it at score 0.976. Because capture followed the diagnostic, it is eligible only for a later independently arising task. Rollback is recoverable archive of that ID. No source behavior, installed runtime, version, merge, release, or deployment changed. |
+| 2026-08-14 | **A real decision-continuity task produced the first bounded correctness signal, and its positive control corrected an overfit selector repair.** The negative screen found Recall injecting unrelated process constraints. The first lexical guard removed that noise but also rejected the user-locked canonical mission when the user paraphrased it. The final selector keeps the lexical guard for ordinary role labels and separately recognizes a semantically strong, user-locked, scoped directive on a decision question. Capture guidance now says to use ranked delivery when paraphrases should work and never choose literal-triggered policy merely to pass one verification question. | The live mission had existed before the new fresh-session question, ranked first, and contained the governing decision absent from the clean control. It was nevertheless blocked by literal-only capture metadata and then by the first overfit lexical repair. This was the earliest causal failure; more architecture was not required. | The user-owned mission record was changed reversibly from `triggered` to `ranked`. The development selector run against the real live store selects only `product-north-star` for the paraphrased decision and abstains on the unrelated issue-2 question. In a seeded three-pair Sol Max component screen, treatment passed 3/3 and control answered `UNKNOWN` 0/3; 452 additional total tokens changed accepted value from zero to three. Exact-tree gates pass: 473 fast tests with 4 skips and 1 slow deselection, the isolated slow bridge test, 48/48 self-protocol checks, scoped Ruff, and whitespace. This is a one-task local signal, not representative lift or release authority. Rollback for the live record is `injection_policy=triggered` with its existing triggers. |
+| 2026-08-14 | **BUG-047 answer-selection recurrence repaired from a live real-task screen.** Recall was asked whether to implement the three actual open GitHub product issues. It supplied unrelated SDD/developer-etiquette constraints each time instead of abstaining. | One selected memory matched only 3 of 28 task terms (10.7%) and passed solely because it was classified as a constraint. This was a concrete harmful-context and token-cost blocker, not missing architecture. | The exact issue-2 false positive now abstains model-free and removes 167 irrelevant context tokens (188 → 21). The first diagnostic answer pair preserved acceptance but did not improve total-token value (14,770 repaired versus 14,761 noisy), so it was stopped and not relabelled as lift. |
+| 2026-08-14 | **BUG-054 runtime provenance closed in development without mutating the live installation.** Customer archives now bind their publication metadata to an internal payload identity; bootstrap and delegated install reject disagreement before recording schema-v3 runtime identity; `doctor` compares the installed version, source commit, cleanliness, and release channel with the payload. Development bundles identify themselves as `development`. | The live runtime executed unreleased Recall code while reporting the same `2.12.2` semantic version as the published release. Version-only evidence could not distinguish stable, candidate, or developer code and therefore could not support a trustworthy task-outcome or release claim. | Focused installer/release tests cover legacy and malformed identity, archive/payload drift, delegated-install drift, upgrade, repair, known-good reinstall, and exact-SHA workflow assertions. No live install, memory data, version, merge, release, or deployment changed. |
+| 2026-08-14 | **GAP-055 aligned Task Intelligence with accepted task value per total token.** The paired report now counts input plus output tokens, reports accepted outcomes per million total tokens, gives rejected work zero value, blocks acceptance regression, and admits token intelligence as an effectiveness path only when the task-clustered 95% lower bound is positive. Fair comparison uses complete pairs while observed spend includes every completed run. The user-directed canonical objective was amended in place in memory `0b27fa62-d459-4029-a390-391305ab555d`; a fresh Recall supplied the corrected objective. | The prior evaluator separated correctness/retries from an input-only cost ceiling. It omitted output cost and could neither express the governing objective nor distinguish accepted work made cheaper from cheap failure. The first replay also hid an unpaired early-stop treatment from pair totals. | Four new tests plus strengthened early-stop accounting pass. Exact-tree proof: 90 Task Intelligence tests and 36 routing tests pass; the 32-task manifest reports zero errors and remains diagnostic-only; the full fast suite passes 462 tests with 4 skips and 1 slow deselection; the isolated slow two-client gate passes. Task 032 remains `STOP`, and its five completed runs now report the exact 1,501,308 observed input-plus-output tokens. Scoped Ruff and whitespace checks pass. Historical outcomes were not relabelled, no model run occurred, and no merge, version, release, or deployment changed. |
+| 2026-08-13 | **GAP-054 explicit durable capture and delivery gate passed model-free.** The reversible global Codex block and customer guidance now distinguish explicit user-directed capture from ordinary conversation, require exact scope and literal triggers, and verify one likely future question after a write. | Recall cannot improve a later task when the host never captures the decision; a successful write also does not prove governance will deliver it. | Initial full-question Recall returned `no_match` against five unsuitable records. Canonical mission memory `0b27fa62-d459-4029-a390-391305ab555d` was stored. Raw retrieval ranked it first, but Recall initially selected an unrelated specification because the mission used prose as exact scope. Correcting scope to `elefante` made Recall supply only the mission. The 178-test affected set, 458-test fast suite (4 skips, 1 slow deselected), isolated slow two-client proof, scoped Ruff, compilation, and whitespace checks pass. No model run, ranking change, task-lift claim, merge, release, or deployment occurred. |
+| 2026-08-13 | **Task 032 completed with a local `STOP`; GAP-053 opened.** The evaluator now preserves fixture source governance, separates reviewed evaluation metadata, compares identical source-only and memory Briefs, binds the real Recall MCP surface in its black-box judge, and automatically prevents redundant model calls after treatment 0/3 makes the decision irreversible. | The initial preflight exposed evaluator-created trigger/lock metadata. After that repair, the intended memory selected and delivered correctly, but all measured patches still missed the same task-local API behavior. | Base failed and known good passed. Memory treatment: 0/3 accepted with intended memory delivered 3/3. Source-only control: 0/2. A third control attempt was terminated before a measurable outcome; exact partial usage is `UNKNOWN`, and a subsequent automatic replay started zero model calls. All five completed patches passed routing, instruction-preservation, and uninstall assertions, then failed because `tools/list` lacked `elefante-Recall`. Recorded completed outcomes used 1,417,856 input tokens, 1,112,064 cached, 305,792 uncached, and 83,452 output. No product code, live memory, version, merge, release, or deployment changed. |
+| 2026-08-13 | **Task Intelligence reduced to one evidence-led implementation experiment.** The North Star remains better accepted task outcomes from the smallest safe durable-memory bundle. The next task is selected and diagnosed model-free before code; the first failed causal stage chooses one repair; Memory Identity and scoped state resolution are conditional rather than presumed; the model ceiling is three frozen pairs with explicit local go/stop/inconclusive rules. | The prior PRD still assigned architecture before evidence. Preserved results show retrieval, selection, and delivery can complete while acceptance fails and agent use remains unknown, so state identity is not yet an established root cause. | Documentation-only. The canonical PRD fell from 735 lines to a bounded experiment; no source behavior, schema, live store, installed runtime, benchmark outcome, version, merge, release, or deployment changed. Immediate gate: select one new eligible memory-dependent task and identify its first failed stage without a model run. |
+| 2026-08-09 | **BUG-052 closed the last known Task Intelligence runtime-infrastructure bypass.** Normal search context, the context prompt, explicit Task Briefs, and opt-in tool-response delivery now deep-copy and current-source-check candidates before the same governed compiler runs. | Current-tree adversarial audit reproduced a digest-stale locked memory that the explicit Task Brief blocked but other delivery paths injected. | Independent replay passed all four delivery paths and confirmed no store mutation. Final exact-tree proof: 435 fast tests passed (4 skipped, 1 slow deselected), the isolated slow proof passed, the live MCP lifecycle passed 47/47, eight canaries remained base-fail/fix-pass, model-free sealed preflight remained deterministic at 1,252/1,500 tokens with zero model calls, all three client archives and checksums verified, dashboard build/audit passed, and promotion correctly stayed blocked. Causal effectiveness remains a separate open gate. |
+| 2026-08-09 | **BUG-051 closed evaluator truth-loss paths and produced one valid real-memory functional signal.** V2 source selection now preserves diverse ownership files, declared context chunks, and later validation evidence under the hard budget; test artifacts are safeguards. Failed workspaces are retained by default, schema-v3 filenames bind the complete task contract, and preflight names selected sources. | The first real-memory pair failed without causal clarity. A later treatment changed the correct public surface but one hidden `~/.bob` judge convention—not disclosed by the frozen source or task—turned it into a false failure. | Final model-free Brief: deterministic, 1,252/1,500 tokens, exact durable memory plus host registry, doctor, manifest, and safeguard. Eight canaries still base-fail/known-fix-pass. The preserved treatment patch passes the corrected judge without another model call. This is one-task diagnostic evidence; 23 historical tasks remain invalid, no paired multi-task lift exists, V1 and all runtime flags remain off, and release promotion stays blocked. |
+| 2026-08-08 | **BUG-049/050 production Task Intelligence loop implemented behind two rollback switches.** User/workflow authority is enforced at write, maintenance, and delete boundaries; archive is the default forgetting operation. A default-off 17th development MCP tool now prepares bounded context and records session-bound delivery, declared use, metadata-only outcome, inspection, and retraction without changing ranking. | The prior compiler/evaluator stopped at retrieval and could not prove which governed memory reached which task or outcome. Governance metadata also had no effective authority boundary. | Focused governance/ledger tests pass. The isolated live MCP self-protocol passes 47/47 with the opt-in surface and leaves the user's store untouched. Normal v2.12.2 discovery remains 16 tools; neither feature enablement nor pilot delivery is released or automatic. |
+| 2026-08-08 | **First sealed real-memory golden-path preflight is deterministic and model-free.** A reviewed export of durable memory `f3482775-83b7-47b5-9cbb-d54da9d8bc73` is digest-bound to one independent doctor CLI black-box task. The store itself remains unchanged. | Earlier trials used generated snapshot context and invalid implementation-shaped judges; neither proved that a real durable memory could travel through the governed selector to a valid task. | Base ref fails and known-good ref passes. The exact durable memory is selected first; repeated Briefs are identical; rendered context is 968/1500 tokens; leakage scan is clean; `model_runs=0`. This proves the pipe, not causal lift. One capped paired calibration remains the next evidence gate. |
+| 2026-08-08 | **BUG-047 selection gate hardened in development.** The existing `elefante-context` prompt and normal `elefante-Memory(action="search")` response now share one bounded answer selector. Broad retrieval remains available, while answer delivery excludes inactive, conflicting, secret-bearing, and inapplicable system-test memories; requires a question-specific action anchor plus independent semantic, concept, or graph corroboration; caps the complete rendered prompt at three memories and 450 tokens; avoids read reinforcement; exposes selection reasons; and abstains when nothing qualifies. | The first fix separated candidate discovery from answer delivery but still admitted one weak signal. The documented Task Intelligence contract requires corroboration before context is injected. The hard-cap regression then caught prompt labels pushing a long rendered prompt over budget. | 5 focused selector tests, all 22 fast MCP daemon tests, all 33 developer-routing tests, and all 46 isolated end-to-end checks pass; scoped lint and whitespace pass. This is unreleased development behavior, not measured product lift, automatic interception of every host question, or a website claim. |
+| 2026-08-08 | **BUG-048 exposure/use boundary corrected in development.** Normal search and automatic context delivery are now read-only with respect to access history and co-activation. Legacy session IDs created by pre-fix retrieval exposure are discarded. The trace-bound `record_use` path writes a reversible declared-use event to a separate ledger and does not change access, co-activation, or ranking. | Retrieval frequency was being treated as memory usefulness, contaminating lifecycle ranking and any Task Intelligence evaluation. Search, delivery, declared use, and task outcome must remain separate signals. | Exposure/use, ledger, and MCP daemon regressions pass; no release, public performance claim, or automatic host interception is authorized. The use event is observational evidence, not causal task lift. |
+| 2026-08-06 | **BUG-007 documentation drift recurrence was audited and guarded across the repository.** Active user docs, developer state, agent protocols, proposals, examples, and embedded MCP descriptions were reconciled with source and the published v2.12.2 assets. SQLite/Kuzu is the default; legacy Chroma migration is support-only; current MCP inventory is 16 tools and 2 prompts; context injection is conditional; scoring, vitality, lifecycle, and Task Intelligence limits are now stated without invented guarantees. Broken links, stale customer-candidate state, duplicate BUG-040 tracking, and obsolete commands were corrected. Historical journal evidence remains preserved and explicitly non-current. | Repeated stale documentation had become an operational defect: instructions could send developers to deleted files, tell customers the wrong release/storage model, and make unimplemented retrieval or forgetting behavior sound shipped. | Active-link audit reports zero unresolved links. Documentation/release/installer/reset/dashboard focus: 161 passed. Full fast suite: 373 passed, 4 legacy-backend skips, 1 slow test deselected. Dashboard production build passed and production audit found 0 vulnerabilities. Version sync, 16-tool/2-prompt inventory, Python compilation, YAML parsing, and whitespace checks passed. The full suite also exposed and fixed a manual-test import-path collision that shadowed the installed MCP package. |
+| 2026-08-06 | **Memory governance was separated from Task Intelligence and documented as the continuation contract.** User-enforced retention and injection are no longer conflated with managed decay or ranked retrieval. Direct user operation is also separated from workflow-mediated operation: both share the local store, but user-directed actions retain user authority while an IDE/agent workflow receives only policy-bounded automation and explicit operation traces. The SDD now defines permanent, managed, and ephemeral retention; always, triggered, and ranked injection; reversible active/dormant/archived lifecycle; explicit user locks; and the rule that Task Intelligence optimizes task context only after governance is applied. A source audit records current scoring, reinforcement, filtering, provenance, and documentation gaps so the next developer does not normalize them as intended behaviour. | The owner clarified that Elefante stores memories under mixed authority: users can require retention or delivery, while healthy managed forgetting is necessary to prevent irrelevant history from overwhelming current work. The person explicitly using Elefante is not equivalent to an automated workflow using Elefante on that person's behalf. | Documentation-only. No schema, runtime, live store, MCP surface, benchmark outcome, release, or website claim changed. Nineteen focused scoring tests pass but do not cover governance, operating-mode authority, or usefulness. Next: freeze the two remaining policy decisions, write governance, invocation-mode, and read-only-retrieval contract tests, then implement the smallest reversible schema/retrieval change before further model evaluation. |
+| 2026-08-06 | **Task Intelligence evaluation is guarded; controlled calibration still shows no repeatable correctness lift.** Seven CLI/API/filesystem fixtures each fail at the exact base ref and pass at the exact known-good ref. The evaluator isolates agent configuration, skips treatment-only Brief construction during baseline screening, aborts non-measurable runs, enforces exact token caps, blocks invalid judges by default, records stage-level metadata from judge through acceptance, preserves unmeasured values as unknown, and requires complete stage traces for promotion. | A valid judge, relevant retrieval, and delivered memory are necessary but individually insufficient. The earlier 0/3 to 2/3 restore signal came from one task and exceeded the latency ceiling. Two newer tasks tied at 3/3 and a harder pair failed in both conditions despite lower treatment cost. | Self-test: 7/7 canaries base-fail/known-fix-pass. Retrieval diagnostic: 16/18. Null graph: 3/3 in both conditions, input -18.5%, duration -15.7%. Restore paths: 3/3 in both, input -26.0%, duration -0.8%. Reset containment: 0/1 in both, input -40.1%, duration -31.9%. Seven tasks are contract-valid; 23 remain ineligible. Correctness promotion fails closed; V1 stays default; no public surface or claim is authorized. Next: do not spend more model tokens until a real pre-existing memory and independent black-box task form a valid causal golden path. |
 | 2026-08-26 | **Elefante's role in the goal-directed agent loop made explicit.** Released-product explanation now locates Elefante at durable context retrieval during Perceive and verified outcome storage during Update while leaving goals, planning, tools, reflection, stopping, and consequential approvals with the agent. Financial advisory is documented as an architectural example rather than a shipped advisory capability. | Cross-repository positioning needed one precise boundary before the product and marketing surfaces could remain coherent. | README and vision use the same loop and exclusions; an active routing regression guards the product boundary and prohibits preserving hidden chain-of-thought as memory. No runtime, MCP surface, release artifact, dashboard, or user data changed. |
 | 2026-08-25 | **v2.12.3 published and independently verified.** PR #26 merged to `main`; the protected release workflow created annotated tag `v2.12.3`, published the GitHub release, and attached the three customer installers plus `SHA256SUMS`. | Complete the owner-authorized surgical patch through the repository control plane and close the active release state with public evidence. | PR gates passed; the publication workflow passed; all three downloaded installers matched the published checksum manifest. Active release surfaces now identify v2.12.3 while historical v2.12.2 records remain unchanged. |
 | 2026-08-25 | **v2.12.3 publication authorized on PR #26.** The audited release marker permits the main-branch workflow to create the exact annotated tag and dispatch the multi-platform release only after merge. | Owner explicitly authorized the surgical v2.12.3 patch publication; direct manual tagging would bypass the repository control plane. | Release-authorization, client-bundle, pipeline, routing, version-sync, and release-note tests pass locally. The marker has no effect before merge; all PR checks remain mandatory. |
@@ -546,6 +572,7 @@ This section is the chronological record of curation events, decisions, and abso
 | 2026-08-25 | **v2.12.3 patch candidate prepared.** The candidate contains the guarded BUG-040 customer-repair hardening and BUG-044 release/capability truth corrections already accumulated after v2.12.2. Task Intelligence remains internal shadow evaluation infrastructure and is not promoted as a public capability. | Owner authorized the surgical resolution after the post-v2.12.2 audit: publish the verified fixes without expanding product scope. | The repository advisor classified the release as PATCH; `bump_version.py` updated the six version-bearing declarations to 2.12.3 and `--check` reported full agreement. The maintained Python suite and isolated slow bridge proof passed; release-note validation, scoped Ruff, diff hygiene, dashboard production build, and npm audit also passed. Publication remains pending. |
 | 2026-08-25 | **BUG-044 release-contract truth drift fixed and guarded.** Active entrypoints now identify v2.12.2 as the published product; scoring documentation is derived from the shipped vitality and five-signal retrieval implementations; `surfaces_when` is explicitly stored non-ranking metadata; dashboard search is labeled snapshot-only; Distiller examples use the executable repository-root module path; the vulnerable transitive dashboard development dependency is updated. The superseded scoring page is preserved verbatim before distillation. | A whole-product audit found that passing tests froze stale release and capability claims instead of checking the actual published tag and execution paths. | 332 automated tests passed with one isolated slow proof deselected; the slow two-bridge proof passed separately; self-protocol passed 46/46; dashboard production build and full/production npm audits passed with zero vulnerabilities. Rendered localhost acceptance showed `3 snapshot results for "daemon"`, no semantic-search claim, and zero browser console errors. No user data, live runtime, GitHub release, remote branch, or deployment changed. |
 | 2026-08-05 | **Task Intelligence preliminary holdout failed the promotion gate.** PR #21 merged the deterministic shadow compiler and capped paired evaluator into `main` at `fa04f2b`; exact-commit Quality, dependency audit, dashboard, clean macOS candidate, and macOS/Windows/Linux package checks are green. One paired repetition then ran across all 12 frozen holdout tasks. The remaining two repetitions were stopped because there was no correctness signal. The used holdout is now diagnostic and cannot serve as fresh promotion evidence after tuning. | The product promise is measurable task improvement, so a tied result must stop promotion even when context cost falls. Inspection showed broad, generic documentation often displaced precise task-local implementation evidence. | Baseline: 1/12 passed. Task Brief: 1/12 passed. Lift: 0.0 points; paired 95% interval `[0, 0]`; total input -16.3%; uncached input +2.9%; duration -1.9%; 24 runs, 7,946,987 total input tokens, 6,882,048 cached, 1,064,939 uncached, and 83,921 output. Cost gate passed; effectiveness and promotion gates failed. No public MCP surface, automatic injection, website claim, or client pilot was added. Next: redesign task-local source retrieval on calibration, then freeze a new answer-isolated holdout. |
+| 2026-08-06 | **Task Intelligence v2 closed retrieval defects and exposed a deeper benchmark-validity failure.** The opt-in shadow profile now uses pre-fix source evidence with lineage, file diversity, independent action relevance, conflict exclusion, abstention, and an identical critical-reasoning protocol in both conditions. The maintained retrieval diagnostic reaches a historical repair file in the top ten for 18/18 calibration tasks. | A paired host-routing pilot still failed both conditions. Audit proved its hidden test requires undisclosed exact module and symbol names; all 30 tasks contain varying degrees of internal-shape coupling. Retrieval hit-rate therefore cannot establish task intelligence. | The historical manifest is explicitly diagnostic-only; promotion now fails closed without behavioral acceptance and rollback contracts. Pilot: control 448,324 input tokens/92,263 ms; treatment 244,365/64,077 ms; correctness 0/1 in both. No more model or holdout runs until black-box benchmark repair. V1 remains the default and exact rollback. |
 | 2026-08-05 | **Task Intelligence Phase 0 and shadow Phase 1 completed.** The 18-task no-Brief calibration baseline is frozen at 6/18 passes with `gpt-5.6-terra`, low reasoning, and the exact local Codex CLI/prompt profile. A deterministic internal Task Brief compiler now filters lifecycle, trust, scope, and score; surfaces conflicts; preserves provenance; enforces 450/750/300 stage budgets, eight evidence items, and one graph hop; and disables read-side memory reinforcement. The paired holdout runner uses local-only GTE embeddings from pre-fix evidence, seeded order, hard token caps, metadata-only outcomes, and an automated clustered-confidence promotion report. | The product objective is measurable task improvement, so implementation must be judged against acceptance tests rather than retrieval volume or persuasive examples. | Calibration: 6/18 passed; 4,971,429 input tokens, 4,329,216 cached, 642,213 uncached, and 54,096 output. A real shadow Brief selected 8 provenance-bearing items in 771 estimated tokens with zero mutations. Twenty focused evaluator/compiler/report tests and the standalone benchmark verifier pass. Phase 2 holdout remains untouched until this evaluator is committed and green; there is no public MCP surface, automatic injection, release claim, or website change. |
 | 2026-08-05 | **BUG-040 live-upgrade recurrence repaired and guarded.** The public v2.12.2 package installed one stable runtime but could not adopt genuine pre-manifest Elefante registrations, leaving Codex and VS Code bound to a deleted checkout. Customer scope now adopts only entries structurally identified by an Elefante MCP module, preserves foreign same-name servers, and retains rollback. The installer handshake now tests the actual stdio bridge and daemon instead of cold-starting a separate direct server. | Owner required global memory across every IDE and customer-first end-to-end proof on the real machine. | Live repair completed with installer state `COMPLETED`; `doctor --json` reported v2.12.2 customer scope, `customer_ready: true`, and Codex, VS Code/Copilot, and Antigravity all verified; daemon health and real bridge handshake passed. Focused regression suite is the merge gate. |
 | 2026-08-05 | **Task Intelligence Phase 0 benchmark fixtures frozen.** Thirty real historical coding tasks now cover installation/distribution, dashboard data integrity, and runtime safety/trust. Every task pins a pre-fix commit, fix commit, one executable pytest node, observable success, and pre-fix context paths. The verifier enforces an 18/12 calibration/holdout split by fix-commit group, a 1,500-token three-stage Brief budget, answer-leakage checks, and metadata-only local outcome records. | The approved SDD requires measurable task improvement, not retrieval activity, before any automatic injection or claim. | Three benchmark contract regressions and the standalone verifier pass locally. Phase 0 remains open: no-Brief model baseline, exact model/tool configuration, and compute budget are not yet recorded. No runtime or public MCP surface changed. |
@@ -580,6 +607,23 @@ This section is the chronological record of curation events, decisions, and abso
 
 ### §10.1 Lessons logged this session
 
+- **2026-08-26 Agent-loop claim audit and release-truth refresh:** tested the
+  supplied Goal → Perceive → Plan → Act → Observe → Update → Repeat claims
+  against the public v2.12.3 source/tag, current public `main`, installed
+  customer runtime, and live website. The evidence supports MCP tool use,
+  durable memory, graph/context/task/ETL/directive lifecycle, compliance
+  gating, and restart persistence; it does not support Elefante owning an
+  autonomous reasoning loop, reflection, stopping, financial-advisory tools,
+  provider billing, or hidden chain-of-thought. The active developer source
+  exposes an unreleased 18-tool/2-prompt surface; its isolated self-protocol
+  passed 48/48, the current relevance/ledger/report suites passed 57, and the
+  documentation/token/MCP suites passed 121 with one intentional deselection.
+  All three v2.12.3 release ZIPs passed `SHA256SUMS`; the live website identity,
+  release-manifest verifier, and production verifier passed. The immutable tag
+  still contains stale version headings, while current `main` and local docs
+  now separate public, installed, and unreleased development claims. No remote,
+  production, durable-memory, or installed-runtime mutation was made by this
+  documentation audit.
 - **2026-07-26 Dashboard truth is a boundary, not a skin:** a useful memory dashboard explains how knowledge evolved and why the current decision endures. Normalize transport aliases once at the UI boundary, derive labels from configured runtime truth, disclose synthetic demo behavior, and never render retrieval signals the snapshot does not carry. The real browser pass is mandatory: TypeScript compilation did not catch the React selector loop, source inspection did not reveal the gray topic fallback, and canonical source provenance did not reveal that the exported header asset was clipped. Brand assets must be inspected in the final composition at shipping size.
 - **2026-07-26 A useful memory graph visualizes reasoning, not topology:** topic rings, generated hubs, and arbitrary “related” sequences may look organized while communicating nothing. A graph becomes commercially legible when explicit edges preserve what was believed, what challenged it, which decision replaced it, what now guards it, and where that claim is grounded. Relationship direction must be phrased from the selected memory's point of view, and the complete trail must fit at the acceptance viewport.
 - **2026-07-29 A release archive is a customer interface:** verify the extracted root, decoded launcher bytes, executable metadata, and the actual primary entrypoint. File-presence assertions missed both a broken Windows path and a confusing cross-platform folder.
@@ -635,18 +679,19 @@ This section is the chronological record of curation events, decisions, and abso
 
 | Metric | Current value | Source | Status |
 |--------|---------------|--------|--------|
-| Active doc LOC (post-curation) | 9,841 | `find ... -name "*.md" \| xargs wc -l` | Tracked |
-| Archived doc LOC (preservation) | 3,815 | `wc -l workspace/*/_archive/*.md` | Tracked |
-| Postmortem LOC reduction | 5,024 → 1,681 (66%) | per-file before/after | Tracked |
-| BUG count tracked | **32 (BUG-001 → BUG-032) + 4 GAPs** | `workspace/ISSUES.md` | Tracked |
+| Release target | **v2.13.0** customer contract; publication in progress under explicit owner authority | `CHANGELOG.md`, §2.2, exact-head CI and release workflow | Local integration verified; public tag/assets pending |
+| BUG/GAP count tracked | **54 BUG records through BUG-054 + 7 GAPs** | `workspace/ISSUES.md` | Tracked |
 | BUG recurrence rate (pre-distillation) | known per-row in `ISSUES.md` | `workspace/ISSUES.md` Recurrence column | Tracked |
-| BUG recurrence rate (post-distillation) | unknown — needs sustained agent traffic across sessions | will derive from `ISSUES.md` Recurrence column after v2.10.x lands real workload | **NOT MEASURED YET** |
-| Hermes Elefante-tool retrieval count | **GAP-028 CLOSED 2026-05-02.** Direct ingestion (Claude-Code-as-MCP-client): 9 lessons submitted, 6+ stored unique, 3 fused via Compliance Gate dedupe; 19 directives total in store. Hermes-as-LLM-agent (deepseek-v4-flash) Layer-3 round-trip surfaced lifecycle memory `f1fb77f5` with verbatim content match + auto-injected directive on every MCP response. **Recursive Hermes <-> Elefante loop alive on the Hermes side.** | `/tmp/elefante-gap-028-verify.py` (Layer 0/1+2/3 PASS); `/tmp/elefante-self-ingest*.py` for direct ingestion | **MEASURED** |
-| Active guard test count | 20 passing | `pytest tests/test_developer_routing.py` | Tracked |
-| Token cost per `MemorySearch` (signal_ratio) | TOKEN_STATS injected per response | `src/mcp/server.py` | Available; not aggregated yet |
-| Documentation Skill compliance % (BUG-026 derivative) | Filename-pattern guard active (`test_no_forbidden_filename_patterns_*`); broader-surface compliance metric not designed yet — deferred to v2.11+ pre-edit hook architecture per BUG-027 | filename guard runs in CI | **DEFERRED (by plan, not unmeasured)** |
+| BUG recurrence rate after current guards | `UNKNOWN` — needs sustained traffic across sessions | future `ISSUES.md` recurrence updates | Not measured |
+| Documentation guard | 36 tests pass | `tests/test_developer_routing.py` | Verified 2026-08-13 |
+| Full non-slow regression suite | 690 passed, 9 skipped, 1 deselected before final release-document integration | Exact source-candidate run on 2026-08-28 | Final exact-head rerun required |
+| Task Intelligence evaluation corpus | 9 reviewed black-box canaries; 23 historical tasks ineligible; tasks 031 and 032 are consumed sealed-memory diagnostics | `workspace/proposals/retrieval-effectiveness.md` | Infrastructure verified; promotion blocked |
+| Task Intelligence outcome lift | Task 032 stopped at treatment 0/3 and control 0/2; no valid representative multi-task lift exists | `workspace/proposals/retrieval-effectiveness.md` | Not demonstrated; promotion blocked |
+| Token cost per `elefante-Memory(action="search")` | `TOKEN_STATS` is available per response; aggregate product effect is not measured | `src/mcp/server.py` | Partial |
+| Session Intelligence companion | v2.13.0 contract provides an opt-in persistent metadata-only ledger, provider-actual versus estimated provenance, dated rate-card authority, Signal Cards, aggregate training hypotheses, explicit consent/export/delete controls, loopback usage ingress, and a read-only dashboard snapshot | `src/session_intelligence/`, `scripts/pipeline/session_intelligence.py`, `workspace/proposals/session-intelligence.md` | Included in release target; no provider billing or causal-value claim |
+| Website production state | Live commit `d4e1f321e646d04d19df7b5ec9e9942951eca83e`, product version 2.12.3; production and online release-manifest verifiers pass | §2.3 and current production proof | Verified 2026-08-26 |
 
-The "not measured yet" rows are this session's open obligations to the journal. Until Hermes runs and agent traffic flows through the distilled memories, the curation's downstream effect is hypothesis, not measurement.
+Unknown and partial rows are explicit evidence gaps, not inferred success.
 
 ### §10.3 The Elefante workflow (canonical)
 

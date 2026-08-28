@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_install_setup.py
-# VERSION : 2.7.2
-# CHANGED : 2026-04-17
 # PROVES  : Installer lifecycle contracts: state tracking, daemon service,
 #           host registration ownership/refresh/rollback, safe uninstall,
 #           dependency bootstrap, and seed-memory guard behavior.
@@ -28,6 +26,50 @@ from packaging.requirements import Requirement
 
 
 ROOT = Path(__file__).resolve().parents[1]
+TEST_SOURCE_COMMIT = "a" * 40
+
+
+def _write_customer_runtime_identity(repo: Path, home: Path, version: str) -> Path:
+    """Create one internally consistent installed-customer identity fixture."""
+    source_dir = repo / "src"
+    source_dir.mkdir(parents=True, exist_ok=True)
+    (source_dir / "__init__.py").write_text(
+        f'__version__ = "{version}"\n',
+        encoding="utf-8",
+    )
+    build_identity = {
+        "schema_version": 1,
+        "version": version,
+        "source_commit": TEST_SOURCE_COMMIT,
+        "source_clean": True,
+        "release_channel": "candidate",
+    }
+    (repo / "elefante-build.json").write_text(
+        json.dumps(build_identity),
+        encoding="utf-8",
+    )
+    manifest = home / ".elefante" / "install-manifest.json"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": 3,
+                "files": {},
+                "commands": {},
+                "runtime": {
+                    "app_root": str(repo),
+                    "data_root": str(home / ".elefante" / "data"),
+                    "scope": "customer",
+                    "version": version,
+                    "source_commit": TEST_SOURCE_COMMIT,
+                    "source_clean": True,
+                    "release_channel": "candidate",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    return manifest
 
 
 def test_installer_entrypoint_starts_without_product_dependencies():
@@ -197,8 +239,10 @@ def test_isolated_package_wheel_preserves_src_runtime_contract(tmp_path):
 def test_readme_and_install_guide_match_current_runtime_and_host_contract():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     install_guide = (ROOT / "docs/how-to/install.md").read_text(encoding="utf-8")
+    normalized_install_guide = " ".join(install_guide.split())
     run_guide = (ROOT / "docs/how-to/run-mcp-server.md").read_text(encoding="utf-8")
     docs_index = (ROOT / "docs/README.md").read_text(encoding="utf-8")
+    normalized_docs_index = " ".join(docs_index.split())
     scripts_index = (ROOT / "scripts/README.md").read_text(encoding="utf-8")
 
     assert "mcp==1.28.1" in _runtime_requirements()
@@ -208,21 +252,39 @@ def test_readme_and_install_guide_match_current_runtime_and_host_contract():
         assert "1.23.1" not in document
     for host in ("Gemini CLI", "Claude Code", "Codex", "OpenClaw"):
         assert host in install_guide
-        assert host in docs_index
+        assert host in normalized_docs_index
     for adapter in (
         "configure_vscode_bob.py",
         "configure_cursor_kiro.py",
         "configure_antigravity.py",
         "configure_cli_agents.py",
     ):
-        assert adapter in install_guide
+        assert adapter not in install_guide
+        assert adapter in scripts_index
     assert "transport-only" in run_guide
     assert "one durable store owner" in run_guide
     assert "configured embedded vector store" in scripts_index
     assert "SQLite snapshot support remains" not in scripts_index
-    assert "configured embedded vector store" in install_guide
-    assert "explicitly configured in `config.yaml`" in install_guide
+    assert "Fresh installations use SQLite vectors plus Kuzu" in install_guide
+    assert "Explicit paths in `config.yaml` remain authoritative" in normalized_install_guide
     assert "would contain its own recovery directory" in scripts_index
+
+
+def test_python_runtime_range_matches_installer_and_package_metadata():
+    from src.utils.version import get_supported_python_message, is_supported_python
+
+    installer = (ROOT / "scripts/setup/install.py").read_text(encoding="utf-8")
+    setup_metadata = (ROOT / "setup.py").read_text(encoding="utf-8")
+
+    assert not is_supported_python((3, 10))
+    assert is_supported_python((3, 11))
+    assert is_supported_python((3, 12))
+    assert is_supported_python((3, 13))
+    assert not is_supported_python((3, 14))
+    assert "3.11, 3.12, or 3.13" in get_supported_python_message((3, 14))
+    assert "Python 3.11, 3.12, or 3.13" in installer
+    for version in ("3.11", "3.12", "3.13"):
+        assert f"Programming Language :: Python :: {version}" in setup_metadata
 
 
 def _load_module(path: Path, name: str):
@@ -232,6 +294,42 @@ def _load_module(path: Path, name: str):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def test_customer_installer_requires_identity_bound_to_payload(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/install.py", "install_identity_module")
+    identity = {
+        "schema_version": 1,
+        "version": module.ELEFANTE_VERSION,
+        "source_commit": TEST_SOURCE_COMMIT,
+        "source_clean": True,
+        "release_channel": "candidate",
+    }
+    (tmp_path / "elefante-build.json").write_text(
+        json.dumps(identity),
+        encoding="utf-8",
+    )
+
+    assert module.resolve_runtime_provenance(
+        root_dir=tmp_path,
+        installation_scope="customer",
+        release_profile="client",
+        expected_version=module.ELEFANTE_VERSION,
+        source_commit=TEST_SOURCE_COMMIT,
+        release_channel="candidate",
+        source_clean=True,
+    ) == identity
+
+    with pytest.raises(ValueError, match="do not match"):
+        module.resolve_runtime_provenance(
+            root_dir=tmp_path,
+            installation_scope="customer",
+            release_profile="client",
+            expected_version=module.ELEFANTE_VERSION,
+            source_commit="b" * 40,
+            release_channel="candidate",
+            source_clean=True,
+        )
 
 
 def test_build_dashboard_ui_prefers_bundled_assets(tmp_path):
@@ -524,24 +622,7 @@ def test_doctor_reports_ready_only_when_runtime_and_daemon_are_healthy(tmp_path)
     )
 
     home = tmp_path / "home"
-    manifest = home / ".elefante" / "install-manifest.json"
-    manifest.parent.mkdir(parents=True)
-    manifest.write_text(
-        json.dumps(
-            {
-                "schema_version": 2,
-                "files": {},
-                "commands": {},
-                "runtime": {
-                    "app_root": str(repo),
-                    "data_root": str(home / ".elefante" / "data"),
-                    "scope": "customer",
-                    "version": "9.9.9",
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
+    _write_customer_runtime_identity(repo, home, "9.9.9")
 
     report = module.build_report(
         repo_root=repo,
@@ -565,12 +646,180 @@ def test_doctor_reports_ready_only_when_runtime_and_daemon_are_healthy(tmp_path)
     }
 
 
+def _add_recall_routing_surface(manifest: Path, home: Path) -> None:
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["files"][str(home / ".codex" / "AGENTS.md")] = {
+        "surface": "codex-recall-routing"
+    }
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_doctor_requires_live_recall_when_installer_owns_routing(tmp_path):
+    module = _load_module(ROOT / "scripts/lifecycle/doctor.py", "doctor_recall_ready_module")
+    repo = tmp_path / "repo"
+    (repo / ".venv" / "bin").mkdir(parents=True)
+    venv_python = repo / ".venv" / "bin" / "python"
+    venv_python.write_text("", encoding="utf-8")
+    (repo / "config.yaml").write_text("app_name: elefante\n", encoding="utf-8")
+    home = tmp_path / "home"
+    manifest = _write_customer_runtime_identity(repo, home, "2.12.2")
+    _add_recall_routing_surface(manifest, home)
+    calls = []
+
+    report = module.build_report(
+        repo_root=repo,
+        home=home,
+        service_inspector=lambda _: {
+            "daemon_health": True,
+            "service_runtime": "active",
+            "service_file_ownership": "owned",
+        },
+        host_detector=lambda **_: {"codex"},
+        surface_inspector=lambda _: {"codex"},
+        recall_inspector=lambda root, python: calls.append((root, python))
+        or {
+            "handshake_ready": True,
+            "tool_count": 17,
+            "tool_present": True,
+            "annotations_read_only": True,
+            "probe_status": "no_match",
+            "probe_read_only": True,
+            "recall_ready": True,
+            "diagnostic": None,
+            "context": "must not be copied into doctor output",
+        },
+    )
+
+    assert calls == [(repo, venv_python)]
+    assert report["customer_ready"] is True
+    assert report["recall"] == {
+        "required": True,
+        "handshake_ready": True,
+        "tool_count": 17,
+        "tool_present": True,
+        "annotations_read_only": True,
+        "probe_status": "no_match",
+        "probe_read_only": True,
+        "ready": True,
+        "diagnostic": None,
+    }
+    assert "context" not in report["recall"]
+
+
+def test_doctor_rejects_routed_customer_when_recall_tool_is_missing(tmp_path):
+    module = _load_module(ROOT / "scripts/lifecycle/doctor.py", "doctor_recall_missing_module")
+    repo = tmp_path / "repo"
+    (repo / ".venv" / "bin").mkdir(parents=True)
+    (repo / ".venv" / "bin" / "python").write_text("", encoding="utf-8")
+    (repo / "config.yaml").write_text("app_name: elefante\n", encoding="utf-8")
+    home = tmp_path / "home"
+    manifest = _write_customer_runtime_identity(repo, home, "2.12.2")
+    _add_recall_routing_surface(manifest, home)
+
+    report = module.build_report(
+        repo_root=repo,
+        home=home,
+        service_inspector=lambda _: {
+            "daemon_health": True,
+            "service_runtime": "active",
+            "service_file_ownership": "owned",
+        },
+        host_detector=lambda **_: {"codex"},
+        surface_inspector=lambda _: {"codex"},
+        recall_inspector=lambda *_: {
+            "handshake_ready": True,
+            "tool_count": 16,
+            "tool_present": False,
+            "annotations_read_only": False,
+            "probe_status": None,
+            "probe_read_only": False,
+            "recall_ready": False,
+            "diagnostic": "recall_tool_missing",
+        },
+    )
+
+    assert report["ready"] is True
+    assert report["customer_ready"] is False
+    assert report["recall"]["ready"] is False
+    assert "recall_tool_missing" in report["customer_diagnostics"]
+
+
+def test_doctor_rejects_installer_owned_recall_routing_that_is_not_active(tmp_path):
+    module = _load_module(ROOT / "scripts/lifecycle/doctor.py", "doctor_recall_route_module")
+    repo = tmp_path / "repo"
+    (repo / ".venv" / "bin").mkdir(parents=True)
+    (repo / ".venv" / "bin" / "python").write_text("", encoding="utf-8")
+    (repo / "config.yaml").write_text("app_name: elefante\n", encoding="utf-8")
+    home = tmp_path / "home"
+    manifest = _write_customer_runtime_identity(repo, home, "2.12.2")
+    _add_recall_routing_surface(manifest, home)
+
+    report = module.build_report(
+        repo_root=repo,
+        home=home,
+        service_inspector=lambda _: {
+            "daemon_health": True,
+            "service_runtime": "active",
+            "service_file_ownership": "owned",
+        },
+        host_detector=lambda **_: set(),
+        surface_inspector=lambda _: set(),
+        recall_inspector=lambda *_: {
+            "handshake_ready": True,
+            "tool_count": 17,
+            "tool_present": True,
+            "annotations_read_only": True,
+            "probe_status": "no_match",
+            "probe_read_only": True,
+            "recall_ready": True,
+            "diagnostic": None,
+        },
+    )
+
+    assert report["ready"] is True
+    assert report["recall"]["ready"] is True
+    assert report["customer_ready"] is False
+    assert "codex_recall_routing_unverified" in report["customer_diagnostics"]
+
+
 def test_client_doctor_uses_runtime_host_contract_without_developer_manifest(tmp_path):
     module = _load_module(ROOT / "scripts/lifecycle/doctor.py", "doctor_client_report_module")
     repo = tmp_path / "repo"
     (repo / ".venv" / "bin").mkdir(parents=True)
     (repo / ".venv" / "bin" / "python").write_text("", encoding="utf-8")
     (repo / "config.yaml").write_text("app_name: elefante\n", encoding="utf-8")
+    home = tmp_path / "home"
+    _write_customer_runtime_identity(repo, home, "2.12.2")
+
+    report = module.build_report(
+        repo_root=repo,
+        home=home,
+        service_inspector=lambda _: {
+            "daemon_health": True,
+            "service_runtime": "active",
+            "service_file_ownership": "owned",
+        },
+        host_detector=lambda **_: set(),
+        surface_inspector=lambda _: set(),
+    )
+
+    assert report["ready"] is True
+    assert report["customer_ready"] is True
+    assert report["diagnostics"] == []
+    assert report["integrations"]["compatible"] == sorted(module.SUPPORTED_HOSTS)
+
+
+def test_doctor_rejects_legacy_customer_identity_without_provenance(tmp_path):
+    module = _load_module(ROOT / "scripts/lifecycle/doctor.py", "doctor_legacy_identity_module")
+    repo = tmp_path / "repo"
+    (repo / ".venv" / "bin").mkdir(parents=True)
+    (repo / ".venv" / "bin" / "python").write_text("", encoding="utf-8")
+    (repo / "config.yaml").write_text("app_name: elefante\n", encoding="utf-8")
+    (repo / "src").mkdir()
+    (repo / "src" / "__init__.py").write_text(
+        '__version__ = "2.12.2"\n',
+        encoding="utf-8",
+    )
     home = tmp_path / "home"
     manifest = home / ".elefante" / "install-manifest.json"
     manifest.parent.mkdir(parents=True)
@@ -604,9 +853,41 @@ def test_client_doctor_uses_runtime_host_contract_without_developer_manifest(tmp
     )
 
     assert report["ready"] is True
-    assert report["customer_ready"] is True
-    assert report["diagnostics"] == []
-    assert report["integrations"]["compatible"] == sorted(module.SUPPORTED_HOSTS)
+    assert report["customer_ready"] is False
+    assert report["customer_diagnostics"] == ["runtime_provenance_missing"]
+
+
+def test_doctor_rejects_runtime_and_payload_identity_mismatch(tmp_path):
+    module = _load_module(ROOT / "scripts/lifecycle/doctor.py", "doctor_identity_mismatch_module")
+    repo = tmp_path / "repo"
+    (repo / ".venv" / "bin").mkdir(parents=True)
+    (repo / ".venv" / "bin" / "python").write_text("", encoding="utf-8")
+    (repo / "config.yaml").write_text("app_name: elefante\n", encoding="utf-8")
+    home = tmp_path / "home"
+    _write_customer_runtime_identity(repo, home, "2.12.2")
+    payload_identity = json.loads(
+        (repo / "elefante-build.json").read_text(encoding="utf-8")
+    )
+    payload_identity["source_commit"] = "b" * 40
+    (repo / "elefante-build.json").write_text(
+        json.dumps(payload_identity),
+        encoding="utf-8",
+    )
+
+    report = module.build_report(
+        repo_root=repo,
+        home=home,
+        service_inspector=lambda _: {
+            "daemon_health": True,
+            "service_runtime": "active",
+            "service_file_ownership": "owned",
+        },
+        host_detector=lambda **_: set(),
+        surface_inspector=lambda _: set(),
+    )
+
+    assert report["customer_ready"] is False
+    assert "runtime_build_identity_mismatch" in report["customer_diagnostics"]
 
 
 def test_doctor_reports_missing_runtime_and_invalid_manifest_without_mutating_it(tmp_path):
@@ -701,24 +982,7 @@ def test_doctor_reports_detected_but_unconfigured_customer_hosts(tmp_path):
     matrix.mkdir(parents=True)
     (matrix / "ide-integration.yaml").write_text("surfaces: []\n", encoding="utf-8")
     home = tmp_path / "home"
-    manifest = home / ".elefante" / "install-manifest.json"
-    manifest.parent.mkdir(parents=True)
-    manifest.write_text(
-        json.dumps(
-            {
-                "schema_version": 2,
-                "files": {},
-                "commands": {},
-                "runtime": {
-                    "app_root": str(repo),
-                    "data_root": str(home / ".elefante" / "data"),
-                    "scope": "customer",
-                    "version": "9.9.9",
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
+    _write_customer_runtime_identity(repo, home, "9.9.9")
 
     report = module.build_report(
         repo_root=repo,
@@ -1030,6 +1294,168 @@ def test_cli_agent_registration_and_uninstall_require_matching_host_configuratio
     assert configured is False
 
 
+def test_codex_recall_guidance_preserves_user_content_and_uninstalls_exact_block(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/configure_cli_agents.py", "codex_guidance_module")
+    manifest = _load_module(ROOT / "scripts/setup/install_manifest.py", "codex_guidance_manifest_module")
+    home = tmp_path / "home"
+    codex_home = home / ".codex"
+    codex_home.mkdir(parents=True)
+    agents = codex_home / "AGENTS.md"
+    original = "# User guidance\n\n- Preserve this rule.\n"
+    agents.write_text(original, encoding="utf-8")
+
+    assert module.configure_codex_guidance(
+        codex_home=codex_home, manifest_home=home
+    ) == "configured"
+    configured = agents.read_text(encoding="utf-8")
+    assert configured.startswith(original)
+    assert configured.count(module.CODEX_GUIDANCE_START) == 1
+    assert "call `elefante-Recall`" in configured
+    assert "at most once" in configured
+    assert "self-contained question" in configured
+    assert "do not retry" in configured
+    assert "explicitly asks Elefante to remember" in configured
+    assert 'invocation_mode="user_directed"' in configured
+    assert "never put descriptive prose in `scope`" in configured
+    assert "stored receipt is not proof" in configured
+    assert "Never infer a memory request from ordinary conversation" in configured
+
+    removed, preserved = manifest.remove_unchanged_files(home=home, apply=True)
+    assert removed == [agents]
+    assert preserved == []
+    assert agents.read_text(encoding="utf-8") == original
+
+
+def test_codex_recall_guidance_uses_active_override_and_preserves_modified_block(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/configure_cli_agents.py", "codex_override_guidance_module")
+    manifest = _load_module(ROOT / "scripts/setup/install_manifest.py", "codex_override_guidance_manifest_module")
+    home = tmp_path / "home"
+    codex_home = home / ".codex"
+    codex_home.mkdir(parents=True)
+    agents = codex_home / "AGENTS.md"
+    override = codex_home / "AGENTS.override.md"
+    agents.write_text("# Base guidance\n", encoding="utf-8")
+    override.write_text("# Active override\n", encoding="utf-8")
+
+    assert module.configure_codex_guidance(
+        codex_home=codex_home, manifest_home=home
+    ) == "configured"
+    assert module.CODEX_GUIDANCE_START not in agents.read_text(encoding="utf-8")
+    modified = override.read_text(encoding="utf-8").replace(
+        "call `elefante-Recall`", "ask before calling `elefante-Recall`"
+    )
+    override.write_text(modified, encoding="utf-8")
+
+    assert module.configure_codex_guidance(
+        codex_home=codex_home, manifest_home=home
+    ) == "preserved"
+    removed, preserved = manifest.remove_unchanged_files(home=home, apply=True)
+    assert removed == []
+    assert preserved == [override]
+    assert override.read_text(encoding="utf-8") == modified
+
+
+def test_codex_memory_guidance_upgrades_an_unchanged_recall_only_block(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/configure_cli_agents.py", "codex_guidance_upgrade_module")
+    manifest = _load_module(ROOT / "scripts/setup/install_manifest.py", "codex_guidance_upgrade_manifest_module")
+    home = tmp_path / "home"
+    codex_home = home / ".codex"
+    codex_home.mkdir(parents=True)
+    agents = codex_home / "AGENTS.md"
+    legacy_block = f"""{module.CODEX_GUIDANCE_START}
+## Elefante memory
+
+- Before answering a question that may depend on stored preferences, prior decisions, or project context, call `elefante-Recall` with the complete question.
+- If Recall reports `no_match`, `blocked`, or `unavailable`, do not invent prior context; continue from current evidence or say that the prior context is unavailable.
+{module.CODEX_GUIDANCE_END}"""
+    agents.write_text(legacy_block + "\n", encoding="utf-8")
+    manifest.record_emitted_text_block(
+        agents,
+        module.CODEX_GUIDANCE_SURFACE,
+        module.CODEX_GUIDANCE_START,
+        module.CODEX_GUIDANCE_END,
+        created=True,
+        leading_separator="",
+        trailing_separator="\n",
+        home=home,
+    )
+
+    assert module.configure_codex_guidance(
+        codex_home=codex_home, manifest_home=home
+    ) == "updated"
+    upgraded = agents.read_text(encoding="utf-8")
+    assert upgraded.count(module.CODEX_GUIDANCE_START) == 1
+    assert "explicitly asks Elefante to remember" in upgraded
+    assert 'invocation_mode="user_directed"' in upgraded
+    assert "never put descriptive prose in `scope`" in upgraded
+    assert "stored receipt is not proof" in upgraded
+    assert manifest.remove_unchanged_files(home=home, apply=False)[0] == [agents]
+
+
+def test_codex_surface_requires_registration_and_recall_routing(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/configure_cli_agents.py", "codex_ready_module")
+    manifest = _load_module(ROOT / "scripts/setup/install_manifest.py", "codex_ready_manifest_module")
+    home = tmp_path / "home"
+    configuration = '{"name":"elefante"}'
+    manifest.record_host_command(
+        "codex:elefante",
+        "codex",
+        ["codex", "mcp", "get", "elefante"],
+        ["codex", "mcp", "add", "elefante"],
+        ["codex", "mcp", "remove", "elefante"],
+        configuration,
+        home=home,
+    )
+
+    def runner(command, **_kwargs):
+        return subprocess.CompletedProcess(command, 0, stdout=configuration)
+
+    assert manifest.configured_surfaces(home, runner=runner) == set()
+    assert module.configure_codex_guidance(
+        codex_home=home / ".codex", manifest_home=home
+    ) == "configured"
+    assert manifest.configured_surfaces(home, runner=runner) == {"codex"}
+
+
+def test_codex_surface_follows_a_later_active_override_without_rewriting_it(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/configure_cli_agents.py", "codex_precedence_module")
+    manifest = _load_module(ROOT / "scripts/setup/install_manifest.py", "codex_precedence_manifest_module")
+    home = tmp_path / "home"
+    codex_home = home / ".codex"
+    configuration = '{"name":"elefante"}'
+    manifest.record_host_command(
+        "codex:elefante",
+        "codex",
+        ["codex", "mcp", "get", "elefante"],
+        ["codex", "mcp", "add", "elefante"],
+        ["codex", "mcp", "remove", "elefante"],
+        configuration,
+        home=home,
+    )
+
+    def runner(command, **_kwargs):
+        return subprocess.CompletedProcess(command, 0, stdout=configuration)
+
+    assert module.configure_codex_guidance(
+        codex_home=codex_home,
+        manifest_home=home,
+    ) == "configured"
+    assert manifest.configured_surfaces(home, runner=runner) == {"codex"}
+
+    override = codex_home / "AGENTS.override.md"
+    user_override = "# User override\n\n- Preserve this active rule.\n"
+    override.write_text(user_override, encoding="utf-8")
+    assert manifest.configured_surfaces(home, runner=runner) == set()
+    assert override.read_text(encoding="utf-8") == user_override
+
+    assert module.configure_codex_guidance(
+        codex_home=codex_home,
+        manifest_home=home,
+    ) == "configured"
+    assert override.read_text(encoding="utf-8").startswith(user_override)
+    assert manifest.configured_surfaces(home, runner=runner) == {"codex"}
+
+
 def test_openclaw_adapter_uses_native_registry_and_safe_manifest_ownership(tmp_path):
     module = _load_module(ROOT / "scripts/setup/configure_cli_agents.py", "openclaw_cli_agents_module")
     manifest = _load_module(ROOT / "scripts/setup/install_manifest.py", "openclaw_manifest_module")
@@ -1199,6 +1625,115 @@ def test_cli_agent_restores_owned_registration_when_refresh_fails(tmp_path):
     assert state == "old"
 
 
+def test_codex_registration_rolls_back_when_recall_guidance_fails(tmp_path, monkeypatch):
+    module = _load_module(
+        ROOT / "scripts/setup/configure_cli_agents.py",
+        "codex_guidance_transaction_module",
+    )
+    state = "missing"
+
+    def runner(command, **_):
+        nonlocal state
+        if command[2:4] == ["get", "elefante"]:
+            return subprocess.CompletedProcess(
+                command,
+                0 if state != "missing" else 1,
+                stdout=f"{state}\n" if state != "missing" else "",
+            )
+        if command[2:4] == ["remove", "elefante"]:
+            state = "missing"
+            return subprocess.CompletedProcess(command, 0, stdout="")
+        if command[2] == "add":
+            state = "configured"
+            return subprocess.CompletedProcess(command, 0, stdout="")
+        raise AssertionError(command)
+
+    monkeypatch.setattr(module, "configure_codex_guidance", lambda **_: "failed")
+    home = tmp_path / "home"
+
+    assert module.configure_cli_host(
+        "codex", "codex", tmp_path, "/tmp/python", home=home, runner=runner
+    ) == "failed"
+    assert state == "missing"
+    manifest = home / ".elefante" / "install-manifest.json"
+    assert not manifest.exists() or not json.loads(manifest.read_text(encoding="utf-8"))["commands"]
+
+
+def test_codex_refresh_restores_owned_registration_when_recall_guidance_fails(
+    tmp_path, monkeypatch
+):
+    module = _load_module(
+        ROOT / "scripts/setup/configure_cli_agents.py",
+        "codex_guidance_refresh_transaction_module",
+    )
+    state = "missing"
+
+    def runner(command, **_):
+        nonlocal state
+        if command[2:4] == ["get", "elefante"]:
+            return subprocess.CompletedProcess(
+                command,
+                0 if state != "missing" else 1,
+                stdout=f"{state}\n" if state != "missing" else "",
+            )
+        if command[2:4] == ["remove", "elefante"]:
+            state = "missing"
+            return subprocess.CompletedProcess(command, 0, stdout="")
+        if command[2] == "add":
+            state = "new" if any("/new-location" in part for part in command) else "old"
+            return subprocess.CompletedProcess(command, 0, stdout="")
+        raise AssertionError(command)
+
+    home = tmp_path / "home"
+    assert module.configure_cli_host(
+        "codex", "codex", tmp_path / "old-location", "/tmp/python", home=home, runner=runner
+    ) == "configured"
+    old_manifest = (home / ".elefante" / "install-manifest.json").read_text(
+        encoding="utf-8"
+    )
+    monkeypatch.setattr(module, "configure_codex_guidance", lambda **_: "failed")
+
+    assert module.configure_cli_host(
+        "codex", "codex", tmp_path / "new-location", "/tmp/python", home=home, runner=runner
+    ) == "failed"
+    assert state == "old"
+    assert (home / ".elefante" / "install-manifest.json").read_text(
+        encoding="utf-8"
+    ) == old_manifest
+
+
+def test_codex_guidance_failure_reports_partial_when_registration_rollback_fails(
+    tmp_path, monkeypatch
+):
+    module = _load_module(
+        ROOT / "scripts/setup/configure_cli_agents.py",
+        "codex_guidance_partial_transaction_module",
+    )
+    state = "missing"
+
+    def runner(command, **_):
+        nonlocal state
+        if command[2:4] == ["get", "elefante"]:
+            return subprocess.CompletedProcess(
+                command,
+                0 if state != "missing" else 1,
+                stdout=f"{state}\n" if state != "missing" else "",
+            )
+        if command[2:4] == ["remove", "elefante"]:
+            return subprocess.CompletedProcess(command, 1, stdout="")
+        if command[2] == "add":
+            state = "configured"
+            return subprocess.CompletedProcess(command, 0, stdout="")
+        raise AssertionError(command)
+
+    monkeypatch.setattr(module, "configure_codex_guidance", lambda **_: "failed")
+
+    assert module.configure_cli_host(
+        "codex", "codex", tmp_path, "/tmp/python", home=tmp_path / "home", runner=runner
+    ) == "partial"
+    assert state == "configured"
+
+
 @pytest.mark.integration
 def test_codex_cli_registration_round_trip_uses_an_isolated_config_home():
     codex = shutil.which("codex")
@@ -1222,6 +1757,7 @@ def test_codex_cli_registration_round_trip_uses_an_isolated_config_home():
             sys.executable,
             home=temp_root / "elefante-home",
             runner=runner,
+            codex_home=codex_home,
         )
         assert result == "configured"
         current = runner([codex, "mcp", "get", "elefante", "--json"], capture_output=True, text=True, check=False)
@@ -1244,6 +1780,7 @@ def test_codex_cli_registration_round_trip_uses_an_isolated_config_home():
             sys.executable,
             home=temp_root / "elefante-home",
             runner=runner,
+            codex_home=codex_home,
         ) == "updated"
         refreshed = runner([codex, "mcp", "get", "elefante", "--json"], capture_output=True, text=True, check=False)
         assert refreshed.returncode == 0
@@ -1280,6 +1817,7 @@ def test_codex_cli_registration_round_trip_uses_an_isolated_config_home():
             sys.executable,
             home=temp_root / "elefante-home",
             runner=runner,
+            codex_home=codex_home,
         ) == "configured"
 
         removed, preserved = manifest.remove_unchanged_host_commands(
@@ -1389,14 +1927,77 @@ def test_install_manifest_records_customer_runtime_without_losing_owned_surfaces
         data_root=home / ".elefante" / "data",
         version="9.9.9",
         scope="customer",
+        source_commit=TEST_SOURCE_COMMIT,
+        release_channel="release",
+        source_clean=True,
         home=home,
     )
     payload = json.loads(target.read_text(encoding="utf-8"))
 
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == 3
     assert payload["runtime"]["scope"] == "customer"
+    assert payload["runtime"]["source_commit"] == TEST_SOURCE_COMMIT
+    assert payload["runtime"]["release_channel"] == "release"
     assert module.read_runtime_installation(home)["version"] == "9.9.9"
     assert module.configured_surfaces(home) == {"vscode-copilot"}
+
+
+def test_runtime_identity_tracks_upgrade_repair_and_known_good_rollback(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/install_manifest.py", "runtime_upgrade_module")
+    home = tmp_path / "home"
+    app_root = tmp_path / "app" / "current"
+    data_root = home / ".elefante" / "data"
+
+    module.record_runtime_installation(
+        app_root=app_root,
+        data_root=data_root,
+        version="2.12.2",
+        scope="customer",
+        source_commit="a" * 40,
+        release_channel="release",
+        source_clean=True,
+        home=home,
+    )
+    module.record_runtime_installation(
+        app_root=app_root,
+        data_root=data_root,
+        version="2.12.3",
+        scope="customer",
+        source_commit="b" * 40,
+        release_channel="candidate",
+        source_clean=True,
+        home=home,
+    )
+    upgraded = module.read_runtime_installation(home)
+    assert upgraded["version"] == "2.12.3"
+    assert upgraded["source_commit"] == "b" * 40
+
+    module.record_runtime_installation(
+        app_root=app_root,
+        data_root=data_root,
+        version="2.12.3",
+        scope="customer",
+        source_commit="b" * 40,
+        release_channel="candidate",
+        source_clean=True,
+        home=home,
+    )
+    assert module.read_runtime_installation(home) == upgraded
+
+    module.record_runtime_installation(
+        app_root=app_root,
+        data_root=data_root,
+        version="2.12.2",
+        scope="customer",
+        source_commit="a" * 40,
+        release_channel="release",
+        source_clean=True,
+        home=home,
+    )
+    rolled_back = module.read_runtime_installation(home)
+    assert rolled_back["version"] == "2.12.2"
+    assert rolled_back["source_commit"] == "a" * 40
+    assert rolled_back["release_channel"] == "release"
 
 
 def test_json_surface_verification_ignores_unrelated_user_settings(tmp_path):
@@ -1513,6 +2114,9 @@ def test_complete_uninstall_can_clear_customer_runtime_identity(tmp_path):
         data_root=home / ".elefante" / "data",
         version="9.9.9",
         scope="customer",
+        source_commit=TEST_SOURCE_COMMIT,
+        release_channel="release",
+        source_clean=True,
         home=home,
     )
 

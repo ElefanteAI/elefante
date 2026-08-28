@@ -5,6 +5,9 @@ on:
     paths:
       - ".github/workflows/build-binaries.yml"
       - "scripts/ci/build_release_client.py"
+      - "scripts/ci/build_windows_installer.py"
+      - "scripts/ci/prepare_windows_branding.py"
+      - "scripts/ci/resolve_release_publication.py"
       - "scripts/ci/verify_release_client.py"
       - "scripts/setup/**"
       - "scripts/lifecycle/**"
@@ -13,6 +16,8 @@ on:
       - "tests/test_installer_bundle.py"
       - "tests/test_release_client_bundle.py"
       - "tests/test_release_pipeline.py"
+      - "tests/test_windows_installer_workflow.py"
+      - "tests/test_windows_branding.py"
       - "README.md"
       - "config.yaml"
       - "requirements.txt"
@@ -29,6 +34,8 @@ jobs:
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    env:
+      SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
@@ -37,6 +44,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SOURCE_COMMIT }}
 
       - name: Setup Python
         uses: actions/setup-python@v7
@@ -61,10 +70,20 @@ jobs:
           npm ci
           npm run build
 
+      - name: Resolve publication status
+        id: publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(python scripts/ci/resolve_release_publication.py \
+            --ref-type "${GITHUB_REF_TYPE}" \
+            --ref-name "${GITHUB_REF_NAME}")"
+          echo "status=${status}" >> "$GITHUB_OUTPUT"
+
       - name: Build clean customer installer
         run: |
-          python scripts/ci/build_release_client.py --platform "${{ runner.os }}" --publication-status release --output dist/elefante-installer-${{ runner.os }}.zip
-          python scripts/ci/verify_release_client.py --archive dist/elefante-installer-${{ runner.os }}.zip --require-clean-source --expected-publication-status release --expected-platform "${{ runner.os }}"
+          python scripts/ci/build_release_client.py --platform "${{ runner.os }}" --publication-status "${{ steps.publication.outputs.status }}" --output dist/elefante-installer-${{ runner.os }}.zip
+          python scripts/ci/verify_release_client.py --archive dist/elefante-installer-${{ runner.os }}.zip --require-clean-source --expected-publication-status "${{ steps.publication.outputs.status }}" --expected-platform "${{ runner.os }}"
 
       - name: Install Python Dependencies
         run: |
@@ -257,19 +276,105 @@ jobs:
           path: dist/elefante-${{ runner.os }}.zip
           retention-days: 5
 
+      - name: Prepare branded Windows resources
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = python -c "from src import __version__; print(__version__)"
+          python scripts/ci/prepare_windows_branding.py `
+            --source-png assets/icons/Elefante-installer-icon.svg.png `
+            --output-dir dist/windows-branding `
+            --version $version
+
+      - name: Build branded Windows EXE validation artifact
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          python scripts/ci/build_windows_installer.py `
+            --payload dist/elefante-installer-Windows.zip `
+            --icon dist/windows-branding/Elefante.ico `
+            --version-file dist/windows-branding/Elefante.version.txt `
+            --output dist/Elefante-Installer-local.exe `
+            --publication-status local
+
+      - name: Upload unsigned Windows EXE validation artifact
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: elefante-Windows-installer-exe-validation
+          path: dist/Elefante-Installer-local.exe
+          retention-days: 5
+
+      - name: Build and Authenticode-sign release Windows EXE
+        id: sign_windows
+        if: runner.os == 'Windows' && startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
+          ELEFANTE_WINDOWS_SIGNING_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PASSWORD }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_CERTIFICATE_BASE64) -or
+              [string]::IsNullOrWhiteSpace($env:ELEFANTE_WINDOWS_SIGNING_PASSWORD)) {
+            "signed=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            Write-Output "Windows signing credentials unavailable; skipping signed EXE publication."
+            exit 0
+          }
+          $certificate = Join-Path $env:RUNNER_TEMP "elefante-signing.pfx"
+          try {
+            [System.IO.File]::WriteAllBytes(
+              $certificate,
+              [System.Convert]::FromBase64String($env:WINDOWS_SIGNING_CERTIFICATE_BASE64)
+            )
+            $env:ELEFANTE_WINDOWS_SIGNING_CERTIFICATE_PATH = $certificate
+            python scripts/ci/build_windows_installer.py `
+              --payload dist/elefante-installer-Windows.zip `
+              --icon dist/windows-branding/Elefante.ico `
+              --version-file dist/windows-branding/Elefante.version.txt `
+              --output dist/Elefante-Installer.exe `
+              --publication-status "${{ steps.publication.outputs.status }}" `
+              --sign
+            if ($LASTEXITCODE -ne 0) {
+              throw "Signed Windows installer build failed"
+            }
+            "signed=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
+          finally {
+            Remove-Item -LiteralPath $certificate -Force -ErrorAction SilentlyContinue
+            Remove-Item Env:ELEFANTE_WINDOWS_SIGNING_CERTIFICATE_PATH -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload signed Windows EXE
+        if: runner.os == 'Windows' && steps.sign_windows.outputs.signed == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: elefante-Windows-installer-exe
+          path: dist/Elefante-Installer.exe
+          retention-days: 5
+
       - name: Build macOS DMG
         if: runner.os == 'macOS'
         run: |
           python scripts/ci/build_dmg.py --bundle dist/elefante-installer-macOS.zip --output dist/Elefante-Installer.dmg
 
       - name: Sign and Notarize DMG
-        if: runner.os == 'macOS' && env.APPLE_DEVELOPER_ID != ''
+        id: sign_notarize
+        if: runner.os == 'macOS'
         env:
           APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        shell: bash
         run: |
+          set -euo pipefail
+          if [[ -z "${APPLE_DEVELOPER_ID:-}" || -z "${APPLE_TEAM_ID:-}" || -z "${APPLE_ID:-}" || -z "${APPLE_APP_PASSWORD:-}" ]]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "Apple signing credentials unavailable; skipping signed DMG publication."
+            exit 0
+          fi
           # Sign
           codesign -s "$APPLE_DEVELOPER_ID" --timestamp dist/Elefante-Installer.dmg
           # Notarize
@@ -282,6 +387,7 @@ jobs:
           xcrun stapler staple dist/Elefante-Installer.dmg
           # Verify
           spctl --assess --type open --context context:primary-signature -v dist/Elefante-Installer.dmg
+          echo "signed=true" >> "$GITHUB_OUTPUT"
 
       - name: Upload Installer Bundle
         uses: actions/upload-artifact@v7
@@ -291,12 +397,10 @@ jobs:
           retention-days: 5
 
       - name: Upload DMG (only if signed)
-        if: runner.os == 'macOS' && env.APPLE_DEVELOPER_ID != ''
-        env:
-          APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
+        if: runner.os == 'macOS' && steps.sign_notarize.outputs.signed == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: elefante-macOS-dmg
+          name: elefante-macOS-installer-dmg
           path: dist/Elefante-Installer.dmg
           retention-days: 5
 
@@ -337,7 +441,7 @@ jobs:
         with:
           # Binary archives are retained for CI diagnostics, not published.
           # Avoid downloading them into the release job.
-          pattern: elefante-*-installer
+          pattern: elefante-*-installer*
           path: artifacts
           merge-multiple: false
 

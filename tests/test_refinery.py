@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_refinery.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PROVES  : Deterministic refinery plan generation: correct identification of
 #           stale, low-score, and superseded memories for pruning.
 # RUN     : pytest tests/test_refinery.py -v
@@ -24,6 +22,8 @@ def _mem(
     access_count: int = 0,
     created_at: datetime | None = None,
     memory_type: str = "conversation",
+    retention_policy: str = "managed",
+    user_locked: bool = False,
 ):
     md = MemoryMetadata(
         category=category,
@@ -32,6 +32,8 @@ def _mem(
         access_count=access_count,
         created_at=created_at or datetime.utcnow(),
         memory_type=memory_type,
+        retention_policy=retention_policy,
+        user_locked=user_locked,
     )
     if title:
         md.custom_metadata["title"] = title
@@ -89,3 +91,71 @@ def test_refinery_canonicalizes_simple_concise_preference():
     updates = {u.memory_id: u.updates for u in plan.updates}
     assert updates[m1.id]["custom_metadata"]["canonical_key"] == "self-pref-communication-simple-concise"
     assert updates[m2.id]["custom_metadata"]["canonical_key"] == "self-pref-communication-simple-concise"
+
+
+def test_refinery_does_not_archive_protected_duplicate() -> None:
+    protected = _mem(
+        "Customer release installer policy",
+        title="customer-release-policy",
+        retention_policy="permanent",
+    )
+    ordinary = _mem(
+        "Customer release installer policy",
+        title="customer-release-policy",
+        score=95,
+    )
+
+    plan = build_refinery_plan([protected, ordinary])
+    updates = {item.memory_id: item.updates for item in plan.updates}
+
+    assert updates[ordinary.id]["status"] == MemoryStatus.REDUNDANT
+    assert protected.id not in {
+        item.memory_id
+        for item in plan.updates
+        if item.updates.get("status") == MemoryStatus.REDUNDANT
+    }
+
+
+def test_refinery_pauses_lifecycle_cleanup_when_two_protected_duplicates_conflict() -> None:
+    first = _mem(
+        "Same protected decision",
+        title="protected-decision",
+        retention_policy="permanent",
+    )
+    second = _mem(
+        "Same protected decision",
+        title="protected-decision",
+        user_locked=True,
+    )
+
+    plan = build_refinery_plan([first, second])
+
+    assert plan.stats["protected_groups"] == 1
+    assert plan.stats["protected_lifecycle_skips"] == 1
+    assert not any(
+        update.updates.get("status") == MemoryStatus.REDUNDANT
+        for update in plan.updates
+    )
+
+
+def test_refinery_never_archives_a_protected_redundant_singleton() -> None:
+    for protected in (
+        _mem(
+            "Permanent historical decision",
+            retention_policy="permanent",
+        ),
+        _mem(
+            "User-locked historical decision",
+            user_locked=True,
+        ),
+    ):
+        protected.metadata.status = MemoryStatus.REDUNDANT
+
+        plan = build_refinery_plan([protected])
+        update = next(
+            (item for item in plan.updates if item.memory_id == protected.id),
+            None,
+        )
+
+        assert update is None or "archived" not in update.updates
+        assert update is None or "deprecated" not in update.updates

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useHealthScore } from '@/hooks/useVisualizationData';
+import { SessionIntelligencePanel } from '@/components/SessionIntelligencePanel';
 import { useDashboardStore } from '@/store';
 import { edgeEndpoints, type GraphEdge, type MemoryNode } from '@/types';
 
@@ -231,6 +232,8 @@ export function OverviewTab() {
     || featured.properties?.source
     || 'redacted snapshot';
   const reviewCount = memories.filter((memory) => {
+    const healthStatus = String(memory.properties?.health_status || '').toLowerCase();
+    if (healthStatus) return healthStatus !== 'healthy';
     const memoryStatus = String(memory.properties?.status || '').toLowerCase();
     return memory.properties?.deprecated
       || memory.properties?.archived
@@ -353,6 +356,10 @@ export function OverviewTab() {
             <h3 className="text-[9px] text-slate-500 elefante-mono uppercase tracking-[0.16em]">
               Knowledge pulse
             </h3>
+            <div className="mt-4 flex items-baseline justify-between border-b elefante-hairline pb-3">
+              <span className="text-[8px] text-slate-600 elefante-mono uppercase tracking-[0.1em]">Local health score</span>
+              <strong className="text-2xl text-slate-100 elefante-mono tracking-[-0.06em]">{health.overall}%</strong>
+            </div>
             <div className="grid grid-cols-4 mt-4">
               {[
                 [health.totalMemories, 'memories'],
@@ -367,9 +374,13 @@ export function OverviewTab() {
               ))}
             </div>
             <p className="mt-4 text-[11px] leading-relaxed text-slate-500">
+              {health.neverRetrievedCount} {health.neverRetrievedCount === 1 ? 'memory has' : 'memories have'} no recorded retrievals; the most-used memory has {health.maxAccessCount} recorded uses.
+            </p>
+            <p className="mt-4 text-[11px] leading-relaxed text-slate-500">
               Snapshot metrics describe this local memory system. They are not performance or customer claims.
             </p>
           </div>
+          <SessionIntelligencePanel />
         </section>
       </div>
     </div>

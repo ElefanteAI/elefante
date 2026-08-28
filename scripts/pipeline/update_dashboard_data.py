@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : update_dashboard_data.py
-# VERSION : 2.5.2
-# CHANGED : 2026-07-23
 # PURPOSE : Read the configured embedded vector store + Kuzu state and emit
 #           dashboard_snapshot.json
 #           consumed by the dashboard server/frontend.
@@ -14,7 +12,6 @@
 #           entities/relationships.
 #           The output file path is determined by config.yaml. Dashboard must be
 #           restarted or will auto-poll for the new snapshot depending on config.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 import asyncio
 import json
@@ -27,12 +24,16 @@ from pathlib import Path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from src.core.graph_store import GraphStore  # noqa: E402
+from src.utils.curation import assess_health_from_raw  # noqa: E402
 from src.utils.config import get_config  # noqa: E402
 from src.utils.dashboard_serializer import (  # noqa: E402
     _redact_secrets,
     _derive_topic,
+    connection_counts_from_edges,
     compute_live_score_from_raw as _compute_live_score,
+    health_summary_from_nodes,
     is_test_artifact as _is_test_artifact,
+    usage_summary_from_nodes,
 )
 
 
@@ -209,6 +210,7 @@ async def main():
                 "deprecated": _truthy(meta.get("deprecated")),
                 "supersedes_id": meta.get("supersedes_id"),
                 "superseded_by_id": meta.get("superseded_by_id"),
+                "conflict_ids": meta.get("conflict_ids"),
                 "canonical_key": meta.get("canonical_key"),
                 "namespace": meta.get("namespace"),
                 "access_count": _safe_int(meta.get("access_count"), 0),
@@ -882,6 +884,25 @@ async def main():
 
     except Exception as e:
         print(f"   [!] Signal hub computation error: {e}", file=sys.stderr)
+
+    # Health is computed after every edge-producing phase so the degree signal
+    # reflects the exact redacted snapshot served to the dashboard.
+    memory_ids = {str(n["id"]) for n in nodes if n.get("type") == "memory"}
+    node_ids = {str(n["id"]) for n in nodes if n.get("id") is not None}
+    connection_counts = connection_counts_from_edges(memory_ids, edges, node_ids=node_ids)
+    for node in nodes:
+        if node.get("type") != "memory":
+            continue
+        properties = node.get("properties")
+        if not isinstance(properties, dict):
+            continue
+        health = assess_health_from_raw(
+            properties,
+            connection_counts.get(str(node["id"]), 0),
+        )
+        properties["health_status"] = health.status.value
+        properties["health_reason"] = health.reason
+        properties["connection_count"] = health.connection_count
     
     # =========================================================================
     # STEP 4: Save snapshot
@@ -894,7 +915,9 @@ async def main():
             "total_nodes": len(nodes),
             "memories": sum(1 for n in nodes if n["type"] == "memory"),
             "entities": sum(1 for n in nodes if n["type"] != "memory"),
-            "edges": len(edges)
+            "edges": len(edges),
+            "health": health_summary_from_nodes(nodes, edges),
+            "usage": usage_summary_from_nodes(nodes),
         },
         "nodes": nodes,
         "edges": edges

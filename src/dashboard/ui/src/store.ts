@@ -1,5 +1,12 @@
 import { create } from 'zustand';
-import type { Tab, Snapshot, StatsResponse, MemoryNode, VisualizationType } from './types';
+import type {
+  Tab,
+  Snapshot,
+  StatsResponse,
+  SessionIntelligenceResponse,
+  MemoryNode,
+  VisualizationType,
+} from './types';
 
 interface DashboardStore {
   // Navigation
@@ -9,6 +16,7 @@ interface DashboardStore {
   // Data
   snapshot: Snapshot | null;
   stats: StatsResponse | null;
+  sessionIntelligence: SessionIntelligenceResponse | null;
   isLoading: boolean;
   error: string | null;
 
@@ -41,6 +49,7 @@ interface DashboardStore {
   // Actions
   fetchSnapshot: () => Promise<void>;
   fetchStats: () => Promise<void>;
+  fetchSessionIntelligence: () => Promise<void>;
   refreshSnapshot: () => Promise<void>;
   isRefreshing: boolean;
 
@@ -58,6 +67,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   // Data
   snapshot: null,
   stats: null,
+  sessionIntelligence: null,
   isLoading: false,
   isRefreshing: false,
   error: null,
@@ -147,12 +157,24 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     }
   },
 
+  fetchSessionIntelligence: async () => {
+    try {
+      const res = await fetch('/api/session-intelligence');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      set({ sessionIntelligence: data });
+    } catch (e) {
+      console.error('Failed to fetch Session Intelligence snapshot:', e);
+    }
+  },
+
   refreshSnapshot: async () => {
     set({ isRefreshing: true, error: null });
     try {
       // The dashboard is an inspection surface. Reload only the existing
       // snapshot; live regeneration belongs to the explicit MCP or CLI path.
       await get().fetchStats();
+      await get().fetchSessionIntelligence();
       await get().fetchSnapshot();
     } catch (e: any) {
       set({ error: `Snapshot reload failed: ${e.message}` });

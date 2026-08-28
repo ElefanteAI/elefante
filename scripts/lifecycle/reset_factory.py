@@ -1,8 +1,6 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : reset_factory.py
-# VERSION : 2.5.2
-# CHANGED : 2026-07-23
-# PURPOSE : Destructive full reset of all Elefante durable state with backup
+# PURPOSE : Privileged, recoverable reset of Elefante durable state with backup
 #           gates; for unrecoverable corruption or an explicit wipe.
 # WHEN    : Last resort only — when the configured vector store AND Kuzu are unrecoverable, or
 #           when an operator explicitly wants a clean-slate install. NOT for
@@ -11,7 +9,6 @@
 # NOTES   : Backup is created automatically before deletion, but backup_elefante_data.py
 #           beforehand is still recommended. Stop all Elefante processes first.
 #           This moves configured and default local durable data into recovery.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 import argparse
 import os
@@ -58,7 +55,7 @@ def _configured_storage() -> tuple[Path, Path, Path]:
     graph_config = payload.get("graph_store") or {}
     if not isinstance(vector_config, dict) or not isinstance(graph_config, dict):
         raise RuntimeError("Cannot safely read Elefante configuration: storage sections must be mappings")
-    vector_type = os.getenv("ELEFANTE_VECTOR_STORE_TYPE", "").strip() or vector_config.get("type", "chromadb")
+    vector_type = os.getenv("ELEFANTE_VECTOR_STORE_TYPE", "").strip() or vector_config.get("type", "sqlite")
     vector_default = "vector" if vector_type == "sqlite" else "chroma"
     vector_path = Path(vector_config.get("persist_directory") or data_dir / vector_default).expanduser().resolve()
     graph_path = Path(graph_config.get("database_path") or data_dir / "kuzu_db").expanduser().resolve()

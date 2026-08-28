@@ -6,11 +6,17 @@ from __future__ import annotations
 import argparse
 import asyncio
 import hashlib
+import io
 import json
+import math
 import os
+import re
 import sys
+import tarfile
+import tempfile
+from collections import Counter
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
@@ -20,37 +26,94 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MANIFEST = ROOT / "benchmarks/task_intelligence/tasks.json"
 DEFAULT_OUTCOMES = ROOT / "benchmarks/task_intelligence/outcomes"
-DEFAULT_WORKSPACES = ROOT / "benchmarks/task_intelligence/worktrees"
+DEFAULT_WORKSPACES = Path(tempfile.gettempdir()) / "elefante-ti"
 DEFAULT_ESTIMATED_INPUT_TOKENS = 600_000
 DEFAULT_ESTIMATED_UNCACHED_INPUT_TOKENS = 100_000
-CONDITIONS = ("baseline", "task-brief")
+STANDARD_CONDITIONS = ("baseline", "task-brief")
+MEMORY_COMPONENT_CONDITIONS = ("source-brief", "memory-brief")
+LOCAL_DECISION_REPETITIONS = 3
+COMPARISON_CONDITIONS = {
+    "standard": STANDARD_CONDITIONS,
+    "memory-component": MEMORY_COMPONENT_CONDITIONS,
+}
+CONDITIONS = STANDARD_CONDITIONS
+ALL_CONDITIONS = (*STANDARD_CONDITIONS, *MEMORY_COMPONENT_CONDITIONS)
 
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.ci import run_task_intelligence_baseline as baseline  # noqa: E402
 from scripts.ci.verify_task_intelligence_benchmark import (  # noqa: E402
+    acceptance_test_sha256,
     scan_memory_payload,
+    task_contract_sha256,
+    task_promotion_validity,
     validate_manifest,
+    validate_memory_fixture,
     validate_outcome_record,
+    verify_black_box_canaries,
 )
 from src.core.embeddings import EmbeddingService  # noqa: E402
 from src.core.retrieval import CognitiveRetriever, MemoryCandidate  # noqa: E402
 from src.core.task_intelligence import (  # noqa: E402
     TaskBrief,
     TaskBriefCompiler,
+    TaskBriefProfile,
     TaskBriefRequest,
 )
 from src.models.memory import (  # noqa: E402
     DomainType,
     Memory,
     MemoryMetadata,
+    MemoryStatus,
     MemoryType,
+    SOURCE_RELIABILITY_SCORES,
     SourceType,
 )
 from src.models.query import SearchResult  # noqa: E402
 from src.utils.curation import extract_concepts  # noqa: E402
 from src.utils.token_counter import estimate_tokens  # noqa: E402
+
+
+V2_SOURCE_SUFFIXES = frozenset(
+    {
+        ".py",
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx",
+        ".sh",
+        ".ps1",
+        ".swift",
+        ".toml",
+        ".yaml",
+        ".yml",
+        ".json",
+        ".md",
+    }
+)
+V2_EXCLUDED_PREFIXES = (
+    ".git/",
+    "benchmarks/",
+    "dist/",
+    "node_modules/",
+    "scripts/archive/",
+    "scripts/demo/",
+    "src/dashboard/ui/dist/",
+    "workspace/proposals/_archive/",
+    "workspace/postmortems/_archive/",
+)
+V2_EXCLUDED_NAMES = frozenset(
+    {"CHANGELOG.md", "package-lock.json", "requirements.lock"}
+)
+V2_MAX_FILE_BYTES = 200_000
+V2_MAX_CANDIDATE_CHUNKS = 64
+V2_MAX_CHUNKS_PER_PATH = 5
+_SYMBOL_PATTERN = re.compile(
+    r"^\s*(?:(?:async\s+def|def|class|function|export\s+(?:async\s+)?function|"
+    r"export\s+class|const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)|"
+    r"([A-Z][A-Z0-9_]*)\s*=)"
+)
 
 
 def _git_text(repo_root: Path, ref: str, path: str) -> str:
@@ -98,6 +161,403 @@ def chunk_document(
     return chunks
 
 
+def _terms(value: str) -> set[str]:
+    return TaskBriefCompiler._terms(value)
+
+
+def _overlap(query_terms: set[str], evidence_terms: set[str]) -> float:
+    return TaskBriefCompiler._overlap(query_terms, evidence_terms)
+
+
+def _focused_overlap(query_terms: set[str], evidence_terms: set[str]) -> float:
+    return TaskBriefCompiler._focused_overlap(query_terms, evidence_terms)
+
+
+def _location_overlap(query_terms: set[str], location_terms: set[str]) -> float:
+    return TaskBriefCompiler._location_overlap(query_terms, location_terms)
+
+
+def _canonical_terms(value: str) -> set[str]:
+    return TaskBriefCompiler._canonical_terms(value)
+
+
+def _source_kind(path: str) -> str:
+    candidate = PurePosixPath(path)
+    name = candidate.name.casefold()
+    parts = {part.casefold() for part in candidate.parts}
+    if candidate.suffix.casefold() == ".md":
+        return "documentation"
+    if (
+        "tests" in parts
+        or "test" in parts
+        or name.startswith("test_")
+        or ".test." in name
+        or ".spec." in name
+    ):
+        return "test"
+    if candidate.suffix.casefold() in {".json", ".toml", ".yaml", ".yml"}:
+        return "configuration"
+    return "implementation"
+
+
+def _heading_aware_chunks(
+    text: str,
+    *,
+    path: str,
+    max_tokens: int = 220,
+) -> list[dict[str, Any]]:
+    """Return stable chunks that retain Markdown heading or code-symbol lineage."""
+    suffix = PurePosixPath(path).suffix.casefold()
+    heading_stack: list[str] = []
+    symbol = ""
+    chunks: list[dict[str, Any]] = []
+    current: list[str] = []
+    start_line = 1
+    current_heading = ""
+    current_symbol = ""
+
+    def flush() -> None:
+        nonlocal current
+        content = "\n".join(current).strip()
+        if content:
+            prefix: list[str] = []
+            if current_heading:
+                prefix.append(f"Section: {current_heading}")
+            if current_symbol:
+                prefix.append(f"Symbol: {current_symbol}")
+            rendered = "\n".join([*prefix, content])
+            chunks.append(
+                {
+                    "line_number": start_line,
+                    "content": rendered,
+                    "heading": current_heading,
+                    "symbol": current_symbol,
+                }
+            )
+        current = []
+
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        if suffix == ".md":
+            heading_match = re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
+            if heading_match:
+                flush()
+                level = len(heading_match.group(1))
+                heading_stack = heading_stack[: level - 1]
+                heading_stack.append(heading_match.group(2).strip())
+                current_heading = " > ".join(heading_stack)
+                current_symbol = ""
+                continue
+        else:
+            symbol_match = _SYMBOL_PATTERN.match(line)
+            if symbol_match:
+                flush()
+                symbol = symbol_match.group(1) or symbol_match.group(2)
+                current_symbol = symbol
+                current_heading = ""
+        stripped = line.rstrip()
+        if not stripped:
+            flush()
+            continue
+        if not current:
+            start_line = line_number
+        proposed = "\n".join([*current, stripped])
+        context = "\n".join(
+            item
+            for item in (
+                f"Section: {current_heading}" if current_heading else "",
+                f"Symbol: {current_symbol}" if current_symbol else "",
+                proposed,
+            )
+            if item
+        )
+        if current and estimate_tokens(context) > max_tokens:
+            flush()
+            start_line = line_number
+        current.append(stripped)
+    flush()
+    return chunks
+
+
+def _repository_files(repo_root: Path, ref: str) -> list[tuple[str, bytes]]:
+    """Read an immutable repository snapshot with one Git process."""
+    archive_bytes = baseline._git_bytes(repo_root, "archive", "--format=tar", ref)
+    files: list[tuple[str, bytes]] = []
+    with tarfile.open(fileobj=io.BytesIO(archive_bytes), mode="r:") as archive:
+        for member in archive.getmembers():
+            path = member.name
+            if not member.isfile():
+                continue
+            if PurePosixPath(path).suffix.casefold() not in V2_SOURCE_SUFFIXES:
+                continue
+            if PurePosixPath(path).name in V2_EXCLUDED_NAMES:
+                continue
+            if path.startswith(V2_EXCLUDED_PREFIXES):
+                continue
+            source = archive.extractfile(member)
+            if source is not None:
+                files.append((path, source.read()))
+    return sorted(files)
+
+
+def source_grounded_candidates(
+    repo_root: Path,
+    task: dict[str, Any],
+    *,
+    limit: int = V2_MAX_CANDIDATE_CHUNKS,
+) -> list[dict[str, Any]]:
+    """Rank pre-fix repository chunks without reading any future ref."""
+    query = "\n".join([task["task_statement"], *task["success_criteria"]])
+    query_terms = _canonical_terms(query)
+    declared_context_paths = list(dict.fromkeys(task.get("context_paths", [])))
+    declared_context_set = set(declared_context_paths)
+    candidates: list[dict[str, Any]] = []
+    document_frequency: Counter[str] = Counter()
+    chunk_count = 0
+    chunk_sequences: dict[str, list[dict[str, Any]]] = {}
+    for path, raw in _repository_files(repo_root, task["base_ref"]):
+        if len(raw) > V2_MAX_FILE_BYTES or b"\x00" in raw:
+            continue
+        text = raw.decode("utf-8", errors="replace")
+        path_terms = _canonical_terms(path)
+        chunks = _heading_aware_chunks(text, path=path)
+        chunk_sequences[path] = chunks
+        for chunk_index, chunk in enumerate(chunks):
+            chunk_count += 1
+            content_terms = _canonical_terms(chunk["content"])
+            symbol_terms = _canonical_terms(chunk["symbol"])
+            evidence_terms = path_terms | content_terms | symbol_terms
+            matched_terms = query_terms & evidence_terms
+            document_frequency.update(matched_terms)
+            minimum_matches = 1 if len(query_terms) <= 4 else 2
+            strong_location_match = (
+                max(
+                    _location_overlap(query_terms, path_terms),
+                    _location_overlap(query_terms, symbol_terms),
+                )
+                >= 0.5
+            )
+            if (
+                len(matched_terms) < minimum_matches
+                and not strong_location_match
+                and path not in declared_context_set
+            ):
+                continue
+            source_kind = _source_kind(path)
+            source_code = source_kind != "documentation"
+            candidates.append(
+                {
+                    **chunk,
+                    "path": path,
+                    "matched_terms": len(matched_terms),
+                    "_chunk_index": chunk_index,
+                    "_path_terms": path_terms,
+                    "_content_terms": content_terms,
+                    "_symbol_terms": symbol_terms,
+                    "source_code": source_code,
+                    "source_kind": source_kind,
+                }
+            )
+    weights = {
+        term: math.log((chunk_count + 1) / (document_frequency[term] + 1)) + 1.0
+        for term in query_terms
+    }
+    weight_total = sum(weights.values()) or 1.0
+
+    def weighted_overlap(evidence_terms: set[str]) -> float:
+        return (
+            sum(weights[term] for term in query_terms & evidence_terms) / weight_total
+        )
+
+    for candidate in candidates:
+        path_terms = candidate.pop("_path_terms")
+        content_terms = candidate.pop("_content_terms")
+        symbol_terms = candidate.pop("_symbol_terms")
+        path_score = weighted_overlap(path_terms)
+        lexical_score = weighted_overlap(content_terms)
+        symbol_score = weighted_overlap(symbol_terms)
+        focused_location_score = max(
+            _location_overlap(query_terms, path_terms),
+            _location_overlap(query_terms, symbol_terms),
+        )
+        candidate.update(
+            {
+                "path_score": path_score,
+                "lexical_score": lexical_score,
+                "symbol_score": symbol_score,
+                "focused_location_score": focused_location_score,
+                "pre_score": (
+                    0.62 * lexical_score
+                    + 0.23 * path_score
+                    + 0.10 * symbol_score
+                    + 0.05 * float(candidate["source_code"])
+                ),
+            }
+        )
+    ranked = sorted(
+        candidates,
+        key=lambda item: (
+            -item["pre_score"],
+            -int(item["source_code"]),
+            item["path"],
+            item["line_number"],
+        ),
+    )
+    diversified: list[dict[str, Any]] = []
+    chunks_per_path: dict[str, int] = {}
+    declared_reserve = (
+        min(12, max(1, limit // 5))
+        if declared_context_paths and limit > 1
+        else 0
+    )
+    anchor_reserve = min(6, max(1, limit // 10)) if limit > 1 else 0
+    neighbor_reserve = min(6, limit // 10)
+    primary_limit = max(
+        1,
+        limit - declared_reserve - anchor_reserve - neighbor_reserve,
+    )
+    for candidate in ranked:
+        path = candidate["path"]
+        if chunks_per_path.get(path, 0) >= V2_MAX_CHUNKS_PER_PATH:
+            continue
+        diversified.append(candidate)
+        chunks_per_path[path] = chunks_per_path.get(path, 0) + 1
+        if len(diversified) == primary_limit:
+            break
+    selected_keys = {
+        (candidate["path"], candidate["line_number"]) for candidate in diversified
+    }
+    selected_paths = {candidate["path"] for candidate in diversified}
+    declared_queues = {
+        path: [
+            candidate
+            for candidate in ranked
+            if candidate["path"] == path
+            and (candidate["path"], candidate["line_number"]) not in selected_keys
+        ]
+        for path in declared_context_paths
+    }
+    declared_added = 0
+    while declared_added < declared_reserve:
+        progressed = False
+        for path in declared_context_paths:
+            queue = declared_queues[path]
+            if not queue:
+                continue
+            candidate = queue.pop(0)
+            key = (candidate["path"], candidate["line_number"])
+            if key in selected_keys:
+                continue
+            diversified.append(candidate)
+            selected_keys.add(key)
+            selected_paths.add(path)
+            declared_added += 1
+            progressed = True
+            if declared_added == declared_reserve:
+                break
+        if not progressed:
+            break
+    anchor_limit = min(
+        anchor_reserve,
+        max(0, limit - len(diversified) - neighbor_reserve),
+    )
+    anchor_candidates = sorted(
+        (
+            candidate
+            for candidate in candidates
+            if candidate["path"] not in selected_paths
+            and candidate["focused_location_score"] >= 0.5
+        ),
+        key=lambda item: (
+            -item["focused_location_score"],
+            -item["pre_score"],
+            item["path"],
+            item["line_number"],
+        ),
+    )
+    anchor_target = len(diversified) + anchor_limit
+    for candidate in anchor_candidates:
+        path = candidate["path"]
+        if path in selected_paths:
+            continue
+        diversified.append(candidate)
+        selected_paths.add(path)
+        selected_keys.add((path, candidate["line_number"]))
+        if len(diversified) == anchor_target:
+            break
+    ordered_paths = list(dict.fromkeys(candidate["path"] for candidate in diversified))
+    for path in ordered_paths:
+        path_candidates = sorted(
+            (
+                candidate
+                for candidate in diversified
+                if candidate["path"] == path
+                and candidate["source_code"]
+                and candidate["symbol"]
+            ),
+            key=lambda candidate: int(candidate["_chunk_index"]),
+            reverse=True,
+        )
+        candidate = None
+        neighbor = None
+        next_index = -1
+        for possible in path_candidates:
+            possible_index = int(possible["_chunk_index"]) + 1
+            sequence = chunk_sequences[path]
+            if possible_index >= len(sequence):
+                continue
+            possible_neighbor = sequence[possible_index]
+            key = (path, possible_neighbor["line_number"])
+            if (
+                key not in selected_keys
+                and possible_neighbor["symbol"] == possible["symbol"]
+            ):
+                candidate = possible
+                neighbor = possible_neighbor
+                next_index = possible_index
+                break
+        if candidate is None or neighbor is None:
+            continue
+        continuation = [neighbor["content"]]
+        sequence = chunk_sequences[path]
+        for following in sequence[next_index + 1 :]:
+            if following["symbol"] != candidate["symbol"]:
+                break
+            proposed = "\n".join([*continuation, following["content"]])
+            if estimate_tokens(proposed) > 220:
+                break
+            continuation.append(following["content"])
+        neighbor = {**neighbor, "content": "\n".join(continuation)}
+        key = (path, neighbor["line_number"])
+        neighbor_content_terms = _canonical_terms(neighbor["content"])
+        neighbor_symbol_terms = _canonical_terms(neighbor["symbol"])
+        neighbor_matches = query_terms & (
+            _canonical_terms(path) | neighbor_content_terms | neighbor_symbol_terms
+        )
+        diversified.append(
+            {
+                **neighbor,
+                "path": path,
+                "path_score": weighted_overlap(_canonical_terms(path)),
+                "lexical_score": weighted_overlap(neighbor_content_terms),
+                "symbol_score": weighted_overlap(neighbor_symbol_terms),
+                "focused_location_score": max(
+                    _location_overlap(query_terms, _canonical_terms(path)),
+                    _location_overlap(query_terms, neighbor_symbol_terms),
+                ),
+                "matched_terms": len(neighbor_matches),
+                "pre_score": candidate["pre_score"] * 0.9,
+                "source_code": True,
+                "source_kind": candidate["source_kind"],
+                "structural_dependency": True,
+                "_chunk_index": next_index,
+            }
+        )
+        selected_keys.add(key)
+        if len(diversified) == limit:
+            break
+    return diversified
+
+
 def snapshot_memories(repo_root: Path, task: dict[str, Any]) -> list[Memory]:
     memories: list[Memory] = []
     for path in sorted(task["context_paths"]):
@@ -140,17 +600,259 @@ def snapshot_memories(repo_root: Path, task: dict[str, Any]) -> list[Memory]:
     return memories
 
 
-async def generate_snapshot_brief(
+def source_snapshot_memories(repo_root: Path, task: dict[str, Any]) -> list[Memory]:
+    """Build v2 memories only from task-relevant pre-fix source evidence."""
+    memories: list[Memory] = []
+    candidates = source_grounded_candidates(repo_root, task)
+    declared_context_paths = set(task.get("context_paths", []))
+    maximum_pre_score = max(
+        (float(candidate.get("pre_score", 0.0)) for candidate in candidates),
+        default=1.0,
+    )
+    for candidate in candidates:
+        path = candidate["path"]
+        line_number = candidate["line_number"]
+        content = candidate["content"]
+        memory_id = uuid5(
+            NAMESPACE_URL,
+            f"v2:{task['base_ref']}:{path}:{line_number}:{content}",
+        )
+        source_code = candidate["source_code"]
+        source_type = SourceType.CODE_ANALYSIS if source_code else SourceType.DOCUMENT
+        memories.append(
+            Memory(
+                id=memory_id,
+                content=content,
+                metadata=MemoryMetadata(
+                    domain=DomainType.PROJECT,
+                    memory_type=MemoryType.FACT,
+                    score=80,
+                    confidence=0.8,
+                    concepts=extract_concepts(content, max_concepts=5),
+                    authority_score=0.8,
+                    source=source_type,
+                    source_detail=f"{path}:{line_number}",
+                    source_reliability=SOURCE_RELIABILITY_SCORES[source_type],
+                    verified=False,
+                    project="elefante",
+                    workspace="historical-snapshot",
+                    file_path=path,
+                    line_number=line_number,
+                    custom_metadata={
+                        "heading": candidate["heading"],
+                        "symbol": candidate["symbol"],
+                        "lexical_score": candidate["lexical_score"],
+                        "path_score": candidate["path_score"],
+                        "symbol_score": candidate["symbol_score"],
+                        "retrieval_specificity": (
+                            1.0
+                            if path in declared_context_paths
+                            else (
+                                float(candidate.get("pre_score", 0.0))
+                                / maximum_pre_score
+                                if maximum_pre_score
+                                else 0.0
+                            )
+                        ),
+                        "declared_context_path": path in declared_context_paths,
+                        "structural_dependency": bool(
+                            candidate.get("structural_dependency", False)
+                        ),
+                        "source_kind": candidate.get("source_kind", _source_kind(path)),
+                        "evidence_role": (
+                            "safeguard"
+                            if candidate.get("source_kind", _source_kind(path))
+                            == "test"
+                            else ""
+                        ),
+                        "observed_at_ref": task["base_ref"],
+                    },
+                    created_at=datetime.utcnow(),
+                    last_accessed=datetime.utcnow(),
+                ),
+            )
+        )
+    for disclosed in task.get("disclosed_memories", []):
+        content = disclosed["content"]
+        memory_id = uuid5(
+            NAMESPACE_URL,
+            f"disclosed:{task['id']}:{disclosed['id']}:{content}",
+        )
+        memories.append(
+            Memory(
+                id=memory_id,
+                content=content,
+                metadata=MemoryMetadata(
+                    domain=DomainType.PROJECT,
+                    memory_type=MemoryType(disclosed["memory_type"]),
+                    score=90,
+                    confidence=0.95,
+                    concepts=extract_concepts(content, max_concepts=8),
+                    authority_score=0.9,
+                    source=SourceType.USER_INPUT,
+                    source_detail=f"disclosed:{disclosed['id']}",
+                    source_reliability=SOURCE_RELIABILITY_SCORES[SourceType.USER_INPUT],
+                    verified=True,
+                    project="elefante",
+                    workspace="historical-snapshot",
+                    custom_metadata={
+                        "evidence_role": "constraint",
+                        "retrieval_specificity": 1.0,
+                        "provenance": disclosed["provenance"],
+                    },
+                    created_at=datetime.utcnow(),
+                    last_accessed=datetime.utcnow(),
+                ),
+            )
+        )
+    findings = scan_memory_payload(
+        {"memories": [{"content": memory.content} for memory in memories]},
+        [task],
+    )
+    if findings:
+        raise RuntimeError(f"benchmark memory leakage detected for {task['id']}")
+    return memories
+
+
+def sealed_fixture_memories(
+    repo_root: Path,
+    task: dict[str, Any],
+    *,
+    fixture_override: Path | None = None,
+) -> list[Memory]:
+    """Load only a manifest-bound, reviewed durable-memory fixture."""
+    contract = task.get("memory_fixture")
+    if contract is None:
+        if fixture_override is not None:
+            raise RuntimeError("--memory-fixture requires a manifest-bound fixture")
+        return []
+    errors = validate_memory_fixture(task, repo_root)
+    if errors:
+        raise RuntimeError("invalid sealed memory fixture: " + "; ".join(errors))
+    declared = (repo_root / contract["path"]).resolve()
+    if fixture_override is not None and fixture_override.resolve() != declared:
+        raise RuntimeError("--memory-fixture must equal the task's sealed fixture path")
+    payload = json.loads(declared.read_text(encoding="utf-8"))
+    source = payload["source"]
+    memory = payload["memory"]
+    lifecycle = payload["lifecycle_review"]
+    source_metadata = (
+        memory.get("metadata") if payload["schema_version"] == 2 else None
+    )
+    evaluation_overlay = (
+        memory.get("evaluation_overlay") if payload["schema_version"] == 2 else None
+    )
+    if source_metadata is None:
+        source_metadata = {
+            "created_at": None,
+            "last_modified": None,
+            "category": "general",
+            "project": memory.get("project"),
+            "workspace": "historical-snapshot",
+            "status": MemoryStatus.VERIFIED.value,
+            "verified": True,
+            "deprecated": False,
+            "archived": False,
+            "conflict_ids": [],
+            "retention_policy": "permanent",
+            "injection_policy": "triggered",
+            "scope": memory.get("scope"),
+            "trigger": memory.get("trigger", []),
+            "user_locked": True,
+        }
+    if evaluation_overlay is None:
+        evaluation_overlay = {
+            "status": MemoryStatus.VERIFIED.value,
+            "verified": True,
+            "score": 90,
+            "confidence": 0.95,
+            "authority_score": 0.9,
+            "evidence_role": "constraint",
+            "retrieval_specificity": 1.0,
+            "last_accessed_fallback": "created_at",
+        }
+    created_at = (
+        datetime.fromisoformat(source_metadata["created_at"])
+        if source_metadata["created_at"] is not None
+        else datetime.utcnow()
+    )
+    last_modified = (
+        datetime.fromisoformat(source_metadata["last_modified"])
+        if source_metadata["last_modified"] is not None
+        else created_at
+    )
+    return [
+        Memory(
+            id=memory["id"],
+            content=memory["content"],
+            metadata=MemoryMetadata(
+                domain=DomainType.PROJECT,
+                memory_type=MemoryType(memory["memory_type"]),
+                status=MemoryStatus(evaluation_overlay["status"]),
+                score=evaluation_overlay["score"],
+                confidence=evaluation_overlay["confidence"],
+                category=source_metadata["category"],
+                concepts=extract_concepts(memory["content"], max_concepts=8),
+                authority_score=evaluation_overlay["authority_score"],
+                source=SourceType(memory["source"]),
+                source_detail=memory["source_detail"],
+                source_reliability=float(memory["source_reliability"]),
+                verified=evaluation_overlay["verified"],
+                project=source_metadata["project"],
+                workspace=source_metadata["workspace"],
+                retention_policy=source_metadata["retention_policy"],
+                injection_policy=source_metadata["injection_policy"],
+                scope=source_metadata["scope"],
+                trigger=source_metadata["trigger"],
+                user_locked=source_metadata["user_locked"],
+                deprecated=source_metadata["deprecated"],
+                archived=source_metadata["archived"],
+                conflict_ids=source_metadata["conflict_ids"],
+                custom_metadata={
+                    "evidence_role": evaluation_overlay["evidence_role"],
+                    "retrieval_specificity": evaluation_overlay[
+                        "retrieval_specificity"
+                    ],
+                    "fixture_id": payload["fixture_id"],
+                    "fixture_sha256": contract["sha256"],
+                    "source_memory_json_sha256": source["memory_json_sha256"],
+                    "original_store_status": lifecycle["original_status"],
+                    "original_store_verified": source_metadata["verified"],
+                    "lifecycle_resolution": lifecycle["resolution"],
+                    "promotion_use": False,
+                },
+                created_at=created_at,
+                last_modified=last_modified,
+                last_accessed=created_at,
+            ),
+        )
+    ]
+
+
+async def _snapshot_brief_inputs(
     repo_root: Path,
     task: dict[str, Any],
     embedding_service: EmbeddingService,
-) -> TaskBrief:
-    memories = snapshot_memories(repo_root, task)
+    *,
+    profile: TaskBriefProfile = TaskBriefProfile.V1,
+    memory_fixture_path: Path | None = None,
+    include_sealed_fixture: bool = True,
+) -> tuple[TaskBriefRequest, list[SearchResult]]:
+    if profile == TaskBriefProfile.V2:
+        memories = source_snapshot_memories(repo_root, task)
+        if include_sealed_fixture:
+            memories.extend(
+                sealed_fixture_memories(
+                    repo_root,
+                    task,
+                    fixture_override=memory_fixture_path,
+                )
+            )
+    else:
+        memories = snapshot_memories(repo_root, task)
     if not memories:
         raise RuntimeError(f"no benchmark memories available for {task['id']}")
-    query = "\n".join(
-        [task["task_statement"], *task["success_criteria"]]
-    )
+    query = "\n".join([task["task_statement"], *task["success_criteria"]])
     vectors = await embedding_service.generate_embeddings_batch(
         [query, *[memory.content for memory in memories]]
     )
@@ -161,9 +863,13 @@ async def generate_snapshot_brief(
     for memory, vector in zip(memories, vectors[1:], strict=True):
         memory.embedding = vector
         memory_vector = np.asarray(vector, dtype=np.float32)
-        denominator = float(np.linalg.norm(query_vector) * np.linalg.norm(memory_vector))
-        similarity = 0.0 if denominator == 0 else float(
-            np.dot(query_vector, memory_vector) / denominator
+        denominator = float(
+            np.linalg.norm(query_vector) * np.linalg.norm(memory_vector)
+        )
+        similarity = (
+            0.0
+            if denominator == 0
+            else float(np.dot(query_vector, memory_vector) / denominator)
         )
         similarity = max(0.0, min(1.0, similarity))
         candidate = MemoryCandidate(
@@ -197,20 +903,68 @@ async def generate_snapshot_brief(
         )
     results.sort(key=lambda result: (-result.score, str(result.memory.id)))
     request = TaskBriefRequest(
+        task_id=task["id"],
         task=task["task_statement"],
         success_criteria=task["success_criteria"],
         project="elefante",
         workspace="historical-snapshot",
+        profile=profile,
     )
-    return TaskBriefCompiler().compile(request, results[:24])
+    candidate_results = results if profile == TaskBriefProfile.V2 else results[:24]
+    return request, candidate_results
 
 
-def build_treatment_prompt(task: dict[str, Any], brief: TaskBrief) -> str:
+async def generate_snapshot_brief(
+    repo_root: Path,
+    task: dict[str, Any],
+    embedding_service: EmbeddingService,
+    *,
+    profile: TaskBriefProfile = TaskBriefProfile.V1,
+    memory_fixture_path: Path | None = None,
+    include_sealed_fixture: bool = True,
+) -> TaskBrief:
+    request, candidates = await _snapshot_brief_inputs(
+        repo_root,
+        task,
+        embedding_service,
+        profile=profile,
+        memory_fixture_path=memory_fixture_path,
+        include_sealed_fixture=include_sealed_fixture,
+    )
+    return TaskBriefCompiler().compile(request, candidates)
+
+
+def build_profile_prompt(
+    task: dict[str, Any],
+    *,
+    profile: TaskBriefProfile,
+) -> str:
+    prompt = baseline.build_baseline_prompt(task)
+    if profile == TaskBriefProfile.V1:
+        return prompt
     return (
-        baseline.build_baseline_prompt(task)
+        prompt
+        + "\n\nDecision protocol (identical in control and treatment):\n"
+        + "- Agreement is not evidence. Inspect current source before accepting a premise.\n"
+        + "- Identify the governing objective and root cause before changing code.\n"
+        + "- Test the strongest plausible competing explanation.\n"
+        + "- State material uncertainty as UNKNOWN; do not hide it with a local patch.\n"
+        + "- Prefer the smallest change that improves the system and verify the measured result."
+    )
+
+
+def build_treatment_prompt(
+    task: dict[str, Any],
+    brief: TaskBrief,
+    *,
+    profile: TaskBriefProfile = TaskBriefProfile.V1,
+) -> str:
+    return (
+        build_profile_prompt(task, profile=profile)
         + "\n\nElefante Task Brief (read-only evidence):\n"
         + brief.rendered_context
-        + "\n\nUse this evidence when relevant. Treat conflicts as unresolved. "
+        + "\n\nUse an item only if it changes the next action. Treat conflicts as unresolved. "
+        "If the Brief abstains or evidence is weak, inspect the repository. "
         "Current repository code remains authoritative."
     )
 
@@ -223,6 +977,7 @@ def paired_plan(
     task_class: str | None,
     repetitions: int,
     run_seed: int,
+    conditions: tuple[str, str] = STANDARD_CONDITIONS,
 ) -> list[dict[str, Any]]:
     task_plan = baseline.build_run_plan(
         manifest,
@@ -233,7 +988,7 @@ def paired_plan(
     )
     plan: list[dict[str, Any]] = []
     for item in task_plan:
-        order = list(CONDITIONS)
+        order = list(conditions)
         digest = hashlib.sha256(
             f"{run_seed}:{item['task_id']}:{item['repeat']}".encode()
         ).digest()
@@ -250,12 +1005,125 @@ def _outcome_path(
     model: str,
     reasoning: str,
     run_seed: int,
+    brief_profile: TaskBriefProfile = TaskBriefProfile.V1,
 ) -> Path:
     profile = baseline.configuration_id(model, reasoning)
+    brief_segment = ""
+    if brief_profile == TaskBriefProfile.V2:
+        task = item.get("task", item)
+        brief_segment = f"__brief-v2__contract-{task_contract_sha256(task)[:12]}"
     return output_dir / (
-        f"{item['condition']}__{profile}__seed-{run_seed}__"
+        f"{item['condition']}__{profile}{brief_segment}__seed-{run_seed}__"
         f"{item['task_id']}__r{item['repeat']}.json"
     )
+
+
+def memory_component_stop_status(
+    plan: list[dict[str, Any]],
+    *,
+    output_dir: Path,
+    model: str,
+    reasoning: str,
+    run_seed: int,
+    brief_profile: TaskBriefProfile,
+) -> dict[str, Any] | None:
+    """Return a decisive local STOP once every treatment repeat is measured.
+
+    The North Star rule makes treatment 0/3 a STOP independently of any
+    remaining control run. Detecting that state prevents a known-redundant
+    model call while leaving the paired protocol explicitly incomplete.
+    """
+    task_ids = {item["task_id"] for item in plan}
+    conditions = {item["condition"] for item in plan}
+    if len(task_ids) != 1 or conditions != set(MEMORY_COMPONENT_CONDITIONS):
+        return None
+    treatment = [item for item in plan if item["condition"] == "memory-brief"]
+    if (
+        len(treatment) != LOCAL_DECISION_REPETITIONS
+        or {item["repeat"] for item in treatment}
+        != set(range(1, LOCAL_DECISION_REPETITIONS + 1))
+    ):
+        return None
+    task = treatment[0]["task"]
+    fixture = task.get("memory_fixture")
+    if not isinstance(fixture, dict):
+        return None
+    payload = json.loads((ROOT / fixture["path"]).read_text(encoding="utf-8"))
+    intended_memory_id = str(payload["source"]["memory_id"])
+    records: list[dict[str, Any]] = []
+    for item in treatment:
+        path = _outcome_path(
+            output_dir,
+            item,
+            model=model,
+            reasoning=reasoning,
+            run_seed=run_seed,
+            brief_profile=brief_profile,
+        )
+        if not path.exists():
+            continue
+        record = json.loads(path.read_text(encoding="utf-8"))
+        errors = validate_outcome_record(record)
+        if errors:
+            raise RuntimeError(f"{path.name}: {'; '.join(errors)}")
+        task = item["task"]
+        trace = record.get("stage_trace", {})
+        expected_evaluation_id = (
+            f"{item['task_id']}-{item['condition']}-seed-{run_seed}-"
+            f"r{item['repeat']}"
+        )
+        if (
+            record.get("evaluation_id") != expected_evaluation_id
+            or record.get("task_id") != item["task_id"]
+            or record.get("condition") != item["condition"]
+            or record.get("run_seed") != run_seed
+            or record.get("model") != model
+            or f"reasoning={reasoning}"
+            not in str(record.get("tool_configuration", ""))
+        ):
+            raise RuntimeError(f"{path.name}: outcome identity mismatch")
+        expected_judge = (
+            "eligible"
+            if task_promotion_validity(task, ROOT)["promotion_eligible"]
+            else "diagnostic-only"
+        )
+        if (
+            record.get("task_contract_sha256") != task_contract_sha256(task)
+            or trace.get("acceptance_fixture_sha256")
+            != acceptance_test_sha256(task, ROOT)
+            or trace.get("judge_status") != expected_judge
+        ):
+            raise RuntimeError(f"{path.name}: outcome contract mismatch")
+        records.append(record)
+
+    if not records:
+        return None
+    delivered = sum(
+        intended_memory_id in record.get("memory_ids", [])
+        and record.get("stage_trace", {}).get("delivery_status") == "delivered"
+        for record in records
+    )
+    passes = sum(bool(record["acceptance_passed"]) for record in records)
+    if delivered < len(records):
+        return {
+            "decision": "STOP",
+            "reason": "intended_memory_not_delivered",
+            "treatment_runs": len(records),
+            "treatment_passes": passes,
+            "intended_memory_deliveries": delivered,
+        }
+    if len(records) != LOCAL_DECISION_REPETITIONS:
+        return None
+    expected = LOCAL_DECISION_REPETITIONS
+    if passes == 0:
+        return {
+            "decision": "STOP",
+            "reason": f"treatment_passed_0_of_{expected}",
+            "treatment_runs": expected,
+            "treatment_passes": 0,
+            "intended_memory_deliveries": delivered,
+        }
+    return None
 
 
 def execute_trial(
@@ -269,13 +1137,19 @@ def execute_trial(
     run_seed: int,
     timeout_seconds: int,
     keep_failures: bool,
+    brief_profile: TaskBriefProfile = TaskBriefProfile.V1,
 ) -> dict[str, Any]:
     task = item["task"]
     condition = item["condition"]
     repeat = item["repeat"]
     profile = baseline.configuration_id(model, reasoning)
-    workspace = workspace_root / (
-        f"{condition}__{profile}__seed-{run_seed}__{task['id']}__r{repeat}"
+    workspace = workspace_root / baseline._workspace_name(
+        condition,
+        profile,
+        brief_profile.value,
+        str(run_seed),
+        task["id"],
+        str(repeat),
     )
     outcome_path = _outcome_path(
         output_dir,
@@ -283,16 +1157,23 @@ def execute_trial(
         model=model,
         reasoning=reasoning,
         run_seed=run_seed,
+        brief_profile=brief_profile,
     )
     baseline.prepare_workspace(ROOT, task, workspace)
     acceptance_passed = False
     try:
         prompt = (
-            baseline.build_baseline_prompt(task)
+            build_profile_prompt(task, profile=brief_profile)
             if condition == "baseline"
-            else build_treatment_prompt(task, brief)
+            else build_treatment_prompt(task, brief, profile=brief_profile)
         )
-        agent_exit, usage, duration_ms, cli_version = baseline.run_codex_baseline(
+        (
+            agent_exit,
+            usage,
+            duration_ms,
+            cli_version,
+            agent_diagnostic,
+        ) = baseline.run_codex_baseline(
             workspace,
             task,
             model=model,
@@ -300,36 +1181,73 @@ def execute_trial(
             timeout_seconds=timeout_seconds,
             prompt=prompt,
         )
-        acceptance_passed = baseline.evaluate_hidden_acceptance(
+        baseline.require_successful_agent_invocation(
+            exit_code=agent_exit,
+            usage=usage,
+            diagnostic=agent_diagnostic,
+        )
+        change_evidence = baseline.workspace_change_evidence(workspace)
+        acceptance = baseline.evaluate_hidden_acceptance_result(
             ROOT,
             workspace,
             task,
             timeout_seconds=timeout_seconds,
         )
+        acceptance_passed = acceptance["passed"]
+        selected_memory_ids = brief.selected_memory_ids if brief else []
+        considered_memory_count = (
+            len(
+                {
+                    *selected_memory_ids,
+                    *(omission.memory_id for omission in brief.omissions),
+                }
+            )
+            if brief
+            else None
+        )
+        brief_digest = (
+            hashlib.sha256(brief.rendered_context.encode("utf-8")).hexdigest()
+            if brief
+            else None
+        )
         record = {
-            "evaluation_id": (
-                f"{task['id']}-{condition}-seed-{run_seed}-r{repeat}"
-            ),
+            "outcome_schema_version": 3,
+            "evaluation_id": (f"{task['id']}-{condition}-seed-{run_seed}-r{repeat}"),
             "task_id": task["id"],
+            "task_contract_sha256": task_contract_sha256(task),
             "condition": condition,
             "model": model,
             "model_version": "not-exposed-by-codex-cli",
             "tool_configuration": (
                 f"{cli_version}; reasoning={reasoning}; sandbox=workspace-write; "
                 "ephemeral=true; ignore_user_config=true; ignore_rules=true; "
-                "prompt_profile=task-intelligence-v1"
+                f"prompt_profile=task-intelligence-{brief_profile.value}"
             ),
             "run_seed": run_seed,
-            "memory_ids": brief.selected_memory_ids if brief else [],
+            "memory_ids": selected_memory_ids,
             "acceptance_passed": acceptance_passed,
-            "retries": 0,
-            "human_corrections": 0,
+            # Not exposed by this single-turn runner. Preserve UNKNOWN instead
+            # of manufacturing a zero that could influence promotion.
+            "retries": None,
+            "human_corrections": None,
             "input_tokens": usage["input_tokens"],
             "cached_input_tokens": usage["cached_input_tokens"],
             "output_tokens": usage["output_tokens"],
             "duration_ms": duration_ms,
-            "failure_category": "" if acceptance_passed else (
-                "agent-exit" if agent_exit else "acceptance-test"
+            "failure_category": ""
+            if acceptance_passed
+            else ("agent-exit" if agent_exit else "acceptance-test"),
+            "stage_trace": baseline.trial_stage_trace(
+                ROOT,
+                task,
+                condition=condition,
+                prompt=prompt,
+                selected_memory_ids=selected_memory_ids,
+                considered_memory_count=considered_memory_count,
+                brief_abstained=brief.abstained if brief else None,
+                brief_digest=brief_digest,
+                change_evidence=change_evidence,
+                acceptance=acceptance,
             ),
         }
         errors = validate_outcome_record(record)
@@ -340,7 +1258,7 @@ def execute_trial(
             json.dumps(record, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        return {
+        result = {
             "task_id": task["id"],
             "condition": condition,
             "repeat": repeat,
@@ -351,6 +1269,9 @@ def execute_trial(
             "duration_ms": duration_ms,
             "outcome": str(outcome_path),
         }
+        if keep_failures and not acceptance_passed:
+            result["failure_workspace"] = str(workspace)
+        return result
     finally:
         if workspace.exists() and not (keep_failures and not acceptance_passed):
             baseline._safe_remove_workspace(workspace, workspace_root)
@@ -359,6 +1280,10 @@ def execute_trial(
 async def _briefs_for_plan(
     plan: list[dict[str, Any]],
     embedding_service: EmbeddingService,
+    *,
+    profile: TaskBriefProfile = TaskBriefProfile.V1,
+    memory_fixture_path: Path | None = None,
+    include_sealed_fixture: bool = True,
 ) -> dict[str, TaskBrief]:
     tasks = {item["task_id"]: item["task"] for item in plan}
     briefs: dict[str, TaskBrief] = {}
@@ -367,32 +1292,201 @@ async def _briefs_for_plan(
             ROOT,
             tasks[task_id],
             embedding_service,
+            profile=profile,
+            memory_fixture_path=memory_fixture_path,
+            include_sealed_fixture=include_sealed_fixture,
         )
     return briefs
+
+
+async def verify_fixture_briefs(
+    repo_root: Path,
+    tasks: list[dict[str, Any]],
+    embedding_service: EmbeddingService,
+    *,
+    fixture_override: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Prove a sealed durable memory is selected, bounded, and deterministic."""
+    reports: list[dict[str, Any]] = []
+    for task in tasks:
+        contract = task["memory_fixture"]
+        fixture_path = (repo_root / contract["path"]).resolve()
+        payload = json.loads(fixture_path.read_text(encoding="utf-8"))
+        expected_memory_id = str(payload["source"]["memory_id"])
+        override = fixture_override if len(tasks) == 1 else None
+        request, candidates = await _snapshot_brief_inputs(
+            repo_root,
+            task,
+            embedding_service,
+            profile=TaskBriefProfile.V2,
+            memory_fixture_path=override,
+        )
+        compiler = TaskBriefCompiler()
+        first = compiler.compile(request, candidates)
+        second = compiler.compile(request, candidates)
+        control_candidates = [
+            candidate
+            for candidate in candidates
+            if str(candidate.memory.id) != expected_memory_id
+        ]
+        control_first = compiler.compile(request, control_candidates)
+        control_second = compiler.compile(request, control_candidates)
+        errors: list[str] = []
+        if expected_memory_id not in first.selected_memory_ids:
+            errors.append("sealed durable memory was not selected")
+        if first.abstained or first.delivery_blocked:
+            errors.append("Task Brief abstained or blocked delivery")
+        if first.estimated_tokens > first.token_budget:
+            errors.append("Task Brief exceeded its hard token budget")
+        if (
+            first.rendered_context != second.rendered_context
+            or first.selected_memory_ids != second.selected_memory_ids
+        ):
+            errors.append("Task Brief selection or rendering is nondeterministic")
+        if (
+            control_first.rendered_context != control_second.rendered_context
+            or control_first.selected_memory_ids != control_second.selected_memory_ids
+        ):
+            errors.append("source-only control Brief is nondeterministic")
+        if expected_memory_id in control_first.selected_memory_ids:
+            errors.append("source-only control contains the sealed durable memory")
+        if scan_memory_payload({"rendered_context": first.rendered_context}, [task]):
+            errors.append("Task Brief leaked hidden acceptance evidence")
+        selected_sources = [
+            {
+                "file_path": evidence.file_path,
+                "role": evidence.role.value,
+                "source_detail": evidence.source_detail,
+                "stage": evidence.stage.value,
+                "truncated": evidence.truncated,
+            }
+            for packet in first.packets
+            for evidence in packet.evidence
+        ]
+        reports.append(
+            {
+                "task_id": task["id"],
+                "passed": not errors,
+                "errors": errors,
+                "expected_memory_id": expected_memory_id,
+                "selected_memory_ids": first.selected_memory_ids,
+                "selected_sources": selected_sources,
+                "estimated_tokens": first.estimated_tokens,
+                "token_budget": first.token_budget,
+                "brief_sha256": hashlib.sha256(
+                    first.rendered_context.encode("utf-8")
+                ).hexdigest(),
+                "component_control": {
+                    "selected_memory_ids": control_first.selected_memory_ids,
+                    "estimated_tokens": control_first.estimated_tokens,
+                    "brief_sha256": hashlib.sha256(
+                        control_first.rendered_context.encode("utf-8")
+                    ).hexdigest(),
+                    "deterministic": (
+                        control_first.rendered_context
+                        == control_second.rendered_context
+                        and control_first.selected_memory_ids
+                        == control_second.selected_memory_ids
+                    ),
+                },
+                "deterministic": (
+                    first.rendered_context == second.rendered_context
+                    and first.selected_memory_ids == second.selected_memory_ids
+                ),
+            }
+        )
+    return reports
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    parser.add_argument(
+        "--memory-fixture",
+        type=Path,
+        help=(
+            "Exact sealed fixture declared by the selected task. Arbitrary memory "
+            "payloads are rejected."
+        ),
+    )
+    parser.add_argument(
+        "--preflight",
+        action="store_true",
+        help="Validate the sealed fixture and base/fix black-box judge without a model run.",
+    )
+    parser.add_argument(
+        "--comparison",
+        choices=tuple(COMPARISON_CONDITIONS),
+        default="standard",
+        help=(
+            "standard compares no Brief with a Task Brief; memory-component "
+            "compares the same v2 source Brief without and with sealed memory"
+        ),
+    )
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--task")
     selection.add_argument("--task-class")
-    parser.add_argument("--split", choices=("calibration", "holdout"), default="holdout")
+    parser.add_argument(
+        "--split", choices=("calibration", "holdout"), default="holdout"
+    )
     parser.add_argument("--repetitions", type=int, default=3)
     parser.add_argument("--run-seed", type=int, default=20260805)
     parser.add_argument("--model", default="gpt-5.6-terra")
     parser.add_argument("--reasoning", default="low")
-    parser.add_argument("--estimated-input-tokens-per-run", type=int, default=DEFAULT_ESTIMATED_INPUT_TOKENS)
-    parser.add_argument("--estimated-uncached-input-tokens-per-run", type=int, default=DEFAULT_ESTIMATED_UNCACHED_INPUT_TOKENS)
+    parser.add_argument(
+        "--condition",
+        choices=ALL_CONDITIONS,
+        help="Run one diagnostic condition; omit for a paired evaluation.",
+    )
+    parser.add_argument(
+        "--brief-profile",
+        choices=tuple(profile.value for profile in TaskBriefProfile),
+        default=TaskBriefProfile.V1.value,
+        help="v1 reproduces frozen evidence; v2 uses source-grounded actionable evidence",
+    )
+    parser.add_argument(
+        "--estimated-input-tokens-per-run",
+        type=int,
+        default=DEFAULT_ESTIMATED_INPUT_TOKENS,
+    )
+    parser.add_argument(
+        "--estimated-uncached-input-tokens-per-run",
+        type=int,
+        default=DEFAULT_ESTIMATED_UNCACHED_INPUT_TOKENS,
+    )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTCOMES)
     parser.add_argument("--workspace-root", type=Path, default=DEFAULT_WORKSPACES)
     parser.add_argument("--timeout-seconds", type=int, default=1800)
     parser.add_argument("--max-runs", type=int)
     parser.add_argument("--max-total-input-tokens", type=int)
     parser.add_argument("--max-total-uncached-input-tokens", type=int)
-    parser.add_argument("--keep-failures", action="store_true")
+    parser.add_argument(
+        "--keep-failures",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Preserve failed disposable workspaces for diagnosis (default: true); "
+            "pass --no-keep-failures to discard them explicitly."
+        ),
+    )
+    parser.add_argument(
+        "--allow-diagnostic",
+        action="store_true",
+        help="Explicitly allow model runs against non-promotable historical judges.",
+    )
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
+    brief_profile = TaskBriefProfile(args.brief_profile)
+    comparison_conditions = COMPARISON_CONDITIONS[args.comparison]
+    if args.preflight and args.execute:
+        parser.error("--preflight and --execute are mutually exclusive")
+    if args.condition and args.condition not in comparison_conditions:
+        parser.error("--condition must belong to the selected --comparison")
+    if (
+        args.comparison == "memory-component"
+        and brief_profile != TaskBriefProfile.V2
+    ):
+        parser.error("--comparison memory-component requires --brief-profile v2")
 
     report = validate_manifest(args.manifest, ROOT)
     if report["errors"]:
@@ -406,7 +1500,55 @@ def main(argv: list[str] | None = None) -> int:
         task_class=args.task_class,
         repetitions=args.repetitions,
         run_seed=args.run_seed,
+        conditions=comparison_conditions,
     )
+    if args.condition:
+        plan = [item for item in plan if item["condition"] == args.condition]
+    selected_tasks = {item["task_id"]: item["task"] for item in plan}
+    if args.memory_fixture and len(selected_tasks) != 1:
+        print(
+            json.dumps(
+                {"error": "--memory-fixture requires exactly one selected task"},
+                indent=2,
+            )
+        )
+        return 2
+    fixture_task_ids = sorted(
+        task_id
+        for task_id, task in selected_tasks.items()
+        if task.get("memory_fixture") is not None
+    )
+    if args.comparison == "memory-component" and set(fixture_task_ids) != set(
+        selected_tasks
+    ):
+        print(
+            json.dumps(
+                {
+                    "error": (
+                        "memory-component comparison requires one sealed fixture "
+                        "for every selected task"
+                    )
+                },
+                indent=2,
+            )
+        )
+        return 2
+    fixture_errors = {
+        task_id: validate_memory_fixture(task, ROOT)
+        for task_id, task in selected_tasks.items()
+        if task.get("memory_fixture") is not None
+    }
+    fixture_errors = {
+        task_id: errors for task_id, errors in fixture_errors.items() if errors
+    }
+    if args.memory_fixture:
+        only_task = next(iter(selected_tasks.values()))
+        try:
+            sealed_fixture_memories(
+                ROOT, only_task, fixture_override=args.memory_fixture
+            )
+        except RuntimeError as error:
+            fixture_errors[only_task["id"]] = [str(error)]
     pending = [
         item
         for item in plan
@@ -416,46 +1558,210 @@ def main(argv: list[str] | None = None) -> int:
             model=args.model,
             reasoning=args.reasoning,
             run_seed=args.run_seed,
+            brief_profile=brief_profile,
         ).exists()
     ]
     estimate = len(pending) * args.estimated_input_tokens_per_run
-    uncached_estimate = (
-        len(pending) * args.estimated_uncached_input_tokens_per_run
+    uncached_estimate = len(pending) * args.estimated_uncached_input_tokens_per_run
+    evaluation_policy = manifest.get("evaluation_policy", {})
+    manifest_is_diagnostic = not (
+        isinstance(evaluation_policy, dict)
+        and evaluation_policy.get("promotion_allowed") is True
+    )
+    diagnostic_task_ids = sorted(
+        {
+            item["task_id"]
+            for item in pending
+            if manifest_is_diagnostic
+            or not task_promotion_validity(item["task"], ROOT)["promotion_eligible"]
+            or (
+                isinstance(item["task"].get("memory_fixture"), dict)
+                and item["task"]["memory_fixture"].get("promotion_use") is not True
+            )
+        }
     )
     summary = {
         "model": args.model,
         "reasoning": args.reasoning,
         "run_seed": args.run_seed,
+        "brief_profile": brief_profile.value,
+        "comparison": args.comparison,
+        "conditions": list(comparison_conditions),
         "planned_runs": len(plan),
         "pending_runs": len(pending),
         "estimated_input_tokens": estimate,
         "estimated_uncached_input_tokens": uncached_estimate,
         "execute": args.execute,
+        "diagnostic_task_ids": diagnostic_task_ids,
+        "sealed_memory_fixture_task_ids": fixture_task_ids,
+        "sealed_memory_fixture_errors": fixture_errors,
     }
+    if args.preflight:
+        if not fixture_task_ids:
+            print(
+                json.dumps(
+                    {
+                        **summary,
+                        "preflight_ready": False,
+                        "error": "no sealed fixture selected",
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 2
+        canaries = verify_black_box_canaries(
+            {"tasks": [selected_tasks[task_id] for task_id in fixture_task_ids]},
+            ROOT,
+        )
+        brief_reports: list[dict[str, Any]] = []
+        if not fixture_errors and all(item["passed"] for item in canaries):
+            # This is local embedding computation only. It makes no model/API call.
+            os.environ.setdefault("HF_HUB_OFFLINE", "1")
+            os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+            embedding_service = EmbeddingService()
+            embedding_service._load_model()
+            brief_reports = asyncio.run(
+                verify_fixture_briefs(
+                    ROOT,
+                    [selected_tasks[task_id] for task_id in fixture_task_ids],
+                    embedding_service,
+                    fixture_override=args.memory_fixture,
+                )
+            )
+        ready = (
+            not fixture_errors
+            and all(item["passed"] for item in canaries)
+            and bool(brief_reports)
+            and all(item["passed"] for item in brief_reports)
+        )
+        print(
+            json.dumps(
+                {
+                    **summary,
+                    "preflight_ready": ready,
+                    "model_runs": 0,
+                    "black_box_canaries": canaries,
+                    "fixture_briefs": brief_reports,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 0 if ready else 2
     if not args.execute:
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 0
+    if diagnostic_task_ids and not args.allow_diagnostic:
+        print(
+            json.dumps(
+                {
+                    **summary,
+                    "error": (
+                        "selected tasks are diagnostic-only; pass "
+                        "--allow-diagnostic to spend model tokens intentionally"
+                    ),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 2
     if args.max_runs != len(pending):
-        print(json.dumps({**summary, "error": "--max-runs must exactly match pending_runs"}, indent=2, sort_keys=True))
+        print(
+            json.dumps(
+                {**summary, "error": "--max-runs must exactly match pending_runs"},
+                indent=2,
+                sort_keys=True,
+            )
+        )
         return 2
     limits = (
         args.max_total_input_tokens,
         args.max_total_uncached_input_tokens,
     )
     if any(not isinstance(value, int) or value <= 0 for value in limits):
-        print(json.dumps({**summary, "error": "positive cumulative token caps are required"}, indent=2, sort_keys=True))
+        print(
+            json.dumps(
+                {**summary, "error": "positive cumulative token caps are required"},
+                indent=2,
+                sort_keys=True,
+            )
+        )
         return 2
     if estimate > limits[0] or uncached_estimate > limits[1]:
-        print(json.dumps({**summary, "error": "estimated execution exceeds a cumulative token cap"}, indent=2, sort_keys=True))
+        print(
+            json.dumps(
+                {
+                    **summary,
+                    "error": "estimated execution exceeds a cumulative token cap",
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
         return 2
 
-    # Apply offline mode only inside an explicitly executed evaluation. Setting
-    # these at module import would leak into normal pytest collection/runtime.
-    os.environ.setdefault("HF_HUB_OFFLINE", "1")
-    os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
-    embedding_service = EmbeddingService()
-    embedding_service._load_model()
-    briefs = asyncio.run(_briefs_for_plan(pending, embedding_service))
+    early_stop = (
+        memory_component_stop_status(
+            plan,
+            output_dir=args.output_dir,
+            model=args.model,
+            reasoning=args.reasoning,
+            run_seed=args.run_seed,
+            brief_profile=brief_profile,
+        )
+        if args.comparison == "memory-component" and not args.condition
+        else None
+    )
+    if early_stop is not None:
+        print(
+            json.dumps(
+                {
+                    **summary,
+                    "results": [],
+                    "early_stop": early_stop,
+                    "remaining_runs_not_started": len(pending),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 0
+
+    brief_plan = [item for item in pending if item["condition"] != "baseline"]
+    briefs: dict[tuple[str, str], TaskBrief] = {}
+    if brief_plan:
+        # Brief construction belongs only to Brief conditions. A baseline-only
+        # screen must not pay for or depend on Elefante retrieval. Apply offline
+        # mode here so evaluator settings cannot leak into product runtime.
+        os.environ.setdefault("HF_HUB_OFFLINE", "1")
+        os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+        embedding_service = EmbeddingService()
+        embedding_service._load_model()
+        for condition in comparison_conditions:
+            condition_plan = [
+                item for item in brief_plan if item["condition"] == condition
+            ]
+            if not condition_plan:
+                continue
+            condition_briefs = asyncio.run(
+                _briefs_for_plan(
+                    condition_plan,
+                    embedding_service,
+                    profile=brief_profile,
+                    memory_fixture_path=(
+                        args.memory_fixture if condition != "source-brief" else None
+                    ),
+                    include_sealed_fixture=condition != "source-brief",
+                )
+            )
+            briefs.update(
+                {
+                    (task_id, condition): brief
+                    for task_id, brief in condition_briefs.items()
+                }
+            )
     args.workspace_root.mkdir(parents=True, exist_ok=True)
     results: list[dict[str, Any]] = []
     total_input = 0
@@ -464,7 +1770,9 @@ def main(argv: list[str] | None = None) -> int:
     for item in pending:
         result = execute_trial(
             item,
-            brief=briefs[item["task_id"]] if item["condition"] == "task-brief" else None,
+            brief=briefs[(item["task_id"], item["condition"])]
+            if item["condition"] != "baseline"
+            else None,
             output_dir=args.output_dir,
             workspace_root=args.workspace_root,
             model=args.model,
@@ -472,14 +1780,66 @@ def main(argv: list[str] | None = None) -> int:
             run_seed=args.run_seed,
             timeout_seconds=args.timeout_seconds,
             keep_failures=args.keep_failures,
+            brief_profile=brief_profile,
         )
         results.append(result)
         total_input += result["input_tokens"]
         total_cached += result["cached_input_tokens"]
         total_output += result["output_tokens"]
         if total_input > limits[0] or total_input - total_cached > limits[1]:
-            print(json.dumps({**summary, "results": results, "error": "cumulative token cap exceeded; remaining runs were not started"}, indent=2, sort_keys=True))
+            print(
+                json.dumps(
+                    {
+                        **summary,
+                        "results": results,
+                        "error": "cumulative token cap exceeded; remaining runs were not started",
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
             return 3
+        early_stop = (
+            memory_component_stop_status(
+                plan,
+                output_dir=args.output_dir,
+                model=args.model,
+                reasoning=args.reasoning,
+                run_seed=args.run_seed,
+                brief_profile=brief_profile,
+            )
+            if args.comparison == "memory-component" and not args.condition
+            else None
+        )
+        if early_stop is not None:
+            remaining = sum(
+                not _outcome_path(
+                    args.output_dir,
+                    planned,
+                    model=args.model,
+                    reasoning=args.reasoning,
+                    run_seed=args.run_seed,
+                    brief_profile=brief_profile,
+                ).exists()
+                for planned in plan
+            )
+            print(
+                json.dumps(
+                    {
+                        **summary,
+                        "results": results,
+                        "early_stop": early_stop,
+                        "remaining_runs_not_started": remaining,
+                        "actual_input_tokens": total_input,
+                        "actual_cached_input_tokens": total_cached,
+                        "actual_uncached_input_tokens": total_input - total_cached,
+                        "actual_output_tokens": total_output,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
     print(
         json.dumps(
             {

@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : installer_gui.py
-# VERSION : 2.8.0
-# CHANGED : 2026-04-16
 # PURPOSE : Native macOS tkinter GUI for the Elefante installer. Launched from
 #           the DMG .app bundle. Shows branded window with install path picker,
 #           real-time progress bar, and scrollable output log.

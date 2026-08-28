@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TEST    : tests/test_installer_gui.py
-# VERSION : 2.9.1
-# CHANGED : 2026-04-16
 # PROVES  : Installer GUI recovery-file routing stays aligned with the bundle
 #           bootstrap contract and progress markers do not double-count.
 #           InstallerApp class is importable (BUG-019 guard).

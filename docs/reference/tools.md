@@ -1,4 +1,4 @@
-# Usage Guide & API Reference (v2.12.0)
+# MCP Tools and Prompts (v2.13.0)
 
 ## 1. Natural Language Interaction
 
@@ -16,7 +16,8 @@ Once connected to your IDE, use natural language to interact with Elefante. The 
 
 ## 2. Current MCP Surface
 
-Elefante exposes **16 tools** and **2 prompts**. Memory operations use one
+Elefante exposes **17 tools** and **2 prompts** in the default customer profile.
+Memory operations use one
 `elefante-Memory` tool with an action discriminator.
 
 - **Tools** read, write, or inspect the system.
@@ -25,15 +26,50 @@ Elefante exposes **16 tools** and **2 prompts**. Memory operations use one
 
 **Critical workflow rule**:
 
+- When `elefante-Recall` is listed by the connected surface, call it at most once
+  per user question when stored preferences, decisions, or project context could
+  materially change the answer. Skip it for a self-contained question. Treat
+  `no_match`, `blocked`, and `unavailable` as terminal for that answer; do not
+  retry or broaden retrieval.
 - Call `elefante-Memory(action="search", ...)` before `elefante-Memory(action="add"|"update"|"delete", ...)` or `elefante-GraphConnect`.
+- When the user explicitly asks Elefante to remember information across sessions
+  or declares a project decision canonical or non-negotiable, search the exact
+  concept and add or correct one concise record with
+  `invocation_mode="user_directed"`. Use `user_locked=true` or permanent retention
+  only when the user explicitly requests that protection. Never infer durable
+  capture from ordinary conversation, and never store secrets. Leave `scope`
+  unset unless an exact project, workspace, or task identifier is known; never
+  use descriptive prose. Prefer ranked delivery when relevant paraphrases should
+  work. Use a triggered policy only when literal phrases are intentionally
+  required; never choose it merely to pass one verification question. After
+  writing, call `elefante-Recall` with one likely future question. A stored
+  receipt is not proof that the memory is deliverable.
 
 **Tool response contract**:
 
-- Every tool response injects `ENTRYPOINT_SEQUENCE_READ_THIS_FIRST`, `MANDATORY_PROTOCOLS_READ_THIS_FIRST`, `DIRECTIVES`, and `TOKEN_STATS`.
-- Some responses also inject `RELEVANT_CONTEXT` when Elefante can surface related memories automatically.
-- `ENTRYPOINT_SEQUENCE_READ_THIS_FIRST` is the exact developer/debug routing path for repository work: Known Issues -> verification command -> compendium -> maintained test surface.
-- `RELEVANT_CONTEXT` is conditional, not universal. It is skipped for tools that already return memory-heavy data, and when present it contains a short `note` plus a `memories` list of summarized snippets rather than full raw memory payloads.
-- `TOKEN_STATS` is injected into every tool response. It tells the agent what each tool call costs in tokens. Fields:
+- `elefante-Recall` is intentionally minimal: it returns only `success`,
+  `status`, `context`, `supplied_count`, `abstained`, `delivery_blocked`, and
+  `read_only`. Internal protocol, directive, entrypoint, and `TOKEN_STATS`
+  wrappers are not sent to the answering model; Elefante still records its
+  token accounting locally. Recall does not echo the current question in its
+  response. Its governed context remains capped at 450 heuristic tokens, and
+  the complete pretty Unicode response is capped at 1,000 heuristic tokens; an
+  encoded response that cannot fit fails closed without a memory body.
+- Other tool responses include `TOKEN_STATS`. Normal memory, graph, context,
+  session, ETL, and task operations also receive the entrypoint, pitfall, and
+  active-directive blocks. System, dashboard, and directive-management tools
+  return through a minimal management path and do not receive those recursive
+  policy blocks.
+- `ENTRYPOINT_SEQUENCE_READ_THIS_FIRST` is environment-specific. Developer
+  runtimes receive repository-debug routing; customer runtimes receive a short
+  memory-use and secret-handling sequence.
+- The customer profile does not enable automatic tool-response context. Recall
+  and the context prompt are the explicit bounded answer-delivery paths.
+- `RELEVANT_CONTEXT` is conditional, not universal. It remains disabled in the
+  customer profile and is not a substitute for Recall or the context prompt.
+- `TOKEN_STATS` is injected into every non-Recall tool response. It reports
+  Elefante's local heuristic estimate of each call's token size; it is not a
+  provider pricing API, invoice estimate, or dollar-cost calculation. Fields:
   - `output_tokens` (int): Total tokens in the response, including protocol overhead and the TOKEN_STATS block itself.
   - `overhead_tokens` (int): Tokens consumed by protocol injection (MANDATORY_PROTOCOLS, DIRECTIVES, ENTRYPOINT_SEQUENCE) plus TOKEN_STATS itself. Not content the agent requested.
   - `signal_ratio` (float, 0.0-1.0): Fraction of output that is actual payload. `1.0` = zero overhead, `0.0` = all overhead. Higher is better.
@@ -45,21 +81,73 @@ Elefante exposes **16 tools** and **2 prompts**. Memory operations use one
 
 ### Core Memory Operations
 
+#### `elefante-Recall`
+
+**Status**: Released and default-on in v2.13.0.
+
+**Purpose**: Give an answering agent the smallest governed durable context for
+one question without exposing the broad search or mutation interface.
+
+**Parameter**:
+
+- `question` (required, string, 1–1,000 characters): The complete standalone
+  customer question. Include specific project, file, person, or decision names
+  when known.
+
+**Result**:
+
+- `status="supplied"`: One to three memories were supplied within a 450-token
+  context budget.
+- `status="no_match"`: No memory passed the relevance and governance gates.
+- `status="blocked"`: Governed context could not be delivered safely within a
+  mandatory-governance or complete-response budget.
+- `status="unavailable"`: Local retrieval failed; the agent must continue from
+  the current request and verified current evidence without inventing history.
+
+Recall is read-only. It does not create a compliance receipt, increment access
+counts, record declared use, mutate ranking, expose memory UUIDs, or require any
+opt-in evaluation flags. The context prompt and Recall share the
+same retrieval, current-source validation, governed selection, and budget path.
+The answering host already owns the question, so Recall does not echo it in the
+returned context. Call Recall at most once for that user question; a terminal
+status is evidence to continue from current sources, not a retry instruction.
+Its MCP annotations declare `readOnlyHint=true`, `destructiveHint=false`,
+`idempotentHint=true`, and `openWorldHint=false`, so compatible hosts do not ask
+for mutation approval.
+
+The customer installer also adds a marked Recall-routing block to Codex's active
+global guidance file (`AGENTS.override.md` when it is non-empty, otherwise
+`AGENTS.md`). Existing user text is preserved. The install manifest owns only
+that exact block; uninstall removes it only while unchanged and preserves a
+user-edited block for review. Configuration rolls back a newly added or prior
+installer-owned Codex registration when managed guidance fails, and reports
+`partial` if that rollback cannot finish. Customer readiness additionally
+requires that the active guidance path, Codex registration, live Recall tool,
+read-only annotations, and one bounded read-only probe all verify.
+
+**Rollback**: Set `ELEFANTE_RECALL_ENABLED=0` in the local daemon environment
+and restart Elefante. The tool disappears from discovery and direct calls fail
+closed; the existing broad memory search and prompts remain unchanged.
+
 #### `elefante-Memory`
 
-**Purpose**: Single discriminated entry point for all persistent memory operations. The `action` parameter selects the operation: `add`, `search`, `update`, `delete`, or `consolidate`.
+**Purpose**: Single discriminated entry point for persistent memory operations.
+The normal customer actions are `add`, `search`, `update`, `resolve`, `delete`,
+and `consolidate`. The source schema reserves `record_use` for the default-off
+developer evaluation profile; it is not a normal customer operation.
 
-**Why one tool, not five**: Five separate memory tools forced agents to pre-classify intent before naming a tool. Consolidation moves that branch into a parameter, halves the memory surface in tool listings, and lets the schema document all five flows together. Atomic-swapped at v2.10.0 / 2026-05-02 — no overlap window, no aliases.
+**Why one tool, not five**: Five separate memory tools forced agents to pre-classify intent before naming a tool. Consolidation moves that branch into a parameter, reduces five memory entries to one, and lets one schema document the later additive actions too. Atomic-swapped at v2.10.0 / 2026-05-02 — no overlap window, no aliases.
 
 **Why `memory_type` matters** (`action=add`): Not cosmetic metadata. It changes decay, ranking, and lifespan.
 
-- `specification` and `directive` never decay.
+- `specification` and `directive` have zero type-specific creation decay, but the current freshness term still lowers their behavioral vitality when they are not accessed.
 - `note` and `conversation` decay quickly.
 - Wrong type = wrong behavior later.
 
 **Common parameter**:
 
-- `action` (required, string): One of `add`, `search`, `update`, `delete`, `consolidate`.
+- `action` (required, string): One of `add`, `search`, `update`, `resolve`,
+  `delete`, or `consolidate` for normal customer operation.
 
 ##### `action="add"` — store a new memory
 
@@ -73,14 +161,29 @@ Elefante exposes **16 tools** and **2 prompts**. Memory operations use one
 - `category` (optional, string): Topic grouping such as `elefante`, `python`, or `user-preferences`.
 - `tags` (optional, string[]): Tags for filtering and retrieval.
 - `entities` (optional, object[]): Graph links as `{name, type}` objects.
+- `attachments` (optional, object[], maximum 8): Local image, audio, or video
+  files copied into Elefante's private content-addressed media store. Each item
+  requires `path` and a bounded text `description`; optional fields are
+  `mime_type`, `width`, `height`, and `duration_ms`. Files are limited to 25 MiB
+  each and never trigger OCR, transcription, captioning, or network upload.
 - `metadata` (optional, object): Additional structured metadata.
+- `retention_policy` (optional): `managed`, `permanent`, or `ephemeral`.
+  Automatic ephemeral expiry is not implemented.
+- `injection_policy` (optional): `ranked`, `triggered`, or `always`. `always`
+  requires `user_locked=true`.
+- `scope` (optional): Exact project, workspace, or task identifier.
+- `trigger` (optional): Up to 20 literal phrases for triggered delivery.
+- `user_locked` (optional): Explicit user authority; automated refinery cleanup
+  does not archive or weaken a protected memory.
 - `force_new` (optional, boolean, default `false`): Always create a new record and bypass deduplication.
 
 **Important**:
 
 - Requires prior `action="search"` (Compliance Gate).
 - `force_new=true` should be rare. It skips title deduplication, preference merge, and high-similarity redundancy checks.
-- Use `specification` for durable architecture or contract truths. Use `directive` for rules that must not fade. Use `note` only for short-lived context.
+- Use `specification` for durable architecture or contract truths. Use
+  `directive` for behavioral rules. Use `note` only for short-lived context.
+  Governance fields are part of the v2.13.0 customer contract.
 
 **Example**:
 
@@ -111,10 +214,14 @@ Elefante exposes **16 tools** and **2 prompts**. Memory operations use one
 **Parameters**:
 
 - `query` (required, string): Explicit, standalone search query.
+- `surface_context` (optional, string, max 1,000 characters): File, terminal-error,
+  or conversation context for the opt-in literal-trigger path. Only memories
+  explicitly configured with `injection_policy="triggered"` can surface from
+  this field; when omitted, the query is used as the context.
 - `mode` (optional, string, default `hybrid`): `semantic`, `structured`, or `hybrid`.
 - `limit` (optional, integer, default `10`, min `1`, max `100`): Maximum results to return.
 - `filters` (optional, object): Filter by `memory_type`, `domain`, `category`, `min_score`, `tags`, `start_date`, or `end_date`.
-- `min_similarity` (optional, number, default `0.3`, min `0.0`, max `1.0`): Minimum semantic similarity threshold.
+- `min_similarity` (optional, number, default `0.1`, min `0.0`, max `1.0`): Minimum semantic similarity threshold for the MCP memory-search path.
 - `include_conversation` (optional, boolean, default `true`): Include recent conversation context.
 - `include_stored` (optional, boolean, default `true`): Include stored memories from the configured local semantic store and Kuzu.
 - `session_id` (optional, string): Session UUID. Required when `include_conversation=true` and the caller needs session-scoped context.
@@ -125,6 +232,27 @@ Elefante exposes **16 tools** and **2 prompts**. Memory operations use one
 
 - Use normal search for questions, context retrieval, and compliance-gate workflows.
 - Use `list_all=true` for browsing or exports such as "show me all memories about X". `list_all=true` is browse mode, not relevance search.
+- Normal search returns broad ranked candidates plus `answer_context`, a compact
+  map of the result numbers safe to use for the current question. Use only those
+  selected results when answering. If `answer_context.abstained` is `true`, do
+  not substitute loosely related results.
+- When governed candidates carry a stored conflict relationship or contradictory
+  status, `answer_context` reports a bounded `conflict_count` and
+  `conflict_warnings` while withholding those candidates from answer delivery.
+  The warning omits internal IDs; neither side is selected as authoritative.
+- When a `surface_context` is supplied, or when the query itself contains a
+  configured literal trigger, matching `triggered` memories are added as
+  `source="triggered"` results with `surface_matches` and an explicit-trigger
+  explanation (or annotate an existing semantic hit). This path is capped at
+  three memories and remains subject to lifecycle, scope, source-trust,
+  conflict, and privacy gates. When a workspace filter is supplied, the shared
+  current-source digest gate also blocks stale source-bound memories. It does
+  not increment access counts or create graph relationships.
+- Search is read-only with respect to behavioral history. Retrieval and automatic
+  context delivery are exposure, not confirmed use; they do not increment access
+  counts or create co-activation.
+- Search results are evidence, not instructions or unquestionable truth. Check
+  current source and the user's current message; surface material conflicts.
 
 **Example**:
 
@@ -150,25 +278,65 @@ Elefante exposes **16 tools** and **2 prompts**. Memory operations use one
 - `archived` (optional, boolean): Archive the memory.
 - `supersedes_id` (optional, string): UUID of the older memory this one replaces.
 - `tags` (optional, string[]): Replacement tags.
+- `retention_policy`, `injection_policy`, `scope`, `trigger`, `user_locked`
+  (optional): Governance fields with the same meanings as `action="add"`.
 
 **Important**:
 
 - Requires prior `action="search"` (Compliance Gate).
 - Prefer `update` over `add` when a decision changes.
 
-##### `action="delete"` — permanently remove a memory
+##### `action="resolve"` — inspect or apply Smart Merge/conflict repair
+
+**Why this exists**: Equivalent records should consolidate without losing
+history, while contradictory records need an explicit authority decision
+instead of an arbitrary timestamp or type winner.
+
+**Parameters**:
+
+- `memory_id` and `related_memory_id` (required UUIDs): The two current records.
+- `winner_memory_id` (optional UUID): Required for an ambiguous true conflict;
+  must identify one of the pair.
+- `apply` (optional boolean, default `false`): Dry-run when false.
+- `reason` (required for apply): Bounded audit reason.
+- `invocation_mode` (required for apply): Must be `user_directed`.
+- `confirm_protected` (required when the losing record is protected): Explicit
+  authorization to supersede it.
+
+**Behavior**:
+
+- Equivalent assertions consolidate automatically into one recoverable current
+  record.
+- A true conflict auto-selects only when exactly one side carries protected user
+  authority; otherwise the user chooses the winner.
+- Different scopes never collapse.
+- The losing record is archived/deprecated/superseded, not silently deleted.
+- Both records and their conflict IDs are updated together; a second-write
+  failure restores the first record.
+- Apply requires the normal search-before-write compliance receipt.
+
+##### `action="delete"` — archive or permanently remove a memory
 
 **Why this exists**: Some information must be removed, not just deprioritized. Examples: harmful facts, bad test data, or false records.
 
 **Parameters**:
 
 - `memory_id` (required, string): UUID of the memory to delete.
-- `reason` (required, string): Audit-trail reason for deletion.
+- `reason` (required, string): Audit-trail reason.
+- `delete_mode` (optional, `archive | permanent`, default `archive`): Archive is
+  recoverable and preserves graph evidence.
+- `invocation_mode` (optional, `workflow_managed | user_directed`, default
+  `workflow_managed`): Declares who authorized the mutation.
+- `confirm_permanent` (required for permanent deletion): Must be `true`.
+- `confirm_protected` (required for protected memory): Must be `true` together
+  with `invocation_mode="user_directed"`.
 
 **Important**:
 
 - Requires prior `action="search"` (Compliance Gate).
-- Use this for true deletion, not normal versioning. If the old fact should remain historically visible, prefer `action="update"` with `deprecated=true` or `supersedes_id`.
+- Default archive is the normal forgetting path. Permanent deletion is reserved
+  for explicit user-directed removal.
+- Workflow-managed calls cannot mutate or delete user-protected memories.
 
 ##### `action="consolidate"` — deduplicate and canonicalize
 
@@ -182,8 +350,6 @@ Elefante exposes **16 tools** and **2 prompts**. Memory operations use one
 
 - Start with `force=false`.
 - Use this for maintenance, not for routine single-memory edits.
-
----
 
 ### Knowledge Graph Operations
 
@@ -419,7 +585,10 @@ Elefante exposes **16 tools** and **2 prompts**. Memory operations use one
 
 ### Directives
 
-Directives are always-on behavioral constraints. They are not memories. They are injected into every tool response and cannot be outcompeted by similarity scores.
+Directives are persistent behavioral constraints. They are not memories and
+cannot be outcompeted by similarity scores. Active directives are injected on
+normal product operations and error responses; directive-management, system,
+and dashboard management paths omit recursive directive injection.
 
 #### `elefante-DirectiveAdd`
 
@@ -443,7 +612,9 @@ Directives are always-on behavioral constraints. They are not memories. They are
 
 **Purpose**: List active directives.
 
-**Why this exists**: Directives need inspection and audit because they affect every future tool response.
+**Why this exists**: Directives need inspection and audit because active rules
+affect normal product-operation responses. Minimal system, dashboard, and
+directive-management responses do not recursively inject them.
 
 **Parameters**: None.
 
@@ -491,14 +662,23 @@ Prompts are not tools. They inject memory-aware instructions or pre-fetched cont
 **Important**:
 
 - This prompt performs a live hybrid memory search before returning content.
-- It is a focused prefetch path for one topic, not a replacement for explicit tool calls when the caller needs structured results or mutations.
+- It is a focused, read-only answer path, not a replacement for explicit tool
+  calls when the caller needs broad structured results or mutations.
+- It fetches up to 12 candidates, then injects at most 3 active,
+  non-conflicting memories within a 450-token prompt budget. Selection requires
+  an action-relevant question-term match plus independent semantic, concept, or
+  graph support; one weak signal is not enough.
+- Deprecated, archived, superseded, contradictory, secret-bearing, and
+  inapplicable system-test memories are withheld. If nothing directly applies,
+  the prompt abstains instead of injecting related noise.
+- Reading through this prompt does not reinforce access counts.
 
 ---
 
 ## 3. Best Practices
 
 1. **Search before write**: Run `elefante-Memory(action="search")` before `action="add"|"update"|"delete"` or `elefante-GraphConnect`.
-2. **Choose memory type by lifespan**: Use `specification` and `directive` for permanent truths. Use `note` and `conversation` only for short-lived context.
+2. **Choose memory type by lifespan**: Use `specification` for durable product truths and the Directive tools for active behavioral constraints. Specification and directive memories have zero type-specific decay, but freshness still affects their current vitality; they are not automatically immutable or permanently injected. Use `note` and `conversation` only for short-lived context.
 3. **Use `list_all` deliberately**: It is browse/export mode, not a replacement for a targeted relevance search.
 4. **Batch graph work**: Prefer one `GraphConnect` call with refs or IDs over many small graph mutations.
 5. **Keep GraphQuery read-only**: Use `GraphQuery` for retrieval and `GraphConnect` for explicit mutations; parameterize Cypher rather than building queries with string interpolation.

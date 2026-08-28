@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────────────
 # NAME    : verify_dashboard_health.py
-# VERSION : 2.5.2
-# CHANGED : 2026-04-15
 # PURPOSE : HTTP-level dashboard probe: checks endpoint reachability and JSON
 #           response shape without touching live databases.
 # WHEN    : After starting the dashboard server to confirm it is live. As a
@@ -12,7 +10,6 @@
 # NOTES   : Requires the dashboard server to be running. Does not touch ChromaDB
 #           or Kuzu. If this passes but the UI is blank, the issue is in the
 #           snapshot data — run verify_dashboard_snapshot.py next.
-# LASTRUN : yyyy-mm-dd hh:mm — update manually
 # ─────────────────────────────────────────────────────────────────────────────
 """Dashboard health check (no DB access required).
 
