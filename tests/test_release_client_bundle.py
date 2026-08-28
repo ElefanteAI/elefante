@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -313,9 +314,28 @@ def test_customer_archive_carries_default_on_recall_contract(tmp_path):
         ROOT / "scripts/ci/build_release_client.py",
         "build_release_client_recall_contract",
     )
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    required_files = (
+        *builder.CLIENT_RUNTIME_FILES,
+        *builder.CLIENT_RUNTIME_SCRIPTS,
+        builder.BOOTSTRAP_SCRIPT,
+    )
+    for relative_path in required_files:
+        target = source_root / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / relative_path, target)
+    for source_path in (ROOT / "src").rglob("*.py"):
+        relative_path = source_path.relative_to(ROOT)
+        target = source_root / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, target)
+    dashboard_index = source_root / "src/dashboard/ui/dist/index.html"
+    dashboard_index.parent.mkdir(parents=True, exist_ok=True)
+    dashboard_index.write_text("<html></html>\n", encoding="utf-8")
     output_path = tmp_path / "Elefante-Linux.zip"
 
-    _build(builder, ROOT, output_path, "Linux")
+    _build(builder, source_root, output_path, "Linux")
 
     bundle_root = "elefante-installer-Linux/payload/elefante"
     with zipfile.ZipFile(output_path) as archive:
