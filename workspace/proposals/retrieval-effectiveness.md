@@ -13,8 +13,9 @@
 > Task 032 implementation baseline: `7c705ca03371771be68460afb270fe0998f30231`.
 > Current development line: `agent/task-intelligence-causal-repair`; verify its
 > exact HEAD before work.
-> Published customer release:
-> v2.12.2. This document authorizes neither merge nor release.
+> Published customer release: v2.12.3. The active development source declaration
+> remains 2.12.2 on the unreleased causal-repair branch. This document authorizes
+> neither merge nor release.
 
 ## 0. Resume contract — do not restart the debate
 
@@ -43,6 +44,31 @@ PRD.
 
 If new evidence contradicts this contract, update this canonical PRD and its
 planning index in the same change. Do not silently route around it.
+
+### 2026-08-28 closure audit — terminal evidence verdict
+
+The owner's broad feature-closure task is not an eligible second outcome pair.
+Its one pre-work Recall call returned `no_match` and supplied zero memories, so
+no pre-existing decision-changing treatment memory shaped the work. The task
+also was not frozen and preregistered as an evaluation before execution.
+Creating a retrospective record or reusing task 031, task 032, or another
+consumed result would manufacture evidence.
+
+The maintained benchmark verifier reports 32 tasks, three classes, zero
+manifest errors, nine promotion-eligible diagnostic tasks,
+`diagnostic_only=true`, and `promotion_ready=false`. Therefore:
+
+- P0's existing one-task local signal remains valid only at its recorded scope.
+- Representative multi-task lift is **NOT PROVEN**.
+- P1 independent-class generalization is **NOT PROVEN**.
+- R5 is **NOT ENTERED — NO ELIGIBLE INDEPENDENT TASK**.
+- This is a terminal evidence decision for this closure, not an unfinished code
+  implementation. No model run, prompt patch, retrospective memory, or
+  promotional claim is authorized to turn absence of evidence into success.
+
+A future naturally arising task may reopen R5 only when its decision-changing
+memory predates the task, is absent from the source-only Brief, and every
+eligibility and acceptance field is frozen before execution.
 
 ## 1. North Star
 
@@ -529,6 +555,14 @@ a semantically strong decision question in its named scope. Ordinary memories
 still need direct or structural task evidence, and the rule does not depend on
 unrelated competitors being present.
 
+A later independently arising self-improvement request exposed one remaining
+short-query recurrence: generic Developer Etiquette was promoted when the
+repeated project name was the only distinct matched term. The shared selector
+now requires two distinct text matches for multi-term questions before ordinary
+text can qualify as a direct answer or role anchor. One-term facts and explicit
+governing or structural paths remain valid. This is a model-free relevance
+repair, not new causal-lift evidence.
+
 Model-free proof now selects only the canonical mission for the paraphrase and
 still abstains on the unrelated issue-2 screen. A seeded three-pair Sol Max
 component screen produced 3/3 accepted treatment answers and 0/3 control answers
@@ -592,3 +626,428 @@ the source task and the later delivery check had no source-only control.
 > arising task; do not invent a benchmark task or inject generic context.**
 
 One local question lift exists; representative lift does not.
+
+## 15. Recall-first development program — plan before code
+
+**Status:** DEVELOPMENT COMPLETE; CUSTOMER ACCEPTANCE PENDING. No source implementation begins under this program until
+the package being entered has its dependency, rollback, and acceptance proof
+identified below. This sequence implements the user's Recall-first direction
+without turning the dirty development checkout into an unbounded feature pass.
+
+**Classification:** BUG-051 owns end-to-end Recall routing; GAP-053 owns the
+difference between broadly relevant and decision-changing memory; GAP-055 owns
+accepted task value per total token. The packages reuse the existing Recall,
+Task Brief v2, governance, evaluator, and outcome ledger. They do not authorize
+a second retrieval system, automatic full-store injection, live-memory
+mutation, installation, merge, release, or deployment.
+
+### 15.1 Ordered development packages
+
+| Package | Question and bounded scope | Dependency | Independent exit gate |
+|---|---|---|---|
+| **R0 — Freeze the baseline** | Bind the exact public, installed, and development tool inventories; reproduce the configured-routing versus live-Recall mismatch; record current Recall response/token sizes. Read-only only. | None | Exact refs and artifacts are recorded; no source, runtime, host, or memory mutation occurred. |
+| **R1 — Customer Recall surface parity** | Ensure a customer artifact that installs Recall guidance also contains default-on, read-only `elefante-Recall`, its operator rollback, and the minimal seven-field response contract. Do not enable Task Intelligence or tool-call context injection. | R0 | Source discovery, built customer archive discovery, and focused MCP tests agree on Recall; rollback returns the previous public surface exactly. |
+| **R2 — Recall-aware readiness** | Make readiness verify the capability the host was instructed to use: MCP initializes, `tools/list` contains Recall, annotations are read-only, and one bounded Recall probe returns `supplied`, `no_match`, or governed `blocked`. Missing tool, transport failure, or `404` is not customer-ready. | R1 | Deterministic doctor tests cover present, absent, disabled, `404`, and safe abstention; the probe performs no write and exposes no memory body in diagnostics. |
+| **R3 — Token-financial response contract** | Measure and minimize Recall request, context, protocol, retry, and failure cost without weakening relevance or governance. Preserve the compact customer payload and keep accounting metadata internal. | R2 | Supplied and positive-control answers retain behavior; `no_match`, `blocked`, and `unavailable` are bounded; no internal IDs, directives, entrypoint wrappers, or `TOKEN_STATS` block enter the Recall payload. |
+| **R4 — Relevance and abstention hardening** | Repair only a reproduced retrieval or selection failure. Deliver memory only when it contains discriminative task evidence; preserve one-term facts, governing paths, source-currentness, conflict, privacy, and token limits. | R3 | The first failed causal stage has a failing regression first; false-positive, positive-control, determinism, no-mutation, and hard-budget tests pass. |
+| **R5 — Independent outcome proof** | Compare selective Recall with a source-only control on the next independently arising eligible task whose decision-changing memory predates the task. Do not invent a task or reuse consumed evidence. | R4 and a naturally eligible task | At most three pre-registered pairs; black-box acceptance and all observed spend are bound. A failed outcome has zero value. One task cannot authorize promotion. |
+| **R6 — Customer closure** | Synchronize shipped reference, installer guidance, release verification, changelog, and rollback only after R1–R5 establish the behavior they describe. | Required preceding package gates | Documentation routing and release-client verification pass; commit, install, merge, tag, release, and deploy remain separately authorized operations. |
+
+Packages are entered one at a time. A package that fails its exit gate stops the
+sequence at that layer; later packages cannot compensate with more context,
+more model calls, or a weaker judge.
+
+#### R0 baseline evidence — 2026-08-26
+
+- Published and installed v2.12.3 expose 16 tools and 2 prompts; their MCP
+  surface does not contain `elefante-Recall`.
+- The current development source exposes 17 tools and 2 prompts by default,
+  including Recall; Task Intelligence remains a separate opt-in eighteenth
+  tool.
+- The installed doctor reports `customer_ready=true`, daemon health, verified
+  Codex coverage, and installer-owned `codex-recall-routing`, while a live
+  Recall invocation returns HTTP `404` at the configured daemon MCP endpoint.
+  This is the exact R1/R2 mismatch; a healthy process is not capability proof.
+- Model-free heuristic samples using the current development compiler measured
+  a one-memory supplied response at 102 context / 143 payload tokens, a
+  `no_match` response at 80 context / 121 payload tokens, and an `unavailable`
+  response at 86 payload tokens. These are reproducible fixtures, not provider
+  billing or general workload averages.
+- Current ceilings are 1,000 question characters, 12 retrieval candidates,
+  three delivered memories, and 450 heuristic context tokens.
+
+R0 passes. R1 is the next package; no product source, installed runtime, host
+configuration, durable memory, or remote state changed during the baseline.
+
+#### R1 result — customer Recall surface parity
+
+- Existing development behavior already exposed Recall by default with
+  read-only, non-destructive, idempotent, closed-world annotations; the local
+  rollback flag restores the 16-tool surface and Task Intelligence stays
+  default-off.
+- Added one release-client regression that builds a real Linux customer ZIP and
+  requires the packaged MCP source, Codex guidance, and default customer
+  configuration to agree on Recall. The archive must contain the Recall tool and
+  rollback contract, must tell Codex to call it, and must not disable it.
+- Proof: four focused Recall MCP boundary tests pass; the new built-archive
+  contract test passes; the complete nine-test release-client suite passed
+  before the new guard and will be rerun at closure.
+
+R1 passes. R2 is next. No installed runtime, host configuration, durable
+memory, provider model, remote branch, release, or deployment changed.
+
+#### R2 decision and subpackage split — Recall-aware readiness
+
+`ready` continues to mean that the local runtime infrastructure is present and
+healthy. `customer_ready` means more: when installer-owned host guidance tells
+Codex to call Recall, the active guidance path and the live MCP capability must
+both verify. A healthy daemon or a recorded file hash alone is insufficient.
+
+R2 is entered in this order:
+
+1. **R2a — live capability inspector.** Extend the maintained customer MCP
+   verifier to initialize the bridge, list tools, validate Recall's read-only
+   annotations, and make one bounded read-only probe. Return only a safe status
+   summary; never print the retrieved context. Doctor consumes this summary and
+   makes missing Recall, invalid annotations, `unavailable`, transport failure,
+   or HTTP `404` customer-readiness diagnostics.
+2. **R2b — active Codex guidance precedence.** Verify that the installer-owned
+   Recall block is in the guidance file Codex actually loads. A later non-empty
+   `AGENTS.override.md` must not leave a base-file routing record counted as
+   ready when the active override masks it. Preserve every user-managed byte.
+3. **R2c — configuration atomicity.** If Codex MCP registration succeeds but
+   managed Recall guidance fails, report partial configuration and recover only
+   installer-owned state. Do not remove or rewrite a user-managed registration
+   or guidance file. This package is entered only after R2a and R2b prove the
+   failure path and rollback target.
+
+Each R2 subpackage gets its own failing test, patch, and focused pass before the
+next begins. Exact-artifact installation and a real Codex normal-question event
+remain R6 acceptance; they are not simulated by weakening R2 unit tests.
+
+##### R2a result — live capability inspector
+
+- The maintained customer MCP verifier can now initialize the real stdio
+  bridge, list tools, validate Recall's four safe annotations, and make one
+  bounded read-only probe. Its returned summary contains only capabilities,
+  counts, booleans, status, and a diagnostic; retrieved context is discarded.
+- Doctor runs the probe only when installer ownership records
+  `codex-recall-routing`. `ready` remains infrastructure health, while
+  `customer_ready` now fails for a missing tool, unsafe annotations,
+  unavailable/invalid probe, timeout, or transport failure.
+- Pure parser and doctor tests accept safe `no_match`, reject missing/unsafe or
+  unavailable Recall, and prove context cannot enter doctor output. Focused
+  result: 19 passed, 62 deselected; compilation and whitespace checks pass.
+- A live read-only probe against installed v2.12.3 initialized successfully,
+  listed 16 tools, and returned `recall_tool_missing`; no Recall call, model
+  call, runtime write, host change, or memory mutation occurred.
+
+R2a passes. R2b is next. The installed runtime still runs the unchanged public
+v2.12.3 artifact; this development proof is not an installed repair.
+
+##### R2b result — active Codex guidance precedence
+
+- Manifest-owned `codex-recall-routing` now counts as configured only when its
+  recorded path is the guidance file Codex currently loads. A non-empty
+  `AGENTS.override.md` masks an installer-owned block in `AGENTS.md`, so the
+  stale base-file record no longer produces a false ready result.
+- Doctor now requires verified Codex host coverage whenever the installer owns
+  Recall routing. Live Recall capability alone cannot conceal missing or
+  inactive guidance.
+- A regression creates a later user-managed override after installation,
+  proves readiness is withdrawn, reruns the installer, and proves the user
+  bytes remain unchanged while the managed block moves to the active path.
+- Focused result: 16 passed, 62 deselected; compilation and whitespace checks
+  pass.
+
+R2b passes. R2c is now eligible for its required failure-first proof. No user
+guidance, installed runtime, host configuration, durable memory, or remote state
+was changed by this development test.
+
+##### R2c entry — reproduced registration/guidance split failure
+
+- A focused regression forces managed Recall guidance to fail after a new Codex
+  MCP registration has been added and verified. On the pre-patch path the
+  function returns `failed` but leaves that registration active; the test fails
+  with `configured != missing`.
+- The repair boundary is the one transaction only: defer ownership recording
+  until guidance succeeds; on guidance failure, remove the newly added
+  installer registration and restore a prior unchanged installer-owned
+  registration when one existed. Never remove an unrelated user registration.
+- A successful rollback returns `failed` because configuration did not finish.
+  A failed rollback returns `partial` so callers cannot mistake residue for a
+  clean failure. No broad uninstall helper or user-file rewrite is allowed.
+
+##### R2c result — configuration atomicity
+
+- Host-command ownership is now recorded only after Codex Recall guidance
+  succeeds. A clean guidance failure removes a newly added registration; a
+  refresh failure restores the exact prior unchanged installer-owned add
+  command and leaves its manifest record intact.
+- If removal or restoration fails, the adapter returns `partial` rather than a
+  clean `failed` result. Existing user-managed registrations remain outside the
+  ownership path.
+- The original failure-first regression and two ownership/partial-state
+  controls pass. The complete installer lifecycle result is 81 passed,
+  including the isolated real Codex registration round trip and wheel contract.
+  One preliminary run used an audit interpreter without `pip`; after
+  bootstrapping `pip` into that temporary environment, the unchanged suite
+  passed in full.
+
+R2 passes. R3 is next. The development checkout changed only the documented
+readiness/installer sources and tests; no installed runtime, live host, user
+guidance, durable memory, release, or remote state changed.
+
+#### R3 decision and subpackage split — token-financial response contract
+
+The relevant cost is the complete host/model path, not only the selected memory
+body. Recall therefore treats the request, response metadata, context,
+serialization expansion, retries, and failed calls as spend. The seven-field
+response remains stable: several booleans are derivable from `status`, but their
+small fixed cost preserves a machine-readable compatibility contract and is not
+worth a breaking migration.
+
+R3 is entered in this order:
+
+1. **R3a — one-question call discipline.** Align the tool description, Codex
+   managed guidance, grounding prompt, and customer reference: skip Recall for
+   a self-contained question and call it at most once per user question. A
+   terminal `no_match`, `blocked`, or `unavailable` response is not a reason to
+   broaden retrieval or retry in the same answer.
+2. **R3b — bounded response serialization.** Do not echo the question back in a
+   Recall context because the host already owns it. Preserve Unicode in the
+   returned text instead of expanding it to ASCII escape sequences. Keep the
+   existing 450-token governed context limit and add a 1,000-heuristic-token hard
+   cap for the complete seven-field response; fail closed with no memory body if
+   encoded output exceeds it.
+3. **R3c — internal accounting fidelity.** Count Recall request, complete
+   returned payload, and delivered context in the in-memory ledger without
+   exposing `TOKEN_STATS`. This remains a local heuristic and never becomes a
+   provider invoice or dollar estimate.
+4. **R3d — contract reconciliation.** Update only the canonical tool, token,
+   architecture, self-protocol, issue, and installer references that state this
+   behavior. Remove stale wording; link rather than create another Recall guide.
+
+Each subpackage gets its own focused assertions. R3 does not change retrieval
+thresholds, candidate count, memory count, ranking, governance, provider model,
+or evaluation prompts.
+
+##### R3 baseline measurements — 2026-08-26
+
+- A maximum-length 1,000-character ASCII question with no selected memory
+  produces a 395-token pretty response because the response repeats 349 tokens
+  of answer-context/question text.
+- A synthetic 450-token ASCII context produces a 495-token complete response;
+  the same raw budget made entirely of backslashes produces 946 tokens because
+  JSON must escape them.
+- A 450-token CJK context produces 1,587 tokens under current ASCII-escaped
+  serialization but 475 tokens with Unicode-preserving serialization.
+- A pathological 450-token control-character context can still exceed 2,700
+  serialized tokens, so Unicode preservation alone is not a hard bound. The
+  complete-response cap must fail closed rather than truncate evidence.
+- The existing `unavailable` response is 91 tokens. These figures use
+  Elefante's checked-in heuristic over the actual pretty JSON shape; they are
+  not provider usage or billing totals.
+
+##### R3a result — one-question call discipline
+
+- Recall discovery now says to call at most once per user question, skip a
+  self-contained question, and not retry terminal `no_match`, `blocked`, or
+  `unavailable` results.
+- The same rule is present in the grounding prompt and the exact reversible
+  Codex installer block. It does not suppress a later verification Recall after
+  an explicit durable write, because that is a distinct post-mutation question.
+- Focused source, prompt, installer-preservation, and real built-customer-archive
+  assertions pass: 4 passed; compilation and whitespace checks pass.
+
+R3a passes. R3b is next. No tool was called twice, no provider evaluation ran,
+and no installed guidance, live host, memory, or remote state changed.
+
+##### R3b result — bounded response serialization
+
+- Recall now asks the shared governed compiler not to echo the current question;
+  search, prompt, and opt-in context consumers retain their self-contained
+  question text. Both supplied and no-match Recall responses preserve selection
+  behavior without paying for the duplicated request.
+- Recall serializes its customer text with Unicode preserved. The measured CJK
+  case falls from 1,587 to 475 heuristic response tokens while retaining the
+  same 450-token context body.
+- The complete seven-field response is capped at 1,000 heuristic tokens over
+  the exact pretty Unicode JSON shown to the model. An oversized encoded body
+  fails closed to a seven-field `blocked` response; it is not truncated or
+  silently substituted.
+- Post-fix measurements: maximum-length no-match is 105 tokens, the CJK case is
+  475, and the synthetic oversized control-character case becomes an 89-token
+  blocked response. Four failure-first tests and the full shared
+  Recall/answer-context slice pass: 18 passed, 32 deselected; compilation and
+  whitespace checks pass.
+
+R3b passes. R3c is next. Retrieval limits remain 12 candidates, three memories,
+and 450 context tokens; no ranking, governance, model, installed runtime, or
+memory data changed.
+
+##### R3c result — internal accounting fidelity
+
+- Recall's in-memory ledger now measures the exact pretty Unicode payload shown
+  to the model and separately counts the returned `context` field. Input remains
+  the heuristic size of the tool arguments.
+- The seven-field customer response still contains no `TOKEN_STATS`; Recall has
+  zero static protocol overhead on this path. Unavailable and blocked attempts
+  still count because failed work is spend.
+- The failure-first multilingual ledger regression passes, and the complete
+  token-intelligence suite passes: 40 passed; compilation and whitespace checks
+  pass.
+
+R3c passes. R3d is next. These totals are process-local estimates, reset with
+the server, and are neither provider usage nor a dollar-cost calculation.
+
+##### R3d result — canonical contract reconciliation
+
+- The tool, token-intelligence, architecture, self-protocol, orchestrator,
+  Copilot, script-index, issue, and changelog surfaces now agree on the one-call
+  rule, 450-token context budget, 1,000-token complete-response cap, hidden
+  heuristic accounting, active-guidance/readiness proof, and atomic rollback.
+- The references continue to state that published v2.12.3 exposes 16 tools and
+  that Recall is an unreleased customer candidate in this checkout. Development
+  proof is not rewritten as an installed or published claim.
+- A cross-document regression binds those claims to the source constants and
+  installed-flow descriptions. It passes, and the full documentation-routing
+  suite passes: 38 passed; link, anchor, inventory, release-boundary, and
+  whitespace checks are included.
+
+R3 passes. No provider evaluation was needed: the repaired serialization path
+reduced the measured CJK response from 1,587 to 475 heuristic tokens while
+retaining the same selected context, and all other proofs were model-free.
+
+#### R4 entry — relevance and abstention screen before repair
+
+R4 begins with no authorized selector edit. The current Task Brief selector and
+its tests already contain uncommitted BUG-045 hardening owned by the existing
+developer checkout. First run the registered false-positive and positive-control
+tests plus the shared Recall/answer-context slice. If they pass, R4 closes as a
+no-change verification; no threshold is moved merely to create activity. If one
+fails, document the first failed causal stage and one smallest rollback before
+touching `src/core/task_intelligence.py`.
+
+##### R4 result — no new selector repair
+
+- All seven pre-registered BUG-045 negative and positive controls pass, including
+  generic constraint rejection, project-name-only rejection, governing
+  directive preservation, question-specific anchors, multi-term direct answers,
+  and one-term factual answers.
+- The shared Recall/answer-context slice passes 18 tests, and the complete Task
+  Brief compiler suite passes 34 tests. No current failed causal stage exists.
+- R4 therefore closes with no source or test edit to the already-dirty
+  `src/core/task_intelligence.py` and `tests/test_task_intelligence.py` files.
+  Moving a threshold after these passes would add risk and spend without an
+  observed failure.
+
+#### R5 eligibility decision — not entered
+
+The current development task is not a valid independent outcome pair. Its
+initial live `elefante-Recall` invocation returned HTTP `404` and supplied no
+pre-existing decision-changing Elefante memory. Current source, workspace
+instructions, and read-only audits—not a treatment memory—drove the work.
+Creating a retrospective memory or reusing prior consumed evidence would violate
+R5's pre-registration rule. Therefore no R5 treatment/control model run starts,
+no acceptance outcome is relabelled, and representative lift remains unproven.
+
+R6 may perform development closure and exact-archive construction tests. A real
+replacement installation and normal-question Codex event remain separately
+authorized operator/release acceptance and cannot be inferred from those tests.
+
+#### R6 result — development closure, not installed promotion
+
+- Three non-overlapping affected lanes pass: 94 runtime/token/handshake tests
+  with one intentional deselection, 91 installer/customer-archive tests, and 72
+  selector/documentation tests. Total: 257 passed, one deselected.
+- The isolated real MCP self-protocol passes 48/48 and deletes its temporary
+  HOME/data. Its v2.12.2 banner is correct for this branch's executable
+  `src.__version__`; public `origin/main` and the installed release are v2.12.3.
+- Pinned Ruff 0.1.15 passes every changed path and the new `src/mcp/server.py`
+  logic when the committed file's 13 existing `E402`/`F401` findings are held
+  constant. Running the same Ruff command against committed `HEAD` reproduces
+  those 13 findings exactly. Compilation and `git diff --check` pass.
+- Read-only installed proof remains negative: installed v2.12.3 doctor reports
+  `customer_ready=true`, but the new independent bridge inspector completes the
+  handshake, lists 16 tools, and reports `recall_tool_missing`. This is the
+  false-positive readiness condition R2 repairs in development.
+- Repository identity remains intentionally unreconciled: branch
+  `agent/task-intelligence-causal-repair` is at
+  `d9aefb1e57fdaad1f4b69c826c83b408a0f07480`, 20 commits ahead and nine behind
+  `origin/main` at `14fda301b9c2c8f027a52bd1ffa23c36950f9da3`.
+  Rebase/merge/version formation is release work and was not performed in this
+  dirty checkout.
+
+Development packages by mutation boundary:
+
+| Package | Implementation boundary | Proof boundary |
+|---|---|---|
+| R1 | No product behavior change; customer archive contract only | Real Linux customer ZIP contains default-on Recall and routing agreement |
+| R2a | Safe live Recall inspector plus doctor customer-readiness gate | Present/absent/unsafe/unavailable parser and doctor tests; installed missing-tool probe |
+| R2b | Active Codex guidance precedence and verified host coverage | Later override masks stale base record without changing user bytes |
+| R2c | Registration/guidance transaction rollback | New registration removed, prior owned registration restored, failed rollback reports `partial` |
+| R3a | One contextual Recall call per question | Tool, prompt, installer, and built-archive wording agree |
+| R3b | No question echo, Unicode response, 1,000-token complete cap | Supplied, no-match, multilingual, and oversized fail-closed cases |
+| R3c | Exact hidden Recall payload/context estimates | Full token ledger suite; no `TOKEN_STATS` in customer response |
+| R3d | Existing canonical references only | Full documentation routing, links, release split, and script inventory |
+| R4 | No selector mutation | Current negative/positive controls and complete compiler suite pass |
+| R5 | Not entered | No eligible pre-existing memory; no retrospective or consumed-evidence pair |
+
+No commit, push, merge, version bump, archive installation, host reconfiguration,
+durable-memory access/mutation, release, or deployment occurred. Exact customer
+installation and one clean normal-question Codex Recall event remain the next
+authorized acceptance gate; representative multi-task outcome lift remains
+separate and unproven.
+
+### 15.2 Token-financial operating rules
+
+1. **Value before thrift.** One accepted outcome contributes one unit of value;
+   a failed outcome contributes zero while retaining its full cost. Optimize
+   accepted outcomes per million total tokens, never cheap failure.
+2. **Count all observed spend.** Total-token accounting is input plus output for
+   every completed attempt, including retries and unpaired early-stop work.
+   Cached input is a subset of input and must not be counted twice.
+3. **Separate tokens from money.** Elefante's `TOKEN_STATS` is a local heuristic,
+   not provider billing. Dollar cost is reported only from actual provider usage
+   and current rates: uncached input, cached input, and output are priced
+   separately. If either usage or rates are unavailable, dollar cost is
+   `UNKNOWN`.
+4. **Spend model tokens last.** Tool inventory, governance, deterministic
+   selection, delivery, no-mutation, and judge validity must pass model-free
+   before an evaluation run. Invalid attempts are fixed or discarded before
+   buying another pair.
+5. **Keep Recall selective.** The current baseline is at most 12 candidates,
+   three delivered memories, and a 450-token heuristic answer-context budget.
+   These are ceilings, not proof of optimality. Reduce them only when positive
+   controls retain accepted value; never fill a budget merely because it exists.
+6. **Make abstention cheap and successful.** `no_match` is a valid read-only
+   result. It must not trigger broad search substitution, full-store injection,
+   repeated automatic retries, or a model call whose only purpose is to force a
+   memory into the answer.
+7. **Do not over-trigger the host.** Global guidance calls Recall at most once
+   for a question that can materially depend on durable context and skips
+   self-contained questions. A retry requires an observable transport failure,
+   remains bounded, and is counted in total spend.
+8. **Keep the comparison honest.** Hold task, source state, model, reasoning,
+   tools, success criteria, timeout, and approval policy constant. Report both
+   complete-pair efficiency and all observed spend so early stopping cannot hide
+   cost.
+
+### 15.3 Planned write ownership
+
+- R1 owns the released MCP/artifact surface and its focused tests.
+- R2 owns doctor/handshake readiness and installer-owned host-routing tests.
+- R3 owns Recall payload and token-accounting tests; it does not add provider
+  pricing to the product.
+- R4 owns selector changes only after a specific failure is reproduced; the
+  existing dirty `src/core/task_intelligence.py` and
+  `tests/test_task_intelligence.py` must be preserved until that gate is reached.
+- R5 uses the maintained evaluator and metadata-only ledger. It creates no new
+  benchmark harness and writes no raw prompt, memory body, response, or source
+  diff into the outcome store.
+- R6 owns documentation and release verification only after behavior is proven.
+
+The immediate authorized move after this plan is R0 read-only baseline proof,
+then R1. No installed runtime, durable memory, host configuration, or remote
+surface is part of the development write set.

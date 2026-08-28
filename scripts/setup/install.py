@@ -122,6 +122,7 @@ from configure_antigravity import (  # noqa: E402
     host_is_detected as antigravity_is_detected,
 )
 from configure_cursor_kiro import configure_detected_hosts, infer_repo_python  # noqa: E402
+from configure_additional_hosts import configure_detected_additional_hosts  # noqa: E402
 from configure_cli_agents import configure_detected_cli_hosts  # noqa: E402
 from install_manifest import (  # noqa: E402
     BUILD_IDENTITY_FILE_NAME,
@@ -132,6 +133,7 @@ from install_manifest import (  # noqa: E402
 )
 from host_selection import (  # noqa: E402
     CLI_HOSTS,
+    ADDITIONAL_HOSTS,
     HOST_LABELS,
     JSON_HOSTS,
     SUPPORTED_HOSTS,
@@ -1485,6 +1487,7 @@ def main():
                 vscode_selection = select_family(selected_hosts, VSCODE_FAMILY)
                 json_selection = select_family(selected_hosts, JSON_HOSTS)
                 cli_selection = select_family(selected_hosts, CLI_HOSTS)
+                extended_selection = select_family(selected_hosts, ADDITIONAL_HOSTS)
 
                 vscode_success = False
                 if vscode_selection is None or vscode_selection:
@@ -1520,6 +1523,15 @@ def main():
                         adopt_legacy=args.installation_scope == "customer",
                     )
 
+                extended_hosts = {}
+                if extended_selection is None or extended_selection:
+                    extended_hosts = configure_detected_additional_hosts(
+                        root_dir,
+                        infer_repo_python(root_dir),
+                        selected=extended_selection,
+                        adopt_legacy=args.installation_scope == "customer",
+                    )
+
                 detail_parts = []
                 if vscode_success:
                     configured_labels = (
@@ -1552,6 +1564,15 @@ def main():
                         detail_parts.append(f"{host} preserved")
                     else:
                         logger.log(f"WARN: {host} MCP configuration was not changed ({result})")
+
+                for host, configured in extended_hosts.items():
+                    if configured:
+                        logger.log(f"OK: MCP Server configured for {HOST_LABELS[host]}")
+                        detail_parts.append(f"{HOST_LABELS[host]} configured")
+                    else:
+                        logger.log(
+                            f"WARN: {HOST_LABELS[host]} MCP configuration was not changed"
+                        )
 
                 failed_cli_hosts = sorted(
                     host

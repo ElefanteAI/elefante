@@ -13,6 +13,7 @@ import sys
 import tempfile
 import time
 from types import SimpleNamespace
+from uuid import uuid4
 
 import httpx
 import pytest
@@ -129,6 +130,36 @@ def test_answer_context_abstains_when_only_one_weak_signal_matches():
 
     assert context.selected_count == 0
     assert context.selection_reasons == ()
+
+
+def test_answer_context_surfaces_known_conflict_without_selecting_either_side():
+    conflicting = _context_result(
+        "Decision: use a global customer runtime for every compatible IDE.",
+        memory_type=MemoryType.DECISION,
+        score=0.95,
+        vector_score=0.95,
+    )
+    conflicting.memory.metadata.conflict_ids = [uuid4()]
+
+    context = compile_answer_context(
+        "What is the customer runtime installation decision?",
+        [conflicting],
+    )
+
+    assert context.selected_count == 0
+    assert context.conflict_count == 1
+    assert len(context.conflict_warnings) == 1
+    assert "unresolved stored conflict" in context.text
+    assert conflicting.memory.content not in context.text
+    assert str(conflicting.memory.id) not in context.text
+
+    metadata = answer_context_metadata(
+        "What is the customer runtime installation decision?",
+        [conflicting],
+        context=context,
+    )
+    assert metadata["conflict_count"] == 1
+    assert metadata["conflict_warnings"] == list(context.conflict_warnings)
 
 
 def test_answer_context_reserves_user_locked_always_memory() -> None:
@@ -262,6 +293,8 @@ async def test_recall_surface_is_default_on_and_has_operator_rollback(
     assert recall.annotations.destructiveHint is False
     assert recall.annotations.idempotentHint is True
     assert recall.annotations.openWorldHint is False
+    assert "at most once" in recall.description
+    assert "self-contained" in recall.description
     assert "elefante-TaskIntelligence" not in default_names
     assert len(default_names) == 17
 
@@ -287,6 +320,27 @@ async def test_recall_surface_is_default_on_and_has_operator_rollback(
     assert "ENTRYPOINT_SEQUENCE_READ_THIS_FIRST" not in payload
     assert "DIRECTIVES" not in payload
     assert "TOKEN_STATS" not in payload
+
+
+@pytest.mark.asyncio
+async def test_grounding_prompt_limits_recall_to_one_contextual_call() -> None:
+    from mcp.types import GetPromptRequest, GetPromptRequestParams
+
+    server = ElefanteMCPServer()
+    handler = server.server.request_handlers[GetPromptRequest]
+    response = await handler(
+        GetPromptRequest(
+            params=GetPromptRequestParams(
+                name="elefante-grounding",
+                arguments={},
+            )
+        )
+    )
+    guidance = response.root.messages[0].content.text
+
+    assert "at most once" in guidance
+    assert "self-contained question" in guidance
+    assert "do not retry" in guidance
 
 
 @pytest.mark.asyncio
@@ -328,6 +382,89 @@ async def test_recall_call_boundary_keeps_customer_payload_minimal(monkeypatch) 
 
 
 @pytest.mark.asyncio
+async def test_recall_serializes_multilingual_context_without_ascii_expansion(
+    monkeypatch,
+) -> None:
+    server = ElefanteMCPServer()
+    multilingual_context = "記" * 900
+
+    async def recall(_arguments):
+        return {
+            "success": True,
+            "status": "supplied",
+            "context": multilingual_context,
+            "supplied_count": 1,
+            "abstained": False,
+            "delivery_blocked": False,
+            "read_only": True,
+        }
+
+    monkeypatch.setattr(server, "_handle_recall", recall)
+    handler = server.server.request_handlers[mcp_types.CallToolRequest]
+    response = await handler(
+        mcp_types.CallToolRequest(
+            params=mcp_types.CallToolRequestParams(
+                name="elefante-Recall",
+                arguments={"question": "What prior multilingual decision applies?"},
+            )
+        )
+    )
+    rendered = response.root.content[0].text
+
+    assert "記" in rendered
+    assert "\\u8a18" not in rendered
+    assert estimate_tokens(rendered) <= 500
+
+
+@pytest.mark.asyncio
+async def test_recall_no_match_does_not_echo_a_maximum_length_question(
+    monkeypatch,
+) -> None:
+    class Orchestrator:
+        async def search_memories(self, **_kwargs):
+            return []
+
+    server = ElefanteMCPServer()
+    monkeypatch.setattr(server, "_get_orchestrator", lambda: _async_value(Orchestrator()))
+    question = "x" * 1000
+
+    response = await server._handle_recall({"question": question})
+    rendered = json.dumps(response, indent=2, ensure_ascii=False)
+
+    assert response["status"] == "no_match"
+    assert question not in response["context"]
+    assert estimate_tokens(rendered) <= 128
+
+
+@pytest.mark.asyncio
+async def test_recall_fails_closed_when_complete_response_exceeds_hard_budget(
+    monkeypatch,
+) -> None:
+    server = ElefanteMCPServer()
+
+    async def oversized_context(_question):
+        return SimpleNamespace(
+            text="\x00" * 1578,
+            selected_count=1,
+            delivery_blocked=False,
+        )
+
+    monkeypatch.setattr(server, "_recall_answer_context", oversized_context)
+
+    response = await server._handle_recall(
+        {"question": "Which previously stored decision applies?"}
+    )
+    rendered = json.dumps(response, indent=2, ensure_ascii=False)
+
+    assert response["status"] == "blocked"
+    assert response["success"] is False
+    assert response["supplied_count"] == 0
+    assert response["delivery_blocked"] is True
+    assert "\x00" not in response["context"]
+    assert estimate_tokens(rendered) <= 1000
+
+
+@pytest.mark.asyncio
 async def test_recall_returns_only_bounded_governed_context_without_internal_ids(
     monkeypatch,
 ) -> None:
@@ -355,15 +492,15 @@ async def test_recall_returns_only_bounded_governed_context_without_internal_ids
     server = ElefanteMCPServer()
     monkeypatch.setattr(server, "_get_orchestrator", lambda: _async_value(Orchestrator()))
 
-    response = await server._handle_recall(
-        {"question": "What did we decide about global installation across IDEs?"}
-    )
+    question = "What did we decide about global installation across IDEs?"
+    response = await server._handle_recall({"question": question})
 
     assert response["success"] is True
     assert response["status"] == "supplied"
     assert response["supplied_count"] == 1
     assert response["read_only"] is True
     assert "one global runtime" in response["context"]
+    assert question not in response["context"]
     assert "Cognitive retrieval" not in response["context"]
     assert estimate_tokens(response["context"]) <= 450
     rendered = json.dumps(response)
@@ -461,6 +598,40 @@ async def test_opt_in_tool_context_uses_governed_answer_selector(monkeypatch) ->
     assert "one global runtime" in context["rendered_context"]
     assert "Cognitive retrieval" not in context["rendered_context"]
     assert context["selected_memory_ids"] == [str(relevant.memory.id)]
+
+
+@pytest.mark.asyncio
+async def test_opt_in_tool_context_surfaces_known_conflict_as_warning(monkeypatch) -> None:
+    conflicting = _context_result(
+        "Decision: customer installation uses one global runtime for every compatible IDE.",
+        memory_type=MemoryType.DECISION,
+        score=0.95,
+        vector_score=0.95,
+    )
+    conflicting.memory.metadata.conflict_ids = [uuid4()]
+
+    class Orchestrator:
+        async def search_memories(self, **_kwargs):
+            return [conflicting]
+
+    server = ElefanteMCPServer()
+    monkeypatch.setenv("ELEFANTE_TASK_INTELLIGENCE_ENABLED", "1")
+    monkeypatch.setenv("ELEFANTE_TASK_INTELLIGENCE_PILOT", "1")
+    monkeypatch.setenv("ELEFANTE_TASK_CONTEXT_ON_TOOL_CALL", "1")
+    monkeypatch.setattr(server, "_get_orchestrator", lambda: _async_value(Orchestrator()))
+
+    returned = await server._inject_context(
+        {"success": True},
+        "elefante-TaskCreate",
+        {"description": "Choose the customer installation runtime"},
+    )
+
+    context = returned["RELEVANT_CONTEXT"]
+    assert context["status"] == "warning"
+    assert context["selected_memory_ids"] == []
+    assert context["conflict_count"] == 1
+    assert "unresolved stored conflict" in context["rendered_context"]
+    assert str(conflicting.memory.id) not in context["rendered_context"]
 
 
 @pytest.mark.asyncio
@@ -849,6 +1020,58 @@ async def test_memory_add_forwards_governance_fields(monkeypatch):
     assert metadata["trigger"] == ["protected"]
     assert metadata["user_locked"] is True
     assert metadata["invocation_mode"] == "user_directed"
+
+
+@pytest.mark.asyncio
+async def test_memory_add_persists_portable_attachment_descriptors(
+    monkeypatch, tmp_path
+):
+    captured: dict[str, object] = {}
+    source = tmp_path / "diagram.png"
+    source.write_bytes(b"\x89PNG\r\n\x1a\nlocal-image-bytes")
+    data_dir = tmp_path / "elefante-data"
+
+    class FakeOrchestrator:
+        _last_rejection_reason = None
+
+        async def add_memory(self, **kwargs: object) -> Memory:
+            captured.update(kwargs)
+            return Memory(content="diagram", metadata=MemoryMetadata())
+
+    monkeypatch.setattr("src.utils.config.DATA_DIR", data_dir)
+    server = ElefanteMCPServer()
+    monkeypatch.setattr(server, "_check_compliance_gate", lambda _: None)
+    monkeypatch.setattr(
+        server, "_get_orchestrator", lambda: _async_value(FakeOrchestrator())
+    )
+    monkeypatch.setattr(server, "_with_request_provenance", lambda args: args)
+
+    result = await server._handle_add_memory(
+        {
+            "content": "Architecture diagram",
+            "memory_type": "fact",
+            "invocation_mode": "user_directed",
+            "attachments": [
+                {
+                    "path": str(source),
+                    "description": "Diagram of the local daemon boundary.",
+                }
+            ],
+        }
+    )
+
+    assert result["status"] == "stored"
+    assert result["attachment_count"] == 1
+    metadata = captured["metadata"]
+    assert isinstance(metadata, dict)
+    descriptor = metadata["attachments"][0]
+    assert descriptor == result["attachments"][0]
+    assert descriptor["storage_path"].startswith("attachments/")
+    assert not Path(descriptor["storage_path"]).is_absolute()
+    assert str(source) not in json.dumps(descriptor)
+    stored = data_dir / descriptor["storage_path"]
+    assert stored.read_bytes() == source.read_bytes()
+    assert stored.stat().st_mode & 0o777 == 0o600
 
 
 @pytest.mark.asyncio

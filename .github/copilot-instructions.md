@@ -6,17 +6,21 @@ input to reasoning, not proof that a memory is correct.
 
 ## When to retrieve
 
-Call `elefante-Recall` before answering when the request may depend on:
+If the connected MCP surface lists `elefante-Recall`, call it before answering
+when the request may depend on:
 
 - the user's preferences or enforced instructions;
 - earlier project decisions, constraints, or unresolved problems;
 - work performed in another session, IDE, or agent host.
 
 Pass the complete standalone question with named projects, files, people, and
-concepts. Recall returns only a bounded governed context or abstains. Use
-`elefante-Memory(action="search")` for broad inspection and before memory
-mutations. Do not fetch memory for a self-contained question that cannot benefit
-from prior context.
+concepts. Call Recall at most once per user question. Treat `no_match`,
+`blocked`, and `unavailable` as terminal for that answer; do not retry or
+broaden retrieval. Recall returns only a bounded governed context or abstains. On the
+published v2.12.3 surface, where Recall is not exposed, use
+`elefante-Memory(action="search")` for targeted retrieval and broad inspection,
+and before memory mutations. Do not fetch memory for a self-contained question
+that cannot benefit from prior context.
 
 ## How to reason with results
 
@@ -46,8 +50,9 @@ request from ordinary conversation. Leave `scope` unset unless an exact project,
 workspace, or task identifier is known; never use descriptive prose. Prefer
 ranked delivery when relevant paraphrases should work. Use a triggered policy
 only when literal phrases are intentionally required; never choose it merely to
-pass one verification question. After writing, call
-`elefante-Recall` with one likely future question; stored is not proof of
+pass one verification question. After writing, use `elefante-Recall` with one
+likely future question when that development tool is available; otherwise run
+a read-only `elefante-Memory(action="search")` check. Stored is not proof of
 deliverable.
 
 - `add`: a new decision, preference, verified fact, reusable insight, or
@@ -59,7 +64,7 @@ deliverable.
 
 Do not store secrets, raw credentials, speculative conclusions, routine chat,
 or every interaction. User-directed retention has priority. Automatic user
-locks and mandatory injection policies are not part of the v2.12.2 runtime.
+locks and mandatory injection policies are not part of the v2.12.3 runtime.
 
 ## Choose the memory type deliberately
 
@@ -79,13 +84,22 @@ freshness still affects their vitality. They are not automatically immutable or
 injected into every response. Active rules belong in the separate Directive
 store.
 
+## Agent boundary
+
+The connected host owns the agent's goal, planning, tool choice, observation,
+reflection, stopping condition, cost limits, and human-approval gates. Elefante
+is the memory layer: it retrieves durable context and preserves verified
+outcomes. It does not provide a financial adviser, market-data service, risk
+calculator, document generator, transaction authority, or provider-billing API.
+
 ## Current MCP surface
 
-Published Elefante v2.12.2 exposes 16 tools and 2 prompts. The unreleased
+Published Elefante v2.12.3 exposes 16 tools and 2 prompts. The unreleased
 customer candidate adds the default-on, read-only `elefante-Recall` path; it is
 not a published release claim.
 
-- Memory: `elefante-Recall`, `elefante-Memory`
+- Memory: `elefante-Memory` (published); `elefante-Recall` (unreleased
+  development candidate only)
 - Context and graph: `elefante-ContextGet`, `elefante-GraphQuery`,
   `elefante-GraphConnect`
 - Sessions and tasks: `elefante-SessionsList`, `elefante-TaskCreate`,
@@ -98,8 +112,9 @@ not a published release claim.
 - Prompts: `elefante-grounding`, `elefante-context`
 
 Normal product-operation responses include active directives and protocol
-guidance. Management responses use a minimal path. Every response includes
-heuristic `TOKEN_STATS`; `RELEVANT_CONTEXT` is conditional.
+guidance. Management responses use a minimal path. Non-Recall responses include
+heuristic `TOKEN_STATS`; Recall is a bounded minimal exception and
+`RELEVANT_CONTEXT` is conditional.
 
 ## Safety and boundaries
 

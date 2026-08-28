@@ -29,7 +29,8 @@ from src.core.vector_store import VectorStore
 from src.core.sqlite_vector_store import SQLiteVectorStore
 from src.core.graph_store import GraphStore
 from src.models.entity import Entity, EntityType, Relationship, RelationshipType
-from src.models.query import QueryMode
+from src.models.memory import MemoryStatus
+from src.models.query import QueryMode, SearchResult
 
 
 def test_vector_store_uses_embedded_chroma_client_not_server_transport(tmp_path, monkeypatch):
@@ -120,6 +121,50 @@ class TestMemoryPersistence:
         assert len(results) > 0
         found = any(r.memory.content == test_content for r in results)
         assert found, "Memory not found in vector store after adding"
+
+    @pytest.mark.asyncio
+    async def test_contradiction_persists_conflicting_memory_id(self, orchestrator, monkeypatch):
+        """A detected contradiction remains inspectable after the write."""
+        class FixedEmbedding:
+            async def generate_embedding(self, _text):
+                return [1.0, 0.0, 0.0]
+
+        embedding = FixedEmbedding()
+        orchestrator.embedding_service = embedding
+        orchestrator.vector_store._embedding_service = embedding
+
+        existing = await orchestrator.add_memory(
+            content="The local daemon stores memory decisions.",
+            memory_type="fact",
+            metadata={"title": "Existing daemon storage"},
+        )
+        assert existing is not None
+
+        async def no_title_match(_title):
+            return None
+
+        async def contradictory_match(**_kwargs):
+            return [
+                SearchResult(
+                    memory=existing,
+                    score=0.80,
+                    vector_score=0.80,
+                    source="vector",
+                )
+            ]
+
+        monkeypatch.setattr(orchestrator.vector_store, "find_by_title", no_title_match)
+        monkeypatch.setattr(orchestrator.vector_store, "search", contradictory_match)
+
+        incoming = await orchestrator.add_memory(
+            content="The local daemon does not store memory decisions.",
+            memory_type="fact",
+            metadata={"title": "Incoming daemon storage"},
+        )
+
+        assert incoming is not None
+        assert incoming.metadata.status == MemoryStatus.CONTRADICTORY.value
+        assert incoming.metadata.conflict_ids == [existing.id]
     
     @pytest.mark.asyncio
     async def test_add_memory_persists_to_graph_store(self, orchestrator):

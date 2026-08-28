@@ -10,8 +10,16 @@ from __future__ import annotations
 import argparse
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from src.utils.curation import assess_health_from_raw
+from src.utils.dashboard_serializer import (
+    connection_counts_from_edges,
+    health_summary_from_nodes,
+    usage_summary_from_nodes,
+)
 
 
 GENERATED_AT = "2026-08-05T18:00:00.000Z"
@@ -112,6 +120,7 @@ def _slug(value: str) -> str:
 
 def build_showcase_snapshot() -> dict[str, Any]:
     """Return a deterministic snapshot that exercises every dashboard view."""
+    showcase_now = datetime(2026, 8, 27, 12, 0, tzinfo=timezone.utc)
     nodes: list[dict[str, Any]] = []
     for index, (key, title, description, memory_type, topic, score, access_count, status, evidence) in enumerate(MEMORIES):
         created_hour = (16 - index) % 24
@@ -135,6 +144,7 @@ def build_showcase_snapshot() -> dict[str, Any]:
                     "status": status,
                     "archived": False,
                     "deprecated": status == "superseded",
+                    "superseded_by_id": "demo:daemon-decision" if status == "superseded" else "",
                     "tags": _slug(topic),
                     "source": "sqlite",
                     "evidence": evidence,
@@ -190,6 +200,26 @@ def build_showcase_snapshot() -> dict[str, Any]:
         for source, target, similarity in SEMANTIC_RELATIONSHIPS
     )
 
+    memory_ids = {node["id"] for node in nodes if node.get("type") == "memory"}
+    node_ids = {node["id"] for node in nodes}
+    connection_counts = connection_counts_from_edges(memory_ids, edges, node_ids=node_ids)
+    for node in nodes:
+        if node.get("type") != "memory":
+            continue
+        properties = node["properties"]
+        health = assess_health_from_raw(
+            properties,
+            connection_counts.get(node["id"], 0),
+            now=showcase_now,
+        )
+        properties.update(
+            {
+                "health_status": health.status.value,
+                "health_reason": health.reason,
+                "connection_count": health.connection_count,
+            }
+        )
+
     return {
         "generated_at": GENERATED_AT,
         "curation": {
@@ -206,6 +236,8 @@ def build_showcase_snapshot() -> dict[str, Any]:
             "memories": len(MEMORIES),
             "entities": len(nodes) - len(MEMORIES),
             "edges": len(edges),
+            "health": health_summary_from_nodes(nodes, edges, now=showcase_now),
+            "usage": usage_summary_from_nodes(nodes),
         },
         "nodes": nodes,
         "edges": edges,

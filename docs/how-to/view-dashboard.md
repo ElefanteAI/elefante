@@ -1,6 +1,6 @@
 # View the Local Dashboard
 
-**Applies to:** v2.12.2
+**Applies to:** v2.12.3
 
 The dashboard is a loopback-only, read-only view of
 `dashboard_snapshot.json`. It never opens the live vector store or Kuzu.

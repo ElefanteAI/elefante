@@ -33,7 +33,37 @@ On Windows PowerShell, set
 `$ElefanteRuntime\.venv\Scripts\python.exe` with the same lifecycle scripts.
 
 Confirm the reported archive exists, is non-empty, and passes its checksum
-verification. JSON/CSV export is analysis-only and is not a restorable backup.
+verification. JSON is a portable memory-migration source, not a full backup;
+CSV is analysis-only. Both omit the graph database and binary embeddings.
+
+## 1.5. Migrate memories from portable JSON
+
+For a cross-install or cross-backend memory migration, export from the source:
+
+```bash
+python scripts/pipeline/export_memories.py --format json --output /tmp/elefante-memories.json
+```
+
+Preview the target without generating embeddings or writing data:
+
+```bash
+python scripts/pipeline/import_memories.py /tmp/elefante-memories.json
+```
+
+Stop the target runtime before applying. If the target store is non-empty,
+create and pass a verified binary backup; the importer is additive and refuses
+to overwrite an existing memory ID:
+
+```bash
+python scripts/pipeline/import_memories.py /tmp/elefante-memories.json \
+  --apply --confirm-stopped STOPPED \
+  --backup-archive /path/to/elefante_data_backup.zip
+```
+
+The importer regenerates vectors with the target's configured local embedding
+model and preserves memory IDs and metadata. It does not restore graph entities
+or relationships; use the binary backup/restore path for complete durable-data
+recovery.
 
 ## 2. Restore data safely
 
@@ -66,7 +96,7 @@ For a developer checkout:
 4. Use a separate worktree or detached checkout for the known-good tag; do not
    rewrite the branch containing current work.
 
-The currently published release is v2.12.2. A future rollback target must be
+The currently published release is v2.12.3. A future rollback target must be
 selected from actual published tags, not copied from this document.
 
 ## 4. Verify

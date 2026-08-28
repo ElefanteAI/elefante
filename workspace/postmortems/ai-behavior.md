@@ -98,11 +98,11 @@
 
 <a id="issue-11"></a>
 
-## Issue #11: JSON Export Is Not a Backup [MITIGATED — portable import planned]
+## Issue #11: JSON Export Is Not a Backup [FIXED, guarded — portable import]
 
 **Trigger:** User runs `export_memories.py --format json`, factory-resets, finds no script to re-import. Brain is gone.
 **Root cause:** Three layers. (1) `export_memories.py` was built for offline analysis, not migration; no `import_memories.py` was ever written. (2) Embeddings excluded — the export calls `collection.get(include=["metadatas", "documents"])` but Elefante stores embeddings explicitly via `thenlper/gte-base`. (3) ChromaDB has no named embedding function in Elefante's collection — using its default (`all-MiniLM-L6-v2`) on upsert silently corrupts semantic search.
-**Solution:** Use backup/restore (`backup_elefante_data.py`) as the persistence path and label JSON/CSV export as analysis-only. Portable JSON import remains Upcoming and must regenerate embeddings with the configured model before writing through the configured vector store.
+**Solution:** The checksummed binary backup/restore path remains the full recovery contract. `scripts/pipeline/import_memories.py` now provides a dry-run-first, additive JSON migration path: it validates every record, preserves memory IDs and metadata, regenerates embeddings through the configured local model, rejects existing IDs, requires `--confirm-stopped STOPPED` for apply plus a verified binary backup for non-empty targets, and rolls back partial writes. The analysis export does not contain graph topology, so JSON migration is not a full backup and CSV remains analysis-only.
 **Lesson:** A write-only export is not a backup. Every export format needs a documented import path or must be explicitly labeled read-only. Never infer "exportable = restorable."
 
 <a id="issue-12"></a>
@@ -130,10 +130,10 @@
 
 ## Issue #14: Search Ranking Was Mistaken for Answer Context [BUG-045, FIXED AGAIN, guarded]
 
-**Trigger:** `elefante-context` initially injected the raw top five search hits, and normal search told the agent that every result was authoritative. On 2026-08-14, a live replacement-task screen exposed a recurrence: Recall supplied unrelated SDD/developer-etiquette constraints for three real GitHub product questions instead of abstaining. A live positive control then caught the first repair rejecting the canonical mission on a paraphrased question.
-**Root cause:** Retrieval and answer delivery were initially treated as one operation. The first v2 guard counted an intrinsic evidence role (`constraint`, `decision`, `failure`, or `safeguard`) as both independent relevance and a question-specific action anchor; one live false positive matched only 3 of 28 task terms (10.7%) but passed because it was classified as a constraint. Replacing that error with one absolute lexical threshold overfit the negative case and discarded an explicitly user-enforced governing directive.
-**Solution:** Keep broad search for exploration and one fail-closed answer selector for delivery. Intrinsic roles now need substantial question-term coverage. A ranked directive receives a separate governing-policy anchor only when it is user-locked, names the task scope, the question asks for a decision, and semantic relevance is strong; it does not depend on unrelated competitors being present. Ordinary memories still require direct or structural task evidence, while always-inject policy remains governed separately.
-**Lesson:** A retrieved role is not proof of task applicability, but explicit user governance is also not ordinary ranking metadata. Test both false-positive abstention and the intended user-enforced decision path.
+**Trigger:** `elefante-context` initially injected the raw top five search hits, and normal search told the agent that every result was authoritative. On 2026-08-14, a live replacement-task screen exposed a recurrence: Recall supplied unrelated SDD/developer-etiquette constraints for three real GitHub product questions instead of abstaining. A live positive control then caught the first repair rejecting the canonical mission on a paraphrased question. On 2026-08-15, the independently requested task `use Elefante to improve Elefante` exposed a narrower recurrence: generic Developer Etiquette was selected when `Elefante` was the only distinct matched term.
+**Root cause:** Retrieval and answer delivery were initially treated as one operation. The first v2 guard counted an intrinsic evidence role (`constraint`, `decision`, `failure`, or `safeguard`) as both independent relevance and a question-specific action anchor; one live false positive matched only 3 of 28 task terms (10.7%) but passed because it was classified as a constraint. Replacing that error with one absolute lexical threshold overfit the negative case and discarded an explicitly user-enforced governing directive. The remaining short-query path still treated one of three distinct terms as both a direct answer and a role-text anchor; repeating the product name raised its apparent coverage without adding task evidence.
+**Solution:** Keep broad search for exploration and one fail-closed answer selector for delivery. Text-only evidence for a multi-term question now requires at least two distinct matched terms before it can become a direct answer or ordinary role-text anchor. One-term factual questions remain eligible, and explicit path, graph, mandatory-governance, or semantically strong user-locked scoped-directive anchors retain their separate bounded paths. Broad search remains inspectable, while always-inject policy remains governed separately.
+**Lesson:** A retrieved role or project identity is not proof of task applicability, but explicit user governance is also not ordinary ranking metadata. Test false-positive abstention, genuine one-term facts, and the intended user-enforced decision path together.
 
 <a id="issue-15"></a>
 
@@ -208,11 +208,21 @@
 **Solution:** Define the current observable value proxy as one unit for a black-box accepted outcome and zero for failure; define total tokens as input, including cached input, plus output. Report accepted outcomes per million tokens and a task-clustered difference from complete pairs, while separately reporting all observed spend so early-stop work is not hidden. The gate requires at least one treatment acceptance, no acceptance-count regression, and a 95% lower bound above zero; historical consumed evidence remains non-promotable.
 **Lesson:** Measure accepted value and complete cost together. Cheap failure is zero intelligence, and raw ratios across unrelated task mixes are not comparable evidence.
 
+<a id="issue-23"></a>
+
+## Issue #23: Declarative Triggers Had No Delivery Path [GAP-056, FIXED in development]
+
+**Trigger:** `trigger` and `surfaces_when` metadata could describe when a memory should matter, but no runtime path examined an explicit file, terminal-error, or conversation context. A caller had to guess a semantic query and could miss an exact opt-in reminder.
+**Root cause:** The schema hint was passive. Adding automatic host interception would cross the local memory authority boundary and introducing another semantic retriever would duplicate the existing search contract, so no bounded delivery surface had been wired.
+**Solution:** Extend the existing `elefante-Memory(action="search")` path with optional `surface_context`. It performs one bounded read-only scan, considers only `injection_policy="triggered"` memories, requires a case-insensitive literal phrase from `trigger` or `surfaces_when`, returns at most three matches with an explicit trigger explanation, and preserves lifecycle, scope, source-trust, conflict, and privacy gates. If a workspace filter is supplied, it uses the shared current-source digest check on a deep copy and skips stale records. It never updates access or graph state. The shared answer-context compiler reports a bounded warning when a relevant candidate has a stored conflict relationship or contradictory status; it withholds the candidate, selects neither side, and omits internal IDs from the warning and Recall text. The 2026-08-28 closure then added typed file, terminal-error, and conversation envelopes for every manifest host family, secret scrubbing and hard bounds, and a loopback `/events/surface` adapter that feeds the same read-only selector without persisting the event. Conservative semantic detection and dry-run-first reversible `Memory(resolve)` repair close the related contradiction path without allowing an arbitrary automatic winner.
+**Proof:** `tests/test_proactive_surfacing.py` covers policy/literal requirements, context separate from the semantic query, scope/trust/lifecycle/conflict/privacy gates, stale-source rejection, result bounds, Task Brief delivery, and read-only behavior. `tests/test_host_event_adapters.py` and `tests/test_host_event_endpoint.py` cover host normalization, privacy, bounds, and daemon integration. `tests/test_conflict_detection.py` and `tests/test_conflict_resolution.py` cover abstention, equivalent consolidation, explicit winner authority, protected records, rollback, and scope separation. `tests/test_mcp_daemon.py` covers answer-context and opt-in warning delivery without selecting or exposing the conflicted memory. The published v2.12.3 surface remains unchanged.
+**Lesson:** A declarative trigger is not a shipped behavior. Make proactive delivery explicit, opt-in, literal, bounded, and read-only before considering host automation or outcome claims.
+
 ---
 
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
-The recurring rules from these 22 issues:
+The recurring rules from these 23 issues:
 
 1. **STATE → DO → VERIFY in the same response** — analysis without action is entertainment. Issues #1, #4.
 2. **Trigger words require proof** — "done" / "ready" / "fixed" must include verification output. Issue #2.
@@ -231,6 +241,7 @@ The recurring rules from these 22 issues:
 15. **Select for decision value, not topical similarity** — a relevant memory that cannot change the next action is context cost, not Task Intelligence. Issue #20.
 16. **Capture and verify before depending on Recall** — explicit user-directed durable decisions need a governed write plus one future-question delivery check before a later task can depend on them. Issue #21.
 17. **Measure accepted value against complete token cost** — input-only savings and cheap failures cannot establish intelligence per overall token. Issue #22.
+18. **Treat declarative triggers as opt-in delivery gates** — a stored trigger is not permission for broad automatic injection; require explicit context, literal matching, bounded output, and the same governance/privacy gates as normal delivery. Issue #23.
 
 Distill any new repeating rule into `../lessons.md`. Postmortems hold the bug-specific narrative; `lessons.md` holds the cross-bug edge.
 

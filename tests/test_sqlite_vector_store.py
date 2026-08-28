@@ -363,6 +363,10 @@ def test_export_pipeline_reads_the_configured_sqlite_store(tmp_path):
     assert documents == [memory.content]
     assert metadatas[0]["custom_metadata"]["title"] == "SQLite export contract"
     exported = __import__("json").loads(output.read_text(encoding="utf-8"))
+    assert exported["format"] == "elefante-memory-export"
+    assert exported["format_version"] == 1
+    assert exported["embeddings_included"] is False
+    assert exported["graph_included"] is False
     assert exported["vector_store_type"] == "sqlite"
     assert exported["vector_store_path"] == str(vector_directory)
     assert exported["memories"][0]["id"] == str(memory.id)
@@ -415,6 +419,18 @@ def test_dashboard_snapshot_pipeline_reads_the_configured_sqlite_store(tmp_path,
     assert snapshot["stats"]["memories"] == 1
     assert node["properties"]["source"] == "sqlite"
     assert node["properties"]["title"] == "SQLite dashboard contract"
+    assert node["properties"]["health_status"] == "healthy"
+    assert node["properties"]["health_reason"] == "current and connected"
+    assert node["properties"]["connection_count"] >= 1
+    assert snapshot["stats"]["health"]["counts"]["healthy"] == 1
+    assert snapshot["stats"]["usage"] == {
+        "total_accesses": 0,
+        "retrieved_memories": 0,
+        "never_retrieved": 1,
+        "retrieval_rate": 0,
+        "average_access_count": 0.0,
+        "max_access_count": 0,
+    }
 
 
 @pytest.mark.skipif(not CHROMADB_AVAILABLE, reason="legacy ChromaDB migration dependency absent")

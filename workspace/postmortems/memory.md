@@ -150,13 +150,13 @@ populate ranking history or co-activation input.
 
 <a id="issue-15"></a>
 
-## Issue #15: Multi-Instance Write Origin Tracking [GAP-025, IN PROGRESS]
+## Issue #15: Multi-Instance Write Origin Tracking [GAP-025, CLOSED FOR CURRENT INSTALLED STORE]
 
 **Trigger:** Two concurrent IDEs (e.g. Hermes + VS Code) writing memory: no `source.*` tuple distinguishes which instance wrote which memory. Stdio-per-client transport makes Kuzu single-writer contract violation possible. Blocks session-intelligence client attribution.
 **Root cause:** Memories had no `source.tool`, `source.instance_id`, or `source.cwd`. Stdio MCP transport is per-client by design, so concurrent IDEs could spawn database-owning processes and fight for Kuzu's single-writer lock.
 **Solution:** A loopback Streamable HTTP daemon is the singleton database owner; stdio bridges forward provenance headers; `(:Entity)-[:WRITTEN_BY]->(:Source)` is written with each memory; and `backfill_memory_provenance.py` provides an idempotent, dry-run-first legacy migration. VS Code, Bob, and Antigravity emit bridge configuration. User-modified configuration is preserved by manifest-driven uninstall.
-**Acceptance:** Two concurrent bridge clients produce distinct `source.instance_id` values with zero Kuzu lock contention. Proof: `pytest tests/test_mcp_daemon.py -m slow -q`. Full closure still requires an authorized apply of pending legacy graph links and host-level install/reconnect/upgrade/uninstall certification.
-**Lesson (provisional):** A multi-writer contract on a single-writer database is a category error. Push concurrency to the layer above the database (daemon), not into the database's locking primitives.
+**Acceptance:** Two concurrent bridge clients produce distinct `source.instance_id` values with zero Kuzu lock contention. Proof: `pytest tests/test_mcp_daemon.py -m slow -q`. On 2026-08-28 the explicitly authorized installed-store migration ran only after daemon shutdown and a verified backup; it added five Memory entities and five source links, a repeat dry-run reported zero pending work, and final customer doctor returned ready with zero diagnostics. Migration closure is store-specific, so every other existing installation must run the same backup-bound operator procedure independently.
+**Lesson:** A multi-writer contract on a single-writer database is a category error. Push concurrency to the layer above the database (daemon), not into the database's locking primitives.
 
 <a id="issue-16"></a>
 

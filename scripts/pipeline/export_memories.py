@@ -8,8 +8,10 @@
 #           Use --format csv for categorical analysis, --format json for precise
 #           content review or scripted processing.
 # USAGE   : python scripts/pipeline/export_memories.py --format json|csv|all
-# NOTES   : This is NOT a backup or restore format: it excludes embeddings and
-#           has no import path. Use backup_elefante_data.py for recovery. Content
+# NOTES   : This is NOT a full backup or restore format: it excludes embeddings
+#           and graph data. JSON has an additive companion importer that
+#           regenerates embeddings; CSV remains analysis-only. Use
+#           backup_elefante_data.py for recovery. Content
 #           is truncated at 500 chars in CSV. --output is only valid for single-
 #           format runs; use --format all to emit both files simultaneously.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -18,9 +20,12 @@
 Reads the configured local vector store without filtering — intended for
 before/after validation, offline analysis, and spreadsheet review.
 
-This output is not a backup: it does not contain the stored embeddings and has
-no restore command. Use ``scripts/lifecycle/backup_elefante_data.py`` before a
-destructive operation.
+This output is not a full backup: it does not contain the stored embeddings or
+the graph database. JSON has a companion additive migration command at
+``scripts/pipeline/import_memories.py``; it regenerates embeddings through the
+configured local model and does not restore graph topology. CSV remains
+analysis-only. Use ``scripts/lifecycle/backup_elefante_data.py`` before a
+destructive operation or full recovery.
 
 Outputs land under the configured data directory unless --output is provided.
 
@@ -43,6 +48,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.utils.config import get_config  # noqa: E402
+
+
+EXPORT_FORMAT = "elefante-memory-export"
+EXPORT_FORMAT_VERSION = 1
 
 
 # ── Shared fetch ─────────────────────────────────────────────────────────────
@@ -100,6 +109,10 @@ def export_json(config, output_path: Path | None) -> Path:
     path = output_path or (Path("data") / f"memory_export_{_timestamp()}_all.json")
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
+        "format": EXPORT_FORMAT,
+        "format_version": EXPORT_FORMAT_VERSION,
+        "embeddings_included": False,
+        "graph_included": False,
         "exported_at": datetime.now().isoformat(),
         "count": len(exported),
         "vector_store_type": config.elefante.vector_store.type,

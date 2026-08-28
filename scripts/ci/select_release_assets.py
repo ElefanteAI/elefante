@@ -27,7 +27,7 @@ DEFAULT_CANDIDATES = [
     Path("artifacts/elefante-Linux-installer/elefante-installer-Linux.zip"),
     Path("artifacts/elefante-macOS-installer/elefante-installer-macOS.zip"),
     Path("artifacts/elefante-Windows-installer/elefante-installer-Windows.zip"),
-    Path("artifacts/elefante-macOS-dmg/Elefante-Installer.dmg"),
+    Path("artifacts/elefante-macOS-installer-dmg/Elefante-Installer.dmg"),
 ]
 
 

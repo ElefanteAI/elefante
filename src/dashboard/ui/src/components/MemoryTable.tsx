@@ -18,6 +18,22 @@ function formatLabel(value: string): string {
   return value.replace(/[_-]/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+const MOBILE_SECONDARY_COLUMNS = new Set([
+  'properties.topic',
+  'properties_topic',
+  'properties.memory_type',
+  'properties_memory_type',
+  'created_at',
+  'properties.score',
+  'properties_score',
+  'properties.access_count',
+  'properties_access_count',
+]);
+
+function responsiveColumnClass(columnId: string): string {
+  return MOBILE_SECONDARY_COLUMNS.has(columnId) ? 'hidden md:table-cell' : '';
+}
+
 interface MemoryTableProps {
   memories: MemoryNode[];
   onSelectMemory?: (memory: MemoryNode) => void;
@@ -88,6 +104,22 @@ export function MemoryTable({ memories, onSelectMemory, selectedId }: MemoryTabl
         ) : null;
       },
       size: 80,
+    }),
+    columnHelper.accessor('properties.health_status', {
+      header: 'Health',
+      cell: (info) => {
+        const health = info.getValue();
+        if (!health) return <span className="text-xs text-slate-600">—</span>;
+        const healthLabels: Record<string, [string, string]> = {
+          healthy: ['Healthy', 'bg-emerald-500/20 text-emerald-300'],
+          stale: ['Stale', 'bg-amber-500/20 text-amber-300'],
+          at_risk: ['At risk', 'bg-red-500/20 text-red-300'],
+          orphan: ['Orphan', 'bg-slate-500/20 text-slate-300'],
+        };
+        const [label, classes] = healthLabels[String(health)] || [formatLabel(String(health)), 'bg-slate-500/20 text-slate-300'];
+        return <span className={`px-2 py-0.5 rounded text-xs ${classes}`} title={info.row.original.properties?.health_reason}>{label}</span>;
+      },
+      size: 82,
     }),
     columnHelper.accessor('created_at', {
       header: 'Created',
@@ -186,14 +218,14 @@ export function MemoryTable({ memories, onSelectMemory, selectedId }: MemoryTabl
 
       {/* Table */}
       <div className="flex-1 overflow-auto">
-        <table className="w-full text-sm">
+        <table className="w-full table-fixed text-sm">
           <thead className="sticky top-0 bg-slate-900/90 backdrop-blur z-10">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id} className="border-b border-slate-700/60">
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="px-3 py-2 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider"
+                    className={`px-3 py-2 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider ${responsiveColumnClass(header.column.id)}`}
                     style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}
                   >
                     {header.isPlaceholder ? null : (
@@ -225,7 +257,7 @@ export function MemoryTable({ memories, onSelectMemory, selectedId }: MemoryTabl
                   }
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-3 py-2">
+                    <td key={cell.id} className={`px-3 py-2 ${responsiveColumnClass(cell.column.id)}`}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}

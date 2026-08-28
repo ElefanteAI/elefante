@@ -20,6 +20,8 @@ SUPPORTED_HOSTS = (
     "openclaw",
     "bob",
     "antigravity",
+    "zed",
+    "continue",
 )
 
 HOST_LABELS = {
@@ -32,11 +34,14 @@ HOST_LABELS = {
     "openclaw": "OpenClaw",
     "bob": "IBM Bob",
     "antigravity": "Antigravity",
+    "zed": "Zed",
+    "continue": "Continue",
 }
 
 VSCODE_FAMILY = frozenset({"vscode-copilot", "bob"})
 JSON_HOSTS = frozenset({"cursor", "kiro", "gemini"})
 CLI_HOSTS = frozenset({"claude-code", "codex", "openclaw"})
+ADDITIONAL_HOSTS = frozenset({"zed", "continue"})
 MANIFEST_SURFACE_ALIASES = {"ibm-bob": "bob"}
 
 
@@ -78,6 +83,15 @@ def detect_supported_hosts(
         detected.add("antigravity")
     if (home / ".gemini").is_dir() and which("gemini"):
         detected.add("gemini")
+    zed_root = (
+        Path(env.get("APPDATA", home / "AppData" / "Roaming")) / "Zed"
+        if system == "Windows"
+        else home / ".config" / "zed"
+    )
+    if zed_root.is_dir() or which("zed"):
+        detected.add("zed")
+    if (home / ".continue").is_dir() or which("cn"):
+        detected.add("continue")
 
     for host, executable in (
         ("claude-code", "claude"),

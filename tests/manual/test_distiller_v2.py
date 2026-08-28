@@ -4,22 +4,25 @@ Exercises: Scanner → Parser → Privacy → Tracker → CLI
 """
 import sys
 import os
+import json
+import tempfile
+from pathlib import Path
 
 # Add the repository root, not ``src/``. Adding ``src/`` makes ``src/mcp``
 # shadow the installed ``mcp`` dependency during pytest collection.
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from src.modules.distiller.scanner import SessionScanner
-from src.modules.distiller.parser import ChatParser
-from src.modules.distiller.privacy import PrivacyFilter
-from src.modules.distiller.tracker import SessionTracker
-from src.modules.distiller.models import ResponseKind
+from src.modules.distiller.scanner import SessionScanner  # noqa: E402
+from src.modules.distiller.parser import ChatParser  # noqa: E402
+from src.modules.distiller.privacy import PrivacyFilter  # noqa: E402
+from src.modules.distiller.tracker import SessionTracker  # noqa: E402
+from src.modules.distiller.models import ResponseKind  # noqa: E402
 
 PASS = "✓"
 FAIL = "✗"
 results = []
 
-def test(name, fn):
+def _run_check(name, fn):
     try:
         fn()
         results.append((name, True, ""))
@@ -121,7 +124,6 @@ def test_privacy_github_token():
 # ─── 4. Tracker ──────────────────────────────────────────────────────────────
 
 def test_tracker_idempotent():
-    import tempfile, os
     tmp = os.path.join(tempfile.gettempdir(), "elefante_test_tracker.json")
     try:
         tracker = SessionTracker(tracker_path=tmp)
@@ -135,7 +137,6 @@ def test_tracker_idempotent():
             os.remove(tmp)
 
 def test_tracker_stats():
-    import tempfile, os
     tmp = os.path.join(tempfile.gettempdir(), "elefante_test_tracker2.json")
     try:
         tracker = SessionTracker(tracker_path=tmp)
@@ -152,8 +153,35 @@ def test_tracker_stats():
 # ─── 5. Integration: Full Pipeline ───────────────────────────────────────────
 
 def test_full_pipeline():
-    import tempfile, os
-    scanner = SessionScanner()
+    # Keep the pipeline check deterministic and privacy-safe.  The scanner's
+    # default root is a user's live VS Code store, where the newest file may be
+    # a metadata-only snapshot with no parseable requests.  This smoke test
+    # validates the pipeline itself with a disposable VS Code-shaped fixture.
+    fixture_root = Path(tempfile.mkdtemp(prefix="elefante-distiller-fixture-"))
+    chat_dir = fixture_root / "workspace-1" / "chatSessions"
+    chat_dir.mkdir(parents=True)
+    (chat_dir.parent / "workspace.json").write_text(
+        json.dumps({"folder": "file:///tmp/elefante-distiller-fixture"}),
+        encoding="utf-8",
+    )
+    session_path = chat_dir / "session-1.json"
+    session_path.write_text(
+        json.dumps(
+            {
+                "requests": [
+                    {
+                        "message": {"text": "Keep the parser contract typed."},
+                        "response": [
+                            {"kind": "markdown", "value": "Return ChatSession."}
+                        ],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    scanner = SessionScanner(storage_root=str(fixture_root))
     parser = ChatParser()
     privacy = PrivacyFilter()
     tmp = os.path.join(tempfile.gettempdir(), "elefante_test_pipeline.json")
@@ -190,6 +218,12 @@ def test_full_pipeline():
     finally:
         if os.path.exists(tmp):
             os.remove(tmp)
+        for path in sorted(fixture_root.rglob("*"), reverse=True):
+            if path.is_file() or path.is_symlink():
+                path.unlink()
+            elif path.is_dir():
+                path.rmdir()
+        fixture_root.rmdir()
 
 
 # ─── Run ──────────────────────────────────────────────────────────────────────
@@ -198,26 +232,26 @@ if __name__ == "__main__":
     print("\n=== Elefante Session Distiller v2 — Smoke Test ===\n")
 
     print("[Scanner]")
-    test("Scanner init", test_scanner_init)
-    test("Scanner list sessions", test_scanner_list)
-    test("Scanner workspace name resolution", test_scanner_workspace_name)
+    _run_check("Scanner init", test_scanner_init)
+    _run_check("Scanner list sessions", test_scanner_list)
+    _run_check("Scanner workspace name resolution", test_scanner_workspace_name)
 
     print("\n[Parser]")
-    test("Parser returns ChatSession", test_parser_returns_typed)
-    test("Parser turns are typed", test_parser_turns_are_typed)
-    test("Parser content hash deterministic", test_parser_content_hash)
+    _run_check("Parser returns ChatSession", test_parser_returns_typed)
+    _run_check("Parser turns are typed", test_parser_turns_are_typed)
+    _run_check("Parser content hash deterministic", test_parser_content_hash)
 
     print("\n[Privacy]")
-    test("Privacy scrubs API keys", test_privacy_scrubs_keys)
-    test("Privacy preserves clean text", test_privacy_preserves_clean)
-    test("Privacy catches GitHub tokens", test_privacy_github_token)
+    _run_check("Privacy scrubs API keys", test_privacy_scrubs_keys)
+    _run_check("Privacy preserves clean text", test_privacy_preserves_clean)
+    _run_check("Privacy catches GitHub tokens", test_privacy_github_token)
 
     print("\n[Tracker]")
-    test("Tracker idempotency", test_tracker_idempotent)
-    test("Tracker stats", test_tracker_stats)
+    _run_check("Tracker idempotency", test_tracker_idempotent)
+    _run_check("Tracker stats", test_tracker_stats)
 
     print("\n[Integration]")
-    test("Full pipeline: scan→parse→scrub→track", test_full_pipeline)
+    _run_check("Full pipeline: scan→parse→scrub→track", test_full_pipeline)
 
     # Summary
     passed = sum(1 for _, ok, _ in results if ok)

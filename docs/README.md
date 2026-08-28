@@ -1,6 +1,6 @@
 # Elefante User Documentation
 
-> **v2.12.2** · Published user documentation. The GitHub release and installers
+> **v2.12.3** · Published user documentation. The GitHub release and installers
 > are public.
 
 Use this index to install, configure, operate, and understand the released
@@ -44,7 +44,7 @@ the mismatch rather than normalizing it.
 | [`rollback.md`](how-to/rollback.md) | Backup + restore |
 | [`docker.md`](how-to/docker.md) | Docker deployment |
 | [`kuzu-troubleshooting.md`](how-to/kuzu-troubleshooting.md) | Kuzu reserved words, locking, troubleshooting |
-| [`agent-handoff.md`](how-to/agent-handoff.md) | Autonomous agent integration |
+| [`agent-handoff.md`](how-to/agent-handoff.md) | Connect an existing agent host |
 
 ## Explanation (`explanation/`) — WHY
 

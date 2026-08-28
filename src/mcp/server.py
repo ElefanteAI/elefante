@@ -33,7 +33,6 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp import types
 from mcp.types import (
-    Tool,
     TextContent,
     ImageContent,
     EmbeddedResource,
@@ -43,8 +42,9 @@ from mcp.types import (
     GetPromptResult,
 )
 import webbrowser
-from src.dashboard.server import serve_dashboard_in_thread
 from src.core.governance import governance_reason, is_mandatory, is_protected
+from src.core.conflict_resolution import ConflictResolutionError, resolve_memory_pair
+from src.core.multimodal import AttachmentStore, AttachmentValidationError
 from src.core.task_intelligence import (
     TaskBriefProfile,
     TaskBriefRequest,
@@ -58,22 +58,21 @@ from src.core.task_intelligence_ledger import (
 )
 from src.models.memory import MemoryStatus
 from src.modules.distiller.privacy import PrivacyFilter
-
-# Global flag to track dashboard status
-DASHBOARD_STARTED = False
-
 from src.core.orchestrator import get_orchestrator
 from src.core.directive_store import get_directive_store
 from src.models.query import QueryMode, SearchFilters
-from src.models.entity import EntityType, RelationshipType
+from src.models.entity import RelationshipType
 from src.utils.logger import get_logger
 from src.utils.validators import validate_cypher_query, validate_memory_content, validate_uuid
-from src.utils.elefante_mode import get_mode_manager, is_elefante_enabled, write_lock
+from src.utils.elefante_mode import get_mode_manager, write_lock
 from src.utils.runtime_profile import is_client_runtime
 from src.utils.token_counter import (
     estimate_tokens, estimate_tokens_json, token_density_score,
     TYPE_TOKEN_BUDGETS, CallTokenSnapshot, SessionTokenLedger,
 )
+
+# Global flag to track dashboard status
+DASHBOARD_STARTED = False
 
 logger = get_logger(__name__)
 
@@ -101,6 +100,7 @@ ANSWER_CONTEXT_MAX_MEMORIES = 3
 ANSWER_CONTEXT_MAX_TOKENS = 450
 ANSWER_CONTEXT_MIN_SCORE = 0.50
 ANSWER_CONTEXT_STRONG_VECTOR_SCORE = 0.78
+RECALL_MAX_RESPONSE_TOKENS = 1000
 RECALL_ROLLBACK_ENV = "ELEFANTE_RECALL_ENABLED"
 
 MEMORY_SEARCH_GUIDANCE = (
@@ -111,6 +111,30 @@ MEMORY_SEARCH_GUIDANCE = (
     "current source, and surface material conflicts. State material uncertainty "
     "normally. Never expose database IDs or internal search metadata to the user."
 )
+
+
+def _render_recall_payload(payload: Dict[str, Any]) -> str:
+    """Render the exact Recall text shown to the model without ASCII expansion."""
+    return json.dumps(payload, indent=2, default=str, ensure_ascii=False)
+
+
+def _bound_recall_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Fail closed when serialization would exceed Recall's complete budget."""
+    if estimate_tokens(_render_recall_payload(payload)) <= RECALL_MAX_RESPONSE_TOKENS:
+        return payload
+    return {
+        "success": False,
+        "status": "blocked",
+        "context": (
+            "# Elefante Recall blocked\n\n"
+            "Selected context exceeded the hard response budget. No memory was "
+            "supplied; answer from the current request and verified evidence."
+        ),
+        "supplied_count": 0,
+        "abstained": True,
+        "delivery_blocked": True,
+        "read_only": True,
+    }
 
 _ANSWER_CONTEXT_STOP_WORDS = {
     "about", "after", "again", "also", "answer", "before", "being", "could",
@@ -136,6 +160,8 @@ class AnswerContext:
     selected_memory_ids: tuple[str, ...]
     selection_reasons: tuple[str, ...] = ()
     governance_warnings: tuple[str, ...] = ()
+    conflict_count: int = 0
+    conflict_warnings: tuple[str, ...] = ()
     delivery_blocked: bool = False
     blocked_reason: str | None = None
 
@@ -178,6 +204,35 @@ def _is_active_answer_memory(metadata: Any) -> bool:
         or status.endswith("archived")
         or status.endswith("contradictory")
     )
+
+
+def _answer_conflict_warning(count: int) -> str:
+    """Describe withheld known conflicts without exposing memory internals."""
+    count = max(1, int(count))
+    noun = "candidate" if count == 1 else "candidates"
+    verb = "was" if count == 1 else "were"
+    return (
+        f"WARNING: {count} retrieved memory {noun} carried an unresolved stored "
+        f"conflict and {verb} withheld from answer context. Compare current "
+        "source and other evidence; do not apply an automatic winner."
+    )
+
+
+def _prepend_answer_conflict_warnings(
+    text: str,
+    warnings: Sequence[str],
+    max_tokens: int,
+) -> str:
+    """Keep conflict warnings inside the hard prompt budget and visible first."""
+    if not warnings:
+        return text
+    notice = "\n\n".join(warnings)
+    heading = "# Elefante answer context"
+    if text.startswith(heading):
+        text = heading + "\n\n" + notice + text[len(heading):]
+    else:
+        text = notice + "\n\n" + text
+    return _fit_text_to_tokens(text, max_tokens)
 
 
 def _system_test_applies(question_terms: set[str]) -> bool:
@@ -428,6 +483,7 @@ def compile_answer_context(
     max_tokens: int = ANSWER_CONTEXT_MAX_TOKENS,
     project: str | None = None,
     workspace: str | None = None,
+    include_question: bool = True,
 ) -> AnswerContext:
     """Compile answer evidence through the same governed v2 selector as evaluation.
 
@@ -491,10 +547,11 @@ def compile_answer_context(
             max_tokens,
         )
     elif brief.abstained:
+        question_context = f"Question: {question}\n\n" if include_question else ""
         text = _fit_text_to_tokens(
             "# Elefante answer context\n\n"
-            f"Question: {question}\n\n"
-            "No stored memory met the governed relevance gate. Ignore loosely "
+            + question_context
+            + "No stored memory met the governed relevance gate. Ignore loosely "
             "related candidates and answer from the current request and verified "
             "current evidence. Mark material unknowns as UNKNOWN.",
             max_tokens,
@@ -508,6 +565,20 @@ def compile_answer_context(
             # Task Brief compiler internally. Task Intelligence itself retains
             # the more specific Task Brief label.
             text = "# Elefante answer context" + text[len("ELEFANTE TASK BRIEF") :]
+        if not include_question:
+            task_prefix = f"# Elefante answer context\nTask: {question}"
+            if text.startswith(task_prefix):
+                text = "# Elefante answer context" + text[len(task_prefix) :]
+    conflict_warnings = (
+        (_answer_conflict_warning(len(brief.conflicts)),)
+        if brief.conflicts
+        else ()
+    )
+    text = _prepend_answer_conflict_warnings(
+        text,
+        conflict_warnings,
+        max_tokens,
+    )
     return AnswerContext(
         text=text,
         selected_count=len(brief.selected_memory_ids),
@@ -515,6 +586,8 @@ def compile_answer_context(
         selected_memory_ids=tuple(brief.selected_memory_ids),
         selection_reasons=selection_reasons,
         governance_warnings=tuple(brief.governance_warnings),
+        conflict_count=len(brief.conflicts),
+        conflict_warnings=conflict_warnings,
         delivery_blocked=brief.delivery_blocked,
         blocked_reason=brief.abstention_reason if brief.delivery_blocked else None,
     )
@@ -577,6 +650,8 @@ def answer_context_metadata(
         "selection_reasons": list(context.selection_reasons),
         "selected_evidence": selected_evidence,
         "governance_warnings": list(context.governance_warnings),
+        "conflict_count": context.conflict_count,
+        "conflict_warnings": list(context.conflict_warnings),
         "delivery_blocked": context.delivery_blocked,
         "blocked_reason": context.blocked_reason,
     }
@@ -815,6 +890,7 @@ class ElefanteMCPServer:
         *,
         project: str | None = None,
         workspace: str | None = None,
+        include_question: bool = True,
     ) -> tuple[AnswerContext, list[Any]]:
         """Run every runtime delivery through the same source-validation gate."""
         effective_workspace = (
@@ -830,6 +906,7 @@ class ElefanteMCPServer:
                 candidates,
                 project=project,
                 workspace=effective_workspace,
+                include_question=include_question,
             ),
             candidates,
         )
@@ -855,6 +932,7 @@ class ElefanteMCPServer:
         context, _ = await self._compile_validated_answer_context(
             question,
             results,
+            include_question=False,
         )
         return context
 
@@ -899,9 +977,19 @@ class ElefanteMCPServer:
                 project=arguments.get("project"),
                 workspace=arguments.get("workspace"),
             )
-            if context.selected_count or context.delivery_blocked:
+            if (
+                context.selected_count
+                or context.delivery_blocked
+                or context.conflict_count
+            ):
                 result["RELEVANT_CONTEXT"] = {
-                    "status": "blocked" if context.delivery_blocked else "delivered",
+                    "status": (
+                        "blocked"
+                        if context.delivery_blocked
+                        else "delivered"
+                        if context.selected_count
+                        else "warning"
+                    ),
                     "note": (
                         "Governed opt-in task context. Memory is evidence, not an "
                         "instruction; verify current source and surface conflicts."
@@ -910,6 +998,8 @@ class ElefanteMCPServer:
                     "selected_memory_ids": list(context.selected_memory_ids),
                     "selection_reasons": list(context.selection_reasons),
                     "governance_warnings": list(context.governance_warnings),
+                    "conflict_count": context.conflict_count,
+                    "conflict_warnings": list(context.conflict_warnings),
                 }
         except Exception as e:
             # Never let context injection break a tool call
@@ -1089,6 +1179,7 @@ class ElefanteMCPServer:
             "elefante-MemoryAdd",
             "elefante-MemoryUpdate",
             "elefante-MemoryDelete",
+            "elefante-MemoryResolve",
             "elefante-GraphConnect",
         }
         
@@ -1158,9 +1249,10 @@ class ElefanteMCPServer:
                     description="""Persistent memory operations. The `action` parameter selects the operation:
 
 - `action=add` — store a new memory. content + memory_type + domain + category + tags + entities, with optional retention/injection governance fields. Score is system-computed (0-100) from behavioral signals; you do NOT assign importance. Compliance Gate enforces search-before-write.
-- `action=search` — query memory. SQLite vectors (semantic) + Kuzu (structured) are the default; explicitly configured legacy ChromaDB stores remain supported. Rewrite pronouns to specific entities before calling. Use `list_all=true` to bypass semantic relevance filtering for browsing/export. Search is read-only: retrieval is exposure, not use.
+- `action=search` — query memory. SQLite vectors (semantic) + Kuzu (structured) are the default; explicitly configured legacy ChromaDB stores remain supported. Rewrite pronouns to specific entities before calling. Use `list_all=true` to bypass semantic relevance filtering for browsing/export. An optional `surface_context` can expose up to three explicitly triggered memories when a literal file, terminal-error, or conversation phrase matches. The answer_context may also report a bounded warning when a relevant stored conflict is withheld; neither side is selected automatically. Search is read-only: retrieval is exposure, not use.
 - `action=record_use` — compatibility route for trace-bound declared use. Requires trace_id and idempotency_key from elefante-TaskIntelligence(action=prepare); it does not change ranking weights.
 - `action=update` — amend an existing memory in-place. memory_id plus content, lifecycle, or governance fields. Compliance Gate.
+- `action=resolve` — inspect or apply a reversible Smart Merge/conflict repair between memory_id and related_memory_id. Dry-run by default. Equivalent assertions consolidate automatically; unresolved conflicts require a user-selected winner unless exactly one assertion is protected. Apply requires user-directed authority and an audit reason. Compliance Gate.
 - `action=delete` — recoverably archive a memory by default. Permanent deletion requires explicit user-directed confirmation. memory_id + reason (audit trail). Compliance Gate.
 - `action=consolidate` — deterministic LLM-free duplicate cleanup (canonicalize groups and recoverably archive redundant records). Default dry-run; pass `force=true` to apply. It is not a general age-based pruning job.
 
@@ -1172,7 +1264,7 @@ Call action=search before answering when user preferences, past decisions, or pr
                         "properties": {
                             "action": {
                                 "type": "string",
-                                "enum": ["add", "search", "record_use", "update", "delete", "consolidate"],
+                                "enum": ["add", "search", "record_use", "update", "resolve", "delete", "consolidate"],
                                 "description": "Operation to perform"
                             },
                             # action=add fields
@@ -1236,10 +1328,28 @@ Call action=search before answering when user preferences, past decisions, or pr
                                 },
                                 "description": "Entities to link in knowledge graph (action=add)"
                             },
+                            "attachments": {
+                                "type": "array",
+                                "maxItems": 8,
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "path": {"type": "string", "description": "User-selected local image, audio, or video path"},
+                                        "description": {"type": "string", "minLength": 1, "maxLength": 1000, "description": "Text fallback used for retrieval and text-only hosts"},
+                                        "mime_type": {"type": "string", "description": "Optional MIME assertion; must match the filename extension"},
+                                        "width": {"type": "integer", "minimum": 1},
+                                        "height": {"type": "integer", "minimum": 1},
+                                        "duration_ms": {"type": "integer", "minimum": 1}
+                                    },
+                                    "required": ["path", "description"]
+                                },
+                                "description": "Local media copied into Elefante's content-addressed attachment store (action=add)"
+                            },
                             "metadata": {"type": "object", "description": "Additional metadata (action=add)"},
                             "force_new": {"type": "boolean", "default": False, "description": "Bypass dedup (action=add)"},
                             # action=search fields
                             "query": {"type": "string", "description": "Search query (action=search). Rewrite pronouns to specific entities first."},
+                            "surface_context": {"type": "string", "maxLength": 1000, "description": "Optional file, terminal-error, or conversation context for explicit literal-trigger surfacing (action=search). Only injection_policy=triggered memories can match."},
                             "mode": {
                                 "type": "string",
                                 "enum": ["semantic", "structured", "hybrid"],
@@ -1279,6 +1389,9 @@ Call action=search before answering when user preferences, past decisions, or pr
                             "idempotency_key": {"type": "string", "minLength": 1, "maxLength": 256, "description": "Retry-safe event key (action=record_use)."},
                             # action=update / delete fields
                             "memory_id": {"type": "string", "description": "Target memory UUID (action=update or delete)"},
+                            "related_memory_id": {"type": "string", "description": "Second memory UUID (action=resolve)"},
+                            "winner_memory_id": {"type": "string", "description": "Explicit authoritative winner UUID when a conflict has no deterministic authority (action=resolve)"},
+                            "apply": {"type": "boolean", "default": False, "description": "Apply the inspected repair plan; default is a non-mutating dry-run (action=resolve)"},
                             "deprecated": {"type": "boolean", "description": "Mark deprecated — excluded from normal search (action=update)"},
                             "archived": {"type": "boolean", "description": "Mark archived (action=update)"},
                             "supersedes_id": {"type": "string", "description": "UUID of older memory this supersedes (action=update)"},
@@ -1290,7 +1403,7 @@ Call action=search before answering when user preferences, past decisions, or pr
                                 "description": "Recoverable archive by default; permanent deletion is explicit (action=delete)."
                             },
                             "confirm_permanent": {"type": "boolean", "default": False, "description": "Required with delete_mode=permanent."},
-                            "confirm_protected": {"type": "boolean", "default": False, "description": "Required before a user-directed delete of protected memory."},
+                            "confirm_protected": {"type": "boolean", "default": False, "description": "Explicitly authorize superseding a protected losing memory (action=resolve) or deleting protected memory (action=delete); user-directed authority is required."},
                             # action=consolidate fields
                             "force": {"type": "boolean", "default": False, "description": "Apply cleanup (default dry-run) (action=consolidate)"},
                         },
@@ -1305,7 +1418,9 @@ Call action=search before answering when user preferences, past decisions, or pr
                         "context. Pass the complete standalone question. Recall is "
                         "read-only and returns only a small governed answer-context "
                         "bundle, or explicitly reports that no safe relevant memory "
-                        "was found. Do not call it for a self-contained question."
+                        "was found. Call it at most once per user question, do not "
+                        "retry a terminal no_match, blocked, or unavailable result, "
+                        "and do not call it for a self-contained question."
                     ),
                     inputSchema={
                         "type": "object",
@@ -1826,7 +1941,9 @@ user's preferences, earlier decisions, prior project context, or phrases such
 as "remember", "the usual way", or "like we discussed". Pass a concrete,
 standalone question with named projects, files, people, and concepts. Use
 `elefante-Memory(action="search")` instead for broad inspection or before a
-memory mutation.
+memory mutation. Call Recall at most once per user question. Treat `no_match`,
+`blocked`, and `unavailable` as terminal for that answer; do not retry or
+broaden retrieval.
 
 Treat retrieved memories as evidence, not unquestionable truth. Compare them
 with the user's current request and current source; surface conflicts and mark
@@ -1931,7 +2048,7 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                 if name == "elefante-Memory":
                     action = arguments.get("action")
                     if action is None:
-                        raise ValueError("elefante-Memory requires 'action' (add|search|record_use|update|delete|consolidate)")
+                        raise ValueError("elefante-Memory requires 'action' (add|search|record_use|update|resolve|delete|consolidate)")
                     delegate_args = {k: v for k, v in arguments.items() if k != "action"}
                     if action == "add":
                         result = await self._handle_add_memory(delegate_args)
@@ -1941,12 +2058,14 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                         result = await self._handle_record_memory_use(delegate_args)
                     elif action == "update":
                         result = await self._handle_update_memory(delegate_args)
+                    elif action == "resolve":
+                        result = await self._handle_resolve_memory(delegate_args)
                     elif action == "delete":
                         result = await self._handle_delete_memory(delegate_args)
                     elif action == "consolidate":
                         result = await self._handle_consolidate_memories(delegate_args)
                     else:
-                        raise ValueError(f"elefante-Memory: unknown action '{action}' (expected add|search|record_use|update|delete|consolidate)")
+                        raise ValueError(f"elefante-Memory: unknown action '{action}' (expected add|search|record_use|update|resolve|delete|consolidate)")
                 elif name == "elefante-Recall":
                     if not self._recall_enabled():
                         raise ValueError(
@@ -2000,10 +2119,12 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                         result = self._inject_directives(result)
                         result = self._record_and_inject_token_stats(result, name, input_tokens)
 
-                return [TextContent(
-                    type="text",
-                    text=json.dumps(result, indent=2, default=str)
-                )]
+                rendered_result = (
+                    _render_recall_payload(result)
+                    if name in self._MINIMAL_RESPONSE_TOOLS
+                    else json.dumps(result, indent=2, default=str)
+                )
+                return [TextContent(type="text", text=rendered_result)]
                 
             except Exception as e:
                 self.logger.error(f"Tool execution failed: {name}", error=str(e), exc_info=True)
@@ -2028,10 +2149,12 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                     error_payload = self._inject_entrypoint_protocol(error_payload)
                     error_payload = self._inject_directives(error_payload)
                     error_payload = self._record_and_inject_token_stats(error_payload, name, input_tokens)
-                return [TextContent(
-                    type="text",
-                    text=json.dumps(error_payload, indent=2)
-                )]
+                rendered_error = (
+                    _render_recall_payload(error_payload)
+                    if name in self._MINIMAL_RESPONSE_TOOLS
+                    else json.dumps(error_payload, indent=2)
+                )
+                return [TextContent(type="text", text=rendered_error)]
             finally:
                 # Release Kuzu write lock after every tool call.
                 # This makes the lock transaction-scoped (held only during the operation)
@@ -2146,6 +2269,27 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                     metadata[key] = args[key]
             metadata["invocation_mode"] = invocation_mode
 
+            attachment_descriptors = []
+            raw_attachments = args.get("attachments") or []
+            if not isinstance(raw_attachments, list):
+                return {"success": False, "error": "attachments must be an array"}
+            if raw_attachments:
+                from src.utils.config import DATA_DIR
+
+                try:
+                    attachment_descriptors = AttachmentStore(
+                        DATA_DIR / "attachments"
+                    ).ingest_many(raw_attachments)
+                except AttachmentValidationError as error:
+                    return {
+                        "success": False,
+                        "error": str(error),
+                        "attachment_status": "BLOCKED",
+                    }
+                metadata["attachments"] = [
+                    descriptor.to_dict() for descriptor in attachment_descriptors
+                ]
+
             # Token intelligence: stamp content token count at ingestion
             content = args["content"]
             memory_type = args.get("memory_type", "conversation")
@@ -2196,6 +2340,11 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                 "score": memory.metadata.score,
                 "memory_type": memory.metadata.memory_type.value if hasattr(memory.metadata.memory_type, 'value') else str(memory.metadata.memory_type),
                 "memory_id": str(memory.id),
+                "conflict_ids": [str(conflict_id) for conflict_id in (memory.metadata.conflict_ids or [])],
+                "attachment_count": len(attachment_descriptors),
+                "attachments": [
+                    descriptor.to_dict() for descriptor in attachment_descriptors
+                ],
                 "invocation_mode": invocation_mode,
                 "privacy_redactions": privacy_redactions,
                 "privacy_redacted_types": privacy_types,
@@ -2260,6 +2409,7 @@ ritual for a self-contained question, and never store secrets or routine chat.""
             session_id=session_id,
             recent_memory_ids=self._session_usage_history,
             reinforce_access=False,
+            surface_context=args.get("surface_context"),
         )
         
         # Filter out deprecated/archived memories from results
@@ -2316,6 +2466,11 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                     ]:
                         if key in meta:
                             slim_meta[key] = meta[key]
+                    custom_metadata = meta.get("custom_metadata")
+                    if isinstance(custom_metadata, dict) and isinstance(
+                        custom_metadata.get("attachments"), list
+                    ):
+                        slim_meta["attachments"] = custom_metadata["attachments"]
                     slim_mem['metadata'] = slim_meta
                     
                 slim['memory'] = slim_mem
@@ -2324,6 +2479,8 @@ ritual for a self-contained question, and never store secrets or routine chat.""
             slim['source'] = r_dict.get('source')
             slim['vector_score'] = r_dict.get('vector_score')
             slim['graph_score'] = r_dict.get('graph_score')
+            if r_dict.get('surface_matches'):
+                slim['surface_matches'] = r_dict['surface_matches']
             if r_dict.get('explanation'):
                 slim['explanation'] = r_dict['explanation']
             compressed_results.append(slim)
@@ -2384,7 +2541,7 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                 "recall_unavailable",
                 error_type=type(error).__name__,
             )
-            return {
+            return _bound_recall_payload({
                 "success": False,
                 "status": "unavailable",
                 "context": (
@@ -2396,7 +2553,7 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                 "abstained": True,
                 "delivery_blocked": False,
                 "read_only": True,
-            }
+            })
 
         if context.delivery_blocked:
             status = "blocked"
@@ -2404,7 +2561,7 @@ ritual for a self-contained question, and never store secrets or routine chat.""
             status = "supplied"
         else:
             status = "no_match"
-        return {
+        return _bound_recall_payload({
             "success": not context.delivery_blocked,
             "status": status,
             "context": context.text,
@@ -2412,7 +2569,7 @@ ritual for a self-contained question, and never store secrets or routine chat.""
             "abstained": context.selected_count == 0,
             "delivery_blocked": context.delivery_blocked,
             "read_only": True,
-        }
+        })
     
     async def _handle_query_graph(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Handle a read-only elefante-GraphQuery tool call."""
@@ -2914,6 +3071,113 @@ ritual for a self-contained question, and never store secrets or routine chat.""
     async def _handle_record_memory_use(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Compatibility route into the trace-bound declared-use ledger."""
         return await self._record_task_memory_use(args)
+
+    async def _handle_resolve_memory(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Inspect or apply a reversible Smart Merge/conflict repair."""
+        args, privacy_redactions, privacy_types = _scrub_sensitive_payload(dict(args))
+        invocation_mode = self._invocation_mode(args)
+        memory_id = args.get("memory_id")
+        related_memory_id = args.get("related_memory_id")
+        if not memory_id or not related_memory_id:
+            return {
+                "success": False,
+                "error": "memory_id and related_memory_id are required",
+            }
+        try:
+            left_id = UUID(str(memory_id))
+            right_id = UUID(str(related_memory_id))
+            winner_id = (
+                UUID(str(args["winner_memory_id"]))
+                if args.get("winner_memory_id")
+                else None
+            )
+        except Exception as error:
+            return {"success": False, "error": f"Invalid memory UUID: {error}"}
+
+        apply = args.get("apply") is True
+        confirm_protected = args.get("confirm_protected") is True
+        if apply and invocation_mode != "user_directed":
+            return {
+                "success": False,
+                "error": "Applying conflict repair must be user-directed.",
+                "authority_status": "BLOCKED",
+                "invocation_mode": invocation_mode,
+            }
+        if confirm_protected and invocation_mode != "user_directed":
+            return {
+                "success": False,
+                "error": "Protected-memory confirmation must be user-directed.",
+                "authority_status": "BLOCKED",
+                "invocation_mode": invocation_mode,
+            }
+        if apply:
+            gate_result = self._check_compliance_gate("elefante-MemoryResolve")
+            if gate_result is not None:
+                return gate_result
+
+        orchestrator = await self._get_orchestrator()
+        if apply:
+            for target_id in (left_id, right_id):
+                existing = await orchestrator.vector_store.get_memory(target_id)
+                if existing is None:
+                    return {"success": False, "error": f"Memory {target_id} not found"}
+                violation = self._authority_violation(args, existing=existing)
+                if violation:
+                    return {
+                        "success": False,
+                        "error": violation,
+                        "authority_status": "BLOCKED",
+                        "invocation_mode": invocation_mode,
+                    }
+
+        async def perform_resolution():
+            return await resolve_memory_pair(
+                orchestrator.vector_store,
+                left_id,
+                right_id,
+                winner_memory_id=winner_id,
+                apply=apply,
+                invocation_mode=invocation_mode,
+                reason=str(args.get("reason") or ""),
+                confirm_protected=confirm_protected,
+            )
+
+        try:
+            if apply:
+                async with self._write_operation() as lock:
+                    if not lock.acquired:
+                        return {
+                            "success": False,
+                            "error": "Could not acquire write lock",
+                            "retry": True,
+                        }
+                    result = await perform_resolution()
+            else:
+                result = await perform_resolution()
+        except (ConflictResolutionError, ValueError) as error:
+            return {
+                "success": False,
+                "error": str(error),
+                "resolution_status": "BLOCKED",
+                "invocation_mode": invocation_mode,
+            }
+
+        payload = result.to_dict()
+        plan = payload["plan"]
+        return {
+            "success": True,
+            **payload,
+            "resolution_status": (
+                "APPLIED"
+                if result.applied
+                else "READY"
+                if plan["applicable"]
+                else "BLOCKED"
+            ),
+            "invocation_mode": invocation_mode,
+            "privacy_redactions": privacy_redactions,
+            "privacy_redacted_types": privacy_types,
+        }
     
     async def _handle_update_memory(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Handle elefante-MemoryUpdate tool call — amend memories in-place."""
@@ -3331,7 +3595,12 @@ ritual for a self-contained question, and never store secrets or routine chat.""
 
         memories = await orchestrator.vector_store.get_all(limit=1000)
 
-        from src.utils.dashboard_serializer import memory_to_dashboard_node
+        from src.utils.dashboard_serializer import (
+            connection_counts_from_edges,
+            health_summary_from_nodes,
+            memory_to_dashboard_node,
+            usage_summary_from_nodes,
+        )
 
         nodes = []
         edges = []
@@ -3507,13 +3776,33 @@ ritual for a self-contained question, and never store secrets or routine chat.""
         except Exception as e:
             self.logger.error(f"Error fetching graph data: {e}")
 
+        # Recompute health after all graph, signal, and relationship edges are
+        # present so the live refresh matches the standalone snapshot pipeline.
+        memory_by_id = {str(mem.id): mem for mem in memories if str(mem.id) in seen_ids}
+        memory_ids = set(memory_by_id)
+        node_ids = {str(node.get("id")) for node in nodes if node.get("id") is not None}
+        connection_counts = connection_counts_from_edges(memory_ids, edges, node_ids=node_ids)
+        for node in nodes:
+            memory = memory_by_id.get(str(node.get("id")))
+            if memory is None:
+                continue
+            refreshed = memory_to_dashboard_node(
+                memory,
+                connection_count=connection_counts.get(str(memory.id), 0),
+            )
+            if refreshed is None:
+                continue
+            node.update(refreshed)
+
         snapshot = {
             "generated_at": datetime.utcnow().isoformat(),
             "stats": {
                 "total_nodes": len(nodes),
                 "memories": sum(1 for n in nodes if n["type"] == "memory"),
                 "entities": sum(1 for n in nodes if n["type"] != "memory"),
-                "edges": len(edges)
+                "edges": len(edges),
+                "health": health_summary_from_nodes(nodes, edges),
+                "usage": usage_summary_from_nodes(nodes),
             },
             "nodes": nodes,
             "edges": edges
@@ -3822,7 +4111,16 @@ ritual for a self-contained question, and never store secrets or routine chat.""
         overhead = self._measure_overhead_tokens(result)
         context = self._measure_context_tokens(result)
         # Measure payload before TOKEN_STATS injection
-        payload_tokens = estimate_tokens_json(result)
+        if tool_name == "elefante-Recall":
+            recall_context = result.get("context")
+            context = (
+                estimate_tokens(recall_context)
+                if isinstance(recall_context, str)
+                else 0
+            )
+            payload_tokens = estimate_tokens(_render_recall_payload(result))
+        else:
+            payload_tokens = estimate_tokens_json(result)
         
         # Measure TOKEN_STATS block size dynamically (ADV-013: eliminates magic constant)
         stats_stub = {"TOKEN_STATS": {"output_tokens": payload_tokens, "overhead_tokens": overhead, "signal_ratio": 0.500}}

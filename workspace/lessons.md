@@ -192,7 +192,7 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Trigger:** A script exports data to a human-readable format (JSON, CSV, YAML).
 - **Rule:** Every export format must either (a) have a documented import counterpart, or (b) be explicitly labeled "read-only analysis output — not a backup" at the top of the script and in the relevant README.
 - **Why:** Users will treat any exportable format as a backup. If no import path exists, the export creates false confidence and a data-loss trap.
-- **Proof:** GAP-013 — `export_memories.py --format json` produced a JSON file with all memory content and metadata. No `import_memories.py` existed. Embeddings were not included (ChromaDB stores them explicitly from `thenlper/gte-base`; the export's `collection.get()` call omits them). A user who exported, factory reset, then tried to restore from JSON would lose their brain. The binary zip backup (`backup_elefante_data.py`) is the only real restore path — but it is not surfaced in the install flow. See [postmortems/ai-behavior.md](postmortems/ai-behavior.md#issue-11).
+- **Proof:** GAP-013 exposed that `export_memories.py --format json` produced a file with memory content and metadata but no import path or embeddings. The guarded `import_memories.py` counterpart now regenerates vectors with the configured local model and protects additive writes with stopped-runtime confirmation, ID-collision, backup, dry-run, and rollback gates. JSON still omits graph topology and is not a full recovery archive; the binary zip backup (`backup_elefante_data.py`) remains the complete restore path. See [postmortems/ai-behavior.md](postmortems/ai-behavior.md#issue-11).
 - **Avoid:** Shipping an export script without a companion import script and without labeling the export as read-only.
 
 ### CI Pipelines Must Build Every Artifact They Package
@@ -428,6 +428,15 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 - **Why:** Separate quality and input-only cost gates can reward an expensive correctness gain without proving overall-token value, omit output cost, or make cheap failure look efficient.
 - **Proof:** [postmortems/ai-behavior.md Issue #22](postmortems/ai-behavior.md#issue-22), `scripts/ci/summarize_task_intelligence_evaluation.py`, and `tests/test_task_intelligence_report.py`.
 - **Avoid:** Comparing raw ratios across unrelated task mixes; excluding output or cached input from overall cost; treating lower cost on rejected work as product improvement; retroactively relabelling consumed evidence.
+
+### Declarative Triggers Must Be Opt-In Delivery Gates (GAP-056)
+
+- **Trigger:** A memory schema contains `trigger` or `surfaces_when` phrases and a new caller wants the memory to appear automatically in task context.
+- **Rule:** Require an explicit caller-supplied context, literal case-insensitive matching, `injection_policy="triggered"`, a small result cap, and the same lifecycle, scope, source-trust, conflict, and privacy gates as normal delivery. Keep the path read-only and do not silently turn a metadata hint into host interception.
+- Known stored conflicts must be surfaced as a bounded warning while both sides remain withheld; warning delivery is not semantic conflict detection or an automatic winner.
+- **Why:** A trigger phrase describes user intent, but it is not a license for broad injection. Unbounded scanning, semantic interpretation, or automatic host hooks can leak stale or private context and create a second retrieval system that users cannot inspect or roll back.
+- **Proof:** [postmortems/ai-behavior.md Issue #23](postmortems/ai-behavior.md#issue-23), `src/core/governance.py`, `src/core/orchestrator.py`, `src/core/task_intelligence.py`, and `tests/test_proactive_surfacing.py`.
+- **Avoid:** Treating `surfaces_when` as active behavior merely because it persists, matching ranked memories, bypassing conflict/privacy gates, or claiming proactive host behavior when only an explicit search context is supported.
 
 ---
 

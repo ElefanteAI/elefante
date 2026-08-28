@@ -1,6 +1,6 @@
 # Connect IDEs and Agent Hosts
 
-**Applies to:** v2.12.2
+**Applies to:** v2.12.3
 
 The release installer is the configuration authority. It detects compatible
 hosts and connects all of them to one user-level Elefante daemon. Rerun the
@@ -43,10 +43,10 @@ that still matches the recorded installer fingerprint.
 
 | Tier | Hosts | Meaning |
 |---|---|---|
-| Compatible | VS Code, Cursor, Kiro, Gemini CLI, Claude Code, Codex, OpenClaw | Released adapter and contract tests; host-driven lifecycle certification incomplete |
+| Compatible | VS Code, Cursor, Kiro, Gemini CLI, Claude Code, Codex, OpenClaw, Zed, Continue | Released adapter and contract tests; host-driven lifecycle certification incomplete |
 | Preview | IBM Bob, Antigravity | Installer output exists; full adapter and host-lifecycle proof is incomplete |
 | Community | Agent Zero and other MCP-capable hosts | Manual bridge route; Elefante does not own the host lifecycle |
-| Planned | Windsurf, Cline, Roo, Kilo, Continue, Zed, Aider, Kiro Skills/Steering | No released integration claim |
+| Planned | Windsurf, Cline, Roo, Kilo, Aider, Kiro Skills/Steering | No released integration claim |
 | Certified | None | Requires real-host install, reconnect, upgrade, and uninstall evidence |
 
 Do not infer support from a host name appearing in development files. The
@@ -68,10 +68,16 @@ developers and support diagnostics:
 ./.venv/bin/python scripts/setup/configure_cli_agents.py --host claude-code
 ./.venv/bin/python scripts/setup/configure_cli_agents.py --host codex
 ./.venv/bin/python scripts/setup/configure_cli_agents.py --host openclaw
+./.venv/bin/python scripts/setup/configure_additional_hosts.py --host zed
+./.venv/bin/python scripts/setup/configure_additional_hosts.py --host continue
 ```
 
 Each adapter detects its host before writing. The customer installer does not
 create host directories merely to make detection succeed.
+
+Zed receives one `context_servers.elefante` JSON entry in its user settings.
+Continue receives a dedicated `~/.continue/mcpServers/elefante.yaml` block, so
+Elefante never needs to reinterpret or rewrite the user's primary YAML file.
 
 ## Manual fallback
 

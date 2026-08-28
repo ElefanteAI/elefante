@@ -73,6 +73,120 @@ def _is_memory_node(node: Dict[str, Any]) -> bool:
     return (node.get("type") or "memory") == "memory"
 
 
+HEALTH_STATUSES = {"healthy", "stale", "at_risk", "orphan"}
+HEALTH_DIMENSIONS = ("score", "freshness", "coverage", "usage", "connectivity")
+USAGE_FIELDS = (
+    "total_accesses",
+    "retrieved_memories",
+    "never_retrieved",
+    "retrieval_rate",
+    "average_access_count",
+    "max_access_count",
+)
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _validate_snapshot_intelligence(
+    stats: Dict[str, Any],
+    memory_nodes: List[Dict[str, Any]],
+    errors: List[str],
+    warnings: List[str],
+    info: List[str],
+) -> None:
+    """Validate optional health/usage summaries when a current snapshot emits them."""
+    health = stats.get("health")
+    status_counts: Dict[str, int] = {}
+    nodes_with_health = 0
+    for index, node in enumerate(memory_nodes):
+        props = _as_dict(node.get("properties"))
+        status = props.get("health_status")
+        if status is None:
+            continue
+        nodes_with_health += 1
+        if not isinstance(status, str) or status not in HEALTH_STATUSES:
+            errors.append(f"Memory node[{index}] has invalid health_status={status!r}")
+        else:
+            status_counts[status] = status_counts.get(status, 0) + 1
+        reason = props.get("health_reason")
+        if not isinstance(reason, str) or not reason.strip():
+            errors.append(f"Memory node[{index}] health_status has no health_reason")
+        connection_count = props.get("connection_count")
+        if (
+            not isinstance(connection_count, int)
+            or isinstance(connection_count, bool)
+            or connection_count < 0
+        ):
+            errors.append(f"Memory node[{index}] has invalid connection_count")
+
+    if nodes_with_health and nodes_with_health != len(memory_nodes):
+        warnings.append(
+            "Only some memory nodes carry canonical health fields; legacy snapshot mix"
+        )
+
+    if health is not None:
+        if not isinstance(health, dict):
+            errors.append("stats.health must be an object")
+        else:
+            for dimension in HEALTH_DIMENSIONS:
+                value = health.get(dimension)
+                if not _is_number(value) or not 0 <= float(value) <= 100:
+                    errors.append(f"stats.health.{dimension} must be a number from 0 to 100")
+            counts = health.get("counts")
+            if not isinstance(counts, dict):
+                errors.append("stats.health.counts must be an object")
+            else:
+                for status, count in counts.items():
+                    if status not in HEALTH_STATUSES:
+                        errors.append(f"stats.health.counts has invalid status={status!r}")
+                    if (
+                        not isinstance(count, int)
+                        or isinstance(count, bool)
+                        or count < 0
+                    ):
+                        errors.append(f"stats.health.counts.{status} must be a non-negative integer")
+                if nodes_with_health == len(memory_nodes) and counts != status_counts:
+                    errors.append("stats.health.counts does not match memory health_status fields")
+            info.append(f"Health score: {health.get('score', 'unknown')}")
+
+    usage = stats.get("usage")
+    if usage is not None:
+        if not isinstance(usage, dict):
+            errors.append("stats.usage must be an object")
+        else:
+            for field in USAGE_FIELDS:
+                if field not in usage:
+                    errors.append(f"stats.usage missing {field}")
+            for field in ("total_accesses", "retrieved_memories", "never_retrieved", "max_access_count"):
+                value = usage.get(field)
+                if (
+                    not isinstance(value, int)
+                    or isinstance(value, bool)
+                    or value < 0
+                ):
+                    errors.append(f"stats.usage.{field} must be a non-negative integer")
+            for field in ("retrieval_rate", "average_access_count"):
+                value = usage.get(field)
+                if not _is_number(value) or float(value) < 0:
+                    errors.append(f"stats.usage.{field} must be a non-negative number")
+            retrieval_rate = usage.get("retrieval_rate")
+            if _is_number(retrieval_rate) and float(retrieval_rate) > 100:
+                errors.append("stats.usage.retrieval_rate must be no more than 100")
+            retrieved = usage.get("retrieved_memories")
+            never = usage.get("never_retrieved")
+            if (
+                isinstance(retrieved, int)
+                and not isinstance(retrieved, bool)
+                and isinstance(never, int)
+                and not isinstance(never, bool)
+                and retrieved + never != len(memory_nodes)
+            ):
+                errors.append("stats.usage memory counts do not match memory node count")
+            info.append(f"Usage: {usage.get('retrieval_rate', 'unknown')}% retrieved")
+
+
 def validate_snapshot(data: Dict[str, Any], *, require_curation: bool) -> ValidationResult:
     errors: List[str] = []
     warnings: List[str] = []
@@ -184,6 +298,7 @@ def validate_snapshot(data: Dict[str, Any], *, require_curation: bool) -> Valida
 
     # Score health check — detect stale stored scores (the "all 100s" bug class)
     memory_nodes = [n for n in nodes if isinstance(n, dict) and _is_memory_node(n)]
+    _validate_snapshot_intelligence(stats, memory_nodes, errors, warnings, info)
     if memory_nodes:
         scores = []
         for mn in memory_nodes:

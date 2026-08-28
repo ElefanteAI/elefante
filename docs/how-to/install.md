@@ -1,7 +1,7 @@
-# Install Elefante v2.12.2
+# Install Elefante v2.12.3
 
 Use the platform archive from the
-[v2.12.2 GitHub release](https://github.com/ElefanteAI/elefante/releases/tag/v2.12.2).
+[v2.12.3 GitHub release](https://github.com/ElefanteAI/elefante/releases/tag/v2.12.3).
 This is the customer path. A source checkout is a separate developer runtime.
 
 ## Requirements
@@ -44,7 +44,7 @@ Extract the ZIP first. Do not run a launcher from inside the archive.
 - **Windows:** double-click `Install Elefante.bat`.
 - **Linux:** run `chmod +x install.sh && ./install.sh`.
 
-The v2.12.2 macOS archive preserves the executable permission required by
+The v2.12.3 macOS archive preserves the executable permission required by
 Finder. Administrator access and manual permission repair are not part of the
 normal flow. Signed and notarized native packaging is Upcoming.
 
@@ -78,9 +78,11 @@ installed later. It preserves the existing memory store.
 
 ### Build identity boundary
 
-The published v2.12.2 installer records its semantic version but predates the
-source-provenance guard. Do not use that version alone to attribute unreleased
-behavior to the published release.
+The published v2.12.3 installer records its semantic version, but its schema-v2
+installation manifest does not record the exact source commit or release
+channel. Do not use version alone to attribute development behavior to the
+published release. The provenance-aware identity guard exists in the active
+development checkout and is not part of the v2.12.3 customer contract.
 
 The next provenance-aware customer candidate records and cross-checks the
 semantic version, exact clean source commit, and `candidate` or `release`
@@ -117,7 +119,10 @@ Run the read-only doctor if needed:
 `doctor` is diagnostic. It does not start services, change host configuration,
 migrate data, or repair build identity. A provenance-aware customer runtime
 reports matching `installation.version`, `installation.source_commit`, and
-`installation.release_channel` values.
+`installation.release_channel` values. The active development checkout also
+checks installer-owned integration surfaces against the repository matrix and
+blocks customer readiness when a configured surface is non-ready or unknown;
+the published v2.12.3 client remains unchanged.
 
 ## 5. Supported installation surfaces
 
@@ -166,9 +171,11 @@ Fresh installs use the configured embedded vector store, SQLite by default,
 plus Kuzu. Paths explicitly configured in `config.yaml` remain authoritative.
 Legacy ChromaDB is support-only and is never migrated or deleted silently.
 
-Stop the daemon before copying or restoring durable data. JSON/CSV exports are
-for inspection and are not restorable backups; use [`rollback.md`](rollback.md)
-for backup and recovery.
+Stop the daemon before copying or restoring durable data. CSV exports are for
+inspection only. JSON exports can be used with the additive
+`scripts/pipeline/import_memories.py` migration command, but omit embeddings and
+graph topology and are not full backups; use [`rollback.md`](rollback.md) for
+the verified backup/restore procedure.
 
 ## 8. Developer source path
 
@@ -176,7 +183,7 @@ Developers should clone the exact release tag when reproducing customer
 behavior, or use their approved development branch for product work:
 
 ```bash
-git clone --branch v2.12.2 --depth 1 https://github.com/ElefanteAI/elefante.git
+git clone --branch v2.12.3 --depth 1 https://github.com/ElefanteAI/elefante.git
 cd elefante
 chmod +x install.sh
 ./install.sh

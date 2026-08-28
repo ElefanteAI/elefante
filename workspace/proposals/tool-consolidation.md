@@ -16,7 +16,7 @@ task outcomes enough to justify a breaking public-contract change?
 
 ## Current truth
 
-The released v2.12.2 surface is 16 tools and 2 prompts. Memory CRUD/search is
+The released v2.12.3 surface is 16 tools and 2 prompts. Memory CRUD/search is
 already consolidated under `elefante-Memory(action=...)`. No further tool
 consolidation is approved, implemented, assigned to a version, or promised.
 

@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 # LAW #1: Dashboard does NOT import core services that access databases
 # from src.core.embeddings import get_embedding_service  # DISABLED
@@ -40,6 +40,14 @@ def _snapshot_path() -> Path:
     return Path(get_config().elefante.data_dir) / "dashboard_snapshot.json"
 
 
+def _session_intelligence_snapshot_path() -> Path:
+    """Return the separate metadata-only Session Intelligence snapshot path."""
+    override = os.environ.get("ELEFANTE_SESSION_INTELLIGENCE_SNAPSHOT", "").strip()
+    if override:
+        return Path(override).expanduser().resolve()
+    return Path(get_config().elefante.data_dir) / "session_intelligence_snapshot.json"
+
+
 def _read_snapshot() -> dict[str, Any] | None:
     """Load the static dashboard snapshot without opening a live data store."""
     snapshot_path = _snapshot_path()
@@ -49,6 +57,18 @@ def _read_snapshot() -> dict[str, Any] | None:
         snapshot = json.load(snapshot_file)
     if not isinstance(snapshot, dict):
         raise ValueError("Dashboard snapshot must contain a JSON object")
+    return snapshot
+
+
+def _read_session_intelligence_snapshot() -> dict[str, Any] | None:
+    """Load the derived metadata-only snapshot without opening its SQLite ledger."""
+    snapshot_path = _session_intelligence_snapshot_path()
+    if not snapshot_path.is_file():
+        return None
+    with snapshot_path.open("r", encoding="utf-8") as snapshot_file:
+        snapshot = json.load(snapshot_file)
+    if not isinstance(snapshot, dict):
+        raise ValueError("Session Intelligence snapshot must contain a JSON object")
     return snapshot
 
 
@@ -236,11 +256,43 @@ async def get_stats():
                 "memories": snapshot_stat.get("memories", 0),
                 "entities": snapshot_stat.get("entities", 0),
                 "edges": snapshot_stat.get("edges", 0),
+                "health": snapshot_stat.get("health", {}),
+                "usage": snapshot_stat.get("usage", {}),
             }
         }
     except Exception as error:
         logger.error(f"Failed to fetch stats: {error}")
         raise HTTPException(status_code=500, detail="Could not read dashboard snapshot")
+
+
+@app.get("/api/session-intelligence")
+async def get_session_intelligence():
+    """Read the derived, metadata-only Session Intelligence product surface."""
+    try:
+        data = _read_session_intelligence_snapshot()
+        if data is None:
+            return {
+                "schema_version": 1,
+                "generated_at": None,
+                "consent": {"schema_version": 1, "enabled": False, "purposes": []},
+                "signal_card": None,
+                "enterprise_report": None,
+                "privacy": {
+                    "metadata_only": True,
+                    "prompts_stored": False,
+                    "transcripts_stored": False,
+                    "responses_stored": False,
+                    "employee_ranking": False,
+                    "sensitive_trait_inference": False,
+                },
+            }
+        return data
+    except Exception as error:
+        logger.error(f"Failed to read Session Intelligence snapshot: {error}")
+        raise HTTPException(
+            status_code=500,
+            detail="Could not read Session Intelligence snapshot",
+        )
 
 # Serve Frontend
 # We assume the frontend is built to src/dashboard/ui/dist

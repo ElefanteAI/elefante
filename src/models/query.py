@@ -65,7 +65,7 @@ class SearchResult(BaseModel):
     """Result from a search operation"""
     memory: Memory
     score: float = Field(ge=0.0, le=1.0)
-    source: str  # "vector", "graph", or "hybrid"
+    source: str  # "vector", "graph", "hybrid", or "triggered"
     
     # Breakdown of scores
     vector_score: Optional[float] = None
@@ -73,6 +73,11 @@ class SearchResult(BaseModel):
     
     # Retrieval explanation
     explanation: Optional[Dict[str, Any]] = None
+
+    # Explicit, literal trigger matches used by the opt-in proactive-surfacing
+    # path.  This is separate from the semantic score so a trigger can explain
+    # why a memory surfaced without pretending it was a vector match.
+    surface_matches: List[str] = Field(default_factory=list)
     
     # Context information
     matched_entities: List[UUID] = Field(default_factory=list)
@@ -91,6 +96,8 @@ class SearchResult(BaseModel):
             "matched_entities": [str(e) for e in self.matched_entities],
             "relationship_path": self.relationship_path,
         }
+        if self.surface_matches:
+            result["surface_matches"] = list(self.surface_matches)
         # Include explanation if present
         if self.explanation:
             result["explanation"] = self.explanation

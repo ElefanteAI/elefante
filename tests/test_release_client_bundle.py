@@ -81,6 +81,9 @@ def test_build_release_client_contains_only_customer_runtime(
     _create_client_source(source_root, builder)
     output_path = tmp_path / f"Elefante-{platform}.zip"
 
+    assert {path.as_posix() for path in builder.CLIENT_RUNTIME_SCRIPTS} == (
+        verifier.RUNTIME_SCRIPTS
+    )
     _build(builder, source_root, output_path, platform)
     verifier.validate_release_client_archive(
         output_path,
@@ -120,6 +123,15 @@ def test_build_release_client_contains_only_customer_runtime(
     }
     assert launchers.issubset(root_names)
     assert f"{bundle_root}/payload/elefante/requirements.client.lock" in names
+    customer_commands = {
+        "scripts/setup/configure_additional_hosts.py",
+        "scripts/pipeline/import_memories.py",
+        "scripts/pipeline/session_intelligence.py",
+        "scripts/pipeline/team_sync.py",
+    }
+    assert {
+        f"{bundle_root}/payload/elefante/{path}" for path in customer_commands
+    } <= names
     assert f"{bundle_root}/payload/elefante/requirements.lock" not in names
     assert not any("/workspace/" in name for name in names)
     assert not any("/tests/" in name for name in names)
@@ -267,3 +279,35 @@ def test_customer_configuration_cannot_enable_unreleased_task_intelligence():
     assert "ELEFANTE_TASK_INTELLIGENCE_PILOT" not in rendered
     assert "ELEFANTE_TASK_CONTEXT_ON_TOOL_CALL" not in rendered
     assert '"elefante-TaskIntelligence"' not in rendered
+
+
+def test_customer_archive_carries_default_on_recall_contract(tmp_path):
+    """A Recall routing rule must never ship ahead of the runtime tool it names."""
+    builder = _load_module(
+        ROOT / "scripts/ci/build_release_client.py",
+        "build_release_client_recall_contract",
+    )
+    output_path = tmp_path / "Elefante-Linux.zip"
+
+    _build(builder, ROOT, output_path, "Linux")
+
+    bundle_root = "elefante-installer-Linux/payload/elefante"
+    with zipfile.ZipFile(output_path) as archive:
+        server_source = archive.read(
+            f"{bundle_root}/src/mcp/server.py"
+        ).decode("utf-8")
+        codex_guidance = archive.read(
+            f"{bundle_root}/scripts/setup/configure_cli_agents.py"
+        ).decode("utf-8")
+        customer_config = archive.read(
+            f"{bundle_root}/config.yaml"
+        ).decode("utf-8")
+
+    assert 'name="elefante-Recall"' in server_source
+    assert 'RECALL_ROLLBACK_ENV = "ELEFANTE_RECALL_ENABLED"' in server_source
+    assert "call `elefante-Recall`" in codex_guidance
+    assert "at most once" in codex_guidance
+    assert "self-contained question" in codex_guidance
+    assert "do not retry" in codex_guidance
+    assert "ELEFANTE_RECALL_ENABLED" not in customer_config
+    assert "ELEFANTE_RECALL_ENABLED=0" not in codex_guidance

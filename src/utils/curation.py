@@ -18,7 +18,11 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from typing import Optional
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Any, Mapping, Optional
+
+from src.models.memory import HealthStatus, Memory, MemoryStatus
 
 
 _CODEBLOCK_RE = re.compile(r"```.*?```", re.DOTALL)
@@ -344,23 +348,146 @@ def compute_authority_score(
     
     return round(min(1.0, max(0.0, score)), 3)
 
+HEALTH_STALE_AFTER_DAYS = 90
 
-from src.models.memory import Memory, HealthStatus
-from datetime import datetime
+
+@dataclass(frozen=True)
+class HealthAssessment:
+    """Deterministic, explainable health result for one memory."""
+
+    status: HealthStatus
+    reason: str
+    days_since_access: int
+    connection_count: int
+
+
+def _coerce_utc_naive(value: Any, fallback: datetime) -> datetime:
+    """Normalize supported timestamps so aware and legacy-naive values compare safely."""
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            value = None
+    if not isinstance(value, datetime):
+        return fallback
+    if value.tzinfo is not None:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
+
+
+def _safe_connection_count(value: Any) -> int:
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError, OverflowError):
+        return 0
+
+
+def _has_value(value: Any) -> bool:
+    """Treat empty persisted JSON/list representations as absent."""
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return value.strip().lower() not in {"", "none", "null", "[]", "{}"}
+    try:
+        return len(value) > 0
+    except TypeError:
+        return bool(value)
+
+
+def assess_health_values(
+    *,
+    status: Any,
+    conflict_ids: Any,
+    superseded_by_id: Any,
+    last_accessed: Any,
+    connection_count: Any,
+    now: Optional[datetime] = None,
+) -> HealthAssessment:
+    """Assess health from model or persisted values without mutating state.
+
+    The priority is explicit: contradictory/superseded memories are at risk;
+    otherwise memories not accessed for more than 90 days are stale; otherwise
+    memories with no graph connection are orphans; all remaining memories are
+    healthy.  This is an inspection signal, not an automatic repair decision.
+    """
+    current = _coerce_utc_naive(now, datetime.utcnow())
+    accessed = _coerce_utc_naive(last_accessed, current)
+    days_since_access = max(0, int((current - accessed).total_seconds() // 86400))
+    connections = _safe_connection_count(connection_count)
+    status_value = getattr(status, "value", status)
+    status_value = str(status_value or "").strip().lower()
+
+    if _has_value(superseded_by_id):
+        return HealthAssessment(
+            status=HealthStatus.AT_RISK,
+            reason="superseded by a newer memory",
+            days_since_access=days_since_access,
+            connection_count=connections,
+        )
+    if status_value == MemoryStatus.CONTRADICTORY.value or _has_value(conflict_ids):
+        return HealthAssessment(
+            status=HealthStatus.AT_RISK,
+            reason="has an unresolved contradiction",
+            days_since_access=days_since_access,
+            connection_count=connections,
+        )
+    if days_since_access > HEALTH_STALE_AFTER_DAYS:
+        return HealthAssessment(
+            status=HealthStatus.STALE,
+            reason=f"not accessed for {days_since_access} days",
+            days_since_access=days_since_access,
+            connection_count=connections,
+        )
+    if connections == 0:
+        return HealthAssessment(
+            status=HealthStatus.ORPHAN,
+            reason="has no graph connections",
+            days_since_access=days_since_access,
+            connection_count=connections,
+        )
+    return HealthAssessment(
+        status=HealthStatus.HEALTHY,
+        reason="current and connected",
+        days_since_access=days_since_access,
+        connection_count=connections,
+    )
+
+
+def assess_health(
+    memory: Memory,
+    connection_count: int,
+    *,
+    now: Optional[datetime] = None,
+) -> HealthAssessment:
+    """Assess one ``Memory`` using its canonical metadata fields."""
+    metadata = memory.metadata
+    return assess_health_values(
+        status=metadata.status,
+        conflict_ids=metadata.conflict_ids,
+        superseded_by_id=metadata.superseded_by_id,
+        last_accessed=metadata.last_accessed,
+        connection_count=connection_count,
+        now=now,
+    )
+
+
+def assess_health_from_raw(
+    metadata: Mapping[str, Any],
+    connection_count: int,
+    *,
+    now: Optional[datetime] = None,
+) -> HealthAssessment:
+    """Assess a raw vector-store metadata mapping with the same rules."""
+    return assess_health_values(
+        status=metadata.get("status"),
+        conflict_ids=metadata.get("conflict_ids"),
+        superseded_by_id=metadata.get("superseded_by_id"),
+        last_accessed=metadata.get("last_accessed"),
+        connection_count=connection_count,
+        now=now,
+    )
 
 
 def compute_health(memory: Memory, connection_count: int) -> HealthStatus:
-    if memory.superseded_by_id:
-        return HealthStatus.AT_RISK
-    if len(memory.conflict_ids) > 0:
-        return HealthStatus.AT_RISK
-    try:
-        last_acc = memory.metadata.last_accessed if hasattr(memory.metadata, 'last_accessed') else datetime.utcnow()
-        days_since = (datetime.utcnow() - last_acc).days
-    except:
-        days_since = 0
-    if days_since > 90:
-        return HealthStatus.STALE
-    if connection_count == 0:
-        return HealthStatus.ORPHAN
-    return HealthStatus.HEALTHY
+    """Backward-compatible status-only API backed by the canonical assessment."""
+    return assess_health(memory, connection_count).status

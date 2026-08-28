@@ -67,6 +67,11 @@ specification/directive boost applies only when the analyzed query has system
 intent. These five signals rank likely relevance; they do not establish that a
 result caused a better task outcome.
 
+Development-only literal-trigger results are marked separately from this
+five-signal score. They require an explicit `surface_context` match on a memory
+with `injection_policy="triggered"`, use a bounded explicit-trigger score for
+delivery, and do not update access history or graph state.
+
 ## Dashboard score
 
 The dashboard uses a separate display score:
@@ -104,7 +109,7 @@ become dormant or archived. Governance is applied before task-specific ranking.
 The development branch now enforces the first bounded contract: scope and
 trigger gates run before ranking, locked `always` memories are reserved, and
 protected memories are not silently archived by the refinery. These fields are
-not presented as part of the published v2.12.2 client until released.
+not presented as part of the published v2.12.3 client until released.
 
 ## Verification
 

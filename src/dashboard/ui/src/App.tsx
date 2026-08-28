@@ -12,6 +12,7 @@ function App() {
   const setActiveTab = useDashboardStore((s) => s.setActiveTab);
   const fetchStats = useDashboardStore((s) => s.fetchStats);
   const fetchSnapshot = useDashboardStore((s) => s.fetchSnapshot);
+  const fetchSessionIntelligence = useDashboardStore((s) => s.fetchSessionIntelligence);
   const isLoading = useDashboardStore((s) => s.isLoading);
   const error = useDashboardStore((s) => s.error);
   const setInspectedMemoryId = useDashboardStore((s) => s.setInspectedMemoryId);
@@ -21,8 +22,9 @@ function App() {
   // Initial data fetch
   useEffect(() => {
     fetchStats();
+    fetchSessionIntelligence();
     fetchSnapshot();
-  }, [fetchStats, fetchSnapshot]);
+  }, [fetchStats, fetchSessionIntelligence, fetchSnapshot]);
 
   // Global keyboard shortcuts
   const handleKeyDown = useCallback((e: KeyboardEvent) => {

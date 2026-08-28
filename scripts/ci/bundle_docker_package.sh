@@ -25,6 +25,7 @@ INCLUDE_PATHS=(
   "config.yaml"
   "src"
   "scripts/verify/verify_health.py"
+  "scripts/pipeline/import_memories.py"
   "scripts/pipeline/update_dashboard_data.py"
   "docs/how-to/agent-handoff.md"
   "docs/how-to/docker.md"

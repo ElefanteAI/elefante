@@ -180,11 +180,16 @@ def ensure_bundle_layout(bundle_root: Path, *, release_profile: str) -> Path:
     )
     required_paths = [
         payload_root,
-        payload_root / BUILD_IDENTITY_FILE_NAME,
         payload_root / INSTALL_SCRIPT_RELATIVE_PATH,
         *dependency_files,
         bundle_root / "scripts" / "setup" / "bootstrap_release_bundle.py",
     ]
+    # Customer bundles are never accepted without an exact build identity.
+    # Developer bundles built by the current pipeline carry one too, but old
+    # developer archives remain dry-run compatible for local recovery and
+    # historical acceptance fixtures.
+    if release_profile == RELEASE_PROFILE_CLIENT:
+        required_paths.insert(1, payload_root / BUILD_IDENTITY_FILE_NAME)
 
     missing = [str(path) for path in required_paths if not path.exists()]
     if missing:
@@ -200,9 +205,11 @@ def load_build_identity(
     manifest: dict[str, object],
     *,
     release_profile: str,
-) -> dict[str, object]:
+) -> dict[str, object] | None:
     """Validate that archive metadata and the payload identify the same build."""
     identity_path = get_payload_root(bundle_root) / BUILD_IDENTITY_FILE_NAME
+    if not identity_path.exists() and release_profile == RELEASE_PROFILE_DEVELOPER:
+        return None
     try:
         identity = json.loads(identity_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
@@ -431,8 +438,9 @@ def main() -> None:
         print(f"Bundle Platform: {manifest['platform']}")
     if release_profile == RELEASE_PROFILE_CLIENT:
         print("Release Profile: Client (runtime-only payload)")
-    print(f"Release Channel: {build_identity['release_channel']}")
-    print(f"Source Commit: {str(build_identity['source_commit'])[:12]}")
+    if build_identity is not None:
+        print(f"Release Channel: {build_identity['release_channel']}")
+        print(f"Source Commit: {str(build_identity['source_commit'])[:12]}")
     print(f"Bundle Root: {bundle_root}")
     print(f"Payload Root: {payload_root}")
     print(f"Install Root: {install_root}")

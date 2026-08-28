@@ -12,7 +12,7 @@ gives MCP-compatible agents a persistent, local second brain: durable memories
 remain inspectable across sessions, while retrieval selects context for the
 task at hand.
 
-**v2.12.2** — Current published release.
+**v2.12.3** — Current published release.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -39,6 +39,26 @@ task at hand.
 
 Durable context stays local and inspectable. Retrieval remains selective.
 
+## How It Works
+
+The agent owns the goal, plan, tools, and stopping decision. Elefante participates
+at two points in that loop: it can retrieve durable context before the agent
+plans, and its memory tools let the agent preserve verified outcomes after it
+acts.
+
+```text
+Goal → Perceive → Plan → Act → Observe → Update → Repeat
+          ↑                              ↓
+     retrieve context              preserve outcomes
+          └──────────── Elefante ────────────┘
+```
+
+Elefante is not an LLM, an agent runtime, or a domain adviser. Financial
+advisory and consulting are valid examples of a host agent carrying durable
+client constraints and decisions, but Elefante supplies no portfolio data,
+risk calculations, market-data service, document generator, transaction
+authority, or provider-billing estimate.
+
 ---
 
 ## What It Does
@@ -63,7 +83,14 @@ policy.
 
 ### Layer 1 — MCP Protocol
 
-The interface between your IDE and the memory engine. 16 tools and 2 prompts let agents store, search, connect, and manage knowledge. A **Compliance Gate** searches before memory writes and reduces redundant memories. **Context Injection** can attach relevant memories to eligible operations when a usable search signal exists. **Directives** can accompany normal product operations. **Token Intelligence** measures MCP tool responses and reports estimated output, protocol overhead, and signal ratio.
+The interface between your IDE and the memory engine. 16 tools and 2 prompts let agents store, search, connect, and manage knowledge. A **Compliance Gate** searches before memory writes and reduces redundant memories. **Context Injection** can attach relevant memories to eligible operations when a usable search signal exists. **Directives** can accompany normal product operations. **Token Intelligence** measures MCP tool responses and reports estimated output tokens, protocol overhead, and signal ratio; it does not itself calculate provider billing or dollar cost.
+
+The development checkout also includes opt-in **Session Intelligence**: a
+metadata-only local SQLite ledger, loopback provider-usage ingress, versioned
+rate-card authority, Signal Cards, aggregate anti-surveillance training
+hypotheses, retention/export/delete controls, and a snapshot-only dashboard
+panel. It is off by default. Exact money remains `UNKNOWN` unless
+provider-actual usage and the matching dated rate card are both present.
 
 Full tool reference → [docs/reference/tools.md](docs/reference/tools.md)
 IDE configuration → [docs/how-to/configure-ide.md](docs/how-to/configure-ide.md)
@@ -123,7 +150,11 @@ The bootstrap places Elefante in a stable install root before it starts setup:
 - macOS / Linux: `~/.elefante/app/current`
 - Windows: `%LOCALAPPDATA%\Elefante\app\current`
 
-Signed and notarized native macOS packaging is Upcoming. The verified v2.12.2 customer path is the macOS ZIP launcher above.
+The verified v2.12.3 customer path remains the ZIP launchers above. The
+development CI can additionally build a branded macOS DMG and branded Windows
+EXE, but it uploads publication-class artifacts only after successful
+credential-gated notarization or Authenticode verification; no unsigned native
+artifact is substituted for a signed release asset.
 
 If `.venv` already exists, the installer offers four paths:
 
@@ -147,13 +178,13 @@ their exact paths at startup and on failure.
 # macOS / Linux
 git clone https://github.com/ElefanteAI/elefante.git
 cd elefante
-git checkout v2.12.2
+git checkout v2.12.3
 chmod +x install.sh && ./install.sh
 
 # Windows
 git clone https://github.com/ElefanteAI/elefante.git
 cd elefante
-git checkout v2.12.2
+git checkout v2.12.3
 install.bat
 ```
 

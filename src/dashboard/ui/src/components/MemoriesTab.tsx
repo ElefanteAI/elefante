@@ -53,7 +53,7 @@ export function MemoriesTab() {
           title: r.metadata?.title || '',
           topic: r.metadata?.topic || '',
           memory_type: r.metadata?.memory_type || '',
-          score: r.similarity,
+          score: Number.isFinite(Number(r.metadata?.score)) ? Number(r.metadata.score) : 0,
           tags: r.metadata?.tags || '',
           status: r.metadata?.status || '',
           archived: r.metadata?.archived || false,
@@ -64,9 +64,19 @@ export function MemoriesTab() {
           source: r.metadata?.source || '',
           access_count: r.metadata?.access_count || 0,
           last_accessed: r.metadata?.last_accessed || '',
+          health_status: r.metadata?.health_status,
+          health_reason: r.metadata?.health_reason,
+          connection_count: r.metadata?.connection_count,
         },
       }))
     : memories;
+
+  const selectedSearchResultIndex = mode === 'search'
+    ? results.findIndex((result) => result.id === selectedId)
+    : -1;
+  const selectedSearchResult = selectedSearchResultIndex >= 0
+    ? results[selectedSearchResultIndex]
+    : undefined;
 
   if (isLoading) {
     return (
@@ -158,6 +168,14 @@ export function MemoriesTab() {
             <MemoryDetailPanel
               memory={mem}
               relatedMemories={related}
+              health_status={mem.properties?.health_status}
+              retrievalEvidence={selectedSearchResult ? {
+                query,
+                result: selectedSearchResult,
+                rank: selectedSearchResultIndex + 1,
+                total: results.length,
+                edges: snapshot?.edges || [],
+              } : undefined}
               onClose={() => {
                 setSelectedId(null);
                 setInspectedMemoryId(null);

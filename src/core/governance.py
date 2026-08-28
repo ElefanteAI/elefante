@@ -69,18 +69,40 @@ def scope_matches(
     )
 
 
-def trigger_matches(metadata: Any, context: str) -> bool:
-    """Return true when a declared trigger phrase appears in the task text."""
+def matching_triggers(metadata: Any, context: str) -> list[str]:
+    """Return declared literal triggers present in ``context``.
+
+    Triggered delivery is an explicit opt-in path.  Matching remains literal
+    and case-insensitive so a host can pass a file name, terminal error, or
+    conversation excerpt without introducing a second semantic retriever.
+    Duplicate phrases are returned once in declaration order, and the original
+    phrase is preserved for a useful explanation in the caller's response.
+    """
     triggers = list(getattr(metadata, "trigger", None) or [])
-    # `surfaces_when` predates the governance field and remains a valid trigger
-    # source for backward-compatible memories.
+    # ``surfaces_when`` predates the governance field and remains a valid
+    # backward-compatible trigger source for memories explicitly marked
+    # ``injection_policy=triggered``.
     triggers.extend(list(getattr(metadata, "surfaces_when", None) or []))
     context_folded = str(context or "").casefold()
-    return bool(context_folded) and any(
-        str(trigger).strip().casefold() in context_folded
-        for trigger in triggers
-        if str(trigger).strip()
-    )
+    if not context_folded:
+        return []
+
+    matches: list[str] = []
+    seen: set[str] = set()
+    for trigger in triggers:
+        phrase = str(trigger).strip()
+        key = phrase.casefold()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        if key in context_folded:
+            matches.append(phrase)
+    return matches
+
+
+def trigger_matches(metadata: Any, context: str) -> bool:
+    """Return true when a declared trigger phrase appears in the context."""
+    return bool(matching_triggers(metadata, context))
 
 
 def governance_reason(

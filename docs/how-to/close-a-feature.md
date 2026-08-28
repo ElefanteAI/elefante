@@ -1,6 +1,6 @@
 # Close an Elefante Development Change
 
-**Applies to:** current developer workflow at v2.12.2
+**Applies to:** current developer workflow; public release v2.12.3
 
 This is a developer procedure, not customer documentation. `AGENTS.md` and
 `agents/orchestrator.md` define the governing workflow.

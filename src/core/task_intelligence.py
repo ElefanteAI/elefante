@@ -656,6 +656,7 @@ class TaskBriefCompiler:
         query_text = " ".join([request.task, *request.success_criteria])
         query_counts = self._canonical_term_counts(query_text)
         query_terms = set(query_counts)
+        minimum_text_matches = min(2, len(query_terms))
         anchor_terms = {term for term, count in query_counts.items() if count >= 2}
         query_intent = CognitiveRetriever.infer_intent(query_text)
         for result in candidates:
@@ -684,8 +685,15 @@ class TaskBriefCompiler:
                 0.0,
                 min(1.0, float(custom.get("retrieval_specificity", 0.0))),
             )
+            surface_match = float(bool(result.surface_matches))
             semantic = float(
-                result.vector_score if result.vector_score is not None else result.score
+                0.0
+                if surface_match
+                else (
+                    result.vector_score
+                    if result.vector_score is not None
+                    else result.score
+                )
             )
             memory_type = str(memory.metadata.memory_type).casefold()
             governing_directive = float(
@@ -711,15 +719,19 @@ class TaskBriefCompiler:
                 workspace=request.workspace,
             )
             role_value = 1.0 if role != EvidenceRole.CONTEXT else 0.0
-            actionability = min(
-                1.0,
-                0.25 * semantic
-                + 0.15 * lexical
-                + 0.15 * max(path, symbol)
-                + 0.10 * max(source_code, dependency)
-                + 0.10 * role_value
-                + 0.25 * specificity,
+            raw_actionability = (
+                1.0
+                if surface_match
+                else (
+                    0.25 * semantic
+                    + 0.15 * lexical
+                    + 0.15 * max(path, symbol)
+                    + 0.10 * max(source_code, dependency)
+                    + 0.10 * role_value
+                    + 0.25 * specificity
+                )
             )
+            actionability = min(1.0, raw_actionability)
             signals = {
                 "semantic": round(semantic, 6),
                 "lexical": round(lexical, 6),
@@ -738,10 +750,11 @@ class TaskBriefCompiler:
                 ),
                 "actionability": round(actionability, 6),
                 "governing_directive": governing_directive,
+                "surface_match": surface_match,
             }
             signals["direct_answer"] = float(
                 semantic >= 0.78
-                and len(matched_terms) >= (1 if len(query_terms) <= 4 else 2)
+                and len(matched_terms) >= minimum_text_matches
                 and float(signals["query_coverage"]) >= 0.25
             )
             positive_signals = [
@@ -749,11 +762,12 @@ class TaskBriefCompiler:
                 for name in (
                     "lexical",
                     "path",
-                    "symbol",
-                    "dependency",
-                    "source_code",
-                    "governing_directive",
-                )
+                "symbol",
+                "dependency",
+                "source_code",
+                "governing_directive",
+                "surface_match",
+            )
                 if float(signals[name]) > 0
             ]
             reason = (
@@ -793,8 +807,13 @@ class TaskBriefCompiler:
         if item.mandatory:
             return True
         signals = item.retrieval_signals or {}
+        # A matching literal trigger is the complete, explicit evidence for
+        # this opt-in path.  Lifecycle, scope, privacy, conflict, and source
+        # trust have already been checked by ``_exclusion_reason``.
+        if float(signals.get("surface_match", 0.0)) > 0.0:
+            return True
         query_term_count = int(signals.get("query_terms", 0))
-        minimum_matches = 1 if query_term_count <= 4 else 2
+        minimum_matches = min(2, query_term_count)
         strong_location_match = (
             max(
                 float(signals.get("path", 0.0)),
@@ -850,6 +869,7 @@ class TaskBriefCompiler:
             or float(signals.get("direct_answer", 0.0)) > 0.0
             or governing_directive
             or role_text_anchor
+            or float(signals.get("surface_match", 0.0)) > 0.0
         )
         # A candidate already classified as a direct answer has strong semantic
         # similarity plus bounded lexical coverage. Do not reject that evidence

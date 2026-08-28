@@ -39,6 +39,13 @@ Required keys:
 - `entities`: integer
 - `edges`: integer
 
+Optional summary objects:
+
+- `health.counts`: counts by canonical memory health label
+- `usage`: read-only retrieval totals derived from memory `access_count` values;
+  includes `total_accesses`, `retrieved_memories`, `never_retrieved`,
+  `retrieval_rate`, `average_access_count`, and `max_access_count`
+
 ## Node schema
 
 Each element of `nodes` is an object:
@@ -72,6 +79,9 @@ Optional fields used by the Memory Intelligence briefing:
 - `status`, `deprecated`, `archived`: lifecycle state
 - `access_count`, `last_accessed`, `last_modified`: behavioral history
 - `namespace`, `canonical_key`, `processing_status`: curation/provenance state
+- `health_status`: deterministic inspection label (`healthy`, `stale`, `at_risk`, or `orphan`)
+- `health_reason`: short explanation for the health label
+- `connection_count`: unique graph neighbors represented in this snapshot
 
 Showcase generators may add display-only classification properties. They are
 optional snapshot metadata, not fields in the released `MemoryMetadata` or ETL
@@ -100,6 +110,22 @@ Where:
 - `engagement` = `min(1.0, log(access_count + 1) / log(20))`
 
 **All node serialization** must go through `memory_to_dashboard_node()` in the shared module. No inline node-building is permitted anywhere.
+
+### Health Contract
+
+Health labels are read-only inspection signals computed during snapshot
+generation. The priority is explicit: contradictory or superseded memories are
+`at_risk`; otherwise memories not accessed for more than 90 days are `stale`;
+otherwise memories with no graph connections are `orphan`; all remaining
+memories are `healthy`. The standalone exporter and live MCP refresh use the
+same curation helper and the same snapshot graph degree calculation.
+
+`health_status` is not an automatic repair or merge instruction. A validated
+aggregate health summary is also emitted under `stats.health`. Its `score`
+uses the existing local dashboard dimensions—freshness 30%, topic coverage
+30%, retrieval usage 20%, and graph connectivity 20%—and is validated as a
+deterministic inspection metric. It is not a customer performance or outcome
+claim.
 
 ## Edge schema
 

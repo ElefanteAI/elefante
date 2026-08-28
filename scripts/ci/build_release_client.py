@@ -4,7 +4,8 @@
 This builder is deliberately separate from the historical installer-bundle
 builder. Its allowlist is the customer contract: source, runtime scripts,
 prebuilt dashboard assets, and the client dependency lock. Development plans,
-tests, migration utilities, repository instructions, and build tools cannot
+tests, unrelated migration/debug utilities, repository instructions, and build
+tools cannot
 enter this archive.
 """
 
@@ -41,6 +42,7 @@ CLIENT_RUNTIME_SCRIPTS = (
     Path("scripts/setup/configure_antigravity.py"),
     Path("scripts/setup/configure_cursor_kiro.py"),
     Path("scripts/setup/configure_cli_agents.py"),
+    Path("scripts/setup/configure_additional_hosts.py"),
     Path("scripts/setup/host_selection.py"),
     Path("scripts/setup/install_manifest.py"),
     Path("scripts/lifecycle/backup_elefante_data.py"),
@@ -50,6 +52,9 @@ CLIENT_RUNTIME_SCRIPTS = (
     Path("scripts/lifecycle/restore_elefante_data.py"),
     Path("scripts/lifecycle/uninstall_elefante.py"),
     Path("scripts/pipeline/export_memories.py"),
+    Path("scripts/pipeline/import_memories.py"),
+    Path("scripts/pipeline/session_intelligence.py"),
+    Path("scripts/pipeline/team_sync.py"),
     Path("scripts/pipeline/update_dashboard_data.py"),
     Path("scripts/verify/verify_health.py"),
     Path("scripts/verify/verify_mcp_handshake.py"),

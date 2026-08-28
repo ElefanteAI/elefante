@@ -611,6 +611,35 @@ def test_v2_constraint_role_cannot_replace_a_question_specific_anchor() -> None:
     assert brief.omissions[0].reason == "insufficient-independent-relevance"
 
 
+def test_v2_project_name_only_match_cannot_become_a_direct_answer() -> None:
+    generic_process_constraint = _result(
+        (
+            "Elefante Developer Etiquette specification for versioning, CLEAN, "
+            "and DOC_SYNC. Review the working tree before claiming done."
+        ),
+        memory_type=MemoryType.SPECIFICATION,
+        project=None,
+        workspace=None,
+        status=MemoryStatus.RELATED,
+        score=0.618,
+        vector_score=0.95,
+    )
+    request = TaskBriefRequest(
+        task="Use Elefante to improve Elefante.",
+        profile=TaskBriefProfile.V2,
+    )
+    compiler = TaskBriefCompiler()
+    ranked = compiler._rank_candidates_v2(request, [generic_process_constraint])[0]
+    brief = compiler.compile(request, [generic_process_constraint])
+
+    assert ranked.retrieval_signals["matched_terms"] == 1
+    assert ranked.retrieval_signals["query_terms"] == 3
+    assert ranked.retrieval_signals["direct_answer"] == 0.0
+    assert compiler._is_actionable(ranked) is False
+    assert brief.abstained is True
+    assert brief.selected_memory_ids == []
+
+
 def test_v2_selects_scoped_user_locked_directive_for_decision_paraphrase() -> None:
     mission = _result(
         (
@@ -775,6 +804,28 @@ def test_v2_accepts_strong_direct_answer_without_implementation_signals() -> Non
     assert ranked[0].retrieval_signals["direct_answer"] == 1.0
     assert ranked[0].actionability_score < 0.3
     brief = compiler.compile(request, [direct_answer])
+    assert brief.selected_memory_ids == [str(direct_answer.memory.id)]
+    assert brief.abstained is False
+
+
+def test_v2_accepts_a_strong_one_term_direct_answer() -> None:
+    direct_answer = _result(
+        "The passphrase is Copper-Orbit.",
+        score=0.64,
+        vector_score=0.91,
+        project=None,
+        workspace=None,
+    )
+    request = TaskBriefRequest(
+        task="Passphrase?",
+        profile=TaskBriefProfile.V2,
+    )
+    compiler = TaskBriefCompiler()
+    ranked = compiler._rank_candidates_v2(request, [direct_answer])[0]
+    brief = compiler.compile(request, [direct_answer])
+
+    assert ranked.retrieval_signals["query_terms"] == 1
+    assert ranked.retrieval_signals["direct_answer"] == 1.0
     assert brief.selected_memory_ids == [str(direct_answer.memory.id)]
     assert brief.abstained is False
 

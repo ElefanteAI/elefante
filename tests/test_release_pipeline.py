@@ -154,7 +154,14 @@ def test_version_sync_tracks_release_identifiers_without_rewriting_history():
         r'__version__\s*=\s*"([^"]+)"',
         (ROOT / "src" / "__init__.py").read_text(encoding="utf-8"),
     ).group(1)
-    assert f"v{source_version}" in (ROOT / "README.md").read_text(encoding="utf-8")
+    # The active checkout may carry an unreleased package version while the
+    # README intentionally names the separately published release.  Verify
+    # both declarations on their own surfaces instead of forcing a candidate
+    # source version into public documentation.
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert f"## [{source_version}]" in changelog
+    assert "**v2.12.3** — Current published release." in readme
 
 
 def test_version_advisor_accepts_candidate_changelog_entries():
@@ -398,6 +405,7 @@ def test_docker_bundle_uses_live_docs_and_hash_locked_dependencies(tmp_path):
     assert {"requirements.txt", "requirements.lock"}.issubset(names)
     assert "docs/how-to/agent-handoff.md" in names
     assert "docs/how-to/docker.md" in names
+    assert "scripts/pipeline/import_memories.py" in names
     assert not any(name.startswith("docs/technical/") for name in names)
 
 

@@ -20,10 +20,11 @@ from __future__ import annotations
 
 import math
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from src.models.memory import Memory, TYPE_DECAY_RATES
+from src.utils.curation import assess_health
 
 
 # ---------------------------------------------------------------------------
@@ -173,10 +174,141 @@ def _configured_vector_source() -> str:
         return "embedded"
 
 
+def connection_counts_from_edges(
+    memory_ids: set[str],
+    edges: list[Dict[str, Any]],
+    *,
+    node_ids: Optional[set[str]] = None,
+) -> Dict[str, int]:
+    """Return unique graph degree for each memory in a snapshot."""
+    neighbors = {memory_id: set[str]() for memory_id in memory_ids}
+    for edge in edges:
+        if not isinstance(edge, dict):
+            continue
+        source = edge.get("from") or edge.get("source")
+        target = edge.get("to") or edge.get("target")
+        if source is None or target is None:
+            continue
+        source = str(source)
+        target = str(target)
+        if source == target:
+            continue
+        if node_ids is not None and (source not in node_ids or target not in node_ids):
+            continue
+        if source in neighbors:
+            neighbors[source].add(target)
+        if target in neighbors:
+            neighbors[target].add(source)
+    return {memory_id: len(links) for memory_id, links in neighbors.items()}
+
+
+def usage_summary_from_nodes(nodes: list[Dict[str, Any]]) -> Dict[str, Any]:
+    """Summarize retrieval history from the redacted memory nodes in a snapshot."""
+    memory_nodes = [node for node in nodes if isinstance(node, dict) and node.get("type") == "memory"]
+    access_counts: list[int] = []
+    for node in memory_nodes:
+        properties = node.get("properties")
+        raw_count = properties.get("access_count", 0) if isinstance(properties, dict) else 0
+        try:
+            access_counts.append(max(0, int(raw_count)))
+        except (TypeError, ValueError, OverflowError):
+            access_counts.append(0)
+
+    total_memories = len(access_counts)
+    total_accesses = sum(access_counts)
+    never_retrieved = sum(1 for count in access_counts if count == 0)
+    retrieved_memories = total_memories - never_retrieved
+    return {
+        "total_accesses": total_accesses,
+        "retrieved_memories": retrieved_memories,
+        "never_retrieved": never_retrieved,
+        "retrieval_rate": round((retrieved_memories / total_memories) * 100) if total_memories else 0,
+        "average_access_count": round(total_accesses / total_memories, 1) if total_memories else 0.0,
+        "max_access_count": max(access_counts, default=0),
+    }
+
+
+def health_summary_from_nodes(
+    nodes: list[Dict[str, Any]],
+    edges: list[Dict[str, Any]],
+    *,
+    now: Optional[datetime] = None,
+) -> Dict[str, Any]:
+    """Return the deterministic aggregate health summary for a snapshot."""
+    memory_nodes = [node for node in nodes if isinstance(node, dict) and node.get("type") == "memory"]
+    total_memories = len(memory_nodes)
+    if total_memories == 0:
+        return {
+            "score": 0,
+            "freshness": 0,
+            "coverage": 0,
+            "usage": 0,
+            "connectivity": 0,
+            "counts": {},
+        }
+
+    current = now or datetime.utcnow()
+    if current.tzinfo is not None:
+        current = current.astimezone(timezone.utc).replace(tzinfo=None)
+
+    fresh_sum = 0.0
+    valid_dates = 0
+    memory_ids = {str(node.get("id")) for node in memory_nodes if node.get("id") is not None}
+    node_ids = {str(node.get("id")) for node in nodes if node.get("id") is not None}
+    health_counts: Dict[str, int] = {}
+    general_count = 0
+    for node in memory_nodes:
+        properties = node.get("properties") if isinstance(node.get("properties"), dict) else {}
+        topic = str(properties.get("topic") or "general")
+        if topic == "general":
+            general_count += 1
+        status = properties.get("health_status")
+        if status:
+            status = str(status)
+            health_counts[status] = health_counts.get(status, 0) + 1
+
+        date_value = node.get("created_at") or properties.get("created_at")
+        if not date_value:
+            continue
+        try:
+            created = datetime.fromisoformat(str(date_value).replace("Z", "+00:00"))
+            if created.tzinfo is not None:
+                created = created.astimezone(timezone.utc).replace(tzinfo=None)
+            age_days = max(0.0, (current - created).total_seconds() / 86400)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        valid_dates += 1
+        fresh_sum += max(0.0, 1.0 - age_days / 90.0)
+
+    freshness = round((fresh_sum / valid_dates) * 100) if valid_dates else 0
+    non_general = total_memories - general_count
+    coverage = round((non_general / total_memories) * 100)
+    usage = usage_summary_from_nodes(nodes)
+    connection_counts = connection_counts_from_edges(memory_ids, edges, node_ids=node_ids)
+    connected = sum(1 for count in connection_counts.values() if count > 0)
+    connectivity = round((connected / total_memories) * 100)
+    score = round(
+        freshness * 0.30
+        + coverage * 0.30
+        + usage["retrieval_rate"] * 0.20
+        + connectivity * 0.20
+    )
+    return {
+        "score": max(0, min(100, score)),
+        "freshness": freshness,
+        "coverage": coverage,
+        "usage": usage["retrieval_rate"],
+        "connectivity": connectivity,
+        "counts": dict(sorted(health_counts.items())),
+    }
+
+
 def memory_to_dashboard_node(
     mem: Memory,
     *,
     vector_source: Optional[str] = None,
+    connection_count: Optional[int] = None,
+    now: Optional[datetime] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Convert a Memory object into a dashboard-consumable node dict.
@@ -207,6 +339,11 @@ def memory_to_dashboard_node(
     )
 
     topic = _derive_topic(title, mem.metadata.category)
+    health = assess_health(
+        mem,
+        len(mem.related_entities) if connection_count is None else connection_count,
+        now=now,
+    )
 
     return {
         "id": str(mem.id),
@@ -225,6 +362,9 @@ def memory_to_dashboard_node(
             "deprecated": bool(getattr(mem.metadata, "deprecated", False)),
             "supersedes_id": str(mem.metadata.supersedes_id) if mem.metadata.supersedes_id else "",
             "superseded_by_id": str(mem.metadata.superseded_by_id) if mem.metadata.superseded_by_id else "",
+            "health_status": health.status.value,
+            "health_reason": health.reason,
+            "connection_count": health.connection_count,
             "processing_status": cm.get("processing_status"),
             "canonical_key": cm.get("canonical_key"),
             "namespace": cm.get("namespace"),

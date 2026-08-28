@@ -53,6 +53,7 @@ export interface HealthScore {
   usage: number;             // 0-100
   staleCount: number;
   freshCount: number;
+  atRiskCount: number;
   orphanCount: number;
   connectedCount: number;
   generalCount: number;
@@ -82,6 +83,7 @@ export function useHealthScore(): HealthScore {
     const empty: HealthScore = { 
       overall: 0, freshness: 0, coverage: 0, connectivity: 0, usage: 0,
       staleCount: 0, freshCount: 0, orphanCount: 0, connectedCount: 0,
+      atRiskCount: 0,
       generalCount: 0, topicCount: 0, totalMemories: 0, totalEdges: 0,
       typeBreakdown: {},
       neverRetrievedCount: 0, retrievedCount: 0, avgAccessCount: 0, maxAccessCount: 0,
@@ -92,7 +94,7 @@ export function useHealthScore(): HealthScore {
     const total = memories.length;
     if (total === 0) return empty;
 
-    // 1. Freshness (40%): How recently were memories created/accessed?
+    // 1. Freshness (30%): How recently were memories created/accessed?
     // Note: created_at is inside properties, not at node level
     const now = Date.now();
     const NINETY_DAYS = 90 * 24 * 60 * 60 * 1000;
@@ -114,8 +116,13 @@ export function useHealthScore(): HealthScore {
     });
     // Use validDates for average, fall back to 0 if no valid dates
     const freshness = validDates > 0 ? Math.round((freshSum / validDates) * 100) : 0;
+    const healthSummary = snapshot.stats?.health;
+    const hasCanonicalHealth = memories.some((m) => Boolean(m.properties?.health_status));
+    const canonicalStaleCount = memories.filter((m) => m.properties?.health_status === 'stale').length;
+    const canonicalAtRiskCount = memories.filter((m) => m.properties?.health_status === 'at_risk').length;
+    const canonicalOrphanCount = memories.filter((m) => m.properties?.health_status === 'orphan').length;
 
-    // 2. Coverage (35%): Are memories spread across multiple topics (not all "general")?
+    // 2. Coverage (30%): Are memories spread across multiple topics (not all "general")?
     const topics = new Map<string, number>();
     memories.forEach((m) => {
       const t = m.properties?.topic || 'general';
@@ -124,7 +131,7 @@ export function useHealthScore(): HealthScore {
     const nonGeneralCount = total - (topics.get('general') || 0);
     const coverage = Math.round((nonGeneralCount / total) * 100);
 
-    // 3. Connectivity (25%): Do memories have edges?
+    // 3. Connectivity (20%): Do memories have edges?
     const memoryIds = new Set(memories.map((m) => m.id));
     const connectedIds = new Set<string>();
     snapshot.edges.forEach((e) => {
@@ -145,26 +152,46 @@ export function useHealthScore(): HealthScore {
     // 5. Usage (20%): Are memories actually being retrieved by agents?
     let accessSum = 0;
     let maxAccess = 0;
-    let neverRetrievedCount = 0;
+    let computedNeverRetrievedCount = 0;
     memories.forEach((m) => {
       const ac = Number(m.properties?.access_count) || 0;
       accessSum += ac;
       if (ac > maxAccess) maxAccess = ac;
-      if (ac === 0) neverRetrievedCount++;
+      if (ac === 0) computedNeverRetrievedCount++;
     });
-    const retrievedCount = total - neverRetrievedCount;
-    const avgAccessCount = total > 0 ? accessSum / total : 0;
-    const usageRate = Math.round((retrievedCount / total) * 100);
+    const usageSummary = snapshot.stats?.usage;
+    const hasUsageSummary = Boolean(
+      usageSummary &&
+      typeof usageSummary.retrieved_memories === 'number' &&
+      typeof usageSummary.never_retrieved === 'number'
+    );
+    const neverRetrievedCount = hasUsageSummary
+      ? Math.max(0, Math.min(total, usageSummary!.never_retrieved))
+      : computedNeverRetrievedCount;
+    const retrievedCount = hasUsageSummary
+      ? Math.max(0, Math.min(total, usageSummary!.retrieved_memories))
+      : total - neverRetrievedCount;
+    const avgAccessCount = hasUsageSummary && typeof usageSummary!.average_access_count === 'number'
+      ? usageSummary!.average_access_count
+      : total > 0 ? accessSum / total : 0;
+    const usageRate = hasUsageSummary && typeof usageSummary!.retrieval_rate === 'number'
+      ? usageSummary!.retrieval_rate
+      : Math.round((retrievedCount / total) * 100);
 
     // Weighted overall (v2.0.0: 30/30/20/20)
-    const overall = Math.round(freshness * 0.3 + coverage * 0.3 + usageRate * 0.2 + connectivity * 0.2);
+    const computedOverall = Math.round(freshness * 0.3 + coverage * 0.3 + usageRate * 0.2 + connectivity * 0.2);
     const generalCount = topics.get('general') || 0;
 
     return { 
-      overall, freshness, coverage, connectivity, usage: usageRate,
-      staleCount, 
-      freshCount: validDates - staleCount,
-      orphanCount, 
+      overall: typeof healthSummary?.score === 'number' ? healthSummary.score : computedOverall,
+      freshness: typeof healthSummary?.freshness === 'number' ? healthSummary.freshness : freshness,
+      coverage: typeof healthSummary?.coverage === 'number' ? healthSummary.coverage : coverage,
+      connectivity: typeof healthSummary?.connectivity === 'number' ? healthSummary.connectivity : connectivity,
+      usage: typeof healthSummary?.usage === 'number' ? healthSummary.usage : usageRate,
+      staleCount: hasCanonicalHealth ? canonicalStaleCount : staleCount,
+      freshCount: hasCanonicalHealth ? memories.filter((m) => m.properties?.health_status === 'healthy').length : validDates - staleCount,
+      atRiskCount: hasCanonicalHealth ? canonicalAtRiskCount : 0,
+      orphanCount: hasCanonicalHealth ? canonicalOrphanCount : orphanCount,
       connectedCount: connectedIds.size,
       generalCount,
       topicCount: topics.size,
@@ -174,7 +201,9 @@ export function useHealthScore(): HealthScore {
       neverRetrievedCount,
       retrievedCount,
       avgAccessCount: Math.round(avgAccessCount * 10) / 10,
-      maxAccessCount: maxAccess,
+      maxAccessCount: hasUsageSummary && typeof usageSummary!.max_access_count === 'number'
+        ? usageSummary!.max_access_count
+        : maxAccess,
     };
   }, [snapshot]);
 }
@@ -207,8 +236,13 @@ export function useUsageData(): UsageData {
     const mostRetrieved = sorted.slice(0, 5).map((w) => w.node);
 
     const totalAccess = withAccess.reduce((s, w) => s + w.count, 0);
-    const avgAccessCount = Math.round((totalAccess / memories.length) * 10) / 10;
-    const retrievalRate = Math.round(((memories.length - neverRetrieved.length) / memories.length) * 100);
+    const usageSummary = snapshot.stats?.usage;
+    const avgAccessCount = typeof usageSummary?.average_access_count === 'number'
+      ? usageSummary.average_access_count
+      : Math.round((totalAccess / memories.length) * 10) / 10;
+    const retrievalRate = typeof usageSummary?.retrieval_rate === 'number'
+      ? usageSummary.retrieval_rate
+      : Math.round(((memories.length - neverRetrieved.length) / memories.length) * 100);
 
     return { neverRetrieved, mostRetrieved, avgAccessCount, retrievalRate };
   }, [snapshot]);

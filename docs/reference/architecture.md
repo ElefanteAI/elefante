@@ -1,6 +1,6 @@
 # Elefante Architecture
 
-> **Release:** v2.12.2 · **Status:** released product contract
+> **Release:** v2.12.3 · **Status:** released product contract
 
 Elefante is a local persistent-memory service for AI agents. It stores semantic
 memory and explicit relationships, exposes them through MCP, and keeps the
@@ -73,13 +73,34 @@ exclusive database-lock contract.
 4. Deprecated and archived memories are removed from normal results.
 5. The result is returned with a compliance stamp and compact payload.
 
+The development checkout also has a bounded literal-trigger extension on the
+existing search path. When a caller supplies `surface_context` (or the query
+itself is used as context), one read-only scan considers only memories with
+`injection_policy=triggered`, requires a case-insensitive literal match, and
+adds at most three results. Scope, lifecycle, source-trust, conflict, and
+privacy gates still apply; the pass does not update access history or graph
+state. If a workspace filter is supplied, it also uses the shared current-source
+digest check on a deep copy and skips stale records. It is an explicit delivery
+hint, not automatic host interception or a second semantic retriever.
+
+The governed answer-context compiler also reports a bounded warning when a
+candidate with a stored conflict relationship or contradictory status is
+withheld. It never selects either side automatically, and the warning omits
+internal memory IDs; the customer Recall text carries the same warning without
+expanding its minimal payload.
+
 The scoring details and known exposure-versus-utility limitation are in
 [`scoring.md`](scoring.md). Retrieval ranks likely relevance; it does not prove
 that a memory improved the downstream task.
 
 ## Response behavior
 
-- Every tool response includes heuristic `TOKEN_STATS`.
+- Every normal non-Recall tool response includes heuristic `TOKEN_STATS`.
+- `elefante-Recall` intentionally returns a minimal customer payload and keeps
+  its token accounting internal. Its shared selector admits at most 12
+  candidates, three memories, and 450 heuristic context tokens; the complete
+  pretty Unicode response is capped at 1,000 heuristic tokens and fails closed
+  instead of truncating evidence.
 - Normal memory, graph, context, session, ETL, and task operations also receive
   entrypoint/pitfall blocks and active directives.
 - `RELEVANT_CONTEXT` is supplementary and conditional. It is skipped for
@@ -97,7 +118,11 @@ See [`token-intelligence.md`](token-intelligence.md) and
 - Dashboard APIs read a redacted snapshot rather than opening live stores.
 - Browser actions cannot regenerate that snapshot.
 - Backup/restore is checksummed, dry-run-first, and preserves replaced data.
-- JSON/CSV export is analysis-only, not a restorable backup.
+- JSON export is a portable, additive vector-memory migration source: the
+  importer regenerates embeddings with the configured local model, preserves
+  memory IDs/metadata, rejects collisions, and does not restore graph topology.
+  CSV remains analysis-only. Neither human-readable format replaces a full
+  binary backup.
 - Host configuration is ownership-tracked; user-managed or modified entries
   are preserved.
 - Migration of an existing legacy store is explicit, stopped-runtime,
@@ -106,9 +131,23 @@ See [`token-intelligence.md`](token-intelligence.md) and
 ## Development-only work
 
 Task Intelligence evaluation, governed retention/injection fields, automatic
-forgetting, expanded host certification, and proactive conflict surfacing are
-not part of the v2.12.2 released architecture unless a later changelog and
-reference document say otherwise.
+forgetting, expanded host certification, Smart Update/Merge, host event
+adapters, Session Intelligence, Team Sync, and multi-modal attachments are not
+part of the v2.12.3 released architecture unless a later changelog and
+reference document say otherwise. The active developer checkout contains a
+conservative explicit-proposition conflict detector, dry-run-first reversible
+conflict repair, typed privacy-scrubbed host event ingress, an opt-in foreground
+Distiller watcher, a consent-gated metadata-only usage ledger and Signal Card
+snapshot, signed scope-bound additive Team Sync bundles, and local
+content-addressed media descriptors. These remain unreleased development
+behavior. Ambiguous conflicts require a user-selected winner. The watcher
+processes changed session files serially and does not persist insights without
+explicit `--store`.
+Known stored-conflict warnings and the bounded literal-trigger extension
+described above are development-only and are not evidence of Task Intelligence
+outcome lift. The `/events/surface` adapter is read-only and does not persist
+host content. The `/events/usage` adapter persists only typed metadata after
+explicit purpose consent.
 
 ## Source authorities
 

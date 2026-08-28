@@ -293,6 +293,10 @@ surfaces:
 
   - id: continue
     kind: vscode-extension
+    user_home:
+      - path: ~/.continue/mcpServers/elefante.yaml
+        purpose: Dedicated Elefante MCP server block
+        installer_writes: true
     skill_paths:
       project:
         - .continue/rules/*.md
@@ -304,9 +308,18 @@ surfaces:
         - globs
         - alwaysApply
     documentation:
-      install_authority: planned
-    last_verified: 2026-04-18
-    status: planned
+      reference: docs/how-to/configure-ide.md
+      install_authority: scripts/setup/configure_additional_hosts.py
+    doc_urls:
+      - https://docs.continue.dev/customize/deep-dives/mcp
+      - https://docs.continue.dev/reference
+    last_verified: 2026-08-28
+    verified_doc_hash: pending
+    status: compatible
+    notes: |
+      Elefante writes one dedicated MCP block instead of parsing or rewriting
+      the user's main Continue YAML. The file is ownership-tracked and removed
+      only while its fingerprint still matches the emitted content.
 
   - id: zed
     kind: ide
@@ -325,16 +338,27 @@ surfaces:
       format: plain-md
     user_home:
       - path: ~/.config/zed/settings.json
-        purpose: Zed MCP server registration
-        installer_writes: false
+        platform: macos-linux
+        purpose: Zed context_servers registration
+        installer_writes: true
+      - path: '%APPDATA%\Zed\settings.json'
+        platform: windows
+        purpose: Zed context_servers registration
+        installer_writes: true
     documentation:
-      install_authority: planned
-    last_verified: 2026-04-18
-    status: planned
+      reference: docs/how-to/configure-ide.md
+      install_authority: scripts/setup/configure_additional_hosts.py
+    doc_urls:
+      - https://zed.dev/docs/ai/mcp
+      - https://zed.dev/faq
+    last_verified: 2026-08-28
+    verified_doc_hash: pending
+    status: compatible
     notes: |
-      Zed auto-detects from a precedence list. The universal AGENTS.md (this repo's
-      new root-level file as of 2026-05-02) is the second item in the list; the
-      first (.rules) is not yet authored. Reading order matters.
+      The installer preserves unrelated settings and writes only
+      context_servers.elefante after Zed is detected. The exact JSON entry is
+      ownership-tracked for safe upgrade and uninstall. Zed's instruction-file
+      precedence remains independent from its MCP registration.
 
   - id: gemini
     kind: cli-agent

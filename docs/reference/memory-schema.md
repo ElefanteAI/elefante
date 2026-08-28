@@ -2,7 +2,7 @@
 
 This reference describes the current `Memory` and `MemoryMetadata` models in
 `src/models/memory.py`. The governance fields below are implemented on the
-development branch but are not part of the published v2.12.2 client contract.
+development branch but are not part of the published v2.12.3 client contract.
 
 ## Memory
 
@@ -32,7 +32,9 @@ development branch but are not part of the published v2.12.2 client contract.
 - `confidence`: float `0.0–1.0`; defaults to 0.7
 - `tags`, `keywords`, `entities`
 - `concepts`: deterministic or agent-supplied key terms
-- `surfaces_when`: query patterns used as retrieval hints
+- `surfaces_when`: query patterns used as retrieval hints; they become an
+  explicit literal-surfacing trigger only when the memory opts into
+  `injection_policy="triggered"`
 - `authority_score`: float `0.0–1.0`
 
 `compute_authority_score()` returns `1.0` for specification/directive types.
@@ -65,6 +67,27 @@ archived. Ephemeral is currently declarative—automatic expiry is not
 implemented. Invocation authority and causal task utility remain separate
 operation/evaluation concerns.
 
+The development proactive-surfacing path accepts an explicit query, file,
+terminal-error, or conversation context and checks literal `trigger` plus
+`surfaces_when` phrases only for `injection_policy="triggered"` memories. It
+returns at most three read-only matches, skips inactive, conflicted, stale-source,
+low-trust, or secret-bearing records, and never reinforces access or graph state.
+When the caller supplies a workspace filter, stale-source means the shared
+source-file digest check found a mismatch; without a workspace, an unavailable
+source is not treated as proof of contradiction.
+This is an opt-in delivery hint, not automatic host interception or a second
+semantic retriever.
+
+Governed answer delivery separately reports a bounded warning when a candidate
+has a stored conflict relationship or contradictory status. The conflicted
+candidate is withheld, neither side is treated as authoritative, and the
+warning omits internal memory IDs. The development branch also has a
+conservative explicit-proposition semantic detector and
+`elefante-Memory(action="resolve")`. Resolve is dry-run-first, consolidates
+equivalent assertions, requires a user-selected winner for ambiguous conflicts,
+protects scope and user authority, preserves the losing record as superseded,
+and rolls back a partial two-record write.
+
 ### Provenance
 
 - `source`, `source_detail`, `source_reliability`, `verified`
@@ -89,6 +112,15 @@ exact formula is in [`scoring.md`](scoring.md).
 - `custom_metadata`: extension/application data
 - `system_metadata`: Elefante-managed data such as token density
 
+`custom_metadata.attachments` may contain portable descriptors for locally
+stored image, audio, or video files. Each descriptor records a SHA-256 digest,
+media kind, allowlisted MIME type, byte size, safe original name, relative
+content-addressed path, bounded text description, and optional dimensions or
+duration. It never stores an absolute source path. Attachment bytes are private
+mode `0600`, bounded to 25 MiB each and eight per memory, and are not sent to a
+model or network by Elefante. Text descriptions remain the retrieval fallback
+for hosts that cannot render media.
+
 Callers must not treat arbitrary custom metadata as a released query or
 lifecycle contract.
 
@@ -108,8 +140,13 @@ language is historical and not part of the live MCP schema.
 
 SQLite stores the complete versioned Memory JSON and explicit float32
 embedding. The legacy ChromaDB adapter flattens metadata and reconstructs typed
-fields on read. Adding a field requires round-trip tests for every supported
-configured backend and the customer backup/restore path.
+fields on read. The JSON corpus export preserves the Memory ID and metadata but
+omits embeddings; `scripts/pipeline/import_memories.py` regenerates them with
+the configured local model and refuses ID collisions. Apply mode is fail-closed
+unless the operator supplies `--confirm-stopped STOPPED`, and a non-empty
+target also requires a verified binary backup. It does not contain the graph
+snapshot, so it is not a full backup. Adding a field requires round-trip tests
+for every supported configured backend and the customer backup/restore path.
 
 ## Related documentation
 

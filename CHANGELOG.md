@@ -13,6 +13,111 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Added a dry-run-first portable JSON memory importer. It validates the full
+  export before writing, preserves memory IDs and metadata, regenerates vectors
+  with the configured local embedding model, rejects existing-ID collisions,
+  requires `--confirm-stopped STOPPED` plus a verified binary backup for
+  non-empty targets, and rolls back partial writes. It intentionally does not
+  restore graph topology.
+- Customer readiness can now inspect the live MCP bridge for the Recall tool,
+  its read-only annotations, and one bounded read-only status without exposing
+  recalled context. A built-customer-archive regression prevents Recall routing
+  from shipping ahead of the runtime tool it names.
+- Explicitly triggered memories can now surface through the existing search and
+  Recall path when a literal trigger appears in the query or supplied
+  `surface_context`. The bounded path preserves lifecycle, scope, source-trust,
+  conflict, and privacy gates and never mutates access or graph state.
+- Governed answer context now reports a bounded warning when a relevant candidate
+  has a stored unresolved conflict or contradictory status. Conflicted evidence
+  remains withheld, neither side is chosen automatically, and the warning does
+  not expose internal memory IDs.
+- Added a conservative, deterministic semantic conflict detector for explicit
+  propositions plus dry-run-first reversible Smart Merge/repair. Ambiguous
+  language abstains; equivalent assertions consolidate, different scopes stay
+  separate, and true conflicts require explicit winner authority unless exactly
+  one side is protected. Partial two-record writes roll back.
+- Added an opt-in foreground Session Distiller watch mode with bounded polling,
+  complete session-file enumeration, deletion/recreation handling, serial
+  processing, and per-session error isolation. It does not store insights unless
+  `--store` is explicitly supplied.
+- Added the dashboard Retrieval Explanation panel. It renders only snapshot
+  evidence actually present for a memory and labels unavailable scoring details
+  instead of inventing a hidden five-signal breakdown.
+- Expanded development `doctor` output with redacted integration-contract drift
+  diagnostics, malformed-manifest handling, and customer-readiness blocking for
+  installer-owned non-ready surfaces.
+- Added typed, bounded, privacy-scrubbed file, terminal-error, and conversation
+  envelopes for every integration-manifest host family, with a loopback
+  `/events/surface` endpoint that reuses governed read-only retrieval and does
+  not persist host content.
+- Added opt-in Session Intelligence: a persistent metadata-only SQLite ledger,
+  provider-actual versus estimated usage provenance, loopback `/events/usage`
+  ingestion, versioned rate-card authority, `UNKNOWN` cost discipline, Signal
+  Cards, aggregate anti-surveillance training hypotheses, retention/export/
+  deletion controls, operator CLI, and snapshot-only dashboard panel.
+- Added signed exact-scope Team Sync bundles and a dry-run-first local CLI.
+  Imports are additive, withhold identity or semantic conflicts, regenerate
+  local embeddings, require user-directed scope/STOPPED/verified-backup gates,
+  and roll back partial writes. No cloud transport is introduced.
+- Added local content-addressed image, audio, and video attachments for memories.
+  Media is bounded, private, integrity-checked, described for text-only hosts,
+  and never sent through OCR, transcription, a model, or a network by Elefante.
+- Added ownership-safe Zed and Continue adapters with read-only detection,
+  unrelated-setting preservation, exact emitted-state fingerprints, and safe
+  uninstall. They are development-compatible, not externally certified.
+- Added branded Windows EXE preparation/build verification and credential-gated
+  Authenticode CI publication. Unsigned EXEs remain validation artifacts and
+  cannot substitute for release assets.
+
+### Changed
+
+- JSON exports now have a documented additive migration counterpart; CSV and
+  JSON remain distinct from the checksummed binary backup/restore path.
+- Recall guidance now limits retrieval to one contextual call per user question
+  and treats terminal abstention/unavailability as a signal to continue from
+  current evidence rather than retrying or broadening retrieval.
+- Recall no longer echoes the question in its response, preserves multilingual
+  Unicode instead of expanding it into ASCII escapes, and fails closed when the
+  complete seven-field response would exceed 1,000 heuristic tokens. Its hidden
+  in-memory ledger measures the exact returned payload and context without
+  exposing `TOKEN_STATS`.
+
+### Fixed
+
+- Customer readiness no longer accepts an installer-owned Recall block in a
+  base `AGENTS.md` when a later non-empty `AGENTS.override.md` masks it.
+- Codex setup now records registration ownership only after managed Recall
+  guidance succeeds. A guidance failure removes a new owned registration or
+  restores the prior unchanged owned registration, and reports `partial` when
+  rollback itself cannot finish.
+
+## [2.12.3] - 2026-08-25
+
+### Fixed
+
+- Active release documentation now derives publication claims from verified
+  tag and checksum evidence without falsely describing the mutable GitHub
+  release object as immutable.
+- The scoring reference now matches the shipped behavioral-vitality formula,
+  five-signal retrieval weights, vector floor, intent-gated authority boost,
+  and implemented dry-run-first consolidation behavior.
+- Dashboard memory search now identifies itself as snapshot search instead of
+  promising semantic search that the read-only browser endpoint does not run.
+- ETL descriptions now distinguish retrieval concepts from `surfaces_when`
+  metadata, which is stored but is not a current ranking signal.
+- Session Distiller examples now use the repository-root module path that
+  actually runs.
+- Customer repairs now replace pre-manifest Elefante host registrations only
+  when their command structurally identifies an older Elefante MCP runtime.
+  Unrelated user-owned servers with the same name remain untouched.
+- Installation now proves the same stdio bridge and local daemon path used by
+  customer IDEs, with enough startup time for a cold local runtime.
+- Release-candidate tooling and workflows now derive manifest identity, archive
+  names, and installation checks from the package version instead of embedding
+  the previous release number or importing product dependencies before setup.
+
+### Added
+
 - Added an unreleased, default-on `elefante-Recall` customer path that accepts
   one standalone question and returns only bounded governed answer context or an
   explicit abstention. It requires no development flags and has a local
@@ -70,7 +175,10 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   coverage; otherwise the memory needs a strong direct answer or explicit
   structural/task-specific evidence. A user-locked, scoped, ranked directive
   can additionally guide a semantically strong decision question in that named
-  scope. Loosely related process memories still abstain.
+  scope. Text-only evidence for a multi-term question must match at least two
+  distinct question terms, so a repeated project name alone cannot promote
+  generic process guidance as a direct answer. Genuine one-term facts remain
+  eligible. Loosely related process memories still abstain.
 - A healthy global runtime no longer depends on the model guessing when to use
   memory in Codex. A normal question that can depend on durable preferences,
   decisions, or project context now routes through `elefante-Recall` before the
