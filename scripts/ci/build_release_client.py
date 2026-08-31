@@ -55,6 +55,7 @@ CLIENT_RUNTIME_SCRIPTS = (
     Path("scripts/pipeline/session_intelligence.py"),
     Path("scripts/pipeline/team_sync.py"),
     Path("scripts/pipeline/update_dashboard_data.py"),
+    Path("scripts/verify/verify_dashboard_snapshot.py"),
     Path("scripts/verify/verify_health.py"),
     Path("scripts/verify/verify_mcp_handshake.py"),
 )

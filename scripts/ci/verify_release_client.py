@@ -41,6 +41,7 @@ RUNTIME_SCRIPTS = {
     "scripts/pipeline/session_intelligence.py",
     "scripts/pipeline/team_sync.py",
     "scripts/pipeline/update_dashboard_data.py",
+    "scripts/verify/verify_dashboard_snapshot.py",
     "scripts/verify/verify_health.py",
     "scripts/verify/verify_mcp_handshake.py",
 }
