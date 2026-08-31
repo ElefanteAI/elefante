@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import platform
+import shutil
 import subprocess
 import sys
 import time
@@ -28,6 +29,14 @@ from scripts.setup.install_manifest import (  # noqa: E402
 
 LABEL = "ai.elefante.daemon"
 DEFAULT_DAEMON_PORT = 8765
+STANDARD_UNIX_EXECUTABLE_DIRS = (
+    "/opt/homebrew/bin",
+    "/usr/local/bin",
+    "/usr/bin",
+    "/bin",
+    "/usr/sbin",
+    "/sbin",
+)
 
 
 def _python() -> Path:
@@ -46,23 +55,48 @@ def service_path(home: Path, system: str | None = None) -> Path:
     raise RuntimeError(f"Unsupported daemon service platform: {system}")
 
 
+def _service_executable_path(system: str) -> str:
+    """Keep certified host discovery available in a minimal service environment."""
+    if system not in {"Darwin", "Linux"}:
+        return ""
+    candidates: list[str] = []
+    codex_command = shutil.which("codex")
+    if codex_command:
+        candidates.append(str(Path(codex_command).parent))
+    if system == "Darwin":
+        for app_root in (Path("/Applications"), Path.home() / "Applications"):
+            bundled_codex = app_root / "ChatGPT.app/Contents/Resources/codex"
+            if bundled_codex.is_file():
+                candidates.append(str(bundled_codex.parent))
+    candidates.extend(STANDARD_UNIX_EXECUTABLE_DIRS)
+    safe_directories = [
+        directory
+        for directory in candidates
+        if Path(directory).is_absolute()
+        and not any(character in directory for character in ('"', "\\r", "\\n"))
+    ]
+    return os.pathsep.join(dict.fromkeys(safe_directories))
+
+
 def render_service(home: Path, system: str | None = None) -> str:
     system = system or platform.system()
     python = _python()
     if system == "Darwin":
+        executable_path = escape(_service_executable_path(system))
         return f'''<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>Label</key><string>{LABEL}</string>
 <key>ProgramArguments</key><array><string>{python}</string><string>-m</string><string>src.mcp.daemon</string></array>
 <key>WorkingDirectory</key><string>{REPO_ROOT}</string>
-<key>EnvironmentVariables</key><dict><key>PYTHONPATH</key><string>{REPO_ROOT}</string></dict>
+<key>EnvironmentVariables</key><dict><key>PYTHONPATH</key><string>{REPO_ROOT}</string><key>PATH</key><string>{executable_path}</string></dict>
 <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
 <key>StandardOutPath</key><string>{home}/.elefante/logs/daemon.out.log</string>
 <key>StandardErrorPath</key><string>{home}/.elefante/logs/daemon.err.log</string>
 </dict></plist>
 '''
     if system == "Linux":
+        executable_path = _service_executable_path(system)
         return f'''[Unit]
 Description=Elefante local MCP daemon
 After=network.target
@@ -71,6 +105,7 @@ After=network.target
 Type=simple
 WorkingDirectory={REPO_ROOT}
 Environment=PYTHONPATH={REPO_ROOT}
+Environment="PATH={executable_path}"
 ExecStart={python} -m src.mcp.daemon
 Restart=on-failure
 RestartSec=2

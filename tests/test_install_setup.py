@@ -536,8 +536,15 @@ def test_client_install_dependencies_use_the_runtime_only_lock(monkeypatch, tmp_
     ]
 
 
-def test_daemon_service_renders_user_scope_macos_and_linux_units(tmp_path):
+def test_daemon_service_renders_user_scope_macos_and_linux_units(monkeypatch, tmp_path):
     module = _load_module(ROOT / "scripts/lifecycle/daemon_service.py", "daemon_service_module")
+    monkeypatch.setattr(
+        module.shutil,
+        "which",
+        lambda command: "/Applications/ChatGPT.app/Contents/Resources/codex"
+        if command == "codex"
+        else None,
+    )
     mac_path = module.service_path(tmp_path, "Darwin")
     linux_path = module.service_path(tmp_path, "Linux")
 
@@ -545,6 +552,7 @@ def test_daemon_service_renders_user_scope_macos_and_linux_units(tmp_path):
     assert linux_path == tmp_path / ".config/systemd/user/ai.elefante.daemon.service"
     assert "src.mcp.daemon" in module.render_service(tmp_path, "Darwin")
     assert "KeepAlive" in module.render_service(tmp_path, "Darwin")
+    assert "/Applications/ChatGPT.app/Contents/Resources" in module.render_service(tmp_path, "Darwin")
     assert "src.mcp.daemon" in module.render_service(tmp_path, "Linux")
     assert "Restart=on-failure" in module.render_service(tmp_path, "Linux")
 
