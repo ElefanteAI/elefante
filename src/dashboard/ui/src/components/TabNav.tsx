@@ -2,9 +2,11 @@ import { useDashboardStore } from '@/store';
 import type { Tab } from '@/types';
 
 const tabs: { id: Tab; label: string }[] = [
-  { id: 'overview', label: 'Briefing' },
+  { id: 'overview', label: 'Home' },
   { id: 'memories', label: 'Memories' },
   { id: 'explore', label: 'Connections' },
+  { id: 'projects', label: 'Projects' },
+  { id: 'recover', label: 'Recover' },
 ];
 
 export function TabNav() {
@@ -12,7 +14,7 @@ export function TabNav() {
   const setActiveTab = useDashboardStore((s) => s.setActiveTab);
 
   return (
-    <nav className="flex items-center justify-center gap-6 md:gap-10 bg-slate-950/75 backdrop-blur border-b elefante-hairline px-4">
+    <nav className="flex items-center justify-start gap-5 overflow-x-auto bg-slate-950/75 px-4 backdrop-blur border-b elefante-hairline sm:justify-center md:gap-9">
       {tabs.map((tab) => (
         <button
           key={tab.id}

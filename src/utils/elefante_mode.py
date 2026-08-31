@@ -24,13 +24,12 @@ Design Principles:
 import os
 import sys
 import time
-import atexit
 
 if sys.platform != "win32":
     import fcntl
 from pathlib import Path
-from typing import Optional, Dict, Any, List
-from datetime import datetime, timedelta
+from typing import Optional, Dict, Any
+from datetime import datetime
 from contextlib import contextmanager
 import threading
 
@@ -49,6 +48,31 @@ WRITE_LOCK_FILE = LOCK_DIR / "write.lock"
 DEFAULT_LOCK_TIMEOUT = 30
 # Max time to wait for lock acquisition (seconds)
 DEFAULT_ACQUIRE_TIMEOUT = 10
+
+
+def runtime_lock_dir() -> Path:
+    """Bind locks to the configured data installation, not always the account default."""
+    explicit = os.environ.get("ELEFANTE_LOCK_DIR", "").strip()
+    if explicit:
+        candidate = Path(explicit).expanduser()
+        if not candidate.is_absolute():
+            raise ValueError("ELEFANTE_LOCK_DIR must be an absolute path")
+        return candidate
+
+    data_override = os.environ.get("ELEFANTE_DATA_DIR", "").strip()
+    configured_data = (
+        Path(data_override).expanduser()
+        if data_override
+        else Path(get_config().elefante.data_dir).expanduser()
+    )
+    if configured_data.resolve(strict=False) == DATA_DIR.resolve(strict=False):
+        return LOCK_DIR
+    return configured_data.resolve(strict=False).parent / "locks"
+
+
+def runtime_lock_file(lock_type: str) -> Path:
+    name = "write.lock" if lock_type == "write" else "elefante.lock"
+    return runtime_lock_dir() / name
 
 
 class TransactionLock:
@@ -74,7 +98,7 @@ class TransactionLock:
         self.stale_threshold = stale_threshold
         self.acquired = False
         self._fd: Optional[int] = None
-        self._lock_path = WRITE_LOCK_FILE if lock_type == "write" else MASTER_LOCK_FILE
+        self._lock_path = runtime_lock_file(lock_type)
         self._holder_info: Optional[Dict[str, str]] = None
         
     def __enter__(self) -> 'TransactionLock':
@@ -138,7 +162,7 @@ class TransactionLock:
     
     def _acquire(self) -> bool:
         """Attempt to acquire the lock with timeout."""
-        LOCK_DIR.mkdir(parents=True, exist_ok=True)
+        self._lock_path.parent.mkdir(parents=True, exist_ok=True)
         
         start_time = time.time()
         
@@ -170,7 +194,7 @@ class TransactionLock:
                 if self._fd is not None:
                     try:
                         os.close(self._fd)
-                    except:
+                    except OSError:
                         pass
                     self._fd = None
                 
@@ -198,7 +222,7 @@ class TransactionLock:
             # Clear lock file content (don't delete - avoids race)
             try:
                 self._lock_path.write_text("")
-            except:
+            except OSError:
                 pass
                 
             logger.debug(f"Lock released: {self._lock_path}")
@@ -240,13 +264,13 @@ class ElefanteModeManager:
         self._orchestrator_ref = None
         
         # Ensure lock directory exists
-        LOCK_DIR.mkdir(parents=True, exist_ok=True)
+        runtime_lock_dir().mkdir(parents=True, exist_ok=True)
         
         # Get config for timeouts
         try:
             config = get_config()
             self._lock_timeout = config.elefante.elefante_mode.lock_timeout_seconds
-        except:
+        except Exception:
             self._lock_timeout = DEFAULT_LOCK_TIMEOUT
         
         logger.info(
@@ -273,7 +297,7 @@ class ElefanteModeManager:
             "mode": "transaction-scoped",
             "startup_time": self._startup_time.isoformat(),
             "lock_timeout_seconds": self._lock_timeout,
-            "data_dir": str(DATA_DIR),
+            "data_dir": str(get_config().elefante.data_dir),
             "pid": os.getpid()
         }
     
@@ -312,7 +336,10 @@ class ElefanteModeManager:
         """Check status of lock files."""
         lock_status = {}
         
-        for name, path in [("write", WRITE_LOCK_FILE), ("master", MASTER_LOCK_FILE)]:
+        for name, path in [
+            ("write", runtime_lock_file("write")),
+            ("master", runtime_lock_file("master")),
+        ]:
             status = {
                 "path": str(path),
                 "exists": path.exists(),
@@ -338,9 +365,9 @@ class ElefanteModeManager:
                                 age = (datetime.utcnow() - lock_time).total_seconds()
                                 status["is_stale"] = age > self._lock_timeout
                                 status["age_seconds"] = age
-                            except:
+                            except Exception:
                                 status["is_stale"] = True
-                except:
+                except Exception:
                     status["is_stale"] = True
             
             lock_status[name] = status
@@ -392,7 +419,7 @@ class ElefanteModeManager:
     
     def _clear_all_stale_locks(self):
         """Clear any stale lock files."""
-        for path in [WRITE_LOCK_FILE, MASTER_LOCK_FILE]:
+        for path in [runtime_lock_file("write"), runtime_lock_file("master")]:
             if path.exists():
                 lock = TransactionLock()
                 lock._lock_path = path

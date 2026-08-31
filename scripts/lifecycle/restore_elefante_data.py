@@ -24,7 +24,7 @@ import stat
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Callable
 
 
 MANIFEST_NAME = "elefante-backup-manifest.json"
@@ -91,9 +91,20 @@ def _read_manifest(archive: zipfile.ZipFile, members: list[zipfile.ZipInfo]) -> 
         raise ValueError("Backup manifest has no file list")
     expected: dict[str, dict[str, Any]] = {}
     for entry in listed_files:
-        if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
+        if (
+            not isinstance(entry, dict)
+            or not isinstance(entry.get("path"), str)
+            or not isinstance(entry.get("size"), int)
+            or entry["size"] < 0
+            or not isinstance(entry.get("sha256"), str)
+            or len(entry["sha256"]) != 64
+            or any(character not in "0123456789abcdef" for character in entry["sha256"])
+        ):
             raise ValueError("Backup manifest contains an invalid file entry")
-        expected[entry["path"]] = entry
+        normalized_path = _safe_relative_path(entry["path"]).as_posix()
+        if normalized_path == MANIFEST_NAME or normalized_path in expected:
+            raise ValueError("Backup manifest contains a duplicate or reserved file path")
+        expected[normalized_path] = entry
     actual = {member.filename for member in members if member.filename != MANIFEST_NAME}
     if set(expected) != actual:
         raise ValueError("Backup manifest file list does not match archive contents")
@@ -153,6 +164,26 @@ def _next_path(parent: Path, stem: str) -> Path:
     return candidate
 
 
+def _resolved_work_path(
+    value: Path | None,
+    *,
+    parent: Path,
+    stem: str,
+) -> Path:
+    """Resolve one exact non-existing sibling work path for restore orchestration."""
+    if value is None:
+        return _next_path(parent, stem)
+    candidate = Path(value).expanduser().resolve(strict=False)
+    if (
+        candidate.parent != parent
+        or not candidate.name.startswith(f"{stem}.")
+        or candidate.exists()
+        or candidate.is_symlink()
+    ):
+        raise ValueError(f"Unsafe or occupied restore work path: {candidate}")
+    return candidate
+
+
 def _extract_to_staging(archive_path: Path, staging_dir: Path) -> None:
     with zipfile.ZipFile(archive_path, "r") as archive:
         members = _regular_members(archive)
@@ -174,6 +205,9 @@ def restore_archive(
     apply: bool = False,
     discard_existing: bool = False,
     discard_confirmation: str = "",
+    staging_path: Path | None = None,
+    previous_path: Path | None = None,
+    verify_staged: Callable[[Path], None] | None = None,
 ) -> dict[str, Any]:
     """Preflight or atomically restore an archive into ``data_dir``."""
     inspection = inspect_archive(archive_path)
@@ -190,12 +224,23 @@ def restore_archive(
         raise ValueError("--discard-existing requires --confirm DISCARD")
 
     data_dir.parent.mkdir(parents=True, exist_ok=True)
-    staging_dir = _next_path(data_dir.parent, ".data.restore")
+    staging_dir = _resolved_work_path(
+        staging_path,
+        parent=data_dir.parent,
+        stem=".data.restore",
+    )
+    planned_previous = _resolved_work_path(
+        previous_path,
+        parent=data_dir.parent,
+        stem="data.pre_restore",
+    )
     previous_dir: Path | None = None
     try:
         _extract_to_staging(Path(inspection["archive"]), staging_dir)
+        if verify_staged is not None:
+            verify_staged(staging_dir)
         if data_dir.exists():
-            previous_dir = _next_path(data_dir.parent, "data.pre_restore")
+            previous_dir = planned_previous
             data_dir.rename(previous_dir)
         try:
             staging_dir.rename(data_dir)

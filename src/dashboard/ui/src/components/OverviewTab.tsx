@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useHealthScore } from '@/hooks/useVisualizationData';
 import { SessionIntelligencePanel } from '@/components/SessionIntelligencePanel';
+import { HomeStatePanel } from '@/components/HomeStatePanel';
 import { useDashboardStore } from '@/store';
 import { edgeEndpoints, type GraphEdge, type MemoryNode } from '@/types';
 
@@ -215,13 +216,16 @@ export function OverviewTab() {
 
   if (!snapshot || !featured) {
     return (
-      <div className="h-full flex items-center justify-center p-8">
-        <div className="max-w-lg border-t border-cyan-500/60 pt-5">
-          <div className="text-[10px] text-cyan-400 elefante-mono uppercase tracking-[0.18em]">Continuity briefing</div>
-          <h2 className="mt-3 text-2xl font-medium text-slate-100">No durable memory is available yet.</h2>
-          <p className="mt-3 text-sm leading-relaxed text-slate-500">
-            Add a decision, preference, constraint, or insight through an Elefante-connected agent. The briefing will show what deserves to shape the next answer.
-          </p>
+      <div className="h-full overflow-auto px-5 py-5 md:px-8 md:py-6">
+        <div className="mx-auto flex min-h-full max-w-[1540px] flex-col gap-5">
+          <HomeStatePanel />
+          <div className="border-t border-cyan-500/60 px-5 py-8">
+            <div className="text-[10px] text-cyan-400 elefante-mono uppercase tracking-[0.18em]">Continuity briefing</div>
+            <h2 className="mt-3 text-2xl font-medium text-slate-100">No durable memory is available yet.</h2>
+            <p className="mt-3 max-w-lg text-sm leading-relaxed text-slate-500">
+              Add a decision, preference, constraint, or lesson through an Elefante-connected agent. The briefing will show what deserves to shape the next answer.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -244,10 +248,11 @@ export function OverviewTab() {
   return (
     <div className="h-full overflow-auto px-5 py-5 md:px-8 md:py-6">
       <div className="max-w-[1540px] mx-auto min-h-full flex flex-col gap-5">
+        <HomeStatePanel />
         <section className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
           <div>
             <div className="text-[10px] text-cyan-400 elefante-mono uppercase tracking-[0.2em]">
-              Continuity briefing / 01
+              Continuity briefing / 02
             </div>
             <h1 className="mt-2 text-[clamp(2rem,3.2vw,3.35rem)] leading-[1.02] font-medium tracking-[-0.045em] text-slate-100">
               The decisions shaping<br className="hidden sm:block" /> your next answer.

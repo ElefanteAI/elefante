@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -25,6 +26,7 @@ from pathlib import Path
 INSTALL_LOG_FILE_NAME = ".elefante-install.log"
 INSTALL_STATUS_FILE_NAME = ".elefante-install-status.txt"
 INSTALL_SUMMARY_FILE_NAME = ".elefante-install-summary.txt"
+VALID_PACKAGE_OPERATIONS = {"install", "repair", "update", "rollback"}
 
 
 def default_install_path() -> Path:
@@ -35,11 +37,206 @@ def default_data_path() -> Path:
     return Path.home() / ".elefante" / "data"
 
 
+def default_backup_path() -> Path:
+    return Path.home() / ".elefante" / "backups"
+
+
+def read_managed_backup_path(
+    installer_dir: Path,
+    install_root: str | Path | None,
+    *,
+    runner=subprocess.run,
+) -> Path | None:
+    """Ask the package owner which single backup directory it will use."""
+    bootstrap = Path(installer_dir) / "scripts" / "setup" / "bootstrap_release_bundle.py"
+    if not bootstrap.is_file():
+        return None
+    try:
+        result = runner(
+            [
+                sys.executable,
+                str(bootstrap),
+                "--bundle-root",
+                str(installer_dir),
+                "--install-root",
+                str(normalize_install_root(install_root)),
+                "--print-managed-backup-path",
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=15,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired, TypeError):
+        return None
+    raw_path = result.stdout.strip()
+    if result.returncode != 0 or not raw_path or "\n" in raw_path:
+        return None
+    candidate = Path(raw_path).expanduser()
+    return candidate if candidate.is_absolute() else None
+
+
 def normalize_install_root(install_root: str | Path | None) -> Path:
     raw_path = str(install_root or "").strip()
     if not raw_path:
         return default_install_path()
     return Path(raw_path).expanduser()
+
+
+def read_package_operation(
+    installer_dir: Path,
+    install_root: str | Path | None,
+    *,
+    runner=subprocess.run,
+) -> dict[str, object] | None:
+    """Ask the package transaction owner for one read-only operation description."""
+    bootstrap = Path(installer_dir) / "scripts" / "setup" / "bootstrap_release_bundle.py"
+    if not bootstrap.is_file():
+        return None
+    try:
+        result = runner(
+            [
+                sys.executable,
+                str(bootstrap),
+                "--bundle-root",
+                str(installer_dir),
+                "--install-root",
+                str(normalize_install_root(install_root)),
+                "--describe-operation",
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=15,
+            check=False,
+        )
+        payload = json.loads(result.stdout)
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError, TypeError):
+        return None
+    if (
+        result.returncode != 0
+        or not isinstance(payload, dict)
+        or payload.get("schema_version") != 1
+        or payload.get("operation") not in VALID_PACKAGE_OPERATIONS
+    ):
+        return None
+    if payload.get("operation") == "rollback" and not isinstance(
+        payload.get("confirmation_token"), str
+    ):
+        return None
+    return payload
+
+
+def read_package_uninstall(
+    installer_dir: Path,
+    install_root: str | Path | None,
+    *,
+    runner=subprocess.run,
+) -> dict[str, object] | None:
+    """Ask the package owner for one exact read-only uninstall plan."""
+    bootstrap = Path(installer_dir) / "scripts" / "setup" / "bootstrap_release_bundle.py"
+    if not bootstrap.is_file():
+        return None
+    try:
+        result = runner(
+            [
+                sys.executable,
+                str(bootstrap),
+                "--bundle-root",
+                str(installer_dir),
+                "--install-root",
+                str(normalize_install_root(install_root)),
+                "--describe-uninstall",
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=15,
+            check=False,
+        )
+        payload = json.loads(result.stdout)
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError, TypeError):
+        return None
+    if (
+        result.returncode != 0
+        or not isinstance(payload, dict)
+        or payload.get("schema_version") != 1
+        or payload.get("operation") != "uninstall"
+        or payload.get("available") is not True
+        or not isinstance(payload.get("confirmation_token"), str)
+        or payload.get("data_effect") != "preserved"
+    ):
+        return None
+    return payload
+
+
+def installer_operation_copy(
+    install_root: str | Path | None,
+    description: dict[str, object] | None = None,
+) -> dict[str, str]:
+    """Return concise customer language for the package's exact operation."""
+    fallback = "repair" if normalize_install_root(install_root).is_dir() else "install"
+    operation = str((description or {}).get("operation") or fallback)
+    if operation not in VALID_PACKAGE_OPERATIONS:
+        operation = fallback
+    verbs = {
+        "install": "Install",
+        "repair": "Repair",
+        "update": "Update",
+        "rollback": "Roll Back",
+    }
+    completion = {
+        "install": "Installation verified — projects, Recall cleanup, and local backup are ready.",
+        "repair": "Repair verified — Elefante, agent connection, and Recall are ready.",
+        "update": "Update verified — Elefante, agent connection, and Recall are ready.",
+        "rollback": "Code rollback verified — Elefante, agent connection, and Recall are ready.",
+    }
+    verb = verbs[operation]
+    retained = (description or {}).get("retained_rollback")
+    retained = retained if isinstance(retained, dict) else {}
+    return {
+        "operation": operation,
+        "verb": verb,
+        "title": f"{verb} Elefante",
+        "ready": f"Ready to {verb.lower()}",
+        "starting": f"Starting {verb.lower()}…",
+        "complete": completion[operation],
+        "confirmation_token": str((description or {}).get("confirmation_token") or ""),
+        "current_version": str((description or {}).get("current_version") or ""),
+        "target_version": str((description or {}).get("target_version") or ""),
+        "retained_rollback_available": (
+            "true" if retained.get("available") is True else "false"
+        ),
+        "retained_rollback_token": str(retained.get("confirmation_token") or ""),
+        "retained_current_version": str(retained.get("current_version") or ""),
+        "retained_target_version": str(retained.get("target_version") or ""),
+    }
+
+
+def build_project_specs(paths: list[str | Path]) -> list[str]:
+    """Build stable NAME=ABSOLUTE_PATH values from customer-selected folders."""
+    selected: list[Path] = []
+    for value in paths:
+        path = Path(value).expanduser().resolve()
+        if path not in selected:
+            selected.append(path)
+    used_names: set[str] = set()
+    specs: list[str] = []
+    for path in selected:
+        base = path.name.replace("=", "-").strip() or "Project"
+        base = base[:90]
+        name = base
+        suffix = 2
+        while name.casefold() in used_names:
+            name = f"{base} {suffix}"
+            suffix += 1
+        used_names.add(name.casefold())
+        specs.append(f"{name}={path}")
+    return specs
 
 
 def build_install_artifact_paths(install_root: str | Path | None) -> dict[str, Path]:
@@ -105,6 +302,8 @@ STAGE_MARKERS = [
     "[Step 4a]",
     "[Step 5]",
     "Verifying MCP handshake",
+    "[Step 5b]",
+    "[Step 5c]",
 ]
 TOTAL_STAGES = len(STAGE_MARKERS)
 
@@ -193,9 +392,24 @@ class InstallerApp:
         self.stages_hit = 0
         self.seen_markers: set[str] = set()
         self.cancel_requested = False
+        self.retry_retained_rollback = False
+        self.retry_uninstall = False
+        self.project_paths: list[Path] = []
 
         self.default_install_path = default_install_path()
         self.default_data_path = default_data_path()
+        self.active_operation = self._read_operation_copy(self.default_install_path)
+        self.managed_backup_path = (
+            read_managed_backup_path(
+                self.installer_dir,
+                self.default_install_path,
+            )
+            or default_backup_path()
+        )
+        self.active_uninstall_description = read_package_uninstall(
+            self.installer_dir,
+            self.default_install_path,
+        )
         self.badge_image = None
 
         # Keep colors limited to log/status accents. The main layout uses native
@@ -212,11 +426,11 @@ class InstallerApp:
         self.root.title("Install Elefante")
 
         # Center on screen
-        w, h = 920, 820
+        w, h = 920, 920
         x = (self.root.winfo_screenwidth() - w) // 2
         y = max(40, (self.root.winfo_screenheight() - h) // 3)
         self.root.geometry(f"{w}x{h}+{x}+{y}")
-        self.root.minsize(820, 700)
+        self.root.minsize(820, 780)
 
         # Bring to front
         self.root.lift()
@@ -272,7 +486,7 @@ class InstallerApp:
         outer = ttk.Frame(self.root, padding=(28, 24, 28, 24))
         outer.pack(fill=tk.BOTH, expand=True)
         outer.columnconfigure(0, weight=1)
-        outer.rowconfigure(7, weight=1)
+        outer.rowconfigure(8, weight=1)
 
         hero = ttk.Frame(outer)
         hero.grid(row=0, column=0, sticky="ew")
@@ -282,7 +496,8 @@ class InstallerApp:
         if badge is not None:
             ttk.Label(hero, image=badge).grid(row=0, column=0, rowspan=3, sticky="nw", padx=(0, 18))
 
-        ttk.Label(hero, text="Install Elefante", style="Title.TLabel").grid(
+        self.operation_title_var = tk.StringVar(value=self.active_operation["title"])
+        ttk.Label(hero, textvariable=self.operation_title_var, style="Title.TLabel").grid(
             row=0, column=1, sticky="w"
         )
         ttk.Label(
@@ -316,6 +531,12 @@ class InstallerApp:
         ttk.Label(summary, text=f"Data:       {self.default_data_path}", style="Mono.TLabel").grid(
             row=2, column=0, sticky="w"
         )
+        self.backup_path_var = tk.StringVar(
+            value=f"Backups:    {self.managed_backup_path}"
+        )
+        ttk.Label(summary, textvariable=self.backup_path_var, style="Mono.TLabel").grid(
+            row=3, column=0, sticky="w", pady=(2, 0)
+        )
 
         location = ttk.LabelFrame(outer, text="Install location", padding=(18, 14), style="Section.TLabelframe")
         location.grid(row=3, column=0, sticky="ew", pady=(16, 0))
@@ -348,8 +569,55 @@ class InstallerApp:
             justify=tk.LEFT,
         ).grid(row=2, column=0, sticky="w", pady=(10, 0))
 
+        self.projects_frame = ttk.LabelFrame(
+            outer,
+            text="Choose where Elefante may remember",
+            padding=(18, 14),
+            style="Section.TLabelframe",
+        )
+        self.projects_frame.grid(row=4, column=0, sticky="ew", pady=(16, 0))
+        self.projects_frame.columnconfigure(0, weight=1)
+        ttk.Label(
+            self.projects_frame,
+            text=(
+                "Select at least one real project folder. Each folder receives an "
+                "isolated memory scope; Elefante never scans or changes project files."
+            ),
+            style="Body.TLabel",
+            wraplength=760,
+            justify=tk.LEFT,
+        ).grid(row=0, column=0, sticky="w")
+        self.project_summary_var = tk.StringVar(value="No project folders selected")
+        self.project_summary_label = ttk.Label(
+            self.projects_frame,
+            textvariable=self.project_summary_var,
+            style="Error.TLabel",
+            wraplength=760,
+            justify=tk.LEFT,
+        )
+        self.project_summary_label.grid(row=1, column=0, sticky="w", pady=(8, 0))
+        project_actions = ttk.Frame(self.projects_frame)
+        project_actions.grid(row=2, column=0, sticky="w", pady=(10, 0))
+        self.add_project_btn = ttk.Button(
+            project_actions,
+            text="Add Project Folder…",
+            command=self._add_project,
+        )
+        self.add_project_btn.grid(row=0, column=0, sticky="w")
+        self.remove_project_btn = ttk.Button(
+            project_actions,
+            text="Remove Last",
+            command=self._remove_project,
+        )
+        self.remove_project_btn.grid(row=0, column=1, sticky="w", padx=(10, 0))
+        ttk.Label(
+            project_actions,
+            text="Disposable Recall and a verified local backup run automatically.",
+            style="Success.TLabel",
+        ).grid(row=0, column=2, sticky="w", padx=(14, 0))
+
         recovery = ttk.LabelFrame(outer, text="Recovery files", padding=(18, 14), style="Section.TLabelframe")
-        recovery.grid(row=4, column=0, sticky="ew", pady=(16, 0))
+        recovery.grid(row=5, column=0, sticky="ew", pady=(16, 0))
         recovery.columnconfigure(0, weight=1)
         ttk.Label(
             recovery,
@@ -382,16 +650,34 @@ class InstallerApp:
         ttk.Button(recovery_actions, text="Open Install Folder", command=self._open_install_folder).grid(row=0, column=3, sticky="w", padx=(10, 0))
 
         actions = ttk.Frame(outer)
-        actions.grid(row=5, column=0, sticky="ew", pady=(16, 10))
-        actions.columnconfigure(1, weight=1)
+        actions.grid(row=6, column=0, sticky="ew", pady=(16, 10))
+        actions.columnconfigure(3, weight=1)
 
         self.install_btn = ttk.Button(
             actions,
-            text="Install Elefante",
+            text=self.active_operation["title"],
             command=self._start_install,
             style="Install.TButton",
         )
         self.install_btn.grid(row=0, column=0, sticky="w")
+
+        self.rollback_btn = ttk.Button(
+            actions,
+            text="Roll Back Previous Version",
+            command=self._start_retained_rollback,
+        )
+        self.rollback_btn.grid(row=0, column=1, sticky="w", padx=(10, 0))
+        if self.active_operation["retained_rollback_available"] != "true":
+            self.rollback_btn.grid_remove()
+
+        self.uninstall_btn = ttk.Button(
+            actions,
+            text="Uninstall Elefante",
+            command=self._start_uninstall,
+        )
+        self.uninstall_btn.grid(row=0, column=2, sticky="w", padx=(10, 0))
+        if self.active_uninstall_description is None:
+            self.uninstall_btn.grid_remove()
 
         ttk.Label(
             actions,
@@ -399,21 +685,25 @@ class InstallerApp:
             style="Muted.TLabel",
             wraplength=560,
             justify=tk.LEFT,
-        ).grid(row=0, column=1, sticky="w", padx=(18, 0))
+        ).grid(row=0, column=3, sticky="w", padx=(18, 0))
 
         progress_wrap = ttk.Frame(outer)
-        progress_wrap.grid(row=6, column=0, sticky="ew")
+        progress_wrap.grid(row=7, column=0, sticky="ew")
         progress_wrap.columnconfigure(0, weight=1)
 
         self.progress_var = tk.DoubleVar(value=0)
         self.progress = ttk.Progressbar(progress_wrap, variable=self.progress_var, maximum=TOTAL_STAGES)
         self.progress.grid(row=0, column=0, sticky="ew")
 
-        self.status_label = ttk.Label(progress_wrap, text="Ready to install", style="Muted.TLabel")
+        self.status_label = ttk.Label(
+            progress_wrap,
+            text=self.active_operation["ready"],
+            style="Muted.TLabel",
+        )
         self.status_label.grid(row=1, column=0, sticky="w", pady=(6, 0))
 
         log_frame = ttk.LabelFrame(outer, text="Installer output", padding=(12, 12), style="Section.TLabelframe")
-        log_frame.grid(row=7, column=0, sticky="nsew", pady=(16, 0))
+        log_frame.grid(row=8, column=0, sticky="nsew", pady=(16, 0))
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(0, weight=1)
 
@@ -440,6 +730,7 @@ class InstallerApp:
         self.output.tag_configure("hdr", foreground=self.C["accent"], font=("Menlo", 10, "bold"))
 
         self._refresh_artifact_paths()
+        self._refresh_project_summary()
         self._append("Live installer output will appear here once installation starts.", "hdr")
 
     # ── Actions ──────────────────────────────────────────────────────────
@@ -453,8 +744,56 @@ class InstallerApp:
         if path:
             self.path_var.set(path)
 
+    def _add_project(self):
+        from tkinter import filedialog
+
+        path = filedialog.askdirectory(title="Choose a Project Folder")
+        if path:
+            selected = Path(path).expanduser().resolve()
+            if selected not in self.project_paths:
+                self.project_paths.append(selected)
+            self._refresh_project_summary()
+
+    def _remove_project(self):
+        if self.project_paths:
+            self.project_paths.pop()
+        self._refresh_project_summary()
+
+    def _refresh_project_summary(self):
+        is_install = self.active_operation["operation"] == "install"
+        if is_install:
+            self.projects_frame.grid()
+        else:
+            self.projects_frame.grid_remove()
+        if self.project_paths:
+            visible = [f"• {path.name} — {path}" for path in self.project_paths[:3]]
+            if len(self.project_paths) > 3:
+                visible.append(f"+ {len(self.project_paths) - 3} more")
+            self.project_summary_var.set("\n".join(visible))
+            self.project_summary_label.configure(style="Mono.TLabel")
+        else:
+            self.project_summary_var.set("No project folders selected")
+            self.project_summary_label.configure(style="Error.TLabel")
+        enabled = not self.installing and is_install
+        self.add_project_btn.configure(state=self.tk.NORMAL if enabled else self.tk.DISABLED)
+        self.remove_project_btn.configure(
+            state=(
+                self.tk.NORMAL
+                if enabled and self.project_paths
+                else self.tk.DISABLED
+            )
+        )
+        self.install_btn.configure(
+            state=(
+                self.tk.NORMAL
+                if not self.installing and (not is_install or self.project_paths)
+                else self.tk.DISABLED
+            )
+        )
+
     def _on_path_changed(self, *_args):
         self._refresh_artifact_paths()
+        self._refresh_operation_copy()
 
     def _current_install_root(self) -> Path:
         return normalize_install_root(self.path_var.get())
@@ -462,11 +801,50 @@ class InstallerApp:
     def _current_artifact_paths(self) -> dict[str, Path]:
         return build_install_artifact_paths(self._current_install_root())
 
+    def _read_operation_copy(self, install_root: str | Path) -> dict[str, str]:
+        description = read_package_operation(self.installer_dir, install_root)
+        return installer_operation_copy(install_root, description)
+
     def _refresh_artifact_paths(self):
         paths = self._current_artifact_paths()
         self.summary_path_var.set(f"Summary: {paths['summary']}")
         self.status_path_var.set(f"Status:  {paths['status']}")
         self.log_path_var.set(f"Log:     {paths['log']}")
+
+    def _refresh_operation_copy(self):
+        if self.installing:
+            return
+        self.active_operation = self._read_operation_copy(self._current_install_root())
+        self.managed_backup_path = (
+            read_managed_backup_path(
+                self.installer_dir,
+                self._current_install_root(),
+            )
+            or default_backup_path()
+        )
+        self.backup_path_var.set(f"Backups:    {self.managed_backup_path}")
+        self.active_uninstall_description = read_package_uninstall(
+            self.installer_dir,
+            self._current_install_root(),
+        )
+        self.operation_title_var.set(self.active_operation["title"])
+        self.install_btn.configure(text=self.active_operation["title"])
+        if self.active_operation["retained_rollback_available"] == "true":
+            target = self.active_operation["retained_target_version"]
+            self.rollback_btn.configure(
+                text=f"Roll Back to {target}" if target else "Roll Back Previous Version",
+                state=self.tk.NORMAL,
+            )
+            self.rollback_btn.grid()
+        else:
+            self.rollback_btn.grid_remove()
+        if self.active_uninstall_description is not None:
+            self.uninstall_btn.configure(state=self.tk.NORMAL)
+            self.uninstall_btn.grid()
+        else:
+            self.uninstall_btn.grid_remove()
+        self._refresh_project_summary()
+        self._set_status(self.active_operation["ready"], "muted")
 
     def _open_path_or_parent(self, path: Path, missing_message: str):
         target = path if path.exists() else path.parent
@@ -498,6 +876,52 @@ class InstallerApp:
         target = install_root if install_root.exists() else install_root.parent
         subprocess.run(["open", str(target)], check=False)
 
+    def _confirm_code_rollback(self, current_version: str, target_version: str) -> bool:
+        from tkinter import messagebox
+
+        return messagebox.askokcancel(
+            "Roll Back Elefante?",
+            (
+                f"Product code will change from {current_version} to {target_version}.\n\n"
+                "Your memories will not be restored or reversed. Elefante will create "
+                "a verified data backup first and restore the current code automatically "
+                "if the target fails verification."
+            ),
+            icon="warning",
+        )
+
+    def _begin_operation(self, install_path: str, cmd: list[str]):
+        self.installing = True
+        self.retry_retained_rollback = "--rollback-retained" in cmd
+        self.retry_uninstall = "--uninstall" in cmd
+        self.stages_hit = 0
+        self.seen_markers.clear()
+        self.cancel_requested = False
+        self.progress_var.set(0)
+        self.install_btn.configure(state=self.tk.DISABLED)
+        self.rollback_btn.configure(state=self.tk.DISABLED)
+        self.uninstall_btn.configure(state=self.tk.DISABLED)
+        self.browse_btn.configure(state=self.tk.DISABLED)
+        self.path_entry.configure(state=self.tk.DISABLED)
+        self.add_project_btn.configure(state=self.tk.DISABLED)
+        self.remove_project_btn.configure(state=self.tk.DISABLED)
+
+        self._set_status(self.active_operation["starting"], "muted")
+        if self.retry_uninstall:
+            self._append("A verified backup will be created before app removal.", "hdr")
+            self._append("Memories remain local and available for reinstall.", "hdr")
+        else:
+            for line in render_install_artifact_paths(install_path):
+                self._append(line, "hdr")
+            if self.active_operation["operation"] == "install":
+                self._append(
+                    f"Projects: {len(self.project_paths)} isolated folder(s); "
+                    "disposable Recall and local backup included",
+                    "hdr",
+                )
+        self._append("")
+        threading.Thread(target=self._run, args=(cmd,), daemon=True).start()
+
     def _start_install(self):
         if self.installing:
             return
@@ -506,19 +930,21 @@ class InstallerApp:
             self._set_status("Please choose an install location", "err")
             return
 
-        self.installing = True
-        self.stages_hit = 0
-        self.seen_markers.clear()
-        self.cancel_requested = False
-        self.progress_var.set(0)
-        self.install_btn.configure(state=self.tk.DISABLED)
-        self.browse_btn.configure(state=self.tk.DISABLED)
-        self.path_entry.configure(state=self.tk.DISABLED)
-
-        self._set_status("Starting installation\u2026", "muted")
-        for line in render_install_artifact_paths(install_path):
-            self._append(line, "hdr")
-        self._append("")
+        self.active_operation = self._read_operation_copy(install_path)
+        project_specs = build_project_specs(self.project_paths)
+        if self.active_operation["operation"] == "install" and not project_specs:
+            self._set_status("Choose at least one project folder", "err")
+            self._refresh_project_summary()
+            return
+        if self.active_operation["operation"] == "rollback":
+            current_version = self.active_operation["current_version"] or "current version"
+            target_version = self.active_operation["target_version"] or "older version"
+            if not self.active_operation["confirmation_token"]:
+                self._set_status("Code rollback cannot be verified from this package", "err")
+                return
+            if not self._confirm_code_rollback(current_version, target_version):
+                self._set_status("Code rollback cancelled; nothing changed", "muted")
+                return
 
         cmd = [
             str(self.installer_dir / "install.sh"),
@@ -526,7 +952,101 @@ class InstallerApp:
             "--venv-mode", "fresh",
             "--verbose",
         ]
-        threading.Thread(target=self._run, args=(cmd,), daemon=True).start()
+        if self.active_operation["operation"] == "rollback":
+            cmd.extend(
+                [
+                    "--confirm-code-rollback",
+                    self.active_operation["confirmation_token"],
+                ]
+            )
+        if self.active_operation["operation"] == "install":
+            for project in project_specs:
+                cmd.extend(["--project", project])
+        self._begin_operation(install_path, cmd)
+
+    def _start_uninstall(self):
+        if self.installing:
+            return
+        from tkinter import messagebox
+
+        install_path = str(self._current_install_root())
+        description = read_package_uninstall(self.installer_dir, install_path)
+        if description is None:
+            self._set_status("Use the exact official package that installed Elefante", "err")
+            self._refresh_operation_copy()
+            return
+        token = str(description.get("confirmation_token") or "")
+        if not token:
+            self._set_status("Uninstall confirmation could not be verified", "err")
+            return
+        if not messagebox.askokcancel(
+            "Uninstall Elefante?",
+            (
+                "Elefante app files and unchanged Elefante-owned agent connections "
+                "will be removed. A verified backup is created first.\n\n"
+                "Your memories remain on this computer for reinstall. Modified "
+                "customer configuration is preserved. Create a support report first "
+                "if you are uninstalling to diagnose a problem."
+            ),
+            icon="warning",
+        ):
+            self._set_status("Uninstall cancelled; nothing changed", "muted")
+            return
+        self.active_operation = {
+            **self.active_operation,
+            "operation": "uninstall",
+            "verb": "Uninstall",
+            "title": "Uninstall Elefante",
+            "ready": "Ready to uninstall",
+            "starting": "Starting uninstall…",
+            "complete": "Uninstall verified — app removed and memories preserved for reinstall.",
+        }
+        cmd = [
+            str(self.installer_dir / "install.sh"),
+            "--install-root",
+            install_path,
+            "--uninstall",
+            token,
+        ]
+        self._begin_operation(install_path, cmd)
+
+    def _start_retained_rollback(self):
+        if self.installing:
+            return
+        install_path = str(self._current_install_root())
+        package_operation = self._read_operation_copy(install_path)
+        token = package_operation["retained_rollback_token"]
+        current_version = package_operation["retained_current_version"]
+        target_version = package_operation["retained_target_version"]
+        if (
+            package_operation["retained_rollback_available"] != "true"
+            or not token
+            or not current_version
+            or not target_version
+        ):
+            self._set_status("No exact verified previous product is available", "err")
+            self._refresh_operation_copy()
+            return
+        if not self._confirm_code_rollback(current_version, target_version):
+            self._set_status("Code rollback cancelled; nothing changed", "muted")
+            return
+        self.active_operation = installer_operation_copy(
+            install_path,
+            {
+                "operation": "rollback",
+                "current_version": current_version,
+                "target_version": target_version,
+                "confirmation_token": token,
+            },
+        )
+        cmd = [
+            str(self.installer_dir / "install.sh"),
+            "--install-root",
+            install_path,
+            "--rollback-retained",
+            token,
+        ]
+        self._begin_operation(install_path, cmd)
 
     def _run(self, cmd: list[str]):
         try:
@@ -581,27 +1101,26 @@ class InstallerApp:
 
         if rc == 0:
             self.progress_var.set(TOTAL_STAGES)
-            self._set_status("Installation complete!", "ok")
+            self._set_status(self.active_operation["complete"], "ok")
             self._append("")
-            self._append(
-                "Installation complete! Restart your IDE to activate Elefante.", "ok",
-            )
+            self._append(self.active_operation["complete"], "ok")
             self.install_btn.configure(
                 text="  Done  ", state=self.tk.NORMAL,
                 command=self.root.destroy,
             )
         else:
+            operation = self.active_operation["verb"]
             failure_status = (
-                "Installation stopped \u2014 use the recovery files below"
+                f"{operation} stopped \u2014 use the recovery files below"
                 if self.cancel_requested
-                else "Installation failed \u2014 use the recovery files below"
+                else f"{operation} failed \u2014 use the recovery files below"
             )
             self._set_status(failure_status, "err")
             self._append("")
             self._append(
-                "Installation stopped before completion."
+                f"{operation} stopped before completion."
                 if self.cancel_requested
-                else "Installation failed.",
+                else f"{operation} failed.",
                 "err",
             )
             for guidance_line in render_failed_install_guidance(self._current_install_root()):
@@ -612,15 +1131,23 @@ class InstallerApp:
             )
             self.browse_btn.configure(state=self.tk.NORMAL)
             self.path_entry.configure(state=self.tk.NORMAL)
+            self.rollback_btn.configure(state=self.tk.NORMAL)
+            self.uninstall_btn.configure(state=self.tk.NORMAL)
+            self._refresh_project_summary()
         self.cancel_requested = False
 
     def _retry(self):
         self.output.configure(state=self.tk.NORMAL)
         self.output.delete("1.0", self.tk.END)
         self.output.configure(state=self.tk.DISABLED)
-        self.install_btn.configure(text="  Install Elefante  ")
         self.installing = False
-        self._start_install()
+        self._refresh_operation_copy()
+        if self.retry_uninstall:
+            self._start_uninstall()
+        elif self.retry_retained_rollback:
+            self._start_retained_rollback()
+        else:
+            self._start_install()
 
     # ── Window close ─────────────────────────────────────────────────────
 

@@ -10,6 +10,13 @@ from scripts.verify.verify_dashboard_snapshot import validate_snapshot
 def _snapshot() -> dict:
     return {
         "generated_at": "2026-08-27T12:00:00",
+        "project_registry": {
+            "status": "ready",
+            "schema_version": 1,
+            "mode": "compatibility",
+            "revision": 0,
+            "projects": [],
+        },
         "stats": {
             "total_nodes": 3,
             "memories": 2,
@@ -97,3 +104,23 @@ def test_snapshot_verifier_rejects_health_and_usage_drift():
     assert any("invalid health_status" in message for message in result.errors)
     assert any("counts does not match" in message for message in result.errors)
     assert any("memory counts do not match" in message for message in result.errors)
+
+
+def test_snapshot_verifier_rejects_missing_or_fail_open_project_state():
+    missing = _snapshot()
+    missing.pop("project_registry")
+    fail_open = _snapshot()
+    fail_open["project_registry"] = {
+        "status": "unavailable",
+        "schema_version": None,
+        "mode": "compatibility",
+        "revision": None,
+        "projects": [],
+        "error_code": "PROJECT_REGISTRY_UNAVAILABLE",
+    }
+
+    missing_result = validate_snapshot(missing, require_curation=False)
+    fail_open_result = validate_snapshot(fail_open, require_curation=False)
+
+    assert any("project_registry" in message for message in missing_result.errors)
+    assert any("fail closed" in message for message in fail_open_result.errors)

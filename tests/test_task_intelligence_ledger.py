@@ -13,7 +13,9 @@ from src.core.task_intelligence_ledger import (
     TaskIntelligenceLedger,
     TaskIntelligenceLedgerError,
     canonical_digest,
+    sha256_text,
 )
+from src.core.project_registry import ProjectRegistry
 from src.mcp.server import ElefanteMCPServer
 from src.models.memory import Memory, MemoryMetadata, MemoryType
 from src.models.query import SearchResult
@@ -41,14 +43,16 @@ async def test_task_intelligence_surface_is_default_off_and_explicitly_enabled(
     default_names = {tool.name for tool in default_result.root.tools}
     assert "elefante-TaskIntelligence" not in default_names
     assert "elefante-Recall" in default_names
-    assert len(default_names) == 17
+    assert "elefante-Recover" in default_names
+    assert len(default_names) == 18
 
     monkeypatch.setenv("ELEFANTE_TASK_INTELLIGENCE_ENABLED", "1")
     enabled_result = await handler(request)
     enabled_names = {tool.name for tool in enabled_result.root.tools}
     assert "elefante-TaskIntelligence" in enabled_names
     assert "elefante-Recall" in enabled_names
-    assert len(enabled_names) == 18
+    assert "elefante-Recover" in enabled_names
+    assert len(enabled_names) == 19
 
 
 def _trace(
@@ -332,6 +336,64 @@ async def test_server_pilot_closes_prepare_use_outcome_loop_without_ranking_muta
     inspected = server._handle_task_trace_inspect({"trace_id": prepared["trace_id"]})
     assert inspected["success"] is True
     assert inspected["trace"]["outcome"]["status"] == "succeeded"
+    ledger.close()
+
+
+@pytest.mark.asyncio
+async def test_task_intelligence_canonicalizes_registered_workspace_before_selection(
+    monkeypatch, tmp_path
+) -> None:
+    real_workspace = tmp_path / "real-project"
+    real_workspace.mkdir()
+    alias_workspace = tmp_path / "project-alias"
+    alias_workspace.symlink_to(real_workspace, target_is_directory=True)
+    registry = ProjectRegistry(tmp_path / "projects.json")
+    project = registry.register("Canonical project", real_workspace)
+    registry.set_mode("strict")
+
+    memory = Memory(
+        content="Decision: use the canonical registered project path for retrieval.",
+        metadata=MemoryMetadata(
+            memory_type=MemoryType.DECISION,
+            source_reliability=0.9,
+            verified=True,
+            project=project.project_id,
+            workspace=project.root,
+        ),
+    )
+    result = SearchResult(memory=memory, score=0.9, vector_score=0.9, source="vector")
+    server = ElefanteMCPServer()
+    server._project_registry = registry
+    ledger = TaskIntelligenceLedger(tmp_path / "canonical-task-ledger.sqlite3")
+    monkeypatch.setenv("ELEFANTE_TASK_INTELLIGENCE_PILOT", "1")
+    monkeypatch.setattr(
+        server,
+        "_request_provenance",
+        lambda: {**PROVENANCE, "cwd": str(alias_workspace)},
+    )
+    monkeypatch.setattr(
+        server, "_get_orchestrator", lambda: _async_value(_Orchestrator(result))
+    )
+    monkeypatch.setattr(server, "_get_task_intelligence_ledger", lambda: ledger)
+
+    prepared = await server._handle_task_intelligence(
+        {
+            "action": "prepare",
+            "task": "Which canonical project path applies to retrieval?",
+            "project": project.project_id,
+            "workspace": str(alias_workspace),
+            "profile": "v2",
+            "delivery_mode": "pilot",
+        }
+    )
+
+    assert prepared["status"] == "delivered"
+    trace = ledger.validate_trace(
+        prepared["trace_id"],
+        provenance={**PROVENANCE, "cwd": str(alias_workspace)},
+    )
+    assert trace["project_sha256"] == sha256_text(project.project_id)
+    assert trace["workspace_sha256"] == sha256_text(project.root)
     ledger.close()
 
 

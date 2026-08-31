@@ -585,6 +585,11 @@ async def test_live_mcp_server_survives_shutdown_regression(tmp_path):
                     "domain": "project",
                     "category": "crash-regression",
                     "tags": [token, "crash-regression", "pytest-live"],
+                    "scope": "project:live-mcp-regression",
+                    "metadata": {
+                        "project": "live-mcp-regression",
+                        "workspace": str(project_root),
+                    },
                     "force_new": True,
                 },
             )
@@ -611,26 +616,41 @@ async def test_live_mcp_server_survives_shutdown_regression(tmp_path):
                 {"action": "search", "query": shared_phrase, "limit": 10},
             )
             assert search.get("success") is True, search
-            response = await client.call_tool(
+            plan_response = await client.call_tool(
                 "elefante-Memory",
-                {"action": "delete", 
+                {
+                    "action": "correct",
+                    "correction": "archive",
                     "memory_id": memory_id,
-                    "reason": f"Cleanup for live MCP crash regression probe {token}",
-                    "delete_mode": "permanent",
-                    "invocation_mode": "user_directed",
-                    "confirm_permanent": True,
                 },
             )
-            assert response.get("success", False), f"MemoryDelete failed for {memory_id}: {response}"
-            await client.ensure_alive(f"after delete {memory_id[:8]}")
+            assert plan_response.get("correction_status") == "READY", plan_response
+            plan = plan_response["plan"]
+            response = await client.call_tool(
+                "elefante-Memory",
+                {
+                    "action": "correct",
+                    "correction": "archive",
+                    "memory_id": memory_id,
+                    "apply": True,
+                    "reason": f"Cleanup for live MCP crash regression probe {token}",
+                    "verification_question": shared_phrase,
+                    "expected_record_sha256": plan["record_sha256"],
+                    "expected_graph_sha256": plan["graph_sha256"],
+                    "invocation_mode": "user_directed",
+                },
+            )
+            assert response.get("success", False), f"Correct archive failed for {memory_id}: {response}"
+            assert response.get("correction_status") == "VERIFIED_COMPLETE", response
+            await client.ensure_alive(f"after verified archive {memory_id[:8]}")
 
         final_search = await client.call_tool("elefante-Memory", {"action": "search", "query": shared_phrase, "limit": 10})
         tagged_after_delete = [
             item for item in final_search.get("results", [])
             if token in item.get("memory", {}).get("content", "")
         ]
-        assert not tagged_after_delete, f"Deleted memories still surfaced after delete: {tagged_after_delete}"
-        await client.ensure_alive("after final delete verification")
+        assert not tagged_after_delete, f"Archived memories still surfaced: {tagged_after_delete}"
+        await client.ensure_alive("after final archive verification")
     finally:
         await client.stop()
     

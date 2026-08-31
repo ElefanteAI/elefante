@@ -5,7 +5,7 @@
 
 ## Current decision
 
-Fresh Elefante v2.12.3 installations use the embedded SQLite vector store plus
+Fresh Elefante v2.12.3 and later installations use the embedded SQLite vector store plus
 Kuzu. ChromaDB is not in the production dependency lock. Elefante does not
 silently inspect, convert, or delete a legacy ChromaDB store.
 

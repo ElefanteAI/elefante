@@ -432,11 +432,43 @@ Keep a lesson out of this file if it is only a one-off workaround, a narrow envi
 ### Declarative Triggers Must Be Opt-In Delivery Gates (GAP-056)
 
 - **Trigger:** A memory schema contains `trigger` or `surfaces_when` phrases and a new caller wants the memory to appear automatically in task context.
-- **Rule:** Require an explicit caller-supplied context, literal case-insensitive matching, `injection_policy="triggered"`, a small result cap, and the same lifecycle, scope, source-trust, conflict, and privacy gates as normal delivery. Keep the path read-only and do not silently turn a metadata hint into host interception.
+- **Rule:** Require an explicit caller- or typed-host-event context, literal case-insensitive matching, `injection_policy="triggered"`, a small result cap, and the same lifecycle, scope, source-trust, conflict, and privacy gates as normal delivery. Keep the path read-only; event adapters must use bounded file, terminal-error, or conversation envelopes and the loopback endpoint rather than invisible full-store interception.
 - Known stored conflicts must be surfaced as a bounded warning while both sides remain withheld; warning delivery is not semantic conflict detection or an automatic winner.
 - **Why:** A trigger phrase describes user intent, but it is not a license for broad injection. Unbounded scanning, semantic interpretation, or automatic host hooks can leak stale or private context and create a second retrieval system that users cannot inspect or roll back.
-- **Proof:** [postmortems/ai-behavior.md Issue #23](postmortems/ai-behavior.md#issue-23), `src/core/governance.py`, `src/core/orchestrator.py`, `src/core/task_intelligence.py`, and `tests/test_proactive_surfacing.py`.
-- **Avoid:** Treating `surfaces_when` as active behavior merely because it persists, matching ranked memories, bypassing conflict/privacy gates, or claiming proactive host behavior when only an explicit search context is supported.
+- **Proof:** [postmortems/ai-behavior.md Issue #23](postmortems/ai-behavior.md#issue-23), `src/core/governance.py`, `src/core/orchestrator.py`, `src/core/task_intelligence.py`, `tests/test_proactive_surfacing.py`, `tests/test_host_event_adapters.py`, and `tests/test_host_event_endpoint.py`.
+- **Avoid:** Treating `surfaces_when` as general ranking, matching ranked memories, bypassing conflict/privacy gates, persisting raw host events, or claiming interception beyond the explicit typed adapter contract.
+
+### Isolate and Validate Destructive Targets Before Apply (BUG-058)
+
+- **Trigger:** A fail-first test must prove that a privileged script resolves the wrong durable target.
+- **Rule:** Make the test's configuration and target isolation effective before invoking the apply path. Assert the dry-run target first, use a temporary custom path, and verify that unrelated durable paths remain untouched. At runtime, reject root, home, data/vector/recovery ancestors and require the exact resolved path as a second confirmation for configured storage outside the Elefante data root.
+- **Why:** A regression can correctly expose a target-resolution bug while still damaging the default store it inherited. “Expected to fail” is not a safety boundary, and a configuration value identifies a candidate target rather than granting authority to move any directory it names.
+- **Proof:** [postmortems/database.md Issue #12](postmortems/database.md#issue-12) and `tests/test_backup_restore.py::test_kuzu_only_reset_targets_configured_graph_and_never_claims_rebuild`.
+- **Avoid:** Calling a known-stale destructive implementation with confirmation flags until test isolation is independently guaranteed; treating one generic confirmation as permission for a broad or external target.
+
+### Verify Completion Across Every Promised Product Surface (BUG-059)
+
+- **Trigger:** A product operation mutates authoritative state and promises a derived view, retrieval result, backup, or other customer-visible consequence.
+- **Rule:** Define those consequences as explicit postconditions. Perform the semantic write once, read back authoritative state, publish derived state atomically, verify the consuming path, and compensate from an exact preimage if any postcondition fails. An incomplete compensation is `UNSAFE`, never success or no-change.
+- **Why:** A successful adapter return proves only that one call returned. It does not prove that durable state is coherent, the UI shows it, or the customer-facing read path uses it.
+- **Proof:** [postmortems/memory.md Issue #17](postmortems/memory.md#issue-17), `tests/test_verified_resolve.py`, `tests/test_atomic_json.py`, and `tests/test_home_control.py`.
+- **Avoid:** Retrying semantic writes, treating snapshot refresh as best effort, trusting boolean adapter returns without readback, or building a generic operation framework before a second operation proves the shared abstraction.
+
+### Fail-Closed Intent Must Survive Loss of Its Primary State (BUG-060)
+
+- **Trigger:** A product safety mode relies on a mutable registry, configuration, or projection that can be missing, stale, or corrupt.
+- **Rule:** Persist the customer's irreversible safety intent separately from the state it governs. Validate both before opening protected stores, preserve unknown or invalid state at every derived surface, and update coupled control files inside one exact rollback boundary. A custom data installation also owns its lock path.
+- **Why:** If absence means compatibility, deleting or losing one file silently weakens a customer promise. If a projection invents readiness or a global lock escapes the configured data root, the UI and test environment no longer prove the same product state as the runtime.
+- **Proof:** [postmortems/memory.md Issue #18](postmortems/memory.md#issue-18), `tests/test_project_registry.py`, `tests/test_project_scoping.py`, `tests/test_home_control.py`, `tests/test_dashboard_snapshot_verifier.py`, and `tests/test_write_lock_isolation.py`.
+- **Avoid:** Encoding strict intent only inside the registry it protects, treating a missing snapshot field as compatibility, updating registry and Home projection independently, or assuming an isolated data directory also isolates account-global locks.
+
+### One Customer Correction Path Must Own Completion (BUG-061)
+
+- **Trigger:** The same customer intent can mutate knowledge through a verified product flow or through older low-level update/delete aliases.
+- **Rule:** Route customer-visible content and lifecycle repair through one inspect-first operation that binds exact project-scoped preimages, writes once, verifies every promised consuming surface, and compensates exactly. Keep governance-only amendments separate. Block irreversible deletion until a verified recovery boundary exists.
+- **Why:** If a legacy alias can skip graph, Home, Recall, authority, or rollback checks, the safer interface is optional and the product cannot truthfully promise correction. An unavailable destructive action is safer and clearer than an irreversible button backed only by confirmation text.
+- **Proof:** [postmortems/memory.md Issue #19](postmortems/memory.md#issue-19), `tests/test_verified_correction.py`, `tests/test_home_control.py`, `tests/test_mcp_daemon.py`, and the rendered Home correction acceptance.
+- **Avoid:** Treating a successful store adapter call as completion; retaining content/lifecycle writes in a compatibility alias; exposing a generic browser write proxy; or enabling permanent deletion before Recover proves a fresh restorable backup.
 
 ---
 

@@ -11,7 +11,8 @@ Elefante user-data directory on Windows; configuration can override it.
 
 Stop the daemon and all direct Elefante processes. On macOS/Linux, use the
 stable customer runtime to preview and then remove only the installer-owned
-service registration; this does not delete memory data:
+service registration; this does not delete memory data or uninstall the
+product:
 
 ```bash
 ELEFANTE_RUNTIME="$HOME/.elefante/app/current"

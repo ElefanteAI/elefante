@@ -686,9 +686,10 @@ class TaskBriefCompiler:
                 min(1.0, float(custom.get("retrieval_specificity", 0.0))),
             )
             surface_match = float(bool(result.surface_matches))
+            recall_cue_match = float(bool(result.recall_cue_match))
             semantic = float(
                 0.0
-                if surface_match
+                if surface_match or recall_cue_match
                 else (
                     result.vector_score
                     if result.vector_score is not None
@@ -721,7 +722,7 @@ class TaskBriefCompiler:
             role_value = 1.0 if role != EvidenceRole.CONTEXT else 0.0
             raw_actionability = (
                 1.0
-                if surface_match
+                if surface_match or recall_cue_match
                 else (
                     0.25 * semantic
                     + 0.15 * lexical
@@ -751,6 +752,7 @@ class TaskBriefCompiler:
                 "actionability": round(actionability, 6),
                 "governing_directive": governing_directive,
                 "surface_match": surface_match,
+                "recall_cue_match": recall_cue_match,
             }
             signals["direct_answer"] = float(
                 semantic >= 0.78
@@ -767,6 +769,7 @@ class TaskBriefCompiler:
                 "source_code",
                 "governing_directive",
                 "surface_match",
+                "recall_cue_match",
             )
                 if float(signals[name]) > 0
             ]
@@ -807,6 +810,10 @@ class TaskBriefCompiler:
         if item.mandatory:
             return True
         signals = item.retrieval_signals or {}
+        # A complete, project-scoped question saved by the customer through a
+        # verified memory operation is direct evidence for that exact query.
+        if float(signals.get("recall_cue_match", 0.0)) > 0.0:
+            return True
         # A matching literal trigger is the complete, explicit evidence for
         # this opt-in path.  Lifecycle, scope, privacy, conflict, and source
         # trust have already been checked by ``_exclusion_reason``.
@@ -870,6 +877,7 @@ class TaskBriefCompiler:
             or governing_directive
             or role_text_anchor
             or float(signals.get("surface_match", 0.0)) > 0.0
+            or float(signals.get("recall_cue_match", 0.0)) > 0.0
         )
         # A candidate already classified as a direct answer has strong semantic
         # similarity plus bounded lexical coverage. Do not reject that evidence
@@ -1124,7 +1132,11 @@ class TaskBriefCompiler:
         )
         if not mandatory and metadata.source_reliability < self.MIN_RELIABILITY:
             return "low-source-reliability"
-        if not mandatory and result.score < self.MIN_RETRIEVAL_SCORE:
+        if (
+            not mandatory
+            and not result.recall_cue_match
+            and result.score < self.MIN_RETRIEVAL_SCORE
+        ):
             return "low-retrieval-score"
         return None
 

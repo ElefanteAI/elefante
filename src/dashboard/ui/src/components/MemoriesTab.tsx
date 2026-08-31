@@ -6,6 +6,29 @@ import { MemoryDetailPanel } from '@/components/MemoryDetailPanel';
 import { Sparkles, X } from 'lucide-react';
 import { edgeEndpoints, type MemoryNode, type SearchResult } from '@/types';
 
+function parseListValue(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value !== 'string') return [];
+
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item).trim()).filter(Boolean);
+      }
+    } catch {
+      return [];
+    }
+  }
+  return trimmed.includes(',')
+    ? trimmed.split(',').map((item) => item.trim()).filter(Boolean)
+    : [trimmed];
+}
+
 export function MemoriesTab() {
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -163,11 +186,16 @@ export function MemoriesTab() {
             if (target === selectedId && source) relatedIds.add(source);
           });
           const related = memories.filter((m) => relatedIds.has(m.id));
+          const conflictIds = parseListValue(mem.properties?.conflict_ids);
+          const conflictMemories = memories.filter(
+            (candidate) => candidate.id !== mem.id && conflictIds.includes(candidate.id),
+          );
 
           return (
             <MemoryDetailPanel
               memory={mem}
               relatedMemories={related}
+              conflictMemories={conflictMemories}
               health_status={mem.properties?.health_status}
               retrievalEvidence={selectedSearchResult ? {
                 query,

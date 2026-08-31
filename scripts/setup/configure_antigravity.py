@@ -25,11 +25,12 @@ _SETUP_DIR = str(Path(__file__).resolve().parent)
 if _SETUP_DIR not in sys.path:
     sys.path.insert(0, _SETUP_DIR)
 
-from install_manifest import (
+from install_manifest import (  # noqa: E402
     is_unchanged_emitted_json_entry,
     record_emitted_json_entry,
     write_json_atomically,
 )
+from host_selection import CUSTOMER_ALWAYS_ALLOW_TOOLS  # noqa: E402
 
 
 def _infer_repo_python(elefante_path: Path) -> str:
@@ -99,21 +100,7 @@ def configure_mcp(argv: list[str] | None = None):
             "unbuffer": "true",
         },
         "disabled": False,
-        "alwaysAllow": [
-            "elefante-Memory",  # consolidated v2.10.0: action=add|search|update|delete|consolidate
-            "elefante-GraphConnect",
-            "elefante-GraphQuery",
-            "elefante-ContextGet",
-            "elefante-SessionsList",
-            "elefante-SystemStatusGet",
-            "elefante-DashboardOpen",
-            "elefante-System",
-            "elefante-TaskCreate",
-            "elefante-TaskUpdate",
-            "elefante-TaskGraph",
-            "elefante-ETLProcess",
-            "elefante-ETLClassify",
-        ],
+        "alwaysAllow": list(CUSTOMER_ALWAYS_ALLOW_TOOLS),
     }
     
     # Inject config

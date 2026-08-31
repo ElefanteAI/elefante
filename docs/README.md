@@ -1,6 +1,8 @@
 # Elefante User Documentation
 
-> **v2.13.0** · Published user documentation. 17 tools, 2 prompts.
+> **v2.13.0** · Published user documentation.
+> Published package: 17 tools, 2 prompts. Current unreleased source: 18 tools,
+> 2 prompts, including verified Recover.
 
 This index covers the released customer product: installation, configuration,
 operation, and public behavior. Developer plans, experiments, release mechanics,
@@ -26,7 +28,7 @@ adapter and contract tests; it does not mean vendor certification. See
 | Document | Contract |
 |---|---|
 | [Architecture](reference/architecture.md) | Local daemon, MCP transports, SQLite vectors, Kuzu graph, dashboard, and optional intelligence ledgers |
-| [Tools and prompts](reference/tools.md) | Public MCP surface (17 tools, 2 prompts), parameters, results, and safety rules |
+| [Tools and prompts](reference/tools.md) | Current source MCP surface (18 tools, 2 prompts), release boundary, parameters, results, and safety rules |
 | [Memory schema](reference/memory-schema.md) | Classification, provenance, governance, lifecycle, conflicts, and local media attachments |
 | [Scoring](reference/scoring.md) | Behavioral vitality and five-signal retrieval scoring |
 | [Ingestion](reference/ingestion.md) | Search-before-write, validation, persistence, graph links, and ETL |

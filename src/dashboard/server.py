@@ -13,6 +13,7 @@ from typing import Any, Optional
 # from src.core.embeddings import get_embedding_service  # DISABLED
 from src.utils.logger import get_logger
 from src.utils.config import get_config
+from src.utils.atomic_json import read_json_strict
 
 logger = get_logger(__name__)
 
@@ -53,11 +54,42 @@ def _read_snapshot() -> dict[str, Any] | None:
     snapshot_path = _snapshot_path()
     if not snapshot_path.is_file():
         return None
-    with snapshot_path.open("r", encoding="utf-8") as snapshot_file:
-        snapshot = json.load(snapshot_file)
+    snapshot = read_json_strict(snapshot_path)
     if not isinstance(snapshot, dict):
         raise ValueError("Dashboard snapshot must contain a JSON object")
     return snapshot
+
+
+def _unavailable_project_registry(error_code: str) -> dict[str, Any]:
+    return {
+        "status": "unavailable",
+        "schema_version": None,
+        "mode": "invalid",
+        "revision": None,
+        "projects": [],
+        "error_code": error_code,
+    }
+
+
+def _project_registry_snapshot(data: dict[str, Any]) -> dict[str, Any]:
+    """Validate the private registry snapshot instead of inventing readiness."""
+    value = data.get("project_registry")
+    if not isinstance(value, dict):
+        return _unavailable_project_registry("PROJECT_REGISTRY_UNAVAILABLE")
+    status = value.get("status")
+    mode = value.get("mode")
+    projects = value.get("projects")
+    if (
+        status not in {"ready", "invalid", "unavailable"}
+        or mode not in {"compatibility", "strict", "invalid"}
+        or not isinstance(projects, list)
+    ):
+        return _unavailable_project_registry("PROJECT_REGISTRY_SNAPSHOT_INVALID")
+    if status == "ready" and mode not in {"compatibility", "strict"}:
+        return _unavailable_project_registry("PROJECT_REGISTRY_SNAPSHOT_INVALID")
+    if status != "ready" and mode != "invalid":
+        return _unavailable_project_registry("PROJECT_REGISTRY_SNAPSHOT_INVALID")
+    return value
 
 
 def _read_session_intelligence_snapshot() -> dict[str, Any] | None:
@@ -133,7 +165,10 @@ async def get_graph(
             return {
                 "nodes": [],
                 "edges": [],
-                "stats": {"node_count": 0, "edge_count": 0, "semantic_edge_count": 0}
+                "stats": {"node_count": 0, "edge_count": 0, "semantic_edge_count": 0},
+                "project_registry": _unavailable_project_registry(
+                    "PROJECT_SNAPSHOT_UNAVAILABLE"
+                ),
             }
         
         # Transform nodes to frontend format
@@ -184,6 +219,10 @@ async def get_graph(
         return {
             "nodes": nodes,
             "edges": edges,
+            "project_registry": _project_registry_snapshot(data),
+            "project_registry_generated_at": data.get(
+                "project_registry_generated_at"
+            ),
             "stats": data.get("stats", {
                 "total_nodes": len(nodes),
                 "memories": sum(1 for n in nodes if n.get("type") == "memory"),

@@ -11,11 +11,12 @@ planning/retrieval, and defer to the released `docs/` contract.
 |------|--------|-------------|
 | [`installer-procedure.md`](installer-procedure.md) | RETAINED DESIGN RECORD — pre-release rationale; not current product guidance | Current behavior is documented in `docs/how-to/install.md` |
 | [`ide-integration-surface.md`](ide-integration-surface.md) | PARTIALLY IMPLEMENTED — shared runtime and compatible adapters shipped; additional certification is Upcoming | Released integration behavior is documented in `docs/how-to/configure-ide.md` |
-| [`session-intelligence.md`](session-intelligence.md) | DRAFT — broader local telemetry remains downstream; it must reuse the existing Task Intelligence ledger rather than duplicate it | `docs/reference/session-intelligence.md` when shipped |
+| [`session-intelligence.md`](session-intelligence.md) | RETAINED DESIGN RECORD — the opt-in metadata-only product surface shipped in v2.13.0; current contracts live in token, architecture, dashboard, and operator docs | Current behavior is documented in `docs/reference/token-intelligence.md` and related shipped references |
 | [`retrieval-effectiveness.md`](retrieval-effectiveness.md) | NORTH STAR — one bounded causal-repair experiment; the first evidenced failed stage chooses the implementation; representative lift and customer promotion remain gated | `docs/reference/task-intelligence.md` when shipped |
 | [`memory-identity.md`](memory-identity.md) | DEFERRED DESIGN REFERENCE — no schema work unless a bounded experiment proves state/scope ambiguity causes task failure and read-only resolution improves it | `docs/reference/memory-identity.md` when shipped |
+| [`four-action-product-lifecycle.md`](four-action-product-lifecycle.md) | APPROVED / LOCAL PRODUCT LOOP IMPLEMENTED — product defaults, complete six-scenario exact-package execution, and release evidence remain gated | Product and operating references when the exact artifact is accepted and shipped |
 | [`integrations/agent-zero.md`](integrations/agent-zero.md) | Integration target draft | `docs/reference/integrations/agent-zero.md` if shipped |
-| [`tool-consolidation.md`](tool-consolidation.md) | EXPLORING — unversioned 16 → smaller-surface hypothesis; no approval or implementation | `docs/reference/tools.md` only if later proved and shipped |
+| [`tool-consolidation.md`](tool-consolidation.md) | EXPLORING — unversioned 17 → smaller-surface hypothesis; no approval or implementation | `docs/reference/tools.md` only if later proved and shipped |
 
 ## Lifecycle
 

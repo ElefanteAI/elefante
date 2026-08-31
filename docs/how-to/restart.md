@@ -41,7 +41,13 @@ it does not manage the customer daemon:
 
 ```bash
 ./.venv/bin/python scripts/lifecycle/restart_elefante.py --verify
+./.venv/bin/python scripts/lifecycle/restart_elefante.py --verify --version 2.13.0
 ```
+
+Verification waits for a private receipt written by the launched process and
+matches both its PID and imported product version. `--version` is rejected
+unless `--verify` is present; the helper's own source import is not accepted as
+proof of the restarted process.
 
 ## If graceful shutdown fails
 

@@ -75,19 +75,24 @@ def _root_files(platform_name: str) -> set[str]:
         "scripts/setup/bootstrap_release_bundle.py",
     }
     if platform_name == "Windows":
-        files.add("Install Elefante.bat")
+        files.update({"Install Elefante.bat", "Uninstall Elefante.bat"})
     else:
-        files.add("install.sh")
+        files.update({"install.sh", "uninstall.sh"})
         if platform_name == "macOS":
-            files.add("Install Elefante.command")
+            files.update({"Install Elefante.command", "Uninstall Elefante.command"})
     return files
 
 
 def _entrypoints(platform_name: str) -> list[str]:
     return {
-        "Linux": ["install.sh"],
-        "macOS": ["Install Elefante.command", "install.sh"],
-        "Windows": ["Install Elefante.bat"],
+        "Linux": ["install.sh", "uninstall.sh"],
+        "macOS": [
+            "Install Elefante.command",
+            "Uninstall Elefante.command",
+            "install.sh",
+            "uninstall.sh",
+        ],
+        "Windows": ["Install Elefante.bat", "Uninstall Elefante.bat"],
     }[platform_name]
 
 
@@ -277,10 +282,17 @@ def validate_release_client_archive(
                 raise ValueError("Windows launcher contains bare LF line endings")
             if b"scripts\\setup\\bootstrap_release_bundle.py" not in launcher:
                 raise ValueError("Windows launcher does not target bundled bootstrap")
+            uninstall_launcher = archive.read(f"{root_prefix}Uninstall Elefante.bat")
+            if b"--uninstall-interactive" not in uninstall_launcher:
+                raise ValueError("Windows uninstall launcher does not use verified package uninstall")
         else:
             _require_executable(archive, f"{root_prefix}install.sh")
+            _require_executable(archive, f"{root_prefix}uninstall.sh")
+            if b"--uninstall-interactive" not in archive.read(f"{root_prefix}uninstall.sh"):
+                raise ValueError("Unix uninstall launcher does not use verified package uninstall")
             if platform_name == "macOS":
                 _require_executable(archive, f"{root_prefix}Install Elefante.command")
+                _require_executable(archive, f"{root_prefix}Uninstall Elefante.command")
 
         lock_contents = archive.read(
             f"{payload_prefix}requirements.client.lock"

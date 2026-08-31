@@ -26,11 +26,13 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+from uuid import UUID
+
+from src.utils.atomic_json import read_json_strict
 
 
 @dataclass
@@ -187,6 +189,72 @@ def _validate_snapshot_intelligence(
             info.append(f"Usage: {usage.get('retrieval_rate', 'unknown')}% retrieved")
 
 
+def _validate_project_registry(
+    data: Dict[str, Any],
+    errors: List[str],
+    info: List[str],
+) -> None:
+    registry = data.get("project_registry")
+    if not isinstance(registry, dict):
+        errors.append("Top-level 'project_registry' must be an object")
+        return
+    status = registry.get("status")
+    mode = registry.get("mode")
+    projects = registry.get("projects")
+    if status not in {"ready", "invalid", "unavailable"}:
+        errors.append("project_registry.status is invalid")
+        return
+    if not isinstance(projects, list):
+        errors.append("project_registry.projects must be a list")
+        return
+    if status != "ready":
+        if mode != "invalid" or projects:
+            errors.append("Unavailable Project Registry state must fail closed")
+        if not isinstance(registry.get("error_code"), str):
+            errors.append("Unavailable Project Registry state requires error_code")
+        info.append(f"Project Registry: {status}")
+        return
+    if registry.get("schema_version") != 1:
+        errors.append("project_registry.schema_version must be 1")
+    if mode not in {"compatibility", "strict"}:
+        errors.append("Ready project_registry.mode is invalid")
+    revision = registry.get("revision")
+    if (
+        not isinstance(revision, int)
+        or isinstance(revision, bool)
+        or revision < 0
+    ):
+        errors.append("project_registry.revision must be a non-negative integer")
+    active_count = 0
+    seen_ids: set[str] = set()
+    for index, project in enumerate(projects):
+        if not isinstance(project, dict):
+            errors.append(f"project_registry.projects[{index}] must be an object")
+            continue
+        try:
+            project_id = str(UUID(str(project.get("project_id"))))
+        except (TypeError, ValueError, AttributeError):
+            errors.append(f"project_registry.projects[{index}] has invalid project_id")
+            continue
+        if project_id in seen_ids:
+            errors.append("project_registry contains duplicate project IDs")
+        seen_ids.add(project_id)
+        if not isinstance(project.get("name"), str) or not project["name"].strip():
+            errors.append(f"project_registry.projects[{index}] has invalid name")
+        root = project.get("root")
+        if not isinstance(root, str) or not Path(root).is_absolute():
+            errors.append(f"project_registry.projects[{index}] has invalid root")
+        if not isinstance(project.get("active"), bool):
+            errors.append(f"project_registry.projects[{index}] has invalid active state")
+        elif project["active"]:
+            active_count += 1
+        if project.get("root_status") not in {"available", "missing"}:
+            errors.append(f"project_registry.projects[{index}] has invalid root_status")
+    if mode == "strict" and active_count == 0:
+        errors.append("Strict Project Registry requires an active project")
+    info.append(f"Project Registry: {mode}, {len(projects)} project(s)")
+
+
 def validate_snapshot(data: Dict[str, Any], *, require_curation: bool) -> ValidationResult:
     errors: List[str] = []
     warnings: List[str] = []
@@ -199,6 +267,7 @@ def validate_snapshot(data: Dict[str, Any], *, require_curation: bool) -> Valida
     nodes = _as_list(data.get("nodes"))
     edges = _as_list(data.get("edges"))
     stats = _as_dict(data.get("stats"))
+    _validate_project_registry(data, errors, info)
 
     if not isinstance(data.get("nodes"), list):
         errors.append("Top-level 'nodes' must be a list")
@@ -352,7 +421,7 @@ def main() -> int:
         return 2
 
     try:
-        data = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        data = read_json_strict(snapshot_path)
     except Exception as e:
         print(f"[error] failed to parse JSON: {e}", file=sys.stderr)
         return 2

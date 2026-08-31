@@ -90,7 +90,7 @@ def source_identity(root_dir: Path) -> dict[str, object]:
         ).stdout.strip()
         dirty = bool(
             subprocess.run(
-                ["git", "status", "--porcelain", "--untracked-files=no"],
+                ["git", "status", "--porcelain", "--untracked-files=all"],
                 cwd=root_dir,
                 capture_output=True,
                 text=True,

@@ -9,7 +9,8 @@
 #           came back healthy.
 # USAGE   : python scripts/lifecycle/restart_elefante.py [--force] [--timeout N] [--verify]
 # NOTES   : Handles stale write-lock cleanup automatically. --force skips the
-#           graceful shutdown wait. --verify runs verify_mcp_handshake after restart.
+#           graceful shutdown wait. --verify requires a process-authored PID and
+#           version receipt; --version compares that live receipt exactly.
 #           Prefer this over manual kill/start to avoid orphan lock files.
 # ─────────────────────────────────────────────────────────────────────────────
 """Elefante Safe Restart Utility.
@@ -30,15 +31,17 @@ import time
 import signal
 import subprocess
 import argparse
+import json
+import tempfile
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
 
 # Add src to path
 WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(WORKSPACE_ROOT))
 
 from src.utils.logger import get_logger  # noqa: E402
+from src.mcp.server import PROCESS_IDENTITY_PATH_ENV  # noqa: E402
 
 logger = get_logger(__name__)
 
@@ -140,7 +143,7 @@ def stop_mcp_server(pid: int, timeout: int = 10, force: bool = False) -> bool:
         return False
 
 
-def start_mcp_server() -> bool:
+def start_mcp_server(identity_path: Path | None = None) -> subprocess.Popen[bytes] | None:
     """Start the MCP server in the background."""
     try:
         venv_python = WORKSPACE_ROOT / ".venv" / "bin" / "python"
@@ -151,9 +154,14 @@ def start_mcp_server() -> bool:
 
         logger.info("Starting MCP server...")
 
+        process_env = os.environ.copy()
+        if identity_path is not None:
+            process_env[PROCESS_IDENTITY_PATH_ENV] = str(identity_path)
+
         process = subprocess.Popen(
             [str(venv_python), "-m", "src.mcp.server"],
             cwd=str(WORKSPACE_ROOT),
+            env=process_env,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
@@ -163,34 +171,66 @@ def start_mcp_server() -> bool:
 
         if process.poll() is not None:
             logger.error(f"MCP server exited immediately with code {process.returncode}")
-            return False
+            return None
 
         logger.info(f"MCP server started with PID {process.pid}")
-        return True
+        return process
 
     except Exception as e:
         logger.error(f"Error starting MCP server: {e}")
-        return False
+        return None
 
 
-def verify_restart(expected_version: Optional[str] = None) -> bool:
-    """Verify the MCP server restarted successfully."""
+def verify_restart(
+    *,
+    process_pid: int,
+    identity_path: Path,
+    expected_version: str | None = None,
+    timeout: float = 30.0,
+) -> bool:
+    """Verify the restarted process using its private process-authored receipt."""
     try:
-        time.sleep(1)
-
-        new_pid = find_mcp_server_process()
-        if not new_pid:
-            logger.error("MCP server process not found after restart")
+        deadline = time.monotonic() + timeout
+        while not identity_path.exists() and time.monotonic() < deadline:
+            try:
+                os.kill(process_pid, 0)
+            except ProcessLookupError:
+                logger.error("Restarted MCP server exited before writing its identity receipt")
+                return False
+            time.sleep(0.1)
+        if not identity_path.exists():
+            logger.error("Restarted MCP server did not write its identity receipt")
             return False
 
-        logger.info(f"MCP server running as PID {new_pid}")
+        payload = json.loads(identity_path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("identity receipt is not an object")
+        receipt_pid = payload.get("pid")
+        receipt_version = payload.get("version")
+        if receipt_pid != process_pid or not isinstance(receipt_version, str):
+            logger.error("Restarted MCP server identity receipt does not match the launched process")
+            return False
+        try:
+            os.kill(process_pid, 0)
+        except ProcessLookupError:
+            logger.error("Restarted MCP server exited after writing its identity receipt")
+            return False
+
+        logger.info(f"MCP server running as PID {process_pid}")
 
         if expected_version:
-            logger.info("Server restarted successfully (version check not implemented)")
+            normalized_expected = expected_version.removeprefix("v")
+            if normalized_expected != receipt_version:
+                logger.error(
+                    "Restarted process version mismatch: "
+                    f"expected {normalized_expected}, found {receipt_version}"
+                )
+                return False
+            logger.info(f"Restarted process version verified: {receipt_version}")
 
         return True
 
-    except Exception as e:
+    except (OSError, ValueError, json.JSONDecodeError) as e:
         logger.error(f"Error verifying restart: {e}")
         return False
 
@@ -205,6 +245,8 @@ def main() -> int:
     parser.add_argument("--version", type=str, help="Expected version to verify (e.g., '1.3.0')")
 
     args = parser.parse_args()
+    if args.version and not args.verify:
+        parser.error("--version requires --verify")
 
     logger.info("=" * 60)
     logger.info("Elefante Safe Restart Utility")
@@ -231,20 +273,28 @@ def main() -> int:
     logger.info("\n[3/5] Cleaning up lock files...")
     clean_locks()
 
-    logger.info("\n[4/5] Starting MCP server...")
-    if not start_mcp_server():
-        logger.error("Failed to start MCP server")
-        return 1
-    logger.info("MCP server started successfully")
-
-    if args.verify:
-        logger.info("\n[5/5] Verifying restart...")
-        if not verify_restart(expected_version=args.version):
-            logger.error("Restart verification failed")
+    with tempfile.TemporaryDirectory(prefix="elefante-restart-identity-") as temp_dir:
+        identity_path = Path(temp_dir) / "process-identity.json" if args.verify else None
+        logger.info("\n[4/5] Starting MCP server...")
+        process = start_mcp_server(identity_path)
+        if process is None:
+            logger.error("Failed to start MCP server")
             return 1
-        logger.info("Restart verified successfully")
-    else:
-        logger.info("\n[5/5] Skipping verification (use --verify to enable)")
+        logger.info("MCP server started successfully")
+
+        if args.verify:
+            logger.info("\n[5/5] Verifying restart...")
+            assert identity_path is not None
+            if not verify_restart(
+                process_pid=process.pid,
+                identity_path=identity_path,
+                expected_version=args.version,
+            ):
+                logger.error("Restart verification failed")
+                return 1
+            logger.info("Restart verified successfully")
+        else:
+            logger.info("\n[5/5] Skipping verification (use --verify to enable)")
 
     logger.info("\n" + "=" * 60)
     logger.info(" Elefante restart completed successfully")

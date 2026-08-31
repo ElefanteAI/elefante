@@ -12,20 +12,34 @@ released customer runtime separate from the developer repository.
 MCP-capable host
   -> native loopback HTTP or storage-free stdio bridge
   -> one user-level daemon at 127.0.0.1:8765
+  -> private Project Registry (local unreleased strict-isolation boundary)
   -> MemoryOrchestrator
        -> SQLite vector store (default)
        -> Kuzu graph store
        -> local directive store
 ```
 
-- The customer installer places one stable account-level runtime and connects
-  every detected compatible host to it.
+- The customer installer places one stable account-level runtime. In the current
+  unreleased first-release contract, Codex is the required certified lane;
+  explicitly selected additional hosts are non-blocking compatibility previews.
 - The daemon is loopback-only. Remote binding is rejected by default.
 - The stdio bridge forwards MCP JSON-RPC and does not open databases.
+- Current unreleased source hardening lets a long-lived bridge survive daemon
+  replacement: only an HTTP 404 for its prior MCP session triggers one fresh
+  initialization, one initialized-notification replay, and one retry of the
+  interrupted request. Other errors are returned unchanged. Published v2.13.0
+  still requires the host to reconnect after daemon replacement.
 - Direct `python -m src.mcp.server` remains a source/developer compatibility
   path, not the customer-global topology.
 - Legacy ChromaDB stores are supported only when explicitly configured; normal
   fresh installations use SQLite.
+
+Current unreleased source resolves the host working directory through one
+private versioned Project Registry before a strict-mode Remember, Search, or
+Recall opens the stores. The unique deepest active registered root wins. A
+separate mode-0600 intent marker makes a missing, corrupt, conflicting, or
+downgraded registry fail closed instead of reverting to global compatibility.
+There is no shared-across-project scope in this contract.
 
 ## Storage responsibilities
 
@@ -49,6 +63,15 @@ memories and do not compete in similarity ranking. Active directives are
 attached to normal product-operation and error responses; management paths do
 not recursively inject them.
 
+### Project Registry (local unreleased source)
+
+The registry stores stable opaque project IDs, customer-visible names, canonical
+roots, and active state. New strict-mode memories carry the resolved project ID,
+root, and exact project scope. Search and Recall force that same pair after
+retrieval so graph, semantic, triggered, or merged candidates cannot cross the
+project boundary. Removing a registration does not delete project files or
+memory records.
+
 ## Write path
 
 1. A host calls `elefante-Memory` with `action="add"`.
@@ -63,6 +86,38 @@ not recursively inject them.
 Writes use transaction-scoped ownership. `elefante-System(action="enable")`
 sets the logical mode and preloads the runtime; it is not a session-wide
 exclusive database-lock contract.
+
+## Correction path (local unreleased source)
+
+`elefante-Memory(action="correct")` is the customer repair boundary. Edit,
+Replace, Archive, and Restore share a verified-operation contract; Resolve keeps
+its explicit two-record conflict-authority semantics while entering through the
+same customer action.
+
+1. Inspect one exact project-scoped target and bind record, graph, content, and
+   scope hashes without writing.
+2. Require user-directed authority, a bounded reason, a disposable likely
+   future Recall question, protected-record confirmation when applicable, the
+   normal compliance receipt, and the exact inspected hashes.
+3. Perform the semantic mutation once under the transaction-scoped write lock.
+4. Read back SQLite and Kuzu authority, atomically publish the private Home
+   snapshot, and verify scoped Recall inclusion/exclusion.
+5. If any postcondition fails, restore the exact memory, graph, snapshot, and
+   operation-created provenance preimage. Incomplete compensation is `UNSAFE`.
+
+Edit preserves the memory ID; Replace creates a new current assertion and keeps
+the older one inspectable; Archive creates a service-owned restore point; and
+Restore accepts only an unambiguous manual archive. Edit and Replace atomically
+re-mine only deterministic `HAS_CONCEPT` links from corrected content, while
+preserving explicit and structural graph relationships. Any failed re-mine or
+later verification restores the previous relationship projection.
+
+Advanced permanent deletion uses the same exact plan boundary plus a separate
+final confirmation. While the outer write lock is held, Recover creates and
+revalidates one fresh workflow backup. Correct removes the target from SQLite,
+Kuzu, Home, scoped Recall, and unshared attachment storage. A failed
+postcondition restores the backup; verified success destroys that temporary
+backup and is explicitly non-recoverable.
 
 ## Retrieval path
 
@@ -80,8 +135,11 @@ itself is used as context), one read-only scan considers only memories with
 adds at most three results. Scope, lifecycle, source-trust, conflict, and
 privacy gates still apply; the pass does not update access history or graph
 state. If a workspace filter is supplied, it also uses the shared current-source
-digest check on a deep copy and skips stale records. It is an explicit delivery
-hint, not automatic host interception or a second semantic retriever.
+digest check on a deep copy and skips stale records. Typed, bounded file,
+terminal-error, and conversation event adapters can supply this explicit
+context through the loopback `/events/surface` endpoint. The event is scrubbed
+and not persisted; the selector remains read-only and is not a second semantic
+retriever.
 
 The governed answer-context compiler also reports a bounded warning when a
 candidate with a stored conflict relationship or contradictory status is
@@ -100,9 +158,14 @@ that a memory improved the downstream task.
   its token accounting internal. Its shared selector admits at most 12
   candidates, three memories, and 450 heuristic context tokens; the complete
   pretty Unicode response is capped at 1,000 heuristic tokens and fails closed
-  instead of truncating evidence.
+  instead of truncating evidence. Success, abstention, invalid input,
+  operator-disabled, and retrieval-failure paths keep the same seven fields.
 - Normal memory, graph, context, session, ETL, and task operations also receive
   entrypoint/pitfall blocks and active directives.
+- GraphConnect and ETL enrichment scrub complete nested payloads before
+  persistence or delivery. Their mutating portions remain inside the
+  transaction-scoped write lock; optional read-only status rendering happens
+  after graph writes release that ownership.
 - The default customer profile does not inject automatic tool-response context.
   Recall and the context prompt provide explicit bounded answer delivery.
 - System, dashboard, and directive-management tools use a minimal management
@@ -113,8 +176,15 @@ See [`token-intelligence.md`](token-intelligence.md) and
 
 ## Trust and recovery boundaries
 
-- Dashboard APIs read a redacted snapshot rather than opening live stores.
-- Browser actions cannot regenerate that snapshot.
+- Dashboard inspection APIs read a redacted snapshot rather than opening live
+  stores, and browser Reload cannot regenerate it.
+- Local unreleased Home controls expose only named Verified Correct, Verified
+  Resolve, and Project Registry operations through a short-lived origin-bound
+  capability. Correction plan tickets contain only target/action/hashes and are
+  one-use; proposed content stays in the dialog and is resent only for apply.
+  Home does not expose a generic MCP, database, path, query, or shell proxy.
+  Registry, strict-intent, and Home-projection updates share an exact rollback
+  boundary.
 - Backup/restore is checksummed, dry-run-first, and preserves replaced data.
 - JSON export is a portable, additive vector-memory migration source: the
   importer regenerates embeddings with the configured local model, preserves
@@ -132,7 +202,9 @@ See [`token-intelligence.md`](token-intelligence.md) and
   same-proposition polarity or value contradictions. Ambiguous language
   abstains. `elefante-Memory(action="resolve")` is dry-run-first, keeps both
   records recoverable, and requires a user-selected winner when authority does
-  not identify one.
+  not identify one. New customer repair flows use
+  `elefante-Memory(action="correct", correction="resolve")`; the direct Resolve
+  verb remains a compatibility path.
 - **Host event ingress:** `/events/surface` accepts bounded, privacy-scrubbed
   file, terminal-error, and conversation envelopes, runs the same read-only
   governed selector, and does not persist the event body. Hosts must opt in and

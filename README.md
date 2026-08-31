@@ -8,19 +8,23 @@
 
 Elefante stores durable preferences, decisions, facts, constraints, and lessons
 on your machine, then supplies a small governed subset when an agent needs prior
-context. It is an MCP memory engine—not an LLM, agent runtime, chat product, or
-cloud memory service.
+context. It works beside the AI tools you already use and gives their separate
+sessions one private, inspectable memory.
 
 **v2.13.0** — Current published release.
 
-17 tools · 2 prompts · Python 3.11–3.13 · MCP 1.28.1
+Published v2.13.0: 17 tools · 2 prompts · Python 3.11–3.13 · MCP 1.28.1
+
+Current unreleased source: 18 tools · 2 prompts, including verified Recover.
 
 ## What a user can do
 
 - Recall relevant prior context with one bounded, read-only `elefante-Recall`
   call. Irrelevant or unsafe candidates produce an explicit abstention.
-- Store, search, amend, archive, consolidate, and resolve durable memories with
-  search-before-write protection and user-governed retention rules.
+- Remember, search, correct, archive, restore, and resolve durable knowledge
+  with search-before-write protection and user-governed retention rules. The
+  unreleased Home candidate also offers an advanced backup-bound permanent
+  delete flow.
 - Connect memories to entities and relationships in a local knowledge graph.
 - Attach bounded local image, audio, and video files. Elefante stores and
   integrity-checks them locally; it does not perform OCR, transcription, model
@@ -57,10 +61,9 @@ Goal → Perceive → Plan → Act → Observe → Update → Repeat
           └──────────── Elefante ────────────┘
 ```
 
-The agent owns the goal, plan, tools, and stopping decision. Elefante
-participates at two points: it retrieves durable context before or during a
-task, and it preserves verified outcomes when the user or workflow explicitly
-asks it to write. Elefante is not an LLM, an agent runtime, or a domain adviser.
+The AI tool continues to do the work. Elefante participates at two points: it
+retrieves durable context before or during a task, and it preserves verified
+outcomes when the user or workflow explicitly asks it to write.
 
 Normal retrieval is read-only. Search exposure does not reinforce ranking or
 prove that a memory improved a task. Conflicting evidence is withheld until it
@@ -79,8 +82,10 @@ verify the checksum, extract the archive, then use its single platform launcher:
 - Windows: open `Install Elefante.bat`
 - Linux: run `chmod +x install.sh && ./install.sh`
 
-The installer creates one stable per-user runtime and one local data root, then
-connects every detected compatible host it can verify.
+The published installer creates one stable per-user runtime and one local data
+root. The current unreleased product candidate narrows first-release acceptance
+to Codex: Codex is required, while other detected hosts are optional
+compatibility previews and cannot block customer readiness.
 
 - macOS/Linux runtime: `~/.elefante/app/current`
 - Windows runtime: `%LOCALAPPDATA%\Elefante\app\current`
@@ -93,6 +98,13 @@ an unsigned native package is never substituted as a release asset.
 For source installation, repair, checksum commands, and uninstall details, see
 the [installation guide](docs/how-to/install.md).
 
+The current unreleased package candidate also carries its own data-preserving
+uninstall launcher (`Uninstall Elefante.command`, `Uninstall Elefante.bat`, or
+`uninstall.sh`). It requires the official package matching the installed build,
+creates and verifies a backup first, removes the active app and only unchanged
+Elefante-owned connections, and leaves memories available for a later reinstall.
+This lifecycle is not part of the published v2.13.0 package.
+
 **If installation fails:** read the persisted recovery files in this order:
 
 1. `.elefante-install-summary.txt`
@@ -104,15 +116,19 @@ host configuration by guesswork.
 
 ## Verify the installation
 
-Restart the host, then ask:
+The installer already performs a disposable acceptance check through the real
+MCP connection. It creates a generated project-scoped memory, proves Recall,
+removes the memory, verifies that it is gone, and creates a verified local
+backup. Installation does not succeed unless that private check passes.
+
+Restart the host, then begin with a real decision from the selected project:
 
 ```text
-What is my Elefante test passcode?
+Remember that this project's release owner is the founder.
 ```
 
-The installer creates one harmless seed memory; the expected answer is
-`Indigo-Echo`. If the host does not route the question automatically, ask it to
-call `elefante-Recall` once.
+In a later session, ask the agent who owns the release. This verifies useful
+continuity without leaving permanent demo content in the customer's memory.
 
 The installed runtime also provides a read-only doctor:
 
@@ -121,14 +137,17 @@ cd ~/.elefante/app/current
 ./.venv/bin/python scripts/lifecycle/doctor.py --json
 ```
 
-A customer-ready installation reports `customer_ready=true` and identifies any
-detected host that was not connected or verified.
+A customer-ready candidate reports `customer_ready=true`, a verified Codex
+connection and Recall path, and separately identifies any selected compatibility
+preview that was not connected or verified.
 
 ## Host coverage
 
 The v2.13.0 installer has ownership-safe, contract-tested adapters for VS Code
 Copilot, Claude Code, Cursor, Kiro, Continue, Zed, Gemini CLI, Codex, and
-OpenClaw. These integrations are **compatible**, not vendor-certified.
+OpenClaw. In the unreleased first-release product contract, Codex is the sole
+required certification lane; the other adapters remain optional compatibility
+previews and do not expand the supported acceptance promise.
 
 IBM Bob and Antigravity remain preview integrations because their full host
 lifecycle has not been independently certified. Agent Zero remains a documented
@@ -136,12 +155,15 @@ community path. Planned hosts are not advertised as supported.
 
 ## Public MCP surface
 
-The default customer profile exposes 17 tools + 2 prompts.
+The current development customer profile exposes 18 tools + 2 prompts. The
+published v2.13.0 package remains at 17 tools + 2 prompts; `elefante-Recover`
+is an unreleased product candidate.
 
 | Area | Surface |
 |---|---|
 | Recall | `elefante-Recall` |
 | Memory | `elefante-Memory` |
+| Recover | `elefante-Recover` |
 | Graph | `elefante-GraphConnect`, `elefante-GraphQuery` |
 | Context | `elefante-ContextGet`, `elefante-SessionsList` |
 | Tasks | `elefante-TaskCreate`, `elefante-TaskUpdate`, `elefante-TaskGraph` |
@@ -165,7 +187,7 @@ result contracts, and safety rules.
   provider-actual usage and a matching dated rate card are both present.
 - Task Intelligence evaluation exists for developers, remains default-off, and
   has not established representative multi-task outcome lift. It is not part
-  of the 17-tool customer profile or a public performance claim.
+  of the 18-tool development customer profile or a public performance claim.
 
 ## Documentation
 

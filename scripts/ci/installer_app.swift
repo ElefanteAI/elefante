@@ -13,6 +13,8 @@ private let stageMarkers = [
     "[Step 4a]",
     "[Step 5]",
     "Verifying MCP handshake",
+    "[Step 5b]",
+    "[Step 5c]",
 ]
 
 private let installLogFileName = ".elefante-install.log"
@@ -32,6 +34,54 @@ private struct HostOption {
     let detected: Bool
 }
 
+private struct PackageOperationDescription: Decodable {
+    let schemaVersion: Int
+    let operation: String
+    let currentVersion: String?
+    let targetVersion: String?
+    let confirmationToken: String?
+    let retainedRollback: RetainedRollbackDescription?
+
+    enum CodingKeys: String, CodingKey {
+        case schemaVersion = "schema_version"
+        case operation
+        case currentVersion = "current_version"
+        case targetVersion = "target_version"
+        case confirmationToken = "confirmation_token"
+        case retainedRollback = "retained_rollback"
+    }
+}
+
+private struct RetainedRollbackDescription: Decodable {
+    let available: Bool
+    let currentVersion: String?
+    let targetVersion: String?
+    let confirmationToken: String?
+
+    enum CodingKeys: String, CodingKey {
+        case available
+        case currentVersion = "current_version"
+        case targetVersion = "target_version"
+        case confirmationToken = "confirmation_token"
+    }
+}
+
+private struct PackageUninstallDescription: Decodable {
+    let schemaVersion: Int
+    let operation: String
+    let available: Bool
+    let confirmationToken: String?
+    let dataEffect: String
+
+    enum CodingKeys: String, CodingKey {
+        case schemaVersion = "schema_version"
+        case operation
+        case available
+        case confirmationToken = "confirmation_token"
+        case dataEffect = "data_effect"
+    }
+}
+
 final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let accentColor = NSColor(calibratedRed: 0.09, green: 0.50, blue: 0.47, alpha: 1.0)
     private let successColor = NSColor.systemGreen
@@ -42,6 +92,13 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var pathField = NSTextField(string: "")
     private var browseButton = NSButton(title: "Browse…", target: nil, action: nil)
     private var installButton = NSButton(title: "Install Elefante", target: nil, action: nil)
+    private var retainedRollbackButton = NSButton(
+        title: "Roll Back Previous Version",
+        target: nil,
+        action: nil
+    )
+    private var uninstallButton = NSButton(title: "Uninstall Elefante", target: nil, action: nil)
+    private var heroTitleLabel = NSTextField(labelWithString: "Install Elefante")
     private var progressBar = NSProgressIndicator()
     private var statusLabel = NSTextField(labelWithString: "Ready to install")
     private var outputView = NSTextView()
@@ -49,11 +106,17 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var summaryPathLabel = NSTextField(labelWithString: "")
     private var statusPathLabel = NSTextField(labelWithString: "")
     private var logPathLabel = NSTextField(labelWithString: "")
+    private var backupPathLabel = NSTextField(labelWithString: "")
     private var openSummaryButton = NSButton(title: "Open Summary", target: nil, action: nil)
     private var openStatusButton = NSButton(title: "Open Status", target: nil, action: nil)
     private var openLogButton = NSButton(title: "Open Log", target: nil, action: nil)
     private var openInstallFolderButton = NSButton(title: "Open Install Folder", target: nil, action: nil)
     private var hostButtons: [String: NSButton] = [:]
+    private var projectCard = NSView()
+    private var projectSummaryLabel = NSTextField(labelWithString: "")
+    private var addProjectButton = NSButton(title: "Add Project Folder…", target: nil, action: nil)
+    private var removeProjectButton = NSButton(title: "Remove Last", target: nil, action: nil)
+    private var projectURLs: [URL] = []
 
     private var process: Process?
     private var outputPipe: Pipe?
@@ -61,6 +124,11 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var seenMarkers = Set<String>()
     private var state: InstallState = .ready
     private var cancelRequested = false
+    private var activeOperation = "Install"
+    private var activeOperationDescription: PackageOperationDescription?
+    private var activeUninstallDescription: PackageUninstallDescription?
+    private var requestedRetainedRollbackToken: String?
+    private var requestedUninstallToken: String?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         do {
@@ -117,13 +185,13 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func buildWindow() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 920, height: 760),
+            contentRect: NSRect(x: 0, y: 0, width: 920, height: 880),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Install Elefante"
-        window.minSize = NSSize(width: 820, height: 700)
+        window.minSize = NSSize(width: 820, height: 780)
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.toolbarStyle = .unified
@@ -156,14 +224,24 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         stack.addArrangedSubview(makeHeroSection())
         stack.addArrangedSubview(makeSeparator())
         stack.addArrangedSubview(makeHostCard())
+        projectCard = makeProjectCard()
+        stack.addArrangedSubview(projectCard)
         stack.addArrangedSubview(makeActionRow())
         stack.addArrangedSubview(makeProgressSection())
         stack.addArrangedSubview(makeOutputSection())
 
         installButton.target = self
         installButton.action = #selector(handlePrimaryAction)
+        retainedRollbackButton.target = self
+        retainedRollbackButton.action = #selector(handleRetainedRollback)
+        uninstallButton.target = self
+        uninstallButton.action = #selector(handleUninstall)
         browseButton.target = self
         browseButton.action = #selector(browseLocation)
+        addProjectButton.target = self
+        addProjectButton.action = #selector(addProjectFolder)
+        removeProjectButton.target = self
+        removeProjectButton.action = #selector(removeLastProject)
         openSummaryButton.target = self
         openSummaryButton.action = #selector(openSummaryFile)
         openStatusButton.target = self
@@ -183,6 +261,8 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         outputView.string = ""
         appendLine("Live installer output will appear here once installation starts.", color: .secondaryLabelColor)
         refreshArtifactLabels()
+        refreshProjectSummary()
+        refreshOperationCopy()
 
         self.window = window
         positionWindow(window)
@@ -294,12 +374,12 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         cardStack.alignment = .leading
 
         cardStack.addArrangedSubview(makeLabel(
-            "Connect Elefante to your agent hosts",
+            "Connect Elefante to Codex",
             font: .systemFont(ofSize: 15, weight: .semibold),
             color: .labelColor
         ))
         cardStack.addArrangedSubview(makeLabel(
-            "Every compatible host detected on this Mac is connected automatically to one private local memory.",
+            "Codex is the first certified connection and is required. Other detected hosts are optional compatibility previews that use the same private local memory.",
             font: .systemFont(ofSize: 12, weight: .regular),
             color: .secondaryLabelColor,
             wrapping: true
@@ -318,12 +398,20 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     target: nil,
                     action: nil
                 )
-                button.state = host.detected ? .on : .off
-                button.isEnabled = false
-                button.font = .systemFont(ofSize: 12, weight: host.detected ? .semibold : .regular)
-                button.toolTip = host.detected
-                    ? "Elefante will configure this detected host automatically"
-                    : "Install this host first, then run Elefante again"
+                let isCertified = host.id == "codex"
+                button.state = isCertified && host.detected ? .on : .off
+                button.isEnabled = host.detected && !isCertified
+                button.font = .systemFont(
+                    ofSize: 12,
+                    weight: isCertified && host.detected ? .semibold : .regular
+                )
+                button.toolTip = isCertified
+                    ? host.detected
+                        ? "Codex is required and selected for the certified setup"
+                        : "Install Codex before running the certified setup"
+                    : host.detected
+                        ? "Optional compatibility preview; select to connect it"
+                        : "Install this host first, then run Elefante again"
                 button.translatesAutoresizingMaskIntoConstraints = false
                 button.widthAnchor.constraint(equalToConstant: 255).isActive = true
                 hostButtons[host.id] = button
@@ -339,7 +427,7 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         cardStack.addArrangedSubview(grid)
 
         cardStack.addArrangedSubview(makeLabel(
-            "One installation. No editor plug-in, copied command, or duplicate memory database.",
+            "Codex defines release readiness. Optional host failures do not block the certified setup.",
             font: .systemFont(ofSize: 11, weight: .medium),
             color: accentColor,
             wrapping: true
@@ -351,6 +439,88 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func selectedHostIDs() -> [String] {
         supportedHosts().compactMap { host in
             hostButtons[host.id]?.state == .on ? host.id : nil
+        }
+    }
+
+    private func makeProjectCard() -> NSView {
+        let cardStack = NSStackView()
+        cardStack.orientation = .vertical
+        cardStack.spacing = 8
+        cardStack.alignment = .leading
+
+        cardStack.addArrangedSubview(makeLabel(
+            "Choose where Elefante may remember",
+            font: .systemFont(ofSize: 15, weight: .semibold),
+            color: .labelColor
+        ))
+        cardStack.addArrangedSubview(makeLabel(
+            "Select at least one real project folder. Each folder receives an isolated memory scope; Elefante never scans or changes the project files.",
+            font: .systemFont(ofSize: 12, weight: .regular),
+            color: .secondaryLabelColor,
+            wrapping: true
+        ))
+
+        projectSummaryLabel.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        projectSummaryLabel.textColor = .labelColor
+        projectSummaryLabel.lineBreakMode = .byTruncatingMiddle
+        projectSummaryLabel.maximumNumberOfLines = 3
+        projectSummaryLabel.translatesAutoresizingMaskIntoConstraints = false
+        projectSummaryLabel.widthAnchor.constraint(equalToConstant: 820).isActive = true
+        cardStack.addArrangedSubview(projectSummaryLabel)
+
+        let buttonRow = NSStackView()
+        buttonRow.orientation = .horizontal
+        buttonRow.spacing = 10
+        buttonRow.alignment = .centerY
+        addProjectButton.bezelStyle = .rounded
+        removeProjectButton.bezelStyle = .rounded
+        buttonRow.addArrangedSubview(addProjectButton)
+        buttonRow.addArrangedSubview(removeProjectButton)
+        buttonRow.addArrangedSubview(makeLabel(
+            "A disposable Recall check and verified local backup run automatically.",
+            font: .systemFont(ofSize: 11, weight: .medium),
+            color: accentColor,
+            wrapping: true
+        ))
+        cardStack.addArrangedSubview(buttonRow)
+        return wrapInCard(cardStack)
+    }
+
+    private func projectSpecs() -> [String] {
+        var usedNames = Set<String>()
+        return projectURLs.map { url in
+            var base = url.lastPathComponent.replacingOccurrences(of: "=", with: "-")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if base.isEmpty {
+                base = "Project"
+            }
+            if base.count > 90 {
+                base = String(base.prefix(90))
+            }
+            var name = base
+            var suffix = 2
+            while usedNames.contains(name.lowercased()) {
+                name = "\(base) \(suffix)"
+                suffix += 1
+            }
+            usedNames.insert(name.lowercased())
+            return "\(name)=\(url.path)"
+        }
+    }
+
+    private func refreshProjectSummary() {
+        if projectURLs.isEmpty {
+            projectSummaryLabel.stringValue = "No project folders selected"
+            projectSummaryLabel.textColor = errorColor
+        } else {
+            projectSummaryLabel.stringValue = projectURLs.prefix(3).map {
+                "• \($0.lastPathComponent) — \($0.path)"
+            }.joined(separator: "\n") + (projectURLs.count > 3 ? "\n+ \(projectURLs.count - 3) more" : "")
+            projectSummaryLabel.textColor = .labelColor
+        }
+        removeProjectButton.isEnabled = state != .installing && !projectURLs.isEmpty
+        if state == .ready || state == .failed {
+            installButton.isEnabled = activeOperation != "Install" || !projectURLs.isEmpty
         }
     }
 
@@ -395,11 +565,12 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         textStack.spacing = 8
         textStack.alignment = .leading
 
-        textStack.addArrangedSubview(makeLabel(
+        heroTitleLabel = makeLabel(
             "Install Elefante",
             font: .systemFont(ofSize: 32, weight: .bold),
             color: .labelColor
-        ))
+        )
+        textStack.addArrangedSubview(heroTitleLabel)
 
         textStack.addArrangedSubview(makeLabel(
             "Private local memory for your AI. Stored on this Mac.",
@@ -436,6 +607,12 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         ))
         cardStack.addArrangedSubview(makeLabel("App files:  \(defaultInstallPath().path)", font: .monospacedSystemFont(ofSize: 11, weight: .regular), color: .labelColor))
         cardStack.addArrangedSubview(makeLabel("Data:       \(defaultDataPath().path)", font: .monospacedSystemFont(ofSize: 11, weight: .regular), color: .labelColor))
+        backupPathLabel = makeLabel(
+            "Backups:    \(defaultBackupPath().path)",
+            font: .monospacedSystemFont(ofSize: 11, weight: .regular),
+            color: .labelColor
+        )
+        cardStack.addArrangedSubview(backupPathLabel)
 
         return wrapInCard(cardStack)
     }
@@ -497,7 +674,17 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         installButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 170).isActive = true
         installButton.heightAnchor.constraint(equalToConstant: 44).isActive = true
 
+        retainedRollbackButton.bezelStyle = .rounded
+        retainedRollbackButton.controlSize = .large
+        retainedRollbackButton.isHidden = true
+
+        uninstallButton.bezelStyle = .rounded
+        uninstallButton.controlSize = .large
+        uninstallButton.isHidden = true
+
         row.addArrangedSubview(installButton)
+        row.addArrangedSubview(retainedRollbackButton)
+        row.addArrangedSubview(uninstallButton)
         row.addArrangedSubview(makeLabel(
             "The installer will show real-time progress below and can be retried if something fails.",
             font: .systemFont(ofSize: 12, weight: .regular),
@@ -646,6 +833,180 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         logPathLabel.stringValue = "Log:     \(logFileURL().path)"
     }
 
+    private func packageOperationDescription(for installRoot: URL) -> PackageOperationDescription? {
+        let scriptURL = installerDir.appendingPathComponent("install.sh")
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = [
+            scriptURL.path,
+            "--install-root", installRoot.path,
+            "--describe-operation",
+        ]
+        process.currentDirectoryURL = installerDir
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return nil
+        }
+        guard process.terminationStatus == 0 else {
+            return nil
+        }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        guard
+            let description = try? JSONDecoder().decode(
+                PackageOperationDescription.self,
+                from: data
+            ),
+            description.schemaVersion == 1,
+            ["install", "repair", "update", "rollback"].contains(description.operation),
+            description.operation != "rollback" || description.confirmationToken != nil
+        else {
+            return nil
+        }
+        return description
+    }
+
+    private func packageManagedBackupPath(for installRoot: URL) -> URL? {
+        let scriptURL = installerDir.appendingPathComponent("install.sh")
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = [
+            scriptURL.path,
+            "--install-root", installRoot.path,
+            "--print-managed-backup-path",
+        ]
+        process.currentDirectoryURL = installerDir
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return nil
+        }
+        guard process.terminationStatus == 0 else {
+            return nil
+        }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        guard
+            let value = String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+            !value.isEmpty,
+            value.first == "/",
+            !value.contains("\n")
+        else {
+            return nil
+        }
+        return URL(fileURLWithPath: value, isDirectory: true)
+    }
+
+    private func packageUninstallDescription(for installRoot: URL) -> PackageUninstallDescription? {
+        let scriptURL = installerDir.appendingPathComponent("install.sh")
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = [
+            scriptURL.path,
+            "--install-root", installRoot.path,
+            "--describe-uninstall",
+        ]
+        process.currentDirectoryURL = installerDir
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return nil
+        }
+        guard process.terminationStatus == 0 else {
+            return nil
+        }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        guard
+            let description = try? JSONDecoder().decode(
+                PackageUninstallDescription.self,
+                from: data
+            ),
+            description.schemaVersion == 1,
+            description.operation == "uninstall",
+            description.available,
+            description.confirmationToken != nil,
+            description.dataEffect == "preserved"
+        else {
+            return nil
+        }
+        return description
+    }
+
+    private func operationVerb(for installRoot: URL) -> String {
+        activeOperationDescription = packageOperationDescription(for: installRoot)
+        if let operation = activeOperationDescription?.operation {
+            return [
+                "install": "Install",
+                "repair": "Repair",
+                "update": "Update",
+                "rollback": "Roll Back",
+            ][operation] ?? "Install"
+        }
+        var isDirectory: ObjCBool = false
+        let exists = FileManager.default.fileExists(
+            atPath: installRoot.path,
+            isDirectory: &isDirectory
+        )
+        return exists && isDirectory.boolValue ? "Repair" : "Install"
+    }
+
+    private func operationProgressTitle() -> String {
+        switch activeOperation {
+        case "Repair":
+            return "Repairing…"
+        case "Update":
+            return "Updating…"
+        case "Roll Back":
+            return "Rolling back…"
+        case "Uninstall":
+            return "Uninstalling…"
+        default:
+            return "Installing…"
+        }
+    }
+
+    private func refreshOperationCopy() {
+        guard state != .installing && state != .complete else {
+            return
+        }
+        activeOperation = operationVerb(for: normalizedInstallRoot())
+        let backupPath = packageManagedBackupPath(for: normalizedInstallRoot())
+            ?? defaultBackupPath()
+        backupPathLabel.stringValue = "Backups:    \(backupPath.path)"
+        activeUninstallDescription = packageUninstallDescription(for: normalizedInstallRoot())
+        heroTitleLabel.stringValue = "\(activeOperation) Elefante"
+        installButton.title = "\(activeOperation) Elefante"
+        if let retained = activeOperationDescription?.retainedRollback,
+           retained.available,
+           retained.confirmationToken != nil {
+            retainedRollbackButton.title = retained.targetVersion.map {
+                "Roll Back to \($0)"
+            } ?? "Roll Back Previous Version"
+            retainedRollbackButton.isHidden = false
+            retainedRollbackButton.isEnabled = true
+        } else {
+            retainedRollbackButton.isHidden = true
+        }
+        uninstallButton.isHidden = activeUninstallDescription == nil
+        uninstallButton.isEnabled = activeUninstallDescription != nil
+        projectCard.isHidden = activeOperation != "Install"
+        addProjectButton.isEnabled = activeOperation == "Install"
+        refreshProjectSummary()
+        setStatus("Ready to \(activeOperation.lowercased())", color: .secondaryLabelColor)
+    }
+
     private func openPathOrParent(_ url: URL, missingMessage: String) {
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: url.path) {
@@ -716,11 +1077,42 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if panel.runModal() == .OK, let url = panel.url {
             pathField.stringValue = url.path
             refreshArtifactLabels()
+            refreshOperationCopy()
         }
     }
 
+    @objc private func addProjectFolder() {
+        guard state != .installing && activeOperation == "Install" else {
+            return
+        }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = false
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Add Project"
+        panel.message = "Choose the real project folders whose memories Elefante should keep isolated."
+        if panel.runModal() == .OK {
+            for url in panel.urls.map(\.standardizedFileURL)
+                where !projectURLs.contains(where: { $0.path == url.path }) {
+                projectURLs.append(url)
+            }
+            refreshProjectSummary()
+        }
+    }
+
+    @objc private func removeLastProject() {
+        guard state != .installing && !projectURLs.isEmpty else {
+            return
+        }
+        projectURLs.removeLast()
+        refreshProjectSummary()
+    }
+
     @objc private func pathFieldDidChange() {
+        requestedRetainedRollbackToken = nil
         refreshArtifactLabels()
+        refreshOperationCopy()
     }
 
     @objc private func openSummaryFile() {
@@ -754,6 +1146,79 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
+    private func confirmCodeRollback(currentVersion: String, targetVersion: String) -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "Roll Back Elefante?"
+        alert.informativeText = """
+            Product code will change from \(currentVersion) to \(targetVersion).
+
+            Your memories will not be restored or reversed. Elefante will create a verified data backup first and restore the current code automatically if the target fails verification.
+            """
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Roll Back Product Code")
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    private func confirmUninstall() -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "Uninstall Elefante?"
+        alert.informativeText = """
+            Elefante app files and unchanged Elefante-owned agent connections will be removed. A verified backup is created first.
+
+            Your memories remain on this Mac for reinstall. Modified customer configuration is preserved. Create a support report first if you are uninstalling to diagnose a problem.
+            """
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Uninstall and Preserve Memories")
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    @objc private func handleUninstall() {
+        guard state != .installing else {
+            return
+        }
+        activeUninstallDescription = packageUninstallDescription(for: normalizedInstallRoot())
+        guard let token = activeUninstallDescription?.confirmationToken else {
+            setStatus("Use the exact official package that installed Elefante", color: errorColor)
+            refreshOperationCopy()
+            return
+        }
+        guard confirmUninstall() else {
+            setStatus("Uninstall cancelled; nothing changed", color: .secondaryLabelColor)
+            return
+        }
+        requestedUninstallToken = token
+        requestedRetainedRollbackToken = nil
+        startInstall()
+    }
+
+    @objc private func handleRetainedRollback() {
+        guard state != .installing else {
+            return
+        }
+        _ = operationVerb(for: normalizedInstallRoot())
+        guard let retained = activeOperationDescription?.retainedRollback,
+              retained.available,
+              let token = retained.confirmationToken else {
+            setStatus("No exact verified previous product is available", color: errorColor)
+            refreshOperationCopy()
+            return
+        }
+        let currentVersion = retained.currentVersion ?? "current version"
+        let targetVersion = retained.targetVersion ?? "previous version"
+        guard confirmCodeRollback(
+            currentVersion: currentVersion,
+            targetVersion: targetVersion
+        ) else {
+            setStatus("Code rollback cancelled; nothing changed", color: .secondaryLabelColor)
+            return
+        }
+        requestedRetainedRollbackToken = token
+        requestedUninstallToken = nil
+        startInstall()
+    }
+
     private func startInstall() {
         let installRoot = normalizedInstallRoot()
         let installPath = installRoot.path
@@ -762,6 +1227,40 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
         let selectedHosts = selectedHostIDs()
+        let retainedRollbackToken = requestedRetainedRollbackToken
+        let uninstallToken = requestedUninstallToken
+        if uninstallToken == nil && !selectedHosts.contains("codex") {
+            setStatus("Install Codex before running the certified Elefante setup", color: errorColor)
+            return
+        }
+        if uninstallToken != nil {
+            activeOperation = "Uninstall"
+        } else if retainedRollbackToken != nil {
+            activeOperation = "Roll Back"
+        } else {
+            activeOperation = operationVerb(for: installRoot)
+        }
+        let selectedProjects = projectSpecs()
+        if activeOperation == "Install" && selectedProjects.isEmpty {
+            setStatus("Choose at least one project folder", color: errorColor)
+            return
+        }
+        if uninstallToken == nil && retainedRollbackToken == nil && activeOperation == "Roll Back" {
+            guard let description = activeOperationDescription,
+                  description.confirmationToken != nil else {
+                setStatus("Code rollback cannot be verified from this package", color: errorColor)
+                return
+            }
+            let currentVersion = description.currentVersion ?? "current version"
+            let targetVersion = description.targetVersion ?? "older version"
+            guard confirmCodeRollback(
+                currentVersion: currentVersion,
+                targetVersion: targetVersion
+            ) else {
+                setStatus("Code rollback cancelled; nothing changed", color: .secondaryLabelColor)
+                return
+            }
+        }
 
         state = .installing
         cancelRequested = false
@@ -769,31 +1268,74 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         pendingOutput = ""
         progressBar.doubleValue = 0
         outputView.textStorage?.setAttributedString(NSAttributedString(string: ""))
-        setStatus("Starting installation…", color: .secondaryLabelColor)
+        setStatus("Starting \(activeOperation.lowercased())…", color: .secondaryLabelColor)
         setControlsEnabled(false)
-        installButton.title = "Installing…"
+        installButton.title = operationProgressTitle()
         refreshArtifactLabels()
-        for line in renderInstallArtifactPaths() {
-            appendLine(line, color: .secondaryLabelColor)
+        if uninstallToken != nil {
+            appendLine("A verified backup will be created before app removal.", color: .secondaryLabelColor)
+            appendLine("Memories remain local and available for reinstall.", color: .secondaryLabelColor)
+        } else {
+            for line in renderInstallArtifactPaths() {
+                appendLine(line, color: .secondaryLabelColor)
+            }
+            let previewHosts = selectedHosts.filter { $0 != "codex" }
+            appendLine(
+                "Certified host: Codex" + (
+                    previewHosts.isEmpty
+                        ? ""
+                        : "; compatibility previews: \(previewHosts.joined(separator: ", "))"
+                ),
+                color: .secondaryLabelColor
+            )
+            if activeOperation == "Install" {
+                appendLine(
+                    "Projects: \(selectedProjects.count) isolated folder(s); disposable Recall and local backup included",
+                    color: .secondaryLabelColor
+                )
+            }
         }
-        appendLine(
-            selectedHosts.isEmpty
-                ? "Agent hosts: none detected; generic MCP bridge installed"
-                : "Agent hosts: all detected (\(selectedHosts.joined(separator: ", ")))",
-            color: .secondaryLabelColor
-        )
         appendLine("")
 
         let scriptURL = installerDir.appendingPathComponent("install.sh")
         let pipe = Pipe()
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        let processArguments = [
-            scriptURL.path,
-            "--install-root", installPath,
-            "--venv-mode", "fresh",
-            "--verbose",
-        ]
+        var processArguments: [String]
+        if let uninstallToken {
+            processArguments = [
+                scriptURL.path,
+                "--install-root", installPath,
+                "--uninstall", uninstallToken,
+            ]
+        } else if let retainedRollbackToken {
+            processArguments = [
+                scriptURL.path,
+                "--install-root", installPath,
+                "--rollback-retained", retainedRollbackToken,
+            ]
+        } else {
+            processArguments = [
+                scriptURL.path,
+                "--install-root", installPath,
+                "--venv-mode", "fresh",
+                "--verbose",
+            ]
+            for host in selectedHosts {
+                processArguments.append(contentsOf: ["--host", host])
+            }
+            if activeOperation == "Install" {
+                for project in selectedProjects {
+                    processArguments.append(contentsOf: ["--project", project])
+                }
+            }
+        }
+        if uninstallToken == nil,
+           retainedRollbackToken == nil,
+           activeOperation == "Roll Back",
+           let confirmationToken = activeOperationDescription?.confirmationToken {
+            processArguments.append(contentsOf: ["--confirm-code-rollback", confirmationToken])
+        }
         process.arguments = processArguments
         process.currentDirectoryURL = installerDir
         process.standardOutput = pipe
@@ -876,19 +1418,37 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if exitCode == 0 {
             state = .complete
             progressBar.doubleValue = Double(stageMarkers.count)
-            setStatus("Installation complete!", color: successColor)
+            let completeMessage: String
+            switch activeOperation {
+            case "Repair":
+                completeMessage = "Repair verified — Elefante, agent connection, and Recall are ready."
+            case "Update":
+                completeMessage = "Update verified — Elefante, agent connection, and Recall are ready."
+            case "Roll Back":
+                completeMessage = "Code rollback verified — Elefante, agent connection, and Recall are ready."
+            case "Uninstall":
+                completeMessage = "Uninstall verified — app removed and memories preserved for reinstall."
+            default:
+                completeMessage = "Installation verified — projects, Recall cleanup, and local backup are ready."
+            }
+            setStatus(completeMessage, color: successColor)
             appendLine("")
-            appendLine("Installation complete! Restart your IDE to activate Elefante.", color: successColor)
+            appendLine(completeMessage, color: successColor)
             installButton.title = "Done"
             setControlsEnabled(false)
         } else {
             state = .failed
             let failureMessage = cancelRequested
-                ? "Installation stopped — use the recovery files below"
-                : "Installation failed — use the recovery files below"
+                ? "\(activeOperation) stopped — use the recovery files below"
+                : "\(activeOperation) failed — use the recovery files below"
             setStatus(failureMessage, color: errorColor)
             appendLine("")
-            appendLine(cancelRequested ? "Installation stopped before completion." : "Installation failed.", color: errorColor)
+            appendLine(
+                cancelRequested
+                    ? "\(activeOperation) stopped before completion."
+                    : "\(activeOperation) failed.",
+                color: errorColor
+            )
             for line in renderFailedInstallGuidance() {
                 appendLine(line, color: .secondaryLabelColor)
             }
@@ -904,7 +1464,12 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         for button in hostButtons.values {
             button.isEnabled = enabled
         }
-        installButton.isEnabled = true
+        addProjectButton.isEnabled = enabled && activeOperation == "Install"
+        removeProjectButton.isEnabled = enabled && !projectURLs.isEmpty && activeOperation == "Install"
+        retainedRollbackButton.isEnabled = enabled && !retainedRollbackButton.isHidden
+        uninstallButton.isEnabled = enabled && !uninstallButton.isHidden
+        installButton.isEnabled = state == .complete
+            || (enabled && (activeOperation != "Install" || !projectURLs.isEmpty))
     }
 
     private func setStatus(_ text: String, color: NSColor) {
@@ -959,6 +1524,12 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         URL(fileURLWithPath: NSHomeDirectory())
             .appendingPathComponent(".elefante", isDirectory: true)
             .appendingPathComponent("data", isDirectory: true)
+    }
+
+    private func defaultBackupPath() -> URL {
+        URL(fileURLWithPath: NSHomeDirectory())
+            .appendingPathComponent(".elefante", isDirectory: true)
+            .appendingPathComponent("backups", isDirectory: true)
     }
 }
 

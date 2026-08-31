@@ -76,12 +76,16 @@ If initialization fails:
 
 Never assume `~/.elefante/data/kuzu_db` when configuration says otherwise.
 
-## Legacy rebuild boundary
+## Kuzu-only quarantine boundary
 
-`scripts/debug/reset_kuzu_nuclear.py` rebuilds graph state from an explicitly
-configured legacy ChromaDB store. It is not the recovery route for the default
-SQLite/Kuzu customer runtime. Do not run it against a fresh v2.13.0
-installation.
+`scripts/debug/reset_kuzu_nuclear.py` resolves the configured Kuzu path and can
+move that path into a timestamped recovery directory after explicit privileged
+confirmation. It leaves the configured vector store untouched and performs no
+automatic graph rebuild. Use it only after a verified backup and only when the
+Kuzu path itself is the confirmed failure. Broad targets that contain the data
+root, vector path, recovery path, home directory, or filesystem root are
+rejected. A graph path configured outside the Elefante data root requires an
+additional `--confirm-path /exact/resolved/path` that matches the dry-run output.
 
 ## Verification
 

@@ -1,10 +1,12 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useCallback } from 'react';
 import { useDashboardStore } from '@/store';
 import { HeaderBar } from '@/components/HeaderBar';
 import { TabNav } from '@/components/TabNav';
 import { OverviewTab } from '@/components/OverviewTab';
 import { MemoriesTab } from '@/components/MemoriesTab';
 import { ExploreTab } from '@/components/ExploreTab';
+import { ProjectsTab } from '@/components/ProjectsTab';
+import { RecoverTab } from '@/components/RecoverTab';
 import type { Tab } from '@/types';
 
 function App() {
@@ -18,6 +20,14 @@ function App() {
   const setInspectedMemoryId = useDashboardStore((s) => s.setInspectedMemoryId);
   const setSearchQuery = useDashboardStore((s) => s.setSearchQuery);
   const version = useDashboardStore((s) => s.stats?.elefante?.package_version ?? '...');
+  const controlEnabled = useDashboardStore((s) => s.controlEnabled);
+  const initializeControlSession = useDashboardStore((s) => s.initializeControlSession);
+
+  // Parse and clear the one-time capability fragment before the dashboard can
+  // render any management affordance.
+  useLayoutEffect(() => {
+    initializeControlSession();
+  }, [initializeControlSession]);
 
   // Initial data fetch
   useEffect(() => {
@@ -32,7 +42,13 @@ function App() {
     const target = e.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
 
-    const tabMap: Record<string, Tab> = { '1': 'overview', '2': 'memories', '3': 'explore' };
+    const tabMap: Record<string, Tab> = {
+      '1': 'overview',
+      '2': 'memories',
+      '3': 'explore',
+      '4': 'projects',
+      '5': 'recover',
+    };
     if (tabMap[e.key]) {
       setActiveTab(tabMap[e.key]);
       return;
@@ -57,6 +73,10 @@ function App() {
         return <MemoriesTab />;
       case 'explore':
         return <ExploreTab />;
+      case 'projects':
+        return <ProjectsTab />;
+      case 'recover':
+        return <RecoverTab />;
       default:
         return <OverviewTab />;
     }
@@ -83,7 +103,9 @@ function App() {
             <div className="text-center">
               <div className="w-10 h-10 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
               <div className="text-slate-300">Reading the local memory snapshot...</div>
-              <div className="text-slate-600 text-xs mt-2 elefante-mono uppercase tracking-widest">Read-only · loopback</div>
+              <div className={`text-xs mt-2 elefante-mono uppercase tracking-widest ${controlEnabled ? 'text-amber-300' : 'text-slate-600'}`}>
+                {controlEnabled ? 'Management session active · loopback' : 'Read-only · loopback'}
+              </div>
             </div>
           </div>
         ) : (
@@ -94,7 +116,11 @@ function App() {
       {/* Footer */}
       <footer className="px-4 py-2 bg-slate-900/50 border-t elefante-hairline text-center">
         <span className="text-xs text-slate-500">
-          Elefante v{version} &middot; Memory Intelligence &middot; <span className="text-slate-600">read-only local snapshot · 1/2/3 to switch views</span>
+          Elefante v{version} &middot; Memory Intelligence &middot;{' '}
+          <span className={controlEnabled ? 'text-amber-300' : 'text-slate-600'}>
+            {controlEnabled ? 'management session active' : 'read-only'}
+          </span>{' '}
+          <span className="text-slate-600">· local snapshot · 1/2/3/4/5 to switch views</span>
         </span>
       </footer>
     </div>

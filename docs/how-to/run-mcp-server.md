@@ -99,10 +99,14 @@ The source inventory contains one default-off developer evaluation tool in
 addition to the customer profile:
 
 ```text
-Available MCP Tools: 18 (source declarations)
-Available MCP Tools: 17 (default customer discovery)
+Available MCP Tools: 19 (source declarations)
+Available MCP Tools: 18 (default customer discovery)
 Available MCP Prompts: 2
 ```
+
+Published v2.13.0 packages remain at 17 customer tools. The additional current
+source declaration is the unreleased verified `elefante-Recover` candidate;
+`elefante-TaskIntelligence` remains default-off and developer-only.
 
 The tools and prompts are enumerated in
 [`../reference/tools.md`](../reference/tools.md). Tool count alone is not a

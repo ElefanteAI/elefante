@@ -64,19 +64,19 @@
 
 ## Issue #7: Developer Documentation Drift — Stale Paths, Versions, and Runtime Claims [FIXED AGAIN, guarded]
 
-**Trigger:** Active guidance routed to deleted files and later recurred as stale release versions, ChromaDB-default claims, legacy MCP names, obsolete scoring formulas, broken relative links, and release-candidate language after v2.12.2 publication.
-**Root cause:** Mutable facts were copied into many prose surfaces without source-derived guards. Historical evidence was also mixed into current instructions without a clear historical boundary.
-**Solution:** Reconciled active user, developer, agent, proposal, example, and embedded MCP documentation against current source and the published release; separated historical records from current operational guidance; added release-version, active-link, MCP-surface, and scoring-contract regressions in `tests/test_developer_routing.py`.
-**Lesson:** A documentation bug is not solved by editing the page where it was noticed. Current claims must derive from code or a single release authority, historical facts must be labeled, and executable links/contracts need automated guards.
+**Trigger:** Active guidance routed to deleted files and later recurred as stale release versions, ChromaDB-default claims, legacy MCP names, obsolete scoring formulas, broken relative links, release-candidate language, v2.12.2 protocol headers, pre-v2.13 proposal state, incomplete Memory action lists, duplicate BUG IDs, incorrect ledger counts, and a `restart_elefante.py --version` flag that first did nothing and then compared only the helper's own import rather than the restarted process.
+**Root cause:** Mutable facts were copied into many prose surfaces without source-derived guards. Historical evidence was mixed into current instructions without a clear historical boundary, and the first CLI repair treated source consistency as runtime evidence.
+**Solution:** Reconciled active user, developer, agent, proposal, example, embedded MCP, operational CLI, and issue-ledger documentation against current source and the published release; separated historical records from current operational guidance; and made the direct server author a private mode-0600 PID/version receipt that the restart helper verifies against the exact launched PID. Protocol-version, active-proposal, unique-ID/derived-count, release-version, active-link, MCP-surface, action-schema, process-identity, and scoring-contract regressions live in `tests/test_developer_routing.py`.
+**Lesson:** A documentation bug is not solved by editing the page where it was noticed. Current claims must derive from code or a single release authority, historical facts must be labeled, executable links/contracts need automated guards, and a controller's own import cannot attest a child process.
 
 <a id="issue-8"></a>
 
-## Issue #8: Self-Protocol Verifier Drift — Path & Payload Assumptions [FIXED, guarded]
+## Issue #8: Self-Protocol Verifier Drift — Path, Payload, and Platform Assumptions [FIXED AGAIN, guarded]
 
-**Trigger:** `verify_e2e_tests.py --with-dashboard-open` reports `[FAIL]` while live MCP surface is healthy. Two cascading failures: dashboard snapshot path, then large-payload stream limit.
-**Root cause:** Verifier encoded convenience assumptions instead of following live runtime behavior. (a) Checked only `temp_data_dir/dashboard_snapshot.json`, but `src.mcp.server` writes through `HOME`-derived `DATA_DIR`. (b) Used asyncio's default subprocess stream limit, too small for `elefante-ContextGet` payloads.
-**Solution:** Stream limit raised to 1 MiB (`STREAM_LIMIT_BYTES = 1024 * 1024`). Snapshot path lookup now tries both `temp_home/.elefante/data/` and `temp_data_dir/`. Guarded by `TestSelfProtocolContract` tests.
-**Lesson:** A maintained verifier is part of the product confidence surface; if it assumes the wrong runtime path or payload shape, it becomes a false bug generator.
+**Trigger:** `verify_e2e_tests.py --with-dashboard-open` reported `[FAIL]` while the live MCP surface was healthy. The original cascading failures were dashboard snapshot path and large-payload stream limit; the 2026-08-28 recurrence used `/usr/bin/true` as its browser stub despite documenting a Windows invocation and also risked presenting the direct-handler harness as customer-transport proof. The 2026-08-30 recurrence then used legacy update/delete actions without the Verified Correct lifecycle and did not create the strict registered project now required by customer Remember, Recall, and Task Intelligence.
+**Root cause:** The verifier encoded convenience assumptions instead of following current product behavior. It checked one snapshot path, used asyncio's default subprocess stream limit, hard-coded a POSIX executable, and kept old mutation/scope shortcuts after the customer contract changed. Direct handler and shipped bridge/daemon topologies were not named as separate evidence layers.
+**Solution:** Raise the stream limit to 1 MiB, check both isolated snapshot paths, build an isolated Python no-op browser command from the active interpreter, and document the direct-handler versus customer bridge/daemon proof boundary. The harness now creates one strict registered project, verifies project-scoped Remember with a durable Recall cue, performs Edit and permanent delete through `Memory(action="correct")`, and searches Task Intelligence using the canonical registered root. Guarded by `TestSelfProtocolContract`, platform-stub, strict-project, verified-correction, and process transport tests.
+**Lesson:** A maintained verifier is part of the product confidence surface. It must evolve with the customer lifecycle, not merely continue invoking a technically reachable legacy path.
 
 <a id="issue-9"></a>
 
@@ -121,9 +121,9 @@
 
 ## Issue #13: Release-Contract Truth Drift [BUG-044, FIXED guarded]
 
-**Trigger:** A whole-product audit found v2.12.2 publicly released while active entrypoints and their tests still declared v2.12.1; the scoring reference documented retired formulas and nonexistent modules; dashboard and ETL copy promised semantics absent from their execution paths.
+**Trigger:** A whole-product audit found v2.12.2 publicly released while active entrypoints and their tests still declared v2.12.1; the scoring reference documented retired formulas and nonexistent modules; dashboard and ETL copy promised semantics absent from their execution paths. The v2.13.0 Gauntlet recurrence then found a maintained v2.12.2 showcase baseline, shipped proposals described as unreleased, 16-tool active inventories, and trigger copy that still called proactive surfacing future behavior.
 **Root cause:** Release and feature-truth checks asserted hand-maintained literals instead of testing the current shipped contract. Passing CI therefore preserved the stale state rather than detecting it.
-**Solution:** Reconciled release entrypoints with the published tag, replaced scoring prose from the source formulas, labeled dashboard search as snapshot-only, marked `surfaces_when` as stored non-ranking metadata, corrected the Distiller module path, and extended maintained regressions across all affected surfaces.
+**Solution:** Reconciled release and protocol entrypoints with the published tag, derived the showcase baseline from `src.__version__`, replaced scoring prose from source formulas, labeled dashboard search as snapshot-only, distinguished triggered delivery from general ranking, corrected shipped proposal status/tool counts and Distiller paths, and extended maintained regressions across all affected surfaces.
 **Lesson:** Contract tests must reject obsolete claims, not merely freeze yesterday's claim. Publication truth, source behavior, UI language, and reference documentation must agree.
 
 <a id="issue-14"></a>
@@ -184,10 +184,10 @@
 
 ## Issue #20: Installed Memory Was Available but a Normal Question Did Not Recall It [BUG-053, FIXED, guarded]
 
-**Trigger:** A clean Codex session answered `UNKNOWN` even though Elefante was globally installed and the requested durable fact existed. An explicit Recall then requested approval; after approval was removed, selection still rejected the direct fact and successful output wasted context on internal wrappers.
-**Root cause:** Four contracts were incorrectly treated as one: host registration, retrieval routing, safe tool authorization, and answer selection. The selector also reused an implementation-actionability threshold for factual questions, while the generic response decorator ignored Recall's narrow customer purpose.
-**Solution:** Keep registration separate, add one manifest-owned reversible global Codex routing block, declare Recall read-only/idempotent/non-destructive/closed-world, allow a strong `direct_answer` to bypass only the implementation-actionability threshold, and return a seven-field Recall payload without internal wrappers. Rebuild and install the exact customer archive, then prove the journey in an empty directory with Codex JSON events.
-**Lesson:** Availability is not use. A customer memory path is complete only when the host routes a normal question, invokes safely, selects answer-bearing evidence, and returns less context than it saves.
+**Trigger:** A clean Codex session answered `UNKNOWN` even though Elefante was globally installed and the requested durable fact existed. An explicit Recall then requested approval; after approval was removed, selection still rejected the direct fact and successful output wasted context on internal wrappers. The 2026-08-28 Gauntlet audit then showed that empty, overlong, missing, or wrong-type input could be rejected by MCP SDK schema validation as a raw protocol error, while packaged Antigravity and VS Code/Bob approval lists still omitted Recall and all three Directive tools from the 17-tool customer surface.
+**Root cause:** Host registration, retrieval routing, safe tool authorization, answer selection, and wire-format failure handling were incorrectly treated as one contract. The selector reused an implementation-actionability threshold for factual questions, the generic response decorator ignored Recall's narrow customer purpose, and strict tool-schema validation could fail before Elefante's governed handler owned the response.
+**Solution:** Keep registration separate, add one manifest-owned reversible global Codex routing block, declare Recall read-only/idempotent/non-destructive/closed-world, allow a strong `direct_answer` to bypass only the implementation-actionability threshold, and route success, abstention, operator-disabled, invalid-input, and retrieval-failure outcomes through the same bounded seven-field Recall payload. The public schema documents the input bound while the handler enforces it, preventing pre-handler protocol errors from replacing the product contract. Host-side approval metadata now derives from one source-checked exact customer inventory instead of duplicated stale lists. Rebuild and install the exact customer archive, then prove the journey in an empty directory with Codex JSON events.
+**Lesson:** Availability is not use, and a documented terminal contract must survive invalid input. A customer memory path is complete only when the host routes a normal question, invokes safely, selects answer-bearing evidence, and returns a bounded product response on every terminal path.
 
 <a id="issue-21"></a>
 
@@ -224,14 +224,34 @@
 **Trigger:** `trigger` and `surfaces_when` metadata could describe when a memory should matter, but no runtime path examined an explicit file, terminal-error, or conversation context. A caller had to guess a semantic query and could miss an exact opt-in reminder.
 **Root cause:** The schema hint was passive. Adding automatic host interception would cross the local memory authority boundary and introducing another semantic retriever would duplicate the existing search contract, so no bounded delivery surface had been wired.
 **Solution:** Extend the existing `elefante-Memory(action="search")` path with optional `surface_context`. It performs one bounded read-only scan, considers only `injection_policy="triggered"` memories, requires a case-insensitive literal phrase from `trigger` or `surfaces_when`, returns at most three matches with an explicit trigger explanation, and preserves lifecycle, scope, source-trust, conflict, and privacy gates. If a workspace filter is supplied, it uses the shared current-source digest check on a deep copy and skips stale records. It never updates access or graph state. The shared answer-context compiler reports a bounded warning when a relevant candidate has a stored conflict relationship or contradictory status; it withholds the candidate, selects neither side, and omits internal IDs from the warning and Recall text. The 2026-08-28 closure then added typed file, terminal-error, and conversation envelopes for every manifest host family, secret scrubbing and hard bounds, and a loopback `/events/surface` adapter that feeds the same read-only selector without persisting the event. Conservative semantic detection and dry-run-first reversible `Memory(resolve)` repair close the related contradiction path without allowing an arbitrary automatic winner.
-**Proof:** `tests/test_proactive_surfacing.py` covers policy/literal requirements, context separate from the semantic query, scope/trust/lifecycle/conflict/privacy gates, stale-source rejection, result bounds, Task Brief delivery, and read-only behavior. `tests/test_host_event_adapters.py` and `tests/test_host_event_endpoint.py` cover host normalization, privacy, bounds, and daemon integration. `tests/test_conflict_detection.py` and `tests/test_conflict_resolution.py` cover abstention, equivalent consolidation, explicit winner authority, protected records, rollback, and scope separation. `tests/test_mcp_daemon.py` covers answer-context and opt-in warning delivery without selecting or exposing the conflicted memory. The published v2.12.3 surface remains unchanged.
+**Proof:** `tests/test_proactive_surfacing.py` covers policy/literal requirements, context separate from the semantic query, scope/trust/lifecycle/conflict/privacy gates, stale-source rejection, result bounds, Task Brief delivery, and read-only behavior. `tests/test_host_event_adapters.py` and `tests/test_host_event_endpoint.py` cover host normalization, privacy, bounds, and daemon integration. `tests/test_conflict_detection.py` and `tests/test_conflict_resolution.py` cover abstention, equivalent consolidation, explicit winner authority, protected records, rollback, and scope separation. `tests/test_mcp_daemon.py` covers answer-context and opt-in warning delivery without selecting or exposing the conflicted memory. These capabilities later shipped in v2.13.0; the earlier v2.12.3 artifact remained unchanged.
 **Lesson:** A declarative trigger is not a shipped behavior. Make proactive delivery explicit, opt-in, literal, bounded, and read-only before considering host automation or outcome claims.
+
+<a id="issue-25"></a>
+
+## Issue #25: Nested Graph and ETL Paths Bypassed Secret Scrubbing [BUG-056, FIXED LOCALLY, guarded]
+
+**Trigger:** Adversarial MCP calls placed API-key and bearer-token patterns inside GraphConnect properties, legacy raw memory text, and ETLClassify enrichment. Graph and enrichment writes preserved those values, while ETLProcess returned a legacy secret directly to the agent.
+**Root cause:** Privacy filtering was applied to common memory-write boundaries but not to complete nested request and response objects. GraphConnect trusted arbitrary `properties`; ETLProcess treated stored raw content as already safe; ETLClassify persisted agent-authored summary, concepts, and trigger metadata unchanged.
+**Solution:** Scrub the complete GraphConnect request before any entity or relationship write, scrub the complete ETLProcess result before it leaves the server, and scrub every ETLClassify enrichment field before persistence. Return only redaction counts and detector types so clients can see that filtering occurred without receiving the secret.
+**Guard:** `pytest tests/test_mcp_daemon.py -k "graph_connect_scrubs or etl_process_scrubs or etl_classify_scrubs" -q` proves response, persistence, nested-property, and metadata behavior with adversarial positive controls.
+**Lesson:** Privacy is an end-to-end data-flow property. Every ingress, persistence, and egress boundary must scrub the complete nested payload, including old records and agent-authored metadata.
+
+<a id="issue-26"></a>
+
+## Issue #26: Task Intelligence Used a Non-Canonical Project Root [BUG-066, FIXED LOCALLY, guarded]
+
+**Trigger:** The strict-project self-protocol registered a macOS temporary workspace under its canonical `/private/var/...` path, while the caller supplied the equivalent `/var/...` spelling. Recall resolved the project, but Task Intelligence compared the raw strings and returned an empty/abstained brief.
+**Root cause:** Task Intelligence accepted project and workspace fields as search filters without first passing them through the same strict Project Registry resolver used by Remember and Recall. Filesystem aliases therefore became false project boundaries on platforms that expose multiple names for one directory.
+**Solution:** Resolve Task Intelligence through the shared registered-project boundary before store access, then search with the stable project ID and canonical registered root. Preserve bounded omission reasons so a genuine abstention remains inspectable. Add a regression using a symlinked/canonical temporary workspace and update the self-protocol to use the exact registered root.
+**Guard:** `pytest tests/test_mcp_daemon.py tests/test_task_intelligence.py -k "task_intelligence and (project or workspace or canonical)" -q`; `python scripts/verify/verify_e2e_tests.py`.
+**Lesson:** Project identity is a registry fact, not a caller-string equality test. Every memory consumer must resolve scope through the same canonical boundary before retrieval.
 
 ---
 
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
-The recurring rules from these 24 issues:
+The recurring rules from these 26 issues:
 
 1. **STATE → DO → VERIFY in the same response** — analysis without action is entertainment. Issues #1, #4.
 2. **Trigger words require proof** — "done" / "ready" / "fixed" must include verification output. Issue #2.
@@ -252,6 +272,8 @@ The recurring rules from these 24 issues:
 17. **Capture and verify before depending on Recall** — explicit user-directed durable decisions need a governed write plus one future-question delivery check before a later task can depend on them. Issue #22.
 18. **Measure accepted value against complete token cost** — input-only savings and cheap failures cannot establish intelligence per overall token. Issue #23.
 19. **Treat declarative triggers as opt-in delivery gates** — a stored trigger is not permission for broad automatic injection; require explicit context, literal matching, bounded output, and the same governance/privacy gates as normal delivery. Issue #24.
+20. **Scrub complete data flows** — privacy guards must cover nested ingress, persistence, and egress, including legacy content and agent-authored enrichment. Issue #25.
+21. **Resolve project scope once** — every consumer must use the same stable project ID and canonical registered root before retrieval. Issue #26.
 
 Distill any new repeating rule into `../lessons.md`. Postmortems hold the bug-specific narrative; `lessons.md` holds the cross-bug edge.
 

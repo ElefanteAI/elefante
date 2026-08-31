@@ -345,6 +345,7 @@ class SQLiteVectorStore(VectorStore):
             "relationship_type", "supersedes_id", "superseded_by_id",
             "last_accessed", "last_modified", "access_count",
             "retention_policy", "injection_policy", "scope", "trigger",
+            "recall_cues",
             "user_locked",
         ):
             if name in updates:

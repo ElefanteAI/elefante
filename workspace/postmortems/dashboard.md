@@ -130,6 +130,16 @@
 **Guard:** `pytest tests/test_dashboard_serializer.py -k "brand_assets" -v`, dashboard production build, and live-header inspection.
 **Lesson:** Brand-asset acceptance happens in the final rendered composition. Inspect the actual pixels at shipping size; source provenance alone does not prove an export is complete.
 
+<a id="issue-14"></a>
+
+## Issue #14: Home Graph Hydration Assumed One Kuzu Row Shape [BUG-064, FIXED locally]
+
+**Trigger:** The real Elefante-on-Elefante Home refresh logged `'dict' object has no attribute 'id'`. The snapshot still contained derived topic connections, so the Connections surface could look healthy while real Kuzu entities and labels were absent.
+**Root cause:** Both snapshot producers assumed that `RETURN n` yielded a model object and that `LABEL(r)` appeared under the literal key `label(r)`. The installed Kuzu driver returns entity mappings and a generated label key; the broad live-refresh exception converted that contract drift into a silent partial snapshot.
+**Solution:** Normalize Kuzu entities and relationship labels through shared serializer helpers used by both snapshot producers. Preserve only visible entity properties, accept the supported driver result shapes, and emit graph edges only when both normalized endpoints exist.
+**Guard:** `pytest tests/test_dashboard_serializer.py tests/test_verified_remember.py -q`; an isolated current-driver query must hydrate without the mapping-attribute error.
+**Lesson:** A populated visualization is not proof that every authoritative source was projected. Exercise driver-native row shapes and reject partial graph output that can be masked by derived edges.
+
 ---
 
 ## Cross-bug pattern (extracted to `../lessons.md`)
@@ -140,6 +150,7 @@
 4. **Long-running servers cache imports** — restart after code changes; migration tools may report success while using stale bytecode. Issue #6.
 5. **Single source of truth for derived values** — three code paths producing the "same output" eventually drift. Issue #9.
 6. **Detach long-lived servers into subprocesses, never daemon threads** — daemon threads die with their transient parent. Issue #7.
+7. **Exercise driver-native result shapes, not only friendly fakes** — partial graph hydration can hide behind derived visualization data. Issue #14.
 
 Distill any new repeating rule into `../lessons.md`.
 

@@ -23,6 +23,24 @@ Recommended:
 
 - `curation`: object capturing snapshot curation provenance
 
+The local unreleased Project Registry integration also writes:
+
+- `project_registry_generated_at`: ISO-8601 generation timestamp
+- `project_registry`: a private Home projection of the registry state
+
+`project_registry` has `status` (`ready`, `invalid`, or `unavailable`),
+`schema_version`, `mode` (`compatibility`, `strict`, or `invalid`), `revision`,
+`projects`, and an optional bounded `error_code`. A ready project entry contains
+its stable `project_id`, display `name`, canonical absolute `root`, `active`
+state, and derived `root_status` (`available` or `missing`). Invalid or
+unavailable state uses `mode="invalid"` and an empty project list; consumers must
+not fabricate compatibility when this field is absent or malformed.
+
+The projection is not the authority. `projects.json` and the separate strict
+intent marker are private runtime control state. Home project operations publish
+the registry, marker, and this projection as one checked operation or restore
+their exact prior bytes and modes.
+
 For a curated showcase, `curation` must disclose whether behavior metadata is
 synthetic, whether content is grounded in repository sources, whether user data
 is present, and that displayed counts are not customer or performance claims.
@@ -82,6 +100,10 @@ Optional fields used by the Memory Intelligence briefing:
 - `status`, `deprecated`, `archived`: lifecycle state
 - `access_count`, `last_accessed`, `last_modified`: behavioral history
 - `namespace`, `canonical_key`, `processing_status`: curation/provenance state
+- `verified_correction_history`: newest ten customer-safe correction events.
+  Each event may expose only `operation_id`, `at`, `action`, bounded `reason`,
+  `invocation_mode`, and `memory_ids`; content, plan hashes, capability tokens,
+  paths, and disposable Recall questions are excluded.
 - `health_status`: deterministic inspection label (`healthy`, `stale`, `at_risk`, or `orphan`)
 - `health_reason`: short explanation for the health label
 - `connection_count`: unique graph neighbors represented in this snapshot
@@ -151,7 +173,16 @@ boundary before computing connectivity, relationships, or graph layout.
 
 ## User-interface interpretation
 
-The dashboard is a read-only memory-inspection surface with three views:
+Elefante Home is a snapshot-first memory understanding and management surface.
+Ordinary browser sessions remain read-only. A dashboard opened through the
+local daemon may receive a short-lived origin-bound management capability in
+the URL fragment; the frontend removes that fragment from browser history and
+keeps the token in memory only. Managed Home can call only named Project,
+Correct, and Resolve control routes. It cannot query or write stores directly,
+run arbitrary MCP tools, regenerate the snapshot from the browser, or expose a
+generic path/query/shell proxy.
+
+Home has four views:
 
 - **Briefing** ranks one durable current memory and, where graph evidence
   permits, presents its evolution as old assumption → evidence → decision →
@@ -161,6 +192,14 @@ The dashboard is a read-only memory-inspection surface with three views:
   reports its lexical match, returned rank, configured storage source, health,
   and explicit relationship evidence. It labels absent evidence instead of
   inventing a five-signal semantic explanation.
+- In a managed session, the same memory detail presents **Edit**, **Replace**,
+  **Archive**, or **Restore** according to lifecycle state, plus **Resolve** for
+  a known conflict pair. Every write follows inspect, preview, confirm, execute,
+  verify, and privacy-safe receipt. An advanced **Delete permanently** flow
+  requires the exact `DELETE` phrase and a separate final confirmation. It
+  creates a temporary verified backup, restores it on failure, and destroys it
+  only after the memory, connections, Home projection, Recall result, and
+  unshared attachments are verified absent.
 - **Connections** presents topic and distribution views plus a Decision Graph.
   The graph derives explorable reasoning trails only from explicit
   memory-to-memory edges, names their relationships, and explains the selected
@@ -168,6 +207,9 @@ The dashboard is a read-only memory-inspection surface with three views:
   hub-spoke, or arbitrary sequential topology. Semantic links may be counted as
   cross-topic bridges but remain secondary to grounded decision and safeguard
 relationships.
+- **Projects** inspects the Project Registry and, only in a managed session,
+  performs named registration operations. Removing a registration does not
+  remove project files or memories.
 
 The optional Session Intelligence panel reads only
 `session_intelligence_snapshot.json` through `/api/session-intelligence`. It

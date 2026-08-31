@@ -19,18 +19,24 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
+from uuid import uuid4
 
 # Add src to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from src.core.graph_store import GraphStore  # noqa: E402
+from src.core.project_registry import ProjectRegistry, ProjectRegistryError  # noqa: E402
 from src.utils.curation import assess_health_from_raw  # noqa: E402
 from src.utils.config import get_config  # noqa: E402
+from src.utils.atomic_json import write_json_atomically  # noqa: E402
 from src.utils.dashboard_serializer import (  # noqa: E402
+    _bounded_resolution_history,
     _redact_secrets,
     _derive_topic,
     connection_counts_from_edges,
     compute_live_score_from_raw as _compute_live_score,
+    graph_entity_payload,
+    graph_relationship_label,
     health_summary_from_nodes,
     is_test_artifact as _is_test_artifact,
     usage_summary_from_nodes,
@@ -154,6 +160,9 @@ async def main():
         except Exception:
             return default
 
+    def _redacted_optional(value):
+        return _redact_secrets(str(value)) if value is not None else None
+
     def _winner_better(meta_new: dict, node_new: dict, meta_old: dict, node_old: dict) -> bool:
         # Prefer active > processed > score > access_count > newer created_at
         a_new = 1 if _active(meta_new) else 0
@@ -228,7 +237,24 @@ async def main():
                 "concepts": meta.get("concepts"),
                 "surfaces_when": meta.get("surfaces_when"),
                 "authority_score": meta.get("authority_score"),
-                "source": vector_store_type
+                "source": meta.get("source") or "unknown",
+                "source_detail": _redact_secrets(meta.get("source_detail") or ""),
+                "source_reliability": meta.get("source_reliability"),
+                "verified": _truthy(meta.get("verified")),
+                "author": _redact_secrets(meta.get("author") or ""),
+                "storage_backend": vector_store_type,
+                "project": _redacted_optional(meta.get("project")),
+                "workspace": _redacted_optional(meta.get("workspace")),
+                "scope": _redacted_optional(meta.get("scope")),
+                "file_path": _redacted_optional(meta.get("file_path")),
+                "line_number": meta.get("line_number"),
+                "url": _redacted_optional(meta.get("url")),
+                "location": _redacted_optional(meta.get("location")),
+                "retention_policy": meta.get("retention_policy") or "managed",
+                "injection_policy": meta.get("injection_policy") or "ranked",
+                "user_locked": _truthy(meta.get("user_locked")),
+                "version": max(1, _safe_int(meta.get("version"), 1)),
+                "conflict_resolution_history": _bounded_resolution_history(meta),
             }
         }
         
@@ -280,8 +306,7 @@ async def main():
         for row in nodes_result:
             entity = row.get('n')
             if entity:
-                props = dict(entity) if hasattr(entity, 'get') else {}
-                props = {k: v for k, v in props.items() if not k.startswith('_')}
+                props = graph_entity_payload(entity)
                 
                 entity_id = props.get('id', '')
                 
@@ -331,7 +356,7 @@ async def main():
         for row in edges_result:
             src = row.get('a.id')
             dst = row.get('b.id')
-            lbl = row.get('label(r)')
+            lbl = graph_relationship_label(row)
             
             if src and dst:
                 # REMAP Edges for deduplicated nodes
@@ -340,14 +365,15 @@ async def main():
                 if dst in id_remap:
                     dst = id_remap[dst]
                 
-                # Avoid self-loops created by consolidation
-                if src == dst:
+                # Avoid self-loops and dangling graph endpoints.
+                if src == dst or src not in seen_ids or dst not in seen_ids:
                     continue
                     
                 edges.append({
                     "from": src,
                     "to": dst,
-                    "label": lbl or "RELATED"
+                    "label": lbl,
+                    "type": "graph",
                 })
         
         print(f"   Found {len(edges)} relationships", file=sys.stderr)
@@ -910,7 +936,10 @@ async def main():
     print("[*] Step 4: Saving snapshot...", file=sys.stderr)
     
     snapshot = {
+        "schema_version": 2,
+        "generation_id": str(uuid4()),
         "generated_at": datetime.utcnow().isoformat(),
+        "project_registry_generated_at": datetime.utcnow().isoformat(),
         "stats": {
             "total_nodes": len(nodes),
             "memories": sum(1 for n in nodes if n["type"] == "memory"),
@@ -922,18 +951,26 @@ async def main():
         "nodes": nodes,
         "edges": edges
     }
-    
-    output_path = str(Path(config.elefante.data_dir) / "dashboard_snapshot.json")
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    
-    class DateTimeEncoder(json.JSONEncoder):
-        def default(self, o):
-            if isinstance(o, datetime):
-                return o.isoformat()
-            return super().default(o)
 
-    with open(output_path, "w") as f:
-        json.dump(snapshot, f, indent=2, cls=DateTimeEncoder)
+    try:
+        snapshot["project_registry"] = {
+            "status": "ready",
+            **ProjectRegistry(
+                Path(config.elefante.data_dir) / "projects.json"
+            ).snapshot(),
+        }
+    except ProjectRegistryError as error:
+        snapshot["project_registry"] = {
+            "status": "invalid",
+            "schema_version": 1,
+            "mode": "invalid",
+            "revision": None,
+            "projects": [],
+            "error_code": error.code,
+        }
+    
+    output_path = Path(config.elefante.data_dir) / "dashboard_snapshot.json"
+    write_json_atomically(output_path, snapshot, default=str)
 
     # =========================================================================
     # STEP 5: Validate snapshot (offline checks only)

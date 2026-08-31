@@ -11,6 +11,156 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added the approved one-founder first-release defaults to the local product
+  candidate: Codex is the sole required certification lane, other detected
+  hosts are explicitly selected non-blocking compatibility previews, setup and
+  Recover display one Elefante-managed backup location, and strict project mode
+  exposes no shared scope or cross-project delivery. Doctor, Recover health,
+  support-report evidence, Project Registry snapshots, Home, installer CLI, and
+  native setup now share that contract. Exact-package certification remains
+  pending and this source work is not installed or released.
+- Added a fail-closed, content-free six-scenario product-release evidence gate.
+  It reads the exact DMG bytes, runs live macOS signature, Gatekeeper, and
+  stapled-notarization checks, binds all six private scenario receipts, verifies
+  seven distinct hashed native/accessibility evidence files, and binds three
+  unfamiliar-user trial receipts to real first-run receipts with declared zero
+  founder intervention. The verifier cannot create evidence, machine-prove
+  participant familiarity, or turn source tests into release proof.
+- Added the receipt-producing exact-package A–F scenario runner. It verifies
+  first use and agent restart, strict project isolation, every Correct action,
+  interruption and a real stage-4 post-switch failed-update rollback, verified
+  backup/restore plus data-preserving uninstall/reinstall, and privacy-safe
+  support export. Runtime scenarios install the supplied package into a fresh
+  disposable root and compare every installed payload byte with it. Restore
+  plan/apply and Recall verification bind to the active strict project, and
+  package failure receipts preserve the exact failed stage. These runners are
+  implemented locally but have not been executed against a final package. The
+  gate is not yet wired into tagged publication because distribution is deferred.
+- Added the first local Memory Control Loop vertical slice: Verified Resolve
+  binds an exact two-record plan, performs one semantic write, verifies
+  authoritative readback, atomically refreshes the private Home snapshot,
+  proves scoped Recall, compensates failed postconditions, and returns a bounded
+  privacy-safe terminal receipt. Elefante Home receives this single named write
+  operation through a short-lived origin-bound capability and one-use plan
+  ticket; no generic browser write proxy is exposed.
+- Added the second local Memory Control Loop slice: a private versioned Project
+  Registry with stable opaque IDs, deterministic deepest-root workspace mapping,
+  strict project-scoped Remember/Search/Recall, and Home controls for adding,
+  renaming, moving, activating, deactivating, and removing registrations. Project
+  removal leaves project files and memories untouched. This source work is not
+  installed or released.
+- Added the complete Correct slice: `elefante-Memory(action="correct")` and
+  Elefante Home now share verified Edit, Replace, Archive, Restore, Resolve, and
+  advanced permanent-delete journeys. Plans bind exact record, graph, content,
+  relationship, and project hashes; apply writes once, verifies SQLite/Kuzu,
+  atomically refreshes Home, proves scoped Recall, and compensates from exact
+  preimages. Content corrections re-mine deterministic concept links while
+  preserving explicit relationships. Permanent deletion requires a second
+  confirmation and an exact live workflow backup; failure restores it, while
+  success proves the memory, links, Home projection, Recall result, and unshared
+  attachments absent before destroying that temporary backup. Home uses named
+  content-free one-use tickets and privacy-safe receipts. This source work is
+  not installed or released.
+- Added the local Recover product loop for health, verified backup, verified
+  data restore, and privacy-safe support reporting. Support reporting previews a
+  strict allowlist, binds confirmation to the exact preview, writes and reads
+  back one private single-manifest ZIP, removes failed output, and downloads it
+  only through authenticated local Home. Secret-seeded and duplicate-key tests
+  guard memory, project, prompt, credential, environment, configuration, and log
+  exclusions. Official-package Repair, Update, automatic rollback, and retained
+  code rollback are also verified. The current package candidate adds exact
+  matching-package Uninstall with explicit confirmation, verified backup and
+  restore preflight, ownership-safe connection removal, byte-stable data proof,
+  private completion receipts, and verified data reattachment on reinstall.
+  Partial connection removal is never mislabeled as a complete rollback. Exact
+  supported-package acceptance remains pending; this source work is not
+  installed or released.
+- Added guided first-run project selection to the native macOS and portable
+  fallback installers. A fresh customer setup creates strict isolated project
+  scopes, proves a generated project-scoped memory through the installed MCP
+  bridge and Recall, removes it, verifies absence, creates a verified backup,
+  and emits a private content-free acceptance receipt. The release workflow now
+  defines install, data-preserving uninstall, and reinstall acceptance with
+  stable project identities and no leftover installer memory; exact-artifact
+  execution remains a release gate.
+
+### Fixed
+
+- Home Remember now persists the customer's bounded likely future question as
+  a project-scoped Recall cue instead of discarding it after acceptance. Exact
+  complete-question delivery still passes lifecycle, trust, source, conflict,
+  privacy, and strict project gates. Edit, Replace, and Restore preserve the
+  same contract, and failed Remember states plainly that nothing was saved.
+- Task Intelligence now resolves project and workspace through the same strict
+  Project Registry boundary as Remember and Recall, including canonical macOS
+  `/var` versus `/private/var` workspace identity.
+- Explicit `must` versus `must not` assertions are classified as conflicts
+  before similarity-based duplicate handling. Keep both writes bilateral
+  conflict state and verifies safe Recall withholding; Resolve then proves only
+  the user-selected current assertion is supplied.
+- Recover no longer changes a staged WAL-mode SQLite tree while checking it.
+  SQLite verification is immutable and the manifest is compared both before
+  and after every database integrity check, so validator side effects stop
+  before the live-data switch.
+- Memory detail now labels provenance as `Source verified`, avoiding confusion
+  with verified completion of Remember, Correct, or Recover operations.
+- Home now preserves all three fixed official-package acceptance checks—safety
+  backup, product readiness, and first-run acceptance—while continuing to drop
+  arbitrary receipt fields and customer text. Interrupted package receipts
+  remain inspectable as running instead of being rejected as malformed.
+- Legacy content/lifecycle update and delete paths now fail closed into verified
+  Correct instead of bypassing its authority, project, rollback, and completion
+  checks. Content corrections now atomically replace only deterministic concept
+  links, preserve explicit relationships, and restore the prior relationship
+  projection if re-mining or a later verification step fails.
+- Home memory detail accepts list- or text-shaped tags, preventing a rendered
+  memory panel crash on valid snapshot metadata.
+- Strict project isolation now has an independent private intent marker, so a
+  missing, corrupt, conflicting, or downgraded registry fails closed instead of
+  silently returning to global compatibility. Registry, marker, and Home
+  projection updates compensate from exact file preimages, unavailable dashboard
+  state remains unavailable, and custom data installations use their own lock
+  directory.
+
+- The storage-free stdio bridge now survives a local daemon replacement without
+  requiring the host to reconnect. It performs one fresh MCP initialization,
+  replays the initialized notification, and retries the interrupted request
+  only when the daemon rejects an expired session with HTTP 404; unrelated
+  failures are not retried or hidden.
+- Recall now preserves its bounded seven-field terminal contract when supplied
+  input is empty, overlong, or the wrong type, and when Recall is disabled or
+  retrieval fails. A missing required question remains an MCP schema error;
+  malformed supplied values no longer replace the product response with an
+  unrelated raw protocol failure.
+- GraphConnect and both ETL tools now scrub complete nested request,
+  persistence, and response payloads. Graph and ETL queue mutations also stay
+  inside the transaction-scoped write lock for their complete lifecycle.
+- Release-client, installer-bundle, and installer source identities now treat
+  untracked files as dirty, preventing untracked payload source from being
+  labeled as a clean build.
+- Active protocol headers, proposal status/tool counts, Memory action summaries,
+  issue-ledger counts, and the maintained dashboard showcase now derive or
+  assert the v2.13.0 source contract instead of preserving pre-release state.
+- Antigravity and VS Code/Bob host approval metadata now derives from one exact
+  17-tool customer inventory, including Recall and the Directive tools.
+- The optional self-protocol dashboard phase now uses a cross-platform isolated
+  Python browser stub and explicitly separates direct-handler proof from the
+  shipped bridge/daemon transport proof.
+- The privileged Kuzu-only reset now targets the configured graph path, moves
+  it into a recoverable timestamped location, preserves the vector store, and
+  truthfully states that it performs no automatic topology rebuild. It rejects
+  broad targets and requires the exact resolved path as a second confirmation
+  whenever configured graph storage is outside the Elefante data root.
+- Direct-source restart verification now requires a private identity receipt
+  authored by the launched process and enforces `--version` against that live
+  process receipt; it no longer treats the helper's own imported source version
+  as proof of what restarted.
+- Dashboard dependencies were refreshed to the newest versions allowed by the
+  existing compatibility ranges; production build and full/production audits
+  remain clean. Major framework migrations remain separate compatibility work.
+
 ## [2.13.0] - 2026-08-28
 
 ### Added

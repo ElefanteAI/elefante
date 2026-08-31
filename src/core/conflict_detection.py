@@ -226,7 +226,7 @@ _PREDICATE_PATTERNS = (
     ("avoid", r"(?:avoid|avoids|avoided)"),
 )
 
-_AUXILIARIES = r"(?:does|do|did|can|cannot|will|shall)"
+_AUXILIARIES = r"(?:does|do|did|can|cannot|will|shall|must)"
 
 
 def _normalize_phrase(value: str) -> str:
@@ -396,6 +396,26 @@ def _parse_statement(statement: object) -> _Proposition | None:
                 value=value,
                 positive=located.group("negation") is None,
                 exclusive_value=True,
+            )
+
+    # Mandatory rules are not hedges: "must be" and "must not be" are an
+    # explicit proposition with stable polarity.  Keep this narrow to `must`
+    # so advisory wording such as should/might continues to abstain.
+    mandatory_copula = re.match(
+        r"^(?P<subject>.+?)\s+must\s+"
+        r"(?:(?P<negation>not|never)\s+)?be\s+(?P<value>.+)$",
+        prepared,
+    )
+    if mandatory_copula:
+        subject = _normalize_subject(mandatory_copula.group("subject"))
+        value = _normalize_value(mandatory_copula.group("value"))
+        if _valid_subject(subject) and _valid_value(value):
+            return _Proposition(
+                subject=subject,
+                predicate="be",
+                value=value,
+                positive=mandatory_copula.group("negation") is None,
+                exclusive_value=_is_exclusive_value_key(subject, "be", value),
             )
 
     copula = re.match(

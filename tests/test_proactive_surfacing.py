@@ -23,6 +23,8 @@ def _memory(
     trigger: list[str] | None = None,
     policy: str = "ranked",
     project: str | None = None,
+    workspace: str | None = None,
+    recall_cues: list[str] | None = None,
     source_reliability: float = 0.9,
     status: MemoryStatus = MemoryStatus.VERIFIED,
     archived: bool = False,
@@ -41,9 +43,11 @@ def _memory(
             archived=archived,
             conflict_ids=conflict_ids or [],
             project=project,
+            workspace=workspace,
             injection_policy=policy,
             trigger=trigger or [],
             surfaces_when=[],
+            recall_cues=recall_cues or [],
         ),
     )
 
@@ -289,6 +293,117 @@ def test_triggered_surface_is_deliverable_without_semantic_overlap():
 
     assert brief.selected_memory_ids == [str(memory.id)]
     assert brief.packets[0].evidence[0].retrieval_signals["surface_match"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_recall_cue_is_exact_project_scoped_and_not_a_generic_trigger():
+    question = "What is the conclusion after all this work? Explain it to me in STAC."
+    accepted = _memory(
+        'User likes answers in simple terms and concisely (STAC).',
+        project="elefante",
+        workspace="/work/elefante",
+        recall_cues=[question],
+    )
+    other_project = _memory(
+        "A different project preference.",
+        project="other",
+        workspace="/work/other",
+        recall_cues=[question],
+    )
+    vector_store = _VectorStore([accepted, other_project])
+    orchestrator = MemoryOrchestrator(
+        vector_store=vector_store,
+        graph_store=object(),
+        embedding_service=object(),
+    )
+
+    results = await orchestrator._surface_recall_cue_memories(
+        "what is the conclusion after all this work explain it to me in stac",
+        filters=SearchFilters(project="elefante", workspace="/work/elefante"),
+    )
+
+    assert [result.memory.id for result in results] == [accepted.id]
+    assert results[0].source == "recall-cue"
+    assert results[0].recall_cue_match is True
+    assert await orchestrator._surface_recall_cue_memories(
+        "Explain STAC differently",
+        filters=SearchFilters(project="elefante", workspace="/work/elefante"),
+    ) == []
+    assert await orchestrator._surface_recall_cue_memories(
+        question,
+        filters=None,
+    ) == []
+
+
+@pytest.mark.asyncio
+async def test_search_preserves_recall_cue_as_explicit_non_vector_evidence(monkeypatch):
+    question = "What is the conclusion after all this work? Explain it to me in STAC."
+    memory = _memory(
+        'User likes answers in simple terms and concisely (STAC).',
+        project="elefante",
+        workspace="/work/elefante",
+        recall_cues=[question],
+    )
+    orchestrator = MemoryOrchestrator(
+        vector_store=_VectorStore([memory]),
+        graph_store=object(),
+        embedding_service=object(),
+    )
+
+    async def no_semantic_results(*_args, **_kwargs):
+        return []
+
+    monkeypatch.setattr(orchestrator, "_search_hybrid", no_semantic_results)
+    results = await orchestrator.search_memories(
+        query=question,
+        mode=QueryMode.HYBRID,
+        filters=SearchFilters(
+            project="elefante",
+            workspace="/work/elefante",
+            include_conversation=False,
+            include_stored=True,
+        ),
+        include_conversation=False,
+        include_stored=True,
+        apply_temporal_decay=False,
+        reinforce_access=False,
+    )
+
+    assert [result.memory.id for result in results] == [memory.id]
+    assert results[0].score == 1.0
+    assert results[0].vector_score is None
+    assert results[0].recall_cue_match is True
+    assert results[0].explanation["signals"][0]["name"] == "customer_recall_cue"
+
+
+def test_recall_cue_is_deliverable_without_semantic_or_lexical_overlap():
+    memory = _memory(
+        'User likes answers in simple terms and concisely (STAC).',
+        project="elefante",
+        workspace="/work/elefante",
+        recall_cues=["What is the conclusion after all this work?"],
+    )
+    result = SearchResult(
+        memory=memory,
+        score=1.0,
+        source="recall-cue",
+        recall_cue_match=True,
+    )
+
+    brief = TaskBriefCompiler().compile(
+        TaskBriefRequest(
+            task="What is the conclusion after all this work?",
+            project="elefante",
+            workspace="/work/elefante",
+            profile=TaskBriefProfile.V2,
+        ),
+        [result],
+    )
+
+    assert brief.selected_memory_ids == [str(memory.id)]
+    assert brief.packets[0].evidence[0].retrieval_signals[
+        "recall_cue_match"
+    ] == 1.0
 
 
 @pytest.mark.asyncio

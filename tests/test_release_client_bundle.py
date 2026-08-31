@@ -84,12 +84,66 @@ def _build(builder, source_root: Path, output_path: Path, platform: str = "macOS
     )
 
 
+def test_source_identity_marks_untracked_payload_source_dirty(tmp_path):
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    builder = _load_module(
+        ROOT / "scripts/ci/build_release_client.py",
+        "build_release_client_untracked_identity",
+    )
+    installer_builder = _load_module(
+        ROOT / "scripts/ci/build_installer_bundle.py",
+        "build_installer_bundle_untracked_identity",
+    )
+    installer = _load_module(
+        ROOT / "scripts/setup/install.py",
+        "install_untracked_identity",
+    )
+    _create_client_source(source_root, builder)
+    subprocess.run(["git", "init", "-q"], cwd=source_root, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "tests@elefante.local"],
+        cwd=source_root,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Elefante Tests"],
+        cwd=source_root,
+        check=True,
+    )
+    subprocess.run(["git", "add", "."], cwd=source_root, check=True)
+    subprocess.run(
+        ["git", "commit", "-q", "-m", "fixture"],
+        cwd=source_root,
+        check=True,
+    )
+
+    assert builder.source_identity(source_root)["clean"] is True
+    assert installer_builder.source_identity(source_root)["clean"] is True
+    assert installer._git_source_identity(source_root)[1] is True
+
+    untracked_source = source_root / "src" / "untracked_runtime.py"
+    untracked_source.write_text("print('must affect identity')\n", encoding="utf-8")
+
+    assert builder.source_identity(source_root)["clean"] is False
+    assert installer_builder.source_identity(source_root)["clean"] is False
+    assert installer._git_source_identity(source_root)[1] is False
+
+
 @pytest.mark.parametrize(
     ("platform", "launchers"),
     [
-        ("macOS", {"install.sh", "Install Elefante.command"}),
-        ("Linux", {"install.sh"}),
-        ("Windows", {"Install Elefante.bat"}),
+        (
+            "macOS",
+            {
+                "install.sh",
+                "uninstall.sh",
+                "Install Elefante.command",
+                "Uninstall Elefante.command",
+            },
+        ),
+        ("Linux", {"install.sh", "uninstall.sh"}),
+        ("Windows", {"Install Elefante.bat", "Uninstall Elefante.bat"}),
     ],
 )
 def test_build_release_client_contains_only_customer_runtime(
@@ -141,6 +195,7 @@ def test_build_release_client_contains_only_customer_runtime(
     assert manifest["publication_status"] == "candidate"
     assert manifest["platform"] == platform
     assert manifest["customer_contract"]["includes_developer_workspace"] is False
+    assert set(manifest["entrypoints"]) == launchers
     assert build_identity == {
         "schema_version": 1,
         "version": manifest["version"],

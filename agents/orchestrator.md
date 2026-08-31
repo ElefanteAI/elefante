@@ -1,7 +1,7 @@
 ---
 PROTOCOL: orchestrator
 INVOKE: elefante-orchestrator
-PROTOCOL_VERSION: 2.12.2
+PROTOCOL_VERSION: 2.13.0
 LOAD_WHEN: Building or debugging Elefante itself (DEVELOPER mode).
 DIAGNOSTIC_QUESTION: "Am I changing src/, fixing a regression, or shipping a release?"
 AUTHORITY: AGENTS.md (universal entry, repo root) → README.md → this file → everything else.
@@ -232,7 +232,7 @@ State the diagnostic question before running anything.
 | Specific path regressed? | targeted `pytest` from `tests/README.md` |
 | Tool surface drift vs `docs/reference/tools.md`? | `scripts/ci/list_mcp_tools.py` |
 | Lock held / write hangs? | `scripts/debug/manage_lock.py` (dry-run first) |
-| Kuzu corrupted? | Verified backup/restore first; `scripts/debug/reset_kuzu_nuclear.py` is legacy-ChromaDB-only |
+| Kuzu corrupted? | Verified backup first; `scripts/debug/reset_kuzu_nuclear.py` only quarantines the configured graph path and never rebuilds it |
 | Need to retune governing behavior itself? | enter **PRIVILEGED**; load `agents/puppeteer.md`; state risk + rollback first |
 
 ## Closure Sequence

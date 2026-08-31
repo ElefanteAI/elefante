@@ -1,9 +1,9 @@
 # IDE and Agent Integration Surface
 
 > **Status:** PARTIALLY IMPLEMENTED. The v2.12.2 customer-global runtime and
-> detected-host adapters are retained in the current v2.12.3 release. The
-> development checkout also has ownership-safe Zed and Continue adapters.
-> Additional host certification,
+> detected-host adapters are retained in the current v2.13.0 release, which
+> also includes ownership-safe Zed and Continue adapters at the Compatible
+> tier. Additional host certification,
 > extension-managed surfaces, and automated documentation-drift inspection are
 > Upcoming without a promised version or date.
 
@@ -52,6 +52,7 @@ from a hostname appearing in this proposal.
 | v2.11 integration baseline | Daemon, bridge, Source provenance, safe ownership, compatible adapters |
 | v2.12.0 installer baseline | Host-aware selection and platform launchers |
 | v2.12.2 customer-global runtime | One stable customer installation, client-only archives, real bridge/daemon handshake |
+| v2.13.0 adapter expansion | Ownership-safe Zed and Continue adapters at the Compatible tier |
 
 ## Upcoming work
 
@@ -65,10 +66,11 @@ from a hostname appearing in this proposal.
 These items have no assigned release or date. Windsurf and any other surface
 without a released adapter remain Planned, not supported.
 
-The 2026-08-28 development closure adds Zed and Continue as **Compatible**:
+The v2.13.0 release adds Zed and Continue as **Compatible**:
 their current vendor contracts are cited, detection is read-only, unrelated
 configuration is preserved, exact emitted state is fingerprint-owned, and the
-shared installer tests cover upgrade/uninstall behavior. This is not a claim
+shared installer tests cover upgrade/uninstall behavior. This remains distinct
+from a claim
 that either external host has completed the Certified lifecycle.
 
 ## Acceptance for a new adapter

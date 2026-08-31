@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from src import __version__ as ELEFANTE_VERSION
 from src.utils.curation import assess_health_from_raw
 from src.utils.dashboard_serializer import (
     connection_counts_from_edges,
@@ -23,7 +24,7 @@ from src.utils.dashboard_serializer import (
 
 
 GENERATED_AT = "2026-08-05T18:00:00.000Z"
-PRODUCT_BASELINE = "v2.12.2"
+PRODUCT_BASELINE = f"v{ELEFANTE_VERSION}"
 
 # id, title, description, type, topic, score, access_count, status, evidence
 MEMORIES = [
@@ -239,6 +240,24 @@ def build_showcase_snapshot() -> dict[str, Any]:
             "health": health_summary_from_nodes(nodes, edges, now=showcase_now),
             "usage": usage_summary_from_nodes(nodes),
         },
+        "project_registry": {
+            "status": "ready",
+            "schema_version": 1,
+            "mode": "strict",
+            "revision": 1,
+            "projects": [
+                {
+                    "project_id": "11111111-1111-4111-8111-111111111111",
+                    "name": "Elefante showcase",
+                    "root": "/showcase/elefante",
+                    "active": True,
+                    "root_status": "unknown",
+                    "created_at": GENERATED_AT,
+                    "updated_at": GENERATED_AT,
+                }
+            ],
+        },
+        "project_registry_generated_at": GENERATED_AT,
         "nodes": nodes,
         "edges": edges,
         "featured_chain": list(FEATURED_CHAIN),

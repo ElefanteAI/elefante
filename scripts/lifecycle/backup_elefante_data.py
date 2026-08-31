@@ -24,7 +24,7 @@ import tempfile
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable, Mapping
 
 
 BACKUP_FORMAT_VERSION = 1
@@ -52,6 +52,16 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _stable_sha256(payload: Any) -> str:
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def _data_files(data_dir: Path) -> Iterable[Path]:
     """Yield regular data files while excluding nested recovery archives."""
     for path in sorted(data_dir.rglob("*")):
@@ -64,8 +74,49 @@ def _data_files(data_dir: Path) -> Iterable[Path]:
             yield path
 
 
-def create_backup(data_dir: Path, out_dir: Path) -> Path:
-    """Create a checksum-verified zip archive and return its final path."""
+def build_backup_manifest(data_dir: Path) -> dict[str, Any]:
+    """Hash one exact managed data tree without storing customer content."""
+    data_dir = data_dir.expanduser().resolve()
+    if not data_dir.is_dir():
+        raise FileNotFoundError(f"data dir not found: {data_dir}")
+
+    entries = []
+    for path in _data_files(data_dir):
+        relative = path.relative_to(data_dir).as_posix()
+        entries.append(
+            {
+                "path": relative,
+                "size": path.stat().st_size,
+                "sha256": _sha256(path),
+            }
+        )
+    return {
+        "format": "elefante-data-backup",
+        "format_version": BACKUP_FORMAT_VERSION,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "files": entries,
+        "file_count": len(entries),
+        "total_bytes": sum(int(entry["size"]) for entry in entries),
+        "source_sha256": _stable_sha256(entries),
+    }
+
+
+def _normalized_manifest_files(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
+    files = manifest.get("files")
+    if not isinstance(files, list):
+        raise ValueError("Backup manifest has no file list")
+    if any(not isinstance(entry, Mapping) for entry in files):
+        raise ValueError("Backup manifest contains an invalid file entry")
+    return [dict(entry) for entry in files]
+
+
+def create_backup(
+    data_dir: Path,
+    out_dir: Path,
+    *,
+    source_manifest: Mapping[str, Any] | None = None,
+) -> Path:
+    """Create and read back one checksum-verified archive."""
     data_dir = data_dir.expanduser().resolve()
     out_dir = out_dir.expanduser().resolve()
     if not data_dir.is_dir():
@@ -80,7 +131,20 @@ def create_backup(data_dir: Path, out_dir: Path) -> Path:
         archive_path = out_dir / f"elefante_data_backup_{_timestamp()}_{suffix}.zip"
         suffix += 1
 
-    entries = []
+    manifest = (
+        dict(source_manifest)
+        if source_manifest is not None
+        else build_backup_manifest(data_dir)
+    )
+    entries = _normalized_manifest_files(manifest)
+    expected_paths = {str(entry.get("path") or "") for entry in entries}
+    actual_paths = {
+        path.relative_to(data_dir).as_posix()
+        for path in _data_files(data_dir)
+    }
+    if "" in expected_paths or expected_paths != actual_paths:
+        raise ValueError("Backup source changed after inspection")
+
     temporary_fd, temporary_name = tempfile.mkstemp(
         prefix=f".{archive_path.stem}.", suffix=".tmp", dir=out_dir
     )
@@ -93,20 +157,22 @@ def create_backup(data_dir: Path, out_dir: Path) -> Path:
             compression=zipfile.ZIP_DEFLATED,
             compresslevel=9,
         ) as archive:
-            for path in _data_files(data_dir):
-                relative = path.relative_to(data_dir).as_posix()
+            for entry in entries:
+                relative = str(entry["path"])
+                path = data_dir.joinpath(*relative.split("/"))
                 archive.write(path, arcname=relative)
-                entries.append(
-                    {"path": relative, "size": path.stat().st_size, "sha256": _sha256(path)}
-                )
-            manifest = {
-                "format": "elefante-data-backup",
-                "format_version": BACKUP_FORMAT_VERSION,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "files": entries,
-            }
             archive.writestr(MANIFEST_NAME, json.dumps(manifest, indent=2, sort_keys=True))
         temporary_path.replace(archive_path)
+        try:
+            # Import lazily to keep the command modules usable independently.
+            from scripts.lifecycle.restore_elefante_data import read_verified_manifest
+
+            verified = read_verified_manifest(archive_path)
+            if _normalized_manifest_files(verified) != entries:
+                raise ValueError("Backup read-back manifest does not match its source")
+        except Exception:
+            archive_path.unlink(missing_ok=True)
+            raise
     except Exception:
         temporary_path.unlink(missing_ok=True)
         raise
@@ -122,6 +188,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Elefante home directory (default: ~/.elefante)",
     )
     parser.add_argument(
+        "--data-dir",
+        type=str,
+        default=None,
+        help="Exact managed data directory (default: <elefante-home>/data)",
+    )
+    parser.add_argument(
         "--out-dir",
         type=str,
         default=None,
@@ -130,7 +202,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     elefante_home = Path(args.elefante_home).expanduser().resolve()
-    data_dir = elefante_home / "data"
+    data_dir = (
+        Path(args.data_dir).expanduser().resolve()
+        if args.data_dir
+        else elefante_home / "data"
+    )
     out_dir = Path(args.out_dir).expanduser() if args.out_dir else elefante_home / "backups"
     try:
         archive_path = create_backup(data_dir, out_dir)

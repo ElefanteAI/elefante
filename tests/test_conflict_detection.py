@@ -28,6 +28,11 @@ from src.models.query import SearchResult
         ),
         ("The service is not healthy.", "The service is healthy."),
         ("The daemon cannot use SQLite.", "The daemon can use SQLite."),
+        (
+            "The product launch banner must not be blue.",
+            "The product launch banner must be blue.",
+        ),
+        ("The daemon must not use SQLite.", "The daemon must use SQLite."),
     ],
 )
 def test_opposite_explicit_polarity_is_conflict(incoming, existing):

@@ -5,8 +5,8 @@
 #           isolated temp environment and proves the full live tool/prompt surface.
 # WHEN    : Before any release. After changes to server.py, orchestrator.py,
 #           or any core module. After a version bump to confirm the deployed
-#           surface is intact. This is the ONLY script that proves the live
-#           MCP surface end-to-end — do not substitute with unit tests.
+#           direct handler surface is intact. Customer stdio bridge/daemon
+#           topology is proved separately in tests/test_mcp_daemon.py.
 # USAGE   : python scripts/verify/verify_e2e_tests.py [--with-dashboard-open]
 # NOTES   : Launches a real MCP server subprocess in a temp dir. Slow (~60s)
 #           but definitive. --with-dashboard-open enables the complete tool
@@ -15,17 +15,22 @@
 """Elefante self-protocol verification harness.
 
 Runs the real MCP server in an isolated temporary Elefante home/data dir and
-verifies the live MCP surface one feature family at a time.
+verifies the live direct MCP handler surface one feature family at a time.
+
+This is not the shipped customer transport topology: customer hosts use the
+storage-free stdio bridge and loopback daemon. Maintained process tests in
+`tests/test_mcp_daemon.py` separately prove that boundary, including exact
+customer inventory and stale-session recovery. Release evidence needs both.
 
 Default mode is safe and self-contained:
-    - verifies 17/18 development tools + 2 prompts
+    - verifies 18/19 development tools + 2 prompts
     - excludes `elefante-DashboardOpen` because that tool binds fixed port 8000
       and attempts to open a browser outside the temp store
 
 Optional full-surface mode:
     - pass `--with-dashboard-open` to include `elefante-DashboardOpen(refresh=True)`
     - only runs if port 8000 is free before the harness starts
-    - stubs browser launch via `BROWSER=/usr/bin/true`
+    - stubs browser launch with an isolated Python no-op command on every platform
     - kills the spawned dashboard server during cleanup
 
 Runs:
@@ -64,17 +69,19 @@ import asyncio
 import json
 import os
 import re
+import shlex
 import socket
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
 
-from src import __version__ as ELEFANTE_VERSION
+from src import __version__ as ELEFANTE_VERSION  # noqa: E402
+from src.core.project_registry import ProjectRegistry  # noqa: E402
 
 
 REQUEST_TIMEOUT_SECONDS = 180
@@ -86,6 +93,7 @@ EXPECTED_TOOLS = {
     # Memory operations consolidated into single tool with action discriminator (v2.10.0 atomic swap, 2026-05-02)
     "elefante-Memory",
     "elefante-Recall",
+    "elefante-Recover",
     "elefante-TaskIntelligence",
     "elefante-GraphConnect",
     "elefante-GraphQuery",
@@ -293,6 +301,10 @@ async def _store_memory(
     memory_type: str,
     category: str,
     tags: list[str],
+    project: str,
+    workspace: str,
+    scope: str,
+    verification_question: str | None = None,
 ) -> tuple[bool, str, dict]:
     # Compliance receipts are intentionally one-use. Prove the full customer
     # contract by grounding every mutation, not by reusing one ritual search.
@@ -304,18 +316,31 @@ async def _store_memory(
             "limit": 3,
         },
     )
+    add_args: dict[str, object] = {
+        "action": "add",
+        "content": content,
+        "memory_type": memory_type,
+        "domain": "project",
+        "category": category,
+        "tags": tags,
+        "project": project,
+        "workspace": workspace,
+        "scope": scope,
+    }
+    if verification_question:
+        add_args.update(
+            {
+                "knowledge_kind": "decision",
+                "verification_question": verification_question,
+                "invocation_mode": "user_directed",
+            }
+        )
     response = await client.call_tool(
         "elefante-Memory",
-        {"action": "add", 
-            "content": content,
-            "memory_type": memory_type,
-            "domain": "project",
-            "category": category,
-            "tags": tags,
-        },
+        add_args,
     )
     memory_id = response.get("memory_id") or response.get("embedding_id") or ""
-    ok = response.get("status") == "stored" and bool(memory_id)
+    ok = response.get("status") in {"stored", "VERIFIED_COMPLETE"} and bool(memory_id)
     return ok, memory_id, response
 
 
@@ -332,6 +357,62 @@ async def _list_protocol_memories(client: MCPClient, tag: str) -> tuple[dict, li
     return response, memories
 
 
+async def _inspect_and_apply_correction(
+    client: MCPClient,
+    *,
+    memory_id: str,
+    correction: str,
+    reason: str,
+    verification_question: str,
+    content: str | None = None,
+    confirm_permanent: bool = False,
+) -> tuple[dict, dict]:
+    """Run the supported inspect-then-apply Correct contract over live MCP."""
+    inspect_args: dict[str, object] = {
+        "action": "correct",
+        "memory_id": memory_id,
+        "correction": correction,
+        "invocation_mode": "user_directed",
+    }
+    if content is not None:
+        inspect_args["content"] = content
+    inspected = await client.call_tool("elefante-Memory", inspect_args)
+    plan = inspected.get("plan", {})
+    if inspected.get("success") is not True or plan.get("applicable") is not True:
+        return inspected, {}
+
+    # Compliance receipts are one-use and Correct is a verified mutation.
+    await client.call_tool(
+        "elefante-Memory",
+        {
+            "action": "search",
+            "query": verification_question,
+            "limit": 5,
+        },
+    )
+    apply_args: dict[str, object] = {
+        **inspect_args,
+        "apply": True,
+        "reason": reason,
+        "verification_question": verification_question,
+        "expected_record_sha256": plan.get("record_sha256"),
+        "expected_graph_sha256": plan.get("graph_sha256"),
+    }
+    if content is not None:
+        apply_args["expected_content_sha256"] = plan.get("content_sha256")
+    if confirm_permanent:
+        apply_args["confirm_permanent"] = True
+    applied = await client.call_tool("elefante-Memory", apply_args)
+    return inspected, applied
+
+
+def _browser_stub_command(temp_root: Path) -> str:
+    """Create a cross-platform no-op browser command for the isolated harness."""
+    stub_path = temp_root / "browser_stub.py"
+    stub_path.write_text("raise SystemExit(0)\n", encoding="utf-8")
+    return f"{shlex.join([sys.executable, str(stub_path)])} %s"
+
+
 async def run_e2e(with_dashboard_open: bool) -> int:
     results: list[bool] = []
     test_tag = f"self-protocol-{uuid4().hex[:8]}"
@@ -339,8 +420,22 @@ async def run_e2e(with_dashboard_open: bool) -> int:
     temp_root = Path(temp_root_manager.name)
     temp_home = temp_root / "home"
     temp_data_dir = temp_root / "data"
+    project_workspace = temp_root / "project"
     temp_home.mkdir(parents=True, exist_ok=True)
     temp_data_dir.mkdir(parents=True, exist_ok=True)
+    project_workspace.mkdir(parents=True, exist_ok=True)
+    project_id = str(uuid4())
+    project_scope = f"project:{project_id}"
+    registry = ProjectRegistry(
+        temp_data_dir / "projects.json",
+        id_factory=lambda: UUID(project_id),
+    )
+    registered_project = registry.register(
+        "Self-protocol project",
+        project_workspace,
+    )
+    if registered_project.project_id != project_id:
+        raise RuntimeError("Self-protocol project identity was not preserved")
 
     # Preserve real model cache paths so the isolated subprocess does not
     # re-download embedding models.  HOME/USERPROFILE are overridden for
@@ -356,10 +451,11 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         "HOME": str(temp_home),
         "USERPROFILE": str(temp_home),
         "ELEFANTE_DATA_DIR": str(temp_data_dir),
+        "ELEFANTE_CLIENT_CWD": str(project_workspace),
         "ELEFANTE_ALLOW_TEST_MEMORIES": "1",
         "ELEFANTE_TASK_INTELLIGENCE_ENABLED": "1",
         "ELEFANTE_TASK_INTELLIGENCE_PILOT": "1",
-        "BROWSER": "/usr/bin/true",
+        "BROWSER": _browser_stub_command(temp_root),
         "HF_HOME": real_hf_home,
         "TORCH_HOME": real_torch_home,
         "SENTENCE_TRANSFORMERS_HOME": os.environ.get(
@@ -380,7 +476,7 @@ async def run_e2e(with_dashboard_open: bool) -> int:
 
     _header(f"Elefante Self-Protocol Harness v{ELEFANTE_VERSION}")
     print("  Purpose : whole-system MCP proof in isolated temp HOME + data")
-    print("  Surface : 17/18 opt-in development tools + 2 prompts")
+    print("  Surface : 18/19 opt-in development tools + 2 prompts")
     print("  Dashboard tool:", "enabled" if with_dashboard_open else "skipped by default")
     print(f"  Tag     : {test_tag}")
 
@@ -542,6 +638,17 @@ async def run_e2e(with_dashboard_open: bool) -> int:
             )
         )
 
+        recover_health = await client.call_tool("elefante-Recover", {"action": "health"})
+        results.append(
+            _result(
+                "Recover exposes read-only lifecycle health",
+                recover_health.get("success") is True
+                and recover_health.get("action") == "health"
+                and isinstance(recover_health.get("health"), dict),
+                "verified lifecycle health returned without applying a recovery action",
+            )
+        )
+
         system_enable = await client.call_tool("elefante-System", {"action": "enable"})
         results.append(
             _result(
@@ -671,7 +778,15 @@ async def run_e2e(with_dashboard_open: bool) -> int:
             )
         )
 
+        # Setup and global protocol checks run in compatibility mode so they can
+        # inspect built-in system specifications. Customer lifecycle checks run
+        # under the actual product boundary: one strict registered project.
+        registry.set_mode("strict")
+
         _header("PHASE 6: Memory lifecycle")
+        graph_recall_question = (
+            f"Which graph memory should the {test_tag} harness use?"
+        )
         graph_memory_content = (
             f"[{test_tag}] Graph memory for context proof. "
             "Link this runtime decision to a synthetic harness project and session."
@@ -682,11 +797,11 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         )
         mutable_memory_old = (
             f"[{test_tag}] Mutable memory OLD phrase. "
-            "This content should be replaced by elefante-Memory(action=update)."
+            "This content should be replaced by the verified Correct flow."
         )
         mutable_memory_new = (
             f"[{test_tag}] Mutable memory NEW phrase. "
-            "elefante-Memory(action=update) wrote this replacement content."
+            "elefante-Memory(action=correct) wrote this replacement content."
         )
         etl_memory_content = (
             f"[{test_tag}] ETL raw memory. "
@@ -709,6 +824,12 @@ async def run_e2e(with_dashboard_open: bool) -> int:
                 memory_type=memory_type,
                 category=category,
                 tags=[test_tag, key],
+                project=project_id,
+                workspace=str(project_workspace),
+                scope=project_scope,
+                verification_question=(
+                    graph_recall_question if key == "graph" else None
+                ),
             )
             stored_all = stored_all and ok
             memory_ids[key] = memory_id
@@ -750,28 +871,47 @@ async def run_e2e(with_dashboard_open: bool) -> int:
             )
         )
 
+        cue_search = await client.call_tool(
+            "elefante-Memory",
+            {
+                "action": "search",
+                "query": graph_recall_question,
+                "project_id": project_id,
+                "workspace": str(project_workspace),
+                "limit": 5,
+            },
+        )
+        cue_results = list(cue_search.get("results", []))
+        results.append(
+            _result(
+                "Verified Remember cue remains project-deliverable",
+                any(
+                    item.get("memory", {}).get("id") == memory_ids["graph"]
+                    and item.get("recall_cue_match") is True
+                    for item in cue_results
+                ),
+                (
+                    f"count={cue_search.get('count')} status={cue_search.get('success')} "
+                    f"cue_matches={sum(1 for item in cue_results if item.get('recall_cue_match'))}"
+                ),
+            )
+        )
+
         task_prepare = await client.call_tool(
             "elefante-TaskIntelligence",
             {
                 "action": "prepare",
-                "task": (
-                    f"[{test_tag}] Use the graph memory runtime decision and the "
-                    "mutable OLD phrase update requirement."
-                ),
-                "success_criteria": [
-                    "Use the runtime decision and mutable-memory requirement"
-                ],
+                "task": graph_recall_question,
+                "success_criteria": [],
+                "project": project_id,
+                "workspace": str(project_workspace),
                 "profile": "v2",
                 "delivery_mode": "pilot",
             },
         )
-        delivered_for_use = [
-            memory_id
-            for memory_id in [memory_ids["graph"], memory_ids["mutable"]]
-            if memory_id in task_prepare.get("delivered_memory_ids", [])
-        ]
+        delivered_for_use = list(task_prepare.get("delivered_memory_ids", []))[:2]
         use_response = await client.call_tool(
-            "elefante-Memory",
+            "elefante-TaskIntelligence",
             {
                 "action": "record_use",
                 "trace_id": task_prepare.get("trace_id"),
@@ -788,7 +928,14 @@ async def run_e2e(with_dashboard_open: bool) -> int:
                 and use_response.get("success") is True
                 and use_response.get("recorded_count") == len(delivered_for_use)
                 and use_response.get("ranking_mutated") is False,
-                "delivery trace bounds declared use without mutating ranking",
+                (
+                    f"prepare={task_prepare.get('status')} "
+                    f"delivered={len(delivered_for_use)} "
+                    f"cue_count={cue_search.get('count')} "
+                    f"omissions={task_prepare.get('omissions', [])} "
+                    f"use_success={use_response.get('success')} "
+                    f"use_error={use_response.get('error', '')}"
+                ),
             )
         )
 
@@ -801,7 +948,7 @@ async def run_e2e(with_dashboard_open: bool) -> int:
             )
         )
 
-        update_response = await client.call_tool(
+        legacy_update_response = await client.call_tool(
             "elefante-Memory",
             {"action": "update", 
                 "memory_id": memory_ids["mutable"],
@@ -811,9 +958,35 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         )
         results.append(
             _result(
-                "Memory(action=update) amends stored content",
-                update_response.get("success") is True,
-                update_response.get("message", ""),
+                "Legacy content update fails closed into verified Correct",
+                legacy_update_response.get("success") is False
+                and legacy_update_response.get("error_code") == "USE_VERIFIED_CORRECT"
+                and legacy_update_response.get("memory_written") is False,
+                legacy_update_response.get("error", ""),
+            )
+        )
+
+        correct_edit_plan, correct_edit_response = await _inspect_and_apply_correction(
+            client,
+            memory_id=memory_ids["mutable"],
+            correction="edit",
+            content=mutable_memory_new,
+            reason=f"self-protocol verified edit {test_tag}",
+            verification_question=mutable_memory_new,
+        )
+        results.append(
+            _result(
+                "Memory(action=correct) verifies an edited memory",
+                correct_edit_response.get("success") is True
+                and correct_edit_response.get("correction_status")
+                == "VERIFIED_COMPLETE",
+                (
+                    f"status={correct_edit_response.get('correction_status')} "
+                    f"plan={correct_edit_plan.get('plan', {}).get('reason_code')} "
+                    f"codes={correct_edit_response.get('receipt', {}).get('error_codes', [])} "
+                    f"checks={correct_edit_response.get('receipt', {}).get('checks', [])} "
+                    f"error={correct_edit_response.get('error', correct_edit_plan.get('error', ''))}"
+                ),
             )
         )
 
@@ -821,13 +994,13 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         updated_memory = _memory_by_id(protocol_memories_after_update, memory_ids["mutable"])
         results.append(
             _result(
-                "Memory(action=update) read-back shows replacement content",
+                "Verified Correct read-back shows replacement content",
                 updated_memory is not None and updated_memory.get("content") == mutable_memory_new,
                 "list_all returns the updated content for the same memory id",
             )
         )
 
-        delete_response = await client.call_tool(
+        legacy_delete_response = await client.call_tool(
             "elefante-Memory",
             {"action": "delete", 
                 "memory_id": memory_ids["active"],
@@ -839,16 +1012,41 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         )
         results.append(
             _result(
-                "Memory(action=delete) removes a stored record",
-                delete_response.get("success") is True,
-                delete_response.get("message", ""),
+                "Legacy permanent delete fails closed into verified Correct",
+                legacy_delete_response.get("success") is False
+                and legacy_delete_response.get("error_code") == "USE_VERIFIED_CORRECT"
+                and legacy_delete_response.get("memory_written") is False,
+                legacy_delete_response.get("error", ""),
+            )
+        )
+
+        correct_delete_plan, correct_delete_response = await _inspect_and_apply_correction(
+            client,
+            memory_id=memory_ids["active"],
+            correction="permanent_delete",
+            reason=f"self-protocol verified delete {test_tag}",
+            verification_question=active_memory_content,
+            confirm_permanent=True,
+        )
+        results.append(
+            _result(
+                "Memory(action=correct) verifies backup-bound permanent deletion",
+                correct_delete_response.get("success") is True
+                and correct_delete_response.get("correction_status")
+                == "VERIFIED_COMPLETE"
+                and correct_delete_response.get("receipt", {}).get("recoverable") is False,
+                (
+                    f"status={correct_delete_response.get('correction_status')} "
+                    f"plan={correct_delete_plan.get('plan', {}).get('reason_code')} "
+                    f"error={correct_delete_response.get('error', correct_delete_plan.get('error', ''))}"
+                ),
             )
         )
 
         _, protocol_memories_after_delete = await _list_protocol_memories(client, test_tag)
         results.append(
             _result(
-                "Memory(action=delete) read-back confirms removal",
+                "Verified Correct read-back confirms permanent removal",
                 _memory_by_id(protocol_memories_after_delete, memory_ids["active"]) is None,
                 f"remaining={len(protocol_memories_after_delete)} tagged memories",
             )
@@ -856,7 +1054,7 @@ async def run_e2e(with_dashboard_open: bool) -> int:
 
         context_prompt = await client.get_prompt(
             "elefante-context",
-            {"topic": "Graph memory for context proof"},
+            {"topic": graph_memory_content},
         )
         context_prompt_text = _prompt_text(context_prompt)
         results.append(
@@ -1190,30 +1388,25 @@ async def run_e2e(with_dashboard_open: bool) -> int:
             },
         )
 
-        cleanup_targets = [memory_ids["graph"], memory_ids["mutable"], memory_ids["etl"]]
+        cleanup_targets = [
+            (memory_ids["graph"], graph_memory_content),
+            (memory_ids["mutable"], mutable_memory_new),
+            (memory_ids["etl"], etl_memory_content),
+        ]
         deleted_count = 0
-        for memory_id in cleanup_targets:
-            await client2.call_tool(
-                "elefante-Memory",
-                {
-                    "action": "search",
-                    "query": f"{test_tag} {memory_id}",
-                    "list_all": True,
-                    "limit": 5,
-                },
+        for memory_id, verification_question in cleanup_targets:
+            _, delete_result = await _inspect_and_apply_correction(
+                client2,
+                memory_id=memory_id,
+                correction="permanent_delete",
+                reason=f"self-protocol cleanup {test_tag}",
+                verification_question=verification_question,
+                confirm_permanent=True,
             )
-            delete_result = await client2.call_tool(
-                "elefante-Memory",
-                {
-                    "action": "delete",
-                    "memory_id": memory_id,
-                    "reason": f"self-protocol cleanup {test_tag}",
-                    "delete_mode": "permanent",
-                    "invocation_mode": "user_directed",
-                    "confirm_permanent": True,
-                },
-            )
-            if delete_result.get("success") is True:
+            if (
+                delete_result.get("success") is True
+                and delete_result.get("correction_status") == "VERIFIED_COMPLETE"
+            ):
                 deleted_count += 1
 
         results.append(

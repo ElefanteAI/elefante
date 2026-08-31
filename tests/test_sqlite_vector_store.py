@@ -417,7 +417,8 @@ def test_dashboard_snapshot_pipeline_reads_the_configured_sqlite_store(tmp_path,
     snapshot = __import__("json").loads((data_directory / "dashboard_snapshot.json").read_text(encoding="utf-8"))
     node = next(item for item in snapshot["nodes"] if item["id"] == str(memory.id))
     assert snapshot["stats"]["memories"] == 1
-    assert node["properties"]["source"] == "sqlite"
+    assert node["properties"]["source"] == "user_input"
+    assert node["properties"]["storage_backend"] == "sqlite"
     assert node["properties"]["title"] == "SQLite dashboard contract"
     assert node["properties"]["health_status"] == "healthy"
     assert node["properties"]["health_reason"] == "current and connected"
@@ -478,5 +479,6 @@ def test_dashboard_snapshot_pipeline_preserves_the_configured_chroma_path(tmp_pa
     snapshot = __import__("json").loads((data_directory / "dashboard_snapshot.json").read_text(encoding="utf-8"))
     node = next(item for item in snapshot["nodes"] if item["id"] == str(memory.id))
     assert snapshot["stats"]["memories"] == 1
-    assert node["properties"]["source"] == "chromadb"
+    assert node["properties"]["source"] == "user_input"
+    assert node["properties"]["storage_backend"] == "chromadb"
     assert node["properties"]["title"] == "Chroma dashboard contract"
