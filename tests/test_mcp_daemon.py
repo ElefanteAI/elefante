@@ -1185,6 +1185,7 @@ async def test_recall_fails_closed_when_complete_response_exceeds_hard_budget(
     monkeypatch,
 ) -> None:
     server = ElefanteMCPServer()
+    monkeypatch.setattr(server, "_strict_project_resolution", lambda _args: None)
 
     async def oversized_context(_question):
         return SimpleNamespace(
@@ -1849,6 +1850,36 @@ def test_daemon_rejects_non_loopback_bind(monkeypatch):
     monkeypatch.setenv("ELEFANTE_DAEMON_HOST", "0.0.0.0")
     with pytest.raises(RuntimeError, match="127.0.0.1"):
         daemon.main()
+
+
+def test_daemon_main_owns_the_direct_home_service(monkeypatch):
+    from src.dashboard import server as dashboard_server
+    from src.mcp import daemon
+
+    calls: dict[str, object] = {}
+    monkeypatch.delenv("ELEFANTE_DAEMON_HOST", raising=False)
+    monkeypatch.setattr(
+        dashboard_server,
+        "serve_dashboard_in_thread",
+        lambda *, port: calls.setdefault("dashboard_port", port),
+    )
+    monkeypatch.setattr(
+        daemon.uvicorn,
+        "run",
+        lambda app, *, host, port, log_level: calls.update(
+            daemon_app=app,
+            daemon_host=host,
+            daemon_port=port,
+            log_level=log_level,
+        ),
+    )
+
+    daemon.main()
+
+    assert calls["dashboard_port"] == 8000
+    assert calls["daemon_host"] == "127.0.0.1"
+    assert calls["daemon_port"] == 8765
+    assert calls["log_level"] == "info"
 
 
 @pytest.mark.asyncio

@@ -140,6 +140,15 @@
 **Guard:** `pytest tests/test_dashboard_serializer.py tests/test_verified_remember.py -q`; an isolated current-driver query must hydrate without the mapping-attribute error.
 **Lesson:** A populated visualization is not proof that every authoritative source was projected. Exercise driver-native row shapes and reject partial graph output that can be masked by derived edges.
 
+<a id="issue-15"></a>
+
+## Issue #15: Direct Home Mistook Authorization Transport for Product Setup [BUG-069, FIXED locally]
+
+**Trigger:** The customer typed `http://localhost:8000` for a healthy installed Elefante with one active project. Home showed `Setup required`, could not verify health, and instructed the customer to return to an agent and request a different secret URL.
+**Root cause:** The UI equated “no capability fragment” with “product not set up.” `DashboardOpen` was the only path that minted a control capability and supplied daemon/project context, while the always-on daemon did not own the dashboard process. A security implementation detail therefore became the customer onboarding model.
+**Solution:** Make port 8000 the stable loopback customer entry point. The daemon starts Home, the snapshot server advertises only the configured loopback daemon port, and the trusted local Home origin requests one bounded in-memory capability directly. Bind exactly one active project automatically; require an explicit choice when scope is ambiguous. Keep every named operation behind the existing expiry, request-limit, preview, confirmation, one-use ticket, exact-hash, verification, and rollback gates. If the daemon is unavailable, preserve snapshot inspection and report `Needs attention` instead of fake setup work.
+**Lesson:** Authentication transport is not onboarding. A local product URL must explain product state directly; IDEs and agents may provide context, but they cannot be required merely to enter the product. Preserve security at the action boundary, not by making the whole opening screen look broken.
+
 ---
 
 ## Cross-bug pattern (extracted to `../lessons.md`)
@@ -151,6 +160,7 @@
 5. **Single source of truth for derived values** — three code paths producing the "same output" eventually drift. Issue #9.
 6. **Detach long-lived servers into subprocesses, never daemon threads** — daemon threads die with their transient parent. Issue #7.
 7. **Exercise driver-native result shapes, not only friendly fakes** — partial graph hydration can hide behind derived visualization data. Issue #14.
+8. **Authentication transport is not onboarding** — keep the stable local entry point independent of agents and enforce authority at named actions. Issue #15.
 
 Distill any new repeating rule into `../lessons.md`.
 

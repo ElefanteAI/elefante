@@ -618,7 +618,7 @@ export function RecoverTab() {
               <div>
                 <h2 className="text-sm font-medium text-slate-200">Recovery controls are locked</h2>
                 <p className="mt-2 text-xs leading-relaxed text-slate-500">
-                  Reopen Home through Elefante for a short-lived local management session. A bookmarked page remains safely read-only.
+                  Reload Home to establish a new short-lived local session. The snapshot remains available if the local service is offline.
                 </p>
               </div>
             </div>

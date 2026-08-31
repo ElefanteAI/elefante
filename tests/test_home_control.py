@@ -614,6 +614,131 @@ async def test_dashboard_open_rejects_unknown_fields_and_invalid_workspace():
 
 
 @pytest.mark.asyncio
+async def test_direct_home_session_is_origin_bound_and_selects_one_active_project(
+    monkeypatch,
+):
+    from src.mcp import daemon
+    from src.mcp.server import ElefanteMCPServer
+
+    project_id = "11111111-1111-4111-8111-111111111111"
+    server = ElefanteMCPServer()
+    server.home_control = HomeControlRegistry(
+        token_factory=lambda: "direct-home-capability",
+        session_ttl_seconds=60,
+    )
+    monkeypatch.setattr(
+        server,
+        "_project_registry_snapshot",
+        lambda: {
+            "status": "ready",
+            "mode": "strict",
+            "projects": [
+                {
+                    "project_id": project_id,
+                    "active": True,
+                    "root_status": "available",
+                }
+            ],
+        },
+    )
+    app = daemon.create_app(elefante=server)
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(
+        transport=transport,
+        base_url="http://127.0.0.1:8765",
+    ) as client:
+        rejected = await client.post(
+            "/control/session",
+            headers={"Origin": "https://evil.example"},
+            json={},
+        )
+        assert rejected.status_code == 403
+        assert rejected.json()["error_code"] == "CONTROL_ORIGIN_REJECTED"
+
+        issued = await client.post(
+            "/control/session",
+            headers={"Origin": "http://localhost:8000"},
+            json={},
+        )
+        assert issued.status_code == 200
+        assert issued.headers["cache-control"] == "no-store"
+        assert issued.json() == {
+            "success": True,
+            "token": "direct-home-capability",
+            "expires_in_seconds": 60,
+            "project_id": project_id,
+        }
+
+    session = server.home_control.authorize(
+        "direct-home-capability",
+        "http://localhost:8000",
+    )
+    assert session.project_id == project_id
+
+
+@pytest.mark.asyncio
+async def test_direct_home_session_requires_project_choice_when_scope_is_ambiguous(
+    monkeypatch,
+):
+    from src.mcp import daemon
+    from src.mcp.server import ElefanteMCPServer
+
+    project_ids = [
+        "11111111-1111-4111-8111-111111111111",
+        "22222222-2222-4222-8222-222222222222",
+    ]
+    tokens = iter(["unbound-home-capability", "selected-home-capability"])
+    server = ElefanteMCPServer()
+    server.home_control = HomeControlRegistry(
+        token_factory=lambda: next(tokens),
+        session_ttl_seconds=60,
+    )
+    monkeypatch.setattr(
+        server,
+        "_project_registry_snapshot",
+        lambda: {
+            "status": "ready",
+            "mode": "strict",
+            "projects": [
+                {
+                    "project_id": project_id,
+                    "active": True,
+                    "root_status": "available",
+                }
+                for project_id in project_ids
+            ],
+        },
+    )
+    app = daemon.create_app(elefante=server)
+    transport = httpx.ASGITransport(app=app)
+    headers = {"Origin": "http://localhost:8000"}
+
+    async with httpx.AsyncClient(
+        transport=transport,
+        base_url="http://127.0.0.1:8765",
+    ) as client:
+        unbound = await client.post("/control/session", headers=headers, json={})
+        selected = await client.post(
+            "/control/session",
+            headers=headers,
+            json={"project_id": project_ids[1]},
+        )
+        invalid = await client.post(
+            "/control/session",
+            headers=headers,
+            json={"project_id": "33333333-3333-4333-8333-333333333333"},
+        )
+
+    assert unbound.status_code == 200
+    assert unbound.json()["project_id"] is None
+    assert selected.status_code == 200
+    assert selected.json()["project_id"] == project_ids[1]
+    assert invalid.status_code == 400
+    assert invalid.json()["error_code"] == "CONTROL_PROJECT_INVALID"
+
+
+@pytest.mark.asyncio
 async def test_daemon_remember_control_binds_overlap_choice_and_verifies_once(
     monkeypatch,
 ):

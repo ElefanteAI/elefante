@@ -478,7 +478,7 @@ pass on the exact supported package.
 
 **Owner:** Home Shell
 
-**Customer surface:** Local browser opened by Elefante
+**Customer surface:** Local browser at `http://localhost:8000`; agent-open is an optional convenience
 
 ### Customer promise
 
@@ -507,8 +507,11 @@ they cannot lead navigation or be required for setup, correction, or recovery.
 ### Control boundary
 
 - Normal Home mode reads only a validated snapshot.
-- A state-changing action opens a short-lived authenticated local control
-  session.
+- A direct loopback Home visit establishes a short-lived authenticated local
+  control session without an IDE or browser connector. Establishing the session
+  does not itself change product or memory state.
+- With one active project, Home binds it deterministically. With several active
+  projects, the customer chooses one before project-scoped actions.
 - The session exposes only named product operations, never arbitrary shell,
   path, query, or MCP execution.
 - Memory changes go through the Memory Service.

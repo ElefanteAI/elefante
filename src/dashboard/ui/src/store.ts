@@ -1073,7 +1073,7 @@ function controlErrorMessage(
 ): string {
   const serverMessage = safeText(body.error, token).trim();
   if (serverMessage) return serverMessage.slice(0, 320);
-  if (response?.status === 401) return 'Management session expired. Reopen the dashboard through Elefante.';
+  if (response?.status === 401) return 'Local session expired. Reload Home to reconnect.';
   if (response?.status === 403) return 'Management session is not authorized for this dashboard.';
   if (response?.status === 409) {
     if (operation === 'remember') {
@@ -1171,11 +1171,13 @@ interface DashboardStore {
 
   // Home management capability. The raw token is intentionally in-memory only.
   controlParsed: boolean;
+  controlConnecting: boolean;
+  controlSessionError: string | null;
   controlEnabled: boolean;
   controlBaseUrl: string | null;
   controlToken: string | null;
   activeProjectId: string | null;
-  initializeControlSession: () => void;
+  initializeControlSession: (projectId?: string) => Promise<void>;
   projectRegistry: ProjectRegistrySnapshot | null;
   isProjectManaging: boolean;
   projectError: string | null;
@@ -1311,6 +1313,8 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
 
   // Home management capability
   controlParsed: false,
+  controlConnecting: false,
+  controlSessionError: null,
   controlEnabled: false,
   controlBaseUrl: null,
   controlToken: null,
@@ -1322,38 +1326,121 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   projectReviewError: null,
   isProjectReviewLoading: false,
   isProjectAssigning: false,
-  initializeControlSession: () => {
-    if (get().controlParsed) return;
-    set({ controlParsed: true });
-
-    if (typeof window === 'undefined' || !window.location.hash) return;
-
-    const fragment = window.location.hash;
-    const params = new URLSearchParams(fragment.startsWith('#') ? fragment.slice(1) : fragment);
-    // Remove the capability before any UI render can expose it again.
-    window.history.replaceState(
-      window.history.state,
-      document.title,
-      `${window.location.pathname}${window.location.search}`,
-    );
-
-    const token = params.get('elefante_control')?.trim() ?? null;
-    const port = parseDaemonPort(params.get('daemon_port'));
-    const activeProjectId = params.get('active_project_id')?.trim() ?? null;
-    if (!isValidControlToken(token) || port === null) return;
+  initializeControlSession: async (requestedProjectId) => {
+    if (get().controlConnecting) return;
+    if (requestedProjectId && !isValidProjectId(requestedProjectId)) {
+      set({ controlSessionError: 'Choose a valid registered project.' });
+      return;
+    }
+    if (
+      get().controlEnabled
+      && (!requestedProjectId || requestedProjectId === get().activeProjectId)
+    ) return;
 
     set({
-      controlEnabled: true,
-      controlBaseUrl: `http://127.0.0.1:${port}`,
-      controlToken: token,
-      activeProjectId: isValidProjectId(activeProjectId) ? activeProjectId : null,
+      controlConnecting: true,
+      controlSessionError: null,
     });
+
+    let fragmentToken: string | null = null;
+    let fragmentPort: number | null = null;
+    let fragmentProjectId: string | null = null;
+    if (!get().controlParsed && typeof window !== 'undefined') {
+      set({ controlParsed: true });
+      if (window.location.hash) {
+        const fragment = window.location.hash;
+        const params = new URLSearchParams(fragment.startsWith('#') ? fragment.slice(1) : fragment);
+        fragmentToken = params.get('elefante_control')?.trim() ?? null;
+        fragmentPort = parseDaemonPort(params.get('daemon_port'));
+        fragmentProjectId = params.get('active_project_id')?.trim() ?? null;
+        // Remove one-time context before any UI render can expose it again.
+        window.history.replaceState(
+          window.history.state,
+          document.title,
+          `${window.location.pathname}${window.location.search}`,
+        );
+      }
+    }
+
+    if (
+      !requestedProjectId
+      && isValidControlToken(fragmentToken)
+      && fragmentPort !== null
+    ) {
+      set({
+        controlConnecting: false,
+        controlEnabled: true,
+        controlBaseUrl: `http://127.0.0.1:${fragmentPort}`,
+        controlToken: fragmentToken,
+        activeProjectId: isValidProjectId(fragmentProjectId) ? fragmentProjectId : null,
+      });
+      return;
+    }
+
+    try {
+      const configResponse = await fetch('/api/control-config', {
+        cache: 'no-store',
+        credentials: 'omit',
+        headers: { Accept: 'application/json' },
+      });
+      const config = await readJson(configResponse);
+      const port = parseDaemonPort(
+        typeof config.daemon_port === 'number' ? String(config.daemon_port) : null,
+      );
+      if (!configResponse.ok || config.available !== true || port === null) {
+        throw new Error('control configuration unavailable');
+      }
+
+      const controlBaseUrl = `http://127.0.0.1:${port}`;
+      const projectId = requestedProjectId
+        || (isValidProjectId(fragmentProjectId) ? fragmentProjectId : null);
+      const sessionResponse = await fetch(`${controlBaseUrl}/control/session`, {
+        method: 'POST',
+        cache: 'no-store',
+        credentials: 'omit',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(projectId ? { project_id: projectId } : {}),
+      });
+      const session = await readJson(sessionResponse);
+      const token = typeof session.token === 'string' ? session.token.trim() : null;
+      const activeProjectId = typeof session.project_id === 'string'
+        ? session.project_id.trim()
+        : null;
+      if (!sessionResponse.ok || session.success !== true || !isValidControlToken(token)) {
+        const message = safeText(session.error, token).trim();
+        throw new Error(message || 'local control session unavailable');
+      }
+
+      set({
+        controlConnecting: false,
+        controlEnabled: true,
+        controlBaseUrl,
+        controlToken: token,
+        activeProjectId: isValidProjectId(activeProjectId) ? activeProjectId : null,
+        controlSessionError: null,
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message.trim() : '';
+      set({
+        controlConnecting: false,
+        controlEnabled: false,
+        controlBaseUrl: null,
+        controlToken: null,
+        activeProjectId: null,
+        controlSessionError: detail && !detail.includes('control configuration')
+          ? detail.slice(0, 320)
+          : 'The local Elefante service is not responding. Reload Home or repair Elefante.',
+      });
+    }
   },
   clearProjectError: () => set({ projectError: null }),
   manageProjects: async (payload) => {
     const { controlEnabled, controlBaseUrl, controlToken } = get();
     if (!controlEnabled || !controlBaseUrl || !controlToken) {
-      const error = 'Management session is not active. Reopen the dashboard through Elefante.';
+      const error = 'Local session is not active. Reload Home to reconnect.';
       set({ projectError: error });
       return { success: false, error, error_code: 'CONTROL_SESSION_UNAVAILABLE' };
     }
@@ -1422,7 +1509,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   fetchProjectReview: async (offset = 0, limit = 25) => {
     const { controlEnabled, controlBaseUrl, controlToken } = get();
     if (!controlEnabled || !controlBaseUrl || !controlToken) {
-      const error = 'Management session is not active. Reopen Home through Elefante.';
+      const error = 'Local session is not active. Reload Home to reconnect.';
       set({ projectReviewError: error, projectReview: null });
       return null;
     }
@@ -1460,7 +1547,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   assignProjectMemory: async (memoryId, projectId, confirmProtected) => {
     const { controlEnabled, controlBaseUrl, controlToken } = get();
     if (!controlEnabled || !controlBaseUrl || !controlToken) {
-      const error = 'Management session is not active. Reopen Home through Elefante.';
+      const error = 'Local session is not active. Reload Home to reconnect.';
       set({ projectReviewError: error });
       return { success: false, error };
     }
@@ -1602,7 +1689,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   remember: async (content, knowledgeKind, verificationQuestion) => {
     const { controlEnabled, controlBaseUrl, controlToken } = get();
     if (!controlEnabled || !controlBaseUrl || !controlToken) {
-      const error = 'Management session is not active. Reopen Home through Elefante.';
+      const error = 'Local session is not active. Reload Home to reconnect.';
       set({ rememberError: error });
       return { success: false, plan_id: null, error };
     }
@@ -1685,7 +1772,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   keepBothMemories: async (planId, content, verificationQuestion) => {
     const { controlEnabled, controlBaseUrl, controlToken } = get();
     if (!controlEnabled || !controlBaseUrl || !controlToken) {
-      const error = 'Management session is not active. Reopen Home through Elefante.';
+      const error = 'Local session is not active. Reload Home to reconnect.';
       set({ rememberError: error });
       return { success: false, plan_id: null, error };
     }
@@ -1754,7 +1841,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   testRecall: async (question) => {
     const { controlEnabled, controlBaseUrl, controlToken } = get();
     if (!controlEnabled || !controlBaseUrl || !controlToken) {
-      const error = 'Management session is not active. Reopen Home through Elefante.';
+      const error = 'Local session is not active. Reload Home to reconnect.';
       set({ recallTestError: error });
       return { success: false, recall_status: 'unavailable', error };
     }
@@ -1835,7 +1922,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   requestResolvePlan: async (memoryId, relatedMemoryId, winnerMemoryId, confirmProtected) => {
     const { controlEnabled, controlBaseUrl, controlToken } = get();
     if (!controlEnabled || !controlBaseUrl || !controlToken) {
-      const error = 'Management session is not active. Reopen the dashboard through Elefante.';
+      const error = 'Local session is not active. Reload Home to reconnect.';
       set({ resolveError: error });
       return { success: false, plan_id: null, error, error_code: 'CONTROL_SESSION_UNAVAILABLE' };
     }
@@ -1880,7 +1967,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   applyResolvePlan: async (planId, reason, verificationQuestion) => {
     const { controlEnabled, controlBaseUrl, controlToken } = get();
     if (!controlEnabled || !controlBaseUrl || !controlToken) {
-      const error = 'Management session is not active. Reopen the dashboard through Elefante.';
+      const error = 'Local session is not active. Reload Home to reconnect.';
       set({ resolveError: error });
       return { success: false, error, error_code: 'CONTROL_SESSION_UNAVAILABLE' };
     }
@@ -1943,7 +2030,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   requestCorrectionPlan: async (memoryId, correction, content, confirmProtected) => {
     const { controlEnabled, controlBaseUrl, controlToken } = get();
     if (!controlEnabled || !controlBaseUrl || !controlToken) {
-      const error = 'Management session is not active. Reopen the dashboard through Elefante.';
+      const error = 'Local session is not active. Reload Home to reconnect.';
       set({ correctionError: error });
       return { success: false, plan_id: null, error, error_code: 'CONTROL_SESSION_UNAVAILABLE' };
     }
@@ -2001,7 +2088,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   ) => {
     const { controlEnabled, controlBaseUrl, controlToken } = get();
     if (!controlEnabled || !controlBaseUrl || !controlToken) {
-      const error = 'Management session is not active. Reopen the dashboard through Elefante.';
+      const error = 'Local session is not active. Reload Home to reconnect.';
       set({ correctionError: error });
       return { success: false, error, error_code: 'CONTROL_SESSION_UNAVAILABLE' };
     }
@@ -2073,7 +2160,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   requestRecoveryPlan: async (action, archiveName) => {
     const { controlEnabled, controlBaseUrl, controlToken } = get();
     if (!controlEnabled || !controlBaseUrl || !controlToken) {
-      const error = 'Management session is not active. Reopen the dashboard through Elefante.';
+      const error = 'Local session is not active. Reload Home to reconnect.';
       set({ recoveryError: error });
       return { success: false, plan_id: null, error, error_code: 'CONTROL_SESSION_UNAVAILABLE' };
     }
@@ -2149,7 +2236,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   applyRecoveryPlan: async (planId, action, verificationQuestion) => {
     const { controlEnabled, controlBaseUrl, controlToken } = get();
     if (!controlEnabled || !controlBaseUrl || !controlToken) {
-      const error = 'Management session is not active. Reopen the dashboard through Elefante.';
+      const error = 'Local session is not active. Reload Home to reconnect.';
       set({ recoveryError: error });
       return { success: false, error, error_code: 'CONTROL_SESSION_UNAVAILABLE' };
     }
@@ -2214,7 +2301,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   downloadSupportReport: async (archiveName) => {
     const { controlEnabled, controlBaseUrl, controlToken } = get();
     if (!controlEnabled || !controlBaseUrl || !controlToken) {
-      const error = 'Management session is not active. Reopen the dashboard through Elefante.';
+      const error = 'Local session is not active. Reload Home to reconnect.';
       set({ recoveryError: error });
       return { success: false, error };
     }

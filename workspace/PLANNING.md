@@ -686,7 +686,7 @@ This section is the chronological record of curation events, decisions, and abso
 | Metric | Current value | Source | Status |
 |--------|---------------|--------|--------|
 | Release target | **v2.13.0**, published 2026-08-28 from merge `86efc5c6c78fc5269c1bcb96f03beeb565a778f3` | `CHANGELOG.md`, §2.2, PR #25, annotated tag `v2.13.0`, protected release run `33191196529`, and published `SHA256SUMS` | Published and independently verified |
-| BUG/GAP count tracked | **66 distinct BUG records through BUG-068 + 9 GAPs** | `workspace/ISSUES.md` | Tracked; uniqueness and declared counts are source-guarded |
+| BUG/GAP count tracked | **67 distinct BUG records through BUG-069 + 9 GAPs** | `workspace/ISSUES.md` | Tracked; uniqueness and declared counts are source-guarded |
 | BUG recurrence rate (pre-distillation) | known per-row in `ISSUES.md` | `workspace/ISSUES.md` Recurrence column | Tracked |
 | BUG recurrence rate after current guards | `UNKNOWN` — needs sustained traffic across sessions | future `ISSUES.md` recurrence updates | Not measured |
 | Documentation guard | 49 tests pass | `tests/test_developer_routing.py` | Verified 2026-08-30; included in the 239-test focused four-action product suite |

@@ -306,7 +306,7 @@ export function ResolveMemoryDialog({ memory, conflictMemories }: ResolveMemoryD
             <ArrowRight size={13} />
           </button>
         ) : (
-          <div className="mt-2 text-[11px] text-slate-500">Read-only mode — reopen this dashboard through Elefante to manage conflicts.</div>
+          <div className="mt-2 text-[11px] text-slate-500">Local control is unavailable — reload Home to manage conflicts.</div>
         )}
       </div>
 

@@ -723,6 +723,23 @@ def test_dashboard_allows_only_explicit_origin_configuration(monkeypatch):
     ]
 
 
+@pytest.mark.asyncio
+async def test_dashboard_advertises_only_the_configured_loopback_control_port(
+    monkeypatch,
+):
+    from src.dashboard import server
+
+    monkeypatch.setenv("ELEFANTE_DAEMON_PORT", "9876")
+
+    assert await server.get_control_config() == {
+        "available": True,
+        "daemon_host": "127.0.0.1",
+        "daemon_port": 9876,
+        "session_path": "/control/session",
+    }
+    assert "/api/control-config" in {route.path for route in server.app.routes}
+
+
 def test_dashboard_container_defaults_remain_host_loopback_only():
     repo_root = Path(__file__).resolve().parents[1]
     dockerfile = (repo_root / "Dockerfile").read_text(encoding="utf-8")

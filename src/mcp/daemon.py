@@ -256,6 +256,80 @@ def create_app(*, elefante: ElefanteMCPServer | None = None) -> Starlette:
             )
         return JSONResponse(result)
 
+    async def control_session(request: Request) -> JSONResponse:
+        """Issue one browser-local capability without requiring an agent launch."""
+        try:
+            origin = request.headers.get("origin", "")
+            if origin not in DEFAULT_HOME_ORIGINS:
+                raise HomeControlError(
+                    "Home control origin is not allowed.",
+                    code="CONTROL_ORIGIN_REJECTED",
+                    status_code=403,
+                )
+            payload = _strict_json_object(await request.body())
+            if set(payload) - {"project_id"}:
+                raise HomeControlError(
+                    "Home session fields are invalid.",
+                    code="CONTROL_FIELDS_INVALID",
+                    status_code=400,
+                )
+
+            requested_project_id = payload.get("project_id")
+            if requested_project_id is not None and not isinstance(
+                requested_project_id,
+                str,
+            ):
+                raise HomeControlError(
+                    "Home project identity is invalid.",
+                    code="CONTROL_PROJECT_INVALID",
+                    status_code=400,
+                )
+            requested_project_id = str(requested_project_id or "").strip() or None
+
+            registry = elefante._project_registry_snapshot()
+            raw_projects = registry.get("projects")
+            projects = raw_projects if isinstance(raw_projects, list) else []
+            active_project_ids = {
+                str(project.get("project_id"))
+                for project in projects
+                if isinstance(project, Mapping)
+                and project.get("active") is True
+                and project.get("root_status") != "missing"
+                and isinstance(project.get("project_id"), str)
+            }
+            if requested_project_id is not None and requested_project_id not in active_project_ids:
+                raise HomeControlError(
+                    "Choose an active registered project for this Home session.",
+                    code="CONTROL_PROJECT_INVALID",
+                    status_code=400,
+                )
+
+            project_id = requested_project_id
+            if (
+                project_id is None
+                and registry.get("status") == "ready"
+                and registry.get("mode") == "strict"
+                and len(active_project_ids) == 1
+            ):
+                project_id = next(iter(active_project_ids))
+
+            grant = elefante.home_control.issue(origin, project_id=project_id)
+            return JSONResponse(
+                {
+                    "success": True,
+                    "token": grant.token,
+                    "expires_in_seconds": grant.expires_in_seconds,
+                    "project_id": project_id,
+                },
+                headers={
+                    "Cache-Control": "no-store",
+                    "Pragma": "no-cache",
+                    "Referrer-Policy": "no-referrer",
+                },
+            )
+        except HomeControlError as error:
+            return _control_error(error)
+
     async def control_remember(request: Request) -> JSONResponse:
         """Remember once or return one content-free overlap choice ticket."""
         try:
@@ -1278,6 +1352,7 @@ def create_app(*, elefante: ElefanteMCPServer | None = None) -> Starlette:
 
     control_app = Starlette(
         routes=[
+            Route("/session", control_session, methods=["POST"]),
             Route("/remember", control_remember, methods=["POST"]),
             Route("/remember/apply", control_remember_apply, methods=["POST"]),
             Route("/recall/test", control_recall_test, methods=["POST"]),
@@ -1350,6 +1425,9 @@ def main() -> None:
     if host != DEFAULT_DAEMON_HOST:
         raise RuntimeError("Elefante daemon must bind to 127.0.0.1")
     port = daemon_port()
+    from src.dashboard.server import serve_dashboard_in_thread
+
+    serve_dashboard_in_thread(port=8000)
     uvicorn.run(create_app(), host=host, port=port, log_level="info")
 
 

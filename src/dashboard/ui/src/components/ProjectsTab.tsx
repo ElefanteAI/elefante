@@ -421,7 +421,7 @@ export function ProjectsTab() {
             </div>
             {!controlEnabled && (
               <span className="max-w-sm text-[10px] leading-relaxed text-slate-600 sm:text-right">
-                Read-only mode can inspect this map but cannot mutate it. Reopen Home through Elefante to manage projects.
+                The local snapshot remains visible, but control is unavailable. Reload Home to manage projects.
               </span>
             )}
           </div>
@@ -473,7 +473,7 @@ export function ProjectsTab() {
               <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-slate-600">
                 {canManage
                   ? 'Add a project folder to give new memory a stable scope.'
-                  : 'Open a management session through Elefante to register a project.'}
+                  : 'Reload Home to reconnect before registering a project.'}
               </p>
             </div>
           ) : (

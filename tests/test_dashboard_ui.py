@@ -196,6 +196,34 @@ def test_home_opens_with_one_product_state_and_four_customer_actions() -> None:
     assert "{ id: 'overview', label: 'Home' }" in tabs
 
 
+def test_home_first_run_explains_project_boundary_and_memory_policy() -> None:
+    home = _read("components/HomeStatePanel.tsx")
+
+    assert "Set the boundary before adding memory." in home
+    assert "Elefante does not ingest every session by default." in home
+    assert "Open Projects" in home
+    assert "Open Recover" in home
+    assert "Never store passwords, API keys, access tokens" in home
+    assert "Your existing memory is safe." in home
+
+
+def test_direct_localhost_home_establishes_its_own_bounded_session() -> None:
+    home = _read("components/HomeStatePanel.tsx")
+    store = _read("store.ts")
+    app = _read("App.tsx")
+
+    assert "Choose the project for this Home session." in home
+    assert "Reload Home" in home
+    assert "fetch('/api/control-config'" in store
+    assert "/control/session" in store
+    assert "cache: 'no-store'" in store
+    assert "credentials: 'omit'" in store
+    assert "local session active" in app
+    assert "Open Home through Elefante first." not in home
+    assert "manually typed localhost URL" not in home
+    assert "browser connector" not in (home + store + app).casefold()
+
+
 def test_home_remember_and_manual_recall_are_project_safe_verified_actions() -> None:
     home = _read("components/HomeStatePanel.tsx")
     dialog = _read("components/HomeMemoryDialog.tsx")

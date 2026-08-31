@@ -113,9 +113,12 @@ function ActionEntry({
 }
 
 export function HomeStatePanel() {
+  const controlConnecting = useDashboardStore((state) => state.controlConnecting);
+  const controlSessionError = useDashboardStore((state) => state.controlSessionError);
   const controlEnabled = useDashboardStore((state) => state.controlEnabled);
   const controlToken = useDashboardStore((state) => state.controlToken);
   const activeProjectId = useDashboardStore((state) => state.activeProjectId);
+  const initializeControlSession = useDashboardStore((state) => state.initializeControlSession);
   const registry = useDashboardStore((state) => state.projectRegistry);
   const requestRecoveryPlan = useDashboardStore((state) => state.requestRecoveryPlan);
   const setActiveTab = useDashboardStore((state) => state.setActiveTab);
@@ -140,7 +143,7 @@ export function HomeStatePanel() {
   const checkHealth = useCallback(async () => {
     if (!controlEnabled) {
       setHealth(null);
-      setHealthError('Reopen Home through Elefante to run the local readiness check.');
+      setHealthError('The local Elefante service is unavailable. Reload Home or repair Elefante.');
       return;
     }
     setChecking(true);
@@ -161,21 +164,39 @@ export function HomeStatePanel() {
     void checkHealth();
   }, [checkHealth, controlEnabled, controlToken]);
 
+  const projectBound = Boolean(
+    activeProject
+      && activeProjectId === activeProject.project_id,
+  );
   const projectReady = Boolean(
     registry
       && registry.status === 'ready'
       && registry.mode === 'strict'
-      && activeProject,
+      && projectBound,
   );
   let productState: HomeState = 'CHECKING';
   let stateSummary = 'Elefante is checking the local runtime, agent, Recall path, project, and backup.';
-  if (!controlEnabled) {
-    productState = 'SETUP_REQUIRED';
-    stateSummary = 'This browser has no active local management session. Reopen Home through Elefante.';
+  if (controlConnecting) {
+    productState = 'CHECKING';
+    stateSummary = 'Elefante is connecting this local Home page to the local service.';
+  } else if (!controlEnabled) {
+    productState = 'NEEDS_ATTENTION';
+    stateSummary = controlSessionError
+      || 'The local snapshot is available, but the Elefante service is not responding.';
+  } else if (
+    registry?.status === 'ready'
+    && registry.mode === 'strict'
+    && activeProjects.length > 0
+    && !projectBound
+  ) {
+    productState = 'NEEDS_ATTENTION';
+    stateSummary = activeProjects.length === 1
+      ? `Continue with ${activeProjects[0].name} for this Home session.`
+      : 'Choose the active project for this Home session.';
   } else if (!projectReady) {
     productState = 'SETUP_REQUIRED';
     stateSummary = registry?.mode === 'compatibility'
-      ? 'Project isolation still needs review before Elefante can claim the correct project.'
+      ? 'Your existing memory is safe. Open Projects to choose the project boundary and review older unassigned memories before enabling isolation.'
       : activeProjects.length > 1
         ? 'Open Home from the active agent workspace so Elefante can identify one project.'
         : 'Register and activate one project before Remember or Recall.';
@@ -196,12 +217,25 @@ export function HomeStatePanel() {
   const projectDetail = activeProject
     ? activeProjectId === activeProject.project_id
       ? 'Bound to this Home session'
-      : 'Only active registered project'
+      : 'Registered; choose for this Home session'
     : activeProjects.length > 1
       ? `${activeProjects.length} active projects; current context required`
       : 'Project setup required';
 
-  let nextActionLabel = 'Open Projects';
+  const showProjectChooser = Boolean(
+    controlEnabled
+      && registry?.status === 'ready'
+      && registry.mode === 'strict'
+      && activeProjects.length > 0
+      && !projectBound,
+  );
+  const showProjectSetupGuide = productState === 'SETUP_REQUIRED' && controlEnabled;
+
+  let nextActionLabel = showProjectChooser
+    ? 'Choose project'
+    : controlEnabled
+      ? 'Open Projects'
+      : 'Reload Home';
   let nextActionTab: Tab = 'projects';
   if (projectReady && health && health.next_action !== 'none') {
     nextActionLabel = NEXT_ACTION_LABELS[health.next_action]
@@ -238,7 +272,7 @@ export function HomeStatePanel() {
           <strong className="mt-2 block text-sm text-slate-100">
             {showNextAction ? nextActionLabel : productState === 'READY' ? 'No action needed' : 'Verification in progress'}
           </strong>
-          {showNextAction && controlEnabled && (
+          {showNextAction && controlEnabled && !showProjectChooser && (
             <button
               type="button"
               onClick={() => setActiveTab(nextActionTab)}
@@ -247,8 +281,17 @@ export function HomeStatePanel() {
               {nextActionLabel}
             </button>
           )}
-          {showNextAction && !controlEnabled && (
-            <p className="mt-3 text-[10px] leading-relaxed text-slate-500">Return to the connected agent and ask it to open Elefante Home.</p>
+          {showNextAction && showProjectChooser && (
+            <p className="mt-3 text-[10px] leading-relaxed text-slate-500">Select one of your active projects below.</p>
+          )}
+          {showNextAction && !controlEnabled && !controlConnecting && (
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-4 min-h-11 border border-current px-4 py-2 text-xs hover:bg-white/5"
+            >
+              Reload Home
+            </button>
           )}
         </div>
       </div>
@@ -279,6 +322,83 @@ export function HomeStatePanel() {
           icon={<Archive size={13} aria-hidden="true" />}
         />
       </div>
+
+      {showProjectChooser && (
+        <section
+          className="mt-6 border border-cyan-400/35 bg-slate-950/45 p-5"
+          aria-labelledby="project-choice-title"
+        >
+          <p className="text-[9px] text-cyan-400 elefante-mono uppercase tracking-[0.18em]">Current context</p>
+          <h2 id="project-choice-title" className="mt-2 text-xl font-semibold text-slate-100">
+            Choose the project for this Home session.
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+            Home will bind Remember, Recall, Correct, and Recover to one active registered project. No project files are scanned or changed.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            {activeProjects.map((project) => (
+              <button
+                key={project.project_id}
+                type="button"
+                disabled={controlConnecting}
+                onClick={() => void initializeControlSession(project.project_id)}
+                className="min-h-11 border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:border-cyan-400/60 hover:text-white disabled:cursor-wait disabled:opacity-60"
+              >
+                {project.name}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {showProjectSetupGuide && (
+        <section
+          className="mt-6 border border-cyan-400/35 bg-slate-950/45 p-5"
+          aria-labelledby="first-run-guide-title"
+        >
+          <p className="text-[9px] text-cyan-400 elefante-mono uppercase tracking-[0.18em]">First run</p>
+          <h2 id="first-run-guide-title" className="mt-2 text-xl font-semibold text-slate-100">
+            Set the boundary before adding memory.
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+            Elefante does not ingest every session by default. Choose the folders that define each body of work, keep only durable governed knowledge, then verify Recall and backup.
+          </p>
+          <div className="mt-5 grid gap-4 lg:grid-cols-3">
+            <div className="border border-slate-800 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-400">1. Choose folders</p>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                Register specific project folders—not your home, the Documents folder itself, or Elefante&apos;s data folder. Elefante uses the folder as scope and does not scan its files.
+              </p>
+              <button
+                type="button"
+                className="mt-4 inline-flex min-h-10 items-center justify-center border border-slate-700 px-3 py-2 text-[10px] text-slate-300 transition-colors hover:border-cyan-400/60 hover:text-white"
+                onClick={() => setActiveTab('projects')}
+              >
+                Open Projects
+              </button>
+            </div>
+            <div className="border border-slate-800 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-400">2. Choose memories</p>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                Remember decisions, constraints, preferences, facts, and lessons. Never store passwords, API keys, access tokens, hidden reasoning, or full transcripts as durable memories.
+              </p>
+            </div>
+            <div className="border border-slate-800 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-400">3. Verify continuity</p>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                Remember one real decision, test it in a later project question, and keep a verified backup before treating setup as complete.
+              </p>
+              <button
+                type="button"
+                className="mt-4 inline-flex min-h-10 items-center justify-center border border-slate-700 px-3 py-2 text-[10px] text-slate-300 transition-colors hover:border-cyan-400/60 hover:text-white"
+                onClick={() => setActiveTab('recover')}
+              >
+                Open Recover
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       <div className="mt-7">
         <div className="flex items-end justify-between gap-4">

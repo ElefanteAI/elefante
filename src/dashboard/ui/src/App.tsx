@@ -20,13 +20,14 @@ function App() {
   const setInspectedMemoryId = useDashboardStore((s) => s.setInspectedMemoryId);
   const setSearchQuery = useDashboardStore((s) => s.setSearchQuery);
   const version = useDashboardStore((s) => s.stats?.elefante?.package_version ?? '...');
+  const controlConnecting = useDashboardStore((s) => s.controlConnecting);
   const controlEnabled = useDashboardStore((s) => s.controlEnabled);
   const initializeControlSession = useDashboardStore((s) => s.initializeControlSession);
 
-  // Parse and clear the one-time capability fragment before the dashboard can
-  // render any management affordance.
+  // Prefer a one-time contextual fragment when an agent supplied one; a bare
+  // localhost visit establishes the same bounded session through the daemon.
   useLayoutEffect(() => {
-    initializeControlSession();
+    void initializeControlSession();
   }, [initializeControlSession]);
 
   // Initial data fetch
@@ -104,7 +105,11 @@ function App() {
               <div className="w-10 h-10 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
               <div className="text-slate-300">Reading the local memory snapshot...</div>
               <div className={`text-xs mt-2 elefante-mono uppercase tracking-widest ${controlEnabled ? 'text-amber-300' : 'text-slate-600'}`}>
-                {controlEnabled ? 'Management session active · loopback' : 'Read-only · loopback'}
+                {controlEnabled
+                  ? 'Local session active · loopback'
+                  : controlConnecting
+                    ? 'Connecting to Elefante · loopback'
+                    : 'Local snapshot · loopback'}
               </div>
             </div>
           </div>
@@ -118,7 +123,11 @@ function App() {
         <span className="text-xs text-slate-500">
           Elefante v{version} &middot; Memory Intelligence &middot;{' '}
           <span className={controlEnabled ? 'text-amber-300' : 'text-slate-600'}>
-            {controlEnabled ? 'management session active' : 'read-only'}
+            {controlEnabled
+              ? 'local session active'
+              : controlConnecting
+                ? 'connecting local service'
+                : 'local snapshot'}
           </span>{' '}
           <span className="text-slate-600">· local snapshot · 1/2/3/4/5 to switch views</span>
         </span>

@@ -247,7 +247,7 @@ export function ProjectReviewPanel() {
 
       {!controlEnabled && (
         <div className="px-5 py-6 text-xs leading-relaxed text-slate-500">
-          Reopen Home through Elefante to verify and assign legacy memories.
+          Reload Home to reconnect before verifying and assigning legacy memories.
         </div>
       )}
 

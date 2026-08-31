@@ -174,13 +174,24 @@ boundary before computing connectivity, relationships, or graph layout.
 ## User-interface interpretation
 
 Elefante Home is a snapshot-first memory understanding and management surface.
-Ordinary browser sessions remain read-only. A dashboard opened through the
-local daemon may receive a short-lived origin-bound management capability in
-the URL fragment; the frontend removes that fragment from browser history and
-keeps the token in memory only. Managed Home can call only named Project,
-Correct, and Resolve control routes. It cannot query or write stores directly,
-run arbitrary MCP tools, regenerate the snapshot from the browser, or expose a
-generic path/query/shell proxy.
+The stable customer entry point is `http://localhost:8000`. The installed daemon
+owns that loopback-only Home service, so opening the URL does not require an IDE,
+browser connector, agent command, or capability-bearing bookmark. Home requests
+one short-lived origin-bound capability from the loopback daemon, keeps the raw
+token in memory only, and binds the sole active project automatically. When more
+than one project is active, Home requires an explicit project choice before
+project-scoped actions. A contextual `DashboardOpen` fragment remains a
+backward-compatible convenience and is removed from browser history before the
+page renders.
+
+The capability is not a generic browser write path. Managed Home can call only
+named Project, Remember, Recall-test, Correct, Resolve, and Recover control
+routes. Every mutation retains its existing preview, confirmation, one-use
+ticket, exact-hash, postcondition, and rollback gates. Home cannot query or write
+stores directly, run arbitrary MCP tools, regenerate the snapshot from the
+browser, or expose a generic path/query/shell proxy. If the daemon is unavailable,
+the validated snapshot remains inspectable and Home reports **Needs attention**,
+not **Setup required** merely because the URL was opened directly.
 
 Home has four views:
 

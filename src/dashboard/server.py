@@ -36,6 +36,20 @@ def _dashboard_cors_origins() -> list[str]:
     return origins or list(DEFAULT_DASHBOARD_CORS_ORIGINS)
 
 
+def _daemon_port() -> int:
+    """Return the loopback daemon port advertised to this local Home page."""
+    raw_port = os.environ.get("ELEFANTE_DAEMON_PORT", "8765").strip()
+    try:
+        port = int(raw_port)
+    except ValueError as error:
+        raise RuntimeError(
+            "ELEFANTE_DAEMON_PORT must be an integer from 1 to 65535"
+        ) from error
+    if not 1 <= port <= 65535:
+        raise RuntimeError("ELEFANTE_DAEMON_PORT must be an integer from 1 to 65535")
+    return port
+
+
 def _snapshot_path() -> Path:
     """Return the only data file the dashboard is permitted to read."""
     return Path(get_config().elefante.data_dir) / "dashboard_snapshot.json"
@@ -259,6 +273,23 @@ async def search_memories(
 async def health_check():
     """Simple health check endpoint for connection testing"""
     return {"status": "ok", "service": "elefante-dashboard"}
+
+
+@app.get("/api/control-config")
+async def get_control_config():
+    """Expose only the loopback port needed to start an in-memory Home session."""
+    try:
+        return {
+            "available": True,
+            "daemon_host": "127.0.0.1",
+            "daemon_port": _daemon_port(),
+            "session_path": "/control/session",
+        }
+    except RuntimeError:
+        raise HTTPException(
+            status_code=503,
+            detail="The local Elefante service configuration is invalid",
+        )
 
 
 @app.get("/api/stats")

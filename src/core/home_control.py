@@ -1,10 +1,10 @@
 """In-memory capabilities for named state-changing actions in Elefante Home.
 
-Home remains a snapshot reader unless it was opened by the running Elefante
-daemon. The daemon grants a short-lived bearer capability in the URL fragment;
-only hashes are retained here. Resolve and Correct apply additionally require
-one exact, one-use plan ticket so a browser cannot mutate different knowledge
-than the user just inspected.
+Home remains a snapshot reader unless it is connected to the running Elefante
+daemon. The trusted loopback Home origin receives a short-lived bearer
+capability and keeps it in browser memory; only hashes are retained here.
+Resolve and Correct apply additionally require one exact, one-use plan ticket
+so a browser cannot mutate different knowledge than the user just inspected.
 """
 
 from __future__ import annotations
@@ -303,7 +303,7 @@ class HomeControlRegistry:
         if session.expires_at_monotonic <= self._now():
             self._sessions.pop(digest, None)
             raise HomeControlError(
-                "Home control session expired; reopen Home through Elefante.",
+                "Home session expired; reload Home to reconnect.",
                 code="CONTROL_SESSION_EXPIRED",
                 status_code=401,
             )
@@ -315,7 +315,7 @@ class HomeControlRegistry:
             )
         if session.requests_used >= self.max_requests:
             raise HomeControlError(
-                "Home control request limit reached; reopen Home through Elefante.",
+                "Home session request limit reached; reload Home to reconnect.",
                 code="CONTROL_REQUEST_LIMIT",
                 status_code=429,
             )

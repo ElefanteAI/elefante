@@ -479,7 +479,7 @@ export function CorrectionDialog({ memory }: { memory: MemoryNode }) {
         </>
       ) : (
         <div className="mt-3 rounded-md border border-slate-700/60 bg-slate-900/50 px-3 py-2.5 text-[11px] leading-relaxed text-slate-500">
-          Read-only mode — reopen this dashboard through Elefante to manage this knowledge.
+          Local control is unavailable — reload Home to manage this knowledge.
         </div>
       )}
 

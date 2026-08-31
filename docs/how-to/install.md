@@ -93,14 +93,40 @@ Rerunning the same installer repairs the runtime and preserves the durable data
 root. A compatibility-preview host is connected only when explicitly selected;
 it does not become part of the certified support lane.
 
-### Project selection and isolation in the unreleased candidate
+After installation, open Elefante Home directly at
+`http://localhost:8000`. The local daemon owns this loopback-only page and
+connects it to a short-lived in-memory control session. No Chrome extension,
+browser connector, IDE command, or special bookmarked URL is required. With one
+active project, Home selects it automatically; with several, Home asks which
+project to use before project-scoped actions.
+
+### First-run choices: folders, memories, and privacy
+
+Choose one or more specific, existing folders that represent a body of work—for
+example, a repository or a dedicated project workspace. Do not choose your home
+folder, the `Documents` folder itself, or Elefante's own data folder. If you work
+across several repositories, add each repository separately.
+
+The folder is a boundary, not an import source. Elefante does not scan or change
+project files, and it does not automatically import every past session. It keeps
+governed durable knowledge such as decisions, constraints, preferences, facts,
+and lessons. Do not store passwords, API keys, access tokens, hidden reasoning,
+or full transcripts as durable memories. Any optional session or file ingestion
+must be explicitly enabled and remains subject to the same project boundary.
+
+For a large existing history, start small: remember one real decision, ask a
+later project question, verify that Recall selects the right memory, and create
+a verified backup. Add more durable knowledge deliberately as it proves useful.
+The goal is a trusted project context, not a second copy of every conversation.
+
+### Project selection and isolation
 
 On a fresh customer installation, the native macOS installer and the
 cross-platform fallback require at least one real project folder. Each selected
-folder receives an isolated memory scope. The first release has no shared scope
-and promises zero cross-project delivery. Elefante does not scan or modify the
-project's files. This is implemented in the current developer candidate; it is
-not yet a published package claim.
+folder receives an isolated memory scope. There is no shared-across-project
+memory scope. An existing upgrade can remain in compatibility mode until its
+older unassigned memories have been reviewed in Elefante Home. Elefante does not
+scan or modify the project's files.
 
 The headless equivalent is:
 
