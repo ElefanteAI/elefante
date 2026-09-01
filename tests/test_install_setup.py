@@ -2538,6 +2538,36 @@ def test_daemon_uninstall_preserves_modified_service_without_stopping_it(monkeyp
     assert path.read_text(encoding="utf-8") == "user-managed service"
 
 
+def test_daemon_uninstall_removes_owned_launchd_unit_after_job_already_stopped(
+    monkeypatch,
+    tmp_path,
+):
+    module = _load_module(
+        ROOT / "scripts/lifecycle/daemon_service.py",
+        "daemon_uninstall_stopped_launchd_module",
+    )
+    home = tmp_path / "home"
+    path = module.service_path(home, "Darwin")
+    path.parent.mkdir(parents=True)
+    path.write_text(module.render_service(home, "Darwin"), encoding="utf-8")
+    module.record_emitted_file(path, "daemon-service", home)
+    commands = []
+    monkeypatch.setattr(module.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(
+        module,
+        "_run_optional",
+        lambda command, apply: commands.append((command, apply)),
+    )
+
+    module.uninstall(home, apply=True)
+
+    assert commands == [
+        (["launchctl", "bootout", f"gui/{module.os.getuid()}", str(path)], True)
+    ]
+    assert not path.exists()
+    assert not module.is_unchanged_emitted_file(path, home)
+
+
 @pytest.mark.asyncio
 async def test_database_verification_uses_configured_storage_paths(monkeypatch, tmp_path):
     """BUG-039: fresh SQLite installs must not report a retired Chroma path."""

@@ -314,7 +314,10 @@ def uninstall(home: Path, apply: bool) -> Path:
         print(f"preserve {path} (not recorded or modified)")
         return path
     if system == "Darwin":
-        _run(["launchctl", "bootout", f"gui/{os.getuid()}", str(path)], apply)
+        # The complete package transaction verifies the daemon stopped before
+        # detaching its owned unit. launchd returns 5 when that already-stopped
+        # job is booted out again, so unit removal must remain idempotent.
+        _run_optional(["launchctl", "bootout", f"gui/{os.getuid()}", str(path)], apply)
     elif system == "Linux":
         _run(["systemctl", "--user", "disable", "--now", LABEL], apply)
         _run(["systemctl", "--user", "daemon-reload"], apply)
