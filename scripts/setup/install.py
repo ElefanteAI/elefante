@@ -322,7 +322,8 @@ def prompt_project_specs() -> list[str]:
     """Collect one or more clean-install projects in the current terminal."""
     selections: list[str] = []
     print("\nProject setup")
-    print("Elefante keeps each project's memories isolated by its folder.")
+    print("Choose a specific folder for one body of work; do not choose your home, the Documents folder itself, or Elefante's data folder.")
+    print("Elefante uses the folder as a scope boundary and does not import every past session.")
     while True:
         raw_root = input("Project folder (absolute path; blank when finished): ").strip()
         if not raw_root:

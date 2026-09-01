@@ -45,6 +45,8 @@ import type {
   RecoveryReceipt,
   RecoverySupportReportPreview,
   RecoveryTerminalStatus,
+  ControlAvailability,
+  SnapshotContext,
 } from './types';
 
 const CONTROL_TOKEN_MIN_LENGTH = 12;
@@ -87,6 +89,32 @@ const REMEMBER_TERMINAL_STATUSES: readonly RememberTerminalStatus[] = [
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function normalizeSnapshotContext(value: unknown): SnapshotContext {
+  if (
+    isRecord(value)
+    && value.mode === 'showcase'
+    && value.label === 'Example workspace'
+    && value.contains_user_data === false
+  ) {
+    return {
+      mode: 'showcase',
+      label: 'Example workspace',
+      contains_user_data: false,
+      source_grounded_content: value.source_grounded_content === true,
+      synthetic_behavioral_metadata: value.synthetic_behavioral_metadata === true,
+      disclaimer: 'Deterministic example data; counts and activity do not describe customer behavior or product performance.',
+    };
+  }
+  return {
+    mode: 'local_snapshot',
+    label: 'Local snapshot',
+    contains_user_data: null,
+    source_grounded_content: null,
+    synthetic_behavioral_metadata: null,
+    disclaimer: 'Read-only snapshot evidence; live actions require a verified local control session.',
+  };
 }
 
 function normalizeRegisteredProject(value: unknown, token: string | null): RegisteredProject | null {
@@ -1174,6 +1202,7 @@ interface DashboardStore {
   controlConnecting: boolean;
   controlSessionError: string | null;
   controlEnabled: boolean;
+  controlAvailability: ControlAvailability;
   controlBaseUrl: string | null;
   controlToken: string | null;
   activeProjectId: string | null;
@@ -1316,6 +1345,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   controlConnecting: false,
   controlSessionError: null,
   controlEnabled: false,
+  controlAvailability: 'checking',
   controlBaseUrl: null,
   controlToken: null,
   activeProjectId: null,
@@ -1339,6 +1369,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
 
     set({
       controlConnecting: true,
+      controlAvailability: 'checking',
       controlSessionError: null,
     });
 
@@ -1370,6 +1401,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       set({
         controlConnecting: false,
         controlEnabled: true,
+        controlAvailability: 'available',
         controlBaseUrl: `http://127.0.0.1:${fragmentPort}`,
         controlToken: fragmentToken,
         activeProjectId: isValidProjectId(fragmentProjectId) ? fragmentProjectId : null,
@@ -1384,6 +1416,22 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         headers: { Accept: 'application/json' },
       });
       const config = await readJson(configResponse);
+      const reasonCode = typeof config.reason_code === 'string' ? config.reason_code : null;
+      if (configResponse.ok && config.available === false) {
+        set({
+          controlConnecting: false,
+          controlEnabled: false,
+          controlAvailability: reasonCode === 'CONTROL_ORIGIN_UNAVAILABLE'
+            || reasonCode === 'SHOWCASE_SNAPSHOT_READ_ONLY'
+            ? 'snapshot_only'
+            : 'unavailable',
+          controlBaseUrl: null,
+          controlToken: null,
+          activeProjectId: null,
+          controlSessionError: null,
+        });
+        return;
+      }
       const port = parseDaemonPort(
         typeof config.daemon_port === 'number' ? String(config.daemon_port) : null,
       );
@@ -1417,6 +1465,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       set({
         controlConnecting: false,
         controlEnabled: true,
+        controlAvailability: 'available',
         controlBaseUrl,
         controlToken: token,
         activeProjectId: isValidProjectId(activeProjectId) ? activeProjectId : null,
@@ -1427,12 +1476,15 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       set({
         controlConnecting: false,
         controlEnabled: false,
+        controlAvailability: 'unavailable',
         controlBaseUrl: null,
         controlToken: null,
         activeProjectId: null,
-        controlSessionError: detail && !detail.includes('control configuration')
+        controlSessionError: detail
+          && !detail.includes('control configuration')
+          && !/failed to fetch|networkerror/i.test(detail)
           ? detail.slice(0, 320)
-          : 'The local Elefante service is not responding. Reload Home or repair Elefante.',
+          : 'The live Elefante service could not be verified from this page.',
       });
     }
   },
@@ -2288,6 +2340,15 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         error: safeOptionalText(body.error, controlToken),
         error_code: safeOptionalText(body.error_code, controlToken),
       };
+      if (
+        action === 'restore'
+        && rawStatus === 'VERIFIED_COMPLETE'
+        && result.success
+        && receipt
+      ) {
+        set({ selectedMemoryIds: [], inspectedMemoryId: null });
+        await get().refreshSnapshot();
+      }
       set({ recoveryError: result.error || null });
       return result;
     } catch {
@@ -2371,11 +2432,14 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const projectRegistry = normalizeProjectRegistry(data.project_registry, get().controlToken);
+        const snapshotContext = normalizeSnapshotContext(data.snapshot_context);
         set({ 
           snapshot: { 
             nodes: data.nodes || [], 
             edges: data.edges || [], 
             stats: data.stats,
+            snapshot_context: snapshotContext,
+            ...(typeof data.generated_at === 'string' ? { generated_at: data.generated_at } : {}),
             ...(projectRegistry ? { project_registry: projectRegistry } : {}),
             ...(typeof data.project_registry_generated_at === 'string'
               ? { project_registry_generated_at: data.project_registry_generated_at }

@@ -432,7 +432,7 @@ def test_active_tool_docs_match_current_mcp_surface() -> None:
     assert f"{default_tool_count} of {source_tool_count}" in self_protocol
 
     assert "docs/technical/dashboard.md" not in readme
-    assert "docs/how-to/view-dashboard.md" in readme
+    assert "docs/how-to/view-dashboard.html" in readme
 
     tool_names, prompt_names = _mcp_surface_names()
     public_names = (tool_names - {"elefante-TaskIntelligence"}) | prompt_names

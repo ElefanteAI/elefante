@@ -32,7 +32,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from src.utils.atomic_json import read_json_strict
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from src.utils.atomic_json import read_json_strict  # noqa: E402
 
 
 @dataclass

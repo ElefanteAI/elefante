@@ -454,7 +454,7 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
             color: .labelColor
         ))
         cardStack.addArrangedSubview(makeLabel(
-            "Select at least one real project folder. Each folder receives an isolated memory scope; Elefante never scans or changes the project files.",
+            "Select specific project folders for each body of work—not your home folder, the Documents folder itself, or Elefante’s data folder. Each folder receives an isolated memory scope; Elefante never scans project files and does not import every past session automatically.",
             font: .systemFont(ofSize: 12, weight: .regular),
             color: .secondaryLabelColor,
             wrapping: true
@@ -1091,7 +1091,7 @@ final class InstallerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.canCreateDirectories = false
         panel.allowsMultipleSelection = true
         panel.prompt = "Add Project"
-        panel.message = "Choose the real project folders whose memories Elefante should keep isolated."
+        panel.message = "Choose the real project folders whose memories Elefante should keep isolated. The folder is a scope boundary, not an import source."
         if panel.runModal() == .OK {
             for url in panel.urls.map(\.standardizedFileURL)
                 where !projectURLs.contains(where: { $0.path == url.path }) {

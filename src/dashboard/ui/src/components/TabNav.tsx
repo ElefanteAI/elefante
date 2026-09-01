@@ -3,7 +3,8 @@ import type { Tab } from '@/types';
 
 const tabs: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'Home' },
-  { id: 'memories', label: 'Memories' },
+  { id: 'recall', label: 'Recall' },
+  { id: 'memories', label: 'Memory Intelligence' },
   { id: 'explore', label: 'Connections' },
   { id: 'projects', label: 'Projects' },
   { id: 'recover', label: 'Recover' },
@@ -14,7 +15,7 @@ export function TabNav() {
   const setActiveTab = useDashboardStore((s) => s.setActiveTab);
 
   return (
-    <nav className="flex items-center justify-start gap-5 overflow-x-auto bg-slate-950/75 px-4 backdrop-blur border-b elefante-hairline sm:justify-center md:gap-9">
+    <nav aria-label="Elefante Home workspaces" className="flex items-center justify-start gap-4 overflow-x-auto bg-slate-950/75 px-4 backdrop-blur border-b elefante-hairline lg:justify-center lg:gap-8">
       {tabs.map((tab) => (
         <button
           key={tab.id}

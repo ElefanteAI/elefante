@@ -98,7 +98,7 @@ export function TopicTreemap() {
                   <div className="text-sm font-bold tracking-tight" style={{ color: palette.text }}>
                     {toLabel(topic)}
                   </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">avg score {avgScore}</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">avg vitality {avgScore}</div>
                 </div>
                 <div className="text-2xl font-black tabular-nums shrink-0"
                   style={{ color: palette.text, opacity: 0.35 }}>

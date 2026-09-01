@@ -509,6 +509,7 @@ function ProductMaintenancePanel({ health }: { health: RecoveryHealth | null }) 
 
 export function RecoverTab() {
   const controlEnabled = useDashboardStore((state) => state.controlEnabled);
+  const setActiveTab = useDashboardStore((state) => state.setActiveTab);
   const isPlanning = useDashboardStore((state) => state.isRecoveryPlanning);
   const isApplying = useDashboardStore((state) => state.isRecoveryApplying);
   const recoveryError = useDashboardStore((state) => state.recoveryError);
@@ -590,6 +591,44 @@ export function RecoverTab() {
   const validBackups = backups.filter((backup) => backup.valid);
   const invalidBackupCount = backups.length - validBackups.length;
   const busy = isPlanning || isApplying;
+
+  if (!controlEnabled) {
+    return (
+      <div className="h-full overflow-auto px-5 py-5 md:px-8 md:py-7">
+        <div className="mx-auto max-w-[980px]">
+          <div className="text-[10px] text-amber-300 elefante-mono uppercase tracking-[0.18em]">Recovery evidence</div>
+          <h1 className="mt-2 text-3xl font-medium tracking-[-0.035em] text-slate-100">Protect Elefante before changing durable state.</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-400">
+            Health, backup, restore, and support-report claims are valid only after the local control plane returns a terminal receipt.
+          </p>
+
+          <section className="mt-6 border border-slate-800 bg-slate-950/55 p-5">
+            <div className="border-l-2 border-amber-300/60 pl-3">
+              <strong className="block text-sm font-medium text-slate-100">No recovery evidence yet</strong>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">No recovery check ran in this environment. Capability is not presented as readiness.</p>
+            </div>
+            <div className="mt-5 text-[9px] text-slate-600 elefante-mono uppercase tracking-[0.15em]">Evidence required for each operation</div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              {[
+                ['Health', 'A timestamped state, checks performed, diagnostic codes, and one safe next action.'],
+                ['Backup', 'An inspected plan followed by a terminal receipt for one verified archive.'],
+                ['Restore', 'A safety backup, staged validation, private Recall check, and rollback result if any check fails.'],
+                ['Support report', 'A reviewed content-free preview and a verified local ZIP; nothing transmitted.'],
+              ].map(([title, description]) => (
+                <div key={title} className="border-l-2 border-slate-700 pl-3">
+                  <strong className="block text-xs font-medium text-slate-200">{title}</strong>
+                  <span className="mt-1 block text-[10px] leading-relaxed text-slate-500">{description}</span>
+                </div>
+              ))}
+            </div>
+            <button type="button" onClick={() => setActiveTab('overview')} className="mt-5 min-h-11 border border-slate-700 px-4 text-xs text-slate-200 hover:border-amber-300/60">
+              Return to Elefante overview
+            </button>
+          </section>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-y-auto">
@@ -700,7 +739,7 @@ export function RecoverTab() {
                       ? <Archive size={20} className="mt-0.5 shrink-0 text-amber-200" aria-hidden="true" />
                       : <FileArchive size={20} className="mt-0.5 shrink-0 text-violet-200" aria-hidden="true" />}
                 <div>
-                  <div className="text-[9px] text-cyan-400 elefante-mono uppercase tracking-[0.16em]">Available now</div>
+                  <div className="text-[9px] text-cyan-400 elefante-mono uppercase tracking-[0.16em]">Live control</div>
                   <h2 className="mt-2 text-lg font-medium text-slate-100">
                     {action === 'health'
                       ? 'Check product readiness'
@@ -950,16 +989,16 @@ export function RecoverTab() {
               <div className="text-[9px] text-slate-600 elefante-mono uppercase tracking-[0.16em]">Safety boundary</div>
               <div className="mt-4 space-y-3 text-xs">
                 <div className="flex items-center justify-between gap-3 text-slate-300">
-                  <span>Product health</span><span className="text-emerald-300">Available</span>
+                  <span>Product health</span><span className={health ? 'text-emerald-300' : 'text-slate-500'}>{health ? health.state.replace(/_/g, ' ') : 'Not checked'}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3 text-slate-300">
-                  <span>Verified backup</span><span className="text-emerald-300">Available</span>
+                  <span>Verified backup</span><span className="text-slate-500">Requires verified plan</span>
                 </div>
                 <div className="flex items-center justify-between gap-3 text-slate-300">
-                  <span>Verified data restore</span><span className="text-emerald-300">Available</span>
+                  <span>Verified data restore</span><span className="text-slate-500">Requires verified plan</span>
                 </div>
                 <div className="flex items-center justify-between gap-3 text-slate-300">
-                  <span>Privacy-safe support report</span><span className="text-emerald-300">Available</span>
+                  <span>Privacy-safe support report</span><span className="text-slate-500">Requires verified plan</span>
                 </div>
                 <div className="flex items-center justify-between gap-3 text-slate-500">
                   <span>Product code changes</span><span>Official package</span>
@@ -993,7 +1032,14 @@ export function RecoverTab() {
           </aside>
         </div>
 
-        <ProductMaintenancePanel health={health} />
+        <details className="mt-6 border border-slate-800 bg-slate-950/45">
+          <summary className="cursor-pointer px-5 py-4 text-xs font-medium text-slate-300 hover:text-white">
+            Advanced: product maintenance
+          </summary>
+          <div className="border-t elefante-hairline p-5">
+            <ProductMaintenancePanel health={health} />
+          </div>
+        </details>
 
         {receipt && (
           <div className="mt-6">

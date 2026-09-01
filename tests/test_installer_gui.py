@@ -265,6 +265,8 @@ def test_native_installer_and_python_engine_share_host_ids():
     assert "Your memories will not be restored or reversed" in swift_source
     assert "Your memories remain on this Mac for reinstall" in swift_source
     assert "Choose where Elefante may remember" in swift_source
+    assert "does not import every past session" in swift_source
+    assert "The folder is a scope boundary, not an import source." in swift_source
     assert 'processArguments.append(contentsOf: ["--project", project])' in swift_source
     assert "disposable Recall and local backup included" in swift_source
 
@@ -279,4 +281,5 @@ def test_native_installer_and_python_engine_share_host_ids():
     assert '"--uninstall"' in python_source
     assert "Your memories remain on this computer for reinstall" in python_source
     assert "Choose where Elefante may remember" in python_source
+    assert "does not import every past session" in python_source
     assert 'cmd.extend(["--project", project])' in python_source

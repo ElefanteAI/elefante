@@ -3,7 +3,7 @@ import { useDashboardStore } from '@/store';
 import { useSearch } from '@/hooks/useSearch';
 import { MemoryTable } from '@/components/MemoryTable';
 import { MemoryDetailPanel } from '@/components/MemoryDetailPanel';
-import { Sparkles, X } from 'lucide-react';
+import { BookOpen, ListChecks, Search, X } from 'lucide-react';
 import { edgeEndpoints, type MemoryNode, type SearchResult } from '@/types';
 
 function parseListValue(value: unknown): string[] {
@@ -29,16 +29,29 @@ function parseListValue(value: unknown): string[] {
     : [trimmed];
 }
 
+function needsReview(memory: MemoryNode): boolean {
+  const health = String(memory.properties?.health_status || '').toLowerCase();
+  const status = String(memory.properties?.status || '').toLowerCase();
+  return Boolean(
+    (health && health !== 'healthy')
+      || memory.properties?.archived
+      || memory.properties?.deprecated
+      || ['contradictory', 'redundant', 'superseded'].includes(status),
+  );
+}
+
 export function MemoriesTab() {
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<'browse' | 'search'>('browse');
+  const [workspaceView, setWorkspaceView] = useState<'library' | 'review'>('library');
   
   const isLoading = useDashboardStore((s) => s.isLoading);
   const inspectedMemoryId = useDashboardStore((s) => s.inspectedMemoryId);
   const setInspectedMemoryId = useDashboardStore((s) => s.setInspectedMemoryId);
   const getMemoryNodes = useDashboardStore((s) => s.getMemoryNodes);
   const snapshot = useDashboardStore((s) => s.snapshot);
+  const isShowcase = snapshot?.snapshot_context?.mode === 'showcase';
   const memories = getMemoryNodes();
 
   // Auto-open detail panel from external navigation (e.g. ActivityFeed click)
@@ -93,6 +106,10 @@ export function MemoriesTab() {
         },
       }))
     : memories;
+  const reviewCount = memories.filter(needsReview).length;
+  const visibleMemories = workspaceView === 'review'
+    ? searchMemories.filter(needsReview)
+    : searchMemories;
 
   const selectedSearchResultIndex = mode === 'search'
     ? results.findIndex((result) => result.id === selectedId)
@@ -127,21 +144,69 @@ export function MemoriesTab() {
 
   return (
     <div className="h-full flex flex-col">
+      <header className="flex flex-col gap-4 border-b border-slate-700/60 bg-slate-900/35 px-5 py-4 lg:flex-row lg:items-end lg:justify-between lg:px-7">
+        <div>
+          <div className="text-[10px] text-cyan-400 elefante-mono uppercase tracking-[0.18em]">Memory Intelligence</div>
+          <h1 className="mt-1 text-2xl font-medium tracking-[-0.025em] text-slate-100">
+            {isShowcase ? 'Inspect the example memory corpus.' : 'Inspect the complete local memory corpus.'}
+          </h1>
+          <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+            {isShowcase
+              ? 'Example workspace · read-only inspection. Search and review describe this snapshot only.'
+              : 'View scope: all memories, read only. Correct remains bound to one active project and its verified postconditions.'}
+          </p>
+        </div>
+        <div className="flex items-center gap-1 border border-slate-800 bg-slate-950/55 p-1" aria-label="Memory Intelligence view">
+          <button
+            type="button"
+            onClick={() => setWorkspaceView('library')}
+            aria-pressed={workspaceView === 'library'}
+            className={`inline-flex min-h-9 items-center gap-2 px-3 text-xs ${
+              workspaceView === 'library'
+                ? 'bg-cyan-950/30 text-cyan-200'
+                : 'text-slate-500 hover:text-slate-200'
+            }`}
+          >
+            <BookOpen size={13} aria-hidden="true" />
+            Library · {memories.length}
+          </button>
+          <button
+            type="button"
+            onClick={() => setWorkspaceView('review')}
+            aria-pressed={workspaceView === 'review'}
+            className={`inline-flex min-h-9 items-center gap-2 px-3 text-xs ${
+              workspaceView === 'review'
+                ? 'bg-amber-950/30 text-amber-200'
+                : 'text-slate-500 hover:text-slate-200'
+            }`}
+          >
+            <ListChecks size={13} aria-hidden="true" />
+            Review · {reviewCount}
+          </button>
+        </div>
+      </header>
+
+      {workspaceView === 'review' && (
+        <div className="border-b border-amber-400/20 bg-amber-950/10 px-5 py-2 text-[10px] leading-relaxed text-amber-100/80 lg:px-7">
+          Review groups direct snapshot health or lifecycle signals. It does not grade truth, usefulness, project scope, or whether a correction is necessary.
+        </div>
+      )}
+
       {/* Semantic Search Bar */}
       <div className="p-4 border-b border-slate-700/60 bg-slate-800/40">
         <div className="max-w-2xl mx-auto">
           <div className="relative">
-            <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 text-violet-400" size={16} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-400" size={16} />
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Snapshot search... (2+ characters)"
-              className="w-full pl-10 pr-10 py-3 bg-slate-900/60 border border-slate-700/60 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50"
+              className="w-full pl-10 pr-10 py-3 bg-slate-900/60 border border-slate-700/60 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/50"
             />
             {isSearching && (
               <div className="absolute right-10 top-1/2 -translate-y-1/2">
-                <div className="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
               </div>
             )}
             {query && (
@@ -164,7 +229,7 @@ export function MemoriesTab() {
       {/* Memory Table + Detail Panel */}
       <div className="flex-1 overflow-hidden relative">
         <MemoryTable
-          memories={searchMemories}
+          memories={visibleMemories}
           selectedId={selectedId}
           onSelectMemory={(memory) => {
             const newId = selectedId === memory.id ? null : memory.id;

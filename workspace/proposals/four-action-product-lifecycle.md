@@ -1,9 +1,9 @@
 ---
-status: APPROVED — IMPLEMENTATION IN PROGRESS
+status: APPROVED — PRODUCT CONTRACT CONVERGED; LOCAL LOOP IMPLEMENTED; CROSS-SURFACE ALIGNMENT PENDING
 document_owner: Elefante founder and product owner
 target: Upcoming; no release or date commitment
 authority: Approved product direction and implementation sequence; released documentation and source remain publication authority
-question: How does Elefante become one self-service product organized around Remember, Recall, Correct, and Recover?
+question: How does Elefante supply governed memory guidance to each task while exposing a truthful, safe advanced maintenance console?
 consumers:
   - Elefante founder and product owner
   - developers and implementation agents
@@ -21,11 +21,58 @@ related:
 
 **Owner:** Elefante product owner
 
-### The product in one sentence
+### The product purpose in one sentence
 
-Elefante keeps the knowledge a user explicitly wants to preserve available to
-their AI agent across work sessions, within the correct project, while giving
-the user a safe way to inspect, correct, back up, and recover it.
+Elefante lets an agent start a task with the smallest governed bundle of durable
+memories justified by the task and project—or abstains—so work can compound
+instead of restarting from zero.
+
+In this PRD, **advice** is customer shorthand for that selected memory bundle.
+Elefante does not synthesize a recommendation, decide the task, or replace the
+agent's reasoning. “Best” means best justified by the available indexed
+evidence, project boundary, and governance rules at that moment; it is not a
+claim of universal optimality.
+
+Memory persistence alone is infrastructure. The immediate product promise is
+governed continuity: the right project memory bundle or a truthful abstention.
+The ultimate north star is improved accepted task value per total token. Until
+representative outcome evidence exists, that improvement remains an objective,
+not a shipped performance claim.
+
+### Product contract lock
+
+The following decisions are stable. A later review may refine wording or
+interaction design, but it may not reverse them without new source, runtime,
+customer, or outcome evidence:
+
+1. **Task intelligence is the purpose.** Elefante exists to improve an agent's
+   work on each eligible memory-dependent task by supplying the best governed
+   memory bundle it can justify, or by abstaining safely.
+2. **The product loop is one system.** Install, Projects, Remember, Recall,
+   Correct, and Recover support that purpose; they are not competing product
+   definitions.
+3. **Host behavior is IDE-agnostic.** MCP carries one semantic contract across
+   compatible IDEs and agents. Host adapters may change connection and
+   bootstrap mechanics, never memory meaning, Recall policy, project safety, or
+   verification requirements.
+4. **Home exposes the engine.** The dashboard is the advanced console for
+   understanding the complete memory corpus, Recall behavior, relationships,
+   scope, corrections, and recovery. Project selection gates delivery and
+   mutation, not read-only understanding of all memories.
+5. **The website proves the released product.** `elefante.ai` explains the same
+   product outcome in customer language and demonstrates only behavior that the
+   published package can substantiate.
+6. **Capabilities are preserved before they are rearranged.** A confusing
+   feature is first given a truthful question, evidence boundary, and useful
+   consequence. It is relabeled, regrouped, or progressively disclosed before
+   deletion is considered. Deletion requires proof that the capability has no
+   unique job, evidence, or consequence, plus explicit owner approval.
+7. **Evidence planes stay distinct.** Semantic Memory owns durable meaning;
+   Session Intelligence owns consented usage facts; Task Intelligence owns
+   task-level outcome evidence. None can impersonate another.
+
+“Think harder” is therefore a request to test this contract against more
+evidence, not permission to replace the contract with a new product thesis.
 
 ### The complete customer experience
 
@@ -33,9 +80,13 @@ the user a safe way to inspect, correct, back up, and recover it.
 Install -> choose projects -> Remember -> Recall -> Correct when needed -> Recover when needed
 ```
 
-- The **agent** is where the customer works every day.
-- **Elefante Home** is where the customer checks status, inspects knowledge,
-  corrects it, and operates recovery.
+- The lifecycle above operates Elefante; it is not the ultimate value statement.
+- The **agent** is where the customer performs the task and receives
+  memory-derived advice.
+- **Elefante** selects or withholds the smallest governed memory bundle for that
+  task and project.
+- The **Elefante dashboard** is the advanced maintenance console for inspecting,
+  correcting, and recovering the memory and Recall machinery.
 - The MCP surface is internal machinery. Tool names and tool count do not appear
   in the primary customer journey.
 
@@ -52,6 +103,18 @@ Every product requirement must name:
 If a term or requirement cannot be placed under an owner and a customer step,
 it does not belong in this PRD.
 
+Every dashboard requirement also carries one evidence state:
+
+- **CURRENT LOCAL** — implemented in the active local source contract;
+- **CURRENT SOURCE PROTOTYPE** — implemented and browser-verified in source,
+  but not yet accepted in an installed customer package;
+- **TARGET** — approved product behavior that still requires implementation;
+- **NOT PROVEN** — an intended outcome without representative evidence;
+- **OUT OF SCOPE** — deliberately excluded from this product phase.
+
+A target prototype, old screenshot, aggregate metric, or marketing sentence may
+not be promoted to `CURRENT LOCAL` without matching source and acceptance proof.
+
 ### Recommendation
 
 Build one narrow, self-service local product before expanding the surface:
@@ -60,15 +123,23 @@ Build one narrow, self-service local product before expanding the surface:
 - one local Elefante installation;
 - one certified platform and agent-host combination first;
 - multiple isolated projects;
-- four customer actions: Remember, Recall, Correct, Recover;
+- three operator jobs—Global understanding, Task intelligence, and Continuity—
+  composed from the governed Remember, Recall, Correct, and Recover actions;
 - no founder involvement during the normal journey.
 
-The product priority remains project-safe Remember and Recall. The implementation
-starts with one narrower trust-bearing vertical slice: **Verified Resolve**.
-That slice proves the shared product discipline — plan, explicit authority, one
-semantic write, authoritative readback, atomic Home refresh, scoped Recall
-verification, compensation, and a privacy-safe receipt — before the same
-discipline is extended to project safety, the rest of Correct, and Recover.
+The product priority remains governed task-specific memory guidance through
+project-safe Remember and Recall. The original implementation sequence started with one
+narrower trust-bearing vertical slice:
+**Verified Resolve**. It proved the shared product discipline — plan, explicit
+authority, one semantic write, authoritative readback, atomic Home refresh,
+scoped Recall verification, compensation, and a privacy-safe receipt — before
+that discipline extended to project safety, the rest of Correct, and Recover.
+Those product-loop slices now exist in local source; their exact-package gates
+remain open. The 2026-08-31 advanced-dashboard product/evidence audit is
+complete, and the 2026-09-01 cross-surface and feature-preservation correction
+is now locked in this PRD. The corrected source prototype is implemented. The
+next product gates are unfamiliar-operator comprehension trials and an exact-
+package acceptance pass, not another product-model rewrite.
 
 ## 1. Customer and product boundary
 
@@ -77,8 +148,10 @@ discipline is extended to project safety, the rest of Correct, and Recover.
 ### Customer
 
 The first customer is one technical owner inside a small or medium company. The
-customer uses an AI agent on recurring projects, wants project knowledge to
-survive across sessions, and does not want to operate Elefante internals.
+customer uses an AI agent on recurring projects and wants accumulated knowledge
+to improve later tasks. Normal work must not require operating Elefante
+internals; the same technical owner may enter the advanced dashboard when they
+want to inspect, maintain, or recover the system.
 
 The first product supports one human owner and one local installation. A company
 can purchase it, but this PRD does not define shared team memory or multiple
@@ -86,11 +159,13 @@ human permissions.
 
 ### Customer promise
 
+**Primary commercial promise:** Your agent should not start from zero.
+
 The customer can say:
 
-> Elefante remembers only what I explicitly ask it to remember, recalls it for
-> the correct project, lets me fix it, and lets me recover it if something goes
-> wrong.
+> Elefante draws from what I asked it to remember, gives my agent the best
+> governed advice it can justify for the current task and project, and lets me
+> inspect, correct, and recover the system behind that advice.
 
 That sentence is the product contract. Every screen, package feature, and test
 must support it.
@@ -104,7 +179,7 @@ experience work without contacting the founder. It includes:
 - guided installation and agent connection;
 - project setup and isolation;
 - a real disposable Recall test;
-- Elefante Home;
+- the advanced local dashboard, Elefante Home;
 - backup, restore, repair, update, rollback, and uninstall;
 - a privacy-safe support report;
 - an acceptance receipt proving the installation works.
@@ -116,18 +191,91 @@ dependencies and are not implemented by this PRD.
 
 **Owner:** Elefante product owner
 
-Elefante is one product assembled from seven owned pieces. A piece may not
-create a competing workflow or write directly into another piece's data.
+Elefante is one product with six owned lifecycle capabilities, supporting
+intelligence capabilities, three operating surfaces, and one public proof
+surface. A surface may compose capabilities, but it may not become a competing
+service or write directly into another capability's data.
 
-| Product piece | Customer job | Owning component | Primary surface |
-|---------------|--------------|------------------|-----------------|
+| Product capability | Customer job | Owning component | Primary surface |
+|--------------------|--------------|------------------|-----------------|
 | Install and Connect | Make Elefante work | Installer | Official package |
 | Projects | Tell Elefante where knowledge belongs | Project Registry | Installer and Home |
 | Remember | Preserve knowledge deliberately | Memory Service | Agent; Home as fallback |
-| Recall | Supply useful project knowledge | Recall Service | Agent |
+| Recall | Supply the smallest governed task-specific memory bundle or abstain | Recall Service | Agent |
 | Correct | Fix or retire stored knowledge | Memory Service | Home and agent |
 | Recover | Protect or restore the product and data | Lifecycle Manager | Home |
-| Home | Show product state and expose safe controls | Home Shell | Local browser UI |
+
+| Customer surface | Primary job | Boundary |
+|------------------|-------------|----------|
+| Official package | Install, connect, repair, update, rollback, and uninstall | Owns product lifecycle, not memory semantics |
+| Connected agent | Perform normal tasks; Remember, Recall, and request correction | Primary task and value-delivery surface |
+| Elefante Home | Inspect evidence, perform verified maintenance, and Recover | Advanced local console; underlying services still own every action |
+
+The Home Shell owns presentation, navigation, local control-session handling,
+and composition. The Project Registry, Memory Service, Recall Service, and
+Lifecycle Manager remain authoritative for their own behavior.
+
+### One contract across package, IDE, Home, and website
+
+| Surface | What the user experiences | Required alignment | Must never imply |
+|---------|---------------------------|--------------------|------------------|
+| Official package | Installs one local daemon, connects selected hosts, proves disposable project-scoped Recall, and owns repair/update/rollback/uninstall | Installed build, host registration, daemon, dashboard, and acceptance receipt identify the same product | A copied file or green installer screen proves the connected workflow |
+| Connected IDE or agent | Recognizes a memory-dependent task, calls Recall once with the complete question, reasons over supplied evidence or a terminal abstention, and writes only through explicit governed flows | Every compatible host receives the same Recall, write, correction, project, and restart semantics; only adapter mechanics differ | MCP presence alone causes automatic use, or retrieved memory is automatically correct |
+| Elefante Home | Understands the whole corpus read-only, inspects one real Recall event, and performs project-bound maintenance or product-wide recovery | Dashboard labels and evidence map to the same services and postconditions used through MCP | Inventory vitality predicts the next task, or a proxy score proves quality or causal value |
+| `elefante.ai` | Understands the problem, released solution, evidence boundary, supported hosts, and download | Copy, screenshots, capability counts, and release identity describe the published package only | Local candidate behavior or developer outcome hypotheses are already shipped |
+| Task Intelligence program | Tests whether governed memory changes accepted task outcomes at acceptable total token cost | Uses real task evidence and keeps negative or inconclusive results visible | Infrastructure, retrieval, token savings, or one task proves representative lift |
+
+The IDE-session behavioral contract is fixed:
+
+1. A host restart clears that host's conversational buffer, not Elefante's
+   durable memory.
+2. The fresh host loads its Elefante bootstrap and opens a new MCP session.
+3. When prior decisions, preferences, or project context may matter, the agent
+   calls `elefante-Recall` at most once with the complete standalone question
+   and exact workspace when known.
+4. `supplied`, `no_match`, `blocked`, and `unavailable` are meaningful terminal
+   results. The agent does not broaden or retry merely to force memory.
+5. Supplied memory is evidence for reasoning, not an instruction to ignore the
+   user's current request or current source.
+6. Durable capture requires explicit authority, search-before-write, one
+   concise record, and a likely future Recall verification. Ordinary chat is
+   not silently remembered.
+7. Correction and recovery use the same preview, authority, verification,
+   rollback, and receipt contracts regardless of whether the request began in
+   an IDE or Home.
+
+The browser is not an IDE integration. A healthy installed Home opens directly
+through the loopback daemon; no extension, connector, agent command, or
+capability-bearing bookmark is required. Host, port, and launch origin are
+transport details and may not become alternate product modes or user handoffs.
+
+### Capability preservation and value map
+
+This table places the developed feature set inside the same product. It does
+not require every feature to become a top-level navigation item.
+
+| Developed capability | Unique question or value | Primary product home | Truth boundary |
+|----------------------|--------------------------|----------------------|----------------|
+| Governed Recall and Context | What prior knowledge is safe and useful for this task now? | Agent through Recall; Home Recall workspace for inspection | A bundle or abstention, not an answer-quality guarantee |
+| Memory lifecycle | What has been deliberately retained, and should it remain current? | Agent Memory service; Home Memory Intelligence | Persistence and verified lifecycle, not automatic truth |
+| Project Registry and isolation | Which knowledge boundary owns this delivery or mutation? | Package and Home Projects; enforced by Recall/Memory | Read-only all-memory understanding does not create global delivery |
+| Vitality, decay, health, and access | Which records deserve human review, and why? | Home Memory Intelligence review | Diagnostic priority, not usefulness, correctness, or deletion authority |
+| Retrieval Explanation | What evidence does this returned dashboard-search item actually expose? | Memory detail and Recall workspace | Snapshot lexical evidence is not the MCP five-signal explanation |
+| Connections and Decision Graph | How do assumptions, evidence, decisions, safeguards, topics, and explicit relationships connect? | Home Connections; Graph tools for advanced queries | Only represented edges; no invented topology or causality |
+| Directives | Which always-active behavioral rules affect normal Elefante operations? | Directive MCP tools; Home Rules inspection is a target | Separate rule store, never disguised as semantic memory |
+| Sessions and task graph | What prior work episode or explicit work state must survive a host session? | Session/task MCP tools; Home Activity inspection is a target | Persistent work state, not a replacement agent runtime |
+| ETL and Live Distiller | Which raw memories need curation, and what supported session material is deliberately processed? | ETL tools and foreground Distiller; Home Curation status is a target | Explicit enrichment/watch; no silent surveillance or automatic storage |
+| Session Intelligence | What consented usage and cost evidence exists? | Optional Home Signal Card and separate local ledger | Metadata-only; unknown usage/cost stays `UNKNOWN`; no per-memory causality |
+| Team Sync | Which explicit allowlisted memories should move between trusted local installations? | Signed local bundle workflow; Home Exchange is a target | No cloud transport, ambient sync, or global shared scope |
+| Local media attachments | Which bounded local artifact belongs to this memory? | Memory service and memory detail | Storage/integrity only; no implied OCR, transcription, or model analysis |
+| Private host events | Did a bounded scrubbed event literally trigger relevant retrieval? | Host adapter and Recall diagnostics | No ambient content retention or host surveillance |
+| System state and Dashboard Open | Is the local owner healthy and how do I reach Home? | Package, System tools, bare loopback Home | Management transport, not customer value by itself |
+| Recover | Can product/data state be protected or restored with verified postconditions? | Recover service and Home | No arbitrary paths, shell, or unverified success |
+| Task Intelligence | Did memory causally improve accepted task value per total token? | Developer evidence program | Default-off and not a customer performance claim until representative proof exists |
+
+The v2.13.0 published capability set, the 18-tool local customer candidate, and
+developer-only Task Intelligence are different evidence states. Alignment does
+not collapse them or advertise the newest local behavior as released.
 
 ### Existing foundations and missing work
 
@@ -139,7 +287,12 @@ create a competing workflow or write directly into another piece's data.
 | Recall | Bounded read-only Recall, strict project enforcement, terminal abstention, and a content-free Home test | Exact official-package and supported-agent acceptance of the project-safe path |
 | Correct | One verified Edit, Replace, Resolve, Archive, Restore, and backup-bound permanent-delete flow shared by MCP and Home; desktop and narrow-screen destructive-flow rendering verified with synthetic data | Exact-package, keyboard/accessibility, and unfamiliar-user destructive-flow acceptance |
 | Recover | Home health/backup/restore/support, one package-maintenance handoff with a safe result receipt, and verified package repair, update, rollback, and data-preserving uninstall | Exact official-artifact lifecycle execution and interruption matrix |
-| Home | Snapshot-first local dashboard with one opening state, four primary actions, Project review, Correct/Resolve, Recover, and package-maintenance guidance | Exact-package visual/accessibility acceptance and unfamiliar-user proof |
+
+Home is therefore not a seventh capability. Its existing foundation is a
+snapshot-first local console with readiness, memory inspection, relationships,
+project review, verified Correct/Resolve, Recover, and package-maintenance
+guidance. Its missing work is a truthful operator workflow, evidence-led
+information architecture, and exact-package usability and accessibility proof.
 
 No new product piece is added unless none of these owners can truthfully own the
 customer need.
@@ -148,7 +301,7 @@ customer need.
 
 **Owner:** Installer
 
-**Customer surface:** Official package, then first-run setup in Home
+**Customer surface:** Official package; Home is the optional advanced post-install control surface
 
 ### Customer promise
 
@@ -211,8 +364,8 @@ checkout, or a terminal.
 
 ### Customer promise
 
-Knowledge from one project does not appear in another project unless the
-customer explicitly marks it as shared across projects.
+Knowledge from one project does not appear in another project. Shared memory and
+cross-project delivery are deferred from the first release.
 
 ### Customer flow
 
@@ -229,8 +382,7 @@ customer explicitly marks it as shared across projects.
 - Use the unique deepest registered folder when projects are nested.
 - Ask the customer when no project matches or the result is ambiguous.
 - Put every new customer memory in an explicit project scope.
-- Keep shared-across-projects memory out of the primary flow. The recommended
-  first release enables it only as an advanced explicit choice.
+- Keep shared-across-projects memory and delivery out of the first release.
 - Never infer project scope from semantic similarity or memory content.
 
 Clean installations start in strict project mode. Upgrades preserve existing
@@ -341,8 +493,9 @@ behavior during normal Recall.
 - Never retry a terminal no-match, blocked, or unavailable result for the same
   customer question.
 - Do not claim that the UI can explain a specific selection unless the runtime
-  has evidence for that selection. Home may show provenance and eligibility,
-  but not invented reasoning.
+  has evidence for that selection. Home may show snapshot provenance and
+  lifecycle evidence separately, but must not relabel either as the reason a
+  memory was selected.
 
 ### Failure promise
 
@@ -474,60 +627,331 @@ Backup, restore, repair, successful update, forced-failure update rollback,
 uninstall-with-data-preserved, reinstall, and support-report privacy scenarios
 pass on the exact supported package.
 
-## 9. Elefante Home
+## 9. Elefante Dashboard (Home)
 
 **Owner:** Home Shell
 
-**Customer surface:** Local browser at `http://localhost:8000`; agent-open is an optional convenience
+**Customer surface:** One local Elefante dashboard. Host, port, and launch origin
+are transport details; they must never become alternate product modes, alternate
+Homes, or user-facing handoffs.
 
-### Customer promise
+### Role and audience
 
-Home answers two questions immediately:
+The dashboard is Elefante's advanced maintenance and control console: the
+engine room for inspecting and maintaining the memory-to-Recall machinery. It is
+not the primary product-onboarding surface, the marketing value surface, the
+daily task surface, or a generic analytics dashboard.
 
-1. Is Elefante ready for my agent?
-2. If not, what is the one safe action I should take?
+The normal customer experiences Elefante through the agent and the guided
+package lifecycle. The advanced technical owner enters the dashboard to
+diagnose, inspect, maintain, correct, verify, or recover Elefante. Advanced does
+not mean cryptic: every status, signal, and operation must still state what it
+means, why it matters, and what the safe next action is.
 
-Home is not another application the customer must keep open. Daily Remember and
-Recall stay in the agent.
+The storefront may show an exact released Home capture as product proof. That
+does not turn Home itself into a sales page or authorize invented controls,
+metrics, or retrieval claims. The storefront may sell governed continuity and
+inspectability; it may not use a heuristically featured inventory memory as
+proof of what shaped one real answer or of improved task performance.
 
-### Opening screen
+On first visit, Home gives one orientation, not a product tour: **Elefante makes
+memory useful for the next task; Home lets advanced users understand, improve,
+and protect that system.** It shows the strongest evidence currently available
+and one safe next action. A direct visit must not turn missing operational proof
+into a product-failure banner or require an IDE, extension, connector, or second
+address to explain the product.
 
-The first screen contains:
+### Operating objective
 
-- one product state: **Ready**, **Setup required**, **Needs attention**,
-  **Recovery required**, or **Unsupported**;
-- connected agent and active project;
-- last verified Recall and backup status;
-- four action entries: Remember, Test Recall, Correct, Recover;
-- exactly one primary next action when the product is not Ready.
+The dashboard must let the advanced owner answer:
 
-Advanced engine views may remain available below the primary experience, but
-they cannot lead navigation or be required for setup, correction, or recovery.
+1. What memories, review signals, themes, stored vitality values, and explicit
+   relationships are represented across Elefante as a whole?
+2. Which observations are direct snapshot evidence, which are operation
+   receipts, and which remain unknown?
+3. For one real project-scoped question, did Recall supply a bundle, abstain
+   with no match, block delivery, or become unavailable?
+4. Which memories were selected by the current Home Recall contract?
+5. What direct evidence supports reviewing a memory, and what does that evidence
+   *not* establish?
+6. Is a maintenance action justified, or is **No action** the correct result?
+7. If an action was applied, did the authoritative store, Home projection, and
+   scoped Recall postcondition agree?
+8. If the product is unhealthy, what is the one safe recovery action?
+
+Home does not decide whether an answer was intelligent. It makes the inputs,
+boundaries, abstentions, and verified maintenance of Recall understandable.
+Representative task improvement belongs to Task Intelligence evidence and is
+**NOT PROVEN**.
+
+### Operator golden paths
+
+Home starts with the owner's job, not readiness theater:
+
+```text
+Global understanding (no project)
+  -> inspect Memory Intelligence
+  -> inspect Topics, Vitality, and explicit Decision Graph relationships
+  -> review direct evidence or stop with No action
+
+Task intelligence (project-bound only when acting)
+  -> bind the exact project
+  -> Remember durable guidance or run one real Recall Check
+  -> inspect only the returned receipt and selected IDs
+  -> choose No action or preview one justified correction
+  -> apply once and verify store, Home, and scoped Recall
+
+Continuity (product-wide)
+  -> check health
+  -> inspect the timestamped receipt
+  -> back up, restore, or create a support report only when justified
+```
+
+Overall understanding never requires a project. Project identity becomes
+mandatory only at the boundary where Elefante selects task context or changes
+durable project memory. Every path permits a healthy conclusion and must never
+pressure the operator to mutate memory merely to complete the journey.
+
+### Information architecture
+
+The preservation-first prototype has six stable operator workspaces:
+
+1. **Home** — one product purpose, the strongest current evidence, three operator
+   jobs (Global understanding, Task intelligence, Continuity), one recommended
+   next action, and optional advanced Session Intelligence.
+2. **Recall** — the advanced Recall Inspector inside the Recall feature; its
+   first version runs one ephemeral, project-scoped Recall Check and explains
+   only the evidence that response actually carries.
+3. **Memory Intelligence** — the complete read-only corpus plus Library,
+   Review, vitality/decay, health, access history, provenance, lifecycle,
+   curation/ETL state, attachments, and contextual Correct controls.
+4. **Connections** — Topics, stored Vitality, explicit relationships, and the Decision
+   Graph. It remains a substantial workspace for understanding *between*
+   memories and is not folded into a memory-detail drawer.
+5. **Projects** — registration, active state, scope boundaries, and unassigned
+   memory review.
+6. **Recover** — health, backup, restore, support, and official-package
+   lifecycle guidance.
+
+Rules, Activity, Curation, Exchange, attachment inspection, and private-trigger
+diagnostics remain preserved advanced modules under the workspace named in the
+capability-value map. A module may stay unavailable until its truthful read
+contract exists; unavailable is not deletion.
+
+`Recall`, not `Advice`, is the truthful label. Elefante currently selects a
+memory bundle; it does not synthesize an advisory answer. This navigation is a
+prototype hypothesis, not implementation authority. Low-fidelity operator
+testing may change hierarchy, wording, or disclosure, but it starts from the
+full capability map and may not silently eliminate a unique operator job.
+
+The developed Briefing ideas are preserved where their evidence has real value,
+not as a random narrative on Home:
+
+- inventory review priority belongs to **Memory Intelligence → Review**;
+- explicit reasoning trails belong to **Connections → Decision Graph**;
+- a **Recall Briefing** may appear only after a real Recall Check and must be
+  bound to that event's terminal status, project, selected IDs, conflicts, and
+  verification time.
+
+Home must not present a heuristically chosen inventory memory as “shaping your
+next answer,” “what agents carry forward,” or evidence of why it “endures.” This
+relocation preserves the ideas while removing unsupported duplication.
+
+### Evidence capability matrix
+
+**Source basis (2026-09-01):** `docs/reference/dashboard-snapshot.md`,
+`src/dashboard/server.py`, `src/mcp/server.py::_handle_home_recall_test`, and the
+current `HomeStatePanel`, `RecallTab`, and `RetrievalExplanation` UI contracts. Reverify these
+before implementation because this matrix describes local source, not a
+released customer artifact.
+
+| Evidence or operation | State | What Home may truthfully show | Hard limit |
+|-----------------------|-------|--------------------------------|------------|
+| Validated memory snapshot | CURRENT LOCAL | Memory content, declared type, project, provenance fields, lifecycle, explicit relationships, represented conflicts, freshness/vitality diagnostics, and snapshot time | Private local inventory; not proof of task relevance, truth, or usefulness |
+| Snapshot lexical search | CURRENT LOCAL | Literal query overlap, returned order, configured storage source, health, and represented relationships | Not the MCP five-signal selection explanation |
+| Project-scoped Home Recall Check | CURRENT LOCAL | `supplied`, `no_match`, `blocked`, or `unavailable`; selected count and up to three selected memory IDs/titles; conflict count; project; verification time; no returned memory content | No selected-memory reason, withheld IDs/reasons, per-signal values, or historical trace |
+| Vitality, decay, health, access, and provenance | CURRENT LOCAL | The documented diagnostic value, formula/reason, source field, and review implication | No automatic truth, quality, utility, scope, merge, archive, or delete judgment |
+| Topics, explicit relationships, and Decision Graph | CURRENT LOCAL | Distribution, represented links, named direction, and source-grounded reasoning trails where the snapshot carries them | No invented topology, causal path, or claim that the trail drove a task |
+| Optional Session Intelligence | CURRENT RELEASE | Consented metadata-only Signal Card, evidence provenance, and explicit unknowns | No prompts/transcripts, automatic consent, provider invoice substitution, or per-memory outcome attribution |
+| Verified Correct and Recover receipts | CURRENT LOCAL | Preview, authority, result, rollback state, and named postconditions carried by the existing operation contract | Home does not reimplement or bypass the owning service |
+| Coherent operator workflow and clear light/dark shell | CURRENT SOURCE PROTOTYPE | One product purpose, three operator jobs, evidence-qualified states, and the next safe action | Installed-package and unfamiliar-operator acceptance remain separate gates |
+| Historical Recall traces | OUT OF SCOPE | None | No raw question or task history is created for dashboard convenience |
+| Per-memory outcome attribution | NOT PROVEN | `No linked outcome evidence` where that question is relevant | Aggregate Session Intelligence cannot establish that one selected memory improved one task |
+| Automatic duplicate, semantic wrong-scope, or factual-truth judgment | OUT OF SCOPE | Only an explicit detector result from a future approved contract | Similarity, age, project difference, or low connectivity cannot establish these defects |
+
+The **Memories** area therefore uses **Review**, not **Quality**. Review groups
+evidence that may deserve human inspection without claiming an automatic grade.
+It may show Library, represented relationships, and lifecycle state only where
+the snapshot carries them. A missing field is shown as unavailable; it is not
+derived from a convenient proxy.
+
+### Scope contract
+
+Home separates **view scope** from **action scope**. `All memories` is a
+read-only installation-wide view over the validated local snapshot. It is not a
+storage scope, a shared-memory feature, or a global agent-delivery path.
+
+| Scope | What the owner can inspect | Allowed operations | Hard boundary |
+|-------|----------------------------|--------------------|---------------|
+| All memories view | Library, declared project ownership, supported review signals, represented relationships, lifecycle, and unassigned items | Browse, filter, inspect, and deliberately choose a project or memory | No implicit Recall, mutation, cross-project ranking, conflict inference, or delivery |
+| Active Project action scope | Project memories, supported review evidence, lifecycle, corrections, and the current ad hoc Recall Check | Remember, Recall Check, and Correct through existing verified boundaries | Missing or ambiguous project identity fails closed before delivery or mutation |
+| Recover | Product health, backup, restore, support, and official-package lifecycle state | Existing verified lifecycle operations | Recover is product-wide, but any required Recall postcondition remains project-scoped |
+
+Action-scope behavior is deterministic:
+
+- with zero active projects, the owner can inspect `All memories`, register a
+  project, and use eligible Recover operations; Remember, Recall Check, and
+  Correct remain unavailable;
+- with one active project, Home may bind that project visibly;
+- with multiple active projects, the owner explicitly chooses one before any
+  project-scoped action;
+- a correction opened from `All memories` must bind the exact owning project
+  before preview or apply.
+
+The same or similar statement in two projects may be legitimate. Home may not
+label it a conflict merely because it appears across projects. Unassigned or
+invalid registry ownership is observable; semantic “wrong scope” remains a
+human judgment unless a future approved contract supplies stronger evidence.
+
+### Maintenance loop
+
+The advanced console follows one understandable operating loop:
+
+```text
+Check -> inspect evidence -> No action or preview one correction -> apply once -> verify -> recover if needed
+```
+
+Every mutation keeps the existing plan, authority, one-write, readback,
+rollback, and receipt requirements. A diagnostic signal never authorizes a
+mutation by itself.
+
+| Signal | Supports | Does not establish |
+|--------|----------|--------------------|
+| Age or decay | Freshness and possible review priority | Factual invalidity or irrelevance |
+| Vitality or health label | Snapshot inspection status under the documented formula | Task usefulness, correctness, or automatic repair |
+| Access count | Prior exposure/access under the current metadata contract | Use, acceptance, causal value, or endorsement |
+| Orphan label | No represented graph neighbor in this snapshot | Uselessness or deletion eligibility |
+| Provenance or source reliability | Where the record came from and declared source confidence | Truth |
+| Explicit conflict evidence | A represented contradiction requiring review or blocking under the conflict contract | A global winner or cross-project conflict |
+| Lexical match or snapshot score | Inventory-search evidence or dashboard vitality | Query-specific MCP relevance or the “best” memory |
+
+Home may recommend **Review**, **No action**, or an existing named operation.
+It may not recommend archive, delete, merge, re-scope, or replace from a single
+proxy score.
+
+### Data and explanation boundary
+
+- Normal dashboard mode reads only a validated snapshot.
+- Recall Inspector may show only the fields in the current Home Recall Check
+  response. It cannot infer reasons for selected or withheld memories.
+- The current snapshot does not contain a full task trace or per-query
+  five-signal explanation. Snapshot lexical search remains separately labeled.
+- No dashboard field may be invented to complete a design. Every field maps to
+  a maintained source contract or is explicitly labeled as a missing gap.
+- The dashboard snapshot can contain private memory content and remains local.
+- Recall Check is ephemeral by default. Home must not persist raw questions,
+  prompts, tasks, or trace history without a separately approved purpose,
+  consent, retention, export, and deletion contract.
+- No feature exposes private chain-of-thought.
+- Aggregate Session Intelligence remains a separate evidence plane and cannot
+  be attributed to one selected memory or Recall event.
+- Task Intelligence remains unreleased evidence work. The dashboard may not
+  present representative task lift as shipped or proven.
+
+If the low-fidelity workflow cannot be honest with current data, preserve the
+capability and choose the smallest truthful treatment: correct its claim,
+relabel it as diagnostic, show the missing evidence, move detail behind
+progressive disclosure, or mark the control unavailable. A new read-only
+contract is proposed only for a unique operator decision with a real
+consequence that cannot otherwise be made safely. Deletion is a separate owner
+decision and requires the Product Contract Lock evidence test.
 
 ### Control boundary
 
-- Normal Home mode reads only a validated snapshot.
-- A direct loopback Home visit establishes a short-lived authenticated local
-  control session without an IDE or browser connector. Establishing the session
-  does not itself change product or memory state.
-- With one active project, Home binds it deterministically. With several active
-  projects, the customer chooses one before project-scoped actions.
+- A direct loopback dashboard visit establishes a short-lived authenticated
+  local control session without an IDE or browser connector. Establishing the
+  session does not itself change product or memory state.
+- With one active project, Home may bind it deterministically. With several
+  active projects, the owner chooses one before project-scoped actions.
 - The session exposes only named product operations, never arbitrary shell,
-  path, query, or MCP execution.
+  path, query, raw-store, or MCP execution.
 - Memory changes go through the Memory Service.
 - Lifecycle changes go through the Lifecycle Manager.
+- `All memories` cannot be used as an implicit scope for mutation or Recall.
 - Closing, timeout, restart, or explicit lock ends control authority.
 
-The exact token/session transport belongs in a technical design after this
-product contract is approved. This PRD owns the behavior and security outcome,
-not a premature browser protocol.
+The exact token/session transport belongs in a technical design. This PRD owns
+the behavior and security outcome, not a premature browser protocol.
+
+### Visual and interaction contract
+
+- Default to a clear, high-contrast light operational theme and preserve a
+  complete dark equivalent. Exact color tokens belong in the later technical
+  design, not this PRD.
+- Preserve the exact canonical Elefante mark. The website's copper Matrix and
+  scroll choreography remain marketing devices; the dashboard uses a calm,
+  stationary operational shell.
+- Use progressive disclosure: lead with the operator's job, evidence, impact,
+  and next action; place raw counts, scores, engine details, and diagnostics in
+  secondary detail.
+- Technical language is allowed for the advanced audience, but every term must
+  be defined in context. Navigation and controls use job-based labels and
+  explicit verbs rather than unexplained internal nouns.
+- Product status is compact. Counts and signals support a diagnosis; they do
+  not dominate hierarchy or imply value.
+- Essential body copy and controls are at least 14 CSS pixels. Smaller metadata
+  may not be the sole carrier of state, authority, safety, or instructions.
+- Normal text meets WCAG AA contrast, focus is always visible, and color is not
+  the only state signal.
+- Desktop is the primary advanced-operation target. At 390 x 844, readiness,
+  scope, inspection, Recover entry, and every already-supported safety-critical
+  correction flow remain usable without hidden actions or horizontal clipping.
+  A future dense graph or analysis may be desktop-only only when Home says so
+  explicitly and offers a safe read-only alternative.
+- Keyboard, 200% zoom, visible focus, reduced motion, and screen-reader state
+  names remain release evidence.
+
+The earlier dark-first Memory Intelligence design record remains valid history
+for the current implementation. This section is the prospective advanced
+dashboard contract and supersedes that shell only after separate implementation
+and release approval.
 
 ### Complete when
 
-An unfamiliar customer can identify product state, complete each of the four
-actions, and recover from every supported failure using only Home and the agent.
-Rendered desktop, narrow-screen, keyboard, light/dark, and reduced-motion states
-must be inspected before release.
+Before visual design, a low-fidelity prototype using synthetic, clearly labeled
+data must prove the golden path with only fields in the evidence capability
+matrix. Before release, at least three unfamiliar advanced technical users,
+without founder explanation, must each be able to:
+
+1. explain that Home maintains Elefante while normal tasks happen in the agent;
+2. identify the current action scope and what is unavailable with zero, one,
+   or multiple active projects;
+3. run a project-scoped Recall Check and correctly distinguish `supplied`,
+   `no_match`, `blocked`, and `unavailable`;
+4. open a selected memory when its ID exists in the snapshot and state what the
+   displayed evidence does and does not prove;
+5. choose **No action** when no repair is justified;
+6. preview one supported correction, verify its postconditions, and recover from
+   a supplied failure scenario;
+7. state `No linked outcome evidence` when asked whether a selected memory
+   improved the task.
+
+The prototype and exact package must cover this state matrix: ready/no action,
+zero projects, one project, multiple projects, stale snapshot, daemon
+unavailable, Recall no-match, conflict-blocked Recall, a selected ID absent from
+the snapshot, correction failure with rollback, and recovery required.
+
+Release acceptance requires 3/3 task completion, zero accepted cross-project or
+unscoped mutations, zero invented causal or relevance explanations, and zero
+founder intervention. Dashboard success is accurate diagnosis, safe verified
+closure, and reduced support burden. Representative task lift is a separate
+Task Intelligence gate.
+
+The dashboard is not required to perform general product marketing or replace
+installer/agent onboarding. Rendered desktop and 390 x 844, light and dark,
+keyboard, screen-reader, 200% zoom, and reduced-motion states must be inspected.
+Exact-package evidence, not a source mock or synthetic screenshot, remains
+release authority.
 
 ## 10. Build order
 
@@ -714,6 +1138,53 @@ unfamiliar-user acceptance. Signing, notarization, clean-machine execution, and
 all six scenario receipts therefore remain unproven. No package claim follows
 from source tests or the partial workflow contract.
 
+### Slice 7 — Advanced dashboard maintenance UX
+
+**Owners:** Elefante product owner and Home Shell
+
+**Status (2026-09-01): SOURCE PROTOTYPE IMPLEMENTED / ISOLATED BROWSER AND
+FOCUSED TESTS GREEN / UNFAMILIAR-OPERATOR AND EXACT-PACKAGE ACCEPTANCE PENDING.**
+
+The goal is to make the already-built advanced maintenance console clear and
+useful without weakening project isolation, snapshot privacy, truthful Recall
+evidence, or verified operations.
+
+#### Specification-driven sequence
+
+| Stage | Deliverable | Exit condition |
+|-------|-------------|----------------|
+| 7A — Product and evidence audit | Capability/surface ownership, preservation/value map, current claim inventory, source/API/snapshot matrix, operator jobs, state matrix, and unsupported-inference list | **Complete in this PRD:** every developed capability has a unique question, product home, evidence boundary, and release state; unsupported `Advice`, automatic Quality, historical-trace, and task-outcome claims are reclassified without deleting their underlying features |
+| 7B — Low-fidelity workflow prototype | Home / Recall / Memory Intelligence / Connections / Projects / Recover content and interaction flow using only current fields and clearly synthetic states | **Source prototype complete; human gate pending:** isolated deterministic-showcase browser proof covers all six workspaces. Three unfamiliar advanced operators must still complete the Section 9 comprehension and decision tasks without founder instruction |
+| 7C — Contract decision | For each blocked operator decision, correct the claim or disclosure first; specify one smallest privacy-safe read-only field addition only when the unique decision still cannot be made | No new endpoint, persistence, score, or trace exists without a named operator decision, owner, privacy lifecycle, and fail-first contract; no feature disappears without the Product Contract Lock evidence test and owner approval |
+| 7D — Visual and technical design | Approved workflow translated into semantic theme tokens, component/data map, accessibility behavior, migration plan, and fail-first UI assertions | **Complete in source prototype:** light-default semantic tokens, retained dark mode, stable six-workspace hierarchy, and evidence-bounded states are implemented; exact-package visual acceptance remains pending |
+| 7E — Implementation | Authorized source and maintained-documentation change | **Complete in local source:** focused dashboard, snapshot, Home control, and UI tests plus the production frontend build pass; no installed runtime or durable customer data changed |
+| 7F — Product acceptance | Exact-package state/visual matrix and three advanced-operator trials from Section 9 | All maintenance tasks pass without founder intervention; release/publication remains separately authorized |
+
+#### Known contract surfaces from the pre-write leakage scan
+
+| Surface | Required synchronized change after implementation is authorized |
+|---------|---------------------------------------------------------------|
+| Shell and navigation | `App`, `TabNav`, tab types, keyboard shortcuts, footer guidance, and persisted view state for the prototype-approved Home / Recall / Memory Intelligence / Connections / Projects / Recover flow |
+| Overview inference recurrence | Repaired in local source: Home no longer features a heuristically selected memory. Review priority lives in Memory Intelligence, explicit trails live in Connections, and any Recall Briefing requires an authoritative Recall event. |
+| Overview target | `HomeStatePanel` states one product purpose, current evidence, Global understanding, Task intelligence, Continuity, and one safe next action; existing control-session and fail-closed project behavior remain authoritative |
+| Recall Inspector | Start with the existing content-free `/control/recall/test` response: status, selected IDs/count, conflict count, project, and verification time. Do not assume reasons, withheld IDs, five-signal values, history, or outcomes. |
+| Memory Intelligence | `MemoriesTab`, `MemoryDetailPanel`, Review semantics, vitality/decay, health, access, provenance, lifecycle, curation, attachments, rules/activity modules, and existing corrections; no automatic duplicate, truth, or semantic wrong-scope judgment |
+| Connections | Preserve `ExploreTab`, Topics, Vitality, explicit relationships, and Decision Graph as a first-class workspace; do not bury between-memory understanding inside Memory Intelligence |
+| Projects and Recover | Existing project isolation, unassigned review, health, backup, restore, support, and package-lifecycle contracts |
+| Visual system | Semantic light/dark tokens and component states; exact logo pixels remain unchanged |
+| Product documentation | `docs/reference/dashboard-snapshot.md` and the maintained HTML dashboard guide change only when the matching behavior exists |
+| Verification | `tests/test_dashboard_ui.py`, routing/reference guards, production build, real browser matrix, and exact-package advanced-operator evidence |
+
+No new raw-store browser access, cross-project Recall path, arbitrary scoring
+control, persisted query history, task-outcome claim, or control operation is
+assumed. When current validated data cannot support an operator decision,
+preserve the capability and correct its claim, hierarchy, disclosure, or
+availability state first; expand a read-only contract only under Stage 7C.
+
+**Exit:** advanced operators can diagnose and maintain the memory-to-Recall
+machinery without replacing the agent as the daily work surface or turning the
+dashboard into a global memory-delivery path.
+
 No slice is assigned to a version or date until the preceding exit passes.
 
 ## 11. Product release scenarios
@@ -725,9 +1196,9 @@ Tests are organized around the assembled product, not isolated feature counts.
 ### Scenario A — First use
 
 An unfamiliar customer installs the exact package, the installer detects the
-required Codex host, the customer selects two projects and reviews the managed
-backup location, disposable Recall acceptance passes, and the customer remembers
-one real decision, restarts the agent, and recalls it.
+required Codex host, selects two projects, reviews the managed backup location,
+passes disposable Recall acceptance, remembers one real decision, restarts the
+agent, and recalls it.
 
 **Pass:** no founder instruction, terminal, leftover acceptance data, or
 unsupported claim.
@@ -831,13 +1302,13 @@ Every future change to this PRD must pass all seven angles:
 
 | Angle | Adversarial question | Failure response |
 |-------|----------------------|------------------|
-| Customer language | Can the customer explain this without internal terminology? | Rewrite in the four-action vocabulary or remove it |
-| Product assembly | Which owned piece supplies this behavior? | Assign one owner or remove the requirement |
+| Customer language | Can the customer explain this without internal terminology? | Rewrite or progressively disclose the terminology; do not delete the underlying capability by default |
+| Product assembly | Which owned piece supplies this behavior? | Assign one owner or mark the requirement unplaced pending the Product Contract Lock test |
 | UX continuity | Where does the customer enter, what do they see, and where do they return? | Complete the flow before adding implementation detail |
 | Failure | What happens if this stops halfway? | Add safe state, rollback, and one next action |
 | Buildability | Which current component changes and what proves it? | Identify the owner and acceptance evidence before approval |
 | One-person company | Does this create recurring manual support or another platform/service to maintain? | Automate, narrow the support lane, or defer it |
-| Product value | Does this improve Remember, Recall, Correct, Recover, setup, or trust? | Move it to its own proposal or remove it |
+| Product value | Does this improve governed task memory guidance, its durable inputs, the four-action lifecycle, setup, recovery, or trust? | Reframe or relocate it; deletion requires the Product Contract Lock evidence test and owner approval |
 
 This gate is applied to whole sections, not only suspicious words. Deleting one
 example term while preserving an unowned concept does not pass.
@@ -876,28 +1347,72 @@ setup and remain renameable in Home; that simplification does not weaken
 isolation. Local implementation does not certify the lane or authorize the exact
 customer package gate; those require the release evidence in Section 11.
 
-This approval authorizes implementation and isolated verification in the active
-developer checkout. It does not authorize installation into the customer
-runtime, durable customer-data mutation, commit, push, merge, release,
-deployment, distribution, or commercial claims.
+### Converged product and advanced-dashboard contract — source prototype implemented
+
+On 2026-08-31 the founder corrected the product and dashboard premise; on
+2026-09-01 the founder locked its cross-surface, IDE-agnostic, and
+feature-preservation consequences. The founder then explicitly authorized the
+immediate local source actions on 2026-09-01. That authority covers the
+preservation-first dashboard prototype and isolated verification, not customer
+runtime installation or publication.
+
+| Decision | Approved contract | Why |
+|----------|-------------------|-----|
+| Product purpose | Supply the smallest governed bundle of durable memories justified for the current task and project, or abstain, so the agent does not start from zero | This is the truthful Elefante contribution; improved task decisions are the intended but still unproven downstream outcome |
+| Meaning of advice | Treat “advice” as customer shorthand for the selected memory bundle, never as a synthesized recommendation or an Elefante-made task decision | Recall selects context; the agent still reasons and acts |
+| Dashboard role | Make Home an advanced maintenance console, not the primary onboarding, marketing, or daily task surface | The dashboard manages Elefante's internal machinery; the agent is where task value is delivered |
+| Capability versus surface | Keep Install/Connect, Projects, Remember, Recall, Correct, and Recover as the six owned capabilities; Home is a composing surface, not a seventh service | Navigation must not create duplicate ownership or a competing write path |
+| Information architecture | Use Home / Recall / Memory Intelligence / Connections / Projects / Recover; Recall Inspector is an add-on inside Recall, Memory Intelligence preserves all-corpus inspection and diagnostics, and Connections remains first-class | Implemented in local source with six stable tabs and keyboard routes; Recall remains bounded to the existing content-free check |
+| Feature preservation | Preserve each developed feature by assigning its unique question, evidence boundary, useful consequence, product home, and release state before changing hierarchy | Confusion, density, or weak copy alone is not evidence that a capability lacks value |
+| Scope model | Offer read-only `All memories` view scope; bind one exact active project for Recall Check or mutation | Whole-installation understanding must not create a global storage scope, cross-project conflict inference, or delivery |
+| Evidence semantics | Explain decay, health, access, provenance, graph, lexical, conflict, and lifecycle signals with their limits; support **No action** | Maintenance proxies are not truth, usefulness, causal value, or automatic repair authority |
+| First visit | State that Home maintains Elefante, then show readiness, action scope, and one safe next step | An advanced console still must orient an unfamiliar owner without pretending to be the daily task surface |
+| Theme and hierarchy | Default to clear high-contrast light, preserve complete dark, and use progressive disclosure | Implemented in local source with semantic color tokens, a persistent local theme control, light-default first visit, and retained dark presentation; exact-package visual acceptance remains pending |
+| Evidence boundary | Show only the current Recall Check fields and snapshot evidence; no selected/withheld reasons, historical trace, per-signal values, or linked outcomes are assumed | The current dashboard contracts do not supply them; aggregate Session Intelligence cannot prove per-memory impact |
+
+The current 2026-09-01 authorization covers implementation and isolated
+verification of this source prototype. It does not authorize installation into
+the customer runtime, durable customer-data mutation, commit, push, merge,
+release, deployment, distribution, or commercial claims.
 
 ## 14. Final recommendation
 
 **Owner:** Elefante product owner
 
-Approve Elefante as one closed-loop product:
+Approve Elefante around one outcome chain:
 
 ```text
-One package
-  -> one local owner
-  -> explicit projects
-  -> Remember and Recall through the agent
-  -> Correct and Recover through Home
-  -> proof at every lifecycle boundary
+Durable memories
+  -> governed Recall for the current task and project
+  -> smallest justified memory bundle or abstention
+  -> agent decision and action
+  -> accepted outcome evidence when available
 ```
 
-Start with Verified Resolve as the smallest complete trust wedge, then enforce
-the project-safe memory loop before broadening Correct or Recover. Do not start
-with a dashboard redesign, tool-count reduction, broader host support, or
-payment machinery. If each slice cannot be explained, owned, failed safely,
-and verified through the customer-facing read path, it is not complete.
+Remember, Recall, Correct, and Recover operate that product loop. The dashboard
+maintains the machinery behind it:
+
+```text
+Diagnose -> inspect -> correct -> verify -> recover
+```
+
+Verified Resolve, project isolation, complete Correct, and Recover exist in
+local source. The preservation-first six-workspace prototype now exists there
+as well. Isolated browser proof covers the light default, retained dark theme,
+all six workspaces, Library/Review, Decision Graph, and fail-closed read-only
+states against the deterministic showcase. The installed customer dashboard
+remains unchanged.
+
+The single next product move is **unfamiliar-operator validation of the source
+prototype**. Run the Section 9 golden path with three unfamiliar technical
+users and record where they cannot understand evidence or choose a safe action.
+Correct claim, hierarchy, explanation, disclosure, or unavailable state first.
+If that passes, request separate authority for exact-package installation and
+acceptance; only the accepted package should drive website synchronization and
+the later publication gate. A remaining decision-critical evidence gap may
+enter a separate privacy-safe read-only contract design. Backend expansion is
+not the default next move.
+
+Do not add cross-project Recall, automatic memory grading, arbitrary ranking
+controls, persisted query history, fabricated selection explanations, or linked
+task-outcome claims. Representative per-task outcome lift remains unproven.

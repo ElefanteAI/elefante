@@ -193,7 +193,7 @@ browser, or expose a generic path/query/shell proxy. If the daemon is unavailabl
 the validated snapshot remains inspectable and Home reports **Needs attention**,
 not **Setup required** merely because the URL was opened directly.
 
-Home has four views:
+Home has five views:
 
 - **Briefing** ranks one durable current memory and, where graph evidence
   permits, presents its evolution as old assumption → evidence → decision →
@@ -221,6 +221,12 @@ relationships.
 - **Projects** inspects the Project Registry and, only in a managed session,
   performs named registration operations. Removing a registration does not
   remove project files or memories.
+- **Recover** checks one bounded product state, previews and creates verified
+  backups, restores only a selected verified archive with a safety backup and
+  rollback checks, and previews a privacy-safe support report before creating
+  one local ZIP. Product-code repair, update, rollback, and uninstall remain
+  official-package operations rather than actions performed by the running
+  Home service.
 
 The optional Session Intelligence panel reads only
 `session_intelligence_snapshot.json` through `/api/session-intelligence`. It

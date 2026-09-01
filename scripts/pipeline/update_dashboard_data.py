@@ -13,6 +13,7 @@
 #           The output file path is determined by config.yaml. Dashboard must be
 #           restarted or will auto-poll for the new snapshot depending on config.
 # ─────────────────────────────────────────────────────────────────────────────
+import argparse
 import asyncio
 import json
 import os
@@ -21,8 +22,9 @@ from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
-# Add src to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from src.core.graph_store import GraphStore  # noqa: E402
 from src.core.project_registry import ProjectRegistry, ProjectRegistryError  # noqa: E402
@@ -1013,8 +1015,21 @@ async def main():
     print(f"   [*] Entities: {snapshot['stats']['entities']}", file=sys.stderr)
     print(f"   [*] Edges: {len(edges)}", file=sys.stderr)
 
-if __name__ == "__main__":
+def cli(argv: list[str] | None = None) -> int:
+    """Parse command-line intent before opening any configured store."""
+
+    parser = argparse.ArgumentParser(
+        description="Regenerate dashboard_snapshot.json from configured stores.",
+    )
+    parser.parse_args(argv)
+
     from contextlib import redirect_stdout
+
     # LAW #6: STDOUT PURITY - Redirect EVERYTHING to stderr
     with redirect_stdout(sys.stderr):
         asyncio.run(main())
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(cli())

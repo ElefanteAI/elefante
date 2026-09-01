@@ -428,6 +428,62 @@ async def test_material_overlap_stops_without_write_and_offers_customer_choices(
 
 
 @pytest.mark.asyncio
+async def test_same_project_boilerplate_does_not_create_unrelated_overlap(
+    tmp_path: Path,
+) -> None:
+    existing = _memory(
+        (
+            "For Customer project onboarding, the dashboard accent must be "
+            "copper, not violet."
+        ),
+        memory_id=UUID("33333333-3333-4333-8333-333333333333"),
+    )
+    harness = Harness(
+        tmp_path,
+        overlaps=[SearchResult(memory=existing, score=0.99, source="vector")],
+    )
+
+    result = await _execute(
+        harness,
+        content=(
+            "For Customer project handoff, the required export format must be HTML."
+        ),
+        verification_question="Which export format is required for Customer project?",
+    )
+
+    assert result.status is VerifiedOperationStatus.VERIFIED_COMPLETE
+    assert result.success is True
+    assert result.plan.overlaps == ()
+    assert harness.orchestrator.add_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_high_score_related_overlap_requires_shared_substantive_terms(
+    tmp_path: Path,
+) -> None:
+    existing = _memory(
+        "For Customer project onboarding, the dashboard accent is copper.",
+        memory_id=UUID("33333333-3333-4333-8333-333333333333"),
+    )
+    harness = Harness(
+        tmp_path,
+        overlaps=[SearchResult(memory=existing, score=0.99, source="vector")],
+    )
+
+    result = await _execute(
+        harness,
+        content=(
+            "For Customer project onboarding, keep the dashboard accent burnished copper."
+        ),
+        verification_question="What dashboard accent should Customer project use?",
+    )
+
+    assert result.status is VerifiedOperationStatus.NEEDS_HUMAN
+    assert result.plan.overlaps[0].relation == "related"
+    assert harness.orchestrator.add_calls == 0
+
+
+@pytest.mark.asyncio
 async def test_keep_both_requires_exact_fresh_overlap_hashes(tmp_path: Path) -> None:
     existing = _memory(
         "Decision: use SQLite for the project index.",

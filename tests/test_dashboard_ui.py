@@ -161,31 +161,37 @@ def test_home_recover_exposes_verified_backup_and_restore_without_path_override(
         "setReceipt(result.receipt ?? null);"
     )
 
+    apply_recovery = store[
+        store.index("applyRecoveryPlan: async"):
+        store.index("downloadSupportReport: async")
+    ]
+    assert "action === 'restore'" in apply_recovery
+    assert "rawStatus === 'VERIFIED_COMPLETE'" in apply_recovery
+    assert "await get().refreshSnapshot();" in apply_recovery
+    assert "selectedMemoryIds: []" in apply_recovery
+    assert "inspectedMemoryId: null" in apply_recovery
 
-def test_home_opens_with_one_product_state_and_four_customer_actions() -> None:
+
+def test_home_leads_with_one_elefante_product_model_and_three_operator_jobs() -> None:
     home = _read("components/HomeStatePanel.tsx")
     overview = _read("components/OverviewTab.tsx")
     store = _read("store.ts")
     types = _read("types.ts")
     tabs = _read("components/TabNav.tsx")
 
-    for state in (
-        "Ready",
-        "Setup required",
-        "Needs attention",
-        "Recovery required",
-        "Unsupported",
-    ):
-        assert state in home
-    for action in ("Remember", "Test Recall", "Correct", "Recover"):
-        assert f'title="{action}"' in home
-
-    assert "Current product state" in home
-    assert "One safe next action" in home
-    assert "Connected agent" in home
-    assert "Active project" in home
-    assert "Last verified Recall" in home
-    assert "Last verified backup" in home
+    assert "Elefante control room" in home
+    assert "Make memory useful for the next task." in home
+    assert "selects governed decisions, constraints, preferences, facts, and lessons" in home
+    assert "Understand the memory system" in home
+    assert "Improve what Elefante supplies" in home
+    assert "Protect and recover" in home
+    assert "No project is required" in home
+    assert "Required for task-scoped Recall and changes—not global inspection" in home
+    assert "Recommended next" in home
+    assert "Memory corpus" in home
+    assert "Review queue" in home
+    assert "Task boundary" in home
+    assert "Recovery evidence" in home
     assert "requestRecoveryPlan('health')" in home
     assert "activeProjectId" in home
     assert "{project.root}" not in home
@@ -196,15 +202,201 @@ def test_home_opens_with_one_product_state_and_four_customer_actions() -> None:
     assert "{ id: 'overview', label: 'Home' }" in tabs
 
 
+def test_dashboard_keeps_environment_state_as_evidence_not_a_second_product() -> None:
+    home = _read("components/HomeStatePanel.tsx")
+    store = _read("store.ts")
+    types = _read("types.ts")
+    header = _read("components/HeaderBar.tsx")
+    app = _read("App.tsx")
+
+    assert "Example workspace" in home
+    assert "No operational receipt in this environment" in home
+    assert "CONTROL_ORIGIN_UNAVAILABLE" in store
+    assert "controlAvailability: ControlAvailability" in store
+    assert "snapshot_context?: SnapshotContext" in types
+    assert "Example workspace" in header
+    assert "example workspace" in app
+    combined = home + app + header
+    assert "installed Elefante Home" not in combined
+    assert "Dashboard preview" not in combined
+    assert "8000" not in combined
+    assert "8001" not in combined
+
+
+def test_home_summary_is_compact_snapshot_evidence_not_a_random_memory_story() -> None:
+    home = _read("components/HomeStatePanel.tsx")
+    overview = _read("components/OverviewTab.tsx")
+
+    assert "Current evidence" in home
+    assert "Memory corpus" in home
+    assert "Review queue" in home
+    assert "Health or lifecycle evidence; not a truth grade" in home
+    assert "Advanced: Session Intelligence" in overview
+    assert "chooseMaintenanceFocus" not in overview
+    assert "Memory Maintenance Briefing" not in overview
+    assert "Snapshot evidence" not in overview
+
+
+def test_recall_never_claims_proof_before_a_live_result_exists() -> None:
+    recall = _read("components/RecallTab.tsx")
+
+    assert "Prove what memory Elefante would supply." in recall
+    assert "No Recall evidence yet" in recall
+    assert "1 · Confirm project" in recall
+    assert "2 · Ask one question" in recall
+    assert "3 · Inspect the receipt" in recall
+    result_block = recall[recall.index("{result && copy && ("):]
+    assert "What this proves" in result_block
+    assert result_block.index("What this proves") < result_block.index("What it does not prove")
+
+
+def test_projects_and_recover_explain_value_without_dead_controls_or_address_handoffs() -> None:
+    projects = _read("components/ProjectsTab.tsx")
+    recover = _read("components/RecoverTab.tsx")
+
+    assert "Example project boundary" in projects
+    assert "Projects prevent unrelated work from sharing Recall context" in projects
+    assert "Overall memory inspection does not require a project" in projects
+    assert "Protect Elefante before changing durable state." in recover
+    assert "No recovery evidence yet" in recover
+    assert "Capability is not presented as readiness" in recover
+    assert "Live control" in recover
+    assert "Requires verified plan" in recover
+    assert "Advanced: product maintenance" in recover
+    assert "Available now" not in recover
+    assert "installed Home" not in projects + recover
+
+
+def test_connections_names_snapshot_metrics_without_truth_claims() -> None:
+    connections = _read("components/ExploreTab.tsx")
+    vitality = _read("components/CalendarHeatmap.tsx")
+    graph = _read("components/KnowledgeGraph.tsx")
+    topics = _read("components/TopicTreemap.tsx")
+
+    assert "label: 'Vitality'" in connections
+    assert "Stored vitality & type breakdown" in connections
+    assert "Stored vitality distribution" in vitality
+    assert "Highest vitality memories" in vitality
+    assert "avg vitality" in topics
+    assert "avg score" not in topics
+    assert "Trace one represented decision" in graph
+    assert "current truth won" not in graph
+
+
+def test_dashboard_uses_the_preservation_first_six_workspace_navigation() -> None:
+    app = _read("App.tsx")
+    tabs = _read("components/TabNav.tsx")
+    types = _read("types.ts")
+    recall = _read("components/RecallTab.tsx")
+
+    for entry in (
+        "{ id: 'overview', label: 'Home' }",
+        "{ id: 'recall', label: 'Recall' }",
+        "{ id: 'memories', label: 'Memory Intelligence' }",
+        "{ id: 'explore', label: 'Connections' }",
+        "{ id: 'projects', label: 'Projects' }",
+        "{ id: 'recover', label: 'Recover' }",
+    ):
+        assert entry in tabs
+
+    assert "'overview' | 'recall' | 'memories' | 'explore' | 'projects' | 'recover'" in types
+    assert "import { RecallTab }" in app
+    assert "case 'recall':" in app
+    assert "return <RecallTab />;" in app
+    assert "'6': 'recover'" in app
+    assert "1/2/3/4/5/6 to switch views" in app
+    assert "Recall Inspector" in recall
+    assert "Run Recall Check" in recall
+    assert "result.selected_count" in recall
+    assert "result?.selected_memory_ids" in recall
+    assert "result.conflict_count" in recall
+    assert "result.project?.name" in recall
+    assert "formatVerifiedAt(result.verified_at)" in recall
+    assert "no memory content is returned to Home" in recall
+    assert "What it does not prove" in recall
+
+
+def test_dashboard_defaults_to_clear_light_and_preserves_dark_theme() -> None:
+    app = _read("App.tsx")
+    header = _read("components/HeaderBar.tsx")
+    styles = _read("index.css")
+    tailwind = (ROOT / "src" / "dashboard" / "ui" / "tailwind.config.js").read_text(encoding="utf-8")
+
+    assert "=== 'dark' ? 'dark' : 'light'" in app
+    assert "document.documentElement.dataset.theme = theme" in app
+    assert "elefante-dashboard-theme" in app
+    assert "onToggleTheme" in header
+    assert "Switch to ${theme === 'light' ? 'dark' : 'light'} theme" in header
+    assert "grid min-h-[104px] grid-cols-1" in header
+    assert "sm:min-h-[72px] sm:flex" in header
+    assert "flex w-full min-w-0 items-center justify-between" in header
+    assert '<span className="sm:hidden">' in header
+    assert 'color-scheme: light' in styles
+    assert ':root[data-theme="dark"]' in styles
+    assert 'color-scheme: dark' in styles
+    assert "token('slate-950')" in tailwind
+    assert "100: token('cyan-100')" in tailwind
+    assert "200: token('violet-200')" in tailwind
+
+
+def test_dashboard_html_guide_matches_the_source_prototype_boundary() -> None:
+    guide = (ROOT / "docs" / "how-to" / "view-dashboard.html").read_text(encoding="utf-8")
+
+    assert "source prototype checked 2026-09-01" in guide
+    assert "This work did not replace the installed runtime or publish a package" in guide
+    assert "Home has six top-level workspaces" in guide
+    assert "Recall: test governed selection" in guide
+    assert "Make memory useful for the next task" in guide
+    assert "Global understanding" in guide
+    assert "Task intelligence" in guide
+    assert "Continuity" in guide
+    assert "Memory Intelligence: inspect and review" in guide
+    assert "New browser profiles start in high-contrast light" in guide
+    assert "Home has five top-level views" not in guide
+    assert "Continuity briefing" not in guide
+
+
+def test_home_summary_is_evidence_not_unbound_recall_claims() -> None:
+    home = _read("components/HomeStatePanel.tsx")
+    overview = _read("components/OverviewTab.tsx")
+
+    assert "Health or lifecycle evidence; not a truth grade" in home
+    assert "Missing relationships and task relevance are never inferred" in home
+    assert "correction is not implied" in home
+    assert "chooseMaintenanceFocus" not in overview
+    assert "shaping your next answer" not in overview
+    assert "What compatible agents carry forward" not in overview
+    assert "retrieved by agents" not in overview
+    assert "Why this memory endures" not in overview
+
+
+def test_memory_intelligence_and_connections_preserve_distinct_operator_jobs() -> None:
+    memories = _read("components/MemoriesTab.tsx")
+    connections = _read("components/ExploreTab.tsx")
+    insights = _read("components/CalendarHeatmap.tsx")
+
+    assert "Memory Intelligence" in memories
+    assert "Library · {memories.length}" in memories
+    assert "Review · {reviewCount}" in memories
+    assert "View scope: all memories, read only" in memories
+    assert "does not grade truth, usefulness" in memories
+    assert "visibleMemories" in memories
+    assert "Connections" in connections
+    assert "Decision Graph" in connections
+    assert "Missing links and causal claims are not inferred" in connections
+    assert "Number(score) >= 80" in insights
+    assert "Number(score) >= 60" in insights
+    assert "Number(score) >= 8 ?" not in insights
+
+
 def test_home_first_run_explains_project_boundary_and_memory_policy() -> None:
     home = _read("components/HomeStatePanel.tsx")
 
-    assert "Set the boundary before adding memory." in home
-    assert "Elefante does not ingest every session by default." in home
-    assert "Open Projects" in home
-    assert "Open Recover" in home
-    assert "Never store passwords, API keys, access tokens" in home
-    assert "Your existing memory is safe." in home
+    assert "No project is required" in home
+    assert "project is required only for task-scoped Recall and changes" in home
+    assert "Remember durable guidance" in home
+    assert "never secrets or full transcripts" in home
+    assert "Capability is not readiness until a check returns a receipt" in home
 
 
 def test_direct_localhost_home_establishes_its_own_bounded_session() -> None:
@@ -212,27 +404,30 @@ def test_direct_localhost_home_establishes_its_own_bounded_session() -> None:
     store = _read("store.ts")
     app = _read("App.tsx")
 
-    assert "Choose the project for this Home session." in home
-    assert "Reload Home" in home
     assert "fetch('/api/control-config'" in store
     assert "/control/session" in store
     assert "cache: 'no-store'" in store
     assert "credentials: 'omit'" in store
-    assert "local session active" in app
+    assert "live local session" in app
     assert "Open Home through Elefante first." not in home
     assert "manually typed localhost URL" not in home
     assert "browser connector" not in (home + store + app).casefold()
+    assert "8000" not in home + app
+    assert "8001" not in home + app
 
 
 def test_home_remember_and_manual_recall_are_project_safe_verified_actions() -> None:
     home = _read("components/HomeStatePanel.tsx")
     dialog = _read("components/HomeMemoryDialog.tsx")
+    recall = _read("components/RecallTab.tsx")
     store = _read("store.ts")
     types = _read("types.ts")
 
-    assert "Remember here" in home
-    assert "Ask a Recall question" in home
+    assert "setMemoryDialog('remember')" in home
+    assert "Improve what Elefante supplies" in home
+    assert "setActiveTab('recall')" in home
     assert "<HomeMemoryDialog" in home
+    assert "testRecall(question.trim())" in recall
     assert "/control/remember" in store
     assert "/control/remember/apply" in store
     assert "/control/recall/test" in store

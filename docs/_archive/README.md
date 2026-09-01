@@ -45,7 +45,7 @@ All non-README files were migrated **out** of this archive into the new structur
 | `technical/ops-installation.md` | [`../how-to/install.md`](../how-to/install.md) |
 | `technical/ops-ide-configuration.md` | [`../how-to/configure-ide.md`](../how-to/configure-ide.md) |
 | `technical/ops-mcp-server.md` | [`../how-to/run-mcp-server.md`](../how-to/run-mcp-server.md) |
-| `technical/ops-dashboard.md` | [`../how-to/view-dashboard.md`](../how-to/view-dashboard.md) |
+| `technical/ops-dashboard.md` | [`../how-to/view-dashboard.html`](../how-to/view-dashboard.html) |
 | `technical/ops-restart.md` | [`../how-to/restart.md`](../how-to/restart.md) |
 | `technical/ops-rollback.md` | [`../how-to/rollback.md`](../how-to/rollback.md) |
 | `technical/ops-docker.md` | [`../how-to/docker.md`](../how-to/docker.md) |

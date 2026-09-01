@@ -108,7 +108,7 @@ export function CalendarHeatmap() {
 
         {/* Score Stats + Distribution */}
         <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-5 space-y-4">
-          <h3 className="text-sm font-semibold text-slate-200">Score Distribution</h3>
+          <h3 className="text-sm font-semibold text-slate-200">Stored vitality distribution</h3>
 
           {/* KPI row */}
           <div className="grid grid-cols-3 gap-3">
@@ -132,7 +132,7 @@ export function CalendarHeatmap() {
                 label={`Score ${score}`}
                 count={count}
                 total={total}
-                color={Number(score) >= 8 ? '#c8894d' : Number(score) >= 6 ? '#dfbb72' : '#c96f5d'}
+                color={Number(score) >= 80 ? '#c8894d' : Number(score) >= 60 ? '#dfbb72' : '#c96f5d'}
               />
             ))}
           </div>
@@ -177,7 +177,7 @@ export function CalendarHeatmap() {
 
         {/* Top 6 by score */}
         <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-5 lg:col-span-2">
-          <h3 className="text-sm font-semibold text-slate-200 mb-4">Highest Scored Memories</h3>
+          <h3 className="text-sm font-semibold text-slate-200 mb-4">Highest vitality memories</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {topByScore.map((m) => {
               const score = Number(m.properties?.score) || 0;

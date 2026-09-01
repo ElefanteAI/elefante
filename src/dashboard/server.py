@@ -3,7 +3,7 @@ import os
 import re
 import threading
 import uvicorn
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
@@ -106,6 +106,51 @@ def _project_registry_snapshot(data: dict[str, Any]) -> dict[str, Any]:
     return value
 
 
+def _snapshot_context(data: dict[str, Any]) -> dict[str, Any]:
+    """Expose a bounded display contract, never arbitrary snapshot copy."""
+    curation = data.get("curation")
+    is_showcase = (
+        isinstance(curation, dict)
+        and curation.get("purpose")
+        == "Elefante Memory Intelligence dashboard showcase"
+        and curation.get("deterministic") is True
+        and curation.get("contains_user_data") is False
+    )
+    if is_showcase:
+        return {
+            "mode": "showcase",
+            "label": "Example workspace",
+            "contains_user_data": False,
+            "source_grounded_content": curation.get("source_grounded_content") is True,
+            "synthetic_behavioral_metadata": (
+                curation.get("synthetic_behavioral_metadata") is True
+            ),
+            "disclaimer": (
+                "Deterministic example data; counts and activity do not describe "
+                "customer behavior or product performance."
+            ),
+        }
+    return {
+        "mode": "local_snapshot",
+        "label": "Local snapshot",
+        "contains_user_data": None,
+        "source_grounded_content": None,
+        "synthetic_behavioral_metadata": None,
+        "disclaimer": (
+            "Read-only snapshot evidence; live actions require a verified local "
+            "control session."
+        ),
+    }
+
+
+def _request_origin(request: Request) -> str:
+    host = request.url.hostname or ""
+    port = request.url.port
+    default_port = 443 if request.url.scheme == "https" else 80
+    suffix = "" if port in {None, default_port} else f":{port}"
+    return f"{request.url.scheme}://{host}{suffix}"
+
+
 def _read_session_intelligence_snapshot() -> dict[str, Any] | None:
     """Load the derived metadata-only snapshot without opening its SQLite ledger."""
     snapshot_path = _session_intelligence_snapshot_path()
@@ -180,6 +225,7 @@ async def get_graph(
                 "nodes": [],
                 "edges": [],
                 "stats": {"node_count": 0, "edge_count": 0, "semantic_edge_count": 0},
+                "snapshot_context": _snapshot_context({}),
                 "project_registry": _unavailable_project_registry(
                     "PROJECT_SNAPSHOT_UNAVAILABLE"
                 ),
@@ -237,6 +283,8 @@ async def get_graph(
             "project_registry_generated_at": data.get(
                 "project_registry_generated_at"
             ),
+            "generated_at": data.get("generated_at"),
+            "snapshot_context": _snapshot_context(data),
             "stats": data.get("stats", {
                 "total_nodes": len(nodes),
                 "memories": sum(1 for n in nodes if n.get("type") == "memory"),
@@ -276,11 +324,27 @@ async def health_check():
 
 
 @app.get("/api/control-config")
-async def get_control_config():
-    """Expose only the loopback port needed to start an in-memory Home session."""
+async def get_control_config(request: Request):
+    """Advertise control only when this page can pass the daemon origin gate."""
+    if _request_origin(request) not in DEFAULT_DASHBOARD_CORS_ORIGINS:
+        return {
+            "available": False,
+            "mode": "snapshot_only",
+            "reason_code": "CONTROL_ORIGIN_UNAVAILABLE",
+            "reason": "Live controls are intentionally unavailable from this dashboard origin.",
+        }
+    snapshot = _read_snapshot()
+    if snapshot and _snapshot_context(snapshot)["mode"] == "showcase":
+        return {
+            "available": False,
+            "mode": "snapshot_only",
+            "reason_code": "SHOWCASE_SNAPSHOT_READ_ONLY",
+            "reason": "Live controls are intentionally unavailable for example data.",
+        }
     try:
         return {
             "available": True,
+            "mode": "live_control",
             "daemon_host": "127.0.0.1",
             "daemon_port": _daemon_port(),
             "session_path": "/control/session",

@@ -591,6 +591,19 @@ export interface GraphEdge {
   similarity?: number;
 }
 
+export type SnapshotMode = 'showcase' | 'local_snapshot';
+
+export interface SnapshotContext {
+  mode: SnapshotMode;
+  label: 'Example workspace' | 'Local snapshot';
+  contains_user_data: boolean | null;
+  source_grounded_content: boolean | null;
+  synthetic_behavioral_metadata: boolean | null;
+  disclaimer: string;
+}
+
+export type ControlAvailability = 'checking' | 'available' | 'snapshot_only' | 'unavailable';
+
 export function edgeEndpoints(edge: GraphEdge): { source: string; target: string } {
   return {
     source: edge.source ?? edge.from ?? '',
@@ -601,6 +614,7 @@ export function edgeEndpoints(edge: GraphEdge): { source: string; target: string
 export interface Snapshot {
   nodes: GraphNode[];
   edges: GraphEdge[];
+  snapshot_context?: SnapshotContext;
   project_registry?: ProjectRegistrySnapshot;
   project_registry_generated_at?: string;
   stats?: {
@@ -692,6 +706,6 @@ export interface SearchResult {
   similarity: number;
 }
 
-export type Tab = 'overview' | 'memories' | 'explore' | 'projects' | 'recover';
+export type Tab = 'overview' | 'recall' | 'memories' | 'explore' | 'projects' | 'recover';
 
 export type VisualizationType = 'treemap' | 'calendar' | 'network';

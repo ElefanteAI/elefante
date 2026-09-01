@@ -142,12 +142,47 @@
 
 <a id="issue-15"></a>
 
-## Issue #15: Direct Home Mistook Authorization Transport for Product Setup [BUG-069, FIXED locally]
+## Issue #15: Direct Home Mistook Authorization Transport for Product Setup [BUG-069, FIXED + installed candidate]
 
 **Trigger:** The customer typed `http://localhost:8000` for a healthy installed Elefante with one active project. Home showed `Setup required`, could not verify health, and instructed the customer to return to an agent and request a different secret URL.
 **Root cause:** The UI equated “no capability fragment” with “product not set up.” `DashboardOpen` was the only path that minted a control capability and supplied daemon/project context, while the always-on daemon did not own the dashboard process. A security implementation detail therefore became the customer onboarding model.
-**Solution:** Make port 8000 the stable loopback customer entry point. The daemon starts Home, the snapshot server advertises only the configured loopback daemon port, and the trusted local Home origin requests one bounded in-memory capability directly. Bind exactly one active project automatically; require an explicit choice when scope is ambiguous. Keep every named operation behind the existing expiry, request-limit, preview, confirmation, one-use ticket, exact-hash, verification, and rollback gates. If the daemon is unavailable, preserve snapshot inspection and report `Needs attention` instead of fake setup work.
-**Lesson:** Authentication transport is not onboarding. A local product URL must explain product state directly; IDEs and agents may provide context, but they cannot be required merely to enter the product. Preserve security at the action boundary, not by making the whole opening screen look broken.
+**Solution:** Make port 8000 the stable loopback customer entry point. The daemon starts Home, the snapshot server advertises only the configured loopback daemon port, and the trusted local Home origin requests one bounded in-memory capability directly. Bind exactly one active project automatically; require an explicit choice when scope is ambiguous. Keep every named operation behind the existing expiry, request-limit, preview, confirmation, one-use ticket, exact-hash, verification, and rollback gates. Ship every installer-called verifier in the customer allowlist, and preserve the certified host executable path in the daemon service so shell health and Home health see the same environment. If the daemon is unavailable, preserve snapshot inspection and report `Needs attention` instead of fake setup work.
+**Follow-up acceptance:** Exercising the HTML guide against an isolated live Home exposed stale post-restore client state. A verified restore now clears stale memory selection and awaits the refreshed snapshot before returning its receipt; the browser immediately shows the restored count and omits the post-backup marker without a page reload.
+**Lesson:** Authentication transport is not onboarding. A local product URL must explain product state directly; IDEs and agents may provide context, but they cannot be required merely to enter the product. Preserve security at the action boundary, not by making the whole opening screen look broken. Runtime health is also environment-bound: a service is not ready merely because the same doctor passes from an interactive shell.
+
+<a id="issue-16"></a>
+
+## Issue #16: Dashboard Confused Capability, Evidence, and Product Workflow [BUG-070, FIXED locally]
+
+**Trigger:** A first-time user saw a dominant attention state, unverified cards,
+controls that did not produce receipts, and large narrative panels whose claims
+were not bound to a real Recall event. Moving between local dashboard processes
+was then explained as if it were a customer journey, while the actual Elefante
+value remained unclear.
+
+**Root cause:** Home used service/session readiness as its information
+architecture. It treated missing operational evidence as product failure,
+capability as readiness, and a heuristic inventory focus as task evidence. The
+same developed ideas were repeated on Home instead of being owned by their
+authoritative workspaces. Transport mechanics escaped into product language.
+
+**Solution:** Lock one purpose—make governed memory useful for the next task—and
+organize the dashboard around three operator jobs: Global understanding, Task
+intelligence, and Continuity. Show snapshot facts and operation receipts as
+different evidence classes. Keep overall inspection project-free; require a
+project only for task-scoped Recall or durable changes. Claim Recall value only
+inside an actual result receipt. Put review priority in Memory Intelligence,
+stored vitality and explicit trails in Connections, and lifecycle proof in
+Recover. Keep host, port, and launch origin invisible as product concepts.
+
+**Guard:** Dashboard, snapshot, Home-control, daemon, and routing regressions;
+the production UI build; and live deterministic-example acceptance across all
+six workspaces, both themes, desktop, and 390×844.
+
+**Lesson:** Capability is not readiness, invocation is not completion, and
+transport is not product hierarchy. Stronger evidence usually requires fewer
+authoritative panels, not more status cards. Preserve developed ideas by giving
+each one a real evidence owner instead of duplicating it on Home.
 
 ---
 
@@ -161,6 +196,7 @@
 6. **Detach long-lived servers into subprocesses, never daemon threads** — daemon threads die with their transient parent. Issue #7.
 7. **Exercise driver-native result shapes, not only friendly fakes** — partial graph hydration can hide behind derived visualization data. Issue #14.
 8. **Authentication transport is not onboarding** — keep the stable local entry point independent of agents and enforce authority at named actions. Issue #15.
+9. **Capability is not readiness; transport is not product hierarchy** — organize the dashboard by operator job and show a claim only where its authoritative evidence exists. Issue #16.
 
 Distill any new repeating rule into `../lessons.md`.
 

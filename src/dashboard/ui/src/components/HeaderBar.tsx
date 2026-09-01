@@ -1,5 +1,10 @@
 import { useDashboardStore } from '@/store';
-import { RefreshCw } from 'lucide-react';
+import { Moon, RefreshCw, Sun } from 'lucide-react';
+
+interface HeaderBarProps {
+  theme: 'light' | 'dark';
+  onToggleTheme: () => void;
+}
 
 function formatSnapshotAge(generatedAt: string): { label: string; stale: boolean } {
   if (!generatedAt || generatedAt === 'unknown') return { label: 'unknown', stale: true };
@@ -18,8 +23,9 @@ function formatSnapshotAge(generatedAt: string): { label: string; stale: boolean
   return { label, stale };
 }
 
-export function HeaderBar() {
+export function HeaderBar({ theme, onToggleTheme }: HeaderBarProps) {
   const stats = useDashboardStore((s) => s.stats);
+  const snapshotContext = useDashboardStore((s) => s.snapshot?.snapshot_context);
   const isRefreshing = useDashboardStore((s) => s.isRefreshing);
   const refreshSnapshot = useDashboardStore((s) => s.refreshSnapshot);
 
@@ -29,9 +35,10 @@ export function HeaderBar() {
   const relationships = stats?.graph_store?.total_relationships || 0;
   const snapshotAt = stats?.snapshot?.generated_at || 'unknown';
   const { label: ageLabel, stale } = formatSnapshotAge(snapshotAt);
+  const isShowcase = snapshotContext?.mode === 'showcase';
 
   return (
-    <header className="min-h-[72px] flex items-center justify-between px-6 md:px-8 bg-slate-950/90 backdrop-blur border-b elefante-hairline">
+    <header className="grid min-h-[104px] grid-cols-1 content-center gap-2 px-4 py-3 sm:min-h-[72px] sm:flex sm:items-center sm:justify-between sm:px-6 sm:py-0 md:px-8 bg-slate-950/90 backdrop-blur border-b elefante-hairline">
       <div className="flex items-center gap-3.5">
         <div className="elefante-mark" aria-hidden="true">
           <div className="elefante-emblem" />
@@ -48,7 +55,7 @@ export function HeaderBar() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 text-[10px] text-slate-500 elefante-mono uppercase tracking-[0.08em]">
+      <div className="flex w-full min-w-0 items-center justify-between gap-2 text-[10px] text-slate-500 elefante-mono uppercase tracking-[0.08em] sm:w-auto sm:justify-end sm:gap-3">
         <span className="hidden lg:inline">{memories} memories</span>
         <span className="hidden lg:inline text-slate-700">·</span>
         <span className="hidden lg:inline">{entities} entities</span>
@@ -56,18 +63,29 @@ export function HeaderBar() {
         <span className="hidden md:inline">{relationships} links</span>
         <span className="hidden md:inline text-slate-700">·</span>
         <span
-          className={stale ? 'text-amber-400/90' : 'text-emerald-400/90'}
-          title={`Snapshot generated: ${snapshotAt}`}
+          className={`min-w-0 truncate ${isShowcase ? 'text-cyan-300' : stale ? 'text-amber-400/90' : 'text-emerald-400/90'}`}
+          title={isShowcase ? 'Deterministic dashboard example' : `Snapshot generated: ${snapshotAt}`}
         >
-          {stale ? `stale · ${ageLabel}` : `current · ${ageLabel}`}
+          {isShowcase ? 'Example workspace' : stale ? `stale · ${ageLabel}` : `current · ${ageLabel}`}
         </span>
+
+        <button
+          type="button"
+          onClick={onToggleTheme}
+          title={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+          aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+          className="flex shrink-0 items-center gap-1.5 border elefante-hairline bg-slate-900/60 px-2.5 py-1.5 text-[10px] font-medium text-slate-500 transition-colors hover:text-slate-100"
+        >
+          {theme === 'light' ? <Moon size={12} aria-hidden="true" /> : <Sun size={12} aria-hidden="true" />}
+          <span className="hidden sm:inline">{theme === 'light' ? 'Dark' : 'Light'}</span>
+        </button>
 
         <button
           onClick={() => refreshSnapshot()}
           disabled={isRefreshing}
-          title="Reload the current dashboard snapshot"
+          title={isShowcase ? 'Reload the example snapshot' : 'Reload the current dashboard snapshot'}
           className={
-            'flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium border transition-colors ' +
+            'flex shrink-0 items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium border transition-colors ' +
             (isRefreshing
               ? 'bg-slate-800/40 elefante-hairline text-slate-600 cursor-not-allowed'
               : stale
@@ -76,7 +94,10 @@ export function HeaderBar() {
           }
         >
           <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} />
-          {isRefreshing ? 'Reloading...' : 'Reload'}
+          <span className="hidden sm:inline">
+            {isRefreshing ? 'Reloading...' : isShowcase ? 'Reload example' : 'Reload'}
+          </span>
+          <span className="sm:hidden">{isRefreshing ? 'Loading...' : 'Reload'}</span>
         </button>
       </div>
     </header>

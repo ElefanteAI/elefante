@@ -40,6 +40,7 @@ from src.utils.atomic_json import (
 from src.utils.curation import (
     canonicalize_concepts,
     canonicalize_recall_cues,
+    extract_concepts,
     generate_title,
 )
 from src.utils.validators import validate_memory_content
@@ -76,6 +77,14 @@ MEMORY_TYPE_TO_KNOWLEDGE_KIND = {
     "insight": "lesson",
 }
 REMEMBER_CHOICES = ("update", "supersede", "keep_both", "cancel")
+_RELATED_BOILERPLATE = {
+    "constraint",
+    "decision",
+    "lesson",
+    "memory",
+    "preference",
+    "project",
+}
 
 
 def _text(value: Any) -> str:
@@ -94,6 +103,21 @@ def _near_duplicate(left: str, right: str) -> bool:
         left_value,
         right_value,
     ).ratio() >= 0.92
+
+
+def _material_related_overlap(
+    left: str,
+    right: str,
+    *,
+    project_name: str,
+) -> bool:
+    """Require lexical evidence beyond same-project boilerplate."""
+
+    project_terms = set(extract_concepts(project_name, max_concepts=24))
+    ignored = project_terms | _RELATED_BOILERPLATE
+    left_terms = set(extract_concepts(left, max_concepts=24)) - ignored
+    right_terms = set(extract_concepts(right, max_concepts=24)) - ignored
+    return len(left_terms & right_terms) >= 2
 
 
 def _projection_sha256(concepts: Sequence[str]) -> str:
@@ -357,6 +381,7 @@ class VerifiedRememberService:
         content: str,
         *,
         project_id: str,
+        project_name: str,
         workspace: str,
     ) -> tuple[RememberOverlap, ...]:
         results = await self.orchestrator.search_memories(
@@ -390,10 +415,15 @@ class VerifiedRememberService:
             score = float(getattr(result, "score", 0.0) or 0.0)
             conflict = assess_conflict(content, memory.content)
             duplicate = _near_duplicate(content, memory.content)
+            related = score >= 0.65 and _material_related_overlap(
+                content,
+                memory.content,
+                project_name=project_name,
+            )
             if (
                 not duplicate
                 and conflict.outcome is not ConflictOutcome.CONFLICT
-                and score < 0.65
+                and not related
             ):
                 continue
             # Explicit contradiction wins over textual near-duplication.  A
@@ -639,6 +669,7 @@ class VerifiedRememberService:
             overlaps = await self._search_overlaps(
                 content,
                 project_id=project_id,
+                project_name=project_name,
                 workspace=workspace,
             )
         except Exception:

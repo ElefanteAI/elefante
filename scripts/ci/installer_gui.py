@@ -580,8 +580,11 @@ class InstallerApp:
         ttk.Label(
             self.projects_frame,
             text=(
-                "Select at least one real project folder. Each folder receives an "
-                "isolated memory scope; Elefante never scans or changes project files."
+                "Select specific project folders for each body of work—not your home "
+                "folder, the Documents folder itself, or Elefante’s data folder. "
+                "Each folder receives an isolated memory scope; Elefante never "
+                "scans project files and does not import every past session "
+                "automatically."
             ),
             style="Body.TLabel",
             wraplength=760,

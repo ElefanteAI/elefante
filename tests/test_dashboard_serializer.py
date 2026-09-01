@@ -615,7 +615,7 @@ def test_showcase_snapshot_is_deterministic_grounded_and_contract_complete():
                 "name": "Elefante showcase",
                 "root": "/showcase/elefante",
                 "active": True,
-                "root_status": "unknown",
+                "root_status": "missing",
                 "created_at": snapshot["generated_at"],
                 "updated_at": snapshot["generated_at"],
             }
@@ -688,7 +688,8 @@ def test_dashboard_graph_uses_real_decision_trails_not_invented_topic_topology()
     ).read_text(encoding="utf-8")
 
     assert "Decision graph" in graph_source
-    assert "See why the current truth won." in graph_source
+    assert "Trace one represented decision." in graph_source
+    assert "current truth won" not in graph_source
     assert "CAUSAL_LABELS.has(edge.label)" in graph_source
     assert "Inter-hub edges" not in graph_source
     assert "hub:" not in graph_source
@@ -724,20 +725,98 @@ def test_dashboard_allows_only_explicit_origin_configuration(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_dashboard_advertises_only_the_configured_loopback_control_port(
+async def test_dashboard_advertises_control_only_from_the_trusted_home_origin(
     monkeypatch,
 ):
     from src.dashboard import server
 
     monkeypatch.setenv("ELEFANTE_DAEMON_PORT", "9876")
+    monkeypatch.setattr(server, "_read_snapshot", lambda: None)
 
-    assert await server.get_control_config() == {
+    trusted_request = SimpleNamespace(
+        url=SimpleNamespace(scheme="http", hostname="127.0.0.1", port=8000),
+    )
+    preview_request = SimpleNamespace(
+        url=SimpleNamespace(scheme="http", hostname="127.0.0.1", port=8001),
+    )
+
+    assert await server.get_control_config(trusted_request) == {
         "available": True,
+        "mode": "live_control",
         "daemon_host": "127.0.0.1",
         "daemon_port": 9876,
         "session_path": "/control/session",
     }
+    assert await server.get_control_config(preview_request) == {
+        "available": False,
+        "mode": "snapshot_only",
+        "reason_code": "CONTROL_ORIGIN_UNAVAILABLE",
+        "reason": "Live controls are intentionally unavailable from this dashboard origin.",
+    }
     assert "/api/control-config" in {route.path for route in server.app.routes}
+
+
+@pytest.mark.asyncio
+async def test_showcase_never_advertises_live_control_even_on_home_port(monkeypatch):
+    from src.dashboard import server
+
+    monkeypatch.setattr(
+        server,
+        "_read_snapshot",
+        lambda: {
+            "curation": {
+                "purpose": "Elefante Memory Intelligence dashboard showcase",
+                "deterministic": True,
+                "contains_user_data": False,
+            }
+        },
+    )
+    trusted_request = SimpleNamespace(
+        url=SimpleNamespace(scheme="http", hostname="localhost", port=8000),
+    )
+
+    assert await server.get_control_config(trusted_request) == {
+        "available": False,
+        "mode": "snapshot_only",
+        "reason_code": "SHOWCASE_SNAPSHOT_READ_ONLY",
+        "reason": "Live controls are intentionally unavailable for example data.",
+    }
+
+
+@pytest.mark.asyncio
+async def test_graph_exposes_only_bounded_showcase_context(monkeypatch):
+    from src.dashboard import server
+
+    monkeypatch.setattr(
+        server,
+        "_read_snapshot",
+        lambda: {
+            "generated_at": "2026-08-27T12:00:00+00:00",
+            "curation": {
+                "purpose": "Elefante Memory Intelligence dashboard showcase",
+                "deterministic": True,
+                "synthetic_behavioral_metadata": True,
+                "source_grounded_content": True,
+                "contains_user_data": False,
+                "disclaimer": "untrusted arbitrary copy must not cross the API",
+            },
+            "nodes": [],
+            "edges": [],
+            "stats": {"total_nodes": 0, "memories": 0, "entities": 0, "edges": 0},
+        },
+    )
+
+    result = await server.get_graph(limit=10)
+
+    assert result["snapshot_context"] == {
+        "mode": "showcase",
+        "label": "Example workspace",
+        "contains_user_data": False,
+        "source_grounded_content": True,
+        "synthetic_behavioral_metadata": True,
+        "disclaimer": "Deterministic example data; counts and activity do not describe customer behavior or product performance.",
+    }
+    assert "curation" not in result
 
 
 def test_dashboard_container_defaults_remain_host_loopback_only():

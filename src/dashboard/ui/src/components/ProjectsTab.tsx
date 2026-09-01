@@ -230,7 +230,9 @@ function ProjectRow({
 
 export function ProjectsTab() {
   const registry = useDashboardStore((state) => state.projectRegistry);
+  const snapshotContext = useDashboardStore((state) => state.snapshot?.snapshot_context);
   const controlEnabled = useDashboardStore((state) => state.controlEnabled);
+  const setActiveTab = useDashboardStore((state) => state.setActiveTab);
   const isManaging = useDashboardStore((state) => state.isProjectManaging);
   const projectError = useDashboardStore((state) => state.projectError);
   const projectReview = useDashboardStore((state) => state.projectReview);
@@ -349,12 +351,60 @@ export function ProjectsTab() {
     if (result.success) setDialog(null);
   };
 
+  if (snapshotContext?.mode === 'showcase') {
+    const exampleProject = projects[0];
+    return (
+      <div className="h-full overflow-auto px-5 py-5 md:px-8 md:py-7">
+        <div className="mx-auto max-w-[980px]">
+          <div className="text-[10px] text-cyan-400 elefante-mono uppercase tracking-[0.18em]">Project boundaries</div>
+          <h1 className="mt-2 text-3xl font-medium tracking-[-0.035em] text-slate-100">Keep task guidance inside the right work.</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-400">
+            Projects prevent unrelated work from sharing Recall context. Overall memory inspection does not require a project; task-scoped Remember, Recall, and Correct do.
+          </p>
+
+          <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_0.8fr]">
+            <div className="border border-slate-800 bg-slate-950/55 p-5">
+              <div className="flex items-start gap-3">
+                <FolderOpen size={19} className="mt-0.5 text-cyan-300" aria-hidden="true" />
+                <div>
+                  <div className="text-[9px] text-slate-600 elefante-mono uppercase tracking-[0.14em]">Example project boundary</div>
+                  <h2 className="mt-2 text-lg font-medium text-slate-100">{exampleProject?.name ?? 'Elefante showcase'}</h2>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                    Example scope only · strict isolation represented · cross-project sharing off.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="border border-slate-800 bg-slate-950/55 p-5">
+              <div className="flex items-center gap-2 text-emerald-300">
+                <ShieldCheck size={16} aria-hidden="true" />
+                <strong className="text-xs font-medium">Why this matters</strong>
+              </div>
+              <p className="mt-3 text-xs leading-relaxed text-slate-500">
+                The active project is the delivery boundary for Remember, Recall, and Correct. Registration does not scan or change project files.
+              </p>
+            </div>
+          </section>
+
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button type="button" onClick={() => setActiveTab('memories')} className="min-h-11 border border-slate-700 px-4 text-xs text-slate-200 hover:border-cyan-400/60">
+              Browse example memories
+            </button>
+            <button type="button" onClick={() => setActiveTab('recall')} className="min-h-11 border border-slate-700 px-4 text-xs text-slate-200 hover:border-cyan-400/60">
+              See Recall evidence model
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-auto px-5 py-5 md:px-8 md:py-6">
       <div className="mx-auto flex min-h-full max-w-[1200px] flex-col gap-5">
         <section className="flex flex-col gap-4 border-b elefante-hairline pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="text-[10px] text-cyan-400 elefante-mono uppercase tracking-[0.2em]">Home Projects / 04</div>
+            <div className="text-[10px] text-cyan-400 elefante-mono uppercase tracking-[0.2em]">Projects</div>
             <h1 className="mt-2 text-[clamp(2rem,4vw,3.2rem)] font-medium leading-[1.02] tracking-[-0.045em] text-slate-100">
               Where your knowledge belongs.
             </h1>

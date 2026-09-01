@@ -10,13 +10,18 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from src import __version__ as ELEFANTE_VERSION
-from src.utils.curation import assess_health_from_raw
-from src.utils.dashboard_serializer import (
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from src import __version__ as ELEFANTE_VERSION  # noqa: E402
+from src.utils.curation import assess_health_from_raw  # noqa: E402
+from src.utils.dashboard_serializer import (  # noqa: E402
     connection_counts_from_edges,
     health_summary_from_nodes,
     usage_summary_from_nodes,
@@ -251,7 +256,7 @@ def build_showcase_snapshot() -> dict[str, Any]:
                     "name": "Elefante showcase",
                     "root": "/showcase/elefante",
                     "active": True,
-                    "root_status": "unknown",
+                    "root_status": "missing",
                     "created_at": GENERATED_AT,
                     "updated_at": GENERATED_AT,
                 }

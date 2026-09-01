@@ -200,7 +200,7 @@ Elefante keeps user and developer documentation separate.
 - [Configure a host](docs/how-to/configure-ide.md)
 - [Tool reference](docs/reference/tools.md)
 - [Architecture](docs/reference/architecture.md)
-- [Dashboard](docs/how-to/view-dashboard.md)
+- [Dashboard](docs/how-to/view-dashboard.html)
 
 ### Developer documentation
 

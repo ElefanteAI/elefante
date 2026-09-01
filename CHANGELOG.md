@@ -88,6 +88,13 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Home refreshes its snapshot and clears stale memory selection immediately
+  after a verified restore. Remember no longer pauses unrelated same-project
+  prose on similarity alone: a non-duplicate, non-conflict candidate must share
+  at least two substantive concepts beyond the project name and generic memory
+  terms. The documented dashboard generator, verifier, and pipeline now run
+  directly from a source checkout; `--help` exits before opening configured
+  stores, and the synthetic showcase passes the maintained strict verifier.
 - Home Remember now persists the customer's bounded likely future question as
   a project-scoped Recall cue instead of discarding it after acceptance. Exact
   complete-question delivery still passes lifecycle, trust, source, conflict,

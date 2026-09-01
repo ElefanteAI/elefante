@@ -15,7 +15,7 @@ postmortems, and internal evaluation are maintained outside this user surface.
 | Install, upgrade, repair, or uninstall | [Install Elefante](how-to/install.md) |
 | Connect an IDE or CLI agent | [Configure a host](how-to/configure-ide.md) |
 | Verify the MCP service manually | [Run the MCP server](how-to/run-mcp-server.md) |
-| Inspect memory safely | [View the dashboard](how-to/view-dashboard.md) |
+| Understand and manage Elefante Home | [Complete dashboard guide](how-to/view-dashboard.html) |
 | Back up or restore local data | [Backup and rollback](how-to/rollback.md) |
 
 Released compatible adapters cover VS Code, Cursor, Kiro, Gemini CLI, Claude
@@ -32,7 +32,7 @@ adapter and contract tests; it does not mean vendor certification. See
 | [Memory schema](reference/memory-schema.md) | Classification, provenance, governance, lifecycle, conflicts, and local media attachments |
 | [Scoring](reference/scoring.md) | Behavioral vitality and five-signal retrieval scoring |
 | [Ingestion](reference/ingestion.md) | Search-before-write, validation, persistence, graph links, and ETL |
-| [Dashboard snapshot](reference/dashboard-snapshot.md) | Redacted, read-only browser data contract |
+| [Dashboard snapshot](reference/dashboard-snapshot.md) | Redacted snapshot plus bounded local Home-control contract |
 | [Token Intelligence](reference/token-intelligence.md) | Local response estimates and the boundary with provider-actual Session Intelligence |
 
 ## How-to: what to do
@@ -42,7 +42,7 @@ adapter and contract tests; it does not mean vendor certification. See
 | [Install Elefante](how-to/install.md) | Customer installation, checksum verification, health proof, repair, upgrade, and uninstall |
 | [Configure a host](how-to/configure-ide.md) | Supported, preview, and community host paths |
 | [Run the MCP server](how-to/run-mcp-server.md) | Manual startup and handshake verification |
-| [View the dashboard](how-to/view-dashboard.md) | Snapshot refresh, Retrieval Explanation, Signal Cards, and troubleshooting |
+| [Complete dashboard guide](how-to/view-dashboard.html) | Every Home state, view, score, control, receipt, safety boundary, and troubleshooting path |
 | [Restart](how-to/restart.md) | Graceful restart and lock-safe recovery |
 | [Backup and rollback](how-to/rollback.md) | Checksummed binary backup and restore |
 | [Docker](how-to/docker.md) | Loopback-safe container operation |
