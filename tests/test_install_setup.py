@@ -29,6 +29,19 @@ ROOT = Path(__file__).resolve().parents[1]
 TEST_SOURCE_COMMIT = "a" * 40
 
 
+def _ready_recall_inspection(*_args):
+    return {
+        "handshake_ready": True,
+        "tool_count": 18,
+        "tool_present": True,
+        "annotations_read_only": True,
+        "probe_status": "no_match",
+        "probe_read_only": True,
+        "recall_ready": True,
+        "diagnostic": None,
+    }
+
+
 def _write_customer_runtime_identity(repo: Path, home: Path, version: str) -> Path:
     """Create one internally consistent installed-customer identity fixture."""
     source_dir = repo / "src"
@@ -84,6 +97,29 @@ def test_installer_entrypoint_starts_without_product_dependencies():
 
     assert result.returncode == 0, result.stderr
     assert "--release-profile" in result.stdout
+    assert "ModuleNotFoundError" not in result.stderr
+
+
+def test_project_registry_preflight_imports_without_product_dependencies():
+    """Clean-install project planning must run before Pydantic is installed."""
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-S",
+            "-c",
+            (
+                "from src.core.project_registry import "
+                "ProjectRegistry, ProjectRegistryError; "
+                "assert ProjectRegistry and ProjectRegistryError"
+            ),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
     assert "ModuleNotFoundError" not in result.stderr
 
 
@@ -370,6 +406,63 @@ def test_install_state_tracker_writes_status_and_summary(tmp_path):
     assert "1|Environment Setup|COMPLETE|Using repository Python" in summary_contents
 
 
+def test_install_state_tracker_retries_and_records_reflection(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/install.py", "install_state_tracker_reflection_module")
+    logger = module.Logger(spinner_enabled=False)
+    status_file = tmp_path / "status.txt"
+    summary_file = tmp_path / "summary.txt"
+    log_file = tmp_path / "install.log"
+    tracker = module.InstallStateTracker(
+        root_dir=tmp_path,
+        logger=logger,
+        status_file=status_file,
+        summary_file=summary_file,
+        log_file=log_file,
+        require_postconditions=True,
+    )
+    outcomes = iter([False, True])
+    repairs = []
+
+    tracker.start_stage("1", "Environment Setup", "Preparing repository virtual environment")
+    assert tracker.complete_stage(
+        "1",
+        "Environment Setup",
+        "Using repository Python",
+        postcondition=lambda: next(outcomes),
+        retry=lambda: repairs.append("repair"),
+        max_attempts=2,
+    )
+    assert tracker.finish(True, next_action="restart your IDE")
+
+    status_contents = status_file.read_text(encoding="utf-8")
+    summary_contents = summary_file.read_text(encoding="utf-8")
+    assert repairs == ["repair"]
+    assert "completion_verified=true" in status_contents
+    assert "reflection_count=1" in status_contents
+    assert "|2|true|expected=Environment Setup postcondition passes" in summary_contents
+
+
+def test_install_state_tracker_rejects_unverified_completion(tmp_path):
+    module = _load_module(ROOT / "scripts/setup/install.py", "install_state_tracker_fail_closed_module")
+    logger = module.Logger(spinner_enabled=False)
+    tracker = module.InstallStateTracker(
+        root_dir=tmp_path,
+        logger=logger,
+        status_file=tmp_path / "status.txt",
+        summary_file=tmp_path / "summary.txt",
+        log_file=tmp_path / "install.log",
+        require_postconditions=True,
+    )
+
+    tracker.start_stage("1", "Environment Setup")
+    assert not tracker.complete_stage("1", "Environment Setup", max_attempts=1)
+    assert not tracker.finish(True)
+
+    status_contents = (tmp_path / "status.txt").read_text(encoding="utf-8")
+    assert "installer_state=failed" in status_contents
+    assert "completion_verified=false" in status_contents
+
+
 def test_install_state_tracker_renders_persisted_file_routing(tmp_path):
     module = _load_module(ROOT / "scripts/setup/install.py", "install_state_tracker_routing_module")
     logger = module.Logger(spinner_enabled=False)
@@ -466,8 +559,15 @@ def test_client_install_dependencies_use_the_runtime_only_lock(monkeypatch, tmp_
     ]
 
 
-def test_daemon_service_renders_user_scope_macos_and_linux_units(tmp_path):
+def test_daemon_service_renders_user_scope_macos_and_linux_units(monkeypatch, tmp_path):
     module = _load_module(ROOT / "scripts/lifecycle/daemon_service.py", "daemon_service_module")
+    monkeypatch.setattr(
+        module.shutil,
+        "which",
+        lambda command: "/Applications/ChatGPT.app/Contents/Resources/codex"
+        if command == "codex"
+        else None,
+    )
     mac_path = module.service_path(tmp_path, "Darwin")
     linux_path = module.service_path(tmp_path, "Linux")
 
@@ -475,6 +575,7 @@ def test_daemon_service_renders_user_scope_macos_and_linux_units(tmp_path):
     assert linux_path == tmp_path / ".config/systemd/user/ai.elefante.daemon.service"
     assert "src.mcp.daemon" in module.render_service(tmp_path, "Darwin")
     assert "KeepAlive" in module.render_service(tmp_path, "Darwin")
+    assert "/Applications/ChatGPT.app/Contents/Resources" in module.render_service(tmp_path, "Darwin")
     assert "src.mcp.daemon" in module.render_service(tmp_path, "Linux")
     assert "Restart=on-failure" in module.render_service(tmp_path, "Linux")
 
@@ -534,6 +635,42 @@ def test_daemon_service_status_preserves_the_distinction_between_missing_and_mod
         health_check=lambda: False,
     )
     assert modified["service_file_ownership"] == "modified_or_untracked"
+
+
+def test_daemon_service_stop_and_start_preserve_the_owned_linux_unit(monkeypatch, tmp_path):
+    module = _load_module(ROOT / "scripts/lifecycle/daemon_service.py", "daemon_pause_module")
+    home = tmp_path / "home"
+    path = module.service_path(home, "Linux")
+    path.parent.mkdir(parents=True)
+    path.write_text(module.render_service(home, "Linux"), encoding="utf-8")
+    module.record_emitted_file(path, "daemon-service", home)
+    commands = []
+    monkeypatch.setattr(module, "_run_optional", lambda command, apply: commands.append((command, apply)))
+    monkeypatch.setattr(module, "_run", lambda command, apply: commands.append((command, apply)))
+
+    assert module.stop(home, apply=True, system="Linux", health_check=lambda: False)
+    assert path.exists()
+    assert module.is_unchanged_emitted_file(path, home)
+    assert module.start(home, apply=True, system="Linux", health_check=lambda: True)
+
+    assert commands == [
+        (["systemctl", "--user", "stop", "ai.elefante.daemon"], True),
+        (["systemctl", "--user", "start", "ai.elefante.daemon"], True),
+    ]
+
+
+def test_daemon_service_stop_refuses_a_modified_unit(monkeypatch, tmp_path):
+    module = _load_module(ROOT / "scripts/lifecycle/daemon_service.py", "daemon_pause_refusal_module")
+    home = tmp_path / "home"
+    path = module.service_path(home, "Linux")
+    path.parent.mkdir(parents=True)
+    path.write_text("user managed service", encoding="utf-8")
+    commands = []
+    monkeypatch.setattr(module, "_run_optional", lambda command, apply: commands.append((command, apply)))
+
+    assert not module.stop(home, apply=True, system="Linux", health_check=lambda: True)
+    assert path.read_text(encoding="utf-8") == "user managed service"
+    assert commands == []
 
 
 def test_daemon_install_preserves_an_untracked_or_modified_service(monkeypatch, tmp_path):
@@ -622,7 +759,8 @@ def test_doctor_reports_ready_only_when_runtime_and_daemon_are_healthy(tmp_path)
     )
 
     home = tmp_path / "home"
-    _write_customer_runtime_identity(repo, home, "9.9.9")
+    manifest = _write_customer_runtime_identity(repo, home, "9.9.9")
+    _add_recall_routing_surface(manifest, home)
 
     report = module.build_report(
         repo_root=repo,
@@ -632,8 +770,9 @@ def test_doctor_reports_ready_only_when_runtime_and_daemon_are_healthy(tmp_path)
             "service_runtime": "active",
             "service_file_ownership": "owned",
         },
-        host_detector=lambda **_: set(),
-        surface_inspector=lambda _: set(),
+        host_detector=lambda **_: {"codex"},
+        surface_inspector=lambda _: {"codex"},
+        recall_inspector=_ready_recall_inspection,
     )
 
     assert report["ready"] is True
@@ -789,7 +928,8 @@ def test_client_doctor_uses_runtime_host_contract_without_developer_manifest(tmp
     (repo / ".venv" / "bin" / "python").write_text("", encoding="utf-8")
     (repo / "config.yaml").write_text("app_name: elefante\n", encoding="utf-8")
     home = tmp_path / "home"
-    _write_customer_runtime_identity(repo, home, "2.12.2")
+    manifest = _write_customer_runtime_identity(repo, home, "2.12.2")
+    _add_recall_routing_surface(manifest, home)
 
     report = module.build_report(
         repo_root=repo,
@@ -799,8 +939,9 @@ def test_client_doctor_uses_runtime_host_contract_without_developer_manifest(tmp
             "service_runtime": "active",
             "service_file_ownership": "owned",
         },
-        host_detector=lambda **_: set(),
-        surface_inspector=lambda _: set(),
+        host_detector=lambda **_: {"codex"},
+        surface_inspector=lambda _: {"codex"},
+        recall_inspector=_ready_recall_inspection,
     )
 
     assert report["ready"] is True
@@ -827,7 +968,11 @@ def test_doctor_rejects_legacy_customer_identity_without_provenance(tmp_path):
         json.dumps(
             {
                 "schema_version": 2,
-                "files": {},
+                "files": {
+                    str(home / ".codex" / "AGENTS.md"): {
+                        "surface": "codex-recall-routing"
+                    }
+                },
                 "commands": {},
                 "runtime": {
                     "app_root": str(repo),
@@ -848,8 +993,9 @@ def test_doctor_rejects_legacy_customer_identity_without_provenance(tmp_path):
             "service_runtime": "active",
             "service_file_ownership": "owned",
         },
-        host_detector=lambda **_: set(),
-        surface_inspector=lambda _: set(),
+        host_detector=lambda **_: {"codex"},
+        surface_inspector=lambda _: {"codex"},
+        recall_inspector=_ready_recall_inspection,
     )
 
     assert report["ready"] is True
@@ -972,7 +1118,7 @@ def test_doctor_cli_uses_readiness_for_its_exit_code_and_json_output(monkeypatch
     assert __import__("json").loads(capsys.readouterr().out)["diagnostics"] == ["daemon_unreachable"]
 
 
-def test_doctor_reports_detected_but_unconfigured_customer_hosts(tmp_path):
+def test_doctor_reports_uncovered_preview_without_failing_certified_lane(tmp_path):
     module = _load_module(ROOT / "scripts/lifecycle/doctor.py", "doctor_host_coverage_module")
     repo = tmp_path / "repo"
     (repo / ".venv" / "bin").mkdir(parents=True)
@@ -982,7 +1128,8 @@ def test_doctor_reports_detected_but_unconfigured_customer_hosts(tmp_path):
     matrix.mkdir(parents=True)
     (matrix / "ide-integration.yaml").write_text("surfaces: []\n", encoding="utf-8")
     home = tmp_path / "home"
-    _write_customer_runtime_identity(repo, home, "9.9.9")
+    manifest = _write_customer_runtime_identity(repo, home, "9.9.9")
+    _add_recall_routing_surface(manifest, home)
 
     report = module.build_report(
         repo_root=repo,
@@ -994,16 +1141,21 @@ def test_doctor_reports_detected_but_unconfigured_customer_hosts(tmp_path):
         },
         host_detector=lambda **_: {"codex", "cursor"},
         surface_inspector=lambda _: {"codex"},
+        recall_inspector=_ready_recall_inspection,
     )
 
     assert report["ready"] is True
-    assert report["customer_ready"] is False
+    assert report["customer_ready"] is True
     assert report["host_coverage"] == {
         "detected": ["codex", "cursor"],
         "verified": ["codex"],
         "uncovered": ["cursor"],
+        "certified_required": ["codex"],
+        "certified_verified": ["codex"],
+        "certified_uncovered": [],
+        "compatibility_uncovered": ["cursor"],
     }
-    assert report["customer_diagnostics"] == ["detected_hosts_unconfigured"]
+    assert report["customer_diagnostics"] == []
 
 
 def test_vscode_adapter_uses_transport_only_bridge(tmp_path):
@@ -2045,8 +2197,26 @@ def test_host_detection_and_customer_runtime_conflict_are_explicit(tmp_path):
         requested_hosts={"codex"},
         detected_hosts=detected,
     )
-    assert selected is None
-    assert required == detected
+    assert selected == {"codex"}
+    assert required == {"codex"}
+    assert install.uncovered_required_hosts(required, detected) == []
+    assert install.uncovered_required_hosts(required, detected - {"codex"}) == [
+        "codex"
+    ]
+    selected, required = install.installation_host_plan(
+        installation_scope="customer",
+        requested_hosts={"cursor"},
+        detected_hosts=detected,
+    )
+    assert selected == {"codex", "cursor"}
+    assert required == {"codex"}
+    selected, required = install.installation_host_plan(
+        installation_scope="customer",
+        requested_hosts=None,
+        detected_hosts=detected,
+    )
+    assert selected == {"codex"}
+    assert required == {"codex"}
     selected, required = install.installation_host_plan(
         installation_scope="developer",
         requested_hosts={"codex"},
@@ -2067,6 +2237,230 @@ def test_host_detection_and_customer_runtime_conflict_are_explicit(tmp_path):
             "version": "9.9.9",
         },
     )
+
+
+def test_clean_customer_project_setup_is_strict_idempotent_and_rollback_safe(
+    tmp_path,
+):
+    install = _load_module(
+        ROOT / "scripts/setup/install.py",
+        "install_project_setup_module",
+    )
+    data_dir = tmp_path / "data"
+    project_root = tmp_path / "company" / "alpha"
+    project_root.mkdir(parents=True)
+
+    with pytest.raises(ValueError, match="at least one project"):
+        install.plan_project_setup(
+            data_dir=data_dir,
+            installation_scope="customer",
+            existing_runtime=None,
+            project_values=None,
+            requested_mode="auto",
+        )
+
+    plan = install.plan_project_setup(
+        data_dir=data_dir,
+        installation_scope="customer",
+        existing_runtime=None,
+        project_values=[f"Alpha={project_root}"],
+        requested_mode="auto",
+    )
+    registry_path = Path(plan["registry_path"])
+    strict_marker_path = Path(plan["strict_marker_path"])
+    snapshot_path = data_dir / "dashboard_snapshot.json"
+    rollback = install.ProjectSetupRollback(
+        [registry_path, strict_marker_path, snapshot_path]
+    )
+
+    first = install.apply_project_setup(plan)
+    second = install.apply_project_setup(plan)
+    snapshot_path.write_text('{"generated":"during-install"}', encoding="utf-8")
+
+    assert first["mode"] == "strict"
+    assert len(first["projects"]) == 1
+    assert second["projects"] == first["projects"]
+    assert install.verify_project_setup(plan) is True
+    assert install.installation_acceptance_workspace(plan) == str(
+        project_root.resolve()
+    )
+
+    rollback.rollback()
+    assert not registry_path.exists()
+    assert not strict_marker_path.exists()
+    assert not snapshot_path.exists()
+
+
+def test_first_run_receipt_is_private_content_free_and_exact(tmp_path):
+    install = _load_module(
+        ROOT / "scripts/setup/install.py",
+        "install_first_run_receipt_module",
+    )
+    receipt_path = tmp_path / install.FIRST_RUN_RECEIPT_FILE_NAME
+    receipt = {
+        "schema_version": 1,
+        "operation": "first_run_acceptance",
+        "status": "VERIFIED_COMPLETE",
+        "finished_at": "2026-08-30T14:00:00+00:00",
+        "checks": [
+            {
+                "name": name,
+                "passed": True,
+                "code": f"{name.upper()}_VERIFIED",
+            }
+            for name in (
+                "project_isolation",
+                "disposable_recall",
+                "acceptance_cleanup",
+                "initial_backup",
+            )
+        ],
+        "acceptance_operation_id": "11111111-1111-4111-8111-111111111111",
+        "backup_operation_id": "22222222-2222-4222-8222-222222222222",
+        "initial_backup": {
+            "archive_name": "elefante_data_backup_20260830.zip",
+            "archive_sha256": "a" * 64,
+        },
+        "memory_content_included": False,
+        "project_path_included": False,
+        "next_action": "open_elefante_home",
+    }
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    os.chmod(receipt_path, 0o600)
+
+    assert install.verify_first_run_receipt(tmp_path) is True
+
+    receipt["workspace"] = "/private/tmp/customer-project"
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    os.chmod(receipt_path, 0o600)
+    assert install.verify_first_run_receipt(tmp_path) is False
+
+
+def test_first_run_runner_passes_workspace_only_in_private_environment(
+    tmp_path,
+    monkeypatch,
+):
+    install = _load_module(
+        ROOT / "scripts/setup/install.py",
+        "install_first_run_runner_module",
+    )
+    calls = []
+
+    def run_command(command, **kwargs):
+        calls.append((command, kwargs))
+        return True
+
+    monkeypatch.setattr(install, "run_command", run_command)
+    workspace = tmp_path / "customer-project"
+    workspace.mkdir()
+    data_dir = tmp_path / "data"
+
+    assert install.run_first_run_acceptance(
+        tmp_path,
+        "/usr/bin/python3",
+        data_dir=data_dir,
+        workspace=str(workspace),
+    ) is True
+    command, kwargs = calls[0]
+    assert command == [
+        "/usr/bin/python3",
+        str(tmp_path / "scripts/verify/verify_mcp_handshake.py"),
+        "--installation-acceptance",
+    ]
+    assert str(workspace) not in command
+    assert kwargs["env"]["ELEFANTE_ACCEPTANCE_WORKSPACE"] == str(workspace)
+    assert kwargs["env"]["ELEFANTE_DATA_DIR"] == str(data_dir.resolve())
+
+
+def test_upgrade_project_setup_preserves_compatibility_for_home_review(tmp_path):
+    install = _load_module(
+        ROOT / "scripts/setup/install.py",
+        "install_project_upgrade_module",
+    )
+    data_dir = tmp_path / "data"
+    project_root = tmp_path / "company" / "alpha"
+    project_root.mkdir(parents=True)
+    existing_runtime = {
+        "app_root": str(tmp_path / "app"),
+        "data_root": str(data_dir),
+        "scope": "customer",
+        "version": "2.13.0",
+    }
+
+    plan = install.plan_project_setup(
+        data_dir=data_dir,
+        installation_scope="customer",
+        existing_runtime=existing_runtime,
+        project_values=None,
+        requested_mode="auto",
+    )
+
+    assert plan["configure"] is False
+    assert plan["review_required"] is True
+    assert not Path(plan["registry_path"]).exists()
+    with pytest.raises(ValueError, match="reviewed in Elefante Home"):
+        install.plan_project_setup(
+            data_dir=data_dir,
+            installation_scope="customer",
+            existing_runtime=existing_runtime,
+            project_values=[f"Alpha={project_root}"],
+            requested_mode="auto",
+        )
+
+
+def test_project_setup_rollback_restores_exact_existing_bytes_and_mode(tmp_path):
+    install = _load_module(
+        ROOT / "scripts/setup/install.py",
+        "install_project_rollback_module",
+    )
+    registry_path = tmp_path / "data" / "projects.json"
+    snapshot_path = tmp_path / "data" / "dashboard_snapshot.json"
+    registry_path.parent.mkdir(parents=True)
+    registry_path.write_bytes(b'{"original":true}\n')
+    snapshot_path.write_bytes(b'{"snapshot":"original"}\n')
+    os.chmod(registry_path, 0o640)
+    os.chmod(snapshot_path, 0o600)
+    rollback = install.ProjectSetupRollback([registry_path, snapshot_path])
+
+    registry_path.write_bytes(b'{"changed":true}')
+    snapshot_path.unlink()
+    rollback.rollback()
+
+    assert registry_path.read_bytes() == b'{"original":true}\n'
+    assert snapshot_path.read_bytes() == b'{"snapshot":"original"}\n'
+    assert registry_path.stat().st_mode & 0o777 == 0o640
+    assert snapshot_path.stat().st_mode & 0o777 == 0o600
+
+
+def test_installer_snapshot_verification_requires_project_registry_contract(tmp_path):
+    install = _load_module(
+        ROOT / "scripts/setup/install.py",
+        "install_dashboard_project_contract_module",
+    )
+    snapshot_path = tmp_path / "dashboard_snapshot.json"
+    snapshot_path.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-08-29T12:00:00+00:00",
+                "stats": {},
+                "nodes": [],
+                "edges": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert install.verify_dashboard_snapshot(tmp_path) is False
+
+    payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    payload["project_registry"] = {
+        "status": "ready",
+        "schema_version": 1,
+        "mode": "compatibility",
+        "revision": 0,
+        "projects": [],
+    }
+    snapshot_path.write_text(json.dumps(payload), encoding="utf-8")
+    assert install.verify_dashboard_snapshot(tmp_path) is True
 
 
 def test_uninstall_removes_only_owned_json_entry_from_shared_config(tmp_path):
@@ -2144,28 +2538,34 @@ def test_daemon_uninstall_preserves_modified_service_without_stopping_it(monkeyp
     assert path.read_text(encoding="utf-8") == "user-managed service"
 
 
-@pytest.mark.asyncio
-async def test_inject_seed_memory_returns_false_when_guard_blocks(monkeypatch):
-    module = _load_module(ROOT / "scripts/setup/init_databases.py", "init_databases_test_module")
+def test_daemon_uninstall_removes_owned_launchd_unit_after_job_already_stopped(
+    monkeypatch,
+    tmp_path,
+):
+    module = _load_module(
+        ROOT / "scripts/lifecycle/daemon_service.py",
+        "daemon_uninstall_stopped_launchd_module",
+    )
+    home = tmp_path / "home"
+    path = module.service_path(home, "Darwin")
+    path.parent.mkdir(parents=True)
+    path.write_text(module.render_service(home, "Darwin"), encoding="utf-8")
+    module.record_emitted_file(path, "daemon-service", home)
+    commands = []
+    monkeypatch.setattr(module.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(
+        module,
+        "_run_optional",
+        lambda command, apply: commands.append((command, apply)),
+    )
 
-    class FakeOrchestrator:
-        _last_rejection_reason = "Test-memory guard blocked this submission"
+    module.uninstall(home, apply=True)
 
-        async def search_memories(self, query):
-            assert query == "Indigo-Echo"
-            return []
-
-        async def add_memory(self, **kwargs):
-            assert kwargs["metadata"]["category"] == "system-test"
-            return None
-
-    import src.core.orchestrator as orchestrator_module
-
-    monkeypatch.setattr(orchestrator_module, "get_orchestrator", lambda: FakeOrchestrator())
-
-    result = await module.inject_seed_memory()
-
-    assert result is False
+    assert commands == [
+        (["launchctl", "bootout", f"gui/{module.os.getuid()}", str(path)], True)
+    ]
+    assert not path.exists()
+    assert not module.is_unchanged_emitted_file(path, home)
 
 
 @pytest.mark.asyncio
@@ -2195,54 +2595,9 @@ async def test_database_verification_uses_configured_storage_paths(monkeypatch, 
     assert "chroma" not in paths_event["vector_dir"].lower()
 
 
-@pytest.mark.asyncio
-async def test_inject_seed_memory_payload_does_not_trip_test_memory_guard(monkeypatch):
-    """BUG-021 regression: the installer's own seed injection must not match
-    the test-memory guard. The guard exists to block E2E/persistence test
-    artifacts from polluting the production graph. If the installer's seed
-    tags or category match the guard, every fresh install fails at stage 3
-    (Database Initialization) — which is exactly what shipped before v2.9.1.
-    """
-    module = _load_module(ROOT / "scripts/setup/init_databases.py", "init_databases_seed_payload_module")
+def test_database_initializer_does_not_create_customer_memories() -> None:
+    source = (ROOT / "scripts/setup/init_databases.py").read_text(encoding="utf-8")
 
-    captured: dict = {}
-
-    class CapturingOrchestrator:
-        _last_rejection_reason = None
-
-        async def search_memories(self, query):
-            return []
-
-        async def add_memory(self, **kwargs):
-            captured.update(kwargs)
-
-            class _StubMemory:
-                id = "stub-seed-id"
-
-            return _StubMemory()
-
-    import src.core.orchestrator as orchestrator_module
-
-    monkeypatch.setattr(orchestrator_module, "get_orchestrator", lambda: CapturingOrchestrator())
-
-    result = await module.inject_seed_memory()
-    assert result is True, "Seed injection must succeed when the orchestrator accepts the payload"
-
-    tags = {t.strip().lower() for t in captured.get("tags", []) if isinstance(t, str) and t.strip()}
-    metadata = captured.get("metadata") or {}
-    category = str(metadata.get("category") or "").strip().lower()
-    namespace = str(metadata.get("namespace") or "").strip().lower()
-    content = (captured.get("content") or "").strip().lower()
-
-    blocking_tags = tags & {"test", "e2e"}
-    assert not blocking_tags, (
-        f"Seed tags must not include guard-blocked tags; found {sorted(blocking_tags)}. "
-        f"Rename or remove these before shipping."
-    )
-    assert not any(t.startswith("hybrid_test_") for t in tags), "Seed tags must not start with 'hybrid_test_'"
-    assert namespace != "test", "Seed metadata.namespace must not equal 'test'"
-    assert category != "test", "Seed metadata.category must not equal 'test'"
-    assert not category.startswith("hybrid_test_"), "Seed metadata.category must not start with 'hybrid_test_'"
-    assert not content.startswith("elefante e2e test memory"), "Seed content must not open with 'elefante e2e test memory'"
-    assert not content.startswith("hybrid search test memory"), "Seed content must not open with 'hybrid search test memory'"
-    assert " test memory" not in content, "Seed content must not contain ' test memory'"
+    assert "inject_seed_memory" not in source
+    assert "Indigo-Echo" not in source
+    assert "add_memory(" not in source

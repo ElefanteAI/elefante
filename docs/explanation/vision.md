@@ -1,6 +1,6 @@
 # Elefante Vision
 
-> Product explanation · Current published version: v2.13.0
+> Product explanation · Current published version: v2.14.0
 
 ## The Thesis
 
@@ -53,8 +53,10 @@ to a connected AI client is governed by that provider's data policy.
 
 The dashboard reads redacted local snapshots. It explains memory freshness,
 lifecycle state, sources, retrieval evidence, optional Session Intelligence
-Signal Cards, and explicit decision relationships
-without giving the browser authority to query or mutate the live store.
+Signal Cards, and explicit decision relationships. Short-lived local Home
+sessions can invoke only named, verified project, correction, and recovery
+operations; the browser receives no arbitrary store, query, path, or shell
+authority.
 
 ## The Four Laws
 

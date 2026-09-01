@@ -6,11 +6,149 @@
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color-scheme: dark;
-  background-color: #070604;
-  color: #eee4d3;
+  color-scheme: light;
+  --color-background: 255 253 249;
+  --color-surface: 249 246 241;
+  --color-primary: 145 77 31;
+  --color-secondary: 105 86 67;
+  --color-accent: 160 87 35;
+  --color-text: 31 26 21;
+  --color-muted: 92 75 58;
+  --color-slate-50: 20 17 13;
+  --color-slate-100: 31 26 21;
+  --color-slate-200: 48 40 32;
+  --color-slate-300: 68 56 44;
+  --color-slate-400: 82 67 52;
+  --color-slate-500: 92 75 58;
+  --color-slate-600: 105 86 67;
+  --color-slate-700: 207 193 174;
+  --color-slate-800: 237 230 220;
+  --color-slate-900: 249 246 241;
+  --color-slate-950: 255 253 249;
+  --color-cyan-100: 105 54 23;
+  --color-cyan-200: 120 64 27;
+  --color-cyan-300: 133 70 29;
+  --color-cyan-400: 145 77 31;
+  --color-cyan-500: 160 87 35;
+  --color-cyan-600: 125 62 21;
+  --color-cyan-950: 245 232 217;
+  --color-emerald-100: 44 82 54;
+  --color-emerald-200: 49 91 61;
+  --color-emerald-300: 55 101 68;
+  --color-emerald-400: 61 111 75;
+  --color-emerald-500: 67 121 82;
+  --color-emerald-600: 48 91 61;
+  --color-emerald-900: 219 235 222;
+  --color-emerald-950: 236 245 238;
+  --color-amber-100: 112 60 23;
+  --color-amber-200: 124 66 25;
+  --color-amber-300: 137 73 28;
+  --color-amber-400: 150 80 31;
+  --color-amber-500: 163 87 34;
+  --color-amber-600: 126 63 22;
+  --color-amber-950: 247 234 216;
+  --color-red-100: 116 45 36;
+  --color-red-200: 128 49 40;
+  --color-red-300: 141 55 45;
+  --color-red-400: 154 60 49;
+  --color-red-500: 167 65 53;
+  --color-red-600: 128 46 38;
+  --color-red-900: 242 222 218;
+  --color-red-950: 250 239 236;
+  --color-blue-400: 124 65 27;
+  --color-blue-500: 145 77 31;
+  --color-blue-600: 112 54 20;
+  --color-violet-200: 94 59 29;
+  --color-violet-300: 102 66 33;
+  --color-violet-400: 108 72 38;
+  --color-violet-500: 121 80 42;
+  --color-violet-600: 94 59 29;
+  --shell-gradient-a: rgba(184, 113, 57, 0.1);
+  --shell-gradient-b: rgba(131, 163, 138, 0.08);
+  --shell-start: #fffdf9;
+  --shell-mid: #f9f5ef;
+  --shell-end: #f4eee6;
+  --binary-ink: rgba(145, 77, 31, 0.05);
+  --panel-background: rgba(255, 253, 249, 0.92);
+  --hairline: rgba(133, 93, 56, 0.25);
+  --panel-shadow: 0 22px 60px rgba(74, 51, 32, 0.1);
+  --scrollbar: #cfc1ae;
+  --scrollbar-hover: #a89176;
+  background-color: rgb(var(--color-background));
+  color: rgb(var(--color-text));
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-background: 7 6 4;
+  --color-surface: 20 17 13;
+  --color-primary: 200 137 77;
+  --color-secondary: 111 103 91;
+  --color-accent: 226 176 110;
+  --color-text: 238 228 211;
+  --color-muted: 168 158 142;
+  --color-slate-50: 244 236 223;
+  --color-slate-100: 238 228 211;
+  --color-slate-200: 216 205 189;
+  --color-slate-300: 192 181 165;
+  --color-slate-400: 168 158 142;
+  --color-slate-500: 129 120 107;
+  --color-slate-600: 111 103 91;
+  --color-slate-700: 61 56 47;
+  --color-slate-800: 26 23 18;
+  --color-slate-900: 13 11 8;
+  --color-slate-950: 7 6 4;
+  --color-cyan-100: 252 229 194;
+  --color-cyan-200: 246 211 164;
+  --color-cyan-300: 239 193 132;
+  --color-cyan-400: 226 176 110;
+  --color-cyan-500: 200 137 77;
+  --color-cyan-600: 157 102 55;
+  --color-cyan-950: 43 28 15;
+  --color-emerald-100: 202 221 205;
+  --color-emerald-200: 184 207 188;
+  --color-emerald-300: 167 192 171;
+  --color-emerald-400: 131 163 138;
+  --color-emerald-500: 110 141 118;
+  --color-emerald-600: 86 112 93;
+  --color-emerald-900: 27 53 34;
+  --color-emerald-950: 15 34 22;
+  --color-amber-100: 252 229 194;
+  --color-amber-200: 247 211 159;
+  --color-amber-300: 239 193 132;
+  --color-amber-400: 226 176 110;
+  --color-amber-500: 200 137 77;
+  --color-amber-600: 157 102 55;
+  --color-amber-950: 48 30 15;
+  --color-red-100: 236 201 194;
+  --color-red-200: 226 179 169;
+  --color-red-300: 213 148 134;
+  --color-red-400: 195 123 109;
+  --color-red-500: 184 111 96;
+  --color-red-600: 142 81 71;
+  --color-red-900: 58 31 26;
+  --color-red-950: 37 19 16;
+  --color-blue-400: 215 161 94;
+  --color-blue-500: 200 137 77;
+  --color-blue-600: 157 102 55;
+  --color-violet-200: 226 207 174;
+  --color-violet-300: 214 188 145;
+  --color-violet-400: 200 167 115;
+  --color-violet-500: 173 133 79;
+  --color-violet-600: 132 99 56;
+  --shell-gradient-a: rgba(184, 113, 57, 0.11);
+  --shell-gradient-b: rgba(131, 163, 138, 0.055);
+  --shell-start: #080704;
+  --shell-mid: #0b0906;
+  --shell-end: #070604;
+  --binary-ink: rgba(196, 137, 77, 0.035);
+  --panel-background: rgba(16, 13, 9, 0.88);
+  --hairline: rgba(210, 163, 103, 0.2);
+  --panel-shadow: 0 28px 80px rgba(0, 0, 0, 0.22);
+  --scrollbar: #3d382f;
+  --scrollbar-hover: #6f675b;
 }
 
 body {
@@ -18,9 +156,9 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background:
-    radial-gradient(circle at 78% 14%, rgba(184, 113, 57, 0.11), transparent 32%),
-    radial-gradient(circle at 18% 92%, rgba(131, 163, 138, 0.055), transparent 28%),
-    linear-gradient(135deg, #080704 0%, #0b0906 52%, #070604 100%);
+    radial-gradient(circle at 78% 14%, var(--shell-gradient-a), transparent 32%),
+    radial-gradient(circle at 18% 92%, var(--shell-gradient-b), transparent 28%),
+    linear-gradient(135deg, var(--shell-start) 0%, var(--shell-mid) 52%, var(--shell-end) 100%);
 }
 
 button,
@@ -34,7 +172,7 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid #e2b06e;
+  outline: 2px solid rgb(var(--color-accent));
   outline-offset: 2px;
 }
 
@@ -42,9 +180,9 @@ textarea:focus-visible {
   position: relative;
   isolation: isolate;
   background:
-    radial-gradient(circle at 78% 14%, rgba(184, 113, 57, 0.11), transparent 32%),
-    radial-gradient(circle at 18% 92%, rgba(131, 163, 138, 0.055), transparent 28%),
-    linear-gradient(135deg, #080704 0%, #0b0906 52%, #070604 100%);
+    radial-gradient(circle at 78% 14%, var(--shell-gradient-a), transparent 32%),
+    radial-gradient(circle at 18% 92%, var(--shell-gradient-b), transparent 28%),
+    linear-gradient(135deg, var(--shell-start) 0%, var(--shell-mid) 52%, var(--shell-end) 100%);
 }
 
 .elefante-shell::before {
@@ -53,7 +191,7 @@ textarea:focus-visible {
   inset: 0;
   z-index: -1;
   overflow: hidden;
-  color: rgba(196, 137, 77, 0.035);
+  color: var(--binary-ink);
   font: 11px/42px "SF Mono", Menlo, Consolas, monospace;
   letter-spacing: 28px;
   word-break: break-all;
@@ -67,13 +205,13 @@ textarea:focus-visible {
 }
 
 .elefante-panel {
-  border: 1px solid rgba(210, 163, 103, 0.2);
-  background: rgba(16, 13, 9, 0.88);
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--hairline);
+  background: var(--panel-background);
+  box-shadow: var(--panel-shadow);
 }
 
 .elefante-hairline {
-  border-color: rgba(210, 163, 103, 0.2);
+  border-color: var(--hairline);
 }
 
 .elefante-mark {
@@ -86,7 +224,7 @@ textarea:focus-visible {
 .elefante-emblem {
   position: absolute;
   inset: 0;
-  background: #c8894d;
+  background: rgb(var(--color-primary));
   -webkit-mask: url("/elefante-emblem.png") center / contain no-repeat;
   mask: url("/elefante-emblem.png") center / contain no-repeat;
   transition: background-color 280ms ease;
@@ -94,7 +232,7 @@ textarea:focus-visible {
 
 .elefante-emblem-network {
   clip-path: polygon(0 0, 36% 0, 36% 40%, 0 40%);
-  background: #e2b06e;
+  background: rgb(var(--color-accent));
   opacity: 0;
   transform: translate3d(-0.4px, 0.4px, 0);
   transition: opacity 420ms ease, transform 900ms cubic-bezier(0.2, 0.75, 0.25, 1);
@@ -107,8 +245,8 @@ textarea:focus-visible {
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #3d382f; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #6f675b; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
 
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -55,6 +55,7 @@ CLIENT_RUNTIME_SCRIPTS = (
     Path("scripts/pipeline/session_intelligence.py"),
     Path("scripts/pipeline/team_sync.py"),
     Path("scripts/pipeline/update_dashboard_data.py"),
+    Path("scripts/verify/verify_dashboard_snapshot.py"),
     Path("scripts/verify/verify_health.py"),
     Path("scripts/verify/verify_mcp_handshake.py"),
 )
@@ -130,7 +131,7 @@ def source_identity(root_dir: Path) -> dict[str, object]:
         ).stdout.strip()
         dirty = bool(
             subprocess.run(
-                ["git", "status", "--porcelain", "--untracked-files=no"],
+                ["git", "status", "--porcelain", "--untracked-files=all"],
                 cwd=root_dir,
                 capture_output=True,
                 text=True,
@@ -179,9 +180,14 @@ def build_manifest(
     if publication_status not in PUBLICATION_STATUSES:
         raise ValueError(f"Unsupported publication status: {publication_status}")
     entrypoints = {
-        "Linux": ["install.sh"],
-        "macOS": ["Install Elefante.command", "install.sh"],
-        "Windows": ["Install Elefante.bat"],
+        "Linux": ["install.sh", "uninstall.sh"],
+        "macOS": [
+            "Install Elefante.command",
+            "Uninstall Elefante.command",
+            "install.sh",
+            "uninstall.sh",
+        ],
+        "Windows": ["Install Elefante.bat", "Uninstall Elefante.bat"],
     }
     default_install_roots = {
         "Linux": "~/.elefante/app/current",
@@ -267,6 +273,23 @@ exec /bin/bash "$ROOT_DIR/install.sh" "$@"
 """
 
 
+def build_unix_uninstall_launcher() -> str:
+    return """#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec /bin/bash "$ROOT_DIR/install.sh" --uninstall-interactive "$@"
+"""
+
+
+def build_windows_uninstall_launcher() -> str:
+    return (
+        '@echo off\r\n'
+        'call "%~dp0Install Elefante.bat" --uninstall-interactive %*\r\n'
+        'exit /b %ERRORLEVEL%\r\n'
+    )
+
+
 def build_windows_wrapper() -> str:
     wrapper = r"""@echo off
 setlocal EnableDelayedExpansion
@@ -305,7 +328,8 @@ def build_start_here(
         "macOS": (
             '1. Double-click "Install Elefante.command".\n'
             "2. Keep the Terminal window open until installation completes.\n"
-            "3. Restart your detected AI hosts.\n\n"
+            "3. Restart your detected AI hosts.\n"
+            'To remove the app later while preserving memories, double-click "Uninstall Elefante.command".\n\n'
             "If macOS cannot verify the developer, Control-click the installer,\n"
             "choose Open, then choose Open again. The package is not yet notarized.\n"
         ),
@@ -313,11 +337,13 @@ def build_start_here(
             '1. Double-click "Install Elefante.bat".\n'
             "2. Keep the installer window open until installation completes.\n"
             "3. Restart your detected AI hosts.\n"
+            'To remove the app later while preserving memories, double-click "Uninstall Elefante.bat".\n'
         ),
         "Linux": (
             "1. Open a terminal in this folder.\n"
             "2. Run: chmod +x install.sh && ./install.sh\n"
             "3. Restart your detected AI hosts.\n"
+            "To remove the app later while preserving memories, run: chmod +x uninstall.sh && ./uninstall.sh\n"
         ),
     }
     status_line = (
@@ -419,6 +445,12 @@ def build_release_client(
                 build_windows_wrapper(),
                 timestamp=timestamp,
             )
+            write_text_entry(
+                archive,
+                f"{bundle_dir}/Uninstall Elefante.bat",
+                build_windows_uninstall_launcher(),
+                timestamp=timestamp,
+            )
         else:
             write_text_entry(
                 archive,
@@ -427,11 +459,25 @@ def build_release_client(
                 timestamp=timestamp,
                 executable=True,
             )
+            write_text_entry(
+                archive,
+                f"{bundle_dir}/uninstall.sh",
+                build_unix_uninstall_launcher(),
+                timestamp=timestamp,
+                executable=True,
+            )
             if platform_name == "macOS":
                 write_text_entry(
                     archive,
                     f"{bundle_dir}/Install Elefante.command",
                     build_macos_launcher(),
+                    timestamp=timestamp,
+                    executable=True,
+                )
+                write_text_entry(
+                    archive,
+                    f"{bundle_dir}/Uninstall Elefante.command",
+                    build_unix_uninstall_launcher(),
                     timestamp=timestamp,
                     executable=True,
                 )

@@ -49,6 +49,16 @@ def _recall_call_response(status: str, *, read_only: bool = True):
     }
 
 
+def _tool_response(payload: dict, *, request_id: int) -> dict:
+    return {
+        "jsonrpc": "2.0",
+        "id": request_id,
+        "result": {
+            "content": [{"type": "text", "text": json.dumps(payload)}]
+        },
+    }
+
+
 def test_recall_capability_summary_accepts_safe_abstention_without_context_leak():
     summary = verify_mcp_handshake.summarize_recall_capability(
         _recall_tool_response(),
@@ -92,3 +102,103 @@ def test_recall_capability_summary_rejects_unavailable_probe():
     assert summary["probe_status"] == "unavailable"
     assert summary["diagnostic"] == "recall_probe_unavailable"
     assert summary["recall_ready"] is False
+
+
+def test_first_run_receipt_proves_disposable_recall_cleanup_and_backup() -> None:
+    acceptance = _tool_response(
+        {
+            "success": True,
+            "action": "installation_acceptance",
+            "status": "VERIFIED_COMPLETE",
+            "recovery_status": "VERIFIED_COMPLETE",
+            "receipt": {
+                "operation_id": "11111111-1111-4111-8111-111111111111",
+                "memory_content_included": False,
+                "project_path_included": False,
+                "checks": [
+                    {"name": "disposable_record_write", "passed": True},
+                    {"name": "project_scoped_recall", "passed": True},
+                    {"name": "disposable_record_cleanup", "passed": True},
+                ],
+            },
+        },
+        request_id=3,
+    )
+    plan = _tool_response(
+        {
+            "success": True,
+            "plan": {
+                "action": "backup",
+                "applicable": True,
+                "layout_sha256": "a" * 64,
+            },
+        },
+        request_id=4,
+    )
+    backup = _tool_response(
+        {
+            "success": True,
+            "status": "VERIFIED_COMPLETE",
+            "recovery_status": "VERIFIED_COMPLETE",
+            "receipt": {
+                "operation_id": "22222222-2222-4222-8222-222222222222",
+                "status": "VERIFIED_COMPLETE",
+                "archive_name": "elefante_data_backup_20260830.zip",
+                "archive_sha256": "b" * 64,
+                "checks": [
+                    {"name": "archive_readback", "passed": True},
+                    {"name": "sqlite_integrity", "passed": True},
+                ],
+            },
+        },
+        request_id=5,
+    )
+
+    receipt = verify_mcp_handshake.summarize_installation_acceptance(
+        acceptance,
+        plan,
+        backup,
+        now="2026-08-30T14:00:00+00:00",
+    )
+
+    assert receipt["status"] == "VERIFIED_COMPLETE"
+    assert [check["name"] for check in receipt["checks"]] == [
+        "project_isolation",
+        "disposable_recall",
+        "acceptance_cleanup",
+        "initial_backup",
+    ]
+    assert receipt["memory_content_included"] is False
+    assert receipt["project_path_included"] is False
+    serialized = json.dumps(receipt, sort_keys=True)
+    assert "/private/" not in serialized
+    assert "installation code" not in serialized
+
+
+def test_first_run_receipt_rejects_unverified_cleanup() -> None:
+    acceptance = _tool_response(
+        {
+            "success": False,
+            "status": "NEEDS_HUMAN",
+            "recovery_status": "NEEDS_HUMAN",
+            "receipt": {
+                "memory_content_included": False,
+                "project_path_included": False,
+                "checks": [
+                    {"name": "disposable_record_cleanup", "passed": False}
+                ],
+            },
+        },
+        request_id=3,
+    )
+
+    try:
+        verify_mcp_handshake.summarize_installation_acceptance(
+            acceptance,
+            _tool_response({}, request_id=4),
+            _tool_response({}, request_id=5),
+        )
+    except ValueError as error:
+        assert str(error) == "Disposable project Recall was not verified"
+    else:
+        raise AssertionError("unverified cleanup must fail closed")

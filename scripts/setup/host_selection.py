@@ -24,6 +24,14 @@ SUPPORTED_HOSTS = (
     "continue",
 )
 
+# The first commercial lane is intentionally narrow. Other adapters remain
+# available as compatibility previews, but they do not define customer
+# readiness or make the certified installation fail.
+CERTIFIED_CUSTOMER_HOSTS = frozenset({"codex"})
+CUSTOMER_COMPATIBILITY_HOSTS = frozenset(SUPPORTED_HOSTS).difference(
+    CERTIFIED_CUSTOMER_HOSTS
+)
+
 HOST_LABELS = {
     "vscode-copilot": "VS Code + Copilot",
     "cursor": "Cursor",
@@ -43,6 +51,30 @@ JSON_HOSTS = frozenset({"cursor", "kiro", "gemini"})
 CLI_HOSTS = frozenset({"claude-code", "codex", "openclaw"})
 ADDITIONAL_HOSTS = frozenset({"zed", "continue"})
 MANIFEST_SURFACE_ALIASES = {"ibm-bob": "bob"}
+
+# Antigravity and VS Code/Bob use an explicit host-side approval list. Keep it
+# source-checked against the default customer MCP inventory; Task Intelligence
+# is intentionally absent because it is developer-only and default-off.
+CUSTOMER_ALWAYS_ALLOW_TOOLS = (
+    "elefante-Memory",
+    "elefante-Recall",
+    "elefante-Recover",
+    "elefante-GraphConnect",
+    "elefante-GraphQuery",
+    "elefante-ContextGet",
+    "elefante-SessionsList",
+    "elefante-SystemStatusGet",
+    "elefante-DashboardOpen",
+    "elefante-System",
+    "elefante-TaskCreate",
+    "elefante-TaskUpdate",
+    "elefante-TaskGraph",
+    "elefante-ETLProcess",
+    "elefante-ETLClassify",
+    "elefante-DirectiveAdd",
+    "elefante-DirectiveList",
+    "elefante-DirectiveRemove",
+)
 
 
 def detect_supported_hosts(

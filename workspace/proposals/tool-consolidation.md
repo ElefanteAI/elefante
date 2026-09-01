@@ -1,7 +1,7 @@
 ---
 status: EXPLORING
 target: unassigned
-authority: design-only; current released surface remains 16 tools and 2 prompts
+authority: design-only; current development source exposes 18 tools and 2 prompts
 related:
   - docs/reference/tools.md
   - src/mcp/server.py
@@ -11,14 +11,16 @@ related:
 
 ## Question
 
-Would reducing Elefante's 16 MCP tools to a smaller set of domain tools improve
+Would reducing Elefante's 18 customer MCP tools to a smaller set of domain tools improve
 task outcomes enough to justify a breaking public-contract change?
 
 ## Current truth
 
-The released v2.12.3 surface is 16 tools and 2 prompts. Memory CRUD/search is
-already consolidated under `elefante-Memory(action=...)`. No further tool
-consolidation is approved, implemented, assigned to a version, or promised.
+The published v2.13.0 surface is 17 tools and 2 prompts. The current development
+source exposes 18 tools and 2 prompts because verified Recover is an unreleased
+candidate. Memory CRUD/search is already consolidated under
+`elefante-Memory(action=...)`. No further tool consolidation is approved,
+implemented, assigned to a version, or promised.
 
 ## Hypothesis
 
@@ -51,7 +53,7 @@ harder policy enforcement. Tool count alone is not a product metric.
 - Task Intelligence evidence that consolidation improves outcomes rather than
   merely reducing a count.
 
-Until that evidence exists, keep the 16-tool surface documented in
+Until that evidence exists, keep the 18-tool development surface documented in
 [`docs/reference/tools.md`](../../docs/reference/tools.md) and derive its exact
 inventory with:
 

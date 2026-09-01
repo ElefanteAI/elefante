@@ -225,6 +225,12 @@ class VectorStore:
         elif isinstance(surfaces_when, str) and surfaces_when.strip():
             metadata["surfaces_when"] = surfaces_when
 
+        recall_cues = memory.metadata.recall_cues or cm.get("recall_cues")
+        if isinstance(recall_cues, list):
+            metadata["recall_cues"] = json.dumps(recall_cues)
+        elif isinstance(recall_cues, str) and recall_cues.strip():
+            metadata["recall_cues"] = recall_cues
+
         authority_score = memory.metadata.authority_score
         if authority_score is not None:
             metadata["authority_score"] = float(authority_score)
@@ -603,6 +609,11 @@ class VectorStore:
             raw_surfaces = custom_metadata.get("surfaces_when")
         surfaces_when = parse_string_list(raw_surfaces)
 
+        raw_recall_cues = metadata.get("recall_cues")
+        if raw_recall_cues is None:
+            raw_recall_cues = custom_metadata.get("recall_cues")
+        recall_cues = parse_string_list(raw_recall_cues)
+
         raw_authority = metadata.get("authority_score")
         if raw_authority is None:
             raw_authority = custom_metadata.get("authority_score")
@@ -616,10 +627,15 @@ class VectorStore:
 
         # Canonicalize for stable concept-overlap scoring (safe, does not rewrite content).
         try:
-            from src.utils.curation import canonicalize_concepts, canonicalize_surfaces_when
+            from src.utils.curation import (
+                canonicalize_concepts,
+                canonicalize_recall_cues,
+                canonicalize_surfaces_when,
+            )
 
             concepts = canonicalize_concepts(concepts)
             surfaces_when = canonicalize_surfaces_when(surfaces_when)
+            recall_cues = canonicalize_recall_cues(recall_cues)
         except Exception:
             pass
 
@@ -643,6 +659,7 @@ class VectorStore:
             # Cognitive Retrieval
             concepts=concepts,
             surfaces_when=surfaces_when,
+            recall_cues=recall_cues,
             authority_score=authority_score,
             
             # Relationships
@@ -848,6 +865,9 @@ class VectorStore:
 
             if "trigger" in updates:
                 memory.metadata.trigger = updates["trigger"]
+
+            if "recall_cues" in updates:
+                memory.metadata.recall_cues = updates["recall_cues"]
 
             if "user_locked" in updates:
                 memory.metadata.user_locked = bool(updates["user_locked"])

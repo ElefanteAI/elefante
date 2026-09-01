@@ -1,4 +1,4 @@
-# MCP Tools and Prompts (v2.13.0)
+# MCP Tools and Prompts (published v2.14.0 baseline; current source)
 
 ## 1. Natural Language Interaction
 
@@ -16,8 +16,8 @@ Once connected to your IDE, use natural language to interact with Elefante. The 
 
 ## 2. Current MCP Surface
 
-Elefante exposes **17 tools** and **2 prompts** in the default customer profile.
-Memory operations use one
+The published customer profile exposes **18 tools** and **2 prompts**, including
+the verified `elefante-Recover` surface documented below. Memory operations use one
 `elefante-Memory` tool with an action discriminator.
 
 - **Tools** read, write, or inspect the system.
@@ -44,6 +44,10 @@ Memory operations use one
   required; never choose it merely to pass one verification question. After
   writing, call `elefante-Recall` with one likely future question. A stored
   receipt is not proof that the memory is deliverable.
+- Home's verified Remember flow asks that likely future question before writing.
+  It persists the bounded question as a strict project-scoped Recall cue and
+  proves the cue through Recall. If proof fails, the attempted memory is removed
+  and Home reports that nothing was saved.
 
 **Tool response contract**:
 
@@ -83,7 +87,7 @@ Memory operations use one
 
 #### `elefante-Recall`
 
-**Status**: Released and default-on in v2.13.0.
+**Status**: Released and default-on in v2.14.0.
 
 **Purpose**: Give an answering agent the smallest governed durable context for
 one question without exposing the broad search or mutation interface.
@@ -93,6 +97,11 @@ one question without exposing the broad search or mutation interface.
 - `question` (required, string, 1–1,000 characters): The complete standalone
   customer question. Include specific project, file, person, or decision names
   when known.
+- `workspace` (optional, absolute path): Current workspace used by the local
+  Project Registry. A host-provided working directory is used when
+  omitted.
+- `project_id` (optional, UUID): Exact registered project ID used only to
+  cross-check the workspace resolution; it never replaces workspace context.
 
 **Result**:
 
@@ -111,6 +120,15 @@ same retrieval, current-source validation, governed selection, and budget path.
 The answering host already owns the question, so Recall does not echo it in the
 returned context. Call Recall at most once for that user question; a terminal
 status is evidence to continue from current sources, not a retry instruction.
+Missing, empty, overlong, and wrong-type questions return the same seven-field
+`status="blocked"` product response rather than an SDK validation wrapper.
+Operator-disabled and retrieval-failure paths use the same seven fields with
+`status="unavailable"`.
+When local strict project mode is active, Elefante resolves one registered
+project before opening the memory stores. Missing, invalid, unregistered, or
+ambiguous workspace context returns `status="blocked"` and explicitly states
+that no memory was read or supplied. Supplied context is then forced to the
+resolved project ID and root; semantic similarity cannot widen that boundary.
 Its MCP annotations declare `readOnlyHint=true`, `destructiveHint=false`,
 `idempotentHint=true`, and `openWorldHint=false`, so compatible hosts do not ask
 for mutation approval.
@@ -148,6 +166,11 @@ developer evaluation profile; it is not a normal customer operation.
 
 - `action` (required, string): One of `add`, `search`, `update`, `resolve`,
   `delete`, or `consolidate` for normal customer operation.
+- `workspace` (optional, absolute path): Current workspace used by the local
+  Project Registry. The host-provided working directory is used when
+  omitted.
+- `project_id` (optional, UUID): Exact registered ID used only as a strict-mode
+  cross-check. A supplied ID that disagrees with workspace mapping is rejected.
 
 ##### `action="add"` — store a new memory
 
@@ -183,7 +206,11 @@ developer evaluation profile; it is not a normal customer operation.
 - `force_new=true` should be rare. It skips title deduplication, preference merge, and high-similarity redundancy checks.
 - Use `specification` for durable architecture or contract truths. Use
   `directive` for behavioral rules. Use `note` only for short-lived context.
-  Governance fields are part of the v2.13.0 customer contract.
+  Governance fields are part of the v2.14.0 customer contract.
+- In local strict project mode, Elefante resolves the workspace
+  before opening the stores and overwrites project/workspace/scope metadata with
+  that registered identity. Missing or ambiguous context, an unavailable root,
+  or a mismatched supplied project ID changes nothing.
 
 **Example**:
 
@@ -266,17 +293,80 @@ developer evaluation profile; it is not a normal customer operation.
 }
 ```
 
-##### `action="update"` — amend an existing memory in place
+##### `action="correct"` — inspect or apply verified customer repair
 
-**Why this exists**: If a stored fact is wrong or outdated, the system should correct the record, not bury the error under another memory.
+**Why this exists**: A customer must be able to fix wrong, stale, duplicate, or
+inactive knowledge without opening SQLite, Kuzu, or internal lifecycle fields.
 
 **Parameters**:
 
-- `memory_id` (required, string): UUID of the memory to update.
-- `content` (optional, string): Replacement content. Triggers re-embedding.
-- `deprecated` (optional, boolean): Exclude the memory from normal search.
-- `archived` (optional, boolean): Archive the memory.
-- `supersedes_id` (optional, string): UUID of the older memory this one replaces.
+- `memory_id` (required UUID): Exact target memory.
+- `correction` (required): `edit`, `replace`, `resolve`, `archive`, `restore`,
+  or `permanent_delete`.
+- `apply` (optional boolean, default `false`): Inspect without writing when
+  false. Apply only the exact inspected plan when true.
+- `content` (required for `edit` and `replace`): Corrected knowledge. Edit keeps
+  the same ID; Replace creates a new current assertion and preserves the older
+  one as history.
+- `related_memory_id` and `winner_memory_id` (Resolve only): Exact peer and, when
+  required, the user-selected authoritative record.
+- `reason`, `verification_question`, and `invocation_mode="user_directed"`
+  (required for apply): Bounded audit reason and one likely future Recall
+  question. Edit, Replace, and Restore persist the canonicalized question as a
+  cue on the resulting current memory. Archive and permanent delete use it only
+  to prove exclusion. The question is never stored in the privacy-safe receipt.
+- `confirm_protected` (required when the affected record is protected): Explicit
+  user authorization.
+- `confirm_permanent` (apply only for `permanent_delete`): A separate final
+  boolean confirmation after inspecting the exact destructive plan.
+- `expected_record_sha256`, `expected_graph_sha256`, and
+  `expected_content_sha256` (apply): Copy the exact hashes returned by the
+  inspected plan. A stale or altered plan performs no write.
+
+**Behavior**:
+
+- Edit, Replace, Archive, and Restore require one exact registered project
+  scope and verify both vector and graph authority.
+- Archive removes the record from normal Recall but preserves an exact manual
+  restore point. Restore accepts only that unambiguous service-created archive;
+  it does not silently revive a superseded or legacy record.
+- Replace preserves the old assertion, creates explicit lineage, and verifies
+  that scoped Recall selects the new assertion and excludes the old one.
+- Edit and Replace re-mine deterministic concept links from the corrected
+  content. Only generated `HAS_CONCEPT` links are replaced; explicit and
+  structural relationships are preserved. A failed re-mine or later
+  postcondition restores the previous content and concept projection.
+- Home is atomically refreshed only after authoritative readback. Any failed
+  postcondition restores the exact memory, graph, snapshot, and correction-
+  created provenance preimage when possible.
+- Terminal statuses are `VERIFIED_COMPLETE`, `FAILED_NO_CHANGE`,
+  `FAILED_ROLLED_BACK`, `NEEDS_HUMAN`, or `UNSAFE`.
+- Receipts contain bounded identifiers, hashes, checks, and error codes, not
+  memory content, customer-entered reason/question, project path, or capability
+  token.
+- `permanent_delete` is an advanced destructive flow. Under one write boundary,
+  Correct revalidates the inspected hashes, creates and revalidates a fresh
+  workflow-managed Recover backup, removes the exact memory, generated concept
+  links, graph entity, orphaned source when safe, and unshared attachments, then
+  proves Home and scoped Recall no longer expose it. Failure restores the
+  verified backup. Success destroys the temporary backup and reports
+  `recoverable=false`; the deleted memory cannot then be restored by Elefante.
+
+**Important**:
+
+- Inspection is read-only. Apply requires the normal search-before-write
+  Compliance Gate and the exact inspected hashes.
+- This is the primary customer repair path. Use it instead of low-level content
+  or lifecycle mutation aliases.
+
+##### `action="update"` — amend governance metadata only
+
+**Why this exists**: Compatibility callers may need to adjust retrieval and
+retention policy without redefining the stored assertion.
+
+**Parameters**:
+
+- `memory_id` (required, string): UUID of the memory to amend.
 - `tags` (optional, string[]): Replacement tags.
 - `retention_policy`, `injection_policy`, `scope`, `trigger`, `user_locked`
   (optional): Governance fields with the same meanings as `action="add"`.
@@ -284,13 +374,21 @@ developer evaluation profile; it is not a normal customer operation.
 **Important**:
 
 - Requires prior `action="search"` (Compliance Gate).
-- Prefer `update` over `add` when a decision changes.
+- Strict mode requires the active project to match the target memory before a
+  store is opened.
+- `content`, `deprecated`, `archived`, and `supersedes_id` are rejected with
+  `USE_VERIFIED_CORRECT`. Use `action="correct"` for knowledge or lifecycle
+  changes.
 
 ##### `action="resolve"` — inspect or apply Smart Merge/conflict repair
 
 **Why this exists**: Equivalent records should consolidate without losing
 history, while contradictory records need an explicit authority decision
 instead of an arbitrary timestamp or type winner.
+
+This direct verb remains as a compatibility path. New customer repair flows
+should use `action="correct", correction="resolve"` so all correction intent is
+expressed through one product action.
 
 **Parameters**:
 
@@ -299,6 +397,8 @@ instead of an arbitrary timestamp or type winner.
   must identify one of the pair.
 - `apply` (optional boolean, default `false`): Dry-run when false.
 - `reason` (required for apply): Bounded audit reason.
+- `verification_question` (required for apply): A bounded, disposable question
+  used only to prove the scoped Recall result. It is not stored in the receipt.
 - `invocation_mode` (required for apply): Must be `user_directed`.
 - `confirm_protected` (required when the losing record is protected): Explicit
   authorization to supersede it.
@@ -313,18 +413,32 @@ instead of an arbitrary timestamp or type winner.
 - The losing record is archived/deprecated/superseded, not silently deleted.
 - Both records and their conflict IDs are updated together; a second-write
   failure restores the first record.
-- Apply requires the normal search-before-write compliance receipt.
+- Both records must already carry one exact matching declared
+  project/workspace/scope identity. Apply also requires the normal
+  search-before-write compliance receipt.
+- Completion is not inferred from the write return. Elefante reads both records
+  back, atomically refreshes the private Home snapshot, and runs scoped Recall;
+  the winner must be supplied and the loser excluded.
+- A failed postcondition restores the exact two-record preimage and verifies the
+  restore. An incomplete restore is `UNSAFE` and requires human recovery.
+- Apply returns one bounded terminal status: `VERIFIED_COMPLETE`,
+  `FAILED_NO_CHANGE`, `FAILED_ROLLED_BACK`, `NEEDS_HUMAN`, or `UNSAFE`, plus a
+  privacy-safe receipt containing IDs, hashes, checks, and error codes but no
+  memory content, project name, path, reason, or verification question.
+- Elefante Home uses the same operation through a short-lived origin-bound
+  capability and one-use plan ticket. It does not expose a generic MCP, database,
+  path, query, or shell proxy.
 
-##### `action="delete"` — archive or permanently remove a memory
+##### `action="delete"` — guarded legacy compatibility path
 
-**Why this exists**: Some information must be removed, not just deprioritized. Examples: harmful facts, bad test data, or false records.
+**Why this exists**: Older callers may still send the historical delete verb;
+it must fail safely rather than bypass the verified product lifecycle.
 
 **Parameters**:
 
 - `memory_id` (required, string): UUID of the memory to delete.
 - `reason` (required, string): Audit-trail reason.
-- `delete_mode` (optional, `archive | permanent`, default `archive`): Archive is
-  recoverable and preserves graph evidence.
+- `delete_mode` (optional, `archive | permanent`, default `archive`).
 - `invocation_mode` (optional, `workflow_managed | user_directed`, default
   `workflow_managed`): Declares who authorized the mutation.
 - `confirm_permanent` (required for permanent deletion): Must be `true`.
@@ -333,10 +447,13 @@ instead of an arbitrary timestamp or type winner.
 
 **Important**:
 
-- Requires prior `action="search"` (Compliance Gate).
-- Default archive is the normal forgetting path. Permanent deletion is reserved
-  for explicit user-directed removal.
-- Workflow-managed calls cannot mutate or delete user-protected memories.
+- `delete_mode="archive"` performs no write and returns
+  `USE_VERIFIED_CORRECT`; use `action="correct", correction="archive"`.
+- Confirmed legacy permanent deletion performs no write and returns
+  `USE_VERIFIED_CORRECT`; use
+  `action="correct", correction="permanent_delete"` so the exact plan, fresh
+  temporary backup, verification, and receipt remain one operation.
+- Workflow-managed calls cannot authorize protected or permanent deletion.
 
 ##### `action="consolidate"` — deduplicate and canonicalize
 
@@ -377,6 +494,10 @@ instead of an arbitrary timestamp or type winner.
 **Important**:
 
 - Requires prior `elefante-Memory(action="search")` (Compliance Gate).
+- The complete nested request is privacy-scrubbed before any graph write;
+  responses expose only redaction counts and detector types.
+- One transaction-scoped write lock covers every entity and relationship
+  mutation. Optional system status is added after that graph ownership ends.
 - Use stable names and refs so repeated calls stay idempotent.
 - Use `id` when updating an existing entity rather than creating a near-duplicate.
 - Prefer enum-aligned values from `src/models/entity.py` such as `PERSON`, `PROJECT`, `FILE`, `CONCEPT`, `TECHNOLOGY`, `TASK`, `SPECIFICATION`, and `DIRECTIVE`. Common relationship values include `RELATES_TO`, `DEPENDS_ON`, `PART_OF`, `CREATED_BY`, `USES`, `BLOCKS`, `REFERENCES`, `WORKS_ON`, `GOVERNS`, `ENFORCES`, `SUPERSEDES`, and `CONTRADICTS`.
@@ -508,6 +629,11 @@ instead of an arbitrary timestamp or type winner.
 
 **Why this exists**: Elefante stores memory first, then lets an agent add a summary, retrieval concepts, and trigger metadata later.
 
+The complete agent-facing result is privacy-scrubbed, including legacy raw
+content, before it leaves the server. Fetching raw rows marks them as processing,
+so that queue transition and optional stats read share one transaction-scoped
+write lock.
+
 **Parameters**:
 
 - `limit` (optional, integer, default `5`, min `1`, max `50`): Number of raw memories to process.
@@ -523,23 +649,75 @@ instead of an arbitrary timestamp or type winner.
 
 **Purpose**: Submit agent-written enrichment for a memory returned by `ETLProcess`.
 
-**Why this exists**: Agent enrichment adds usable summaries and retrieval concepts while preserving trigger metadata for inspection and future proactive surfacing.
+**Why this exists**: Agent enrichment adds usable summaries and retrieval concepts while preserving trigger metadata for bounded proactive surfacing.
 
 **Parameters**:
 
 - `memory_id` (required, string): Memory UUID from `ETLProcess`.
 - `summary` (required, string): One-line summary, max 200 characters.
 - `concepts` (optional, string[]): Key terms for graph edges and retrieval.
-- `surfaces_when` (optional, string[]): Stored trigger metadata for inspection and future proactive surfacing; not a current ranking signal.
+- `surfaces_when` (optional, string[]): Stored trigger phrases for the explicit,
+  bounded proactive-surfacing path; this is not a current ranking signal for
+  general semantic retrieval.
 
 **Important**:
 
 - The live schema fields are `concepts` and `surfaces_when`.
 - `topic` and `knowledge_type` are not part of the live schema.
+- Summary, concepts, and trigger metadata are privacy-scrubbed before
+  persistence; responses expose only redaction counts and detector types.
 
 ---
 
 ### System Operations
+
+#### `elefante-Recover`
+
+**Purpose**: Inspect and perform named, verified lifecycle operations without
+exposing arbitrary paths, shell access, or database primitives.
+
+**Why this exists**: A customer needs one recovery contract that says what will
+happen, requires confirmation, verifies the result, and reports whether anything
+changed or was rolled back.
+
+**Actions**:
+
+- `health`: read-only product state from runtime, agent, Recall, and verified
+  backup evidence. It accepts no apply fields.
+- `backup`: inspect the managed data layout, then create and independently
+  restage one checksummed local backup.
+- `restore`: list configured backup basenames or inspect one archive; apply
+  creates a safety backup, stages and verifies the target, switches once, tests
+  Home and Recall, and restores exact previous data when a postcondition fails.
+- `support_report`: preview an allowlisted diagnostic manifest, then create one
+  private verified ZIP containing only `support-report.json`. Elefante does not
+  transmit the ZIP.
+
+**Plan and apply**:
+
+- Omit `apply` or set it to `false` for inspection.
+- Apply requires `confirm=true`, a valid `invocation_mode`, and the exact plan
+  hash: `expected_layout_sha256` for backup/restore,
+  `expected_archive_sha256` for restore, or `expected_report_sha256` for the
+  support report.
+- Restore also requires one disposable `verification_question`. The question
+  is used for the post-restore Recall check and is not written to the receipt.
+- A changed layout, archive, or support preview is stale and must be inspected
+  again.
+
+**Support-report privacy boundary**:
+
+- Included: product/build identity, OS and Python version, agent and Recall
+  readiness, diagnostic codes, backup validity counts, and allowlisted
+  content-free lifecycle receipts.
+- Excluded: memory content, project names and paths, prompts, questions,
+  answers, transcripts, credentials, environment values, host configuration
+  contents, and application logs.
+- Elefante Home shows these categories before confirmation and downloads the
+  verified managed ZIP through the short-lived local control session.
+
+Repair, update, code rollback, and data-preserving uninstall remain
+official-package operations rather than MCP Recover actions.
 
 #### `elefante-System`
 
@@ -579,7 +757,16 @@ instead of an arbitrary timestamp or type winner.
 
 - `refresh=true` reads from live databases and requires Elefante Mode to be enabled.
 - Use `refresh=false` when you only need the latest existing snapshot.
-- The browser dashboard itself is read-only: its Reload control fetches only the existing snapshot and cannot trigger a live database refresh.
+- Snapshot browsing and Reload remain read-only and cannot trigger a live
+  database refresh. Local Elefante Home can additionally request only
+  named Verified Correct, Verified Resolve, and Project Registry operations
+  through `/control`, using a short-lived origin-bound capability carried in
+  the URL fragment and removed from browser history after load. Correct supports
+  Edit, Replace, Archive, Restore, and advanced permanent deletion through
+  content-free one-use plan tickets. Permanent deletion additionally requires
+  typing `DELETE` and a separate final confirmation; its temporary verified
+  backup is restored on failure and destroyed on verified success. Home exposes
+  no generic MCP, database, path, query, or shell proxy.
 
 ---
 

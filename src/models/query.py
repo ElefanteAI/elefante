@@ -65,7 +65,7 @@ class SearchResult(BaseModel):
     """Result from a search operation"""
     memory: Memory
     score: float = Field(ge=0.0, le=1.0)
-    source: str  # "vector", "graph", "hybrid", or "triggered"
+    source: str  # "vector", "graph", "hybrid", "triggered", or "recall-cue"
     
     # Breakdown of scores
     vector_score: Optional[float] = None
@@ -78,6 +78,10 @@ class SearchResult(BaseModel):
     # path.  This is separate from the semantic score so a trigger can explain
     # why a memory surfaced without pretending it was a vector match.
     surface_matches: List[str] = Field(default_factory=list)
+
+    # True only when the complete scoped query matched a cue explicitly saved
+    # by the customer through verified Remember/Correct.
+    recall_cue_match: bool = False
     
     # Context information
     matched_entities: List[UUID] = Field(default_factory=list)
@@ -98,6 +102,8 @@ class SearchResult(BaseModel):
         }
         if self.surface_matches:
             result["surface_matches"] = list(self.surface_matches)
+        if self.recall_cue_match:
+            result["recall_cue_match"] = True
         # Include explanation if present
         if self.explanation:
             result["explanation"] = self.explanation

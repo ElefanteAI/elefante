@@ -207,7 +207,9 @@ class MemoryOrchestrator:
         tags: List[str] = None,
         entities: List[Dict[str, str]] = None,
         metadata: Dict[str, Any] = None,
-        force_new: bool = False
+        force_new: bool = False,
+        memory_id: UUID | None = None,
+        conflict_ids: List[UUID] | None = None,
     ) -> Optional[Memory]:
         """
         Validate, enrich, deduplicate, persist, and graph-link a memory.
@@ -216,6 +218,14 @@ class MemoryOrchestrator:
         Decay rate is set automatically from memory_type.
         """
 
+
+        explicit_conflict_ids = list(dict.fromkeys(conflict_ids or []))
+        if any(not isinstance(item, UUID) for item in explicit_conflict_ids):
+            raise ValueError("conflict_ids must contain UUID values")
+        if memory_id is not None and memory_id in explicit_conflict_ids:
+            raise ValueError("a memory cannot conflict with itself")
+        if explicit_conflict_ids and not force_new:
+            raise ValueError("explicit conflict links require a forced new memory")
 
         # ==================================================================================
         # STEP 1: PRIVACY + VALIDATE INPUT
@@ -399,21 +409,24 @@ class MemoryOrchestrator:
             )
 
             if preference_candidates:
-                # Filter down to preference-like candidates after retrieval to avoid
-                # brittle Chroma where-clauses and to include self.constraints too.
+                # Filter down to actual preferences after retrieval to avoid brittle
+                # Chroma where-clauses. A close decision, constraint, or fact is
+                # related evidence; it must never be rewritten as a preference
+                # reassertion.
                 pref_like = [
                     r
                     for r in preference_candidates
                     if str(r.memory.metadata.memory_type).lower() == MemoryType.PREFERENCE.value
                 ]
 
-                if not pref_like:
-                    pref_like = preference_candidates
-
-                best_pref = pref_like[0]
+                best_pref = pref_like[0] if pref_like else None
 
                 # Merge only when we're confident it's the same preference.
-                if best_pref.score >= 0.40 and _has_meaningful_overlap(content, best_pref.memory.content):
+                if (
+                    best_pref is not None
+                    and best_pref.score >= 0.40
+                    and _has_meaningful_overlap(content, best_pref.memory.content)
+                ):
                     existing = best_pref.memory
                     now = datetime.utcnow()
 
@@ -492,9 +505,26 @@ class MemoryOrchestrator:
         related_id = None
         if similar_memories:
             best_match = similar_memories[0]
-            
-            # Check for redundancy
-            if best_match.score >= 0.95:
+
+            # A contradiction is materially stronger than textual similarity.
+            # Check it first so a one-word negation cannot be downgraded to a
+            # near-duplicate simply because the rest of the sentence matches.
+            conflict_assessment = assess_conflict(
+                content,
+                best_match.memory.content,
+            )
+            if (
+                best_match.score >= 0.75
+                and conflict_assessment.outcome is ConflictOutcome.CONFLICT
+            ):
+                status = MemoryStatus.CONTRADICTORY
+                related_id = best_match.memory.id
+                self.logger.warning(
+                    "CONTRADICTORY memory detected",
+                    conflicting_memory_id=str(best_match.memory.id),
+                    reason=conflict_assessment.reason,
+                )
+            elif best_match.score >= 0.95:
                 if _is_near_duplicate(content, best_match.memory.content):
                     status = MemoryStatus.REDUNDANT
                     related_id = best_match.memory.id
@@ -502,24 +532,16 @@ class MemoryOrchestrator:
                 else:
                     status = MemoryStatus.RELATED
                     related_id = best_match.memory.id
-            
-            # Check for contradiction (High similarity but conflicting content)
             elif best_match.score >= 0.75:
-                conflict_assessment = assess_conflict(
-                    content,
-                    best_match.memory.content,
-                )
-                if conflict_assessment.outcome is ConflictOutcome.CONFLICT:
-                    status = MemoryStatus.CONTRADICTORY
-                    related_id = best_match.memory.id
-                    self.logger.warning(
-                        "CONTRADICTORY memory detected",
-                        conflicting_memory_id=str(best_match.memory.id),
-                        reason=conflict_assessment.reason,
-                    )
-                else:
-                    status = MemoryStatus.RELATED
-                    related_id = best_match.memory.id
+                status = MemoryStatus.RELATED
+                related_id = best_match.memory.id
+
+        # Verified Remember performs the customer-visible overlap inspection
+        # before this write.  Preserve its exact conflict decision even though
+        # force_new intentionally skips the legacy similarity/deduplication path.
+        if explicit_conflict_ids:
+            status = MemoryStatus.CONTRADICTORY
+            related_id = explicit_conflict_ids[0]
 
         # ==================================================================================
         # STEP 3: WRITE (Construct Memory Object)
@@ -547,6 +569,7 @@ class MemoryOrchestrator:
                 infer_surfaces_when,
                 compute_authority_score,
                 canonicalize_concepts,
+                canonicalize_recall_cues,
                 canonicalize_surfaces_when,
             )
             
@@ -563,6 +586,13 @@ class MemoryOrchestrator:
 
             surfaces_when = canonicalize_surfaces_when(surfaces_when)
             metadata["surfaces_when"] = surfaces_when
+
+            recall_cues = canonicalize_recall_cues(
+                metadata.get("recall_cues")
+                if isinstance(metadata.get("recall_cues"), list)
+                else []
+            )
+            metadata["recall_cues"] = recall_cues
             
             # Compute initial authority score
             authority_score = compute_authority_score(
@@ -619,6 +649,7 @@ class MemoryOrchestrator:
             # Cognitive Retrieval Fields
             custom_metadata["concepts"] = concepts
             custom_metadata["surfaces_when"] = surfaces_when
+            custom_metadata["recall_cues"] = recall_cues
             custom_metadata["authority_score"] = authority_score
             custom_metadata["elefante_source"] = source_context
             
@@ -626,7 +657,9 @@ class MemoryOrchestrator:
                 memory_type=MemoryType(memory_type),
                 status=status,
                 conflict_ids=(
-                    [related_id]
+                    explicit_conflict_ids
+                    if explicit_conflict_ids
+                    else [related_id]
                     if status == MemoryStatus.CONTRADICTORY and related_id
                     else []
                 ),
@@ -649,6 +682,7 @@ class MemoryOrchestrator:
                 # Cognitive retrieval fields
                 concepts=concepts,
                 surfaces_when=surfaces_when,
+                recall_cues=recall_cues,
                 authority_score=authority_score,
                 custom_metadata=custom_metadata,
                 system_metadata=system_metadata,
@@ -662,6 +696,7 @@ class MemoryOrchestrator:
             )
             
             memory = Memory(
+                id=memory_id or uuid4(),
                 content=content,
                 metadata=memory_metadata,
                 embedding=embedding
@@ -682,6 +717,7 @@ class MemoryOrchestrator:
                 name=entity_name,
                 type=EntityType.MEMORY,
                 description=summary_text,
+                created_at=memory.metadata.created_at,
                 properties={
                     "content": content[:200],
                     "memory_type": memory_type,
@@ -695,9 +731,18 @@ class MemoryOrchestrator:
             await self.graph_store.record_memory_source(memory.id, source_context)
             
             # 5b. Link to Contradiction/Redundancy
-            if related_id:
+            relationship_targets = (
+                explicit_conflict_ids if explicit_conflict_ids else [related_id] if related_id else []
+            )
+            for relationship_target in relationship_targets:
                 rel_type = RelationshipType.RELATES_TO
-                props = {"similarity": similar_memories[0].score}
+                props = {
+                    "similarity": (
+                        float(similar_memories[0].score)
+                        if similar_memories
+                        else 1.0
+                    )
+                }
                 
                 if status == MemoryStatus.REDUNDANT:
                     rel_type = RelationshipType.SIMILAR_TO
@@ -707,7 +752,7 @@ class MemoryOrchestrator:
                 
                 await self.graph_store.create_relationship(Relationship(
                     from_entity_id=memory.id,
-                    to_entity_id=related_id,
+                    to_entity_id=relationship_target,
                     relationship_type=rel_type,
                     properties=props
                 ))
@@ -789,6 +834,27 @@ class MemoryOrchestrator:
             self.logger.error(f"Failed to store memory: {e}", exc_info=True)
             raise
     
+    @staticmethod
+    def _matches_explicit_scope(memory: Memory, filters: SearchFilters | None) -> bool:
+        """Enforce explicit project filters after every retrieval branch.
+
+        Vector backends already filter these fields, but structured graph and
+        merged paths may not.  A hard post-merge gate prevents an unscoped or
+        cross-project graph hit from bypassing strict project isolation.
+        """
+        if filters is None:
+            return True
+        metadata = memory.metadata
+        if filters.project is not None and str(metadata.project or "") != str(
+            filters.project
+        ):
+            return False
+        if filters.workspace is not None and str(metadata.workspace or "") != str(
+            filters.workspace
+        ):
+            return False
+        return True
+
     async def search_memories(
         self,
         query: str,
@@ -924,6 +990,32 @@ class MemoryOrchestrator:
                                 [*existing.surface_matches, *triggered.surface_matches]
                             )
                         )
+
+                # A verified customer Recall cue is a separate, project-only
+                # route. It makes the question saved in Remember usable later
+                # without converting the memory to literal-triggered delivery.
+                cue_results = await self._surface_recall_cue_memories(
+                    query,
+                    filters=filters,
+                    limit=min(limit, SURFACE_MAX_MEMORIES),
+                )
+                for cue_result in cue_results:
+                    existing = by_memory_id.get(str(cue_result.memory.id))
+                    if existing is None:
+                        results.append(cue_result)
+                        by_memory_id[str(cue_result.memory.id)] = cue_result
+                    else:
+                        existing.recall_cue_match = True
+
+            # SearchFilters are a hard customer boundary, not merely a vector
+            # optimization. Apply them after semantic, graph, conversation, and
+            # triggered paths have merged so no branch can leak another project.
+            if filters and (filters.project is not None or filters.workspace is not None):
+                results = [
+                    result
+                    for result in results
+                    if self._matches_explicit_scope(result.memory, filters)
+                ]
             
             # =============================================================
             # COGNITIVE SCORING - Multi-signal re-ranking
@@ -1091,6 +1183,116 @@ class MemoryOrchestrator:
             )
         )
         return matches[:limit]
+
+    async def _surface_recall_cue_memories(
+        self,
+        question: str,
+        *,
+        filters: Optional[SearchFilters] = None,
+        limit: int = SURFACE_MAX_MEMORIES,
+    ) -> List[SearchResult]:
+        """Find an exact customer-authored Recall cue inside one project.
+
+        This path is intentionally narrower than semantic or proactive
+        retrieval: both project and workspace must be explicit, the complete
+        normalized question must match, and all lifecycle, governance,
+        current-source, trust, and privacy gates remain active.
+        """
+        if (
+            not question
+            or limit <= 0
+            or filters is None
+            or not filters.project
+            or not filters.workspace
+        ):
+            return []
+
+        from src.core.task_intelligence import TaskBriefService
+        from src.modules.distiller.privacy import PrivacyFilter
+        from src.utils.curation import matching_recall_cue
+
+        matches: list[SearchResult] = []
+        try:
+            memories = await self.vector_store.get_all(
+                limit=SURFACE_SCAN_MAX_MEMORIES,
+                offset=0,
+                filters=filters,
+            )
+            for stored in memories[:SURFACE_SCAN_MAX_MEMORIES]:
+                if not self._matches_explicit_scope(stored, filters):
+                    continue
+                metadata = stored.metadata
+                if not matching_recall_cue(metadata.recall_cues, question):
+                    continue
+                status = str(
+                    getattr(
+                        getattr(metadata, "status", None),
+                        "value",
+                        getattr(metadata, "status", ""),
+                    )
+                ).casefold()
+                if (
+                    bool(metadata.deprecated)
+                    or bool(metadata.archived)
+                    or metadata.superseded_by_id is not None
+                    or bool(metadata.conflict_ids)
+                    or status
+                    in {
+                        MemoryStatus.DEPRECATED.value,
+                        MemoryStatus.ARCHIVED.value,
+                        MemoryStatus.CONTRADICTORY.value,
+                    }
+                    or float(metadata.source_reliability) < 0.5
+                ):
+                    continue
+                candidate = stored.model_copy(deep=True)
+                await asyncio.to_thread(
+                    TaskBriefService._annotate_current_source,
+                    candidate,
+                    filters.workspace,
+                )
+                if str(
+                    (candidate.metadata.custom_metadata or {}).get(
+                        "current_source_state", ""
+                    )
+                ).casefold() == "contradicted":
+                    continue
+                if governance_reason(
+                    candidate.metadata,
+                    question,
+                    project=filters.project,
+                    workspace=filters.workspace,
+                ):
+                    continue
+                _, redactions, _ = PrivacyFilter().scrub_payload(
+                    {
+                        "content": candidate.content,
+                        "recall_cues": candidate.metadata.recall_cues,
+                    }
+                )
+                if redactions:
+                    continue
+                matches.append(
+                    SearchResult(
+                        memory=candidate,
+                        score=1.0,
+                        source="recall-cue",
+                        vector_score=None,
+                        recall_cue_match=True,
+                    )
+                )
+        except Exception as error:
+            self.logger.warning("Recall cue surfacing unavailable: %s", error)
+            return []
+
+        matches.sort(
+            key=lambda result: (
+                -result.memory.metadata.source_reliability,
+                -int(result.memory.metadata.verified),
+                str(result.memory.id),
+            )
+        )
+        return matches[:limit]
     
     def _create_query_plan(
         self,
@@ -1174,6 +1376,26 @@ class MemoryOrchestrator:
             # Literal-trigger matches are an explicit governance signal, not a
             # vector score. Preserve that distinction in both ranking and the
             # explanation shown to the caller.
+            if result.recall_cue_match:
+                result.score = 1.0
+                result.vector_score = None
+                result.explanation = {
+                    "composite_score": 1.0,
+                    "signals": [
+                        {
+                            "name": "customer_recall_cue",
+                            "score": 1.0,
+                            "weight": 1.0,
+                            "weighted": 1.0,
+                            "reason": (
+                                "Complete project-scoped customer Recall cue matched"
+                            ),
+                            "details": {"project_scoped": True},
+                        }
+                    ],
+                }
+                scored_results.append(result)
+                continue
             if result.surface_matches:
                 result.score = 1.0
                 result.vector_score = None
@@ -2392,3 +2614,31 @@ def get_orchestrator() -> MemoryOrchestrator:
     if _orchestrator is None:
         _orchestrator = MemoryOrchestrator()
     return _orchestrator
+
+
+async def reset_orchestrator(
+    extra_orchestrator: MemoryOrchestrator | None = None,
+) -> None:
+    """Close persistence handles and force the next request to open fresh stores."""
+    global _orchestrator
+
+    current = _orchestrator
+    _orchestrator = None
+    instances = []
+    for candidate in (current, extra_orchestrator):
+        if candidate is not None and all(candidate is not item for item in instances):
+            instances.append(candidate)
+    failures: list[Exception] = []
+    for instance in instances:
+        try:
+            await instance.close()
+        except Exception as error:
+            failures.append(error)
+
+    from src.core.graph_store import reset_graph_store
+    from src.core.vector_store import reset_vector_store
+
+    reset_vector_store()
+    reset_graph_store()
+    if failures:
+        raise failures[0]

@@ -266,7 +266,10 @@ build with a version is byte-equivalent to the release, but it cannot distinguis
 published, development, or candidate code built from different commits.
 The candidate workflow also assumed `GITHUB_SHA` always meant the reviewed
 source commit; for a `pull_request` event it denotes GitHub's temporary merge
-commit.
+commit. A later Gauntlet recurrence found that the release builder, installer
+builder, and installer all asked Git to ignore untracked files when declaring
+the source clean. An untracked runtime module could therefore enter a payload
+whose metadata claimed clean source.
 **Impact:** Installed-path evidence can be attributed to the wrong release;
 `doctor` can report a truthful semantic version but an incomplete build
 identity; development features may appear published. This does not prove that
@@ -284,14 +287,17 @@ Candidate artifact jobs now resolve one `SOURCE_COMMIT`: the pull-request head
 SHA for PRs and `github.sha` for tags, pushes, and manual runs. They check out
 that exact commit before building and compare the installed identity with the
 same value. Candidate checksum manifests are generated from inside `dist/`, so
-they remain valid after GitHub strips the upload directory.
+they remain valid after GitHub strips the upload directory. All three local
+source-identity helpers include untracked files in the cleanliness decision.
 **Guard:** Focused installer, release-client, doctor, and workflow tests cover
 candidate/release versus development, malformed and legacy identity, archive
 drift, delegated-install drift, upgrade, repair, and known-good reinstall. The
 macOS candidate workflow additionally requires the installed source commit to
 equal `SOURCE_COMMIT`. Workflow regressions require both candidate producers to
 use the same durable checkout rule and require the standalone artifact checksum
-to use a portable basename. The existing live installation was not replaced.
+to use a portable basename. A temporary real Git repository regression proves
+that a newly added untracked runtime module makes all three helpers dirty. The
+existing live installation was not replaced.
 **Lesson:** A semantic version identifies a release contract, not arbitrary code
 built after that release. Reproducible product evidence requires version plus
 source provenance and channel.
@@ -303,6 +309,55 @@ package builds. Downloaded `SHA256SUMS` verifies without path rewriting; the
 archive manifest and payload identity both report that full SHA and clean
 candidate status; the Finder launcher remains executable; and a local dry run
 left its target absent. The existing live runtime was not replaced.
+
+<a id="issue-26"></a>
+
+## Issue #26: Bridge Session Expired When The Daemon Restarted [BUG-055, FIXED LOCALLY, guarded]
+
+**Trigger:** A live Codex task had initialized successfully through the installed
+stdio bridge. After the loopback daemon was replaced, direct health and a fresh
+MCP initialization succeeded, but every call from the existing task returned
+HTTP 404 because it kept presenting the prior daemon's session ID.
+**Root cause:** The bridge persisted the daemon-issued `mcp-session-id` for its
+entire process lifetime but did not retain enough of the successful MCP
+handshake to create a replacement session. Daemon sessions correctly end with
+the daemon process, while host stdio processes may live longer.
+**Solution:** The bridge now caches the successful initialize request and
+initialized notification. Exactly when a request with an existing session gets
+HTTP 404, it establishes one fresh session, replays the initialized notification,
+and retries the interrupted request once. An initialize request itself is
+retried without the stale header. The bridge does not retry HTTP 500 or other
+unrelated failures, emits no internal recovery response on stdout, and opens no
+storage.
+**Guard:** Focused unit coverage proves the exact request sequence for both a
+request and an `initialized` notification plus the non-404 negative path. A
+slow isolated process test keeps one real bridge alive, stops and replaces its
+real daemon, then proves the exact 17-tool customer inventory and a successful
+seven-field `elefante-Recall` result without reconnecting the host. The existing
+two-bridge/one-daemon integration proof remains green.
+**Lesson:** A transport session belongs to the daemon lifetime, not the host
+process lifetime. Compatibility bridges must recover boundedly from explicit
+session invalidation while allowing unrelated transport and server failures to
+surface unchanged.
+
+<a id="issue-27"></a>
+
+## Issue #27: Package Proof Lost Checks At The Home Boundary [BUG-062, FIXED LOCALLY, guarded]
+
+**Trigger:** The official package wrote three acceptance checks, but Elefante
+Home could show only one of them. The privacy projection accepted the package
+receipt and its codes while silently removing the `safety_backup` and
+`product_readiness` entries.
+**Root cause:** The package writer and Recover reader maintained separate fixed
+check-name allowlists. Tests used an empty synthetic package-check list, so they
+proved privacy but not the real producer-consumer contract.
+**Solution:** Add the two fixed package check names to the Recover allowlist and
+generate the regression fixture through the actual package receipt writer.
+Arbitrary names, free text, paths, and next actions remain excluded; interrupted
+`RUNNING` receipts remain inspectable.
+**Guard:** `pytest tests/test_verified_recovery.py::test_health_exposes_only_allowlisted_package_handoff_receipt tests/test_verified_recovery.py::test_support_report_preview_and_export_are_strictly_allowlisted -q`; `ruff check src/core/verified_recovery.py tests/test_verified_recovery.py`; `git diff --check`.
+**Lesson:** A privacy projection must be tested with the real producer output.
+An allowlisted receipt is not product proof if valid fields disappear silently.
 
 ## Cross-bug pattern (extracted to `../lessons.md`)
 

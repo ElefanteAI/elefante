@@ -20,6 +20,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from scripts.lifecycle.daemon_service import service_status  # noqa: E402
 from scripts.setup.host_selection import (  # noqa: E402
+    CERTIFIED_CUSTOMER_HOSTS,
     SUPPORTED_HOSTS,
     detect_supported_hosts,
     normalize_manifest_surfaces,
@@ -178,7 +179,7 @@ def _compare_integration_surfaces(
         diagnostics.add("install_manifest_surface_unknown")
     if unknown_compatible:
         diagnostics.add("integration_matrix_unknown_surface")
-    if non_customer_ready:
+    if non_customer_ready.intersection(CERTIFIED_CUSTOMER_HOSTS):
         customer_diagnostics.add("integration_surface_not_customer_ready")
 
     return {
@@ -377,9 +378,24 @@ def build_report(
     daemon = _safe_daemon_report(daemon)
     manifest, manifest_diagnostics = _read_manifest(home)
     runtime_installation = read_runtime_installation(home)
+    customer_runtime = bool(
+        runtime_installation is not None
+        and runtime_installation.get("scope") == "customer"
+    )
     detected_hosts = host_detector(home=home)
     verified_surfaces = normalize_manifest_surfaces(surface_inspector(home))
     uncovered_hosts = sorted(detected_hosts.difference(verified_surfaces))
+    certified_required = (
+        set(CERTIFIED_CUSTOMER_HOSTS) if customer_runtime else set()
+    )
+    certified_verified = certified_required.intersection(
+        detected_hosts,
+        verified_surfaces,
+    )
+    certified_uncovered = sorted(certified_required.difference(certified_verified))
+    compatibility_uncovered = sorted(
+        detected_hosts.difference(verified_surfaces).difference(certified_required)
+    )
     integration_matrix = repo_root / "agents/manifests/ide-integration.yaml"
     if integration_matrix.is_file():
         declared_statuses, integration_diagnostics = _read_integration_declarations(
@@ -412,9 +428,9 @@ def build_report(
     customer_diagnostics: list[str] = list(
         integration_contract["customer_diagnostics"]
     )
-    recall_required = "codex-recall-routing" in manifest.get(
-        "configured_surfaces",
-        [],
+    configured_manifest_surfaces = set(manifest.get("configured_surfaces", []))
+    recall_required = customer_runtime or "codex-recall-routing" in (
+        configured_manifest_surfaces
     )
     recall_report: dict[str, Any] = {
         "required": recall_required,
@@ -472,6 +488,8 @@ def build_report(
             )
     if runtime_installation is None:
         customer_diagnostics.append("runtime_installation_unrecorded")
+        if uncovered_hosts:
+            customer_diagnostics.append("detected_hosts_unconfigured")
     else:
         if runtime_installation["scope"] != "customer":
             customer_diagnostics.append("runtime_scope_not_customer")
@@ -526,11 +544,27 @@ def build_report(
                     }
                     if payload_identity != expected_identity:
                         customer_diagnostics.append("runtime_build_identity_mismatch")
-    if uncovered_hosts:
-        customer_diagnostics.append("detected_hosts_unconfigured")
+    if certified_uncovered:
+        customer_diagnostics.append("certified_host_unconfigured")
+    if customer_runtime and "codex-recall-routing" not in configured_manifest_surfaces:
+        customer_diagnostics.append("codex_recall_guidance_unverified")
     if recall_required and "codex" not in verified_surfaces:
         customer_diagnostics.append("codex_recall_routing_unverified")
     runtime_ready = not diagnostics
+    host_coverage = {
+        "detected": sorted(detected_hosts),
+        "verified": sorted(detected_hosts.intersection(verified_surfaces)),
+        "uncovered": uncovered_hosts,
+    }
+    if customer_runtime:
+        host_coverage.update(
+            {
+                "certified_required": sorted(certified_required),
+                "certified_verified": sorted(certified_verified),
+                "certified_uncovered": certified_uncovered,
+                "compatibility_uncovered": compatibility_uncovered,
+            }
+        )
     return {
         "schema_version": 2,
         "ready": runtime_ready,
@@ -543,11 +577,7 @@ def build_report(
         "daemon": daemon,
         "installer_ownership": manifest,
         "installation": _safe_installation_report(runtime_installation),
-        "host_coverage": {
-            "detected": sorted(detected_hosts),
-            "verified": sorted(detected_hosts.intersection(verified_surfaces)),
-            "uncovered": uncovered_hosts,
-        },
+        "host_coverage": host_coverage,
         "integrations": integrations,
         "integration_contract": integration_contract,
         "recall": recall_report,
@@ -580,6 +610,10 @@ def _render_text(report: dict) -> str:
             "configured_surfaces=" + ",".join(report["installer_ownership"].get("configured_surfaces", [])),
             "detected_hosts=" + ",".join(report["host_coverage"]["detected"]),
             "uncovered_hosts=" + ",".join(report["host_coverage"]["uncovered"]),
+            "certified_hosts="
+            + ",".join(report["host_coverage"].get("certified_required", [])),
+            "certified_uncovered="
+            + ",".join(report["host_coverage"].get("certified_uncovered", [])),
             "compatible_hosts=" + ",".join(report["integrations"]["compatible"]),
             "community_hosts=" + ",".join(report["integrations"]["community"]),
             "integration_matrix_statuses=" + matrix_status_text,

@@ -42,7 +42,7 @@ from install_manifest import (  # noqa: E402
     record_emitted_json_entry,
     write_json_atomically,
 )
-from host_selection import VSCODE_FAMILY  # noqa: E402
+from host_selection import CUSTOMER_ALWAYS_ALLOW_TOOLS, VSCODE_FAMILY  # noqa: E402
 
 
 def _infer_repo_python(elefante_path: Path) -> str:
@@ -346,21 +346,7 @@ def configure_mcp(argv: list[str] | None = None):
                 "ANONYMIZED_TELEMETRY": "False" # Disable ChromaDB telemetry
             },
             "disabled": False,
-            "alwaysAllow": [
-                "elefante-Memory",  # consolidated v2.10.0: action=add|search|update|delete|consolidate
-                "elefante-GraphConnect",
-                "elefante-GraphQuery",
-                "elefante-ContextGet",
-                "elefante-SessionsList",
-                "elefante-SystemStatusGet",
-                "elefante-DashboardOpen",
-                "elefante-System",
-                "elefante-TaskCreate",
-                "elefante-TaskUpdate",
-                "elefante-TaskGraph",
-                "elefante-ETLProcess",
-                "elefante-ETLClassify",
-            ]
+            "alwaysAllow": list(CUSTOMER_ALWAYS_ALLOW_TOOLS)
         }
         
         # Inject config

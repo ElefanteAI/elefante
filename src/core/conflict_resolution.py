@@ -70,7 +70,27 @@ class ConflictResolutionResult:
 
 
 class ConflictResolutionError(RuntimeError):
-    """Raised when an approved plan cannot be applied safely."""
+    """Raised when an approved plan cannot be applied safely.
+
+    Structured state lets product callers report whether a failed write left
+    data unchanged, was rolled back, or requires recovery without parsing
+    human-facing exception text.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        error_code: str = "CONFLICT_RESOLUTION_FAILED",
+        mutation_started: bool = False,
+        rollback_performed: bool = False,
+        rollback_complete: bool = True,
+    ) -> None:
+        super().__init__(message)
+        self.error_code = error_code
+        self.mutation_started = mutation_started
+        self.rollback_performed = rollback_performed
+        self.rollback_complete = rollback_complete
 
 
 def _scope_key(memory: Memory) -> tuple[str, str, str]:
@@ -246,7 +266,10 @@ async def resolve_memory_pair(
     right = await store.get_memory(right_memory_id)
     if left is None or right is None:
         missing = left_memory_id if left is None else right_memory_id
-        raise ConflictResolutionError(f"Memory {missing} not found")
+        raise ConflictResolutionError(
+            f"Memory {missing} not found",
+            error_code="MEMORY_NOT_FOUND",
+        )
 
     plan = plan_conflict_resolution(
         left,
@@ -257,11 +280,20 @@ async def resolve_memory_pair(
     if not apply:
         return ConflictResolutionResult(plan=plan, applied=False)
     if invocation_mode != "user_directed":
-        raise ConflictResolutionError("Applying conflict repair must be user-directed")
+        raise ConflictResolutionError(
+            "Applying conflict repair must be user-directed",
+            error_code="USER_AUTHORITY_REQUIRED",
+        )
     if not reason.strip():
-        raise ConflictResolutionError("Applying conflict repair requires an audit reason")
+        raise ConflictResolutionError(
+            "Applying conflict repair requires an audit reason",
+            error_code="AUDIT_REASON_REQUIRED",
+        )
     if not plan.applicable:
-        raise ConflictResolutionError(plan.reason)
+        raise ConflictResolutionError(
+            plan.reason,
+            error_code="RESOLUTION_PLAN_BLOCKED",
+        )
 
     records = {str(left.id): left, str(right.id): right}
     winner_before = records[str(plan.winner_memory_id)]
@@ -297,7 +329,10 @@ async def resolve_memory_pair(
     _append_audit(loser, event)
 
     if not await store.replace_memory(loser):
-        raise ConflictResolutionError("Could not persist the losing memory; no repair was applied")
+        raise ConflictResolutionError(
+            "Could not persist the losing memory; no repair was applied",
+            error_code="LOSER_WRITE_FAILED",
+        )
     if await store.replace_memory(winner):
         return ConflictResolutionResult(plan=plan, applied=True)
 
@@ -305,9 +340,19 @@ async def resolve_memory_pair(
     winner_restored = await store.replace_memory(winner_before)
     if not (loser_restored and winner_restored):
         raise ConflictResolutionError(
-            "Conflict repair failed and automatic rollback was incomplete; restore the verified backup"
+            "Conflict repair failed and automatic rollback was incomplete; restore the verified backup",
+            error_code="ROLLBACK_INCOMPLETE",
+            mutation_started=True,
+            rollback_performed=True,
+            rollback_complete=False,
         )
-    raise ConflictResolutionError("Conflict repair failed; both memories were rolled back")
+    raise ConflictResolutionError(
+        "Conflict repair failed; both memories were rolled back",
+        error_code="WINNER_WRITE_FAILED_ROLLED_BACK",
+        mutation_started=True,
+        rollback_performed=True,
+        rollback_complete=True,
+    )
 
 
 __all__ = [

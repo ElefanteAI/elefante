@@ -6,8 +6,10 @@ import argparse
 import json
 import os
 import platform
+import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Callable
 from urllib.error import URLError
@@ -19,7 +21,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.setup.install_manifest import (
+from scripts.setup.install_manifest import (  # noqa: E402
     forget_emitted_file,
     is_unchanged_emitted_file,
     record_emitted_file,
@@ -27,6 +29,14 @@ from scripts.setup.install_manifest import (
 
 LABEL = "ai.elefante.daemon"
 DEFAULT_DAEMON_PORT = 8765
+STANDARD_UNIX_EXECUTABLE_DIRS = (
+    "/opt/homebrew/bin",
+    "/usr/local/bin",
+    "/usr/bin",
+    "/bin",
+    "/usr/sbin",
+    "/sbin",
+)
 
 
 def _python() -> Path:
@@ -45,23 +55,48 @@ def service_path(home: Path, system: str | None = None) -> Path:
     raise RuntimeError(f"Unsupported daemon service platform: {system}")
 
 
+def _service_executable_path(system: str) -> str:
+    """Keep certified host discovery available in a minimal service environment."""
+    if system not in {"Darwin", "Linux"}:
+        return ""
+    candidates: list[str] = []
+    codex_command = shutil.which("codex")
+    if codex_command:
+        candidates.append(str(Path(codex_command).parent))
+    if system == "Darwin":
+        for app_root in (Path("/Applications"), Path.home() / "Applications"):
+            bundled_codex = app_root / "ChatGPT.app/Contents/Resources/codex"
+            if bundled_codex.is_file():
+                candidates.append(str(bundled_codex.parent))
+    candidates.extend(STANDARD_UNIX_EXECUTABLE_DIRS)
+    safe_directories = [
+        directory
+        for directory in candidates
+        if Path(directory).is_absolute()
+        and not any(character in directory for character in ('"', "\\r", "\\n"))
+    ]
+    return os.pathsep.join(dict.fromkeys(safe_directories))
+
+
 def render_service(home: Path, system: str | None = None) -> str:
     system = system or platform.system()
     python = _python()
     if system == "Darwin":
+        executable_path = escape(_service_executable_path(system))
         return f'''<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>Label</key><string>{LABEL}</string>
 <key>ProgramArguments</key><array><string>{python}</string><string>-m</string><string>src.mcp.daemon</string></array>
 <key>WorkingDirectory</key><string>{REPO_ROOT}</string>
-<key>EnvironmentVariables</key><dict><key>PYTHONPATH</key><string>{REPO_ROOT}</string></dict>
+<key>EnvironmentVariables</key><dict><key>PYTHONPATH</key><string>{REPO_ROOT}</string><key>PATH</key><string>{executable_path}</string></dict>
 <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
 <key>StandardOutPath</key><string>{home}/.elefante/logs/daemon.out.log</string>
 <key>StandardErrorPath</key><string>{home}/.elefante/logs/daemon.err.log</string>
 </dict></plist>
 '''
     if system == "Linux":
+        executable_path = _service_executable_path(system)
         return f'''[Unit]
 Description=Elefante local MCP daemon
 After=network.target
@@ -70,6 +105,7 @@ After=network.target
 Type=simple
 WorkingDirectory={REPO_ROOT}
 Environment=PYTHONPATH={REPO_ROOT}
+Environment="PATH={executable_path}"
 ExecStart={python} -m src.mcp.daemon
 Restart=on-failure
 RestartSec=2
@@ -169,6 +205,78 @@ def service_status(
     }
 
 
+def _wait_for_health_state(
+    expected: bool,
+    *,
+    health_check: Callable[[], bool] = daemon_healthy,
+    timeout_seconds: float = 15.0,
+    poll_seconds: float = 0.25,
+) -> bool:
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() <= deadline:
+        if health_check() is expected:
+            return True
+        time.sleep(poll_seconds)
+    return False
+
+
+def stop(
+    home: Path,
+    apply: bool,
+    *,
+    system: str | None = None,
+    health_check: Callable[[], bool] = daemon_healthy,
+) -> bool:
+    """Stop only Elefante's unchanged owned service without deleting its unit."""
+    system = system or platform.system()
+    path = service_path(home, system)
+    if not path.exists():
+        print(f"service absent: {path}")
+        return not apply or not health_check()
+    if not is_unchanged_emitted_file(path, home):
+        print(f"preserve {path} (not recorded or modified)")
+        return False
+
+    print(f"stop {path}")
+    try:
+        if system == "Darwin":
+            _run_optional(["launchctl", "bootout", f"gui/{os.getuid()}", str(path)], apply)
+        elif system == "Linux":
+            _run_optional(["systemctl", "--user", "stop", LABEL], apply)
+        else:
+            _run_optional(["schtasks", "/end", "/tn", LABEL], apply)
+    except OSError:
+        return False
+    return not apply or _wait_for_health_state(False, health_check=health_check)
+
+
+def start(
+    home: Path,
+    apply: bool,
+    *,
+    system: str | None = None,
+    health_check: Callable[[], bool] = daemon_healthy,
+) -> bool:
+    """Start only Elefante's unchanged owned service without rewriting its unit."""
+    system = system or platform.system()
+    path = service_path(home, system)
+    if not path.exists() or not is_unchanged_emitted_file(path, home):
+        print(f"preserve {path} (service is absent, unrecorded, or modified)")
+        return False
+
+    print(f"start {path}")
+    try:
+        if system == "Darwin":
+            _run(["launchctl", "bootstrap", f"gui/{os.getuid()}", str(path)], apply)
+        elif system == "Linux":
+            _run(["systemctl", "--user", "start", LABEL], apply)
+        else:
+            _run(["schtasks", "/run", "/tn", LABEL], apply)
+    except (OSError, subprocess.CalledProcessError):
+        return False
+    return not apply or _wait_for_health_state(True, health_check=health_check)
+
+
 def install(home: Path, apply: bool) -> Path:
     system = platform.system()
     path = service_path(home, system)
@@ -206,7 +314,10 @@ def uninstall(home: Path, apply: bool) -> Path:
         print(f"preserve {path} (not recorded or modified)")
         return path
     if system == "Darwin":
-        _run(["launchctl", "bootout", f"gui/{os.getuid()}", str(path)], apply)
+        # The complete package transaction verifies the daemon stopped before
+        # detaching its owned unit. launchd returns 5 when that already-stopped
+        # job is booted out again, so unit removal must remain idempotent.
+        _run_optional(["launchctl", "bootout", f"gui/{os.getuid()}", str(path)], apply)
     elif system == "Linux":
         _run(["systemctl", "--user", "disable", "--now", LABEL], apply)
         _run(["systemctl", "--user", "daemon-reload"], apply)
@@ -221,7 +332,7 @@ def uninstall(home: Path, apply: bool) -> Path:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("install", "uninstall", "status"))
+    parser.add_argument("action", choices=("install", "uninstall", "start", "stop", "status"))
     parser.add_argument("--apply", action="store_true", help="perform the action; default is dry-run")
     args = parser.parse_args()
     home = Path.home()
@@ -234,6 +345,14 @@ def main() -> None:
             raise SystemExit(2)
     elif args.action == "uninstall":
         uninstall(home, args.apply)
+    elif args.action == "stop":
+        if not stop(home, args.apply):
+            print("service_stop=not_verified")
+            raise SystemExit(2)
+    elif args.action == "start":
+        if not start(home, args.apply):
+            print("service_start=not_verified")
+            raise SystemExit(2)
     else:
         for key, value in service_status(home).items():
             print(f"{key}={value}")

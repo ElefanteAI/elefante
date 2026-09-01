@@ -11,20 +11,27 @@ on:
       - ".github/workflows/quality.yml"
       - "requirements.client.txt"
       - "requirements.client.lock"
-      - "scripts/ci/build_release_client.py"
-      - "scripts/ci/verify_release_client.py"
-      - "scripts/setup/bootstrap_release_bundle.py"
-      - "scripts/setup/install.py"
+      - "scripts/ci/**"
+      - "scripts/lifecycle/**"
+      - "scripts/setup/**"
+      - "scripts/verify/verify_mcp_handshake.py"
       - "src/**"
+      - "tests/test_install_acceptance.py"
+      - "tests/test_install_setup.py"
+      - "tests/test_installer_bundle.py"
+      - "tests/test_installer_gui.py"
+      - "tests/test_mcp_handshake_verifier.py"
       - "tests/test_release_client_bundle.py"
       - "tests/test_release_pipeline.py"
+      - "tests/test_verified_recovery.py"
   workflow_dispatch:
 
 jobs:
   macos-client-candidate:
     name: Build clean macOS client candidate
-    runs-on: macos-latest
+    runs-on: macos-15
     env:
+      CODEX_CLI_VERSION: "0.151.0"
       SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
     permissions:
       contents: read
@@ -44,6 +51,12 @@ jobs:
           node-version: "20"
           cache: npm
           cache-dependency-path: src/dashboard/ui/package-lock.json
+      - name: Verify the certified Apple Silicon and Codex lane
+        run: |
+          test "$(uname -s)" = "Darwin"
+          test "$(uname -m)" = "arm64"
+          npm install --global "@openai/codex@${CODEX_CLI_VERSION}"
+          codex --version
       - name: Build dashboard assets
         working-directory: src/dashboard/ui
         run: |
@@ -88,13 +101,19 @@ jobs:
           bundle_root="$package_root/elefante-installer-macOS"
           install_root="$HOME/.elefante/app/current"
           doctor_report="$RUNNER_TEMP/elefante-doctor.json"
+          project_alpha="$RUNNER_TEMP/elefante-project-alpha"
+          project_beta="$RUNNER_TEMP/elefante-project-beta"
 
-          mkdir -p "$package_root"
+          mkdir -p "$package_root" "$project_alpha" "$project_beta"
           ditto -x -k "${{ steps.release_metadata.outputs.archive }}" "$package_root"
           test -x "$bundle_root/Install Elefante.command"
           test ! -e "$install_root"
 
-          "$bundle_root/Install Elefante.command" --venv-mode fresh --verbose
+          "$bundle_root/Install Elefante.command" \
+            --venv-mode fresh \
+            --project "Alpha=$project_alpha" \
+            --project "Beta=$project_beta" \
+            --verbose
 
           test -x "$install_root/.venv/bin/python"
           "$install_root/.venv/bin/python" \
@@ -118,13 +137,69 @@ jobs:
           assert report["host_coverage"]["uncovered"] == [], report
           PY
 
-          "$install_root/.venv/bin/python" \
-            "$install_root/scripts/lifecycle/uninstall_elefante.py" --apply
+          (
+          cd "$install_root"
+          ./.venv/bin/python - \
+            "$HOME/.elefante/data/projects.json" \
+            "$install_root/.elefante-first-run-receipt.json" \
+            "$install_root/.elefante-package-receipt.json" \
+            "$project_alpha" "$project_beta" <<'PY'
+          import asyncio
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          from scripts.lifecycle.restore_elefante_data import read_verified_manifest
+          from src.core.vector_store import get_vector_store, reset_vector_store
+
+          registry_path, first_run_path, package_path, alpha, beta = map(Path, sys.argv[1:])
+          registry = json.loads(registry_path.read_text(encoding="utf-8"))
+          assert registry["mode"] == "strict", registry
+          assert [project["name"] for project in registry["projects"]] == ["Alpha", "Beta"], registry
+          assert {project["root"] for project in registry["projects"]} == {
+              str(alpha.resolve()), str(beta.resolve())
+          }, registry
+          Path(os.environ["RUNNER_TEMP"], "project-ids-before.json").write_text(
+              json.dumps([project["project_id"] for project in registry["projects"]]),
+              encoding="utf-8",
+          )
+
+          first_run = json.loads(first_run_path.read_text(encoding="utf-8"))
+          serialized = json.dumps(first_run, sort_keys=True)
+          assert first_run["status"] == "VERIFIED_COMPLETE", first_run
+          assert first_run["memory_content_included"] is False, first_run
+          assert first_run["project_path_included"] is False, first_run
+          assert str(alpha) not in serialized and str(beta) not in serialized, first_run
+          backup_name = first_run["initial_backup"]["archive_name"]
+          backup_path = Path.home() / ".elefante" / "backups" / backup_name
+          assert backup_path.is_file(), backup_path
+          read_verified_manifest(backup_path)
+
+          package = json.loads(package_path.read_text(encoding="utf-8"))
+          checks = {check["name"]: check for check in package["checks"]}
+          assert checks["first_run_acceptance"]["passed"] is True, package
+          assert checks["first_run_acceptance"]["code"] == "FIRST_RUN_ACCEPTANCE_VERIFIED", package
+
+          async def verify_no_acceptance_memory():
+              store = get_vector_store()
+              memories = await store.get_all(limit=10000, offset=0)
+              assert all(memory.metadata.created_by != "elefante-installer" for memory in memories), memories
+              assert all("Indigo-Echo" not in memory.content for memory in memories), memories
+              reset_vector_store()
+
+          asyncio.run(verify_no_acceptance_memory())
+          PY
+          )
+
+          printf 'UNINSTALL\n' | "$bundle_root/uninstall.sh" --install-root "$install_root"
           if launchctl print "gui/$(id -u)/ai.elefante.daemon" >/dev/null 2>&1; then
             echo "Elefante daemon remained registered after uninstall" >&2
             exit 1
           fi
-          python - "$HOME/.elefante/install-manifest.json" <<'PY'
+          test ! -e "$install_root"
+          test -d "$HOME/.elefante/data"
+          python - "$HOME/.elefante/install-manifest.json" "$HOME/.elefante/data-preservation.json" <<'PY'
           import json
           import sys
           from pathlib import Path
@@ -133,7 +208,48 @@ jobs:
           if manifest_path.exists():
               manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
               assert "runtime" not in manifest, manifest
+          receipt = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+          assert receipt["status"] == "VERIFIED_COMPLETE", receipt
+          assert receipt["app_removed"] is True, receipt
+          assert receipt["data_state"]["present"] is True, receipt
           PY
+
+          "$bundle_root/Install Elefante.command" --install-root "$install_root" --venv-mode fresh --verbose
+          test -x "$install_root/.venv/bin/python"
+          test ! -e "$HOME/.elefante/data-preservation.json"
+          "$install_root/.venv/bin/python" \
+            "$install_root/scripts/lifecycle/doctor.py" --json > "$doctor_report"
+          python - "$doctor_report" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          report = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          assert report["ready"] is True, report
+          assert report["customer_ready"] is True, report
+          recall = report.get("recall", {})
+          assert recall.get("required") is not True or recall.get("ready") is True, report
+          PY
+
+          "$install_root/.venv/bin/python" - \
+            "$HOME/.elefante/data/projects.json" \
+            "$install_root/.elefante-first-run-receipt.json" \
+            "$RUNNER_TEMP/project-ids-before.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          registry = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          first_run = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+          before = json.loads(Path(sys.argv[3]).read_text(encoding="utf-8"))
+          assert registry["mode"] == "strict", registry
+          assert [project["project_id"] for project in registry["projects"]] == before, registry
+          assert first_run["status"] == "VERIFIED_COMPLETE", first_run
+          assert first_run["project_path_included"] is False, first_run
+          PY
+
+          printf 'UNINSTALL\n' | "$bundle_root/uninstall.sh" --install-root "$install_root"
+          test ! -e "$install_root"
       - name: Upload validation artifact only
         uses: actions/upload-artifact@v7
         with:

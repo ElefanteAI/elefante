@@ -165,6 +165,100 @@ class TestMemoryPersistence:
         assert incoming is not None
         assert incoming.metadata.status == MemoryStatus.CONTRADICTORY.value
         assert incoming.metadata.conflict_ids == [existing.id]
+
+    @pytest.mark.asyncio
+    async def test_preference_reassertion_does_not_merge_into_another_memory_type(
+        self, orchestrator, monkeypatch
+    ):
+        """A close decision is related evidence, not an existing preference."""
+        class FixedEmbedding:
+            async def generate_embedding(self, _text):
+                return [1.0, 0.0, 0.0]
+
+        embedding = FixedEmbedding()
+        orchestrator.embedding_service = embedding
+        orchestrator.vector_store._embedding_service = embedding
+
+        existing = await orchestrator.add_memory(
+            content="Project Alpha uses local memory routing for agent decisions.",
+            memory_type="decision",
+            metadata={"title": "Existing routing decision"},
+        )
+        assert existing is not None
+
+        async def no_title_match(_title):
+            return None
+
+        async def close_non_preference(**_kwargs):
+            return [
+                SearchResult(
+                    memory=existing,
+                    score=0.99,
+                    vector_score=0.99,
+                    source="vector",
+                )
+            ]
+
+        monkeypatch.setattr(orchestrator.vector_store, "find_by_title", no_title_match)
+        monkeypatch.setattr(orchestrator.vector_store, "search", close_non_preference)
+
+        incoming = await orchestrator.add_memory(
+            content="Project Alpha prefers local memory routing for dashboard advice.",
+            memory_type="preference",
+            metadata={"title": "Incoming routing preference"},
+        )
+
+        assert incoming is not None
+        assert incoming.id != existing.id
+        assert str(incoming.metadata.memory_type) == "preference"
+
+    @pytest.mark.asyncio
+    async def test_preference_reassertion_still_merges_an_existing_preference(
+        self, orchestrator, monkeypatch
+    ):
+        """The cross-type guard must preserve genuine preference reinforcement."""
+        class FixedEmbedding:
+            async def generate_embedding(self, _text):
+                return [1.0, 0.0, 0.0]
+
+        embedding = FixedEmbedding()
+        orchestrator.embedding_service = embedding
+        orchestrator.vector_store._embedding_service = embedding
+
+        existing = await orchestrator.add_memory(
+            content="Project Alpha prefers local memory routing for agent advice.",
+            memory_type="preference",
+            metadata={"title": "Existing routing preference"},
+        )
+        assert existing is not None
+
+        async def no_title_match(_title):
+            return None
+
+        async def close_preference(**_kwargs):
+            return [
+                SearchResult(
+                    memory=existing,
+                    score=0.99,
+                    vector_score=0.99,
+                    source="vector",
+                )
+            ]
+
+        monkeypatch.setattr(orchestrator.vector_store, "find_by_title", no_title_match)
+        monkeypatch.setattr(orchestrator.vector_store, "search", close_preference)
+
+        incoming = await orchestrator.add_memory(
+            content="Project Alpha prefers local memory routing for dashboard advice.",
+            memory_type="preference",
+            metadata={"title": "Reasserted routing preference"},
+        )
+
+        assert incoming is not None
+        assert incoming.id == existing.id
+        persisted = await orchestrator.vector_store.get_memory(existing.id)
+        assert persisted is not None
+        assert "Reasserted" in persisted.content
     
     @pytest.mark.asyncio
     async def test_add_memory_persists_to_graph_store(self, orchestrator):
@@ -585,6 +679,11 @@ async def test_live_mcp_server_survives_shutdown_regression(tmp_path):
                     "domain": "project",
                     "category": "crash-regression",
                     "tags": [token, "crash-regression", "pytest-live"],
+                    "scope": "project:live-mcp-regression",
+                    "metadata": {
+                        "project": "live-mcp-regression",
+                        "workspace": str(project_root),
+                    },
                     "force_new": True,
                 },
             )
@@ -611,26 +710,41 @@ async def test_live_mcp_server_survives_shutdown_regression(tmp_path):
                 {"action": "search", "query": shared_phrase, "limit": 10},
             )
             assert search.get("success") is True, search
-            response = await client.call_tool(
+            plan_response = await client.call_tool(
                 "elefante-Memory",
-                {"action": "delete", 
+                {
+                    "action": "correct",
+                    "correction": "archive",
                     "memory_id": memory_id,
-                    "reason": f"Cleanup for live MCP crash regression probe {token}",
-                    "delete_mode": "permanent",
-                    "invocation_mode": "user_directed",
-                    "confirm_permanent": True,
                 },
             )
-            assert response.get("success", False), f"MemoryDelete failed for {memory_id}: {response}"
-            await client.ensure_alive(f"after delete {memory_id[:8]}")
+            assert plan_response.get("correction_status") == "READY", plan_response
+            plan = plan_response["plan"]
+            response = await client.call_tool(
+                "elefante-Memory",
+                {
+                    "action": "correct",
+                    "correction": "archive",
+                    "memory_id": memory_id,
+                    "apply": True,
+                    "reason": f"Cleanup for live MCP crash regression probe {token}",
+                    "verification_question": shared_phrase,
+                    "expected_record_sha256": plan["record_sha256"],
+                    "expected_graph_sha256": plan["graph_sha256"],
+                    "invocation_mode": "user_directed",
+                },
+            )
+            assert response.get("success", False), f"Correct archive failed for {memory_id}: {response}"
+            assert response.get("correction_status") == "VERIFIED_COMPLETE", response
+            await client.ensure_alive(f"after verified archive {memory_id[:8]}")
 
         final_search = await client.call_tool("elefante-Memory", {"action": "search", "query": shared_phrase, "limit": 10})
         tagged_after_delete = [
             item for item in final_search.get("results", [])
             if token in item.get("memory", {}).get("content", "")
         ]
-        assert not tagged_after_delete, f"Deleted memories still surfaced after delete: {tagged_after_delete}"
-        await client.ensure_alive("after final delete verification")
+        assert not tagged_after_delete, f"Archived memories still surfaced: {tagged_after_delete}"
+        await client.ensure_alive("after final archive verification")
     finally:
         await client.stop()
     
@@ -849,7 +963,7 @@ finally:
         repo_root = Path(__file__).resolve().parents[1]
         active_docs = [
             repo_root / "docs" / "how-to" / "kuzu-troubleshooting.md",
-            repo_root / "docs" / "how-to" / "view-dashboard.md",
+            repo_root / "docs" / "how-to" / "view-dashboard.html",
             repo_root / "docs" / "how-to" / "run-mcp-server.md",
         ]
 

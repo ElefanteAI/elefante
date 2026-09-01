@@ -13,6 +13,7 @@ import asyncio
 import hashlib
 import json
 import importlib.util
+import stat
 import struct
 from pathlib import Path
 from types import SimpleNamespace
@@ -22,7 +23,16 @@ from uuid import uuid4
 
 import pytest
 
-from src.models.memory import HealthStatus, Memory, MemoryMetadata, MemoryStatus, MemoryType
+from src.models.memory import (
+    HealthStatus,
+    InjectionPolicy,
+    Memory,
+    MemoryMetadata,
+    MemoryStatus,
+    MemoryType,
+    RetentionPolicy,
+    SourceType,
+)
 from src.mcp.server import ElefanteMCPServer
 from src.utils.curation import assess_health, assess_health_from_raw
 from src.utils.dashboard_serializer import (
@@ -66,6 +76,7 @@ def _sample_memory() -> Memory:
             last_accessed=datetime(2025, 6, 1, 12, 0, 0),
             access_count=5,
             decay_rate=0.002,
+            recall_cues=["How should answers be written?"],
             custom_metadata={"title": "Code Style | PEP8"},
         ),
     )
@@ -107,6 +118,7 @@ def test_memory_to_dashboard_node_serializes_score_and_topic():
     assert node["properties"]["score"] == score
     assert node["name"] == "Code Style | PEP8"
     assert node["properties"]["topic"] == "Code Style"
+    assert node["properties"]["recall_cues"] == ["How should answers be written?"]
 
 
 def test_health_assessment_reads_metadata_fields_and_is_explainable():
@@ -249,7 +261,87 @@ def test_memory_to_dashboard_node_uses_explicit_configured_backend_label():
     node = memory_to_dashboard_node(_sample_memory(), vector_source="sqlite")
 
     assert node is not None
-    assert node["properties"]["source"] == "sqlite"
+    assert node["properties"]["storage_backend"] == "sqlite"
+
+
+def test_memory_to_dashboard_node_exposes_bounded_product_control_metadata():
+    conflict_id = uuid4()
+    memory = Memory(
+        content="Use the verified product contract.",
+        metadata=MemoryMetadata(
+            project="elefante",
+            workspace="/private/workspaces/elefante",
+            scope="project:elefante",
+            source=SourceType.CODE_ANALYSIS,
+            source_detail="src/product.py:42",
+            verified=True,
+            retention_policy=RetentionPolicy.PERMANENT,
+            injection_policy=InjectionPolicy.RANKED,
+            user_locked=True,
+            conflict_ids=[conflict_id],
+            custom_metadata={
+                "conflict_resolution_history": [
+                    {
+                        "at": f"2026-08-29T18:00:{index:02d}+00:00",
+                        "action": "supersede",
+                        "winner_memory_id": str(uuid4()),
+                        "loser_memory_id": str(uuid4()),
+                        "reason": (
+                            "token=abcdefghijklmnopqrstuvwxyz"
+                            if index == 11
+                            else f"review {index}"
+                        ),
+                        "invocation_mode": "user_directed",
+                        "ignored": "must not leak",
+                    }
+                    for index in range(12)
+                ],
+                "verified_correction_history": [
+                    {
+                        "operation_id": str(uuid4()),
+                        "at": f"2026-08-29T19:00:{index:02d}+00:00",
+                        "action": "edit",
+                        "reason": (
+                            "token=abcdefghijklmnopqrstuvwxyz"
+                            if index == 11
+                            else f"correction {index}"
+                        ),
+                        "invocation_mode": "user_directed",
+                        "memory_ids": {"target": str(uuid4())},
+                        "ignored": "must not leak",
+                    }
+                    for index in range(12)
+                ],
+            },
+        ),
+    )
+
+    node = memory_to_dashboard_node(memory, vector_source="sqlite")
+
+    assert node is not None
+    properties = node["properties"]
+    assert properties["source"] == "code_analysis"
+    assert properties["source_detail"] == "src/product.py:42"
+    assert properties["storage_backend"] == "sqlite"
+    assert properties["project"] == "elefante"
+    assert properties["workspace"] == "/private/workspaces/elefante"
+    assert properties["scope"] == "project:elefante"
+    assert properties["retention_policy"] == "permanent"
+    assert properties["injection_policy"] == "ranked"
+    assert properties["user_locked"] is True
+    assert properties["verified"] is True
+    assert properties["conflict_ids"] == [str(conflict_id)]
+    assert len(properties["conflict_resolution_history"]) == 10
+    assert properties["conflict_resolution_history"][-1]["reason"] == (
+        "token=[REDACTED]"
+    )
+    assert "ignored" not in properties["conflict_resolution_history"][-1]
+    assert len(properties["verified_correction_history"]) == 10
+    assert properties["verified_correction_history"][-1]["reason"] == (
+        "token=[REDACTED]"
+    )
+    assert "target" in properties["verified_correction_history"][-1]["memory_ids"]
+    assert "ignored" not in properties["verified_correction_history"][-1]
 
 
 def test_raw_and_memory_scores_stay_close():
@@ -265,7 +357,10 @@ def test_dashboard_open_waits_for_readiness_before_browser_launch():
 
     assert "def _wait_for_ready" in server_source
     assert "ready = _wait_for_ready(max_wait=15.0)" in server_source
-    assert re.search(r"if ready:\n\s+try:\n\s+webbrowser\.open\(url\)", server_source)
+    assert re.search(
+        r"if ready:\n\s+try:\n\s+webbrowser\.open\(browser_url\)",
+        server_source,
+    )
     assert "Dashboard server is still starting on port" in server_source
 
 
@@ -284,6 +379,7 @@ def test_dashboard_refresh_forces_restart_of_existing_server():
 async def test_live_dashboard_refresh_includes_usage_summary(monkeypatch, tmp_path):
     from src.utils import config
 
+    requested_limits = []
     memory = Memory(
         content="Use SQLite for durable memory",
         metadata=MemoryMetadata(
@@ -294,15 +390,33 @@ async def test_live_dashboard_refresh_includes_usage_summary(monkeypatch, tmp_pa
 
     class FakeVectorStore:
         async def get_all(self, limit=1000, offset=0):
+            requested_limits.append((limit, offset))
             return [memory]
 
-    class EmptyGraphStore:
+    class DictGraphStore:
         async def execute_query(self, query):
-            return []
+            if "MATCH (n:Entity)" in query:
+                return [{
+                    "n": {
+                        "_label": "Entity",
+                        "id": "entity-1",
+                        "name": "Elefante product",
+                        "type": "project",
+                        "description": "Product context",
+                        "created_at": "2026-08-30 12:00:00",
+                        "props": "{}",
+                    }
+                }]
+            return [{
+                "a.id": str(memory.id),
+                "b.id": "entity-1",
+                "LABEL(r._ID,[RELATES_TO])": "RELATES_TO",
+                "values": [str(memory.id), "entity-1", "RELATES_TO"],
+            }]
 
     orchestrator = SimpleNamespace(
         vector_store=FakeVectorStore(),
-        graph_store=EmptyGraphStore(),
+        graph_store=DictGraphStore(),
     )
     dashboard_server = ElefanteMCPServer()
 
@@ -310,11 +424,37 @@ async def test_live_dashboard_refresh_includes_usage_summary(monkeypatch, tmp_pa
         return orchestrator
 
     monkeypatch.setattr(dashboard_server, "_get_orchestrator", fake_get_orchestrator)
-    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    current_config = config.get_config()
+    monkeypatch.setattr(
+        config,
+        "get_config",
+        lambda: SimpleNamespace(
+            elefante=SimpleNamespace(
+                data_dir=str(tmp_path),
+                vector_store=current_config.elefante.vector_store,
+            )
+        ),
+    )
 
     result = await dashboard_server._refresh_dashboard_snapshot()
 
     assert result["success"] is True
+    assert requested_limits == [(1_000_000, 0)]
+    snapshot_path = tmp_path / "dashboard_snapshot.json"
+    snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    assert snapshot["schema_version"] == 2
+    assert snapshot["generation_id"] == result["generation_id"]
+    assert snapshot["project_registry"] == {
+        "status": "ready",
+        "schema_version": 1,
+        "mode": "compatibility",
+        "revision": 0,
+        "scope_policy": "isolated",
+        "shared_across_projects": False,
+        "projects": [],
+    }
+    assert stat.S_IMODE(snapshot_path.stat().st_mode) == 0o600
+    assert list(tmp_path.glob(".dashboard_snapshot.json.*.tmp")) == []
     assert result["stats"]["usage"] == {
         "total_accesses": 5,
         "retrieved_memories": 1,
@@ -323,6 +463,13 @@ async def test_live_dashboard_refresh_includes_usage_summary(monkeypatch, tmp_pa
         "average_access_count": 5.0,
         "max_access_count": 5,
     }
+    assert any(node["id"] == "entity-1" for node in snapshot["nodes"])
+    assert {
+        "from": str(memory.id),
+        "to": "entity-1",
+        "label": "RELATES_TO",
+        "type": "graph",
+    } in snapshot["edges"]
 
 
 def test_dashboard_frontend_retries_stats_and_snapshot_fetches():
@@ -333,6 +480,44 @@ def test_dashboard_frontend_retries_stats_and_snapshot_fetches():
     assert store_source.count("1000 * Math.pow(2, attempt)") >= 2
     assert "fetch('/api/graph')" in store_source
     assert "fetch('/api/stats')" in store_source
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("snapshot", "error_code"),
+    [
+        (None, "PROJECT_SNAPSHOT_UNAVAILABLE"),
+        ({"nodes": [], "edges": [], "stats": {}}, "PROJECT_REGISTRY_UNAVAILABLE"),
+        (
+            {
+                "nodes": [],
+                "edges": [],
+                "stats": {},
+                "project_registry": {"status": "ready", "mode": "strict"},
+            },
+            "PROJECT_REGISTRY_SNAPSHOT_INVALID",
+        ),
+    ],
+)
+async def test_dashboard_never_fabricates_project_compatibility(
+    monkeypatch,
+    snapshot,
+    error_code,
+):
+    from src.dashboard import server as dashboard_app
+
+    monkeypatch.setattr(dashboard_app, "_read_snapshot", lambda: snapshot)
+
+    response = await dashboard_app.get_graph(limit=1000, space=None)
+
+    assert response["project_registry"] == {
+        "status": "unavailable",
+        "schema_version": None,
+        "mode": "invalid",
+        "revision": None,
+        "projects": [],
+        "error_code": error_code,
+    }
 
 
 def test_dashboard_frontend_normalizes_production_edge_endpoints():
@@ -380,7 +565,7 @@ def test_showcase_snapshot_is_deterministic_grounded_and_contract_complete():
     assert snapshot == repeated
     assert snapshot["curation"] == {
         "purpose": "Elefante Memory Intelligence dashboard showcase",
-        "product_baseline": "v2.12.2",
+        "product_baseline": f"v{__import__('src').__version__}",
         "deterministic": True,
         "synthetic_behavioral_metadata": True,
         "source_grounded_content": True,
@@ -419,6 +604,23 @@ def test_showcase_snapshot_is_deterministic_grounded_and_contract_complete():
         "demo:daemon-decision",
         "demo:bridge-guard",
     ]
+    assert snapshot["project_registry"] == {
+        "status": "ready",
+        "schema_version": 1,
+        "mode": "strict",
+        "revision": 1,
+        "projects": [
+            {
+                "project_id": "11111111-1111-4111-8111-111111111111",
+                "name": "Elefante showcase",
+                "root": "/showcase/elefante",
+                "active": True,
+                "root_status": "missing",
+                "created_at": snapshot["generated_at"],
+                "updated_at": snapshot["generated_at"],
+            }
+        ],
+    }
 
     memories = [node for node in snapshot["nodes"] if node["type"] == "memory"]
     assert all(memory["properties"]["evidence"] for memory in memories)
@@ -486,7 +688,8 @@ def test_dashboard_graph_uses_real_decision_trails_not_invented_topic_topology()
     ).read_text(encoding="utf-8")
 
     assert "Decision graph" in graph_source
-    assert "See why the current truth won." in graph_source
+    assert "Trace one represented decision." in graph_source
+    assert "current truth won" not in graph_source
     assert "CAUSAL_LABELS.has(edge.label)" in graph_source
     assert "Inter-hub edges" not in graph_source
     assert "hub:" not in graph_source
@@ -519,6 +722,101 @@ def test_dashboard_allows_only_explicit_origin_configuration(monkeypatch):
         "https://dashboard.example.test",
         "https://admin.example.test",
     ]
+
+
+@pytest.mark.asyncio
+async def test_dashboard_advertises_control_only_from_the_trusted_home_origin(
+    monkeypatch,
+):
+    from src.dashboard import server
+
+    monkeypatch.setenv("ELEFANTE_DAEMON_PORT", "9876")
+    monkeypatch.setattr(server, "_read_snapshot", lambda: None)
+
+    trusted_request = SimpleNamespace(
+        url=SimpleNamespace(scheme="http", hostname="127.0.0.1", port=8000),
+    )
+    preview_request = SimpleNamespace(
+        url=SimpleNamespace(scheme="http", hostname="127.0.0.1", port=8001),
+    )
+
+    assert await server.get_control_config(trusted_request) == {
+        "available": True,
+        "mode": "live_control",
+        "daemon_host": "127.0.0.1",
+        "daemon_port": 9876,
+        "session_path": "/control/session",
+    }
+    assert await server.get_control_config(preview_request) == {
+        "available": False,
+        "mode": "snapshot_only",
+        "reason_code": "CONTROL_ORIGIN_UNAVAILABLE",
+        "reason": "Live controls are intentionally unavailable from this dashboard origin.",
+    }
+    assert "/api/control-config" in {route.path for route in server.app.routes}
+
+
+@pytest.mark.asyncio
+async def test_showcase_never_advertises_live_control_even_on_home_port(monkeypatch):
+    from src.dashboard import server
+
+    monkeypatch.setattr(
+        server,
+        "_read_snapshot",
+        lambda: {
+            "curation": {
+                "purpose": "Elefante Memory Intelligence dashboard showcase",
+                "deterministic": True,
+                "contains_user_data": False,
+            }
+        },
+    )
+    trusted_request = SimpleNamespace(
+        url=SimpleNamespace(scheme="http", hostname="localhost", port=8000),
+    )
+
+    assert await server.get_control_config(trusted_request) == {
+        "available": False,
+        "mode": "snapshot_only",
+        "reason_code": "SHOWCASE_SNAPSHOT_READ_ONLY",
+        "reason": "Live controls are intentionally unavailable for example data.",
+    }
+
+
+@pytest.mark.asyncio
+async def test_graph_exposes_only_bounded_showcase_context(monkeypatch):
+    from src.dashboard import server
+
+    monkeypatch.setattr(
+        server,
+        "_read_snapshot",
+        lambda: {
+            "generated_at": "2026-08-27T12:00:00+00:00",
+            "curation": {
+                "purpose": "Elefante Memory Intelligence dashboard showcase",
+                "deterministic": True,
+                "synthetic_behavioral_metadata": True,
+                "source_grounded_content": True,
+                "contains_user_data": False,
+                "disclaimer": "untrusted arbitrary copy must not cross the API",
+            },
+            "nodes": [],
+            "edges": [],
+            "stats": {"total_nodes": 0, "memories": 0, "entities": 0, "edges": 0},
+        },
+    )
+
+    result = await server.get_graph(limit=10)
+
+    assert result["snapshot_context"] == {
+        "mode": "showcase",
+        "label": "Example workspace",
+        "contains_user_data": False,
+        "source_grounded_content": True,
+        "synthetic_behavioral_metadata": True,
+        "disclaimer": "Deterministic example data; counts and activity do not describe customer behavior or product performance.",
+    }
+    assert "curation" not in result
 
 
 def test_dashboard_container_defaults_remain_host_loopback_only():
@@ -687,6 +985,22 @@ def test_get_graph_handles_null_name_safely(monkeypatch):
             {"id": "node-2", "name": "Valid Node", "type": "concept", "properties": {}},
         ],
         "edges": [],
+        "project_registry": {
+            "status": "ready",
+            "schema_version": 1,
+            "mode": "strict",
+            "revision": 2,
+            "projects": [
+                {
+                    "project_id": "project-a",
+                    "name": "Alpha",
+                    "root": "/company/alpha",
+                    "active": True,
+                    "created_at": "2026-08-29T12:00:00+00:00",
+                    "updated_at": "2026-08-29T12:00:00+00:00",
+                }
+            ],
+        },
         "stats": {"total_nodes": 2},
     }
 
@@ -697,3 +1011,5 @@ def test_get_graph_handles_null_name_safely(monkeypatch):
     assert result["nodes"][0]["label"] == ""
     assert result["nodes"][0]["name"] == ""
     assert result["nodes"][1]["label"] == "Valid Node"
+    assert result["project_registry"]["mode"] == "strict"
+    assert result["project_registry"]["projects"][0]["name"] == "Alpha"

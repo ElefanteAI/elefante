@@ -353,7 +353,11 @@ def test_release_client_candidate_workflow_is_validation_only():
     )
 
     assert '"release/**"' in workflow
-    assert "macos-latest" in workflow
+    assert "runs-on: macos-15" in workflow
+    assert 'CODEX_CLI_VERSION: "0.151.0"' in workflow
+    assert 'test "$(uname -m)" = "arm64"' in workflow
+    assert 'npm install --global "@openai/codex@${CODEX_CLI_VERSION}"' in workflow
+    assert "codex --version" in workflow
     assert "scripts/ci/build_release_client.py" in workflow
     assert "scripts/ci/verify_release_client.py" in workflow
     assert "actions/upload-artifact@v7" in workflow
@@ -367,7 +371,13 @@ def test_release_client_candidate_workflow_is_validation_only():
     assert "steps.release_metadata.outputs.archive" in workflow
     assert "steps.release_metadata.outputs.version" in workflow
     assert "v2.12.2-rc.1" not in workflow
-    assert '"$bundle_root/Install Elefante.command" --venv-mode fresh --verbose' in workflow
+    assert '"$bundle_root/Install Elefante.command" \\' in workflow
+    assert '--project "Alpha=$project_alpha" \\' in workflow
+    assert '--project "Beta=$project_beta" \\' in workflow
+    assert (
+        '"$bundle_root/Install Elefante.command" --install-root "$install_root" '
+        '--venv-mode fresh --verbose'
+    ) in workflow
     assert '"$install_root/scripts/lifecycle/doctor.py" --json' in workflow
     assert 'report["customer_ready"] is True' in workflow
     assert 'report["installation"]["version"] == sys.argv[2]' in workflow
@@ -381,7 +391,9 @@ def test_release_client_candidate_workflow_is_validation_only():
     assert 'report["installation"]["app_root"]' not in workflow
     assert 'shasum -a 256 "$archive" > dist/SHA256SUMS' in workflow
     assert '"tests/test_release_pipeline.py"' in workflow
-    assert '"$install_root/scripts/lifecycle/uninstall_elefante.py" --apply' in workflow
+    assert "printf 'UNINSTALL\\n' | \"$bundle_root/uninstall.sh\"" in workflow
+    assert 'test ! -e "$install_root"' in workflow
+    assert 'test ! -e "$HOME/.elefante/data-preservation.json"' in workflow
     assert "if manifest_path.exists():" in workflow
     assert "softprops/action-gh-release" not in workflow
     assert "candidate-not-for-public-download" not in workflow

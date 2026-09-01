@@ -1,7 +1,7 @@
 ---
 PROTOCOL: memory-inspector
 INVOKE: elefante-memory-inspector
-PROTOCOL_VERSION: 2.12.2
+PROTOCOL_VERSION: 2.14.0
 LOAD_WHEN: User asks "what do I have stored", "show me my memories", export request, audit, dashboard navigation, "find a memory about X".
 DIAGNOSTIC_QUESTION: "What memories exist that match this question, and what do they tell me about the system's state?"
 AUTHORITY: This file owns memory inspection. Read-only. Any write operation routes to `agents/memory-janitor.md` instead.

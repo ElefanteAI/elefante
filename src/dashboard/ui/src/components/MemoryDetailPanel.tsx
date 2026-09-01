@@ -1,7 +1,9 @@
 import { useEffect, useCallback } from 'react';
-import { X, Clock, Tag, Layers, Brain, Star, Hash, Globe, User } from 'lucide-react';
+import { X, Clock, Tag, Layers, Brain, Star, Hash, Globe, User, Check } from 'lucide-react';
 import type { MemoryHealthStatus, MemoryNode } from '@/types';
 import { RetrievalExplanation, type RetrievalEvidence } from '@/components/RetrievalExplanation';
+import { ResolveMemoryDialog } from '@/components/ResolveMemoryDialog';
+import { CorrectionDialog } from '@/components/CorrectionDialog';
 
 function formatRelativeTime(dateStr: string): string {
   const now = Date.now();
@@ -40,6 +42,7 @@ interface MemoryDetailPanelProps {
   memory: MemoryNode;
   onClose: () => void;
   relatedMemories?: MemoryNode[];
+  conflictMemories?: MemoryNode[];
   onNavigateToMemory?: (id: string) => void;
   health_status?: MemoryHealthStatus;
   retrievalEvidence?: RetrievalEvidence;
@@ -89,7 +92,7 @@ function parseListValue(value: unknown): string[] {
   return [trimmed];
 }
 
-export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNavigateToMemory, health_status, retrievalEvidence }: MemoryDetailPanelProps) {
+export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], conflictMemories = [], onNavigateToMemory, health_status, retrievalEvidence }: MemoryDetailPanelProps) {
   // Escape to close
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') onClose();
@@ -101,9 +104,10 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNav
   }, [handleKeyDown]);
 
   const p = memory.properties;
-  const tags = p.tags ? p.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [];
+  const tags = parseListValue(p.tags);
   const concepts = parseListValue(p.concepts);
   const surfacesWhen = parseListValue(p.surfaces_when);
+  const recallCues = parseListValue(p.recall_cues);
   const lifecycleStatus = p.status ? formatLabel(String(p.status)) : '-';
   const processingStatus = p.processing_status ? formatLabel(String(p.processing_status)) : '-';
   const topic = p.topic ? formatLabel(String(p.topic)) : 'General';
@@ -111,9 +115,34 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNav
   const ring = p.ring ? formatLabel(String(p.ring)) : '-';
   const knowledgeType = p.knowledge_type ? formatLabel(String(p.knowledge_type)) : '-';
   const healthStatus = health_status || p.health_status;
+  const conflictIds = Array.from(new Set(parseListValue(p.conflict_ids)));
+  const conflictHistory = Array.isArray(p.conflict_resolution_history)
+    ? p.conflict_resolution_history.slice(-10)
+    : [];
+  const correctionHistory = Array.isArray(p.verified_correction_history)
+    ? p.verified_correction_history.slice(-10).reverse()
+    : [];
+
+  const displayValue = (value: unknown): string => {
+    if (value === null || value === undefined || value === '') return '-';
+    return String(value);
+  };
+
+  const displayBoolean = (value: unknown): string => {
+    if (typeof value !== 'boolean') return '-';
+    return value ? 'Yes' : 'No';
+  };
+
+  const memoryLabelForId = (id: unknown): string => {
+    if (typeof id !== 'string') return '-';
+    const matched = id === memory.id ? memory : conflictMemories.find((candidate) => candidate.id === id);
+    return matched
+      ? String(matched.properties?.title || matched.properties?.summary || matched.name || id)
+      : id;
+  };
 
   return (
-    <div className="fixed right-0 top-0 h-full w-[420px] bg-slate-900/98 backdrop-blur border-l border-slate-700/60 shadow-2xl z-50 flex flex-col overflow-hidden">
+    <div className="fixed right-0 top-0 h-full w-full sm:w-[420px] bg-slate-900/98 backdrop-blur border-l border-slate-700/60 shadow-2xl z-50 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="px-5 py-4 border-b border-slate-700/60 bg-slate-800/40 flex-shrink-0">
         <div className="flex items-start justify-between gap-3">
@@ -209,6 +238,35 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNav
           )}
         </div>
 
+        {/* Provenance and declared scope */}
+        <div className="px-5 py-3 border-b border-slate-800/60">
+          <div className="text-xs uppercase tracking-wider text-slate-500 mb-2">Provenance &amp; scope</div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
+            <MetaRow icon={<Globe size={12} />} label="Storage" value={displayValue(p.storage_backend)} />
+            <MetaRow icon={<User size={12} />} label="Source detail" value={displayValue(p.source_detail)} />
+            <MetaRow icon={<Layers size={12} />} label="Project" value={displayValue(p.project)} />
+            <MetaRow icon={<Layers size={12} />} label="Workspace" value={displayValue(p.workspace)} />
+            <MetaRow icon={<Layers size={12} />} label="Scope" value={displayValue(p.scope)} />
+            <MetaRow icon={<User size={12} />} label="Author" value={displayValue(p.author)} />
+          </div>
+        </div>
+
+        {/* Governance */}
+        <div className="px-5 py-3 border-b border-slate-800/60">
+          <div className="text-xs uppercase tracking-wider text-slate-500 mb-2">Governance</div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
+            <MetaRow icon={<Star size={12} />} label="Authority" value={displayValue(p.authority_score)} />
+            <MetaRow icon={<Star size={12} />} label="Reliability" value={displayValue(p.source_reliability)} />
+            <MetaRow icon={<Check size={12} />} label="Source verified" value={displayBoolean(p.verified)} />
+            <MetaRow icon={<Hash size={12} />} label="Version" value={displayValue(p.version)} />
+            <MetaRow icon={<Hash size={12} />} label="Retention" value={displayValue(p.retention_policy)} />
+            <MetaRow icon={<Hash size={12} />} label="Injection" value={displayValue(p.injection_policy)} />
+            <MetaRow icon={<User size={12} />} label="User locked" value={displayBoolean(p.user_locked)} />
+          </div>
+        </div>
+
+        <CorrectionDialog memory={memory} />
+
         {concepts.length > 0 && (
           <div className="px-5 py-3 border-b border-slate-800/60">
             <div className="text-xs uppercase tracking-wider text-slate-500 mb-2">Concepts</div>
@@ -217,6 +275,22 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNav
                 <span key={concept} className="px-2 py-0.5 bg-cyan-500/10 text-cyan-200 rounded text-xs border border-cyan-500/20">
                   {concept}
                 </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {recallCues.length > 0 && (
+          <div className="px-5 py-3 border-b border-slate-800/60">
+            <div className="text-xs uppercase tracking-wider text-slate-500 mb-1">Recall questions</div>
+            <p className="mb-2 text-[11px] leading-relaxed text-slate-500">
+              Exact project questions saved by Remember or Correct to find this knowledge later.
+            </p>
+            <div className="space-y-1.5">
+              {recallCues.map((cue) => (
+                <div key={cue} className="text-xs text-slate-200 bg-cyan-950/20 border border-cyan-500/20 rounded px-2.5 py-2">
+                  {cue}
+                </div>
               ))}
             </div>
           </div>
@@ -248,6 +322,93 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], onNav
                   {tag}
                 </span>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Conflicts and bounded correction history */}
+        {(conflictIds.length > 0 || conflictHistory.length > 0) && (
+          <div className="px-5 py-3 border-b border-slate-800/60">
+            <div className="text-xs uppercase tracking-wider text-slate-500 mb-2">
+              Conflicts {conflictIds.length > 0 ? `(${conflictIds.length})` : ''}
+            </div>
+            {conflictIds.length > 0 ? (
+              <div className="space-y-1.5">
+                {conflictIds.map((conflictId) => {
+                  const peer = conflictMemories.find((candidate) => candidate.id === conflictId);
+                  return peer && onNavigateToMemory ? (
+                    <button
+                      key={conflictId}
+                      type="button"
+                      onClick={() => onNavigateToMemory(peer.id)}
+                      className="flex w-full items-center justify-between gap-3 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-left transition-colors hover:border-amber-400/45 hover:bg-amber-500/10"
+                    >
+                      <span className="min-w-0 truncate text-xs text-amber-100">{memoryLabelForId(conflictId)}</span>
+                      <span className="flex-shrink-0 text-[10px] text-amber-300">Inspect</span>
+                    </button>
+                  ) : (
+                    <div key={conflictId} className="rounded-md border border-slate-700/50 bg-slate-800/30 px-3 py-2 text-xs text-slate-500">
+                      {memoryLabelForId(conflictId)} <span className="text-slate-600">(not in current snapshot)</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-xs text-slate-500">No active conflict IDs are recorded.</div>
+            )}
+
+            {conflictHistory.length > 0 ? (
+              <div className="mt-4 space-y-2">
+                <div className="text-[10px] uppercase tracking-widest text-slate-600">Resolution history · latest {conflictHistory.length}</div>
+                {conflictHistory.map((event, index) => (
+                  <div key={`${String(event.at || 'event')}-${index}`} className="rounded-md border border-slate-800/70 bg-slate-950/35 px-3 py-2">
+                    <div className="flex items-center justify-between gap-3 text-[11px]">
+                      <span className="text-slate-300">{formatLabel(String(event.action || 'resolution'))}</span>
+                      {event.at && <span className="text-slate-600">{formatRelativeTime(String(event.at))}</span>}
+                    </div>
+                    {event.reason && <p className="mt-1 text-xs leading-relaxed text-slate-400">{String(event.reason)}</p>}
+                    {(event.winner_memory_id || event.loser_memory_id) && (
+                      <div className="mt-1.5 text-[10px] text-slate-600">
+                        Winner: <span className="text-slate-500">{memoryLabelForId(event.winner_memory_id)}</span>
+                        {' · '}
+                        Loser: <span className="text-slate-500">{memoryLabelForId(event.loser_memory_id)}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-3 text-[11px] text-slate-600">No prior resolution history.</div>
+            )}
+
+            <ResolveMemoryDialog memory={memory} conflictMemories={conflictMemories} />
+          </div>
+        )}
+
+        {correctionHistory.length > 0 && (
+          <div className="border-b border-slate-800/60 px-5 py-3">
+            <div className="text-xs uppercase tracking-wider text-slate-500">
+              Correction history · latest {correctionHistory.length}
+            </div>
+            <div className="mt-3 space-y-2">
+              {correctionHistory.map((event, index) => {
+                const reason = typeof event.reason === 'string' ? event.reason : '';
+                const boundedReason = reason.length > 240 ? `${reason.slice(0, 240)}…` : reason;
+                return (
+                  <div
+                    key={`${String(event.at || 'correction')}-${index}`}
+                    className="rounded-md border border-slate-800/70 bg-slate-950/35 px-3 py-2"
+                  >
+                    <div className="flex items-center justify-between gap-3 text-[11px]">
+                      <span className="text-slate-300">{formatLabel(String(event.action || 'correction'))}</span>
+                      {event.at && <span className="text-slate-600">{formatRelativeTime(String(event.at))}</span>}
+                    </div>
+                    {boundedReason && (
+                      <p className="mt-1 text-xs leading-relaxed text-slate-400">{boundedReason}</p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

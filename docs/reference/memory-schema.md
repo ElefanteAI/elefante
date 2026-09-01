@@ -1,7 +1,8 @@
 # Memory Schema
 
-This reference describes the released v2.13.0 `Memory` and `MemoryMetadata`
-models in `src/models/memory.py`.
+This reference describes the current development `Memory` and `MemoryMetadata`
+models in `src/models/memory.py`. Published v2.13.0 does not yet include the
+unreleased `recall_cues` extension described below.
 
 ## Memory
 
@@ -31,11 +32,20 @@ models in `src/models/memory.py`.
 | ----------------- | ---------- | ---------------------------------------------- | -------------- |
 | `concepts`        | `string[]` | 3-5 key terms used by concept-overlap retrieval | Yes            |
 | `surfaces_when`   | `string[]` | Literal hints for explicitly triggered delivery; not a current ranking signal | Yes |
+| `recall_cues`     | `string[]` | Up to five customer-supplied likely future questions used by exact project-scoped Recall | Verified customer writes only |
 | `authority_score` | `float`    | Stored compatibility/dashboard field; the current retriever derives authority from vitality and access count | Yes |
 
 - `score`: integer `0–100`; defaults to 100 and is system-managed
 - `confidence`: float `0.0–1.0`; defaults to 0.7
 - `tags`, `keywords`, `entities`
+
+Recall cues are canonicalized, bounded to 1,000 characters each, deduplicated,
+and never treated as a broad trigger or similarity override. A cue matches only
+the complete normalized question, and only when both project and workspace are
+resolved through the strict registry. The candidate must still pass lifecycle,
+scope, reliability, current-source, conflict, and privacy gates. Home Remember
+creates the first cue; verified Edit, Replace, and Restore maintain the cue on
+the resulting current record.
 
 `compute_authority_score()` returns `1.0` for specification/directive types.
 Other types combine current score (0.35), access frequency (0.25), creation
@@ -75,8 +85,10 @@ low-trust, or secret-bearing records, and never reinforces access or graph state
 When the caller supplies a workspace filter, stale-source means the shared
 source-file digest check found a mismatch; without a workspace, an unavailable
 source is not treated as proof of contradiction.
-This is an opt-in delivery hint, not automatic host interception or a second
-semantic retriever.
+This is an opt-in delivery hint consumed by the bounded search/Recall selector.
+Typed file, terminal-error, and conversation host adapters may submit explicit
+surface context through the loopback event endpoint; the event is scrubbed and
+not persisted, and no second semantic retriever is introduced.
 
 Governed answer delivery separately reports a bounded warning when a candidate
 has a stored conflict relationship or contradictory status. The conflicted

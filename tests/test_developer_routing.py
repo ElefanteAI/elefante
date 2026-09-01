@@ -9,6 +9,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
 from __future__ import annotations
 import ast
+import json
+import os
 import re
 import subprocess
 import sys
@@ -73,6 +75,149 @@ def _mcp_surface_names() -> tuple[set[str], set[str]]:
     tool_names = set(re.findall(r'types\.Tool\(\s*name="(elefante-[^"]+)"', server, re.DOTALL))
     prompt_names = set(re.findall(r'Prompt\(\s*name="(elefante-[^"]+)"', server, re.DOTALL))
     return tool_names, prompt_names
+
+
+def test_protocol_headers_match_current_product_contract() -> None:
+    expected = _current_version()
+    protocol_files = sorted((ROOT / "agents").glob("*.md"))
+    declared: dict[str, str] = {}
+    for path in protocol_files:
+        match = re.search(r"^PROTOCOL_VERSION: (\S+)$", path.read_text(encoding="utf-8"), re.MULTILINE)
+        if match:
+            declared[path.name] = match.group(1)
+
+    assert declared
+    assert set(declared.values()) == {expected}, declared
+
+
+def test_active_proposals_do_not_restate_pre_v213_product_state() -> None:
+    tool_count, prompt_count = _mcp_surface_counts()
+    tool_proposal = _read("workspace/proposals/tool-consolidation.md")
+    agent_zero = _read("workspace/proposals/integrations/agent-zero.md")
+    session = _read("workspace/proposals/session-intelligence.md")
+    integration = _read("workspace/proposals/ide-integration-surface.md")
+    north_star = _read("workspace/proposals/retrieval-effectiveness.md")
+    proposal_index = _read("workspace/proposals/README.md")
+
+    for document in (tool_proposal, agent_zero):
+        assert f"{tool_count} tools and {prompt_count} prompts" in document
+        assert "16 tools and 2 prompts" not in document
+    assert "SHIPPED IN v2.13.0" in session
+    assert "current v2.13.0 release" in integration
+    assert "Published customer release: v2.13.0" in north_star
+    assert "four-action-product-lifecycle.md" in proposal_index
+    assert "APPROVED / LOCAL PRODUCT LOOP IMPLEMENTED" in proposal_index
+    assert "PROPOSED — one-operator self-service product shell" not in proposal_index
+
+
+def test_issue_ledger_ids_are_unique_and_declared_counts_are_derived() -> None:
+    ledger = _read("workspace/ISSUES.md")
+    bug_ids = re.findall(r"^\| (BUG-\d+) \|", ledger, re.MULTILINE)
+    gap_ids = re.findall(r"^\| (GAP-\d+) \|", ledger, re.MULTILINE)
+    header = re.search(
+        r"(\d+) distinct BUG records through BUG-(\d+) \+ (\d+) GAPs",
+        ledger,
+    )
+
+    assert len(bug_ids) == len(set(bug_ids)), bug_ids
+    assert len(gap_ids) == len(set(gap_ids)), gap_ids
+    assert header is not None
+    assert int(header.group(1)) == len(set(bug_ids))
+    assert int(header.group(2)) == max(int(value.split("-")[1]) for value in bug_ids)
+    assert int(header.group(3)) == len(set(gap_ids))
+
+
+def test_host_auto_allow_contract_matches_customer_tool_surface() -> None:
+    expected_tools, _prompt_names = _mcp_surface_names()
+    expected_tools.discard("elefante-TaskIntelligence")
+    namespace: dict[str, object] = {}
+    exec(compile(_read("scripts/setup/host_selection.py"), "host_selection.py", "exec"), namespace)
+    configured = set(namespace["CUSTOMER_ALWAYS_ALLOW_TOOLS"])
+
+    assert configured == expected_tools
+    for path in (
+        "scripts/setup/configure_antigravity.py",
+        "scripts/setup/configure_vscode_bob.py",
+    ):
+        source = _read(path)
+        assert "CUSTOMER_ALWAYS_ALLOW_TOOLS" in source, path
+        assert '"alwaysAllow": list(CUSTOMER_ALWAYS_ALLOW_TOOLS)' in source, path
+
+
+def test_self_protocol_browser_stub_is_platform_neutral() -> None:
+    harness = _read("scripts/verify/verify_e2e_tests.py")
+
+    assert "/usr/bin/true" not in harness
+    assert "_browser_stub_command" in harness
+
+
+def test_active_memory_action_summaries_cover_the_full_schema() -> None:
+    server = _read("src/mcp/server.py")
+    expected = [
+        "add",
+        "search",
+        "record_use",
+        "correct",
+        "update",
+        "resolve",
+        "delete",
+        "consolidate",
+    ]
+
+    assert f'"enum": {json.dumps(expected)}' in server
+    for action in expected:
+        assert f"`action={action}`" in server
+    assert '"elefante-Memory",  # all memory actions skip context-injection' in server
+
+
+def test_direct_restart_version_verification_is_real(monkeypatch, tmp_path) -> None:
+    from scripts.lifecycle import restart_elefante
+
+    process_pid = 12345
+    identity_path = tmp_path / "process-identity.json"
+    monkeypatch.setattr(restart_elefante.os, "kill", lambda _pid, _signal: None)
+    identity_path.write_text(
+        json.dumps({"pid": process_pid, "version": _current_version()}),
+        encoding="utf-8",
+    )
+
+    assert restart_elefante.verify_restart(
+        process_pid=process_pid,
+        identity_path=identity_path,
+        expected_version=_current_version(),
+    ) is True
+    assert restart_elefante.verify_restart(
+        process_pid=process_pid,
+        identity_path=identity_path,
+        expected_version="0.0.0",
+    ) is False
+    identity_path.write_text(
+        json.dumps({"pid": process_pid + 1, "version": _current_version()}),
+        encoding="utf-8",
+    )
+    assert restart_elefante.verify_restart(
+        process_pid=process_pid,
+        identity_path=identity_path,
+        expected_version=_current_version(),
+    ) is False
+    source = _read("scripts/lifecycle/restart_elefante.py")
+    assert "version check not implemented" not in source
+    assert "PROCESS_IDENTITY_PATH_ENV" in source
+
+
+def test_direct_server_authors_private_process_identity_receipt(monkeypatch, tmp_path) -> None:
+    from src.mcp import server
+
+    identity_path = tmp_path / "server-identity.json"
+    monkeypatch.setenv(server.PROCESS_IDENTITY_PATH_ENV, str(identity_path))
+
+    server._write_process_identity_receipt()
+
+    assert json.loads(identity_path.read_text(encoding="utf-8")) == {
+        "pid": os.getpid(),
+        "version": _current_version(),
+    }
+    assert identity_path.stat().st_mode & 0o777 == 0o600
 
 
 def test_active_developer_routing_avoids_retired_paths() -> None:
@@ -216,7 +361,10 @@ def test_living_plan_tracks_the_released_product_and_separate_client_candidate()
     assert "| OB5 |" not in planning
     assert "source-grounded" in planning
     assert f"**RELEASE_TARGET:** v{version}" in planning
-    assert "**PUBLICATION_AUTHORITY:** owner authorization covers this core release only." in planning
+    assert (
+        "**PUBLICATION_AUTHORITY:** owner authorization covers core publication, "
+        "matching local installation, and website synchronization"
+    ) in planning
 
 
 def test_active_scoring_reference_matches_runtime_contract() -> None:
@@ -280,14 +428,14 @@ def test_active_tool_docs_match_current_mcp_surface() -> None:
     verifier = _read("scripts/verify/verify_e2e_tests.py")
     source_tool_names, _ = _mcp_surface_names()
     source_tool_count = len(source_tool_names)
-    default_tool_count = source_tool_count - 1  # DashboardOpen is opt-in.
+    default_tool_count = source_tool_count - 1  # TaskIntelligence is opt-in.
     assert f"Available MCP Tools: {tool_count}" in startup_guide
     assert "Available MCP Tools: 21" not in startup_guide
     assert f"{default_tool_count}/{source_tool_count}" in verifier
     assert f"{default_tool_count} of {source_tool_count}" in self_protocol
 
     assert "docs/technical/dashboard.md" not in readme
-    assert "docs/how-to/view-dashboard.md" in readme
+    assert "docs/how-to/view-dashboard.html" in readme
 
     tool_names, prompt_names = _mcp_surface_names()
     public_names = (tool_names - {"elefante-TaskIntelligence"}) | prompt_names
@@ -667,8 +815,9 @@ def test_product_explanation_keeps_the_agent_and_memory_boundaries_separate() ->
         assert "retrieve" in text
         assert "verified outcomes" in text
 
-    assert "The agent owns the goal, plan, tools, and stopping decision." in readme
-    assert "Elefante is not an LLM, an agent runtime, or a domain adviser." in readme
+    assert "The AI tool continues to do the work." in readme
+    assert "retrieves durable context" in readme
+    assert "agent runtime" not in readme
     assert "architectural example, not a claim" in vision
     assert "not hidden chain-of-thought" in vision
 
@@ -815,7 +964,7 @@ def test_recall_cost_and_release_contract_is_synced_across_loaded_surfaces() -> 
     assert "provider usage" in token_doc
     assert "1,000" in architecture
     assert "1,000" in self_protocol
-    assert "Released and default-on in v2.13.0" in tools_doc
+    assert f"Released and default-on in v{_current_version()}" in tools_doc
     assert "published v2.12.3 installers" not in tools_doc
     assert "1,000" in issues
     assert "live Recall capability" in scripts_index

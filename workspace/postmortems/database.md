@@ -105,6 +105,36 @@ field renames.
 **Guard:** `pytest tests/test_memory_persistence.py -k "config_paths_exist or fresh_home" -v`.
 **Lesson:** Filesystem tests must include a clean-home proof. Persistent developer state can make obsolete path assumptions look valid indefinitely.
 
+<a id="issue-11"></a>
+
+## Issue #11: MCP Write Lock Ended Before Graph and Queue Mutations [BUG-057, FIXED LOCALLY, guarded]
+
+**Trigger:** A Gauntlet event-order regression observed the transaction-scoped write lock exit before `GraphConnect` called entity creation. The same source shape existed in `ETLProcess`, whose raw-memory fetch marks rows as processing after its lock had already ended.
+**Root cause:** The handlers used the lock as an admission check rather than as ownership of the complete mutating lifecycle. Acquiring and immediately leaving the context manager proved only that the store was momentarily available; it did not serialize the writes that followed.
+**Solution:** Keep GraphConnect's lock through every entity and relationship write. Keep ETLProcess's lock through the queue-state transition and related stats read. Render optional system status only after the graph write lock is released so read-only reporting does not expand native database ownership.
+**Guard:** `pytest tests/test_mcp_daemon.py -k "graph_connect_scrubs or etl_process_scrubs" -q` records context-manager entry, mutation, and exit order and fails if writes escape the lock again.
+**Lesson:** A transaction lock must own the mutation, not merely precede it. Event-order tests are the shortest proof that context-manager scope matches the actual write lifecycle.
+
+<a id="issue-12"></a>
+
+## Issue #12: Kuzu-Only Reset Ignored Configuration and Claimed a Rebuild [BUG-058, FIXED LOCALLY, guarded]
+
+**Trigger:** A Gauntlet regression supplied an isolated configuration and expected only its temporary graph path to move. The script ignored that configuration and moved the real default `~/.elefante/data/kuzu_db` instead, proving the destructive target bug. The exact timestamped backup was moved back immediately; daemon health and installed `doctor` then returned customer-ready with all configured hosts and 17 tools. No memory contents were inspected.
+**Root cause:** The privileged script hard-coded `Path.home()/.elefante/data/kuzu_db` instead of resolving the running configuration. Its headers and active operator docs also claimed it rebuilt topology from a legacy Chroma store, but no reconstruction code existed. The initial regression failed to make its apply target safe before invoking the known-stale implementation. The first repair then treated configuration as authority for any external directory after only the generic `DELETE` confirmation.
+**Solution:** Reuse the config-only storage resolver, show the exact configured graph target in dry-run, preserve the vector path, and move the graph into `<configured-data>/backups/kuzu_reset` only after privilege and confirmation gates. Reject filesystem-root, home, data-root, vector, and recovery ancestors. Any graph path outside the configured data root additionally requires `--confirm-path` to match the exact resolved dry-run target. State explicitly that next initialization is empty and no automatic rebuild occurs.
+**Guard:** `pytest tests/test_backup_restore.py -k "kuzu_only_reset" -q` uses temporary custom graph paths, proves dry-run no-op, exact external-target confirmation, broad-directory rejection, apply recovery, vector preservation, and truthful output. The test cannot reach the user's default path because the implementation resolves its isolated config first.
+**Lesson:** A destructive regression must isolate the target before exercising apply, even when the purpose is to prove that target resolution is broken. Configuration is target discovery, not sufficient destructive authority; broad and external paths need separate fail-closed validation.
+
+<a id="issue-13"></a>
+
+## Issue #13: Restore Integrity Check Mutated the Staged Manifest [BUG-068, FIXED LOCALLY, guarded]
+
+**Trigger:** Home restored a verified backup whose SQLite database used WAL journal mode. Archive readback, staged manifest, SQLite, and Kuzu checks passed, but the active manifest immediately failed and Elefante rolled the exact previous data back.
+**Root cause:** SQLite opened with `mode=ro` can still create `-wal` and `-shm` sidecars for a WAL-mode database. The staged manifest was compared before the integrity connection opened, so verification changed the tree after declaring it exact. The atomic switch then correctly exposed the extra files as `MANIFEST_MISMATCH`.
+**Solution:** Open frozen staged SQLite files with `mode=ro&immutable=1`, which performs `PRAGMA quick_check` without creating sidecars. Compare the complete data manifest both before and after all SQLite/Kuzu integrity checks. Any validator side effect now fails while data is still staged, before the active directory switch. The existing safety backup and exact rollback remain unchanged.
+**Guard:** `pytest tests/test_verified_recovery.py -q` includes a real WAL archive and an adversarial mutating integrity checker. Isolated Home acceptance additionally creates a post-backup marker, restores the earlier archive, confirms `Restore verified`, reloads 14 rather than 15 memories, proves the marker question returns no applicable memory, and proves the restored decision is recalled.
+**Lesson:** Verification must be observational. Hash both sides of any validator that can touch a durable tree, especially before an atomic restore switch.
+
 ---
 
 ## Cross-bug pattern (extracted to `../lessons.md`)
@@ -114,6 +144,9 @@ field renames.
 3. **Native objects need a single owner; cross-thread lifetimes are bugs** — Issue #7.
 4. **Storage format ≠ domain model — always translate via helpers** — Issues #6, #8.
 5. **Generic mental models of schemas hide concrete relation/property differences** — Issue #8.
+6. **Lock scope must contain the write lifecycle** — entering a lock before a mutation is not protection if the context exits first. Issue #11.
+7. **Isolate and validate destructive targets before apply** — never let a fail-first test inherit a real durable default; reject broad paths and require exact confirmation for external configured storage. Issue #12.
+8. **Verification must not mutate the thing it verifies** — compare durable manifests before and after database checks, and fail before switching live data. Issue #13.
 
 Distill any new repeating rule into `../lessons.md`.
 

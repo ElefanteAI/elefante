@@ -209,6 +209,45 @@ def canonicalize_surfaces_when(
     return out
 
 
+def canonicalize_recall_cues(
+    cues: list[str],
+    *,
+    max_cues: int = 5,
+    max_length: int = 1000,
+) -> list[str]:
+    """Return bounded, deduplicated user-authored Recall cues.
+
+    Cues preserve the customer's wording for inspection while equality uses the
+    same punctuation-insensitive normalization as the retrieval matcher.  They
+    are not generic proactive triggers and do not change injection policy.
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in cues or []:
+        if not isinstance(raw, str):
+            continue
+        cue = collapse_ws(raw)
+        normalized = normalize_label(cue)
+        if not normalized or len(cue) > max_length or normalized in seen:
+            continue
+        seen.add(normalized)
+        out.append(cue)
+        if len(out) >= max_cues:
+            break
+    return out
+
+
+def matching_recall_cue(cues: list[str], question: str) -> bool:
+    """Match one complete project Recall question to a customer-authored cue."""
+    normalized_question = normalize_label(question)
+    if not normalized_question:
+        return False
+    return any(
+        normalize_label(cue) == normalized_question
+        for cue in canonicalize_recall_cues(cues)
+    )
+
+
 def extract_concepts(content: str, max_concepts: int = 5) -> list[str]:
     """
     Extract 3-5 key concepts from content for graph edges.

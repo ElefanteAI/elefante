@@ -7,8 +7,8 @@ import type { VisualizationType } from '@/types';
 
 const vizOptions: { id: VisualizationType; label: string; icon: React.ReactNode; desc: string }[] = [
   { id: 'treemap',  label: 'Topics',   icon: <LayoutGrid size={14} />, desc: 'Knowledge grouped by topic' },
-  { id: 'calendar', label: 'Insights', icon: <BarChart2 size={14} />,  desc: 'Score & type breakdown' },
-  { id: 'network',  label: 'Graph',    icon: <Network size={14} />,    desc: 'Decisions, evidence & safeguards' },
+  { id: 'calendar', label: 'Vitality', icon: <BarChart2 size={14} />,  desc: 'Stored vitality & type breakdown' },
+  { id: 'network',  label: 'Decision Graph', icon: <Network size={14} />, desc: 'Decisions, evidence & safeguards' },
 ];
 
 export function ExploreTab() {
@@ -42,6 +42,16 @@ export function ExploreTab() {
 
   return (
     <div className="h-full flex flex-col">
+      <header className="flex flex-col gap-3 border-b border-slate-700/60 bg-slate-900/35 px-5 py-4 lg:flex-row lg:items-end lg:justify-between lg:px-7">
+        <div>
+          <div className="text-[10px] text-cyan-400 elefante-mono uppercase tracking-[0.18em]">Connections</div>
+          <h1 className="mt-1 text-2xl font-medium tracking-[-0.025em] text-slate-100">Understand what is represented between memories.</h1>
+        </div>
+        <p className="max-w-lg text-[11px] leading-relaxed text-slate-500 lg:text-right">
+          Topics, distributions, and explicit graph edges describe the current snapshot. Missing links and causal claims are not inferred.
+        </p>
+      </header>
+
       {/* Selector */}
       <div className="px-6 py-3 border-b border-slate-700/60 bg-slate-800/40">
         <div className="flex items-center justify-between">

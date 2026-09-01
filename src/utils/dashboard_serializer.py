@@ -21,10 +21,46 @@ from __future__ import annotations
 import math
 import re
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Mapping, Optional
 
 from src.models.memory import Memory, TYPE_DECAY_RATES
 from src.utils.curation import assess_health
+
+
+def graph_entity_payload(value: Any) -> dict[str, Any]:
+    """Normalize one Kuzu entity value across driver result shapes."""
+    if isinstance(value, Mapping):
+        return {
+            str(key): item
+            for key, item in value.items()
+            if not str(key).startswith("_")
+        }
+    if hasattr(value, "to_dict"):
+        payload = value.to_dict()
+        return dict(payload) if isinstance(payload, Mapping) else {}
+    properties = getattr(value, "properties", None)
+    if not isinstance(properties, Mapping):
+        return {}
+    payload = dict(properties)
+    for name in ("id", "name", "type", "description", "created_at"):
+        attribute = getattr(value, name, None)
+        if attribute is not None:
+            payload.setdefault(name, attribute)
+    return payload
+
+
+def graph_relationship_label(row: Mapping[str, Any]) -> str:
+    """Return a relationship label despite Kuzu's version-specific key text."""
+    direct = row.get("label(r)")
+    if direct:
+        return str(direct)
+    for key, value in row.items():
+        if str(key).upper().startswith("LABEL(") and value:
+            return str(value)
+    values = row.get("values")
+    if isinstance(values, (list, tuple)) and len(values) >= 3 and values[2]:
+        return str(values[2])
+    return "RELATED"
 
 
 # ---------------------------------------------------------------------------
@@ -172,6 +208,68 @@ def _configured_vector_source() -> str:
         return str(get_config().elefante.vector_store.type)
     except Exception:
         return "embedded"
+
+
+def _enum_text(value: Any) -> str:
+    return str(getattr(value, "value", value) or "")
+
+
+def _redacted_optional(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    return _redact_secrets(str(value))
+
+
+def _bounded_resolution_history(custom_metadata: Dict[str, Any]) -> list[Dict[str, Any]]:
+    """Expose only the correction fields Home can explain, newest ten only."""
+    raw_history = custom_metadata.get("conflict_resolution_history") or []
+    if not isinstance(raw_history, list):
+        return []
+    allowed = (
+        "at",
+        "action",
+        "winner_memory_id",
+        "loser_memory_id",
+        "reason",
+        "invocation_mode",
+    )
+    history: list[Dict[str, Any]] = []
+    for raw_event in raw_history[-10:]:
+        if not isinstance(raw_event, dict):
+            continue
+        event = {
+            key: _redact_secrets(str(raw_event[key]))
+            for key in allowed
+            if raw_event.get(key) is not None
+        }
+        if event:
+            history.append(event)
+    return history
+
+
+def _bounded_correction_history(custom_metadata: Dict[str, Any]) -> list[Dict[str, Any]]:
+    """Expose newest verified Correct events without leaking arbitrary metadata."""
+    raw_history = custom_metadata.get("verified_correction_history") or []
+    if not isinstance(raw_history, list):
+        return []
+    history: list[Dict[str, Any]] = []
+    for raw_event in raw_history[-10:]:
+        if not isinstance(raw_event, dict):
+            continue
+        event: Dict[str, Any] = {}
+        for key in ("operation_id", "at", "action", "reason", "invocation_mode"):
+            if raw_event.get(key) is not None:
+                event[key] = _redact_secrets(str(raw_event[key]))
+        memory_ids = raw_event.get("memory_ids")
+        if isinstance(memory_ids, dict):
+            event["memory_ids"] = {
+                _redact_secrets(str(key)): _redact_secrets(str(value))
+                for key, value in memory_ids.items()
+                if value is not None
+            }
+        if event:
+            history.append(event)
+    return history
 
 
 def connection_counts_from_edges(
@@ -330,8 +428,8 @@ def memory_to_dashboard_node(
     content_redacted = _redact_secrets(mem.content)
     title_redacted = _redact_secrets(title)
 
-    mem_type = mem.metadata.memory_type.value if hasattr(mem.metadata.memory_type, "value") else str(mem.metadata.memory_type)
-    status_val = mem.metadata.status.value if hasattr(mem.metadata.status, "value") else str(mem.metadata.status)
+    mem_type = _enum_text(mem.metadata.memory_type)
+    status_val = _enum_text(mem.metadata.status)
     rel_type_val = (
         mem.metadata.relationship_type.value
         if getattr(mem.metadata, "relationship_type", None) and hasattr(mem.metadata.relationship_type, "value")
@@ -370,16 +468,42 @@ def memory_to_dashboard_node(
             "namespace": cm.get("namespace"),
             "title": title_redacted,
             "topic": topic,
-            "summary": _redact_secrets(cm.get("summary") or ""),
+            "summary": _redact_secrets(mem.metadata.summary or cm.get("summary") or ""),
             "access_count": max(0, mem.metadata.access_count),
             "last_accessed": mem.metadata.last_accessed.isoformat() if mem.metadata.last_accessed else None,
             "last_modified": mem.metadata.last_modified.isoformat() if mem.metadata.last_modified else None,
             "ring": cm.get("ring"),
             "knowledge_type": cm.get("knowledge_type"),
             "owner_id": cm.get("owner_id"),
-            "concepts": cm.get("concepts"),
-            "surfaces_when": cm.get("surfaces_when"),
-            "authority_score": cm.get("authority_score"),
-            "source": vector_source or _configured_vector_source(),
+            "concepts": mem.metadata.concepts or cm.get("concepts") or [],
+            "surfaces_when": (
+                mem.metadata.surfaces_when or cm.get("surfaces_when") or []
+            ),
+            "recall_cues": [
+                _redact_secrets(str(cue))
+                for cue in (mem.metadata.recall_cues or cm.get("recall_cues") or [])
+                if str(cue).strip()
+            ],
+            "authority_score": mem.metadata.authority_score,
+            "source": _enum_text(mem.metadata.source),
+            "source_detail": _redact_secrets(mem.metadata.source_detail or ""),
+            "source_reliability": mem.metadata.source_reliability,
+            "verified": bool(mem.metadata.verified),
+            "author": _redact_secrets(mem.metadata.author or ""),
+            "storage_backend": vector_source or _configured_vector_source(),
+            "project": _redacted_optional(mem.metadata.project),
+            "workspace": _redacted_optional(mem.metadata.workspace),
+            "scope": _redacted_optional(mem.metadata.scope),
+            "file_path": _redacted_optional(mem.metadata.file_path),
+            "line_number": mem.metadata.line_number,
+            "url": _redacted_optional(mem.metadata.url),
+            "location": _redacted_optional(mem.metadata.location),
+            "retention_policy": _enum_text(mem.metadata.retention_policy),
+            "injection_policy": _enum_text(mem.metadata.injection_policy),
+            "user_locked": bool(mem.metadata.user_locked),
+            "version": max(1, int(mem.metadata.version)),
+            "conflict_ids": [str(item) for item in (mem.metadata.conflict_ids or [])],
+            "conflict_resolution_history": _bounded_resolution_history(cm),
+            "verified_correction_history": _bounded_correction_history(cm),
         }
     }

@@ -269,7 +269,7 @@ export function KnowledgeGraph() {
 
   if (memories.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-[#6f675b]">
+      <div className="flex h-full items-center justify-center text-sm text-slate-500">
         No memories to visualise
       </div>
     );
@@ -279,12 +279,12 @@ export function KnowledgeGraph() {
     return (
       <div className="flex h-full items-center justify-center px-8 text-center">
         <div className="max-w-lg">
-          <div className="elefante-mono mb-3 text-[10px] uppercase tracking-[0.24em] text-[#c8894d]">
+          <div className="elefante-mono mb-3 text-[10px] uppercase tracking-[0.24em] text-cyan-500">
             No decision trails yet
           </div>
-          <p className="text-sm leading-6 text-[#b5aa98]">
-            Connect evidence, decisions, and safeguards to preserve why the
-            current truth won.
+          <p className="text-sm leading-6 text-slate-400">
+            Connect explicit evidence, decisions, and safeguards to preserve a
+            represented decision trail.
           </p>
         </div>
       </div>
@@ -298,38 +298,38 @@ export function KnowledgeGraph() {
   );
 
   return (
-    <div className="flex h-full min-h-[460px] flex-col overflow-hidden bg-[#090805]">
-      <div className="grid grid-cols-[1fr_auto] border-b border-[#34281d] px-6 py-4">
+    <div className="flex h-full min-h-[460px] flex-col overflow-hidden bg-slate-950">
+      <div className="grid grid-cols-[1fr_auto] border-b border-slate-700 px-6 py-4">
         <div>
-          <div className="elefante-mono mb-1 text-[10px] uppercase tracking-[0.24em] text-[#c8894d]">
+          <div className="elefante-mono mb-1 text-[10px] uppercase tracking-[0.24em] text-cyan-500">
             Decision graph
           </div>
-          <h2 className="text-lg font-medium tracking-[-0.02em] text-[#eee4d3]">
-            See why the current truth won.
+          <h2 className="text-lg font-medium tracking-[-0.02em] text-slate-100">
+            Trace one represented decision.
           </h2>
         </div>
         <div className="hidden items-end gap-7 pb-0.5 text-right md:flex">
           <div>
-            <strong className="block text-base font-medium text-[#eee4d3]">{trails.length}</strong>
-            <span className="elefante-mono text-[9px] uppercase tracking-[0.16em] text-[#6f675b]">
+            <strong className="block text-base font-medium text-slate-100">{trails.length}</strong>
+            <span className="elefante-mono text-[9px] uppercase tracking-[0.16em] text-slate-500">
               grounded trails
             </span>
           </div>
           <div>
-            <strong className="block text-base font-medium text-[#c96f5d]">{retiredCount}</strong>
-            <span className="elefante-mono text-[9px] uppercase tracking-[0.16em] text-[#6f675b]">
+            <strong className="block text-base font-medium text-red-400">{retiredCount}</strong>
+            <span className="elefante-mono text-[9px] uppercase tracking-[0.16em] text-slate-500">
               old assumptions
             </span>
           </div>
           <div>
-            <strong className="block text-base font-medium text-[#8ea889]">{guardCount}</strong>
-            <span className="elefante-mono text-[9px] uppercase tracking-[0.16em] text-[#6f675b]">
+            <strong className="block text-base font-medium text-emerald-400">{guardCount}</strong>
+            <span className="elefante-mono text-[9px] uppercase tracking-[0.16em] text-slate-500">
               safeguards
             </span>
           </div>
           <div>
-            <strong className="block text-base font-medium text-[#b99473]">{semanticBridgeCount}</strong>
-            <span className="elefante-mono text-[9px] uppercase tracking-[0.16em] text-[#6f675b]">
+            <strong className="block text-base font-medium text-violet-400">{semanticBridgeCount}</strong>
+            <span className="elefante-mono text-[9px] uppercase tracking-[0.16em] text-slate-500">
               topic bridges
             </span>
           </div>
@@ -337,8 +337,8 @@ export function KnowledgeGraph() {
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[286px_minmax(0,1fr)]">
-        <aside className="min-h-0 overflow-y-auto border-b border-[#34281d] lg:border-b-0 lg:border-r">
-          <div className="elefante-mono border-b border-[#241d16] px-5 py-3 text-[9px] uppercase tracking-[0.2em] text-[#6f675b]">
+        <aside className="min-h-0 overflow-y-auto border-b border-slate-700 lg:border-b-0 lg:border-r">
+          <div className="elefante-mono border-b border-slate-800 px-5 py-3 text-[9px] uppercase tracking-[0.2em] text-slate-500">
             Preserved reasoning
           </div>
           {trails.map((trail, index) => {
@@ -350,22 +350,22 @@ export function KnowledgeGraph() {
                   setSelectedTrailId(trail.id);
                   setSelectedMemoryId(trail.decisionId);
                 }}
-                className={`block w-full border-b border-[#241d16] px-5 py-4 text-left transition-colors ${
+                className={`block w-full border-b border-slate-800 px-5 py-4 text-left transition-colors ${
                   active
-                    ? 'bg-[#c8894d0d] shadow-[inset_2px_0_0_#c8894d]'
-                    : 'hover:bg-[#eee4d308]'
+                    ? 'bg-cyan-500/10 shadow-[inset_2px_0_0_#c8894d]'
+                    : 'hover:bg-slate-100/5'
                 }`}
               >
                 <div className="mb-1.5 flex items-center justify-between">
-                  <span className="elefante-mono text-[9px] uppercase tracking-[0.18em] text-[#c8894d]">
+                  <span className="elefante-mono text-[9px] uppercase tracking-[0.18em] text-cyan-500">
                     {String(index + 1).padStart(2, '0')} · {trail.topic}
                   </span>
-                  <span className="elefante-mono text-[9px] text-[#6f675b]">
+                  <span className="elefante-mono text-[9px] text-slate-500">
                     {trail.nodes.length}M / {trail.edges.length}L
                   </span>
                 </div>
                 <strong className={`block text-[13px] font-medium leading-5 ${
-                  active ? 'text-[#eee4d3]' : 'text-[#b5aa98]'
+                  active ? 'text-slate-100' : 'text-slate-400'
                 }`}>
                   {trail.title}
                 </strong>
@@ -375,17 +375,17 @@ export function KnowledgeGraph() {
         </aside>
 
         <section className="min-h-0 overflow-y-auto">
-          <div className="border-b border-[#34281d] px-5 py-5 sm:px-7">
+          <div className="border-b border-slate-700 px-5 py-5 sm:px-7">
             <div className="mb-4 flex items-start justify-between gap-6">
               <div>
-                <div className="elefante-mono mb-1 text-[9px] uppercase tracking-[0.2em] text-[#6f675b]">
+                <div className="elefante-mono mb-1 text-[9px] uppercase tracking-[0.2em] text-slate-500">
                   {selectedTrail.topic} · {selectedTrail.edges.length} explicit relationships
                 </div>
-                <h3 className="max-w-2xl text-xl font-medium tracking-[-0.025em] text-[#eee4d3]">
+                <h3 className="max-w-2xl text-xl font-medium tracking-[-0.025em] text-slate-100">
                   {selectedTrail.title}
                 </h3>
               </div>
-              <span className="elefante-mono shrink-0 border border-[#dfbb7240] px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-[#dfbb72]">
+              <span className="elefante-mono shrink-0 border border-amber-400/30 px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-amber-400">
                 source grounded
               </span>
             </div>
@@ -409,8 +409,8 @@ export function KnowledgeGraph() {
                       onClick={() => setSelectedMemoryId(memory.id)}
                       className={`w-[160px] shrink-0 border px-4 py-4 text-left transition-all 2xl:w-[178px] ${
                         active
-                          ? 'border-[#eee4d3] bg-[#eee4d30a]'
-                          : 'border-[#34281d] bg-[#0e0b08] hover:border-[#6f675b]'
+                          ? 'border-slate-100 bg-slate-100/5'
+                          : 'border-slate-700 bg-slate-900 hover:border-slate-500'
                       }`}
                     >
                       <div className="mb-5 flex items-center justify-between">
@@ -420,23 +420,23 @@ export function KnowledgeGraph() {
                         >
                           {String(index + 1).padStart(2, '0')} · {role.label}
                         </span>
-                        <span className="elefante-mono text-[10px] text-[#6f675b]">
+                        <span className="elefante-mono text-[10px] text-slate-500">
                           {memoryScore(memory)}
                         </span>
                       </div>
-                      <strong className="block text-[13px] font-medium leading-[1.45] text-[#eee4d3]">
+                      <strong className="block text-[13px] font-medium leading-[1.45] text-slate-100">
                         {memoryTitle(memory)}
                       </strong>
                     </button>
 
                     {nextMemory && (
                       <div className="flex w-[68px] shrink-0 flex-col items-center justify-center 2xl:w-[92px]">
-                        <span className="elefante-mono mb-2 max-w-[64px] text-center text-[8px] uppercase tracking-[0.12em] text-[#b99473] 2xl:max-w-[84px]">
+                        <span className="elefante-mono mb-2 max-w-[64px] text-center text-[8px] uppercase tracking-[0.12em] text-violet-400 2xl:max-w-[84px]">
                           {connectingEdge ? relationshipText(connectingEdge.label) : 'connected'}
                         </span>
                         <div className="flex w-full items-center">
-                          <span className="h-px flex-1 bg-[#6f5135]" />
-                          <span className="h-1.5 w-1.5 rotate-45 border-r border-t border-[#c8894d]" />
+                          <span className="h-px flex-1 bg-cyan-600" />
+                          <span className="h-1.5 w-1.5 rotate-45 border-r border-t border-cyan-500" />
                         </div>
                       </div>
                     )}
@@ -455,29 +455,29 @@ export function KnowledgeGraph() {
                 >
                   {selectedRole.label}
                 </span>
-                <span className="h-px w-8 bg-[#34281d]" />
-                <span className="elefante-mono text-[9px] uppercase tracking-[0.16em] text-[#6f675b]">
+                <span className="h-px w-8 bg-slate-700" />
+                <span className="elefante-mono text-[9px] uppercase tracking-[0.16em] text-slate-500">
                   {selectedMemory.properties?.status || 'current'}
                 </span>
               </div>
-              <h4 className="mb-2 text-base font-medium text-[#eee4d3]">
+              <h4 className="mb-2 text-base font-medium text-slate-100">
                 {memoryTitle(selectedMemory)}
               </h4>
-              <p className="max-w-3xl text-[13px] leading-6 text-[#b5aa98]">
+              <p className="max-w-3xl text-[13px] leading-6 text-slate-400">
                 {selectedMemory.description || selectedMemory.properties?.summary}
               </p>
-              <div className="mt-4 border-l border-[#c8894d66] pl-3">
-                <span className="elefante-mono block text-[8px] uppercase tracking-[0.18em] text-[#6f675b]">
+              <div className="mt-4 border-l border-cyan-500/40 pl-3">
+                <span className="elefante-mono block text-[8px] uppercase tracking-[0.18em] text-slate-500">
                   Grounded in
                 </span>
-                <strong className="mt-1 block text-[11px] font-medium text-[#c8894d]">
+                <strong className="mt-1 block text-[11px] font-medium text-cyan-500">
                   {selectedMemory.properties?.evidence || selectedMemory.properties?.source}
                 </strong>
               </div>
             </div>
 
-            <div className="border-t border-[#34281d] px-5 py-5 xl:border-l xl:border-t-0">
-              <div className="elefante-mono mb-3 text-[9px] uppercase tracking-[0.18em] text-[#6f675b]">
+            <div className="border-t border-slate-700 px-5 py-5 xl:border-l xl:border-t-0">
+              <div className="elefante-mono mb-3 text-[9px] uppercase tracking-[0.18em] text-slate-500">
                 What it changes
               </div>
               <div className="space-y-2">
@@ -488,12 +488,12 @@ export function KnowledgeGraph() {
                     <button
                       key={`${edge.source}-${edge.target}-${edge.label}`}
                       onClick={() => peer && setSelectedMemoryId(peer.id)}
-                      className="block w-full border-t border-[#241d16] pt-2 text-left"
+                      className="block w-full border-t border-slate-800 pt-2 text-left"
                     >
-                      <span className="elefante-mono block text-[8px] uppercase tracking-[0.16em] text-[#b99473]">
+                      <span className="elefante-mono block text-[8px] uppercase tracking-[0.16em] text-violet-400">
                         {relationshipForMemory(edge, selectedMemory.id)}
                       </span>
-                      <strong className="mt-1 block text-[11px] font-medium leading-4 text-[#b5aa98]">
+                      <strong className="mt-1 block text-[11px] font-medium leading-4 text-slate-400">
                         {peer ? memoryTitle(peer) : peerId}
                       </strong>
                     </button>
@@ -505,7 +505,7 @@ export function KnowledgeGraph() {
                   setInspectedMemoryId(selectedMemory.id);
                   setActiveTab('memories');
                 }}
-                className="elefante-mono mt-5 border-b border-[#c8894d] pb-1 text-[9px] uppercase tracking-[0.16em] text-[#c8894d] hover:text-[#dfbb72]"
+                className="elefante-mono mt-5 border-b border-cyan-500 pb-1 text-[9px] uppercase tracking-[0.16em] text-cyan-500 hover:text-amber-400"
               >
                 Open complete memory →
               </button>

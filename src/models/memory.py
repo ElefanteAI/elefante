@@ -152,7 +152,12 @@ class MemoryMetadata(BaseModel):
     
     # Cognitive Retrieval
     concepts: List[str] = Field(default_factory=list, description="3-5 key terms for graph edges")
-    surfaces_when: List[str] = Field(default_factory=list, description="Stored trigger metadata for inspection and future proactive surfacing; not a current ranking signal")
+    surfaces_when: List[str] = Field(default_factory=list, description="Stored trigger metadata for explicit bounded proactive surfacing; not a current ranking signal")
+    recall_cues: List[str] = Field(
+        default_factory=list,
+        max_length=5,
+        description="User-authored, project-scoped questions or phrases that directly recall this memory",
+    )
     authority_score: float = Field(default=0.5, ge=0.0, le=1.0, description="score x access x freshness")
     
     # Relationship Tracking
@@ -326,14 +331,6 @@ class Memory(BaseModel):
     
     def __repr__(self) -> str:
         return self.__str__()
-
-
-
-
-
-from enum import Enum
-
-
 class HealthStatus(Enum):
     """Memory health status based on behavioral signals."""
     HEALTHY = "healthy"

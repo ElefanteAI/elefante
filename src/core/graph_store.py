@@ -16,12 +16,13 @@ Supports Cypher-like queries for deterministic fact retrieval.
 import asyncio
 import hashlib
 from typing import List, Optional, Dict, Any, Tuple
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import datetime
 from pathlib import Path
 
 from src.models.entity import Entity, EntityType, Relationship, RelationshipType
 from src.models.memory import Memory, MemoryMetadata, MemoryType
+from src.utils.curation import canonicalize_concepts
 from src.utils.config import get_config
 from src.utils.logger import get_logger
 from src.utils.validators import validate_entity_name
@@ -223,7 +224,7 @@ class GraphStore:
         """Destructor cleanup."""
         try:
             self.close()
-        except:
+        except Exception:
             pass
     
     def _get_query_results(self, result) -> list:
@@ -470,6 +471,46 @@ class GraphStore:
         )
         return hashlib.sha256(identity.encode("utf-8")).hexdigest()
 
+    @staticmethod
+    def source_id_for(source: Dict[str, Any]) -> str:
+        """Expose the stable provenance identity for verified rollback planning."""
+        normalized = {
+            "tool": str(source.get("tool", "legacy")),
+            "instance_id": str(source.get("instance_id", "legacy")),
+            "session_id": str(source.get("session_id", "legacy")),
+        }
+        return GraphStore._source_id(normalized)
+
+    async def source_exists(self, source_id: str) -> bool:
+        """Return whether one provenance Source node already exists."""
+        _, rows = await self._run_query(
+            "MATCH (s:Source) WHERE s.id = $source_id RETURN s.id",
+            {"source_id": str(source_id)},
+        )
+        return bool(rows)
+
+    async def delete_source_if_orphan(self, source_id: str) -> bool:
+        """Delete a Source only when no memory entity still references it."""
+        normalized = str(source_id)
+        if not await self.source_exists(normalized):
+            return True
+        _, references = await self._run_query(
+            """
+            MATCH (m:Entity)-[:WRITTEN_BY]->(s:Source)
+            WHERE s.id = $source_id
+            RETURN m.id
+            LIMIT 1
+            """,
+            {"source_id": normalized},
+        )
+        if references:
+            return False
+        await self._run_query(
+            "MATCH (s:Source) WHERE s.id = $source_id DETACH DELETE s",
+            {"source_id": normalized},
+        )
+        return not await self.source_exists(normalized)
+
     async def record_memory_source(self, memory_id: UUID, source: Dict[str, Any]) -> str:
         """Idempotently link a memory entity to its provenance Source node."""
         normalized = {
@@ -479,7 +520,7 @@ class GraphStore:
             "cwd": str(source.get("cwd", "")),
             "transport": str(source.get("transport", "stdio")),
         }
-        source_id = self._source_id(normalized)
+        source_id = self.source_id_for(normalized)
         now = datetime.utcnow()
         query = """
             MERGE (s:Source {id: $source_id})
@@ -672,7 +713,7 @@ class GraphStore:
         query = """
             MATCH (e:Entity)
             WHERE e.id = $id
-            RETURN e.id, e.name, e.type, e.description, e.created_at, e.properties
+            RETURN e.id, e.name, e.type, e.description, e.created_at, e.props
         """
         
         try:
@@ -687,7 +728,7 @@ class GraphStore:
             if len(row) > 5 and row[5]:
                 try:
                     props = json.loads(row[5])
-                except:
+                except (TypeError, ValueError, json.JSONDecodeError):
                     props = {}
 
             entity = Entity(
@@ -695,7 +736,11 @@ class GraphStore:
                 name=row[1],
                 type=EntityType(row[2]),
                 description=row[3] if row[3] else None,
-                created_at=datetime.fromisoformat(row[4]),
+                created_at=(
+                    row[4]
+                    if isinstance(row[4], datetime)
+                    else datetime.fromisoformat(row[4])
+                ),
                 properties=props
             )
             
@@ -704,6 +749,47 @@ class GraphStore:
         except Exception as e:
             logger.error("failed_to_get_entity", entity_id=str(entity_id), error=str(e))
             return None
+
+    async def replace_entity(self, entity: Entity) -> bool:
+        """Replace one entity projection while preserving its relationships."""
+        self._initialize_connection()
+        import json
+
+        def json_serializer(value: Any) -> Any:
+            if isinstance(value, datetime):
+                return value.isoformat()
+            if hasattr(value, "value"):
+                return value.value
+            raise TypeError(f"Type {type(value)} not serializable")
+
+        query = """
+            MATCH (e:Entity)
+            WHERE e.id = $id
+            SET e.name = $name,
+                e.type = $type,
+                e.description = $description,
+                e.created_at = timestamp($created_at),
+                e.props = $props
+            RETURN e.id
+        """
+        params = {
+            "id": str(entity.id),
+            "name": entity.name,
+            "type": entity.type.value,
+            "description": entity.description or "",
+            "created_at": entity.created_at.isoformat(),
+            "props": json.dumps(entity.properties, default=json_serializer),
+        }
+        try:
+            _, rows = await self._run_query(query, params)
+            return bool(rows and str(rows[0][0]) == str(entity.id))
+        except Exception as error:
+            logger.error(
+                "failed_to_replace_entity",
+                entity_id=str(entity.id),
+                error_type=type(error).__name__,
+            )
+            return False
     
     async def create_relationship(self, relationship: Relationship) -> UUID:
         """
@@ -786,19 +872,19 @@ class GraphStore:
             query = """
                 MATCH (fromNode:Entity)-[r]->(toNode:Entity)
                 WHERE fromNode.id = $id
-                RETURN fromNode.id, toNode.id, type(r)
+                RETURN fromNode.id, toNode.id, label(r)
             """
         elif direction == "incoming":
             query = """
                 MATCH (fromNode:Entity)-[r]->(toNode:Entity)
                 WHERE toNode.id = $id
-                RETURN fromNode.id, toNode.id, type(r)
+                RETURN fromNode.id, toNode.id, label(r)
             """
         else:  # both
             query = """
                 MATCH (e1:Entity)-[r]-(e2:Entity)
                 WHERE e1.id = $id OR e2.id = $id
-                RETURN e1.id, e2.id, type(r)
+                RETURN e1.id, e2.id, label(r)
             """
         
         try:
@@ -1129,6 +1215,209 @@ class GraphStore:
     # =========================================================================
     # CONCEPT GRAPH METHODS
     # =========================================================================
+
+    async def get_memory_concepts(self, memory_id: UUID) -> List[str]:
+        """Return the exact canonical concept projection for one memory entity."""
+        self._initialize_connection()
+        query = """
+            MATCH (e:Entity)-[r:HAS_CONCEPT]->(c:Concept)
+            WHERE e.id = $memory_id
+            RETURN c.canonical_name
+            ORDER BY c.canonical_name
+        """
+        _, rows = await self._run_query(query, {"memory_id": str(memory_id)})
+        concepts = [str(row[0]) for row in rows]
+        if len(concepts) != len(set(concepts)):
+            raise RuntimeError("Memory concept projection contains duplicate edges")
+        return concepts
+
+    def _replace_memory_concepts_sync(
+        self,
+        memory_id: UUID,
+        concepts: List[str],
+    ) -> List[str]:
+        """Atomically reconcile only deterministic memory-to-concept edges."""
+        self._initialize_connection()
+        self._begin_operation()
+        transaction_started = False
+
+        def run(query: str, params: Optional[Dict[str, Any]] = None) -> List[Any]:
+            _columns, rows = self._execute_query_sync(query, params)
+            return rows
+
+        try:
+            with self._lock:
+                run("BEGIN TRANSACTION")
+                transaction_started = True
+
+                entity_rows = run(
+                    "MATCH (e:Entity) WHERE e.id = $memory_id RETURN count(e)",
+                    {"memory_id": str(memory_id)},
+                )
+                if not entity_rows or int(entity_rows[0][0]) != 1:
+                    raise RuntimeError("Memory entity is unavailable for concept projection")
+
+                current_rows = run(
+                    """
+                    MATCH (e:Entity)-[r:HAS_CONCEPT]->(c:Concept)
+                    WHERE e.id = $memory_id
+                    RETURN c.id, c.canonical_name
+                    """,
+                    {"memory_id": str(memory_id)},
+                )
+                current: Dict[str, str] = {}
+                for concept_id, canonical_name in current_rows:
+                    canonical = str(canonical_name)
+                    if canonical in current:
+                        raise RuntimeError(
+                            "Memory concept projection contains duplicate edges"
+                        )
+                    current[canonical] = str(concept_id)
+
+                desired = set(concepts)
+                touched_ids: set[str] = set()
+                for canonical in sorted(set(current) - desired):
+                    concept_id = current[canonical]
+                    run(
+                        """
+                        MATCH (e:Entity)-[r:HAS_CONCEPT]->(c:Concept)
+                        WHERE e.id = $memory_id AND c.id = $concept_id
+                        DELETE r
+                        """,
+                        {
+                            "memory_id": str(memory_id),
+                            "concept_id": concept_id,
+                        },
+                    )
+                    touched_ids.add(concept_id)
+
+                for canonical in sorted(desired - set(current)):
+                    concept_rows = run(
+                        """
+                        MATCH (c:Concept)
+                        WHERE c.canonical_name = $canonical
+                        RETURN c.id
+                        """,
+                        {"canonical": canonical},
+                    )
+                    if len(concept_rows) > 1:
+                        raise RuntimeError("Concept projection is ambiguous")
+                    if concept_rows:
+                        concept_id = str(concept_rows[0][0])
+                    else:
+                        concept_id = str(uuid4())
+                        run(
+                            """
+                            CREATE (c:Concept {
+                                id: $id,
+                                name: $name,
+                                canonical_name: $canonical,
+                                created_at: $created_at,
+                                usage_count: 0
+                            })
+                            """,
+                            {
+                                "id": concept_id,
+                                "name": canonical,
+                                "canonical": canonical,
+                                "created_at": datetime.utcnow(),
+                            },
+                        )
+                    run(
+                        """
+                        MATCH (e:Entity), (c:Concept)
+                        WHERE e.id = $memory_id AND c.id = $concept_id
+                        CREATE (e)-[r:HAS_CONCEPT {created_at: $created_at}]->(c)
+                        """,
+                        {
+                            "memory_id": str(memory_id),
+                            "concept_id": concept_id,
+                            "created_at": datetime.utcnow(),
+                        },
+                    )
+                    touched_ids.add(concept_id)
+
+                for concept_id in sorted(touched_ids):
+                    entity_links = run(
+                        """
+                        MATCH (e:Entity)-[r:HAS_CONCEPT]->(c:Concept)
+                        WHERE c.id = $concept_id
+                        RETURN count(r)
+                        """,
+                        {"concept_id": concept_id},
+                    )
+                    memory_links = run(
+                        """
+                        MATCH (m:Memory)-[r:HAS_CONCEPT_MEM]->(c:Concept)
+                        WHERE c.id = $concept_id
+                        RETURN count(r)
+                        """,
+                        {"concept_id": concept_id},
+                    )
+                    usage_count = int(entity_links[0][0]) + int(memory_links[0][0])
+                    if usage_count:
+                        run(
+                            """
+                            MATCH (c:Concept)
+                            WHERE c.id = $concept_id
+                            SET c.usage_count = $usage_count
+                            """,
+                            {
+                                "concept_id": concept_id,
+                                "usage_count": usage_count,
+                            },
+                        )
+                    else:
+                        run(
+                            """
+                            MATCH (c:Concept)
+                            WHERE c.id = $concept_id
+                            DELETE c
+                            """,
+                            {"concept_id": concept_id},
+                        )
+
+                final_rows = run(
+                    """
+                    MATCH (e:Entity)-[r:HAS_CONCEPT]->(c:Concept)
+                    WHERE e.id = $memory_id
+                    RETURN c.canonical_name
+                    ORDER BY c.canonical_name
+                    """,
+                    {"memory_id": str(memory_id)},
+                )
+                final = [str(row[0]) for row in final_rows]
+                if final != sorted(desired) or len(final) != len(set(final)):
+                    raise RuntimeError("Memory concept projection verification failed")
+                run("COMMIT")
+                transaction_started = False
+                return final
+        except Exception:
+            if transaction_started:
+                try:
+                    with self._lock:
+                        run("ROLLBACK")
+                except Exception:
+                    logger.error(
+                        "memory_concept_projection_rollback_failed",
+                        memory_id=str(memory_id),
+                    )
+            raise
+        finally:
+            self._end_operation()
+
+    async def replace_memory_concepts(
+        self,
+        memory_id: UUID,
+        concepts: List[str],
+    ) -> List[str]:
+        """Replace deterministic concept links without touching explicit relationships."""
+        canonical = canonicalize_concepts(list(concepts or []), max_concepts=5)
+        return await asyncio.to_thread(
+            self._replace_memory_concepts_sync,
+            memory_id,
+            canonical,
+        )
     
     async def create_or_get_concept(self, concept_name: str) -> str:
         """

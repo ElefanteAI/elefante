@@ -17,9 +17,17 @@ That stack is valid. It is not sufficient when the question is broader:
 
 > "Is Elefante actually running end-to-end as a real MCP server?"
 
-That question requires a live subprocess, the real MCP tool/prompt surface, real state mutation, restart persistence, and cleanup inside an isolated store.
+That question requires a live subprocess, the real direct MCP tool/prompt
+surface, real state mutation, restart persistence, and cleanup inside an
+isolated store.
 
 This document defines that whole-system proof.
+
+It does not replace the customer transport proof. The shipped topology is a
+stdio bridge talking to the loopback daemon, while this harness launches the
+MCP handler directly. `tests/test_mcp_daemon.py` separately proves the real
+bridge/daemon handshake, exact 18-tool current-source customer inventory, concurrent bridges,
+and bounded stale-session recovery. A release claim needs both layers.
 
 ---
 
@@ -42,7 +50,7 @@ Default mode is intentionally self-contained:
 - Uses temporary `HOME`, `USERPROFILE`, and `ELEFANTE_DATA_DIR`
 - Enables `ELEFANTE_ALLOW_TEST_MEMORIES=1`
 - Explicitly enables the default-off Task Intelligence development surface
-- Verifies **17 of 18 development tools** plus **both prompts**
+- Verifies **18 of 19 development tools** plus **both prompts**
 - Deletes protocol-created memories through the tool surface
 - Removes the entire temporary Elefante store at the end
 
@@ -66,7 +74,7 @@ That means it is not fully self-contained, so it cannot be part of the default s
 ./.venv/bin/python scripts/verify/verify_e2e_tests.py --with-dashboard-open
 ```
 
-Use this only when you explicitly want the eighteenth development tool checked.
+Use this only when you explicitly want the nineteenth development tool checked.
 
 Preconditions:
 
@@ -76,7 +84,8 @@ Preconditions:
 Runtime behavior:
 
 - The harness preflights port `8000`
-- Browser launch is stubbed with `BROWSER=/usr/bin/true`
+- Browser launch is stubbed with an isolated Python no-op command built from the
+  active interpreter, so the optional phase has no POSIX-only path dependency
 - The dashboard server is killed during cleanup
 - Snapshot verification must follow the live runtime path, which may be the `HOME`-derived `~/.elefante/data/dashboard_snapshot.json` path used by `src.mcp.server`
 
@@ -90,9 +99,10 @@ The authoritative harness verifies these phases in order:
 
 1. **Handshake and inventory**
    The real MCP server boots, completes `initialize`, and exposes the expected
-   opt-in 18-tool plus 2-prompt development surface. Normal public v2.13.0
-   discovery exposes 17 tools and 2 prompts; the extra Task Intelligence tool
-   remains default-off and developer-only.
+   opt-in 19-tool plus 2-prompt development surface. Current-source customer
+   discovery exposes 18 tools and 2 prompts; the extra Task Intelligence tool
+   remains default-off and developer-only. Published v2.13.0 remains at 17
+   customer tools because verified Recover is not released yet.
 2. **Answer context and prompt retrieval**
    `elefante-Recall` returns its seven-field bounded read-only payload without
    an echoed question, internal IDs, or generic protocol wrappers. The governed
@@ -109,7 +119,11 @@ The authoritative harness verifies these phases in order:
 6. **Compliance Gate**
    A fresh session with no prior search cannot mutate memory.
 7. **Memory lifecycle**
-   `elefante-Memory` actions `add`, `search` (including `list_all`), `update`, and `delete` all round-trip through the live store.
+   One strict registered project owns the isolated records. Verified Remember
+   persists and proves a future Recall cue; `search` and `list_all` inspect the
+   scoped result; verified Correct edits one record and permanently deletes
+   protocol-created records through its backup-bound lifecycle. Legacy content
+   and lifecycle aliases are not used as product proof.
 8. **Task Intelligence lifecycle**
    A pilot Task Brief delivers bounded memory IDs, and declared use is accepted
    only for the same trace without changing ranking.
@@ -128,8 +142,8 @@ The authoritative harness verifies these phases in order:
 
 ## Full-Surface Coverage Map
 
-When run with `--with-dashboard-open`, the self-protocol invokes all 18 opt-in
-development MCP tools and both prompts. Default mode verifies 17 of 18 and skips
+When run with `--with-dashboard-open`, the self-protocol invokes all 19 opt-in
+development MCP tools and both prompts. Default mode verifies 18 of 19 and skips
 only `elefante-DashboardOpen`. The harness sets both Task Intelligence flags only
 inside its isolated temporary environment.
 
@@ -140,6 +154,7 @@ inside its isolated temporary environment.
 | `elefante-Memory(action="add")` | Memory lifecycle | Yes | Yes |
 | `elefante-Memory(action="search")` | Routing, compliance reset, memory lifecycle, cleanup | Yes | Yes |
 | `elefante-Recall` | Bounded customer answer context | Yes | Yes |
+| `elefante-Recover(action="health")` | Read-only lifecycle health | Yes | Yes |
 | `elefante-TaskIntelligence` | Bounded prepare and trace-bound declared use | Yes | Yes |
 | `elefante-GraphQuery` | Graph and context | Yes | Yes |
 | `elefante-ContextGet` | Graph and context | Yes | Yes |
@@ -167,19 +182,24 @@ inside its isolated temporary environment.
 | `elefante-grounding` | Surface inventory | Yes | Yes |
 | `elefante-context` | Memory lifecycle | Yes | Yes |
 
-This is the concrete answer to "are all Elefante tools really invoked?" The full-surface run is the maintained path that proves yes without polluting the user's durable memory store.
+This is the concrete answer to "are all direct development-handler tools really
+invoked?" The full-surface run is the maintained path that proves yes without
+polluting the user's durable memory store. It is not, by itself, proof of the
+customer bridge/daemon topology.
 
 ---
 
 ## What It Does Not Prove By Default
 
-Default mode does **not** prove `elefante-DashboardOpen` itself.
+Default mode does **not** prove `elefante-DashboardOpen` itself or the shipped
+stdio bridge/daemon transport.
 
 That exclusion is deliberate. The dashboard tool is process- and UI-bearing, so its safest automated coverage remains split:
 
 - Default self-protocol: everything self-contained
-- Opt-in `--with-dashboard-open`: full 18-tool development sweep when explicitly requested
+- Opt-in `--with-dashboard-open`: full 19-tool development sweep when explicitly requested
 - Targeted dashboard guards: `pytest tests/test_dashboard_serializer.py -k "dashboard" -v`
+- Customer transport guards: `pytest tests/test_mcp_daemon.py -k "stdio_bridge or bridge_reinitializes" -q`
 
 This is not a gap hidden under the rug. It is an explicit boundary between self-contained proof and global side-effect proof.
 

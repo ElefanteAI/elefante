@@ -1,7 +1,7 @@
 ---
 PROTOCOL: restarter
 INVOKE: elefante-restarter
-PROTOCOL_VERSION: 2.12.2
+PROTOCOL_VERSION: 2.14.0
 LOAD_WHEN: MCP tools not surfacing in IDE, server stuck, dashboard returns 500, `elefante-*` tools absent from tool list, IDE shows "MCP connection failed", post-install verification step fails.
 DIAGNOSTIC_QUESTION: "Is the MCP server alive over stdio JSON-RPC, and is the IDE actually connecting to it?"
 AUTHORITY: This file owns the restart and recovery protocol. Scattered restart instructions in older docs are forwarding only.
@@ -54,18 +54,18 @@ If `manage_lock.py` shows a stale lock:
 
 If the lock is held by a live process, **do not release it**. Find why the process is hung first; that's a different bug class — load `agents/orchestrator.md` and route through `workspace/postmortems/database.md`.
 
-## Legacy-only nuclear option (Kuzu only)
+## Privileged Kuzu-only quarantine
 
-`reset_kuzu_nuclear.py` rebuilds from a legacy ChromaDB store. It is not a
-recovery path for the released SQLite default. For SQLite installations, stop
-and route through the verified backup/restore procedure; do not improvise a
-graph rebuild.
+`reset_kuzu_nuclear.py` resolves the configured Kuzu path, then moves only that
+path into the configured data directory's recovery area. It does not inspect or
+change the vector store and does not rebuild graph topology.
 
-For an explicitly configured legacy ChromaDB installation:
+After explicit destructive-repair authority and a current verified backup:
 
 1. **Backup first.** `./.venv/bin/python scripts/lifecycle/backup_elefante_data.py` (non-negotiable).
-2. `./.venv/bin/python scripts/debug/reset_kuzu_nuclear.py` — destroys and rebuilds the graph from the legacy ChromaDB store.
-3. Restart per sequence above.
+2. Run `./.venv/bin/python scripts/debug/reset_kuzu_nuclear.py` and inspect the configured target in the dry run.
+3. Apply only with `ELEFANTE_PRIVILEGED=1 --apply --confirm DELETE`. If the dry run reports a path outside the configured Elefante data root, also pass its exact `--confirm-path` value. Broad paths are rejected even with confirmation.
+4. Restart and verify health. Restore the verified backup if the prior topology is required; no automatic reconstruction occurs.
 
 This is a `PRIVILEGED` mode operation per the orchestrator. Requires `ELEFANTE_PRIVILEGED=1`.
 

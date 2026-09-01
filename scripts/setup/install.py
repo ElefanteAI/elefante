@@ -37,6 +37,7 @@ import argparse
 import datetime
 import json
 import signal
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -73,6 +74,9 @@ VENV_MODE_ABORT = "abort"
 RELEASE_PROFILE_DEVELOPER = "developer"
 RELEASE_PROFILE_CLIENT = "client"
 RELEASE_PROFILES = (RELEASE_PROFILE_DEVELOPER, RELEASE_PROFILE_CLIENT)
+PROJECT_MODE_AUTO = "auto"
+PROJECT_MODE_STRICT = "strict"
+PROJECT_MODES = (PROJECT_MODE_AUTO, PROJECT_MODE_STRICT)
 DEPENDENCY_LOCKS = {
     RELEASE_PROFILE_DEVELOPER: "requirements.lock",
     RELEASE_PROFILE_CLIENT: "requirements.client.lock",
@@ -80,6 +84,7 @@ DEPENDENCY_LOCKS = {
 INSTALL_LOG_FILE_NAME = ".elefante-install.log"
 INSTALL_STATUS_FILE_NAME = ".elefante-install-status.txt"
 INSTALL_SUMMARY_FILE_NAME = ".elefante-install-summary.txt"
+FIRST_RUN_RECEIPT_FILE_NAME = ".elefante-first-run-receipt.json"
 DAEMON_HEALTH_URL = "http://127.0.0.1:8765/health"
 verbose_mode = False
 BRAILLE_SPINNER_FRAMES = [
@@ -134,6 +139,7 @@ from install_manifest import (  # noqa: E402
 from host_selection import (  # noqa: E402
     CLI_HOSTS,
     ADDITIONAL_HOSTS,
+    CERTIFIED_CUSTOMER_HOSTS,
     HOST_LABELS,
     JSON_HOSTS,
     SUPPORTED_HOSTS,
@@ -161,7 +167,7 @@ def _git_source_identity(root_dir: Path) -> tuple[str, bool]:
         ).stdout.strip()
         dirty = bool(
             subprocess.run(
-                ["git", "status", "--porcelain", "--untracked-files=no"],
+                ["git", "status", "--porcelain", "--untracked-files=all"],
                 cwd=root_dir,
                 capture_output=True,
                 text=True,
@@ -266,9 +272,357 @@ def installation_host_plan(
 ) -> tuple[set[str] | None, set[str]]:
     """Select adapters and readiness requirements for one installation scope."""
     if installation_scope == "customer":
-        return None, set(detected_hosts)
+        # Codex is the first certified customer lane. Explicitly selected
+        # detected adapters remain available as compatibility previews, but
+        # they do not expand the readiness/support promise.
+        selected = set(requested_hosts or ())
+        selected.update(CERTIFIED_CUSTOMER_HOSTS)
+        return selected, set(CERTIFIED_CUSTOMER_HOSTS)
     selected = None if requested_hosts is None else set(requested_hosts)
     return selected, set(requested_hosts or detected_hosts)
+
+
+def normalize_project_specs(values: list[str] | None) -> list[dict[str, str]]:
+    """Validate repeatable NAME=ABSOLUTE_PATH project selections without writing."""
+    projects: list[dict[str, str]] = []
+    seen_names: set[str] = set()
+    seen_roots: set[str] = set()
+    for value in values or []:
+        name, separator, raw_root = str(value or "").partition("=")
+        name = name.strip()
+        raw_root = raw_root.strip()
+        if not separator or not name or not raw_root:
+            raise ValueError("project must use NAME=ABSOLUTE_PATH")
+        if len(name) > 100 or not name.isprintable():
+            raise ValueError("project name must be printable and at most 100 characters")
+        root = Path(raw_root).expanduser()
+        if not root.is_absolute():
+            raise ValueError(f"project folder must be absolute: {raw_root}")
+        try:
+            canonical = root.resolve(strict=True)
+        except (OSError, RuntimeError) as error:
+            raise ValueError(f"project folder does not exist: {raw_root}") from error
+        if not canonical.is_dir():
+            raise ValueError(f"project folder is not a directory: {raw_root}")
+        if canonical == Path(canonical.anchor) or canonical == Path.home().resolve():
+            raise ValueError("project folder is too broad; choose the actual project directory")
+        name_key = name.casefold()
+        root_key = os.path.normcase(str(canonical))
+        if name_key in seen_names:
+            raise ValueError(f"duplicate project name: {name}")
+        if root_key in seen_roots:
+            raise ValueError(f"duplicate project folder: {canonical}")
+        seen_names.add(name_key)
+        seen_roots.add(root_key)
+        projects.append({"name": name, "root": str(canonical)})
+    return projects
+
+
+def prompt_project_specs() -> list[str]:
+    """Collect one or more clean-install projects in the current terminal."""
+    selections: list[str] = []
+    print("\nProject setup")
+    print("Choose a specific folder for one body of work; do not choose your home, the Documents folder itself, or Elefante's data folder.")
+    print("Elefante uses the folder as a scope boundary and does not import every past session.")
+    while True:
+        raw_root = input("Project folder (absolute path; blank when finished): ").strip()
+        if not raw_root:
+            if selections:
+                return selections
+            print("At least one project is required for a clean customer installation.")
+            continue
+        default_name = Path(raw_root).expanduser().name or "Project"
+        name = input(f"Project name [default: {default_name}]: ").strip() or default_name
+        selections.append(f"{name}={raw_root}")
+
+
+def plan_project_setup(
+    *,
+    data_dir: Path,
+    installation_scope: str,
+    existing_runtime: dict[str, str] | None,
+    project_values: list[str] | None,
+    requested_mode: str,
+) -> dict[str, object]:
+    """Build one non-mutating Project Registry setup decision."""
+    from src.core.project_registry import ProjectRegistry, ProjectRegistryError
+
+    specs = normalize_project_specs(project_values)
+    registry = ProjectRegistry(Path(data_dir) / "projects.json")
+    try:
+        existing_projects = registry.list_projects()
+        existing_mode = registry.mode.value
+    except ProjectRegistryError as error:
+        raise ValueError(
+            "the existing Project Registry is invalid and must be repaired before installation"
+        ) from error
+
+    is_upgrade = existing_runtime is not None
+    if is_upgrade and specs:
+        raise ValueError(
+            "project changes during an upgrade must be reviewed in Elefante Home"
+        )
+    if is_upgrade:
+        return {
+            "configure": False,
+            "review_required": not existing_projects or existing_mode != "strict",
+            "target_mode": existing_mode,
+            "specs": [],
+            "registry_path": registry.path,
+            "strict_marker_path": registry.strict_marker_path,
+        }
+
+    target_mode = (
+        "strict"
+        if installation_scope == "customer" or requested_mode == PROJECT_MODE_STRICT
+        else existing_mode
+    )
+    if installation_scope == "customer" and not specs and not existing_projects:
+        raise ValueError(
+            "a clean customer installation requires at least one project folder"
+        )
+    return {
+        "configure": bool(specs) or target_mode != existing_mode,
+        "review_required": False,
+        "target_mode": target_mode,
+        "specs": specs,
+        "registry_path": registry.path,
+        "strict_marker_path": registry.strict_marker_path,
+    }
+
+
+def apply_project_setup(plan: dict[str, object]) -> dict[str, object]:
+    """Create only missing registrations, then enable the planned mode."""
+    from src.core.project_registry import ProjectRegistry
+
+    registry = ProjectRegistry(Path(plan["registry_path"]))
+    existing = registry.list_projects()
+    by_root = {os.path.normcase(project.root): project for project in existing}
+    by_name = {project.name.casefold(): project for project in existing}
+    for spec in plan.get("specs", []):
+        name = str(spec["name"])
+        root = str(spec["root"])
+        root_match = by_root.get(os.path.normcase(root))
+        name_match = by_name.get(name.casefold())
+        if root_match is not None:
+            if root_match.name != name:
+                raise ValueError(
+                    f"project folder is already registered as {root_match.name}"
+                )
+            continue
+        if name_match is not None:
+            raise ValueError(
+                f"project name is already registered at {name_match.root}"
+            )
+        project = registry.register(name, root)
+        by_root[os.path.normcase(project.root)] = project
+        by_name[project.name.casefold()] = project
+    target_mode = str(plan["target_mode"])
+    if registry.mode.value != target_mode:
+        registry.set_mode(target_mode)
+    return registry.snapshot()
+
+
+def verify_project_setup(plan: dict[str, object]) -> bool:
+    """Prove exact selected roots and target mode after setup."""
+    from src.core.project_registry import ProjectRegistry, ProjectRegistryError
+
+    try:
+        registry = ProjectRegistry(Path(plan["registry_path"]))
+        if registry.mode.value != str(plan["target_mode"]):
+            return False
+        projects = registry.list_projects()
+    except (ProjectRegistryError, ValueError):
+        return False
+    pairs = {(project.name, project.root) for project in projects}
+    return all(
+        (str(spec["name"]), str(spec["root"])) in pairs
+        for spec in plan.get("specs", [])
+    )
+
+
+def installation_acceptance_workspace(plan: dict[str, object]) -> str:
+    """Return one active strict project root for the disposable Recall proof."""
+    from src.core.project_registry import ProjectRegistry, ProjectRegistryMode
+
+    registry = ProjectRegistry(Path(plan["registry_path"]))
+    if registry.mode is not ProjectRegistryMode.STRICT:
+        raise ValueError("first-run acceptance requires strict project isolation")
+    projects = registry.list_projects(include_inactive=False)
+    if not projects:
+        raise ValueError("first-run acceptance requires one active project")
+    selected_roots = [str(spec["root"]) for spec in plan.get("specs", [])]
+    if selected_roots:
+        selected = next(
+            (
+                project
+                for project in projects
+                if os.path.normcase(project.root)
+                == os.path.normcase(selected_roots[0])
+            ),
+            None,
+        )
+        if selected is None:
+            raise ValueError("selected first-run project is not registered")
+        return selected.root
+    return projects[0].root
+
+
+def _reject_duplicate_receipt_keys(
+    pairs: list[tuple[str, object]],
+) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("first-run receipt contains duplicate keys")
+        result[key] = value
+    return result
+
+
+def verify_first_run_receipt(root_dir: Path) -> bool:
+    """Read back the exact content-free first-run proof and private mode."""
+    target = Path(root_dir) / FIRST_RUN_RECEIPT_FILE_NAME
+    if target.is_symlink() or not target.is_file() or target.stat().st_size > 64 * 1024:
+        return False
+    if os.name != "nt" and target.stat().st_mode & 0o777 != 0o600:
+        return False
+    try:
+        receipt = json.loads(
+            target.read_text(encoding="utf-8"),
+            object_pairs_hook=_reject_duplicate_receipt_keys,
+        )
+    except (OSError, UnicodeDecodeError, ValueError):
+        return False
+    expected_fields = {
+        "schema_version",
+        "operation",
+        "status",
+        "finished_at",
+        "checks",
+        "acceptance_operation_id",
+        "backup_operation_id",
+        "initial_backup",
+        "memory_content_included",
+        "project_path_included",
+        "next_action",
+    }
+    if not isinstance(receipt, dict) or set(receipt) != expected_fields:
+        return False
+    checks = receipt.get("checks")
+    expected_checks = {
+        "project_isolation",
+        "disposable_recall",
+        "acceptance_cleanup",
+        "initial_backup",
+    }
+    if not (
+        receipt.get("schema_version") == 1
+        and receipt.get("operation") == "first_run_acceptance"
+        and receipt.get("status") == "VERIFIED_COMPLETE"
+        and receipt.get("memory_content_included") is False
+        and receipt.get("project_path_included") is False
+        and receipt.get("next_action") == "open_elefante_home"
+        and isinstance(receipt.get("finished_at"), str)
+        and isinstance(receipt.get("acceptance_operation_id"), str)
+        and isinstance(receipt.get("backup_operation_id"), str)
+        and isinstance(checks, list)
+        and len(checks) == len(expected_checks)
+        and {
+            str(check.get("name"))
+            for check in checks
+            if isinstance(check, dict)
+            and set(check) == {"name", "passed", "code"}
+            and check.get("passed") is True
+            and isinstance(check.get("code"), str)
+        }
+        == expected_checks
+    ):
+        return False
+    initial_backup = receipt.get("initial_backup")
+    return bool(
+        isinstance(initial_backup, dict)
+        and set(initial_backup) == {"archive_name", "archive_sha256"}
+        and isinstance(initial_backup.get("archive_name"), str)
+        and bool(str(initial_backup["archive_name"]).strip())
+        and "/" not in str(initial_backup["archive_name"])
+        and "\\" not in str(initial_backup["archive_name"])
+        and isinstance(initial_backup.get("archive_sha256"), str)
+        and re.fullmatch(r"[0-9a-f]{64}", str(initial_backup["archive_sha256"]))
+        is not None
+    )
+
+
+def run_first_run_acceptance(
+    root_dir: Path,
+    python_cmd: str,
+    *,
+    data_dir: Path,
+    workspace: str,
+) -> bool:
+    """Run the installer-only MCP acceptance without exposing its project path."""
+    script_path = root_dir / "scripts" / "verify" / "verify_mcp_handshake.py"
+    return run_command(
+        [python_cmd, str(script_path), "--installation-acceptance"],
+        cwd=root_dir,
+        env={
+            "ELEFANTE_ACCEPTANCE_WORKSPACE": workspace,
+            "ELEFANTE_DATA_DIR": str(Path(data_dir).expanduser().resolve()),
+            "ELEFANTE_LOG_FORMAT": "text",
+            "ELEFANTE_LOGGING_FORMAT": "text",
+        },
+    )
+
+
+class ProjectSetupRollback:
+    """Restore exact registry and Home snapshot bytes if installation fails."""
+
+    def __init__(self, paths: list[Path]) -> None:
+        self._original: dict[Path, tuple[bytes, int] | None] = {}
+        self._active = True
+        for path in paths:
+            resolved = Path(path)
+            if resolved.is_file():
+                self._original[resolved] = (
+                    resolved.read_bytes(),
+                    resolved.stat().st_mode & 0o777,
+                )
+            else:
+                self._original[resolved] = None
+
+    @staticmethod
+    def _restore_file(path: Path, payload: bytes, mode: int) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{path.name}.rollback.",
+            dir=str(path.parent),
+        )
+        temporary = Path(temporary_name)
+        try:
+            os.chmod(temporary, 0o600)
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, path)
+            os.chmod(path, mode)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
+
+    def rollback(self) -> None:
+        if not self._active:
+            return
+        for path, original in self._original.items():
+            if original is None:
+                if path.is_file():
+                    path.unlink()
+                continue
+            payload, mode = original
+            self._restore_file(path, payload, mode)
+        self._active = False
+
+    def commit(self) -> None:
+        self._active = False
 
 
 class Logger:
@@ -381,12 +735,23 @@ cancel_requested = False
 
 
 class InstallStateTracker:
-    def __init__(self, root_dir, logger, status_file=None, summary_file=None, log_file=None):
+    TERMINAL_STAGE_STATUSES = {"COMPLETE", "WARN", "FAILED", "BLOCKED", "CANCELLED"}
+
+    def __init__(
+        self,
+        root_dir,
+        logger,
+        status_file=None,
+        summary_file=None,
+        log_file=None,
+        require_postconditions=False,
+    ):
         self.root_dir = Path(root_dir)
         self.logger = logger
         self.status_file = Path(status_file) if status_file else self.root_dir / INSTALL_STATUS_FILE_NAME
         self.summary_file = Path(summary_file) if summary_file else self.root_dir / INSTALL_SUMMARY_FILE_NAME
         self.log_file = Path(log_file) if log_file else Path(logger.log_file or self.root_dir / INSTALL_LOG_FILE_NAME)
+        self.require_postconditions = bool(require_postconditions)
         self.current_state = "starting"
         self.current_stage_id = ""
         self.current_stage_name = ""
@@ -403,7 +768,7 @@ class InstallStateTracker:
         return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     def _sanitize(self, detail):
-        return (detail or "").replace("\n", " ").strip()
+        return str(detail or "").replace("\n", " ").replace("|", "/").strip()
 
     def request_cancellation(self):
         self.cancel_requested = True
@@ -422,30 +787,201 @@ class InstallStateTracker:
             "name": stage_name,
             "status": "IN_PROGRESS",
             "detail": self._sanitize(detail),
+            "attempts": 0,
+            "verified": False,
+            "reflections": [],
+            "last_reflection": "",
             "updated_at": self._timestamp(),
         }
         self._write_status()
         self._write_summary()
 
-    def _set_stage_status(self, stage_id, stage_name, status, detail=""):
+    def _set_stage_status(
+        self,
+        stage_id,
+        stage_name,
+        status,
+        detail="",
+        *,
+        attempts=None,
+        verified=None,
+    ):
         stage_key = str(stage_id)
         if stage_key not in self.stage_order:
             self.stage_order.append(stage_key)
-        self.stages[stage_key] = {
+        previous = self.stages.get(stage_key, {})
+        stage = {
             "id": stage_key,
             "name": stage_name,
             "status": status,
             "detail": self._sanitize(detail),
             "updated_at": self._timestamp(),
         }
+        for key in ("attempts", "verified", "reflections", "last_reflection"):
+            if key in previous:
+                stage[key] = previous[key]
+        if attempts is not None:
+            stage["attempts"] = int(attempts)
+        if verified is not None:
+            stage["verified"] = bool(verified)
+        self.stages[stage_key] = stage
         if status in {"COMPLETE", "WARN"}:
             self.current_stage_id = ""
             self.current_stage_name = ""
         self._write_status()
         self._write_summary()
 
-    def complete_stage(self, stage_id, stage_name, detail=""):
-        self._set_stage_status(stage_id, stage_name, "COMPLETE", detail)
+    def unresolved_stage_ids(self):
+        return [
+            stage_id
+            for stage_id in self.stage_order
+            if self.stages.get(stage_id, {}).get("status") not in self.TERMINAL_STAGE_STATUSES
+        ]
+
+    def failed_stage_ids(self):
+        return [
+            stage_id
+            for stage_id in self.stage_order
+            if self.stages.get(stage_id, {}).get("status") in {"FAILED", "BLOCKED", "CANCELLED"}
+        ]
+
+    def reflection_count(self):
+        return sum(len(stage.get("reflections", [])) for stage in self.stages.values())
+
+    def completion_verified(self):
+        return bool(self.stage_order) and all(
+            self.stages.get(stage_id, {}).get("status") == "COMPLETE"
+            and self.stages.get(stage_id, {}).get("verified", False)
+            for stage_id in self.stage_order
+        )
+
+    def _record_reflection(self, stage_id, *, attempt, expected, observed, action):
+        stage_key = str(stage_id)
+        stage = self.stages.setdefault(stage_key, {})
+        stage.setdefault("id", stage_key)
+        stage.setdefault("name", stage_key)
+        stage.setdefault("status", "IN_PROGRESS")
+        stage.setdefault("detail", "")
+        stage.setdefault("attempts", 0)
+        stage.setdefault("verified", False)
+        stage.setdefault("reflections", [])
+        stage.setdefault("last_reflection", "")
+        stage.setdefault("updated_at", self._timestamp())
+        reflection = {
+            "attempt": int(attempt),
+            "expected": self._sanitize(expected),
+            "observed": self._sanitize(observed),
+            "action": self._sanitize(action),
+            "updated_at": self._timestamp(),
+        }
+        stage.setdefault("reflections", []).append(reflection)
+        stage["last_reflection"] = self._sanitize(
+            "expected={expected}; observed={observed}; action={action}".format(**reflection)
+        )
+        stage["updated_at"] = reflection["updated_at"]
+        self.logger.log(f"REFLECTION {stage['name']}: {stage['last_reflection']}")
+        self._write_status()
+        self._write_summary()
+
+    def _run_postcondition(self, postcondition):
+        if postcondition is None:
+            if self.require_postconditions:
+                return False, "no postcondition hook supplied"
+            return True, "legacy completion"
+        try:
+            result = postcondition()
+        except Exception as error:
+            return False, f"{type(error).__name__}: {error}"
+        if isinstance(result, tuple) and len(result) == 2:
+            passed, detail = result
+            return bool(passed), self._sanitize(detail) or "postcondition returned false"
+        return bool(result), "postcondition returned false"
+
+    def complete_stage(
+        self,
+        stage_id,
+        stage_name,
+        detail="",
+        *,
+        postcondition=None,
+        retry=None,
+        max_attempts=3,
+    ):
+        """Complete a stage only after its readback hook passes.
+
+        ``postcondition`` must be side-effect free and read the authoritative
+        state. ``retry`` is reserved for an explicitly safe, idempotent repair.
+        The loop is deliberately finite so a persistent failure becomes a
+        visible failed stage instead of an endless installer spin.
+        """
+        if max_attempts < 1:
+            raise ValueError("max_attempts must be at least 1")
+
+        for attempt in range(1, int(max_attempts) + 1):
+            passed, observed = self._run_postcondition(postcondition)
+            stage = self.stages.setdefault(str(stage_id), {})
+            stage.setdefault("id", str(stage_id))
+            stage.setdefault("name", stage_name)
+            stage.setdefault("status", "IN_PROGRESS")
+            stage.setdefault("detail", self._sanitize(detail))
+            stage.setdefault("reflections", [])
+            stage["attempts"] = attempt
+            stage["verified"] = passed
+            self._write_status()
+            self._write_summary()
+            if passed:
+                self._set_stage_status(
+                    stage_id,
+                    stage_name,
+                    "COMPLETE",
+                    detail,
+                    attempts=attempt,
+                    verified=True,
+                )
+                return True
+
+            self._record_reflection(
+                stage_id,
+                attempt=attempt,
+                expected=f"{stage_name} postcondition passes",
+                observed=observed,
+                action="verify completion",
+            )
+            if attempt >= max_attempts:
+                break
+
+            if retry is not None:
+                try:
+                    retry_result = retry()
+                except Exception as error:
+                    retry_result = False
+                    retry_detail = f"{type(error).__name__}: {error}"
+                else:
+                    retry_detail = "retry action returned false" if retry_result is False else "retry action completed"
+                if retry_result is False:
+                    self._record_reflection(
+                        stage_id,
+                        attempt=attempt,
+                        expected="safe retry action completes",
+                        observed=retry_detail,
+                        action="repair and retry",
+                    )
+
+            self._set_stage_status(
+                stage_id,
+                stage_name,
+                "RETRYING",
+                f"{detail}; retrying verification ({attempt + 1}/{max_attempts})",
+                attempts=attempt,
+                verified=False,
+            )
+
+        self.fail_stage(
+            stage_id,
+            stage_name,
+            f"{detail}; completion verification failed after {max_attempts} attempt(s)",
+        )
+        return False
 
     def warn_stage(self, stage_id, stage_name, detail=""):
         self._set_stage_status(stage_id, stage_name, "WARN", detail)
@@ -478,13 +1014,24 @@ class InstallStateTracker:
         self._write_summary()
 
     def finish(self, success, next_action=""):
-        if success:
+        unresolved = self.unresolved_stage_ids()
+        failed = self.failed_stage_ids()
+        if success and (unresolved or failed):
+            success = False
+            self.current_state = "failed"
+            self.final_note = self._sanitize(
+                "Completion verification failed for stages: " + ", ".join(unresolved + failed)
+            )
+        elif success:
             self.current_state = "completed"
             self.final_note = self._sanitize(next_action)
+        elif self.current_state == "running":
+            self.current_state = "failed"
         self.current_stage_id = ""
         self.current_stage_name = ""
         self._write_status()
         self._write_summary()
+        return success
 
     def render_console_summary(self, next_action=""):
         lines = []
@@ -494,6 +1041,8 @@ class InstallStateTracker:
             if stage["detail"]:
                 line += f" ({stage['detail']})"
             lines.append(line)
+            if stage.get("last_reflection"):
+                lines.append(f"  Reflection: {stage['last_reflection']}")
 
         lines.append(f"Installer state: {self.current_state.upper()}")
         if next_action:
@@ -520,6 +1069,8 @@ class InstallStateTracker:
             f"current_stage_id={self.current_stage_id}",
             f"current_stage_name={self.current_stage_name}",
             f"cancel_requested={str(self.cancel_requested).lower()}",
+            f"completion_verified={str(self.completion_verified()).lower()}",
+            f"reflection_count={self.reflection_count()}",
             f"log_file={self.log_file}",
             f"summary_file={self.summary_file}",
         ]
@@ -535,7 +1086,7 @@ class InstallStateTracker:
             f"status_file={self.status_file}",
             f"summary_file={self.summary_file}",
             "",
-            "stage_id|stage_name|status|detail|updated_at",
+            "stage_id|stage_name|status|detail|updated_at|attempts|verified|reflection",
         ]
         for stage_id in self.stage_order:
             stage = self.stages[stage_id]
@@ -547,6 +1098,9 @@ class InstallStateTracker:
                         stage["status"],
                         stage["detail"],
                         stage["updated_at"],
+                        str(stage.get("attempts", 0)),
+                        str(bool(stage.get("verified", False))).lower(),
+                        stage.get("last_reflection", ""),
                     ]
                 )
             )
@@ -641,6 +1195,72 @@ def run_command(cmd, cwd=None, shell=False, env=None):
     except Exception as e:
         logger.log(f"ERROR: Execution error: {e}")
         return False
+
+
+def verify_bytecode_purge(root_dir):
+    """Read back the bytecode cleanup without changing the checkout."""
+    return not any(path.is_dir() for path in root_dir.rglob("__pycache__")) and not any(
+        path.is_file() for path in root_dir.rglob("*.pyc")
+    )
+
+
+def verify_python_environment(python_cmd):
+    """Confirm the selected interpreter exists and is executable."""
+    path = Path(python_cmd)
+    return path.is_file() and (os.name == "nt" or os.access(path, os.X_OK))
+
+
+def verify_dependencies(root_dir, python_cmd):
+    """Use pip's dependency checker as the install postcondition."""
+    return run_command([python_cmd, "-m", "pip", "check"], cwd=root_dir)
+
+
+def verify_preflight_checks(root_dir, release_profile):
+    """Re-read the non-interactive pre-flight invariants after they pass."""
+    try:
+        if shutil.disk_usage(root_dir).free < 5_000_000_000:
+            return False
+        if not dependency_lock_for_profile(root_dir, release_profile).is_file():
+            return False
+        kuzu_db_path = Path.home() / ".elefante" / "data" / "kuzu_db"
+        if kuzu_db_path.is_dir() and (
+            any(kuzu_db_path.glob("*.kz")) or any(kuzu_db_path.glob(".lock"))
+        ):
+            return False
+    except (OSError, ValueError):
+        return False
+    return True
+
+
+def verify_dashboard_assets(root_dir):
+    """Confirm that a completed dashboard build has its entrypoint."""
+    return (Path(root_dir) / "src" / "dashboard" / "ui" / "dist" / "index.html").is_file()
+
+
+def verify_dashboard_snapshot(data_dir):
+    """Confirm Home snapshot structure, including fail-closed project state."""
+    from scripts.verify.verify_dashboard_snapshot import validate_snapshot
+    from src.utils.atomic_json import read_json_strict
+
+    snapshot_path = Path(data_dir) / "dashboard_snapshot.json"
+    if not snapshot_path.is_file():
+        return False
+    try:
+        payload = read_json_strict(snapshot_path)
+        if not isinstance(payload, dict):
+            return False
+        return not validate_snapshot(
+            payload,
+            require_curation=False,
+        ).errors
+    except (OSError, ValueError):
+        return False
+
+
+def verify_runtime_installation(expected, home=None):
+    """Confirm the persisted runtime manifest matches this install identity."""
+    observed = read_runtime_installation(home)
+    return isinstance(observed, dict) and all(observed.get(key) == value for key, value in expected.items())
 
 def check_kuzu_compatibility(root_dir):
     """
@@ -1273,6 +1893,23 @@ def main():
             "direct source-checkout installs are developer runtimes."
         ),
     )
+    parser.add_argument(
+        "--project",
+        action="append",
+        help=(
+            "Register a clean-install project as NAME=ABSOLUTE_PATH. "
+            "Repeat for multiple projects."
+        ),
+    )
+    parser.add_argument(
+        "--project-mode",
+        choices=PROJECT_MODES,
+        default=PROJECT_MODE_AUTO,
+        help=(
+            "Use strict project isolation for a clean developer install. "
+            "Clean customer installs are always strict; upgrades are reviewed in Home."
+        ),
+    )
     parser.add_argument("--expected-version", help="Bundle-declared semantic version")
     parser.add_argument("--source-commit", help="Bundle-declared immutable source commit")
     parser.add_argument(
@@ -1316,6 +1953,7 @@ def main():
         status_file=str(status_file),
         summary_file=str(summary_file),
         log_file=str(log_file),
+        require_postconditions=True,
     )
     install_signal_handlers()
 
@@ -1323,14 +1961,27 @@ def main():
     
     data_dir = os.environ.get("ELEFANTE_DATA_DIR") or str(Path.home() / ".elefante" / "data")
     detected_hosts = detect_supported_hosts()
-    # A customer installation is account-global: every compatible host that is
-    # present must share the same runtime and memory store. Host filters remain
-    # useful for developer checkouts and targeted adapter testing only.
+    # One customer runtime remains account-global, while the first certified
+    # connection is deliberately Codex-only. Other explicitly selected hosts
+    # use the same runtime as compatibility previews and do not widen readiness.
     selected_hosts, required_hosts = installation_host_plan(
         installation_scope=args.installation_scope,
         requested_hosts=requested_hosts,
         detected_hosts=detected_hosts,
     )
+    unavailable_certified_hosts = uncovered_required_hosts(
+        required_hosts,
+        detected_hosts,
+    )
+    if args.installation_scope == "customer" and unavailable_certified_hosts:
+        labels = ", ".join(
+            HOST_LABELS[host] for host in unavailable_certified_hosts
+        )
+        print(
+            "ERROR: The certified Elefante setup requires this installed host: "
+            f"{labels}. Install it, then run the official package again."
+        )
+        raise SystemExit(1)
     existing_runtime = read_runtime_installation()
 
     if developer_runtime_conflicts_with_customer(
@@ -1345,6 +1996,26 @@ def main():
         )
         raise SystemExit(1)
 
+    project_values = list(args.project or [])
+    if (
+        args.installation_scope == "customer"
+        and existing_runtime is None
+        and not project_values
+        and sys.stdin.isatty()
+    ):
+        project_values = prompt_project_specs()
+    try:
+        project_setup = plan_project_setup(
+            data_dir=Path(data_dir),
+            installation_scope=args.installation_scope,
+            existing_runtime=existing_runtime,
+            project_values=project_values,
+            requested_mode=args.project_mode,
+        )
+    except ValueError as error:
+        print(f"ERROR: Project setup is invalid: {error}")
+        raise SystemExit(1) from error
+
     print_header("ELEFANTE INSTALLATION WIZARD")
     logger.log(f"  Install to:  {root_dir}")
     logger.log(f"  Data:        {data_dir}")
@@ -1354,8 +2025,17 @@ def main():
     logger.log(f"  Profile:     {release_profile}")
     logger.log(f"  Channel:     {runtime_provenance['release_channel']}")
     logger.log(f"  Source:      {str(runtime_provenance['source_commit'])[:12]}")
+    logger.log(f"  Projects:    {project_setup['target_mode']}")
     if args.installation_scope == "customer":
-        logger.log("  Agent hosts: every detected compatible host (customer-global)")
+        optional_hosts = selected_hosts.difference(CERTIFIED_CUSTOMER_HOSTS)
+        logger.log("  Certified host: Codex")
+        if optional_hosts:
+            labels = ", ".join(
+                HOST_LABELS[host]
+                for host in SUPPORTED_HOSTS
+                if host in optional_hosts
+            )
+            logger.log(f"  Compatibility previews: {labels}")
     elif selected_hosts is None:
         logger.log("  Agent hosts: all detected compatible hosts")
     else:
@@ -1372,6 +2052,7 @@ def main():
     install_status = "FAILED"
     next_action = ""
     python_cmd = get_python_cmd()
+    project_rollback = None
 
     try:
         check_for_safe_cancellation("bytecode purge")
@@ -1380,7 +2061,14 @@ def main():
         bytecode_ok = purge_bytecode(root_dir)
         logger.stop_spinner()
         if bytecode_ok:
-            state_tracker.complete_stage("0a", "Bytecode Purge", "Stale bytecode artifacts removed")
+            if not state_tracker.complete_stage(
+                "0a",
+                "Bytecode Purge",
+                "Stale bytecode artifacts removed",
+                postcondition=lambda: verify_bytecode_purge(root_dir),
+                max_attempts=1,
+            ):
+                success = False
         else:
             state_tracker.warn_stage("0a", "Bytecode Purge", "Bytecode purge reported warnings")
 
@@ -1393,7 +2081,13 @@ def main():
             state_tracker.fail_stage("0b", "Pre-Flight Checks", "Resolve the reported pre-flight issues and retry")
             success = False
         else:
-            state_tracker.complete_stage("0b", "Pre-Flight Checks", "All automated checks passed")
+            if not state_tracker.complete_stage(
+                "0b",
+                "Pre-Flight Checks",
+                "All automated checks passed",
+                postcondition=lambda: verify_preflight_checks(root_dir, release_profile),
+            ):
+                success = False
 
         if success:
             check_for_safe_cancellation("environment setup")
@@ -1408,7 +2102,14 @@ def main():
                 success = False
             else:
                 python_cmd = venv_python
-                state_tracker.complete_stage("1", "Environment Setup", f"Using repository Python at {python_cmd}")
+                if not state_tracker.complete_stage(
+                    "1",
+                    "Environment Setup",
+                    f"Using repository Python at {python_cmd}",
+                    postcondition=lambda: verify_python_environment(python_cmd),
+                    max_attempts=1,
+                ):
+                    success = False
 
         if success:
             check_for_safe_cancellation("dependency installation")
@@ -1421,7 +2122,15 @@ def main():
                 state_tracker.fail_stage("2", "Dependencies", "Python dependency installation failed")
                 success = False
             else:
-                state_tracker.complete_stage("2", "Dependencies", "Python dependencies installed")
+                if not state_tracker.complete_stage(
+                    "2",
+                    "Dependencies",
+                    "Python dependencies installed",
+                    postcondition=lambda: verify_dependencies(root_dir, python_cmd),
+                    retry=lambda: install_dependencies(root_dir, python_cmd, release_profile),
+                    max_attempts=2,
+                ):
+                    success = False
 
         if success:
             check_for_safe_cancellation("dashboard ui build")
@@ -1431,9 +2140,24 @@ def main():
             ui_status = build_dashboard_ui(root_dir)
             logger.stop_spinner()
             if ui_status == "built":
-                state_tracker.complete_stage("2a", "Dashboard UI Build", "Production dashboard assets built locally")
+                if not state_tracker.complete_stage(
+                    "2a",
+                    "Dashboard UI Build",
+                    "Production dashboard assets built locally",
+                    postcondition=lambda: verify_dashboard_assets(root_dir),
+                    retry=lambda: build_dashboard_ui(root_dir) in {"built", "bundled"},
+                    max_attempts=2,
+                ):
+                    success = False
             elif ui_status == "bundled":
-                state_tracker.complete_stage("2a", "Dashboard UI Build", "Bundled dashboard assets detected and reused")
+                if not state_tracker.complete_stage(
+                    "2a",
+                    "Dashboard UI Build",
+                    "Bundled dashboard assets detected and reused",
+                    postcondition=lambda: verify_dashboard_assets(root_dir),
+                    max_attempts=1,
+                ):
+                    success = False
             else:
                 state_tracker.warn_stage("2a", "Dashboard UI Build", "Dashboard build skipped; see installer log for details")
 
@@ -1452,7 +2176,70 @@ def main():
                 state_tracker.fail_stage("3", "Database Initialization", "Database initialization failed")
                 success = False
             else:
-                state_tracker.complete_stage("3", "Database Initialization", "Database initialization completed")
+                if not state_tracker.complete_stage(
+                    "3",
+                    "Database Initialization",
+                    "Database initialization completed",
+                    postcondition=lambda: Path(data_dir).is_dir(),
+                    max_attempts=1,
+                ):
+                    success = False
+
+        if success:
+            check_for_safe_cancellation("project registry setup")
+            state_tracker.start_stage(
+                "3p",
+                "Project Registry",
+                "Preparing deterministic project isolation",
+            )
+            if project_setup["configure"]:
+                registry_path = Path(project_setup["registry_path"])
+                project_rollback = ProjectSetupRollback(
+                    [
+                        registry_path,
+                        Path(project_setup["strict_marker_path"]),
+                        registry_path.parent / "dashboard_snapshot.json",
+                    ]
+                )
+                try:
+                    project_snapshot = apply_project_setup(project_setup)
+                except (OSError, RuntimeError, ValueError) as error:
+                    project_rollback.rollback()
+                    project_rollback = None
+                    logger.log(f"ERROR: Project Registry setup failed: {error}")
+                    state_tracker.fail_stage(
+                        "3p",
+                        "Project Registry",
+                        "Project setup failed without changing the prior registry",
+                    )
+                    success = False
+                else:
+                    if not state_tracker.complete_stage(
+                        "3p",
+                        "Project Registry",
+                        (
+                            f"{len(project_snapshot['projects'])} project(s); "
+                            f"{project_snapshot['mode']} mode"
+                        ),
+                        postcondition=lambda: verify_project_setup(project_setup),
+                        max_attempts=1,
+                    ):
+                        success = False
+            elif project_setup["review_required"]:
+                state_tracker.warn_stage(
+                    "3p",
+                    "Project Registry",
+                    "Upgrade compatibility mode preserved; review project folders in Elefante Home",
+                )
+            else:
+                if not state_tracker.complete_stage(
+                    "3p",
+                    "Project Registry",
+                    f"Existing {project_setup['target_mode']} project mode preserved",
+                    postcondition=lambda: verify_project_setup(project_setup),
+                    max_attempts=1,
+                ):
+                    success = False
 
         if success:
             check_for_safe_cancellation("dashboard snapshot generation")
@@ -1463,7 +2250,15 @@ def main():
             snapshot_status = generate_dashboard_snapshot(root_dir, python_cmd)
             logger.stop_spinner()
             if snapshot_status == "generated":
-                state_tracker.complete_stage("3a", "Dashboard Snapshot", "Initial dashboard snapshot generated")
+                if not state_tracker.complete_stage(
+                    "3a",
+                    "Dashboard Snapshot",
+                    "Initial dashboard snapshot generated",
+                    postcondition=lambda: verify_dashboard_snapshot(data_dir),
+                    retry=lambda: generate_dashboard_snapshot(root_dir, python_cmd) == "generated",
+                    max_attempts=2,
+                ):
+                    success = False
             else:
                 state_tracker.warn_stage("3a", "Dashboard Snapshot", "Snapshot generation failed; dashboard can refresh later")
 
@@ -1476,12 +2271,22 @@ def main():
                 state_tracker.fail_stage("3b", "Local Daemon Service", "Daemon service installation failed")
                 success = False
             else:
-                state_tracker.complete_stage("3b", "Local Daemon Service", "User-scope daemon service installed")
+                if not state_tracker.complete_stage(
+                    "3b",
+                    "Local Daemon Service",
+                    "User-scope daemon service installed",
+                    postcondition=daemon_health_check,
+                ):
+                    success = False
 
         if success:
             check_for_safe_cancellation("ide configuration")
             print_step(4, "IDE Configuration")
-            state_tracker.start_stage("4", "IDE Configuration", "Configuring MCP clients for supported IDEs")
+            state_tracker.start_stage(
+                "4",
+                "IDE Configuration",
+                "Configuring Codex and selected compatibility previews",
+            )
             ide_detail = ""
             try:
                 vscode_selection = select_family(selected_hosts, VSCODE_FAMILY)
@@ -1579,11 +2384,27 @@ def main():
                     for host, result in cli_hosts.items()
                     if result not in {"configured", "updated", "already-present"}
                 )
+                required_cli_failures = sorted(
+                    set(failed_cli_hosts).intersection(required_hosts)
+                )
+                optional_cli_failures = sorted(
+                    set(failed_cli_hosts).difference(required_hosts)
+                )
                 verified_surfaces = configured_surfaces(Path.home())
                 uncovered_hosts = uncovered_required_hosts(required_hosts, verified_surfaces)
-                if failed_cli_hosts:
-                    labels = ", ".join(HOST_LABELS[host] for host in failed_cli_hosts)
-                    ide_detail = f"CLI integration failed: {labels}"
+                if optional_cli_failures:
+                    labels = ", ".join(
+                        HOST_LABELS[host] for host in optional_cli_failures
+                    )
+                    logger.log(
+                        "WARN: Compatibility preview was not configured: "
+                        f"{labels}"
+                    )
+                if required_cli_failures:
+                    labels = ", ".join(
+                        HOST_LABELS[host] for host in required_cli_failures
+                    )
+                    ide_detail = f"Certified CLI integration failed: {labels}"
                     logger.log(f"ERROR: {ide_detail}")
                     if args.installation_scope == "customer":
                         state_tracker.fail_stage("4", "IDE Configuration", ide_detail)
@@ -1592,10 +2413,15 @@ def main():
                         state_tracker.warn_stage("4", "IDE Configuration", ide_detail)
                 elif uncovered_hosts:
                     labels = ", ".join(HOST_LABELS[host] for host in uncovered_hosts)
-                    ide_detail = f"Detected hosts not verified: {labels}"
+                    ide_detail = f"Certified host not verified: {labels}"
                     logger.log(f"ERROR: {ide_detail}")
-                    logger.log("   Elefante will not claim customer readiness while a detected host is uncovered.")
-                    logger.log("   Re-run the released installer after resolving the reported host configuration.")
+                    logger.log(
+                        "   Elefante will not claim customer readiness until "
+                        "the certified Codex connection is verified."
+                    )
+                    logger.log(
+                        "   Install or repair Codex, then re-run the official package."
+                    )
                     if args.installation_scope == "customer":
                         state_tracker.fail_stage("4", "IDE Configuration", ide_detail)
                         success = False
@@ -1603,10 +2429,26 @@ def main():
                         state_tracker.warn_stage("4", "IDE Configuration", ide_detail)
                 elif not required_hosts:
                     ide_detail = "0 compatible hosts detected; generic MCP bridge remains available"
-                    state_tracker.complete_stage("4", "IDE Configuration", ide_detail)
+                    if not state_tracker.complete_stage(
+                        "4",
+                        "IDE Configuration",
+                        ide_detail,
+                        postcondition=lambda: not failed_cli_hosts
+                        and not uncovered_required_hosts(required_hosts, configured_surfaces(Path.home())),
+                        max_attempts=1,
+                    ):
+                        success = False
                 else:
                     ide_detail = "; ".join(detail_parts) or "All detected hosts verified"
-                    state_tracker.complete_stage("4", "IDE Configuration", ide_detail)
+                    if not state_tracker.complete_stage(
+                        "4",
+                        "IDE Configuration",
+                        ide_detail,
+                        postcondition=lambda: not failed_cli_hosts
+                        and not uncovered_required_hosts(required_hosts, configured_surfaces(Path.home())),
+                        max_attempts=1,
+                    ):
+                        success = False
             except Exception as e:
                 logger.log(f"ERROR: Error configuring MCP: {e}")
                 if args.installation_scope == "customer":
@@ -1628,7 +2470,14 @@ def main():
                 logger.log("   See https://elefante.ai/docs for setup instructions.")
                 state_tracker.warn_stage("4a", "Agent Behavior Bootstrap", "copilot-instructions.md is missing")
             else:
-                state_tracker.complete_stage("4a", "Agent Behavior Bootstrap", "Agent bootstrap instructions verified")
+                if not state_tracker.complete_stage(
+                    "4a",
+                    "Agent Behavior Bootstrap",
+                    "Agent bootstrap instructions verified",
+                    postcondition=lambda: (root_dir / ".github" / "copilot-instructions.md").is_file(),
+                    max_attempts=1,
+                ):
+                    success = False
 
         if success:
             check_for_safe_cancellation("system verification")
@@ -1642,7 +2491,15 @@ def main():
                 state_tracker.fail_stage("5", "System Verification", "Health check failed")
                 success = False
             else:
-                state_tracker.complete_stage("5", "System Verification", "Health check passed")
+                if not state_tracker.complete_stage(
+                    "5",
+                    "System Verification",
+                    "Health check passed",
+                    postcondition=lambda: run_health_check(root_dir, python_cmd),
+                    retry=lambda: run_health_check(root_dir, python_cmd),
+                    max_attempts=2,
+                ):
+                    success = False
 
         if success:
             check_for_safe_cancellation("mcp handshake verification")
@@ -1654,14 +2511,81 @@ def main():
             logger.stop_spinner()
             if handshake_ok:
                 logger.log("OK: MCP handshake verified")
-                state_tracker.complete_stage("5a", "MCP Handshake Verification", "MCP server responded successfully")
+                if not state_tracker.complete_stage(
+                    "5a",
+                    "MCP Handshake Verification",
+                    "MCP server responded successfully",
+                    postcondition=lambda: run_command([python_cmd, str(handshake_script)], cwd=root_dir),
+                    retry=lambda: run_command([python_cmd, str(handshake_script)], cwd=root_dir),
+                    max_attempts=2,
+                ):
+                    success = False
             else:
                 logger.log("ERROR: MCP handshake failed. Server is not responding to protocol.")
                 state_tracker.fail_stage("5a", "MCP Handshake Verification", "MCP server did not respond to protocol handshake")
                 success = False
 
+        if (
+            success
+            and args.installation_scope == "customer"
+            and existing_runtime is None
+        ):
+            check_for_safe_cancellation("first-run acceptance")
+            logger.log("\n[Step 5b] First-Run Acceptance...")
+            state_tracker.start_stage(
+                "5b",
+                "First-Run Acceptance",
+                "Proving project Recall, exact cleanup, and initial backup",
+            )
+            try:
+                acceptance_workspace = installation_acceptance_workspace(
+                    project_setup
+                )
+            except (OSError, RuntimeError, ValueError) as error:
+                logger.log(f"ERROR: First-run project proof could not start: {error}")
+                state_tracker.fail_stage(
+                    "5b",
+                    "First-Run Acceptance",
+                    "Strict project selection could not be verified",
+                )
+                success = False
+            else:
+                logger.start_spinner("Proving project Recall and initial backup")
+                acceptance_ok = run_first_run_acceptance(
+                    root_dir,
+                    python_cmd,
+                    data_dir=Path(data_dir),
+                    workspace=acceptance_workspace,
+                )
+                logger.stop_spinner()
+                if not acceptance_ok:
+                    state_tracker.fail_stage(
+                        "5b",
+                        "First-Run Acceptance",
+                        "Disposable Recall or initial backup was not verified",
+                    )
+                    success = False
+                elif not state_tracker.complete_stage(
+                    "5b",
+                    "First-Run Acceptance",
+                    "Project Recall, cleanup, and local backup verified",
+                    postcondition=lambda: verify_first_run_receipt(root_dir),
+                    max_attempts=1,
+                ):
+                    success = False
+
         if success:
-            state_tracker.start_stage("5b", "Runtime Registration", "Recording the installed runtime identity")
+            logger.log("\n[Step 5c] Runtime Registration...")
+            state_tracker.start_stage("5c", "Runtime Registration", "Recording the installed runtime identity")
+            expected_runtime = {
+                "app_root": str(root_dir.expanduser().resolve()),
+                "data_root": str(Path(data_dir).expanduser().resolve()),
+                "scope": args.installation_scope,
+                "version": ELEFANTE_VERSION,
+                "source_commit": str(runtime_provenance["source_commit"]),
+                "release_channel": str(runtime_provenance["release_channel"]),
+                "source_clean": bool(runtime_provenance["source_clean"]),
+            }
             try:
                 record_runtime_installation(
                     app_root=root_dir,
@@ -1674,7 +2598,7 @@ def main():
                 )
             except (OSError, RuntimeError, ValueError) as error:
                 logger.log(f"ERROR: Could not record runtime installation: {error}")
-                state_tracker.fail_stage("5b", "Runtime Registration", "Runtime identity was not recorded")
+                state_tracker.fail_stage("5c", "Runtime Registration", "Runtime identity was not recorded")
                 success = False
             else:
                 detail = (
@@ -1682,10 +2606,19 @@ def main():
                     if args.installation_scope == "customer"
                     else "Developer runtime recorded"
                 )
-                state_tracker.complete_stage("5b", "Runtime Registration", detail)
+                if not state_tracker.complete_stage(
+                    "5c",
+                    "Runtime Registration",
+                    detail,
+                    postcondition=lambda: verify_runtime_installation(expected_runtime),
+                    max_attempts=1,
+                ):
+                    success = False
 
     except InstallationCancelled:
         logger.stop_spinner()
+        if project_rollback is not None:
+            project_rollback.rollback()
         install_status = "CANCELLED"
         print_header("INSTALLATION CANCELLED")
         generate_proof(root_dir, install_status)
@@ -1696,22 +2629,33 @@ def main():
         if os.name == 'nt':
             input("Press Enter to exit...")
         return
+    except Exception:
+        logger.stop_spinner()
+        if project_rollback is not None:
+            project_rollback.rollback()
+        raise
 
     install_status = "SUCCESS" if success else "FAILED"
     next_action = "restart your IDE" if success else f"review {log_file}"
-    state_tracker.finish(success, next_action=next_action)
+    if not state_tracker.finish(success, next_action=next_action):
+        success = False
+        install_status = "FAILED"
+        next_action = f"review {log_file}"
+    if project_rollback is not None:
+        if success:
+            project_rollback.commit()
+        else:
+            project_rollback.rollback()
     generate_proof(root_dir, install_status)
 
     if success:
         print_header("INSTALLATION COMPLETE")
         for line in state_tracker.render_console_summary(next_action=next_action):
             logger.log(line)
-        logger.log("Let's prove it works.")
-        logger.log("\n1. Restart your IDE to load the Elefante MCP server.")
-        logger.log("2. Open your AI Chat (Copilot / Cursor / etc).")
-        logger.log("3. Copy and paste exactly this question:\n")
-        logger.log('   "What is my Elefante test passcode?"\n')
-        logger.log("4. Watch your AI fetch the embedded seed memory autonomously.")
+        if args.installation_scope == "customer" and existing_runtime is None:
+            logger.log("Project connection, disposable Recall, cleanup, and local backup are verified.")
+        logger.log("\n1. Open Elefante Home to review health and your selected projects.")
+        logger.log("2. Return to your agent and ask it to remember a real decision.")
     else:
         print_header("INSTALLATION FAILED")
         for line in state_tracker.render_console_summary(next_action=next_action):

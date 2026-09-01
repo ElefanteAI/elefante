@@ -1,6 +1,6 @@
 """Runtime contracts for the shared local MCP daemon and its bridge."""
 
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 import concurrent.futures
 import io
 import json
@@ -22,15 +22,36 @@ from mcp import types as mcp_types
 from src.mcp.server import (
     ElefanteMCPServer,
     MEMORY_SEARCH_GUIDANCE,
+    RECALL_MAX_RESPONSE_TOKENS,
     answer_context_metadata,
     compile_answer_context,
 )
-from src.models.memory import Memory, MemoryMetadata, MemoryStatus, MemoryType
+from src.models.memory import Memory, MemoryMetadata, MemoryType
 from src.models.query import SearchResult
 from src.utils.token_counter import estimate_tokens
 
 
 BRIDGE_RESPONSE_TIMEOUT_SECONDS = 60
+EXPECTED_CUSTOMER_TOOLS = {
+    "elefante-Memory",
+    "elefante-Recall",
+    "elefante-GraphConnect",
+    "elefante-GraphQuery",
+    "elefante-ContextGet",
+    "elefante-SessionsList",
+    "elefante-SystemStatusGet",
+    "elefante-System",
+    "elefante-Recover",
+    "elefante-DashboardOpen",
+    "elefante-ETLProcess",
+    "elefante-ETLClassify",
+    "elefante-TaskCreate",
+    "elefante-TaskUpdate",
+    "elefante-TaskGraph",
+    "elefante-DirectiveAdd",
+    "elefante-DirectiveList",
+    "elefante-DirectiveRemove",
+}
 
 
 def _context_result(
@@ -296,13 +317,30 @@ async def test_recall_surface_is_default_on_and_has_operator_rollback(
     assert "at most once" in recall.description
     assert "self-contained" in recall.description
     assert "elefante-TaskIntelligence" not in default_names
-    assert len(default_names) == 17
+    assert len(default_names) == 18
+
+    recover = next(
+        tool for tool in default_result.root.tools if tool.name == "elefante-Recover"
+    )
+    assert recover.annotations is not None
+    assert recover.annotations.readOnlyHint is False
+    assert recover.annotations.destructiveHint is True
+    assert recover.annotations.idempotentHint is False
+    assert recover.inputSchema["properties"]["action"]["enum"] == [
+        "health",
+        "backup",
+        "restore",
+        "support_report",
+        "installation_acceptance",
+    ]
+    assert "installer-only" in recover.description
+    assert recover.inputSchema["properties"]["workspace"]["maxLength"] == 2048
 
     monkeypatch.setenv("ELEFANTE_RECALL_ENABLED", "0")
     rolled_back_result = await handler(request)
     rolled_back_names = {tool.name for tool in rolled_back_result.root.tools}
     assert "elefante-Recall" not in rolled_back_names
-    assert len(rolled_back_names) == 16
+    assert len(rolled_back_names) == 17
 
     call_handler = server.server.request_handlers[mcp_types.CallToolRequest]
     response = await call_handler(
@@ -314,12 +352,652 @@ async def test_recall_surface_is_default_on_and_has_operator_rollback(
         )
     )
     payload = json.loads(response.root.content[0].text)
+    assert set(payload) == {
+        "success",
+        "status",
+        "context",
+        "supplied_count",
+        "abstained",
+        "delivery_blocked",
+        "read_only",
+    }
     assert payload["success"] is False
-    assert "disabled by the local operator" in payload["error"]
+    assert payload["status"] == "unavailable"
+    assert "disabled by the local operator" in payload["context"]
     assert "MANDATORY_PROTOCOLS_READ_THIS_FIRST" not in payload
     assert "ENTRYPOINT_SEQUENCE_READ_THIS_FIRST" not in payload
     assert "DIRECTIVES" not in payload
     assert "TOKEN_STATS" not in payload
+
+
+@pytest.mark.asyncio
+async def test_recover_backup_is_plan_first_and_binds_apply_to_exact_layout(
+    monkeypatch,
+) -> None:
+    from src.core.verified_operation import VerifiedOperationStatus
+
+    server = ElefanteMCPServer()
+    applied: list[dict[str, str]] = []
+
+    class _Plan:
+        layout_sha256 = "a" * 64
+
+        def to_dict(self):
+            return {
+                "schema_version": 1,
+                "action": "backup",
+                "applicable": True,
+                "layout_sha256": self.layout_sha256,
+                "reason": "Verified local backup plan.",
+            }
+
+    class _Result:
+        status = VerifiedOperationStatus.VERIFIED_COMPLETE
+
+        def to_dict(self):
+            return {
+                "success": True,
+                "status": self.status.value,
+                "receipt": {
+                    "status": self.status.value,
+                    "authority": "user_directed",
+                    "archive_name": "elefante_data_backup.zip",
+                },
+            }
+
+    class _Service:
+        def plan_backup(self):
+            return _Plan()
+
+        def history(self):
+            return ({"status": "VERIFIED_COMPLETE"},)
+
+        async def execute_backup(self, *, expected_layout_sha256, authority):
+            applied.append(
+                {
+                    "expected_layout_sha256": expected_layout_sha256,
+                    "authority": authority,
+                }
+            )
+            return _Result()
+
+    monkeypatch.setattr(server, "_verified_recovery_service", lambda: _Service())
+
+    preview = await server._handle_recover({"action": "backup"})
+
+    assert preview["success"] is True
+    assert preview["plan"]["layout_sha256"] == "a" * 64
+    assert preview["recovery_history"] == [{"status": "VERIFIED_COMPLETE"}]
+    assert applied == []
+
+    unconfirmed = await server._handle_recover(
+        {
+            "action": "backup",
+            "apply": True,
+            "expected_layout_sha256": "a" * 64,
+        }
+    )
+    assert unconfirmed["error_code"] == "CONFIRMATION_REQUIRED"
+    assert applied == []
+
+    result = await server._handle_recover(
+        {
+            "action": "backup",
+            "apply": True,
+            "confirm": True,
+            "expected_layout_sha256": "a" * 64,
+            "invocation_mode": "user_directed",
+        }
+    )
+
+    assert result["success"] is True
+    assert result["recovery_status"] == "VERIFIED_COMPLETE"
+    assert applied == [
+        {
+            "expected_layout_sha256": "a" * 64,
+            "authority": "user_directed",
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_installation_acceptance_rejects_non_installer_before_project_access(
+    monkeypatch,
+) -> None:
+    server = ElefanteMCPServer()
+    monkeypatch.setattr(
+        server,
+        "_request_provenance",
+        lambda: {
+            "tool": "unknown-stdio",
+            "transport": "stdio",
+            "cwd": "/private/tmp/project",
+        },
+    )
+
+    def unexpected_project_access(_args):
+        raise AssertionError("project registry must not be read")
+
+    monkeypatch.setattr(server, "_strict_project_resolution", unexpected_project_access)
+
+    result = await server._handle_recover(
+        {
+            "action": "installation_acceptance",
+            "workspace": "/private/tmp/project",
+        }
+    )
+
+    assert result["success"] is False
+    assert result["error_code"] == "INSTALL_ACCEPTANCE_AUTHORITY_REQUIRED"
+    assert result["recovery_status"] == "FAILED_NO_CHANGE"
+
+
+@pytest.mark.asyncio
+async def test_installation_acceptance_requires_strict_registered_project(
+    monkeypatch,
+) -> None:
+    server = ElefanteMCPServer()
+    monkeypatch.setattr(
+        server,
+        "_request_provenance",
+        lambda: {"tool": "elefante-installer", "transport": "stdio"},
+    )
+    monkeypatch.setattr(server, "_strict_project_resolution", lambda _args: None)
+
+    async def unexpected_orchestrator():
+        raise AssertionError("storage must not open before strict project resolution")
+
+    monkeypatch.setattr(server, "_get_orchestrator", unexpected_orchestrator)
+
+    result = await server._handle_recover(
+        {
+            "action": "installation_acceptance",
+            "workspace": "/private/tmp/project",
+        }
+    )
+
+    assert result["success"] is False
+    assert result["error_code"] == "PROJECT_STRICT_MODE_REQUIRED"
+    assert result["memory_read"] is False
+    assert result["memory_written"] is False
+
+
+@pytest.mark.asyncio
+async def test_installation_acceptance_delegates_canonical_project_under_lock(
+    monkeypatch,
+) -> None:
+    from src.core.verified_operation import VerifiedOperationStatus
+
+    server = ElefanteMCPServer()
+    project = SimpleNamespace(
+        project_id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        scope="project:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        root="/private/tmp/project",
+    )
+    resolution = SimpleNamespace(matched=True, project=project)
+    orchestrator = SimpleNamespace()
+    executed: list[dict[str, str]] = []
+
+    class _Result:
+        status = VerifiedOperationStatus.VERIFIED_COMPLETE
+
+        def to_dict(self):
+            return {
+                "success": True,
+                "action": "installation_acceptance",
+                "status": self.status.value,
+                "receipt": {"memory_content_included": False},
+            }
+
+    class _Service:
+        async def execute(self, **kwargs):
+            executed.append(kwargs)
+            return _Result()
+
+    async def get_orchestrator():
+        return orchestrator
+
+    @asynccontextmanager
+    async def locked_operation():
+        yield SimpleNamespace(acquired=True)
+
+    monkeypatch.setattr(
+        server,
+        "_request_provenance",
+        lambda: {"tool": "elefante-installer", "transport": "stdio"},
+    )
+    monkeypatch.setattr(
+        server,
+        "_strict_project_resolution",
+        lambda _args: resolution,
+    )
+    monkeypatch.setattr(server, "_get_orchestrator", get_orchestrator)
+    monkeypatch.setattr(
+        server,
+        "_install_acceptance_service",
+        lambda selected: _Service() if selected is orchestrator else None,
+    )
+    monkeypatch.setattr(server, "_write_operation", locked_operation)
+
+    result = await server._handle_recover(
+        {
+            "action": "installation_acceptance",
+            "workspace": "/private/tmp/project/nested",
+        }
+    )
+
+    assert result["success"] is True
+    assert result["recovery_status"] == "VERIFIED_COMPLETE"
+    assert executed == [
+        {
+            "project_id": project.project_id,
+            "project_scope": project.scope,
+            "workspace": project.root,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_installation_acceptance_fails_closed_when_write_lock_is_busy(
+    monkeypatch,
+) -> None:
+    server = ElefanteMCPServer()
+    project = SimpleNamespace(
+        project_id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        scope="project:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        root="/private/tmp/project",
+    )
+
+    async def get_orchestrator():
+        return SimpleNamespace()
+
+    @asynccontextmanager
+    async def busy_operation():
+        yield SimpleNamespace(acquired=False)
+
+    monkeypatch.setattr(
+        server,
+        "_request_provenance",
+        lambda: {"tool": "elefante-installer", "transport": "stdio"},
+    )
+    monkeypatch.setattr(
+        server,
+        "_strict_project_resolution",
+        lambda _args: SimpleNamespace(matched=True, project=project),
+    )
+    monkeypatch.setattr(server, "_get_orchestrator", get_orchestrator)
+    monkeypatch.setattr(server, "_install_acceptance_service", lambda _item: object())
+    monkeypatch.setattr(server, "_write_operation", busy_operation)
+
+    result = await server._handle_recover(
+        {
+            "action": "installation_acceptance",
+            "workspace": project.root,
+        }
+    )
+
+    assert result["success"] is False
+    assert result["error_code"] == "WRITE_LOCK_BUSY"
+    assert result["retry"] is True
+
+
+@pytest.mark.asyncio
+async def test_recover_health_is_read_only_and_returns_one_safe_next_action(
+    monkeypatch,
+) -> None:
+    server = ElefanteMCPServer()
+
+    class _Health:
+        def to_dict(self):
+            return {
+                "schema_version": 1,
+                "state": "NEEDS_ATTENTION",
+                "summary": "A verified backup is required.",
+                "next_action": "back_up_now",
+                "diagnostic_codes": ["verified_backup_missing"],
+                "checks": [],
+                "valid_backups": 0,
+                "invalid_backups": 0,
+                "latest_verified_backup_at": None,
+            }
+
+    class _Service:
+        def history(self):
+            return ({"status": "VERIFIED_COMPLETE"},)
+
+        async def check_health(self):
+            return _Health()
+
+    monkeypatch.setattr(server, "_verified_recovery_service", lambda: _Service())
+
+    result = await server._handle_recover({"action": "health"})
+
+    assert result["success"] is True
+    assert result["action"] == "health"
+    assert result["health"]["state"] == "NEEDS_ATTENTION"
+    assert result["health"]["next_action"] == "back_up_now"
+    assert result["recovery_history"] == [{"status": "VERIFIED_COMPLETE"}]
+
+    rejected = await server._handle_recover(
+        {"action": "health", "apply": True, "confirm": True}
+    )
+    assert rejected["success"] is False
+    assert rejected["error_code"] == "RECOVERY_FIELDS_INVALID"
+
+
+@pytest.mark.asyncio
+async def test_recovery_health_uses_existing_doctor_through_async_boundary(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    from scripts.lifecycle import doctor
+    from src.utils import config as config_module
+
+    data_dir = tmp_path / "home" / "data"
+    fake_config = SimpleNamespace(
+        elefante=SimpleNamespace(
+            data_dir=str(data_dir),
+            vector_store=SimpleNamespace(
+                persist_directory=str(data_dir / "vector"),
+            ),
+            graph_store=SimpleNamespace(
+                database_path=str(data_dir / "kuzu_db"),
+            ),
+        )
+    )
+    seen: dict[str, Path] = {}
+
+    def build_report(*, repo_root, home):
+        seen["repo_root"] = repo_root
+        seen["home"] = home
+        return {
+            "ready": True,
+            "customer_ready": True,
+            "daemon": {"daemon_health": True},
+            "host_coverage": {"verified": ["codex"]},
+            "recall": {"required": True, "ready": True},
+            "diagnostics": [],
+            "customer_diagnostics": [],
+        }
+
+    monkeypatch.setattr(config_module, "get_config", lambda: fake_config)
+    monkeypatch.setattr(doctor, "build_report", build_report)
+    monkeypatch.setenv(
+        "ELEFANTE_BACKUP_DIR",
+        str(tmp_path / "customer-selected-path-must-be-ignored"),
+    )
+
+    recovery = ElefanteMCPServer()._verified_recovery_service()
+    assert recovery.backup_dir == tmp_path / "home" / "backups"
+    health = await recovery.check_health()
+
+    assert health.state == "NEEDS_ATTENTION"
+    assert health.next_action == "back_up_now"
+    assert seen["repo_root"] == Path(__file__).resolve().parents[1]
+    assert seen["home"] == Path.home()
+
+
+@pytest.mark.asyncio
+async def test_recover_restore_lists_then_binds_archive_and_private_recall_question(
+    monkeypatch,
+) -> None:
+    from src.core.verified_operation import VerifiedOperationStatus
+
+    server = ElefanteMCPServer()
+    applied: list[dict[str, str]] = []
+    recovery_scopes: list[dict[str, str]] = []
+    archive_name = "elefante_data_backup_20260829.zip"
+
+    class _Archive:
+        def to_dict(self):
+            return {
+                "archive_name": archive_name,
+                "valid": True,
+                "archive_sha256": "b" * 64,
+                "source_sha256": "c" * 64,
+                "files": 4,
+                "bytes": 4096,
+            }
+
+    class _Plan:
+        layout_sha256 = "a" * 64
+        archive_sha256 = "b" * 64
+
+        def to_dict(self):
+            return {
+                "schema_version": 1,
+                "action": "restore",
+                "applicable": True,
+                "layout_sha256": self.layout_sha256,
+                "archive_name": archive_name,
+                "archive_sha256": self.archive_sha256,
+                "source_sha256": "c" * 64,
+                "reason": "Verified restore plan.",
+            }
+
+    class _Result:
+        status = VerifiedOperationStatus.VERIFIED_COMPLETE
+
+        def to_dict(self):
+            return {
+                "success": True,
+                "status": self.status.value,
+                "receipt": {
+                    "status": self.status.value,
+                    "operation": "restore",
+                    "archive_name": archive_name,
+                },
+            }
+
+    class _Service:
+        def history(self):
+            return ()
+
+        def available_backups(self):
+            return (_Archive(),)
+
+        def plan_restore(self, selected):
+            assert selected == archive_name
+            return _Plan()
+
+        async def execute_restore(
+            self,
+            selected,
+            *,
+            expected_layout_sha256,
+            expected_archive_sha256,
+            verification_question,
+            authority,
+        ):
+            applied.append(
+                {
+                    "archive_name": selected,
+                    "expected_layout_sha256": expected_layout_sha256,
+                    "expected_archive_sha256": expected_archive_sha256,
+                    "verification_question": verification_question,
+                    "authority": authority,
+                }
+            )
+            return _Result()
+
+    project = SimpleNamespace(
+        project_id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        root="/private/tmp/Alpha",
+    )
+    monkeypatch.setattr(
+        server,
+        "_strict_project_resolution",
+        lambda _args: SimpleNamespace(matched=True, project=project),
+    )
+
+    def recovery_service(**scope):
+        recovery_scopes.append(scope)
+        return _Service()
+
+    monkeypatch.setattr(server, "_verified_recovery_service", recovery_service)
+
+    listed = await server._handle_recover({"action": "restore"})
+    assert listed["success"] is True
+    assert listed["available_backups"][0]["archive_name"] == archive_name
+    assert applied == []
+
+    preview = await server._handle_recover(
+        {"action": "restore", "archive_name": archive_name}
+    )
+    assert preview["plan"]["archive_sha256"] == "b" * 64
+    assert applied == []
+
+    missing_hash = await server._handle_recover(
+        {
+            "action": "restore",
+            "archive_name": archive_name,
+            "apply": True,
+            "confirm": True,
+            "expected_layout_sha256": "a" * 64,
+            "verification_question": "What was restored?",
+        }
+    )
+    assert missing_hash["error_code"] == "RECOVERY_ARCHIVE_HASH_REQUIRED"
+    assert applied == []
+
+    result = await server._handle_recover(
+        {
+            "action": "restore",
+            "archive_name": archive_name,
+            "apply": True,
+            "confirm": True,
+            "expected_layout_sha256": "a" * 64,
+            "expected_archive_sha256": "b" * 64,
+            "verification_question": "What was restored?",
+            "invocation_mode": "user_directed",
+        }
+    )
+    assert result["recovery_status"] == "VERIFIED_COMPLETE"
+    assert "What was restored?" not in json.dumps(result)
+    assert recovery_scopes == [
+        {
+            "verification_project": project.project_id,
+            "verification_workspace": project.root,
+        }
+    ] * 4
+    assert applied == [
+        {
+            "archive_name": archive_name,
+            "expected_layout_sha256": "a" * 64,
+            "expected_archive_sha256": "b" * 64,
+            "verification_question": "What was restored?",
+            "authority": "user_directed",
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_recover_support_report_requires_exact_preview_hash(monkeypatch) -> None:
+    from src.core.verified_operation import VerifiedOperationStatus
+
+    server = ElefanteMCPServer()
+    applied: list[dict[str, str]] = []
+
+    class _Plan:
+        report_sha256 = "f" * 64
+
+        def to_dict(self):
+            return {
+                "schema_version": 1,
+                "action": "support_report",
+                "applicable": True,
+                "reason_code": None,
+                "reason": "Previewed allowlisted evidence only.",
+                "report_sha256": self.report_sha256,
+                "preview": {"schema_version": 1},
+                "included": ["product and build identity"],
+                "excluded": ["memory content"],
+                "estimated_bytes": 1024,
+                "irreversible": False,
+            }
+
+    class _Result:
+        status = VerifiedOperationStatus.VERIFIED_COMPLETE
+
+        def to_dict(self):
+            return {
+                "success": True,
+                "status": self.status.value,
+                "receipt": {
+                    "status": self.status.value,
+                    "operation": "support_report",
+                    "archive_name": "elefante_support_20260830.zip",
+                },
+            }
+
+    class _Service:
+        def history(self):
+            return ()
+
+        async def plan_support_report(self):
+            return _Plan()
+
+        async def execute_support_report(self, *, expected_report_sha256, authority):
+            applied.append(
+                {
+                    "expected_report_sha256": expected_report_sha256,
+                    "authority": authority,
+                }
+            )
+            return _Result()
+
+    monkeypatch.setattr(server, "_verified_recovery_service", lambda: _Service())
+
+    preview = await server._handle_recover({"action": "support_report"})
+    assert preview["success"] is True
+    assert preview["plan"]["report_sha256"] == "f" * 64
+    assert applied == []
+
+    missing_hash = await server._handle_recover(
+        {"action": "support_report", "apply": True, "confirm": True}
+    )
+    assert missing_hash["error_code"] == "RECOVERY_SUPPORT_REPORT_HASH_REQUIRED"
+    assert applied == []
+
+    completed = await server._handle_recover(
+        {
+            "action": "support_report",
+            "apply": True,
+            "confirm": True,
+            "expected_report_sha256": "f" * 64,
+            "invocation_mode": "user_directed",
+        }
+    )
+    assert completed["recovery_status"] == "VERIFIED_COMPLETE"
+    assert applied == [
+        {
+            "expected_report_sha256": "f" * 64,
+            "authority": "user_directed",
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_memory_tool_exposes_correct_as_primary_verified_repair_action() -> None:
+    server = ElefanteMCPServer()
+    handler = server.server.request_handlers[mcp_types.ListToolsRequest]
+    result = await handler(mcp_types.ListToolsRequest(method="tools/list"))
+    memory_tool = next(
+        tool for tool in result.root.tools if tool.name == "elefante-Memory"
+    )
+
+    action_schema = memory_tool.inputSchema["properties"]["action"]
+    correction_schema = memory_tool.inputSchema["properties"]["correction"]
+    assert "correct" in action_schema["enum"]
+    assert correction_schema["enum"] == [
+        "edit",
+        "replace",
+        "resolve",
+        "archive",
+        "restore",
+        "permanent_delete",
+    ]
+    assert "primary customer repair path" in memory_tool.description
 
 
 @pytest.mark.asyncio
@@ -379,6 +1057,72 @@ async def test_recall_call_boundary_keeps_customer_payload_minimal(monkeypatch) 
         "delivery_blocked",
         "read_only",
     }
+    assert estimate_tokens(response.root.content[0].text) <= RECALL_MAX_RESPONSE_TOKENS
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        {"question": ""},
+        {"question": "x" * 1001},
+        {"question": 7},
+    ],
+)
+async def test_recall_invalid_input_keeps_seven_field_terminal_contract(arguments) -> None:
+    server = ElefanteMCPServer()
+    handler = server.server.request_handlers[mcp_types.CallToolRequest]
+
+    response = await handler(
+        mcp_types.CallToolRequest(
+            params=mcp_types.CallToolRequestParams(
+                name="elefante-Recall",
+                arguments=arguments,
+            )
+        )
+    )
+    rendered = response.root.content[0].text
+    payload = json.loads(rendered)
+
+    assert set(payload) == {
+        "success",
+        "status",
+        "context",
+        "supplied_count",
+        "abstained",
+        "delivery_blocked",
+        "read_only",
+    }
+    assert payload["success"] is False
+    assert payload["status"] == "blocked"
+    assert payload["supplied_count"] == 0
+    assert payload["abstained"] is True
+    assert payload["delivery_blocked"] is True
+    assert payload["read_only"] is True
+    question = arguments.get("question")
+    if isinstance(question, str) and question:
+        assert question not in payload["context"]
+    assert estimate_tokens(rendered) <= RECALL_MAX_RESPONSE_TOKENS
+
+
+@pytest.mark.asyncio
+async def test_recall_missing_question_is_rejected_by_required_mcp_schema() -> None:
+    server = ElefanteMCPServer()
+    handler = server.server.request_handlers[mcp_types.CallToolRequest]
+
+    response = await handler(
+        mcp_types.CallToolRequest(
+            params=mcp_types.CallToolRequestParams(
+                name="elefante-Recall",
+                arguments={},
+            )
+        )
+    )
+    rendered = response.root.content[0].text
+
+    assert response.root.isError is True
+    assert "Input validation error" in rendered
+    assert "'question' is a required property" in rendered
 
 
 @pytest.mark.asyncio
@@ -441,6 +1185,7 @@ async def test_recall_fails_closed_when_complete_response_exceeds_hard_budget(
     monkeypatch,
 ) -> None:
     server = ElefanteMCPServer()
+    monkeypatch.setattr(server, "_strict_project_resolution", lambda _args: None)
 
     async def oversized_context(_question):
         return SimpleNamespace(
@@ -775,12 +1520,366 @@ def test_stdio_bridge_does_not_reuse_an_id_after_a_later_parse_failure(monkeypat
     ]
 
 
+def test_stdio_bridge_reinitializes_once_after_daemon_session_loss(monkeypatch):
+    from src.mcp import stdio_bridge
+
+    class FakeResponse:
+        def __init__(self, status_code, payload=None, headers=None):
+            self.status_code = status_code
+            self._payload = payload
+            self.headers = headers or {}
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                request = httpx.Request("POST", "http://127.0.0.1:8765/mcp/")
+                response = httpx.Response(self.status_code, request=request)
+                raise httpx.HTTPStatusError(
+                    f"status {self.status_code}",
+                    request=request,
+                    response=response,
+                )
+
+        def json(self):
+            return self._payload
+
+    class FakeClient:
+        def __init__(self):
+            self.calls = []
+            self.responses = iter(
+                [
+                    FakeResponse(
+                        200,
+                        {"jsonrpc": "2.0", "id": 1, "result": {"serverInfo": {"name": "elefante"}}},
+                        {"mcp-session-id": "old-session"},
+                    ),
+                    FakeResponse(202),
+                    FakeResponse(404),
+                    FakeResponse(
+                        200,
+                        {"jsonrpc": "2.0", "id": 1, "result": {"serverInfo": {"name": "elefante"}}},
+                        {"mcp-session-id": "new-session"},
+                    ),
+                    FakeResponse(202),
+                    FakeResponse(
+                        200,
+                        {"jsonrpc": "2.0", "id": 2, "result": {"tools": []}},
+                        {"mcp-session-id": "new-session"},
+                    ),
+                ]
+            )
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def post(self, url, *, json, headers):
+            self.calls.append({"url": url, "request": json, "headers": dict(headers)})
+            return next(self.responses)
+
+    client = FakeClient()
+    monkeypatch.setenv("ELEFANTE_DAEMON_URL", "http://127.0.0.1:8765/mcp/")
+    monkeypatch.setattr(stdio_bridge.httpx, "Client", lambda **_: client)
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO(
+            "\n".join(
+                [
+                    json.dumps(
+                        {
+                            "jsonrpc": "2.0",
+                            "id": 1,
+                            "method": "initialize",
+                            "params": {
+                                "protocolVersion": "2025-06-18",
+                                "capabilities": {},
+                                "clientInfo": {"name": "Codex", "version": "1"},
+                            },
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "jsonrpc": "2.0",
+                            "method": "notifications/initialized",
+                            "params": {},
+                        }
+                    ),
+                    json.dumps(
+                        {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}
+                    ),
+                    "",
+                ]
+            )
+        ),
+    )
+    stdout = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", stdout)
+
+    stdio_bridge.main()
+
+    assert [json.loads(line) for line in stdout.getvalue().splitlines()] == [
+        {"jsonrpc": "2.0", "id": 1, "result": {"serverInfo": {"name": "elefante"}}},
+        {"jsonrpc": "2.0", "id": 2, "result": {"tools": []}},
+    ]
+    assert [call["request"]["method"] for call in client.calls] == [
+        "initialize",
+        "notifications/initialized",
+        "tools/list",
+        "initialize",
+        "notifications/initialized",
+        "tools/list",
+    ]
+    assert client.calls[2]["headers"]["mcp-session-id"] == "old-session"
+    assert "mcp-session-id" not in client.calls[3]["headers"]
+    assert client.calls[4]["headers"]["mcp-session-id"] == "new-session"
+    assert client.calls[5]["headers"]["mcp-session-id"] == "new-session"
+
+
+def test_stdio_bridge_recovers_when_initialized_notification_finds_stale_session(
+    monkeypatch,
+):
+    from src.mcp import stdio_bridge
+
+    class FakeResponse:
+        def __init__(self, status_code, payload=None, headers=None):
+            self.status_code = status_code
+            self._payload = payload
+            self.headers = headers or {}
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise RuntimeError(f"daemon status {self.status_code}")
+
+        def json(self):
+            return self._payload
+
+    responses = iter(
+        [
+            FakeResponse(
+                200,
+                {"jsonrpc": "2.0", "id": 1, "result": {"serverInfo": {"name": "elefante"}}},
+                {"mcp-session-id": "old-session"},
+            ),
+            FakeResponse(202),
+            FakeResponse(404),
+            FakeResponse(
+                200,
+                {"jsonrpc": "2.0", "id": 1, "result": {"serverInfo": {"name": "elefante"}}},
+                {"mcp-session-id": "new-session"},
+            ),
+            FakeResponse(202),
+            FakeResponse(
+                200,
+                {"jsonrpc": "2.0", "id": 2, "result": {"tools": []}},
+                {"mcp-session-id": "new-session"},
+            ),
+        ]
+    )
+    calls = []
+
+    class FakeClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    def fake_post_request(_client, _url, request, session_id=None):
+        calls.append((request["method"], session_id))
+        return next(responses)
+
+    monkeypatch.setenv("ELEFANTE_DAEMON_URL", "http://127.0.0.1:8765/mcp/")
+    monkeypatch.setattr(stdio_bridge.httpx, "Client", lambda **_: FakeClient())
+    monkeypatch.setattr(stdio_bridge, "post_request", fake_post_request)
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO(
+            "\n".join(
+                [
+                    json.dumps(
+                        {
+                            "jsonrpc": "2.0",
+                            "id": 1,
+                            "method": "initialize",
+                            "params": {
+                                "protocolVersion": "2025-06-18",
+                                "capabilities": {},
+                                "clientInfo": {"name": "Codex", "version": "1"},
+                            },
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "jsonrpc": "2.0",
+                            "method": "notifications/initialized",
+                            "params": {},
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "jsonrpc": "2.0",
+                            "method": "notifications/initialized",
+                            "params": {},
+                        }
+                    ),
+                    json.dumps(
+                        {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}
+                    ),
+                    "",
+                ]
+            )
+        ),
+    )
+    stdout = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", stdout)
+
+    stdio_bridge.main()
+
+    assert calls == [
+        ("initialize", None),
+        ("notifications/initialized", "old-session"),
+        ("notifications/initialized", "old-session"),
+        ("initialize", None),
+        ("notifications/initialized", "new-session"),
+        ("tools/list", "new-session"),
+    ]
+    assert [json.loads(line) for line in stdout.getvalue().splitlines()] == [
+        {"jsonrpc": "2.0", "id": 1, "result": {"serverInfo": {"name": "elefante"}}},
+        {"jsonrpc": "2.0", "id": 2, "result": {"tools": []}},
+    ]
+
+
+def test_stdio_bridge_does_not_recover_an_unrelated_http_failure(monkeypatch):
+    from src.mcp import stdio_bridge
+
+    class FakeResponse:
+        def __init__(self, status_code, payload=None, headers=None):
+            self.status_code = status_code
+            self._payload = payload
+            self.headers = headers or {}
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise RuntimeError(f"daemon status {self.status_code}")
+
+        def json(self):
+            return self._payload
+
+    responses = iter(
+        [
+            FakeResponse(
+                200,
+                {"jsonrpc": "2.0", "id": 1, "result": {"serverInfo": {"name": "elefante"}}},
+                {"mcp-session-id": "active-session"},
+            ),
+            FakeResponse(202),
+            FakeResponse(500),
+        ]
+    )
+    calls = []
+
+    class FakeClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    def fake_post_request(_client, _url, request, session_id=None):
+        calls.append((request["method"], session_id))
+        return next(responses)
+
+    monkeypatch.setenv("ELEFANTE_DAEMON_URL", "http://127.0.0.1:8765/mcp/")
+    monkeypatch.setattr(stdio_bridge.httpx, "Client", lambda **_: FakeClient())
+    monkeypatch.setattr(stdio_bridge, "post_request", fake_post_request)
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO(
+            "\n".join(
+                [
+                    json.dumps(
+                        {
+                            "jsonrpc": "2.0",
+                            "id": 1,
+                            "method": "initialize",
+                            "params": {
+                                "protocolVersion": "2025-06-18",
+                                "capabilities": {},
+                                "clientInfo": {"name": "Codex", "version": "1"},
+                            },
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "jsonrpc": "2.0",
+                            "method": "notifications/initialized",
+                            "params": {},
+                        }
+                    ),
+                    json.dumps(
+                        {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}
+                    ),
+                    "",
+                ]
+            )
+        ),
+    )
+    stdout = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", stdout)
+
+    stdio_bridge.main()
+
+    assert calls == [
+        ("initialize", None),
+        ("notifications/initialized", "active-session"),
+        ("tools/list", "active-session"),
+    ]
+    output = [json.loads(line) for line in stdout.getvalue().splitlines()]
+    assert output[0]["result"]["serverInfo"]["name"] == "elefante"
+    assert output[1]["id"] == 2
+    assert output[1]["error"]["message"] == "daemon status 500"
+
+
 def test_daemon_rejects_non_loopback_bind(monkeypatch):
     from src.mcp import daemon
 
     monkeypatch.setenv("ELEFANTE_DAEMON_HOST", "0.0.0.0")
     with pytest.raises(RuntimeError, match="127.0.0.1"):
         daemon.main()
+
+
+def test_daemon_main_owns_the_direct_home_service(monkeypatch):
+    from src.dashboard import server as dashboard_server
+    from src.mcp import daemon
+
+    calls: dict[str, object] = {}
+    monkeypatch.delenv("ELEFANTE_DAEMON_HOST", raising=False)
+    monkeypatch.setattr(
+        dashboard_server,
+        "serve_dashboard_in_thread",
+        lambda *, port: calls.setdefault("dashboard_port", port),
+    )
+    monkeypatch.setattr(
+        daemon.uvicorn,
+        "run",
+        lambda app, *, host, port, log_level: calls.update(
+            daemon_app=app,
+            daemon_host=host,
+            daemon_port=port,
+            log_level=log_level,
+        ),
+    )
+
+    daemon.main()
+
+    assert calls["dashboard_port"] == 8000
+    assert calls["daemon_host"] == "127.0.0.1"
+    assert calls["daemon_port"] == 8765
+    assert calls["log_level"] == "info"
 
 
 @pytest.mark.asyncio
@@ -983,6 +2082,161 @@ async def test_memory_write_lock_encloses_the_actual_store_operation(monkeypatch
 
 
 @pytest.mark.asyncio
+async def test_graph_connect_scrubs_properties_and_holds_lock_through_writes(monkeypatch):
+    from src.mcp import server as server_module
+
+    events: list[str] = []
+    captured: dict[str, object] = {}
+    secret = "sk-" + ("g" * 32)
+
+    @contextmanager
+    def recording_lock():
+        events.append("entered")
+        yield SimpleNamespace(acquired=True)
+        events.append("exited")
+
+    class FakeOrchestrator:
+        async def create_entity(self, **kwargs):
+            assert events == ["entered"]
+            captured["entity"] = kwargs
+            return SimpleNamespace(
+                id=uuid4(),
+                name=kwargs["name"],
+                type=SimpleNamespace(value=kwargs["entity_type"]),
+            )
+
+        async def create_relationship(self, **kwargs):
+            assert events == ["entered"]
+            captured["relationship"] = kwargs
+            return SimpleNamespace(
+                from_entity_id=kwargs["from_entity_id"],
+                to_entity_id=kwargs["to_entity_id"],
+                relationship_type=SimpleNamespace(value=kwargs["relationship_type"]),
+                properties=kwargs["properties"],
+            )
+
+    monkeypatch.setattr(server_module, "write_lock", recording_lock)
+    server = ElefanteMCPServer()
+    monkeypatch.setattr(server, "_check_compliance_gate", lambda _: None)
+    monkeypatch.setattr(
+        server,
+        "_get_orchestrator",
+        lambda: _async_value(FakeOrchestrator()),
+    )
+
+    result = await server._handle_set_elefante_connection(
+        {
+            "entities": [
+                {
+                    "ref": "project",
+                    "name": "Elefante",
+                    "type": "project",
+                    "properties": {"credential": secret},
+                },
+                {
+                    "ref": "decision",
+                    "name": "Local memory",
+                    "type": "decision",
+                },
+            ],
+            "relationships": [
+                {
+                    "from_ref": "decision",
+                    "to_ref": "project",
+                    "relationship_type": "RELATES_TO",
+                    "properties": {"token": f"Bearer {secret}"},
+                }
+            ],
+        }
+    )
+
+    assert events == ["entered", "exited"]
+    assert secret not in json.dumps(captured, default=str)
+    assert secret not in json.dumps(result, default=str)
+    assert result["privacy_redactions"] == 2
+
+
+@pytest.mark.asyncio
+async def test_etl_process_scrubs_legacy_secrets_from_agent_response(monkeypatch):
+    from src.core import etl as etl_module
+    from src.mcp import server as server_module
+
+    events: list[str] = []
+    secret = "sk-" + ("p" * 32)
+
+    @contextmanager
+    def recording_lock():
+        events.append("entered")
+        yield SimpleNamespace(acquired=True)
+        events.append("exited")
+
+    class FakeETL:
+        vector_store = None
+
+        async def get_raw_memories(self, limit):
+            assert events == ["entered"]
+            assert limit == 1
+            return [{"id": str(uuid4()), "content": f"Legacy secret {secret}"}]
+
+    monkeypatch.setattr(server_module, "write_lock", recording_lock)
+    server = ElefanteMCPServer()
+    monkeypatch.setattr(etl_module, "get_etl_processor", lambda: FakeETL())
+    monkeypatch.setattr(
+        server,
+        "_get_orchestrator",
+        lambda: _async_value(SimpleNamespace(vector_store=object())),
+    )
+
+    result = await server._handle_etl_process({"limit": 1})
+
+    assert events == ["entered", "exited"]
+    assert secret not in json.dumps(result)
+    assert result["privacy_redactions"] == 1
+
+
+@pytest.mark.asyncio
+async def test_etl_classify_scrubs_enrichment_before_persistence(monkeypatch):
+    from src.core import etl as etl_module
+    from src.mcp import server as server_module
+
+    captured: dict[str, object] = {}
+    secret = "sk-" + ("c" * 32)
+
+    @contextmanager
+    def recording_lock():
+        yield SimpleNamespace(acquired=True)
+
+    class FakeETL:
+        vector_store = None
+
+        async def apply_classification(self, **kwargs):
+            captured.update(kwargs)
+            return {"success": True, **kwargs}
+
+    monkeypatch.setattr(server_module, "write_lock", recording_lock)
+    monkeypatch.setattr(etl_module, "get_etl_processor", lambda: FakeETL())
+    server = ElefanteMCPServer()
+    monkeypatch.setattr(
+        server,
+        "_get_orchestrator",
+        lambda: _async_value(SimpleNamespace(vector_store=object())),
+    )
+
+    result = await server._handle_etl_classify(
+        {
+            "memory_id": str(uuid4()),
+            "summary": f"Do not persist {secret}",
+            "concepts": ["privacy", secret],
+            "surfaces_when": [f"Bearer {secret}"],
+        }
+    )
+
+    assert secret not in json.dumps(captured)
+    assert secret not in json.dumps(result)
+    assert result["privacy_redactions"] == 3
+
+
+@pytest.mark.asyncio
 async def test_memory_add_forwards_governance_fields(monkeypatch):
     captured: dict[str, object] = {}
 
@@ -1127,7 +2381,39 @@ async def test_memory_add_scrubs_secrets_before_storage(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_memory_update_scrubs_secrets_before_storage(monkeypatch):
+async def test_legacy_content_update_routes_to_verified_correct_before_storage(
+    monkeypatch,
+):
+    memory = Memory(content="existing decision", metadata=MemoryMetadata())
+
+    class VectorStore:
+        async def get_memory(self, _memory_id):
+            raise AssertionError("legacy content update must not open memory storage")
+
+    server = ElefanteMCPServer()
+    monkeypatch.setattr(server, "_strict_project_resolution", lambda _args: None)
+    monkeypatch.setattr(server, "_check_compliance_gate", lambda _: None)
+    monkeypatch.setattr(
+        server,
+        "_get_orchestrator",
+        lambda: _async_value(SimpleNamespace(vector_store=VectorStore())),
+    )
+
+    result = await server._handle_update_memory(
+        {
+            "memory_id": str(memory.id),
+            "content": "Correct this decision through the verified path.",
+        }
+    )
+
+    assert result["success"] is False
+    assert result["error_code"] == "USE_VERIFIED_CORRECT"
+    assert result["memory_read"] is False
+    assert result["memory_written"] is False
+
+
+@pytest.mark.asyncio
+async def test_memory_governance_update_scrubs_secrets_before_storage(monkeypatch):
     memory = Memory(content="existing decision", metadata=MemoryMetadata())
     captured: dict[str, object] = {}
 
@@ -1140,6 +2426,7 @@ async def test_memory_update_scrubs_secrets_before_storage(monkeypatch):
             return True
 
     server = ElefanteMCPServer()
+    monkeypatch.setattr(server, "_strict_project_resolution", lambda _args: None)
     monkeypatch.setattr(server, "_check_compliance_gate", lambda _: None)
     monkeypatch.setattr(
         server,
@@ -1151,13 +2438,344 @@ async def test_memory_update_scrubs_secrets_before_storage(monkeypatch):
     result = await server._handle_update_memory(
         {
             "memory_id": str(memory.id),
-            "content": f"Never persist this key {secret}",
+            "tags": [f"Never persist this key {secret}"],
         }
     )
 
-    assert secret not in str(captured["content"])
-    assert "[REDACTED:OPENAI_KEY]" in str(captured["content"])
+    assert secret not in str(captured["tags"])
+    assert "[REDACTED:OPENAI_KEY]" in str(captured["tags"])
     assert result["privacy_redactions"] == 1
+
+
+@pytest.mark.asyncio
+async def test_correct_plan_is_read_only_and_returns_exact_product_plan(monkeypatch):
+    memory = Memory(
+        content="Scoped decision",
+        metadata=MemoryMetadata(
+            project="project-id",
+            workspace="/tmp/project",
+            scope="project:project-id",
+        ),
+    )
+
+    class VectorStore:
+        async def get_memory(self, _memory_id):
+            return memory
+
+    class CorrectionService:
+        async def plan(self, memory_id, **kwargs):
+            assert memory_id == memory.id
+            assert kwargs["action"].value == "archive"
+            return SimpleNamespace(
+                applicable=True,
+                to_dict=lambda: {
+                    "action": "archive",
+                    "record_sha256": {"target": "a" * 64},
+                    "graph_sha256": {"target": "b" * 64},
+                },
+            )
+
+        async def execute(self, *_args, **_kwargs):
+            raise AssertionError("planning must not write")
+
+    server = ElefanteMCPServer()
+    monkeypatch.setattr(server, "_strict_project_resolution", lambda _args: None)
+    monkeypatch.setattr(
+        server,
+        "_get_orchestrator",
+        lambda: _async_value(SimpleNamespace(vector_store=VectorStore())),
+    )
+    monkeypatch.setattr(
+        server,
+        "_verified_correction_service",
+        lambda _orchestrator: CorrectionService(),
+    )
+
+    result = await server._handle_correct_memory(
+        {"memory_id": str(memory.id), "correction": "archive"}
+    )
+
+    assert result["success"] is True
+    assert result["applied"] is False
+    assert result["correction_status"] == "READY"
+    assert result["plan"]["record_sha256"]["target"] == "a" * 64
+
+
+@pytest.mark.asyncio
+async def test_correct_apply_requires_inspected_hashes_before_opening_stores(
+    monkeypatch,
+):
+    server = ElefanteMCPServer()
+    monkeypatch.setattr(server, "_strict_project_resolution", lambda _args: None)
+
+    async def forbidden_orchestrator():
+        raise AssertionError("validation must finish before opening durable stores")
+
+    monkeypatch.setattr(server, "_get_orchestrator", forbidden_orchestrator)
+    result = await server._handle_correct_memory(
+        {
+            "memory_id": str(uuid4()),
+            "correction": "archive",
+            "apply": True,
+            "reason": "No longer current.",
+            "verification_question": "What decision is current?",
+            "invocation_mode": "user_directed",
+        }
+    )
+
+    assert result["success"] is False
+    assert result["error_code"] == "CORRECTION_PLAN_REQUIRED"
+
+
+@pytest.mark.asyncio
+async def test_correct_apply_uses_gate_lock_and_verified_service(monkeypatch):
+    memory = Memory(
+        content="Scoped decision",
+        metadata=MemoryMetadata(
+            project="project-id",
+            workspace="/tmp/project",
+            scope="project:project-id",
+        ),
+    )
+    captured: dict[str, object] = {}
+
+    class VectorStore:
+        async def get_memory(self, _memory_id):
+            return memory
+
+    class CorrectionService:
+        async def execute(self, memory_id, **kwargs):
+            captured["memory_id"] = memory_id
+            captured.update(kwargs)
+            return SimpleNamespace(
+                status=SimpleNamespace(value="VERIFIED_COMPLETE"),
+                to_dict=lambda: {
+                    "success": True,
+                    "status": "VERIFIED_COMPLETE",
+                    "receipt": {"status": "VERIFIED_COMPLETE"},
+                },
+            )
+
+    class AcquiredWrite:
+        async def __aenter__(self):
+            captured["locked"] = True
+            return SimpleNamespace(acquired=True)
+
+        async def __aexit__(self, *_args):
+            return False
+
+    server = ElefanteMCPServer()
+    monkeypatch.setattr(server, "_strict_project_resolution", lambda _args: None)
+    monkeypatch.setattr(
+        server,
+        "_get_orchestrator",
+        lambda: _async_value(SimpleNamespace(vector_store=VectorStore())),
+    )
+    monkeypatch.setattr(
+        server,
+        "_verified_correction_service",
+        lambda _orchestrator: CorrectionService(),
+    )
+    monkeypatch.setattr(server, "_write_operation", lambda: AcquiredWrite())
+    monkeypatch.setattr(
+        server,
+        "_check_compliance_gate",
+        lambda tool: captured.setdefault("gate", tool) and None,
+    )
+
+    result = await server._handle_correct_memory(
+        {
+            "memory_id": str(memory.id),
+            "correction": "archive",
+            "apply": True,
+            "reason": "No longer current.",
+            "verification_question": "What decision is current?",
+            "expected_record_sha256": {"target": "a" * 64},
+            "expected_graph_sha256": {"target": "b" * 64},
+            "invocation_mode": "user_directed",
+        }
+    )
+
+    assert result["success"] is True
+    assert result["correction_status"] == "VERIFIED_COMPLETE"
+    assert captured["gate"] == "elefante-MemoryCorrect"
+    assert captured["locked"] is True
+    assert captured["memory_id"] == memory.id
+    assert captured["expected_record_sha256"] == {"target": "a" * 64}
+
+
+@pytest.mark.asyncio
+async def test_permanent_correct_requires_final_confirmation_before_storage(monkeypatch):
+    server = ElefanteMCPServer()
+
+    async def forbidden_orchestrator():
+        raise AssertionError("missing final confirmation must not open storage")
+
+    monkeypatch.setattr(server, "_get_orchestrator", forbidden_orchestrator)
+
+    result = await server._handle_correct_memory(
+        {
+            "memory_id": str(uuid4()),
+            "correction": "permanent_delete",
+            "apply": True,
+            "reason": "User requested erasure.",
+            "verification_question": "What should no longer be recalled?",
+            "expected_record_sha256": {"target": "a" * 64},
+            "expected_graph_sha256": {
+                "target": "b" * 64,
+                "target_relationships": "c" * 64,
+            },
+            "invocation_mode": "user_directed",
+        }
+    )
+
+    assert result["error_code"] == "PERMANENT_CONFIRMATION_REQUIRED"
+    assert result["correction_status"] == "NEEDS_HUMAN"
+
+
+@pytest.mark.asyncio
+async def test_permanent_correct_runs_backup_bound_service_under_write_lock(monkeypatch):
+    from src.core.verified_operation import VerifiedOperationStatus
+
+    memory = Memory(
+        content="Scoped decision",
+        metadata=MemoryMetadata(
+            project="project-id",
+            workspace="/tmp/project",
+            scope="project:project-id",
+        ),
+    )
+    captured: dict[str, object] = {}
+
+    class VectorStore:
+        async def get_memory(self, _memory_id):
+            return memory
+
+    class CorrectionService:
+        async def plan(self, *_args, **_kwargs):
+            raise AssertionError("apply uses the inspected hashes")
+
+    class Result:
+        status = VerifiedOperationStatus.VERIFIED_COMPLETE
+
+        @staticmethod
+        def to_dict():
+            return {
+                "success": True,
+                "status": "VERIFIED_COMPLETE",
+                "receipt": {
+                    "operation": "permanent_delete",
+                    "status": "VERIFIED_COMPLETE",
+                    "recoverable": False,
+                },
+            }
+
+    async def apply_permanent(**kwargs):
+        captured.update(kwargs)
+        return Result()
+
+    class AcquiredWrite:
+        async def __aenter__(self):
+            captured["locked"] = True
+            return SimpleNamespace(acquired=True)
+
+        async def __aexit__(self, *_args):
+            return False
+
+    server = ElefanteMCPServer()
+    monkeypatch.setattr(server, "_strict_project_resolution", lambda _args: None)
+    monkeypatch.setattr(server, "_check_compliance_gate", lambda _tool: None)
+    monkeypatch.setattr(server, "_authority_violation", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        server,
+        "_get_orchestrator",
+        lambda: _async_value(SimpleNamespace(vector_store=VectorStore())),
+    )
+    monkeypatch.setattr(
+        server,
+        "_verified_correction_service",
+        lambda _orchestrator: CorrectionService(),
+    )
+    monkeypatch.setattr(server, "_write_operation", lambda: AcquiredWrite())
+    monkeypatch.setattr(
+        server,
+        "_apply_permanent_delete_with_held_lock",
+        apply_permanent,
+    )
+
+    result = await server._handle_correct_memory(
+        {
+            "memory_id": str(memory.id),
+            "correction": "permanent_delete",
+            "apply": True,
+            "reason": "User requested erasure.",
+            "verification_question": "What should no longer be recalled?",
+            "confirm_permanent": True,
+            "expected_record_sha256": {"target": "a" * 64},
+            "expected_graph_sha256": {
+                "target": "b" * 64,
+                "target_relationships": "c" * 64,
+            },
+            "invocation_mode": "user_directed",
+        }
+    )
+
+    assert result["correction_status"] == "VERIFIED_COMPLETE"
+    assert captured["memory_id"] == memory.id
+    assert captured["existing"] is memory
+    assert captured["locked"] is True
+    assert captured["expected_graph_sha256"] == {
+        "target": "b" * 64,
+        "target_relationships": "c" * 64,
+    }
+
+
+@pytest.mark.asyncio
+async def test_correct_rejects_memory_outside_active_strict_project(monkeypatch):
+    memory = Memory(
+        content="Other project decision",
+        metadata=MemoryMetadata(
+            project="other-project",
+            workspace="/tmp/other",
+            scope="project:other-project",
+        ),
+    )
+    project = SimpleNamespace(
+        project_id="active-project",
+        root="/tmp/active",
+        scope="project:active-project",
+    )
+
+    class VectorStore:
+        async def get_memory(self, _memory_id):
+            return memory
+
+    server = ElefanteMCPServer()
+    monkeypatch.setattr(
+        server,
+        "_strict_project_resolution",
+        lambda _args: SimpleNamespace(matched=True, project=project),
+    )
+    monkeypatch.setattr(
+        server,
+        "_get_orchestrator",
+        lambda: _async_value(SimpleNamespace(vector_store=VectorStore())),
+    )
+    monkeypatch.setattr(
+        server,
+        "_verified_correction_service",
+        lambda _orchestrator: (_ for _ in ()).throw(
+            AssertionError("mismatched scope must not reach correction service")
+        ),
+    )
+
+    result = await server._handle_correct_memory(
+        {"memory_id": str(memory.id), "correction": "archive"}
+    )
+
+    assert result["success"] is False
+    assert result["error_code"] == "PROJECT_SCOPE_MISMATCH"
+    assert result["memory_written"] is False
 
 
 @pytest.mark.asyncio
@@ -1325,11 +2943,12 @@ async def test_workflow_cannot_change_protected_memory(monkeypatch):
 
     orchestrator = SimpleNamespace(vector_store=VectorStore())
     server = ElefanteMCPServer()
+    monkeypatch.setattr(server, "_strict_project_resolution", lambda _args: None)
     monkeypatch.setattr(server, "_check_compliance_gate", lambda _: None)
     monkeypatch.setattr(server, "_get_orchestrator", lambda: _async_value(orchestrator))
 
     result = await server._handle_update_memory(
-        {"memory_id": str(protected.id), "content": "automation rewrite"}
+        {"memory_id": str(protected.id), "tags": ["automation rewrite"]}
     )
 
     assert result["success"] is False
@@ -1338,46 +2957,23 @@ async def test_workflow_cannot_change_protected_memory(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_delete_archives_by_default_and_keeps_graph(monkeypatch):
-    memory = Memory(content="recoverable decision", metadata=MemoryMetadata())
-    updates: dict[str, object] = {}
-
-    class VectorStore:
-        async def get_memory(self, _memory_id):
-            return memory
-
-        async def update_memory(self, _memory_id, values):
-            updates.update(values)
-            return True
-
-        async def delete_memory(self, _memory_id):
-            raise AssertionError("default delete must not be permanent")
-
-    class GraphStore:
-        async def delete_entity(self, _memory_id):
-            raise AssertionError("archive must preserve graph provenance")
-
+async def test_legacy_delete_routes_archive_to_verified_correct(monkeypatch):
     server = ElefanteMCPServer()
-    monkeypatch.setattr(server, "_check_compliance_gate", lambda _: None)
-    monkeypatch.setattr(
-        server,
-        "_get_orchestrator",
-        lambda: _async_value(
-            SimpleNamespace(vector_store=VectorStore(), graph_store=GraphStore())
-        ),
-    )
-    monkeypatch.setattr(server, "_save_session_history", lambda: None)
+
+    async def forbidden_orchestrator():
+        raise AssertionError("legacy archive guidance must not open durable stores")
+
+    monkeypatch.setattr(server, "_get_orchestrator", forbidden_orchestrator)
 
     result = await server._handle_delete_memory(
-        {"memory_id": str(memory.id), "reason": "no longer active"}
+        {"memory_id": str(uuid4()), "reason": "no longer active"}
     )
 
-    assert result["success"] is True
+    assert result["success"] is False
     assert result["delete_mode"] == "archive"
-    assert result["recoverable"] is True
-    assert updates["archived"] is True
-    assert updates["deprecated"] is True
-    assert updates["status"] == MemoryStatus.ARCHIVED
+    assert result["error_code"] == "USE_VERIFIED_CORRECT"
+    assert result["memory_read"] is False
+    assert result["memory_written"] is False
 
 
 @pytest.mark.asyncio
@@ -1407,6 +3003,41 @@ async def test_permanent_delete_requires_user_confirmation(monkeypatch):
     assert result["success"] is False
     assert result["authority_status"] == "CONFIRMATION_REQUIRED"
     assert "confirm_permanent=true" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_confirmed_legacy_permanent_delete_routes_to_verified_correct(monkeypatch):
+    memory = Memory(content="ordinary note", metadata=MemoryMetadata())
+
+    class VectorStore:
+        async def get_memory(self, _memory_id):
+            return memory
+
+        async def delete_memory(self, _memory_id):
+            raise AssertionError("permanent deletion must remain blocked")
+
+    server = ElefanteMCPServer()
+    monkeypatch.setattr(server, "_check_compliance_gate", lambda _: None)
+    monkeypatch.setattr(
+        server,
+        "_get_orchestrator",
+        lambda: _async_value(SimpleNamespace(vector_store=VectorStore())),
+    )
+
+    result = await server._handle_delete_memory(
+        {
+            "memory_id": str(memory.id),
+            "reason": "requested cleanup",
+            "delete_mode": "permanent",
+            "invocation_mode": "user_directed",
+            "confirm_permanent": True,
+        }
+    )
+
+    assert result["success"] is False
+    assert result["error_code"] == "USE_VERIFIED_CORRECT"
+    assert result["recoverable"] is True
+    assert result["memory_written"] is False
 
 
 @pytest.mark.asyncio
@@ -1456,6 +3087,98 @@ async def _async_value(value):
 
 @pytest.mark.integration
 @pytest.mark.slow
+def test_bridge_reinitializes_against_a_restarted_daemon():
+    """One live bridge survives daemon replacement without host reconnection."""
+    repo = Path(__file__).resolve().parents[1]
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    port = listener.getsockname()[1]
+    listener.close()
+
+    with tempfile.TemporaryDirectory(prefix="elefante-bridge-restart-") as temp_dir:
+        temp_root = Path(temp_dir)
+        env = {
+            **os.environ,
+            "PYTHONPATH": str(repo),
+            "HOME": str(temp_root / "home"),
+            "USERPROFILE": str(temp_root / "home"),
+            "ELEFANTE_DATA_DIR": str(temp_root / "data"),
+            "ELEFANTE_DAEMON_PORT": str(port),
+            "ELEFANTE_RECALL_ENABLED": "1",
+            "ELEFANTE_TASK_INTELLIGENCE_ENABLED": "0",
+            "HF_HOME": os.environ.get(
+                "HF_HOME",
+                str(Path.home() / ".cache" / "huggingface"),
+            ),
+        }
+        daemon = _start_daemon(repo, env)
+        bridge = None
+        try:
+            _wait_for_daemon(port, daemon)
+            bridge = _start_bridge(repo, env, port, "codex", "restart-window")
+            initialized = _bridge_request(
+                bridge,
+                1,
+                "initialize",
+                {
+                    "protocolVersion": "2025-06-18",
+                    "capabilities": {},
+                    "clientInfo": {"name": "Codex", "version": "1"},
+                },
+            )
+            assert initialized["serverInfo"]["name"] == "elefante"
+            _bridge_notification(bridge, "notifications/initialized", {})
+            first_tools = _bridge_request(bridge, 2, "tools/list", {})
+            assert {tool["name"] for tool in first_tools["tools"]} == EXPECTED_CUSTOMER_TOOLS
+
+            _terminate(daemon)
+            daemon = _start_daemon(repo, env)
+            _wait_for_daemon(port, daemon)
+
+            recovered_tools = _bridge_request(bridge, 3, "tools/list", {})
+            assert [tool["name"] for tool in recovered_tools["tools"]] == [
+                tool["name"] for tool in first_tools["tools"]
+            ]
+            status = _bridge_request(
+                bridge,
+                4,
+                "tools/call",
+                {"name": "elefante-SystemStatusGet", "arguments": {}},
+            )
+            status_payload = json.loads(status["content"][0]["text"])
+            assert status_payload["success"] is True
+            assert status_payload["status"]["enabled"] is True
+            recall = _bridge_request(
+                bridge,
+                5,
+                "tools/call",
+                {
+                    "name": "elefante-Recall",
+                    "arguments": {
+                        "question": "What prior decision applies to this isolated test?"
+                    },
+                },
+            )
+            recall_payload = json.loads(recall["content"][0]["text"])
+            assert set(recall_payload) == {
+                "success",
+                "status",
+                "context",
+                "supplied_count",
+                "abstained",
+                "delivery_blocked",
+                "read_only",
+            }
+            assert recall_payload["status"] == "no_match"
+            assert recall_payload["read_only"] is True
+        finally:
+            if bridge is not None:
+                _terminate(bridge)
+            _terminate(daemon)
+
+
+@pytest.mark.integration
+@pytest.mark.slow
 def test_two_bridge_clients_share_one_daemon_with_distinct_sources():
     """Two hosts write concurrently through one daemon without Kuzu contention."""
     repo = Path(__file__).resolve().parents[1]
@@ -1481,16 +3204,7 @@ def test_two_bridge_clients_share_one_daemon_with_distinct_sources():
             # The fast suite warms this cache before the slow runtime proof.
             "HF_HOME": str(host_huggingface_cache),
         }
-        daemon = subprocess.Popen(
-            [sys.executable, "-m", "src.mcp.daemon"],
-            cwd=repo,
-            env=env,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True,
-            start_new_session=True,
-        )
+        daemon = _start_daemon(repo, env)
         bridges: list[subprocess.Popen[str]] = []
         memory_ids: list[str] = []
         try:
@@ -1606,6 +3320,19 @@ def _wait_for_daemon(port: int, daemon: subprocess.Popen[str]) -> None:
             time.sleep(0.1)
     stderr = daemon.stderr.read() if daemon.stderr else ""
     raise AssertionError(f"daemon did not become ready: {stderr[-1000:]}")
+
+
+def _start_daemon(repo: Path, env: dict[str, str]) -> subprocess.Popen[str]:
+    return subprocess.Popen(
+        [sys.executable, "-m", "src.mcp.daemon"],
+        cwd=repo,
+        env=env,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
 
 
 def _start_bridge(

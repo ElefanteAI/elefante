@@ -1,0 +1,26 @@
+# Elefante v2.14.0 release authorization
+
+Authorized: 2026-09-01
+Purpose: Publish the strict-project local memory control loop, verified
+Remember/Correct/Recover operations, complete package lifecycle, and curated
+Elefante Home maintenance console prepared in PR #30.
+Source changes: PR #30
+
+Publication requirements:
+- Every maintained version declaration and the dated changelog entry resolve
+  to 2.14.0.
+- PR #30 quality, dashboard, dependency audit, clean macOS lifecycle, and all
+  platform package gates are green at the exact head before merge.
+- The published customer surface contains 18 tools and 2 prompts, including
+  verified Recover; Task Intelligence remains default-off and carries no
+  representative multi-task outcome-lift claim.
+- The exact final package satisfies the approved product-release gate in
+  `workspace/proposals/four-action-product-lifecycle.md` Section 11, or the
+  owner records an equally strict explicit manual approval. This marker may be
+  reviewed on the PR branch, but it must not be merged while that gate remains
+  unresolved.
+- Release assets carry release provenance and pass independent SHA-256
+  verification after publication.
+- Website version synchronization follows accepted core publication and must
+  pass maintained production and rendered-state verification.
+- Published historical tags remain immutable.

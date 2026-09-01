@@ -62,7 +62,7 @@ def test_parse_integration_declarations_is_deterministic_and_conservative() -> N
     ]
 
 
-def test_compare_integration_surfaces_normalizes_aliases_and_blocks_non_ready_tiers() -> None:
+def test_compare_integration_surfaces_normalizes_aliases_without_blocking_previews() -> None:
     result = doctor._compare_integration_surfaces(
         {
             "bob": "partial",
@@ -93,9 +93,7 @@ def test_compare_integration_surfaces_normalizes_aliases_and_blocks_non_ready_ti
     ]
     assert result["unknown_installer_surfaces"] == []
     assert result["diagnostics"] == []
-    assert result["customer_diagnostics"] == [
-        "integration_surface_not_customer_ready"
-    ]
+    assert result["customer_diagnostics"] == []
 
 
 def test_compare_integration_surfaces_reports_unknown_installer_and_compatible_matrix_ids() -> None:
@@ -115,7 +113,7 @@ def test_compare_integration_surfaces_reports_unknown_installer_and_compatible_m
     ]
 
 
-def test_build_report_diagnoses_non_ready_surface_without_mutating_or_leaking_manifest(
+def test_build_report_reports_non_ready_preview_without_mutating_or_leaking_manifest(
     tmp_path: Path,
 ) -> None:
     repo, home = _customer_fixture(
@@ -141,7 +139,8 @@ def test_build_report_diagnoses_non_ready_surface_without_mutating_or_leaking_ma
     serialized = json.dumps(report, sort_keys=True)
 
     assert report["customer_ready"] is False
-    assert "integration_surface_not_customer_ready" in report["customer_diagnostics"]
+    assert "integration_surface_not_customer_ready" not in report["customer_diagnostics"]
+    assert "runtime_installation_unrecorded" in report["customer_diagnostics"]
     assert report["integration_contract"]["non_customer_ready_surfaces"] == [
         "agent-zero"
     ]

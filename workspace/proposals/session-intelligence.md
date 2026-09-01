@@ -1,9 +1,10 @@
 # PRD: Session Intelligence - Privacy-Respecting Invocation Telemetry
 
-> **Status**: IMPLEMENTED IN DEVELOPMENT (opt-in, unreleased) — the local
+> **Status**: SHIPPED IN v2.13.0 (opt-in) — the local
 > metadata-only ledger, provider-usage ingress, rate cards, Signal Cards,
 > aggregate enterprise hypotheses, data controls, and dashboard surface are
-> guarded. No release, provider integration, or customer usage claim follows.
+> guarded. No automatic provider connector, observed customer usage, or causal
+> value claim follows from shipping the local surface.
 >
 > **Owner**: Elefante dev team
 >
@@ -40,9 +41,10 @@ false precision, or a second usefulness system?
   reasoning, employee ranking, and sensitive-trait inference are rejected or
   absent by schema.
 
-The implementation is a development product surface, not a published v2.12.3
-capability. Provider hosts must explicitly post their actual usage metadata,
-and cost remains `UNKNOWN` without a matching versioned local rate card.
+The implementation is an opt-in v2.13.0 product surface. Provider hosts must
+explicitly post their actual usage metadata; Elefante does not scrape provider
+accounts. Cost remains `UNKNOWN` without complete provider-actual usage and a
+matching versioned local rate card.
 
 ---
 
@@ -65,9 +67,11 @@ It matters because Elefante's core thesis is not raw storage. It is signal quali
 
 ---
 
-## 2. Honest Assessment: Current Elefante Reality
+## 2. Honest Assessment: Original Gap and Current Limits
 
-The current system has partial building blocks, but not a real session-intelligence layer.
+Before v2.13.0, Elefante had partial building blocks but no persistent
+session-intelligence layer. The opt-in local layer now exists; the table keeps
+the remaining evidence and host-ingress limits explicit.
 
 | Surface | Current State | Gap |
 | ------- | ------------- | --- |
@@ -80,7 +84,9 @@ The current system has partial building blocks, but not a real session-intellige
 | Retrieval effectiveness | Evaluation infrastructure exists in [`retrieval-effectiveness.md`](retrieval-effectiveness.md) | Product lift remains unproven; per-retrieval outcomes are not persisted |
 | Privacy | No Elefante product telemetry; Session Intelligence is local, metadata-only, consent-gated, bounded, and deletable | A configured host still controls whether it submits an eligible event; no remote telemetry exists |
 
-This feature request exists because the current system cannot answer session-level product questions with confidence.
+Hosts that do not submit an eligible event remain unobserved, and usefulness
+remains unknown without independently valid outcome evidence. Those are current
+limits, not missing ledger implementation.
 
 ---
 

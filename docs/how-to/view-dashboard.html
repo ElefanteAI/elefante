@@ -1,0 +1,1586 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A complete, source-backed guide to every Elefante Home dashboard state, view, score, control, receipt, and safety boundary.">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23070604'/%3E%3Crect x='3' y='3' width='26' height='26' fill='none' stroke='%23b86f35'/%3E%3Ctext x='16' y='21' text-anchor='middle' font-family='monospace' font-size='15' fill='%23c69a4a'%3EE%3C/text%3E%3C/svg%3E">
+  <title>Elefante Home — Complete Dashboard Guide</title>
+  <style>
+    :root {
+      --carbon-950: #070604;
+      --carbon-900: #100d0a;
+      --carbon-850: #17120e;
+      --carbon-800: #211a14;
+      --ink: #211b16;
+      --ink-soft: #5d5147;
+      --paper: #f6f1e8;
+      --paper-raised: #fffdf8;
+      --paper-muted: #ece4d8;
+      --tusk: #eee4d3;
+      --copper: #b86f35;
+      --copper-deep: #8c4f25;
+      --brass: #c69a4a;
+      --clay: #a95346;
+      --sage: #617866;
+      --line: #d9cdbd;
+      --line-dark: rgba(238, 228, 211, 0.16);
+      --shadow: 0 24px 70px rgba(48, 31, 18, 0.12);
+      --content: 76rem;
+      --sidebar: 17.5rem;
+      --radius: 0.45rem;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 5rem; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 80% 2%, rgba(184, 111, 53, 0.11), transparent 24rem),
+        var(--paper);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 1rem;
+      line-height: 1.68;
+      text-rendering: optimizeLegibility;
+    }
+
+    a { color: var(--copper-deep); text-underline-offset: 0.18em; }
+    a:hover { color: var(--copper); }
+    a:focus-visible, button:focus-visible, [tabindex="0"]:focus-visible {
+      outline: 3px solid var(--brass);
+      outline-offset: 3px;
+    }
+    ::selection { background: #e8bd88; color: var(--carbon-950); }
+
+    .skip-link {
+      position: fixed;
+      z-index: 100;
+      top: 0.75rem;
+      left: 0.75rem;
+      padding: 0.75rem 1rem;
+      color: var(--carbon-950);
+      background: var(--tusk);
+      border: 2px solid var(--copper);
+      transform: translateY(-160%);
+      transition: transform 150ms ease;
+    }
+    .skip-link:focus { transform: translateY(0); }
+
+    .reading-progress {
+      position: fixed;
+      z-index: 90;
+      inset: 0 0 auto 0;
+      height: 3px;
+      background: transparent;
+      pointer-events: none;
+    }
+    .reading-progress > span {
+      display: block;
+      width: 0;
+      height: 100%;
+      background: linear-gradient(90deg, var(--copper), var(--brass));
+    }
+
+    .masthead {
+      position: relative;
+      overflow: hidden;
+      color: var(--tusk);
+      background: var(--carbon-950);
+      border-bottom: 1px solid #3f2c20;
+    }
+    .masthead::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: 0.27;
+      background-image:
+        linear-gradient(rgba(223, 187, 114, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(223, 187, 114, 0.08) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: linear-gradient(to bottom, black, transparent 92%);
+    }
+    .masthead::after {
+      content: "";
+      position: absolute;
+      width: 34rem;
+      height: 34rem;
+      right: -10rem;
+      top: -16rem;
+      border: 1px solid rgba(200, 137, 77, 0.28);
+      border-radius: 50%;
+      box-shadow: 0 0 0 5rem rgba(200, 137, 77, 0.025), 0 0 0 10rem rgba(200, 137, 77, 0.018);
+    }
+    .masthead-inner {
+      position: relative;
+      z-index: 1;
+      width: min(calc(100% - 3rem), var(--content));
+      margin: 0 auto;
+      padding: clamp(3.5rem, 8vw, 7.5rem) 0 clamp(3rem, 6vw, 5.5rem);
+    }
+    .wordmark {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: clamp(2.5rem, 6vw, 5rem);
+      color: var(--tusk);
+      font-size: 0.73rem;
+      font-weight: 760;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+    .wordmark-mark {
+      display: grid;
+      width: 2rem;
+      height: 2rem;
+      place-items: center;
+      border: 1px solid var(--copper);
+      color: var(--brass);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: 0;
+    }
+    .eyebrow {
+      margin: 0 0 0.8rem;
+      color: var(--brass);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    .masthead h1 {
+      max-width: 13ch;
+      margin: 0;
+      color: #fffaf1;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(2.75rem, 7vw, 6.3rem);
+      font-weight: 480;
+      letter-spacing: -0.045em;
+      line-height: 0.96;
+    }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.65fr);
+      gap: clamp(2rem, 7vw, 7rem);
+      align-items: end;
+    }
+    .hero-copy { max-width: 36rem; padding-bottom: 0.35rem; }
+    .hero-copy p {
+      margin: 0 0 1.4rem;
+      color: #cbbdad;
+      font-size: clamp(1rem, 1.5vw, 1.15rem);
+    }
+    .hero-copy strong { color: var(--tusk); }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 0.7rem; }
+    .button {
+      display: inline-flex;
+      min-height: 2.85rem;
+      align-items: center;
+      justify-content: center;
+      padding: 0.7rem 1rem;
+      border: 1px solid rgba(238, 228, 211, 0.25);
+      color: var(--tusk);
+      font-size: 0.82rem;
+      font-weight: 720;
+      letter-spacing: 0.02em;
+      text-decoration: none;
+      transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+    }
+    .button:hover { border-color: var(--brass); color: #fffaf1; background: rgba(223, 187, 114, 0.08); }
+    .button-primary { color: var(--carbon-950); background: var(--copper); border-color: var(--copper); }
+    .button-primary:hover { color: var(--carbon-950); background: var(--brass); border-color: var(--brass); }
+    .proof-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      margin-top: 1.3rem;
+      color: #9f9184;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.69rem;
+    }
+    .proof-line span { padding-right: 0.55rem; border-right: 1px solid var(--line-dark); }
+    .proof-line span:last-child { border: 0; }
+
+    .journey-map {
+      position: relative;
+      z-index: 2;
+      width: min(calc(100% - 3rem), var(--content));
+      margin: -1.75rem auto 0;
+      background: var(--paper-raised);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+    .journey-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem 1.2rem;
+      border-bottom: 1px solid var(--line);
+      background: #f0e8dc;
+    }
+    .journey-heading h2 { margin: 0; font-size: 0.8rem; letter-spacing: 0.13em; text-transform: uppercase; }
+    .journey-heading p { margin: 0; color: var(--ink-soft); font-size: 0.78rem; }
+    .journey-grid { display: grid; grid-template-columns: repeat(3, 1fr); }
+    .journey { min-height: 10rem; padding: 1.3rem; border-right: 1px solid var(--line); }
+    .journey:last-child { border-right: 0; }
+    .journey small { display: block; margin-bottom: 0.65rem; color: var(--copper-deep); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.68rem; font-weight: 750; letter-spacing: 0.12em; text-transform: uppercase; }
+    .journey h3 { margin: 0 0 0.4rem; font-family: Georgia, "Times New Roman", serif; font-size: 1.28rem; font-weight: 520; }
+    .journey p { margin: 0; color: var(--ink-soft); font-size: 0.88rem; line-height: 1.5; }
+    .journey-path { margin-top: 0.9rem; color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.7rem; font-weight: 700; }
+
+    .page-shell {
+      display: grid;
+      grid-template-columns: var(--sidebar) minmax(0, 1fr);
+      gap: clamp(2.5rem, 5vw, 5.5rem);
+      width: min(calc(100% - 3rem), var(--content));
+      margin: clamp(3rem, 7vw, 6rem) auto 0;
+      align-items: start;
+    }
+    .toc {
+      position: sticky;
+      top: 1.5rem;
+      max-height: calc(100vh - 3rem);
+      overflow: auto;
+      padding: 0 0.75rem 1.5rem 0;
+      scrollbar-width: thin;
+      scrollbar-color: var(--line) transparent;
+    }
+    .toc-label { margin: 0 0 0.75rem; color: var(--ink-soft); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.68rem; font-weight: 760; letter-spacing: 0.15em; text-transform: uppercase; }
+    .toc-link {
+      display: grid;
+      grid-template-columns: 1.65rem 1fr;
+      gap: 0.45rem;
+      align-items: baseline;
+      padding: 0.45rem 0.5rem;
+      border-left: 2px solid transparent;
+      color: #75665a;
+      font-size: 0.78rem;
+      line-height: 1.25;
+      text-decoration: none;
+    }
+    .toc-link span { color: #aa9786; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.61rem; }
+    .toc-link:hover { color: var(--ink); background: rgba(184, 111, 53, 0.05); }
+    .toc-link.is-active { color: var(--copper-deep); border-left-color: var(--copper); background: rgba(184, 111, 53, 0.08); font-weight: 700; }
+    .toc-dashboard { display: flex; margin-top: 1rem; color: var(--paper-raised); background: var(--carbon-900); border-color: var(--carbon-900); }
+    .toc-note { margin: 0.8rem 0 0; padding: 0.7rem; color: var(--ink-soft); border: 1px solid var(--line); font-size: 0.7rem; line-height: 1.45; }
+
+    .mobile-nav {
+      display: none;
+      position: sticky;
+      z-index: 80;
+      top: 0;
+      width: 100%;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.8rem 1rem;
+      color: var(--tusk);
+      background: rgba(7, 6, 4, 0.96);
+      border: 0;
+      border-bottom: 1px solid #3f2c20;
+      font: inherit;
+      font-size: 0.8rem;
+      font-weight: 750;
+    }
+    .mobile-nav span:last-child { color: var(--brass); }
+
+    .guide-body { min-width: 0; padding-bottom: 7rem; }
+    .guide-body > * { max-width: 48rem; }
+    .guide-body .table-scroll, .guide-body pre { max-width: 100%; }
+    .guide-body h2 {
+      margin: 5rem 0 1.15rem;
+      padding-top: 0.25rem;
+      color: var(--carbon-950);
+      border-top: 1px solid var(--line);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.9rem, 4vw, 3rem);
+      font-weight: 520;
+      letter-spacing: -0.025em;
+      line-height: 1.08;
+    }
+    .guide-body h2:first-of-type { margin-top: 4rem; }
+    .guide-body h3 { margin: 2.8rem 0 0.75rem; color: #3f2a1d; font-size: 1.23rem; line-height: 1.25; }
+    .guide-body h4 { margin: 2rem 0 0.65rem; font-size: 1rem; }
+    .heading-anchor { color: inherit; text-decoration: none; }
+    .heading-anchor:hover { color: var(--copper-deep); }
+    .guide-body p { margin: 0.7rem 0 1rem; }
+    .guide-body li + li { margin-top: 0.42rem; }
+    .guide-body strong { color: #25160e; }
+    .guide-body code {
+      padding: 0.1em 0.3em;
+      color: #723d21;
+      background: #ebe0d2;
+      border: 1px solid #dac8b4;
+      border-radius: 0.2rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.84em;
+      overflow-wrap: anywhere;
+    }
+    .guide-body pre {
+      overflow: auto;
+      margin: 1.25rem 0 1.7rem;
+      padding: 1.1rem 1.2rem;
+      color: #ece1d0;
+      background: var(--carbon-900);
+      border-left: 3px solid var(--copper);
+      box-shadow: inset 0 1px rgba(255, 255, 255, 0.03);
+    }
+    .guide-body pre code { padding: 0; color: inherit; background: transparent; border: 0; white-space: pre; overflow-wrap: normal; }
+    .guide-body blockquote {
+      margin: 1.5rem 0;
+      padding: 0.85rem 1rem;
+      color: #53453b;
+      background: #efe6da;
+      border-left: 3px solid var(--brass);
+    }
+    .guide-body blockquote > :first-child { margin-top: 0; }
+    .guide-body blockquote > :last-child { margin-bottom: 0; }
+
+    .guide-preface {
+      max-width: 100% !important;
+      padding: clamp(1.3rem, 3vw, 2rem);
+      background: var(--paper-raised);
+      border: 1px solid var(--line);
+      box-shadow: 0 12px 36px rgba(48, 31, 18, 0.07);
+    }
+    .guide-preface > * { max-width: 47rem; }
+    .guide-preface ol { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin: 1.5rem 0; padding: 0; list-style: none; counter-reset: purpose; }
+    .guide-preface ol li { position: relative; margin: 0; padding: 1rem; counter-increment: purpose; border: 1px solid var(--line); background: #faf6ef; font-size: 0.86rem; line-height: 1.5; }
+    .guide-preface ol li::before { content: "0" counter(purpose); display: block; margin-bottom: 0.6rem; color: var(--copper-deep); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.68rem; font-weight: 760; letter-spacing: 0.1em; }
+    .guide-status, .release-note { position: relative; margin: 0 0 0.8rem !important; padding: 0.9rem 1rem 0.9rem 9rem; border: 1px solid var(--line); font-size: 0.85rem; line-height: 1.5; }
+    .guide-status { background: #edf0e8; border-color: #c3cdbd; }
+    .release-note { background: #f4e7d8; border-color: #dfbea0; }
+    .status-label { position: absolute; left: 1rem; top: 0.95rem; color: var(--ink-soft); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.65rem; font-weight: 760; letter-spacing: 0.1em; text-transform: uppercase; }
+
+    .table-scroll {
+      overflow-x: auto;
+      margin: 1.25rem 0 2rem;
+      border: 1px solid var(--line);
+      background: var(--paper-raised);
+      box-shadow: 0 7px 24px rgba(48, 31, 18, 0.045);
+    }
+    table { width: 100%; min-width: 38rem; border-collapse: collapse; font-size: 0.82rem; line-height: 1.45; }
+    th, td { padding: 0.78rem 0.9rem; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); border-right: 1px solid #e8dfd3; }
+    th:last-child, td:last-child { border-right: 0; }
+    tr:last-child td { border-bottom: 0; }
+    th { color: var(--paper-raised); background: var(--carbon-850); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; }
+    tbody tr:nth-child(even) { background: #faf6ef; }
+    tbody tr:hover { background: #f4eadf; }
+
+    .doc-footer {
+      max-width: 48rem;
+      margin-top: 4rem;
+      padding-top: 1.2rem;
+      border-top: 1px solid var(--line);
+      color: var(--ink-soft);
+      font-size: 0.75rem;
+    }
+    .doc-footer strong { color: var(--ink); }
+    .back-to-top { float: right; }
+    .visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; border: 0 !important; }
+
+    @media (max-width: 950px) {
+      .hero-grid { grid-template-columns: 1fr; gap: 2rem; }
+      .hero-copy { max-width: 44rem; }
+      .page-shell { display: block; width: min(calc(100% - 2rem), 50rem); margin-top: 2.5rem; }
+      .mobile-nav { display: flex; }
+      .toc {
+        position: fixed;
+        z-index: 85;
+        inset: 3.25rem 0 auto 0;
+        display: none;
+        max-height: calc(100vh - 3.25rem);
+        padding: 1rem;
+        background: var(--paper-raised);
+        border-bottom: 1px solid var(--line);
+        box-shadow: var(--shadow);
+      }
+      .toc.is-open { display: block; }
+      .toc-link { padding: 0.6rem; }
+      .journey-grid { grid-template-columns: 1fr; }
+      .journey { min-height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+      .journey:last-child { border-bottom: 0; }
+    }
+
+    @media (max-width: 650px) {
+      body { font-size: 0.96rem; }
+      .masthead-inner, .journey-map { width: min(calc(100% - 1.4rem), var(--content)); }
+      .masthead-inner { padding-top: 2.6rem; }
+      .wordmark { margin-bottom: 2.8rem; }
+      .masthead h1 { font-size: clamp(2.6rem, 15vw, 4.5rem); }
+      .hero-actions { display: grid; }
+      .button { width: 100%; }
+      .proof-line { display: grid; }
+      .proof-line span { border: 0; }
+      .journey-heading { display: block; }
+      .journey-heading p { margin-top: 0.3rem; }
+      .guide-preface ol { grid-template-columns: 1fr; }
+      .guide-status, .release-note { padding: 3rem 0.85rem 0.85rem; }
+      .status-label { top: 0.8rem; left: 0.85rem; }
+      .guide-body h2 { margin-top: 3.8rem; }
+      .back-to-top { float: none; display: block; margin-top: 0.7rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
+
+    @media print {
+      @page { margin: 1.5cm; }
+      body { background: white; color: black; font-size: 10pt; }
+      .reading-progress, .mobile-nav, .toc, .hero-actions, .journey-map { display: none !important; }
+      .masthead { color: black; background: white; border: 0; }
+      .masthead::before, .masthead::after { display: none; }
+      .masthead-inner { width: 100%; padding: 0 0 1.5rem; }
+      .wordmark, .eyebrow, .hero-copy p, .proof-line { color: black; }
+      .masthead h1 { max-width: none; color: black; font-size: 30pt; }
+      .hero-grid { display: block; }
+      .page-shell { display: block; width: 100%; margin: 0; }
+      .guide-body { padding: 0; }
+      .guide-body h2 { break-after: avoid; margin-top: 2rem; }
+      .guide-body h3, .guide-body h4 { break-after: avoid; }
+      .table-scroll { overflow: visible; box-shadow: none; }
+      table { min-width: 0; font-size: 8pt; }
+      th { color: black; background: #eee; }
+      pre { white-space: pre-wrap; }
+      a { color: black; text-decoration: none; }
+      a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.82em; }
+    }
+  </style>
+</head>
+<body id="top">
+  <a class="skip-link" href="#main-content">Skip to guide</a>
+  <div class="reading-progress" aria-hidden="true"><span id="reading-progress-bar"></span></div>
+
+  <header class="masthead">
+    <div class="masthead-inner">
+      <div class="wordmark"><span class="wordmark-mark">E</span><span>Elefante / local memory authority</span></div>
+      <div class="hero-grid">
+        <div>
+          <p class="eyebrow">Complete dashboard field guide</p>
+          <h1>Make memory useful for the next task.</h1>
+        </div>
+        <div class="hero-copy">
+          <p>A source-backed explanation of <strong>every visible state, view, score, control, receipt, and safety boundary</strong>—written for the first time you open the product.</p>
+          <p>The short version: use Home to understand the whole memory system, improve what Elefante supplies to a task, and protect continuity. A project is required only when Recall or a durable change needs an exact task boundary.</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="http://localhost:8000/">Open Elefante dashboard</a>
+            <a class="button" href="#choose-the-journey-that-matches-your-goal">Choose your path</a>
+          </div>
+          <div class="proof-line" aria-label="Guide evidence status">
+            <span>source checked</span>
+            <span>source prototype checked 2026-09-01</span>
+            <span>one product / one dashboard</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="journey-map" aria-labelledby="journey-map-title">
+    <div class="journey-heading">
+      <h2 id="journey-map-title">The product in three journeys</h2>
+      <p>Start with your question, not with a feature.</p>
+    </div>
+    <div class="journey-grid">
+      <article class="journey">
+        <small>01 / no project needed</small>
+        <h3>Global understanding</h3>
+        <p>Browse the complete local snapshot, see themes, inspect health, and follow evidence-backed relationships.</p>
+        <div class="journey-path">Memory Intelligence → Connections</div>
+      </article>
+      <article class="journey">
+        <small>02 / project bound</small>
+        <h3>Task intelligence</h3>
+        <p>Bind the exact project, preserve durable guidance, and verify what governed Recall supplies for one real task.</p>
+        <div class="journey-path">Project → Remember or Recall → receipt</div>
+      </article>
+      <article class="journey">
+        <small>03 / product-wide</small>
+        <h3>Continuity</h3>
+        <p>Check health, protect data, restore safely, and inspect receipts instead of trusting a success label.</p>
+        <div class="journey-path">Recover → timestamped evidence</div>
+      </article>
+    </div>
+  </section>
+
+  <button class="mobile-nav" id="mobile-nav" type="button" aria-expanded="false" aria-controls="guide-toc">
+    <span>Guide map</span><span aria-hidden="true">Menu</span>
+  </button>
+
+  <div class="page-shell">
+    <aside class="toc" id="guide-toc" aria-label="Dashboard guide sections">
+      <p class="toc-label">Guide map</p>
+      <a class="toc-link" href="#open-home" data-section="open-home"><span>01</span>Open Home</a>
+<a class="toc-link" href="#choose-the-journey-that-matches-your-goal" data-section="choose-the-journey-that-matches-your-goal"><span>02</span>Choose the journey that matches your goal</a>
+<a class="toc-link" href="#the-operating-model-snapshot-plus-bounded-control" data-section="the-operating-model-snapshot-plus-bounded-control"><span>03</span>The operating model: snapshot plus bounded control</a>
+<a class="toc-link" href="#the-dashboard-shell" data-section="the-dashboard-shell"><span>04</span>The dashboard shell</a>
+<a class="toc-link" href="#home-purpose-evidence-next" data-section="home-purpose-evidence-next"><span>05</span>Home: purpose, evidence, next action</a>
+<a class="toc-link" href="#home-s-three-operator-jobs" data-section="home-s-three-operator-jobs"><span>06</span>Home's three operator jobs</a>
+<a class="toc-link" href="#recall-inspector" data-section="recall-inspector"><span>07</span>Recall: test governed selection</a>
+<a class="toc-link" href="#where-the-briefing-ideas-live" data-section="where-the-briefing-ideas-live"><span>08</span>Where the Briefing ideas live</a>
+<a class="toc-link" href="#memories-browse-understand-and-correct" data-section="memories-browse-understand-and-correct"><span>09</span>Memory Intelligence: inspect and review</a>
+<a class="toc-link" href="#connections-understand-relationships-across-memories" data-section="connections-understand-relationships-across-memories"><span>10</span>Connections: understand represented relationships</a>
+<a class="toc-link" href="#projects-define-where-managed-memory-belongs" data-section="projects-define-where-managed-memory-belongs"><span>11</span>Projects: define where managed memory belongs</a>
+<a class="toc-link" href="#recover-health-backup-restore-and-support" data-section="recover-health-backup-restore-and-support"><span>12</span>Recover: health, backup, restore, and support</a>
+<a class="toc-link" href="#loading-empty-locked-and-error-states" data-section="loading-empty-locked-and-error-states"><span>13</span>Loading, empty, locked, and error states</a>
+<a class="toc-link" href="#responsive-and-accessibility-behavior" data-section="responsive-and-accessibility-behavior"><span>14</span>Responsive and accessibility behavior</a>
+<a class="toc-link" href="#privacy-and-security-boundary" data-section="privacy-and-security-boundary"><span>15</span>Privacy and security boundary</a>
+<a class="toc-link" href="#troubleshooting" data-section="troubleshooting"><span>16</span>Troubleshooting</a>
+<a class="toc-link" href="#source-checkout-workflow" data-section="source-checkout-workflow"><span>17</span>Source-checkout workflow</a>
+<a class="toc-link" href="#safe-showcase" data-section="safe-showcase"><span>18</span>Safe showcase</a>
+<a class="toc-link" href="#authoritative-references" data-section="authoritative-references"><span>19</span>Authoritative references</a>
+      <a class="button toc-dashboard" href="http://localhost:8000/">Open dashboard</a>
+      <p class="toc-note">Home is local and loopback-only. This guide loads no external scripts, fonts, trackers, or services.</p>
+    </aside>
+
+    <main id="main-content" tabindex="-1">
+      <article class="guide-body">
+        <section class="guide-preface" aria-labelledby="guide-purpose"><h2 class="visually-hidden" id="guide-purpose">What Elefante Home is for</h2><p class="guide-status"><span class="status-label">Applies to</span> the current Elefante Home source prototype, built and rendered with the deterministic showcase on 2026-09-01.</p>
+<p class="release-note"><span class="status-label">Release boundary</span> this guide documents the six-workspace source prototype. This work did not replace the installed runtime or publish a package. The local page always belongs to one Elefante product, but an installed package may contain an earlier dashboard build until this source prototype passes package acceptance.</p>
+<p>Elefante Home is the advanced local control room for three jobs:</p>
+<ol>
+<li><strong>Global understanding.</strong> Memory Intelligence and Connections inspect everything represented in the current snapshot; no project is required.</li>
+<li><strong>Task intelligence.</strong> Remember, Recall, and Correct improve the governed memory bundle Elefante can supply to one task; project identity is required at this boundary.</li>
+<li><strong>Continuity.</strong> Recover checks health, protects data, restores safely, and produces bounded support evidence.</li>
+</ol>
+<p>Home is not an IDE feature. Host, port, launch origin, browser, and agent are transport details—not separate Elefante products or alternate Home experiences.</p>
+</section><h2 id="open-home"><a class="heading-anchor" href="#open-home">Open Home</a></h2>
+<p>For an installed customer runtime, open this address in any local browser:</p>
+<p><a href="http://localhost:8000">http://localhost:8000</a></p>
+<p>This is an entry address, not a product mode. A development or packaged build may use a different loopback address; the purpose, workspaces, evidence contract, and user workflow must remain identical.</p>
+<p>The installed Elefante daemon owns the loopback-only page. A bare visit requests
+its own short-lived local management session. If exactly one active project is
+available, Home binds it automatically. If several are active, Home asks which
+one should own this session's managed actions.</p>
+<p><code>elefante-DashboardOpen</code> remains an optional agent convenience; it is not the
+customer entry requirement. Its <code>refresh=true</code> option regenerates the dashboard
+snapshot before opening Home. The header's <strong>Reload</strong> button and a normal browser
+reload only reread the snapshot that already exists.</p>
+<h2 id="choose-the-journey-that-matches-your-goal"><a class="heading-anchor" href="#choose-the-journey-that-matches-your-goal">Choose the journey that matches your goal</a></h2>
+<div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Goal</th>
+<th>Start here</th>
+<th>Project required?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Understand the overall memory system</td>
+<td>Home -&gt; Memory Intelligence -&gt; Connections</td>
+<td>No project choice is required merely to inspect the current snapshot</td>
+</tr>
+<tr>
+<td>Find one known memory</td>
+<td>Memory Intelligence -&gt; Snapshot search or Filter</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Understand why memories are connected</td>
+<td>Connections -&gt; Topics, Vitality, or Decision Graph</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Prove continuity for current work</td>
+<td>Projects -&gt; Remember or Recall -&gt; inspect receipt</td>
+<td>Yes, one active project is bound to the local session</td>
+</tr>
+<tr>
+<td>Correct governed knowledge</td>
+<td>Memory Intelligence -&gt; open a memory -&gt; Correct or Resolve</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Assess or protect the installation</td>
+<td>Recover -&gt; Check health or Back up now</td>
+<td>A managed local session is required; project-bound verification is used where applicable</td>
+</tr>
+</tbody>
+</table></div>
+<p>This distinction is intentional. <strong>Elefante is not only project-driven.</strong> The
+overall views explain the complete snapshot. Projects prevent new writes or
+Recall checks from leaking across bodies of work.</p>
+<h2 id="the-operating-model-snapshot-plus-bounded-control"><a class="heading-anchor" href="#the-operating-model-snapshot-plus-bounded-control">The operating model: snapshot plus bounded control</a></h2>
+<p>Home combines two layers without mixing their authority.</p>
+<h3 id="1-the-inspection-snapshot"><a class="heading-anchor" href="#1-the-inspection-snapshot">1. The inspection snapshot</a></h3>
+<p>The dashboard server reads one generated file,
+<code>dashboard_snapshot.json</code>. It does not open SQLite vectors or Kuzu in response
+to browser inspection. The snapshot provides memory records, entities,
+relationships, counts, health signals, usage summaries, and Project Registry
+projection data.</p>
+<p>Snapshot search is lexical. It is not the same query path as MCP Recall, and it
+does not expose Recall's vector, concept, co-activation, authority, or temporal
+signal breakdown.</p>
+<h3 id="2-the-local-management-session"><a class="heading-anchor" href="#2-the-local-management-session">2. The local management session</a></h3>
+<p>A direct local visit can request a short-lived, origin-bound capability from the
+loopback daemon. The raw capability stays in browser memory. A legacy
+capability-bearing URL fragment, when supplied by an agent, is removed from
+browser history before the page renders.</p>
+<p>The capability permits only named Project, Remember, Recall-test, Correct,
+Resolve, and Recover routes. It is not a generic store, file, shell, MCP, or
+query proxy. Mutations retain their preview, explicit confirmation, one-use
+ticket, exact-state checks, postconditions, and rollback gates.</p>
+<p>If operational control is unavailable, the snapshot can remain inspectable while Home says exactly what is missing: <strong>No operational receipt in this environment</strong>. That is an evidence boundary, not a claim that Elefante itself failed.</p>
+<h2 id="the-dashboard-shell"><a class="heading-anchor" href="#the-dashboard-shell">The dashboard shell</a></h2>
+<h3 id="header"><a class="heading-anchor" href="#header">Header</a></h3>
+<div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Elefante version</td>
+<td>Package version reported by the dashboard process; the configuration version is used only as fallback</td>
+</tr>
+<tr>
+<td>Memories</td>
+<td>Memory-node count in the current snapshot</td>
+</tr>
+<tr>
+<td>Entities</td>
+<td>Non-memory entity count reported by the snapshot</td>
+</tr>
+<tr>
+<td>Links</td>
+<td>Relationship count reported by the snapshot</td>
+</tr>
+<tr>
+<td><code>current</code></td>
+<td>Snapshot is less than 60 minutes old</td>
+</tr>
+<tr>
+<td><code>stale</code></td>
+<td>Snapshot is at least 60 minutes old, or its generation time is unavailable</td>
+</tr>
+<tr>
+<td>Reload</td>
+<td>Rereads stats, Session Intelligence, and the existing snapshot; it does not regenerate live data</td>
+</tr>
+<tr>
+<td>Light / Dark</td>
+<td>Switches the local presentation theme. New browser profiles start in high-contrast light; an explicit dark choice is retained locally</td>
+</tr>
+</tbody>
+</table></div>
+<p>Snapshot age is not product readiness. A current snapshot can coexist with an
+unavailable daemon, and a stale snapshot does not prove that the live memory
+store is stale or empty.</p>
+<h3 id="main-navigation"><a class="heading-anchor" href="#main-navigation">Main navigation</a></h3>
+<p>Home has six top-level workspaces:</p>
+<ol>
+<li><strong>Home</strong> — one product purpose, current evidence, three operator jobs, and one recommended next action.</li>
+<li><strong>Recall</strong> — one ephemeral project-scoped Recall Check and its bounded evidence receipt.</li>
+<li><strong>Memory Intelligence</strong> — complete snapshot library, review signals, detail, correction, and conflict resolution.</li>
+<li><strong>Connections</strong> — topics, stored vitality, explicit relationships, and grounded Decision Graph trails.</li>
+<li><strong>Projects</strong> — scope registry, legacy assignment, and strict isolation.</li>
+<li><strong>Recover</strong> — health, backup, restore, support report, and package handoff.</li>
+</ol>
+<p>The number keys <code>1</code> through <code>6</code> switch to those workspaces when focus is
+not inside a text field. <code>Escape</code> closes the open memory detail and clears its
+search state. Dialogs also support <code>Escape</code>; managed operations cannot be closed
+while their apply step is running.</p>
+<h3 id="footer"><a class="heading-anchor" href="#footer">Footer</a></h3>
+<p>The footer repeats the product version and distinguishes:</p>
+<ul>
+<li><strong>local session active</strong> — named management routes are available;</li>
+<li><strong>connecting local service</strong> — the page is establishing its loopback session;</li>
+<li><strong>local snapshot</strong> — inspection is available, but management is not active.</li>
+</ul>
+<h2 id="home-purpose-evidence-next"><a class="heading-anchor" href="#home-purpose-evidence-next">Home: purpose, evidence, next action</a></h2>
+<p>Home begins with the product promise: <strong>Make memory useful for the next task.</strong>
+It does not begin with a green light, a setup alarm, or a random memory. The
+opening panel explains that Elefante selects governed decisions, constraints,
+preferences, facts, and lessons while the dashboard lets advanced users
+understand, improve, and protect that system.</p>
+<h3 id="context-and-evidence-state"><a class="heading-anchor" href="#context-and-evidence-state">Context and evidence state</a></h3>
+<div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead><tr><th>Label</th><th>What it proves</th><th>What it does not prove</th></tr></thead>
+<tbody>
+<tr><td>Example workspace</td><td>The deterministic, disclosed example snapshot is loaded</td><td>No customer data, operation, or performance result</td></tr>
+<tr><td>Local memory snapshot</td><td>The dashboard loaded the represented local inspection file</td><td>Live product readiness or current Recall behavior</td></tr>
+<tr><td>Operational session verified</td><td>Named bounded management routes are available in this session</td><td>That any particular action has already succeeded</td></tr>
+<tr><td>No operational receipt in this environment</td><td>No live management proof was returned here</td><td>That Elefante is broken or needs installation</td></tr>
+</tbody></table></div>
+<p>The <strong>Recommended next</strong> card always points to an action that is meaningful
+in the evidence currently available: review direct signals, browse the corpus,
+set a task boundary, or test Recall. It never sends the user to another Home.</p>
+<h3 id="current-evidence"><a class="heading-anchor" href="#current-evidence">Current evidence</a></h3>
+<div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead><tr><th>Cell</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>Memory corpus</td><td>Count of memory nodes directly represented in the loaded snapshot</td></tr>
+<tr><td>Review queue</td><td>Count of direct health or lifecycle signals; this is not a truth or quality grade</td></tr>
+<tr><td>Task boundary</td><td>The bound project when a verified task action is available; otherwise global inspection remains available without one</td></tr>
+<tr><td>Recovery evidence</td><td>The latest health receipt returned in this session, or <strong>Not checked</strong></td></tr>
+</tbody></table></div>
+<p>Home never fills missing proof with <strong>Available</strong>, <strong>Ready</strong>, or
+<strong>Not verified</strong> placeholders. It names the evidence it has and the check
+needed to establish more.</p>
+
+<h2 id="home-s-three-operator-jobs"><a class="heading-anchor" href="#home-s-three-operator-jobs">Home's three operator jobs</a></h2>
+<div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead><tr><th>Job</th><th>Purpose</th><th>Project required?</th><th>Primary controls</th></tr></thead>
+<tbody>
+<tr><td>Global understanding</td><td>Inspect the whole represented memory system and the relationships between memories</td><td>No</td><td>Memory Intelligence, Connections</td></tr>
+<tr><td>Task intelligence</td><td>Improve and prove the governed context Elefante supplies for one task</td><td>Only for Recall and durable changes</td><td>Remember, Recall, Correct</td></tr>
+<tr><td>Continuity</td><td>Protect product health and durable data</td><td>No general project choice; a scoped postcondition may apply</td><td>Recover</td></tr>
+</tbody></table></div>
+<p>A project is an isolation boundary, not the entrance fee to understand
+Elefante. With no project, the user can inspect the complete snapshot. Before
+Recall or a write, Elefante must bind the exact project so unrelated work cannot
+enter the result. Choosing a project declares scope; it does not scan or ingest
+the project's files.</p>
+
+<h3 id="remember"><a class="heading-anchor" href="#remember">Remember</a></h3>
+<p><strong>Remember</strong> appears on Home only when a live strict project context is
+ready. It preserves one durable decision, constraint, preference, or lesson—never
+passwords, keys, tokens, hidden reasoning, or full transcripts. The form accepts
+up to 8,000 characters plus a likely future Recall question of up to 1,000
+characters. Elefante searches before writing, applies once, and checks the future
+question through governed Recall.</p>
+<p>If overlap is found, <strong>Update existing</strong> and <strong>Supersede existing</strong>
+open the existing memory for review; they do not silently write. <strong>Keep both</strong>
+uses the explicit keep-both plan. <strong>Cancel</strong> changes nothing. Success requires
+a <code>VERIFIED_COMPLETE</code> receipt and the named postconditions.</p>
+
+<h3 id="test-recall"><a class="heading-anchor" href="#test-recall">Recall</a></h3>
+<p><strong>Recall</strong> opens the dedicated Recall Inspector. Home does not run a hidden
+query, invent a question, or claim a selection occurred. See the complete
+evidence contract in <a href="#recall-inspector">Recall</a>.</p>
+
+<h3 id="correct"><a class="heading-anchor" href="#correct">Correct</a></h3>
+<p><strong>Correct</strong> opens Memory Intelligence. The action menu depends on the
+selected memory's represented lifecycle state:</p>
+<div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead><tr><th>Action</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>Edit</td><td>Fix a mistake without changing the intended meaning</td></tr>
+<tr><td>Replace</td><td>Record a newer version while preserving the old history</td></tr>
+<tr><td>Archive</td><td>Keep the record inspectable but remove it from Recall delivery</td></tr>
+<tr><td>Restore</td><td>Return a manually archived, non-superseded record to Recall eligibility</td></tr>
+<tr><td>Delete permanently</td><td>Remove the memory and unshared attachments only after a temporary verified safety backup</td></tr>
+</tbody></table></div>
+<p>The managed flow is always: choose an action; explain why; provide a likely
+future Recall question; inspect a no-write plan; confirm its single-use ticket;
+apply once; verify store, graph, Home, and scoped Recall; then inspect the
+privacy-safe receipt. Protected memories add explicit acknowledgement. Permanent
+deletion adds exact <code>DELETE</code> confirmation and is not recoverable after all
+postconditions pass.</p>
+
+<h3 id="resolve"><a class="heading-anchor" href="#resolve">Resolve</a></h3>
+<p><strong>Verified Resolve</strong> appears only for a represented conflict pair. The
+user chooses the authoritative winner, reviews the plan, and confirms one
+single-use ticket. Elefante then verifies that governed Recall supplies the
+chosen winner. Ambiguity does not choose a winner automatically.</p>
+
+<h3 id="correction-and-resolve-receipt-states"><a class="heading-anchor" href="#correction-and-resolve-receipt-states">Managed-action receipt states</a></h3>
+<div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead><tr><th>Terminal state</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>VERIFIED_COMPLETE</code></td><td>The change and all required postconditions passed</td></tr>
+<tr><td><code>FAILED_NO_CHANGE</code></td><td>The requested operation did not complete and no state change was verified</td></tr>
+<tr><td><code>FAILED_ROLLED_BACK</code></td><td>The operation failed, then the prior state was restored and verified</td></tr>
+<tr><td><code>NEEDS_HUMAN</code></td><td>The evidence changed or remains ambiguous; inspect and re-plan</td></tr>
+<tr><td><code>UNSAFE</code></td><td>Elefante could not prove a safe automatic state; do not retry blindly</td></tr>
+</tbody></table></div>
+<p>A receipt can show action, changed state, recoverability, rollback, operation
+ID, bounded error codes, and individual verification checks. Invocation alone
+is never presented as completion.</p>
+
+<h3 id="recover"><a class="heading-anchor" href="#recover">Recover</a></h3>
+<p><strong>Recover</strong> opens the product-wide lifecycle surface described in
+<a href="#recover-health-backup-restore-and-support">Recover</a>. Its controls become
+readiness evidence only after a timestamped check or verified operation receipt.</p>
+<h2 id="recall-inspector"><a class="heading-anchor" href="#recall-inspector">Recall: test governed selection</a></h2>
+<p>Recall is the truthful place to test what Elefante would supply for one real
+question. The first version is deliberately narrow: one ephemeral question,
+one active registered project, and one read-only check. It does not answer the
+question, write a memory, or create Recall history for dashboard convenience.</p>
+<p><strong>Run Recall Check</strong> returns bounded proof, not private memory content:</p>
+<div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>supplied</code></td>
+<td>Governed Recall selected one or more project memories; Home shows selected count plus bounded IDs and titles</td>
+</tr>
+<tr>
+<td><code>no_match</code></td>
+<td>Recall ran correctly and abstained because it found no eligible memory</td>
+</tr>
+<tr>
+<td><code>blocked</code></td>
+<td>Conflict or governance stopped delivery</td>
+</tr>
+<tr>
+<td><code>unavailable</code></td>
+<td>The Recall path could not be verified</td>
+</tr>
+</tbody>
+</table></div>
+<p>The receipt may also show conflict count, active project, and verification
+time. A selected ID can open that record in Memory Intelligence. The selected
+memory content remains in the agent delivery path and is not copied into Home.</p>
+<p>The current contract does <strong>not</strong> expose per-signal reasons, withheld IDs,
+historical trace, answer quality, or task-outcome evidence. A supplied bundle
+does not prove that an answer was correct; <code>no_match</code> can be a healthy result.</p>
+<p>If no active project or local management session is available, Recall fails
+closed and points to Projects or Home. It never converts the all-memory view
+into a global Recall scope.</p>
+<h2 id="where-the-briefing-ideas-live"><a class="heading-anchor" href="#where-the-briefing-ideas-live">Where the Briefing ideas live</a></h2>
+<p>The earlier Memory Maintenance Briefing combined useful ideas in one crowded
+Home panel, but its featured-memory narrative was not bound to a real task. The
+ideas remain; each now appears where its evidence is authoritative:</p>
+<div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead><tr><th>Developed idea</th><th>Current home</th><th>Evidence boundary</th></tr></thead>
+<tbody>
+<tr><td>Records that deserve inspection</td><td>Memory Intelligence -&gt; Review</td><td>Direct health or lifecycle signals; review is not a correction verdict</td></tr>
+<tr><td>Topic, vitality, use, health, and lifecycle distributions</td><td>Memory Intelligence and Connections</td><td>Snapshot diagnostics; not task relevance or outcome quality</td></tr>
+<tr><td>Old assumption -&gt; evidence -&gt; decision -&gt; guard</td><td>Connections -&gt; Decision Graph</td><td>Only explicit represented edges; no chain inferred from topic or row order</td></tr>
+<tr><td>What shaped one task</td><td>Recall, after a real check</td><td>Only the returned status, project, selected IDs, conflicts, and verification time</td></tr>
+</tbody></table></div>
+<p>This removes unsupported duplication, not capability. Home chooses the job;
+the specialist workspace explains the evidence. <strong>No action</strong> remains a
+valid conclusion when the represented evidence does not justify a change.</p>
+<h3 id="session-intelligence"><a class="heading-anchor" href="#session-intelligence">Session Intelligence</a></h3>
+<p>Session Intelligence remains on Home under the collapsed <strong>Advanced</strong>
+disclosure. It is <strong>off by default</strong>. Without explicit local consent and a
+derived metadata-only snapshot, Home shows only the disabled explanation.</p>
+<p>When evidence exists, the Signal Card can show event count, provider-actual
+input/output tokens, verified cost when known, accepted-outcome evidence,
+training hypotheses, and explicit unknowns. Provider-actual and estimated usage
+remain separate. Prompts, transcripts, responses, employee ranking, and
+sensitive-trait inference are outside this surface.</p>
+<h2 id="memories-browse-understand-and-correct"><a class="heading-anchor" href="#memories-browse-understand-and-correct">Memory Intelligence: inspect and review</a></h2>
+<p>Memory Intelligence presents every memory node returned from the current snapshot. The
+default graph response is bounded to 1,000 total nodes, so “overall” means the
+complete browser snapshot response, not an unbounded live-store query.</p>
+<p><strong>Library</strong> shows the complete snapshot corpus. <strong>Review</strong> narrows that
+same data to records carrying a direct non-healthy health signal or represented
+archive, deprecation, contradiction, redundancy, or supersession state. Review
+does not grade truth, usefulness, project scope, or whether correction is
+necessary.</p>
+<h3 id="the-two-search-boxes-are-different"><a class="heading-anchor" href="#the-two-search-boxes-are-different">The two search boxes are different</a></h3>
+<div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Scope</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Snapshot search</td>
+<td>Snapshot API</td>
+<td>Starts after two characters and a 300 ms delay; the current UI requests up to 20 lexical matches</td>
+</tr>
+<tr>
+<td>Filter memories</td>
+<td>Rows currently displayed</td>
+<td>Filters the current table in the browser; it does not run Recall or another backend search</td>
+</tr>
+</tbody>
+</table></div>
+<p>Clearing Snapshot search returns to overall browsing. Clearing Filter preserves
+the current Snapshot-search mode but removes the table-only filter.</p>
+<p>Current limitation: when Snapshot search reports zero results, the table can
+fall back to the browse rows. The <code>0 snapshot results</code> line is authoritative;
+those visible browse rows are not matches. Search failures also lack a dedicated
+visible error message in the current UI.</p>
+<h3 id="table-columns"><a class="heading-anchor" href="#table-columns">Table columns</a></h3>
+<div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Title</td>
+<td>Curated memory title; missing titles display as Untitled</td>
+</tr>
+<tr>
+<td>Topic</td>
+<td>Snapshot topic label</td>
+</tr>
+<tr>
+<td>Type</td>
+<td>Stored memory type such as decision, fact, preference, insight, note, conversation, specification, or directive</td>
+</tr>
+<tr>
+<td>Health</td>
+<td>Deterministic inspection state with its reason in the tooltip</td>
+</tr>
+<tr>
+<td>Created</td>
+<td>Creation date</td>
+</tr>
+<tr>
+<td>Vitality</td>
+<td>Label derived from the snapshot's 0-100 dashboard display score</td>
+</tr>
+<tr>
+<td>Uses</td>
+<td>Snapshot <code>access_count</code>; zero displays as Never</td>
+</tr>
+</tbody>
+</table></div>
+<p>Click a column heading to change sort order. The initial order is newest created
+first. The chevron at the left expands an inline row with Title, Body, ID, Tags,
+and Source. Clicking the rest of the row opens the complete detail drawer.</p>
+<p>On narrow screens, Topic, Type, Created, Vitality, and Uses are hidden from the
+table to protect the primary reading path; the detail drawer still exposes the
+available fields.</p>
+<h3 id="vitality-is-not-recall-relevance"><a class="heading-anchor" href="#vitality-is-not-recall-relevance">Vitality is not Recall relevance</a></h3>
+<p>The UI column is labelled <strong>Vitality</strong>, but its underlying snapshot <code>score</code> is
+the dashboard display score:</p>
+<pre><code class="language-text">dashboard score = 50% temporal vitality
+                + 25% memory-type weight
+                + 25% engagement
+</code></pre>
+<p>The labels are:</p>
+<div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th style="text-align:right">Score</th>
+<th>Label</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right">80-100</td>
+<td>Fresh</td>
+</tr>
+<tr>
+<td style="text-align:right">60-79</td>
+<td>Healthy</td>
+</tr>
+<tr>
+<td style="text-align:right">40-59</td>
+<td>Aging</td>
+</tr>
+<tr>
+<td style="text-align:right">20-39</td>
+<td>Fading</td>
+</tr>
+<tr>
+<td style="text-align:right">0-19</td>
+<td>Dormant</td>
+</tr>
+</tbody>
+</table></div>
+<p>Do not compare this number with a query's Recall score. Recall relevance is
+computed for one question through a different governed path.</p>
+<p>Normal MCP retrieval is currently read-only and does not update access history.
+Consequently, <strong>Never</strong> means the snapshot records zero uses; it is not proof
+that the memory has never been useful or delivered through every possible path.</p>
+<h3 id="health-labels"><a class="heading-anchor" href="#health-labels">Health labels</a></h3>
+<p>Health is also separate from score:</p>
+<div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Health</th>
+<th>Rule used at snapshot generation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>At risk</td>
+<td>The memory is contradictory or superseded</td>
+</tr>
+<tr>
+<td>Stale</td>
+<td>Otherwise, it has not been accessed for more than 90 days</td>
+</tr>
+<tr>
+<td>Orphan</td>
+<td>Otherwise, it has no represented graph connection</td>
+</tr>
+<tr>
+<td>Healthy</td>
+<td>None of the higher-priority conditions applies</td>
+</tr>
+</tbody>
+</table></div>
+<p>Health is an inspection signal, not an automatic archive, merge, delete, or
+repair instruction.</p>
+<h3 id="complete-memory-drawer"><a class="heading-anchor" href="#complete-memory-drawer">Complete memory drawer</a></h3>
+<p>The drawer reveals only sections supported by the selected snapshot record:</p>
+<ul>
+<li>title, type, ring, knowledge type, relative age, and health;</li>
+<li>Summary and Content;</li>
+<li>Metadata: topic, type, ring, knowledge, dashboard score, lifecycle, health,
+connections, processing, namespace, and source;</li>
+<li>Provenance &amp; scope: storage, source detail, project, workspace, scope, author;</li>
+<li>Governance: authority, reliability, source verification, version, retention,
+injection policy, and user lock;</li>
+<li>Correct controls allowed by lifecycle state;</li>
+<li>concepts, saved Recall questions, surfacing rules, and tags;</li>
+<li>active conflicts and the latest ten resolution events;</li>
+<li>latest ten verified correction events;</li>
+<li>up to eight related memories represented by snapshot edges;</li>
+<li>Debug Info: ID, timestamps, archive/deprecation state, and supersession IDs.</li>
+</ul>
+<p>A dash means the snapshot does not supply that field. Home does not infer a
+missing value.</p>
+<h3 id="retrieval-explanation"><a class="heading-anchor" href="#retrieval-explanation">Retrieval Explanation</a></h3>
+<p>Retrieval Explanation appears only when the record was opened from Snapshot
+search. It reports:</p>
+<ul>
+<li>lexical match percentage for the typed query;</li>
+<li>rank among the returned snapshot results;</li>
+<li>configured storage source recorded in the snapshot;</li>
+<li>health label and reason;</li>
+<li>explicit inbound/outbound relationships represented in the snapshot.</li>
+</ul>
+<p>It explicitly does <strong>not</strong> claim to explain MCP Recall's vector, concept,
+co-activation, authority, or temporal signals because the dashboard API does
+not receive those per-query values.</p>
+<h2 id="connections-understand-relationships-across-memories"><a class="heading-anchor" href="#connections-understand-relationships-across-memories">Connections: understand relationships across memories</a></h2>
+<p>Connections is snapshot-wide and has three subviews.</p>
+<h3 id="topics"><a class="heading-anchor" href="#topics">Topics</a></h3>
+<p>Topics groups memories by snapshot topic, largest groups first. Each card shows:</p>
+<ul>
+<li>topic name and memory count;</li>
+<li>average stored vitality value;</li>
+<li>counts by memory type;</li>
+<li>up to four highest-vitality memory titles;</li>
+<li>how many additional records remain in that topic.</li>
+</ul>
+<p>The color palette separates categories visually. Color is not another score.</p>
+<h3 id="vitality"><a class="heading-anchor" href="#vitality">Vitality</a></h3>
+<p>Vitality computes a display-only breakdown of the current memory nodes:</p>
+<ul>
+<li>average, highest, and lowest dashboard score;</li>
+<li>count at each exact score;</li>
+<li>memory-type distribution;</li>
+<li>topic distribution;</li>
+<li>six highest-scored records.</li>
+</ul>
+<p>These are snapshot composition metrics, not Recall quality or task-outcome
+measurements. The score bars use display thresholds at 80 and 60 on the
+snapshot's 0-100 dashboard-score scale. They are visual grouping bands, not
+truth, utility, or Recall-quality grades.</p>
+<h3 id="graph"><a class="heading-anchor" href="#graph">Decision Graph</a></h3>
+<p>The Decision Graph builds trails only from explicit memory-to-memory causal,
+correction, contradiction, dependency, enablement, governance, and safeguard
+relationships. Semantic similarity edges do not form reasoning trails.</p>
+<p>The header can report:</p>
+<ul>
+<li>grounded trail count;</li>
+<li>old assumptions, derived from deprecated or superseded records;</li>
+<li>explicit safeguards in grounded trails;</li>
+<li>semantic topic bridges between memory nodes.</li>
+</ul>
+<p>Choose a trail in <strong>Preserved reasoning</strong>, then choose a memory card to inspect
+its role, source grounding, and named relationships. <strong>Open complete memory</strong>
+returns to the Memory Intelligence drawer.</p>
+<p><strong>No decision trails yet</strong> does not mean there are no links. It means the
+snapshot has no qualifying explicit memory-to-memory decision/evidence/guard
+component. Topic/entity links and semantic bridges can still exist.</p>
+<h2 id="projects-define-where-managed-memory-belongs"><a class="heading-anchor" href="#projects-define-where-managed-memory-belongs">Projects: define where managed memory belongs</a></h2>
+<p>Projects governs new project-scoped actions; it is not required merely to read
+the overall snapshot.</p>
+<p>In the disclosed Example workspace, Projects explains this boundary and links
+back to Memory Intelligence or Recall; it does not simulate registration or
+claim that a project was changed. The controls below appear only when a verified
+local management session returns a real registry.</p>
+<h3 id="registry-state"><a class="heading-anchor" href="#registry-state">Registry state</a></h3>
+<div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>State</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Compatibility</td>
+<td>Existing unscoped behavior remains available while legacy memory is reviewed</td>
+</tr>
+<tr>
+<td>Strict</td>
+<td>New memory requires one active registered project and cross-project delivery is disabled</td>
+</tr>
+<tr>
+<td>Needs attention / Invalid</td>
+<td>The registry projection cannot be proven or validated; changes are disabled</td>
+</tr>
+<tr>
+<td>Management enabled</td>
+<td>The short-lived local session can call named project controls</td>
+</tr>
+<tr>
+<td>Read-only</td>
+<td>Registry information can be visible, but project controls are locked</td>
+</tr>
+</tbody>
+</table></div>
+<p>If the projection reports isolated scope and sharing off, Home displays that
+fact explicitly. It never fabricates Compatibility when registry state is
+missing or invalid.</p>
+<h3 id="registry-summary"><a class="heading-anchor" href="#registry-summary">Registry summary</a></h3>
+<p>The four counters are:</p>
+<ul>
+<li><strong>Registered</strong> — total project mappings;</li>
+<li><strong>Active</strong> — mappings eligible for current sessions;</li>
+<li><strong>Revision</strong> — authoritative registry revision;</li>
+<li><strong>Unassigned</strong> — legacy memories with no declared project.</li>
+</ul>
+<h3 id="registered-projects"><a class="heading-anchor" href="#registered-projects">Registered projects</a></h3>
+<p>Each row shows display name, Active/Inactive state, canonical root, a shortened
+stable project ID, and <strong>Folder missing</strong> when the root is unavailable.</p>
+<div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Add project</td>
+<td>Register an existing absolute, specific project folder</td>
+</tr>
+<tr>
+<td>Edit</td>
+<td>Rename or move the registration while preserving its stable project ID</td>
+</tr>
+<tr>
+<td>Activate / Deactivate</td>
+<td>Change whether the project can own a Home session; a missing folder cannot be activated</td>
+</tr>
+<tr>
+<td>Remove</td>
+<td>Remove only Elefante's registry mapping after acknowledgement</td>
+</tr>
+</tbody>
+</table></div>
+<p>Removing a registration does not delete the project folder or any memory.
+Deactivation can be rejected when strict mode would be left without another
+usable active project.</p>
+<h3 id="legacy-memory-review"><a class="heading-anchor" href="#legacy-memory-review">Legacy memory review</a></h3>
+<p>Fully unassigned older memories remain available under Compatibility until the
+user chooses where they belong. Elefante never guesses a project from memory
+text.</p>
+<p>The review lists 25 records per page with Previous/Next controls. <strong>Choose
+project</strong> opens the explicit assignment dialog. A protected memory requires an
+additional acknowledgement; its protection is preserved and only the declared
+project is added. Success requires a <strong>VERIFIED_COMPLETE</strong> assignment receipt.</p>
+<h3 id="enabling-strict-isolation"><a class="heading-anchor" href="#enabling-strict-isolation">Enabling strict isolation</a></h3>
+<p><strong>Enable strict</strong> is available only when:</p>
+<ul>
+<li>the registry is currently in Compatibility mode;</li>
+<li>at least one active project has an available folder;</li>
+<li>the legacy scan completed;</li>
+<li>zero fully unassigned memories remain;</li>
+<li>local management is active.</li>
+</ul>
+<p>The final acknowledgement is explicit. Strict mode is a one-way Home action and
+cannot be downgraded from this dashboard.</p>
+<h2 id="recover-health-backup-restore-and-support"><a class="heading-anchor" href="#recover-health-backup-restore-and-support">Recover: health, backup, restore, and support</a></h2>
+<p>Recover provides one trustworthy state, one safe next action, and verified
+protection before a data switch.</p>
+<p>Without an operational receipt, Recover shows the evidence required for health,
+backup, restore, and support, but does not present those capabilities as ready.
+The snapshot can remain readable while lifecycle controls are unavailable.</p>
+<h3 id="check-health"><a class="heading-anchor" href="#check-health">Check health</a></h3>
+<p><strong>Check health</strong> verifies runtime readiness, connected agent evidence, Recall,
+and backup evidence without reading memory content. It returns one of Ready,
+Needs attention, Recovery required, or Unsupported, individual named checks,
+verified/invalid backup counts, and one safe next action.</p>
+<p>If the next action is Backup, Restore, or Support report, Home links directly to
+that flow. Product-code repair is handed to the official package rather than
+performed by the running app.</p>
+<h3 id="back-up-now"><a class="heading-anchor" href="#back-up-now">Back up now</a></h3>
+<p>The flow is deliberately two-stage:</p>
+<ol>
+<li><strong>Inspect backup</strong> reports estimated file count, size, configured destination,
+and the steps Elefante will take. Home cannot redirect durable data to an
+arbitrary path.</li>
+<li>A checkbox acknowledges that writes pause briefly, then <strong>Create verified
+backup</strong> executes the one-use plan.</li>
+</ol>
+<p>Completion requires archive readback, staged restoration, and database
+verification. A failed untrusted archive is removed rather than presented as a
+backup.</p>
+<h3 id="restore-a-backup"><a class="heading-anchor" href="#restore-a-backup">Restore a backup</a></h3>
+<ol>
+<li><strong>Find verified backups</strong> lists only archives in the configured backup
+location; invalid archives are counted and excluded.</li>
+<li>Choose one archive and <strong>Inspect selected backup</strong>.</li>
+<li>Supply a private Recall question that the restored state should answer. It is
+used once and is not written to the recovery receipt.</li>
+<li>Acknowledge the safety plan, then <strong>Restore with rollback protection</strong>.</li>
+</ol>
+<p>Elefante creates a verified backup of current data before switching. It stages
+and checks the selected archive before activation, then verifies active files,
+Home, and scoped Recall. Any failed final check triggers restoration of the
+exact previous data. If rollback cannot be proven, the terminal state is
+<code>UNSAFE</code>.</p>
+<h3 id="support-report"><a class="heading-anchor" href="#support-report">Support report</a></h3>
+<p><strong>Preview support report</strong> shows every category before creation. The result is
+one private local ZIP that is downloaded by the browser and never transmitted
+by Elefante.</p>
+<p>The preview can include:</p>
+<ul>
+<li>product and build identity;</li>
+<li>operating system, architecture, and Python version;</li>
+<li>customer readiness and verified agent-connection counts;</li>
+<li>Recall and backup readiness facts;</li>
+<li>bounded diagnostic codes;</li>
+<li>content-free recovery and package receipts.</li>
+</ul>
+<p>It never includes:</p>
+<ul>
+<li>memory content;</li>
+<li>project names or paths;</li>
+<li>prompts, questions, answers, responses, or transcripts;</li>
+<li>credentials or environment values;</li>
+<li>host configuration contents;</li>
+<li>logs.</li>
+</ul>
+<p>After acknowledgement, <strong>Create and download report</strong> writes, reads back, and
+downloads the allowlisted ZIP. A failed report is removed. A verified receipt
+offers <strong>Download ZIP again</strong>.</p>
+<h3 id="safety-boundary"><a class="heading-anchor" href="#safety-boundary">Safety boundary</a></h3>
+<p>Recover owns product health, verified backup, verified data restore, and the
+privacy-safe support report. Two operations intentionally live elsewhere:</p>
+<ul>
+<li>permanent memory deletion belongs to Correct's verified gate;</li>
+<li>product code changes belong to the exact official package.</li>
+</ul>
+<h3 id="product-maintenance-handoff"><a class="heading-anchor" href="#product-maintenance-handoff">Product maintenance handoff</a></h3>
+<p>Home explains, but does not execute, four package operations:</p>
+<div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Package authority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Repair</td>
+<td>Matching official package reinstalls owned code and connections while preserving data</td>
+</tr>
+<tr>
+<td>Update</td>
+<td>Newer official package backs up, switches code, verifies Recall, and rolls code back on failure</td>
+</tr>
+<tr>
+<td>Roll back code</td>
+<td>Current official package returns to one retained verified code version; it does not claim to undo memory changes</td>
+</tr>
+<tr>
+<td>Uninstall</td>
+<td>Matching official package backs up and removes unchanged Elefante-owned code/connections while preserving memories</td>
+</tr>
+</tbody>
+</table></div>
+<p>The customer journey is <strong>open the official package -&gt; review and confirm -&gt;
+return to Home and Check health</strong>. The last content-free package receipt appears
+only after the health check loads it.</p>
+<h3 id="recovery-receipts"><a class="heading-anchor" href="#recovery-receipts">Recovery receipts</a></h3>
+<p>Recover shows the operation, terminal state, bounded archive label, file count,
+size, safety-backup label when applicable, verification checks, and named next
+action. Recent receipts shows at most five bounded lifecycle entries.</p>
+<div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Terminal state</th>
+<th>Meaning in Recover</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>VERIFIED_COMPLETE</code></td>
+<td>Backup, restore, or report and its readback checks completed</td>
+</tr>
+<tr>
+<td><code>FAILED_NO_CHANGE</code></td>
+<td>The requested switch did not occur</td>
+</tr>
+<tr>
+<td><code>FAILED_ROLLED_BACK</code></td>
+<td>Failure was contained and the prior state or untrusted output was safely restored/removed</td>
+</tr>
+<tr>
+<td><code>NEEDS_HUMAN</code></td>
+<td>The inspected plan no longer matches current evidence</td>
+</tr>
+<tr>
+<td><code>RUNNING</code></td>
+<td>The operation was interrupted or may still be running; inspect before starting another</td>
+</tr>
+<tr>
+<td><code>UNSAFE</code></td>
+<td>Safe rollback could not be proven; do not retry automatically</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="loading-empty-locked-and-error-states"><a class="heading-anchor" href="#loading-empty-locked-and-error-states">Loading, empty, locked, and error states</a></h2>
+<div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Screen</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reading the local memory snapshot</td>
+<td>Initial stats and graph fetch are in progress; retries use bounded exponential backoff</td>
+</tr>
+<tr>
+<td>0 memories represented</td>
+<td>The loaded snapshot has no memory nodes; this alone does not prove that the durable store is empty</td>
+</tr>
+<tr>
+<td>No memories</td>
+<td>The current snapshot contains no memory nodes</td>
+</tr>
+<tr>
+<td>No data to visualise</td>
+<td>Connections has no memory nodes to group</td>
+</tr>
+<tr>
+<td>No topic data available</td>
+<td>Memory nodes exist but no topic groups can be formed</td>
+</tr>
+<tr>
+<td>No decision trails yet</td>
+<td>No qualifying explicit causal/decision/safeguard trail exists</td>
+</tr>
+<tr>
+<td>No operational receipt in this environment</td>
+<td>Snapshot inspection remains, but this page has no evidence that a named management operation is available</td>
+</tr>
+<tr>
+<td>Error banner</td>
+<td>A snapshot fetch failed after retries; the shown browser state is not authoritative product health</td>
+</tr>
+</tbody>
+</table></div>
+<p>Do not interpret an empty or stale snapshot as proof that the live store is
+empty. Regeneration is a separate explicit action.</p>
+<p>Header-stat and Session Intelligence fetch failures currently log to the browser
+console without a dedicated visible error. Unexpected zero/unknown header
+values or an unexpected <strong>Off by default</strong> panel should therefore be verified
+against <code>/api/stats</code> or <code>/api/session-intelligence</code> before being treated as
+product truth.</p>
+<h2 id="responsive-and-accessibility-behavior"><a class="heading-anchor" href="#responsive-and-accessibility-behavior">Responsive and accessibility behavior</a></h2>
+<ul>
+<li>At phone width, product identity and status controls occupy separate header
+rows; the example/status label can shrink while theme and Reload remain visible.</li>
+<li>The top tab bar scrolls horizontally on narrow screens.</li>
+<li>The Memory Intelligence table hides secondary columns on narrow screens; the detail
+drawer becomes full-width.</li>
+<li>Light is the default presentation for a new browser profile. The header
+theme control preserves an explicit dark choice in that browser.</li>
+<li>Project dialogs trap keyboard focus and return it to the prior control.</li>
+<li>Correction, Resolve, Remember, assignment, and project dialogs support
+<code>Escape</code>, subject to their in-progress safety locks.</li>
+<li>Current limitation: Related-memory cards in the detail drawer are clickable
+non-button elements, so complete keyboard behavior is not guaranteed by the
+source contract.</li>
+</ul>
+<h2 id="privacy-and-security-boundary"><a class="heading-anchor" href="#privacy-and-security-boundary">Privacy and security boundary</a></h2>
+<p>The snapshot is pattern-redacted, not anonymized. It can still contain private
+memory content. Keep Home on loopback and do not expose port 8000 to a network
+without a separately authenticated operator boundary.</p>
+<p>The default allowed browser origins are:</p>
+<ul>
+<li><code>http://localhost:8000</code></li>
+<li><code>http://127.0.0.1:8000</code></li>
+</ul>
+<p>The snapshot server exposes read-only GET routes:</p>
+<ul>
+<li><code>/api/graph</code></li>
+<li><code>/api/search</code></li>
+<li><code>/api/stats</code></li>
+<li><code>/api/session-intelligence</code></li>
+<li><code>/api/control-config</code>, which exposes only the configured loopback daemon port</li>
+</ul>
+<p>Named management requests go to the daemon's separate local control service and
+require its short-lived origin-bound capability. Home cannot regenerate the
+snapshot, open the stores, run arbitrary tools, or select arbitrary backup or
+support-report destinations.</p>
+<h2 id="troubleshooting"><a class="heading-anchor" href="#troubleshooting">Troubleshooting</a></h2>
+<h3 id="i-see-an-older-or-simpler-dashboard"><a class="heading-anchor" href="#i-see-an-older-or-simpler-dashboard">I see an older or simpler dashboard</a></h3>
+<p>Confirm the installed build, not only the semantic version in the header. The
+six-workspace, light-default dashboard described here is currently a verified
+source prototype. This work did not replace the installed runtime or publish a
+package. If the dashboard does not show Home, Recall, Memory Intelligence,
+Connections, Projects, and Recover, the running package still owns earlier
+dashboard assets. This is a package-version boundary, not a second Elefante
+product.</p>
+<h3 id="home-has-no-operational-receipt"><a class="heading-anchor" href="#home-has-no-operational-receipt">Home has no operational receipt</a></h3>
+<p>Continue with Global understanding if the snapshot is available. If you expected
+live Recall or lifecycle controls, verify the installed Elefante service and use
+Recover's evidence model. Do not install a browser connector and do not treat a
+visible snapshot as proof that an operation ran.</p>
+<h3 id="recall-has-no-evidence-yet"><a class="heading-anchor" href="#recall-has-no-evidence-yet">Recall has no evidence yet</a></h3>
+<p>This means no Recall receipt was returned in the current environment. A real
+check requires one exact active project and one question. The page must not
+claim supplied, no match, blocked, or unavailable until that check returns.</p>
+<h3 id="snapshot-is-empty-or-stale"><a class="heading-anchor" href="#snapshot-is-empty-or-stale">Snapshot is empty or stale</a></h3>
+<p>Use <code>elefante-DashboardOpen(refresh=true)</code> from a connected agent to regenerate
+the snapshot, or use the source pipeline below. Header Reload alone cannot
+regenerate it.</p>
+<h3 id="graph-says-no-decision-trails-yet"><a class="heading-anchor" href="#graph-says-no-decision-trails-yet">Graph says No decision trails yet</a></h3>
+<p>Inspect Topics and Vitality first. The snapshot can contain many topic, entity,
+or semantic links without the explicit memory-to-memory edges required for a
+grounded decision trail.</p>
+<h3 id="local-dashboard-address-is-unavailable"><a class="heading-anchor" href="#local-dashboard-address-is-unavailable">The local dashboard address is unavailable</a></h3>
+<p>This is a transport diagnostic, not a product workflow. First test whether the
+existing process is the healthy Elefante dashboard. Do not kill an unknown
+process blindly.</p>
+<pre><code class="language-bash">curl --fail http://127.0.0.1:8000/health
+curl --fail http://127.0.0.1:8000/api/stats
+</code></pre>
+<p>Expected dashboard health response:</p>
+<pre><code class="language-json">{&quot;status&quot;:&quot;ok&quot;,&quot;service&quot;:&quot;elefante-dashboard&quot;}
+</code></pre>
+<p>This response proves the dashboard HTTP process, not the daemon, Recall,
+project, or backup. Use Home or Recover for the complete product state.</p>
+<h3 id="browser-reports-a-cors-or-connection-error"><a class="heading-anchor" href="#browser-reports-a-cors-or-connection-error">Browser reports a CORS or connection error</a></h3>
+<p>Use the exact loopback URL. External origins require an explicit
+<code>ELEFANTE_DASHBOARD_CORS_ORIGINS</code> list and a separately authenticated network
+boundary.</p>
+<h3 id="snapshot-export-reports-a-kuzu-lock"><a class="heading-anchor" href="#snapshot-export-reports-a-kuzu-lock">Snapshot export reports a Kuzu lock</a></h3>
+<p>Wait for the current transaction or stop the competing database-owning source
+process. Follow <a href="kuzu-troubleshooting.md">Kuzu troubleshooting</a>. Never delete
+Kuzu's internal lock file as a default repair.</p>
+<h2 id="source-checkout-workflow"><a class="heading-anchor" href="#source-checkout-workflow">Source-checkout workflow</a></h2>
+<p>Installed customers do not need a source checkout. Developers can generate,
+validate, and serve a snapshot explicitly:</p>
+<pre><code class="language-bash">./.venv/bin/python scripts/pipeline/update_dashboard_data.py
+./.venv/bin/python scripts/verify/verify_dashboard_snapshot.py \
+  --path ~/.elefante/data/dashboard_snapshot.json
+./.venv/bin/python -m src.dashboard.server
+</code></pre>
+<p>Then open <a href="http://127.0.0.1:8000">http://127.0.0.1:8000</a>.</p>
+<p>The standalone pipeline opens configured stores while exporting. Do not run it
+beside another direct database-owning source process. For an installed daemon,
+prefer the governed <code>elefante-DashboardOpen(refresh=true)</code> path.</p>
+<h2 id="safe-showcase"><a class="heading-anchor" href="#safe-showcase">Safe showcase</a></h2>
+<p>To inspect the visual surface without opening or changing a real memory store:</p>
+<pre><code class="language-bash">./.venv/bin/python scripts/demo/generate_showcase_snapshot.py \
+  --output /tmp/elefante-showcase/dashboard_snapshot.json
+ELEFANTE_DATA_DIR=/tmp/elefante-showcase \
+  ./.venv/bin/python -m src.dashboard.server
+</code></pre>
+<p>The maintained showcase is deterministic, source-grounded, and explicitly
+labelled <strong>Example workspace</strong>. It supports inspection and workflow
+explanation but never advertises live control or an operation receipt. Its
+counts are not customer usage or product-performance evidence.</p>
+<h2 id="authoritative-references"><a class="heading-anchor" href="#authoritative-references">Authoritative references</a></h2>
+<div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>What the browser snapshot may contain</td>
+<td><a href="../reference/dashboard-snapshot.md">Dashboard snapshot contract</a></td>
+</tr>
+<tr>
+<td>Why dashboard score, vitality, Recall relevance, trust, and utility differ</td>
+<td><a href="../reference/scoring.md">Memory vitality and retrieval scoring</a></td>
+</tr>
+<tr>
+<td>Exact MCP and Home operation contracts</td>
+<td><a href="../reference/tools.md">Tools and prompts</a></td>
+</tr>
+<tr>
+<td>Installed customer opening and first-run flow</td>
+<td><a href="install.md">Install Elefante</a></td>
+</tr>
+<tr>
+<td>Backup and rollback operator details</td>
+<td><a href="rollback.md">Backup and rollback</a></td>
+</tr>
+<tr>
+<td>Kuzu lock-safe diagnosis</td>
+<td><a href="kuzu-troubleshooting.md">Kuzu troubleshooting</a></td>
+</tr>
+</tbody>
+</table></div>
+<p>This guide explains current user-visible behavior. When it conflicts with a
+rendered local candidate, current source, or an authoritative operation receipt,
+those live and source-level proofs win; update this guide rather than inventing
+an explanation.</p>
+
+        <footer class="doc-footer">
+          <strong>Evidence boundary.</strong> This guide explains current user-visible source and the installed local candidate checked on 2026-08-31. A live receipt and current source win if behavior changes.
+          <a class="back-to-top" href="#top">Back to top</a>
+        </footer>
+      </article>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      const progress = document.getElementById('reading-progress-bar');
+      const navButton = document.getElementById('mobile-nav');
+      const toc = document.getElementById('guide-toc');
+      const links = Array.from(document.querySelectorAll('.toc-link'));
+      const sections = links
+        .map((link) => document.getElementById(link.dataset.section))
+        .filter(Boolean);
+
+      const updateProgress = () => {
+        const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+        const ratio = scrollable > 0 ? Math.min(1, Math.max(0, window.scrollY / scrollable)) : 0;
+        progress.style.width = `${ratio * 100}%`;
+      };
+
+      navButton.addEventListener('click', () => {
+        const open = navButton.getAttribute('aria-expanded') !== 'true';
+        navButton.setAttribute('aria-expanded', String(open));
+        toc.classList.toggle('is-open', open);
+        navButton.lastElementChild.textContent = open ? 'Close' : 'Menu';
+      });
+
+      links.forEach((link) => link.addEventListener('click', () => {
+        navButton.setAttribute('aria-expanded', 'false');
+        navButton.lastElementChild.textContent = 'Menu';
+        toc.classList.remove('is-open');
+      }));
+
+      if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver((entries) => {
+          const visible = entries
+            .filter((entry) => entry.isIntersecting)
+            .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+          if (!visible) return;
+          links.forEach((link) => link.classList.toggle('is-active', link.dataset.section === visible.target.id));
+        }, { rootMargin: '-12% 0px -72% 0px', threshold: [0, 1] });
+        sections.forEach((section) => observer.observe(section));
+      }
+
+      window.addEventListener('scroll', updateProgress, { passive: true });
+      window.addEventListener('resize', updateProgress);
+      updateProgress();
+    })();
+  </script>
+</body>
+</html>

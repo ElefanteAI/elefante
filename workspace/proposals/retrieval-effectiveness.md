@@ -3,19 +3,18 @@
 > Status: NORTH STAR — METRIC ALIGNED; FIRST BOUNDED FEASIBILITY EXPERIMENT
 > COMPLETE (`STOP`)
 >
-> Product state: governed Recall, Task Brief v2, evaluation, and a metadata-only
-> outcome ledger exist in unreleased development. Representative task lift is
-> not proven.
+> Product state: governed Recall is released in v2.13.0. Task Brief v2,
+> evaluation, and its metadata-only outcome ledger remain developer-only.
+> Representative task lift is not proven.
 >
 > Canonical role: this file owns the Task Intelligence objective, the immediate
 > experiment, its evidence gates, and the boundary to later product work.
 >
 > Task 032 implementation baseline: `7c705ca03371771be68460afb270fe0998f30231`.
-> Current development line: `agent/task-intelligence-causal-repair`; verify its
-> exact HEAD before work.
-> Published customer release: v2.12.3. The active development source declaration
-> remains 2.12.2 on the unreleased causal-repair branch. This document authorizes
-> neither merge nor release.
+> Current development line: verify the exact branch and HEAD before work; the
+> 2026-08-28 Gauntlet line declares 2.13.0.
+> Published customer release: v2.13.0. This document authorizes neither merge
+> nor release and does not promote Task Intelligence.
 
 ## 0. Resume contract — do not restart the debate
 
@@ -671,7 +670,7 @@ Packages are entered one at a time. A package that fails its exit gate stops the
 sequence at that layer; later packages cannot compensate with more context,
 more model calls, or a weaker judge.
 
-#### R0 baseline evidence — 2026-08-26
+#### R0 baseline evidence — 2026-08-26 historical pre-v2.13.0 checkpoint
 
 - Published and installed v2.12.3 expose 16 tools and 2 prompts; their MCP
   surface does not contain `elefante-Recall`.
@@ -915,7 +914,7 @@ memory data changed.
 R3c passes. R3d is next. These totals are process-local estimates, reset with
 the server, and are neither provider usage nor a dollar-cost calculation.
 
-##### R3d result — canonical contract reconciliation
+##### R3d result — canonical contract reconciliation at the pre-v2.13.0 checkpoint
 
 - The tool, token-intelligence, architecture, self-protocol, orchestrator,
   Copilot, script-index, issue, and changelog surfaces now agree on the one-call
@@ -970,7 +969,7 @@ R6 may perform development closure and exact-archive construction tests. A real
 replacement installation and normal-question Codex event remain separately
 authorized operator/release acceptance and cannot be inferred from those tests.
 
-#### R6 result — development closure, not installed promotion
+#### R6 result — historical development closure before v2.13.0 publication
 
 - Three non-overlapping affected lanes pass: 94 runtime/token/handshake tests
   with one intentional deselection, 91 installer/customer-archive tests, and 72
