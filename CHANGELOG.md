@@ -88,6 +88,9 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Matching-package uninstall can create and verify its mandatory safety backup
+  when the lifecycle script is launched directly from the extracted client
+  package instead of from a source-checkout working directory.
 - Clean customer installation can validate project setup before product
   dependencies are installed. Package initializers now keep runtime-heavy
   models and services lazy while preserving their public convenience imports.

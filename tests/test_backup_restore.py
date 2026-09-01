@@ -9,8 +9,11 @@
 
 import hashlib
 import json
+import shutil
 import sqlite3
 import stat
+import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
@@ -58,6 +61,44 @@ def test_backup_cli_accepts_the_exact_managed_data_root(tmp_path):
     assert read_verified_manifest(archives[0])["source_sha256"] == build_backup_manifest(
         custom_data
     )["source_sha256"]
+
+
+def test_packaged_backup_script_runs_outside_the_source_tree(tmp_path):
+    payload_root = tmp_path / "package" / "payload" / "elefante"
+    lifecycle_root = payload_root / "scripts" / "lifecycle"
+    lifecycle_root.mkdir(parents=True)
+    backup_script = lifecycle_root / "backup_elefante_data.py"
+    shutil.copy2(
+        Path(__file__).parents[1] / "scripts" / "lifecycle" / backup_script.name,
+        backup_script,
+    )
+    shutil.copy2(
+        Path(__file__).parents[1] / "scripts" / "lifecycle" / "restore_elefante_data.py",
+        lifecycle_root / "restore_elefante_data.py",
+    )
+    data_dir = tmp_path / "customer" / "data"
+    backup_dir = tmp_path / "customer" / "backups"
+    outside_root = tmp_path / "outside"
+    outside_root.mkdir()
+    _write_data(data_dir, "packaged backup")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(backup_script),
+            "--data-dir",
+            str(data_dir),
+            "--out-dir",
+            str(backup_dir),
+        ],
+        cwd=outside_root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
+    assert len(list(backup_dir.glob("elefante_data_backup_*.zip"))) == 1
 
 
 def test_backup_writes_verified_manifest_and_excludes_nested_recovery_archives(tmp_path):
