@@ -840,8 +840,13 @@ async def run_e2e(with_dashboard_open: bool) -> int:
         results.append(
             _result(
                 "Memory(action=add) stores protocol fixtures",
-                stored_all and all(memory_ids.values()),
-                f"stored={sum(1 for value in memory_ids.values() if value)}/{len(memory_specs)}",
+                stored_all
+                and all(memory_ids.values())
+                and len(set(memory_ids.values())) == len(memory_specs),
+                (
+                    f"stored={sum(1 for value in memory_ids.values() if value)}/{len(memory_specs)} "
+                    f"unique_ids={len(set(memory_ids.values()))}/{len(memory_specs)}"
+                ),
             )
         )
         results.append(
