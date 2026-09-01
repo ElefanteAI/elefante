@@ -283,6 +283,7 @@ async def test_server_pilot_closes_prepare_use_outcome_loop_without_ranking_muta
         source="vector",
     )
     server = ElefanteMCPServer()
+    server._project_registry = ProjectRegistry(tmp_path / "projects.json")
     ledger = TaskIntelligenceLedger(tmp_path / "task-ledger.sqlite3")
     monkeypatch.setenv("ELEFANTE_TASK_INTELLIGENCE_PILOT", "1")
     monkeypatch.setattr(server, "_request_provenance", lambda: dict(PROVENANCE))
@@ -406,6 +407,7 @@ async def test_server_shadow_never_delivers_context_and_pilot_has_kill_switch(
     )
     result = SearchResult(memory=memory, score=0.9, vector_score=0.9, source="vector")
     server = ElefanteMCPServer()
+    server._project_registry = ProjectRegistry(tmp_path / "projects.json")
     ledger = TaskIntelligenceLedger(tmp_path / "task-ledger.sqlite3")
     monkeypatch.delenv("ELEFANTE_TASK_INTELLIGENCE_PILOT", raising=False)
     monkeypatch.setattr(server, "_request_provenance", lambda: dict(PROVENANCE))
