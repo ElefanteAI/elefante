@@ -1,7 +1,7 @@
 ---
 PROTOCOL: operator
 INVOKE: elefante-operator
-PROTOCOL_VERSION: 2.13.0
+PROTOCOL_VERSION: 2.14.0
 LOAD_WHEN: Backup, restore, factory reset, dashboard pipeline refresh, planned downtime, any destructive op against a live install.
 DIAGNOSTIC_QUESTION: "Is the backup current AND is the server stopped before any file-level operation?"
 AUTHORITY: This file owns OPERATOR mode. Backup-first is non-negotiable.

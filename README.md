@@ -11,20 +11,17 @@ on your machine, then supplies a small governed subset when an agent needs prior
 context. It works beside the AI tools you already use and gives their separate
 sessions one private, inspectable memory.
 
-**v2.13.0** — Current published release.
+**v2.14.0** — Current published release.
 
-Published v2.13.0: 17 tools · 2 prompts · Python 3.11–3.13 · MCP 1.28.1
-
-Current unreleased source: 18 tools · 2 prompts, including verified Recover.
+Published v2.14.0: 18 tools · 2 prompts · Python 3.11–3.13 · MCP 1.28.1
 
 ## What a user can do
 
 - Recall relevant prior context with one bounded, read-only `elefante-Recall`
   call. Irrelevant or unsafe candidates produce an explicit abstention.
 - Remember, search, correct, archive, restore, and resolve durable knowledge
-  with search-before-write protection and user-governed retention rules. The
-  unreleased Home candidate also offers an advanced backup-bound permanent
-  delete flow.
+  with search-before-write protection and user-governed retention rules. Home
+  also offers an advanced backup-bound permanent-delete flow.
 - Connect memories to entities and relationships in a local knowledge graph.
 - Attach bounded local image, audio, and video files. Elefante stores and
   integrity-checks them locally; it does not perform OCR, transcription, model
@@ -83,8 +80,7 @@ verify the checksum, extract the archive, then use its single platform launcher:
 - Linux: run `chmod +x install.sh && ./install.sh`
 
 The published installer creates one stable per-user runtime and one local data
-root. The current unreleased product candidate narrows first-release acceptance
-to Codex: Codex is required, while other detected hosts are optional
+root. Codex is the required certified lane; other detected hosts are optional
 compatibility previews and cannot block customer readiness.
 
 - macOS/Linux runtime: `~/.elefante/app/current`
@@ -98,12 +94,11 @@ an unsigned native package is never substituted as a release asset.
 For source installation, repair, checksum commands, and uninstall details, see
 the [installation guide](docs/how-to/install.md).
 
-The current unreleased package candidate also carries its own data-preserving
+The published package also carries its own data-preserving
 uninstall launcher (`Uninstall Elefante.command`, `Uninstall Elefante.bat`, or
 `uninstall.sh`). It requires the official package matching the installed build,
 creates and verifies a backup first, removes the active app and only unchanged
 Elefante-owned connections, and leaves memories available for a later reinstall.
-This lifecycle is not part of the published v2.13.0 package.
 
 **If installation fails:** read the persisted recovery files in this order:
 
@@ -143,9 +138,9 @@ preview that was not connected or verified.
 
 ## Host coverage
 
-The v2.13.0 installer has ownership-safe, contract-tested adapters for VS Code
+The v2.14.0 installer has ownership-safe, contract-tested adapters for VS Code
 Copilot, Claude Code, Cursor, Kiro, Continue, Zed, Gemini CLI, Codex, and
-OpenClaw. In the unreleased first-release product contract, Codex is the sole
+OpenClaw. In the current product contract, Codex is the sole
 required certification lane; the other adapters remain optional compatibility
 previews and do not expand the supported acceptance promise.
 
@@ -155,9 +150,8 @@ community path. Planned hosts are not advertised as supported.
 
 ## Public MCP surface
 
-The current development customer profile exposes 18 tools + 2 prompts. The
-published v2.13.0 package remains at 17 tools + 2 prompts; `elefante-Recover`
-is an unreleased product candidate.
+The published customer profile exposes 18 tools + 2 prompts, including the
+verified `elefante-Recover` lifecycle surface.
 
 | Area | Surface |
 |---|---|

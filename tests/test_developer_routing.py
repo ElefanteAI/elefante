@@ -361,7 +361,10 @@ def test_living_plan_tracks_the_released_product_and_separate_client_candidate()
     assert "| OB5 |" not in planning
     assert "source-grounded" in planning
     assert f"**RELEASE_TARGET:** v{version}" in planning
-    assert "**PUBLICATION_AUTHORITY:** owner authorization covers this core release only." in planning
+    assert (
+        "**PUBLICATION_AUTHORITY:** owner authorization covers core publication, "
+        "matching local installation, and website synchronization"
+    ) in planning
 
 
 def test_active_scoring_reference_matches_runtime_contract() -> None:
@@ -961,7 +964,7 @@ def test_recall_cost_and_release_contract_is_synced_across_loaded_surfaces() -> 
     assert "provider usage" in token_doc
     assert "1,000" in architecture
     assert "1,000" in self_protocol
-    assert "Released and default-on in v2.13.0" in tools_doc
+    assert f"Released and default-on in v{_current_version()}" in tools_doc
     assert "published v2.12.3 installers" not in tools_doc
     assert "1,000" in issues
     assert "live Recall capability" in scripts_index

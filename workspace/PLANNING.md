@@ -71,66 +71,69 @@ The non-negotiable product shape is:
 
 ### §1.4 Product trust gates — claims require current proof
 
-| Gate | Required proof | Current state (2026-08-28) |
+| Gate | Required proof | Current state (2026-09-01) |
 |------|----------------|-----------------------------|
 | Privacy boundary | Dashboard and local APIs bind loopback by default; no wildcard CORS; documented proxy/auth responsibility | Guarded; dashboard, daemon, event-ingress, media, and Session Intelligence privacy tests pass |
 | Write authority | Retrieval cannot mutate memory or graph state; protected writes require explicit authority | Guarded; search, Recall, triggered delivery, conflict repair, Team Sync, and graph-write boundaries have negative and positive regressions |
-| Data integrity | One-writer daemon, source provenance, exact build identity, migration + rollback proof | Guarded in the v2.13.0 source candidate; legacy-store migration remains stopped, backup-gated support work |
-| Quality | Full suite, targeted regressions, frontend build, locks, packages, and exact-head CI are green | The integrated source passed 690 non-slow tests with 9 skips and 1 intentional deselection plus the dashboard production build before the final documentation pass; exact-head release gates remain mandatory |
+| Data integrity | One-writer daemon, source provenance, exact build identity, migration + rollback proof | Guarded in the v2.14.0 source candidate; legacy-store migration remains stopped, backup-gated support work |
+| Quality | Full suite, targeted regressions, frontend build, locks, packages, and exact-head CI are green | The pre-version exact tree passed 1,005 tests with 9 skips, the dashboard build, and all exact-head PR gates; the v2.14.0 commit must repeat exact-head CI before any merge |
 | Compatibility | Every advertised host has an ownership-safe adapter and honest tier | VS Code, Claude Code, Cursor, Kiro, Continue, Zed, Gemini CLI, Codex, and OpenClaw are contract-tested compatible; Bob and Antigravity are preview; Agent Zero is community; vendor certification remains open |
 | Supply chain | Runtime locks are exact; archives are checksummed and source-bound; native publication fails closed without signatures | Guarded by strict release-client verification, SHA256SUMS, source identity, credential-gated DMG notarization, and Authenticode verification |
 
 ---
 
-## §2 Release Contract: v2.13.0 Governed Memory Intelligence
+## §2 Release Contract: v2.14.0 Local Memory Control Loop
 
 ### §2.1 Outcome
 
 **Give each task the smallest safe durable-memory bundle that can change the
-next decision, while keeping every write, conflict, cost, and source boundary
-inspectable.**
+next decision, while giving the owner one verified local console to understand,
+correct, and recover the memory system behind it.**
 
-The release extends the customer product without claiming representative Task
-Intelligence lift. All new operational surfaces stay local, explicit,
-recoverable, and bounded.
+The release turns the existing read-heavy dashboard into Elefante Home: an
+advanced maintenance console for the memory engine, not a marketing page or the
+daily agent surface. It preserves the v2.13 governed-memory contract, adds
+strict project isolation and verified Remember/Correct/Recover operations, and
+does not claim representative Task Intelligence lift.
 
-### §2.2 Included in v2.13.0
+### §2.2 Included in v2.14.0
 
 | Surface | Customer contract |
 |---|---|
-| Recall | Default-on read-only `elefante-Recall`; 17 customer tools + 2 prompts; one bounded call per contextual question; explicit abstention |
-| Governed memory | Retention, injection policy, exact scope, user locks, current-source validation, conservative conflict detection, and dry-run-first reversible `Memory(resolve)` |
+| Recall | Default-on read-only `elefante-Recall`; 18 customer tools + 2 prompts; one bounded call per contextual question; explicit abstention |
+| Project isolation | Private Project Registry with stable IDs, deterministic deepest-root resolution, fail-closed strict mode, no shared scope, and no cross-project delivery |
+| Remember and Correct | Search-before-write Remember plus verified Edit, Replace, Resolve, Archive, Restore, and backup-bound permanent deletion with exact plans, authoritative readback, scoped Recall proof, and compensation |
+| Recover | Named health, backup, restore, and privacy-safe support-report actions through `elefante-Recover`; Repair, Update, rollback, and uninstall remain matching-package operations |
+| Elefante Home | Six-workspace light-default maintenance console for Home, Recall, Memory Intelligence, Connections, Projects, and Recover; redacted snapshots plus named short-lived local controls, never a generic store/query/path/shell proxy |
+| Installation lifecycle | Codex is the required certified lane; optional detected hosts are non-blocking compatibility previews; guided project setup, disposable Recall acceptance, verified backup, data-preserving uninstall, and stable-project reinstall are package-gated |
+| Governed memory | Retention, injection policy, exact scope, user locks, current-source validation, conservative conflict detection, and dry-run-first reversible resolution |
 | Local media | Bounded content-addressed image/audio/video attachments with integrity metadata and no OCR, transcription, model call, or network upload |
 | Proactive ingress | Typed file, terminal-error, and conversation envelopes through loopback `/events/surface`; literal-trigger retrieval is read-only and the event body is not persisted |
-| Dashboard | Retrieval Explanation using only snapshot evidence plus an opt-in Session Intelligence Signal Card surface |
 | Session Intelligence | Consent-gated metadata-only ledger, provider-actual versus estimated provenance, dated rate cards, outcome records, Signal Cards, aggregate training hypotheses, export, retention, and deletion |
 | Distiller and Team Sync | Foreground opt-in Distiller watch mode and signed exact-scope local Team Sync bundles; no background daemon or cloud transport claim |
 | Host coverage | Ownership-safe Continue and Zed adapters join the compatible tier; vendor certification remains separate |
-| Distribution | Exact source provenance in archives and installed state; checksummed ZIPs; credential-gated notarized DMG and Authenticode EXE publication paths |
+| Distribution | Exact source provenance in archives and installed state; checksummed ZIPs; signed native assets publish only when credential and trust gates pass |
 
 Task Intelligence remains developer-only, default-off, and excluded from the
-17-tool customer profile because representative multi-task lift is not proven.
+18-tool customer profile because representative multi-task lift is not proven.
 
 ### §2.3 Current release state
 
 | Work | Current proof |
 |---|---|
-| Source integration | Feature commit `aec2d33` is integrated with current public `main`; duplicate public/development issue IDs were reconciled without rewriting published BUG-044/045 history |
-| Local candidate proof | 690 non-slow tests passed with 9 skips and 1 intentional deselection before final documentation integration; dashboard build and the 32-task/9-canary diagnostic benchmark passed while `promotion_ready=false` |
-| Publication | **IN PROGRESS under explicit owner authorization.** Exact-head CI, PR merge, tag workflow, asset download, and checksum verification remain the release gates |
-| Installed runtime | Separate operator state. Publishing v2.13.0 does not replace the user's current installed runtime or mutate durable data |
-| Website | Separate product surface. No website deployment is authorized by this core release request |
+| Source integration | PR #30 carries the complete local product loop and dashboard curation. Exact-head CI at `1c86bcd18edbaafd9b4ede98997b3a713be97b4c` passed Python, dashboard, dependency, all-platform package, and clean macOS install/uninstall/reinstall lanes before the v2.14.0 version/documentation commit |
+| Local candidate proof | The complete source suite passed 1,005 tests with 9 skips; adjacent package regressions passed 158 tests; the exact clean macOS candidate installed locally and reports `customer_ready=true`, 18 tools, governed Recall ready, and the expected blocked probe without project context |
+| Publication | **EVIDENCE BLOCKED.** Owner authorization covers publication, but the approved product PRD §11 still requires final trusted-package A–F execution, seven native/accessibility evidence files, and three unfamiliar-user first-use receipts, or an equally strict explicit manual approval. A green tag workflow alone is not product-release approval |
+| Installed runtime | The exact clean candidate at `1c86bcd18edbaafd9b4ede98997b3a713be97b4c` is installed with verified safety backup and rollback; final v2.14.0 exact-commit replacement remains pending |
+| Website | Production remains v2.13.0 at `8bad7469bcb94c0ff8c40c51400d9b300e987151`; synchronization must follow an accepted core publication and pass maintained release/production plus rendered-state verification |
 
 ### §2.4 Approval gates
 
-The owner explicitly authorized commit, push, PR completion, merge, tag, and
-GitHub release publication for v2.13.0. The following remain outside that
-authority:
-
-1. Replace or reconfigure the installed customer runtime.
-2. Apply another migration to durable user data.
-3. Deploy or rewrite the website.
-4. Spend money, rotate credentials, or contact third parties.
+The owner explicitly authorized the v2.14.0 commits, pushes, PR completion,
+merge, GitHub release, matching local-runtime replacement, and website
+synchronization. That authority does not fabricate or waive the product
+evidence gate. Durable-data migration, spending, credential rotation, and
+third-party contact remain outside scope.
 
 ### §2.5 Scope guard
 
@@ -154,12 +157,12 @@ Rejected alternatives remain closed without new evidence:
 ### §2.6 Resume verdict
 
 - **RESUME_SAFE:** YES — active state is here; defects/capability gaps are in [`workspace/ISSUES.md`](../workspace/ISSUES.md); integration truth is in [`agents/manifests/ide-integration.yaml`](../agents/manifests/ide-integration.yaml).
-- **RELEASE_TARGET:** v2.13.0, with the customer contract listed in §2.2.
-- **PUBLISHED_PRODUCT:** v2.13.0, published from annotated tag `v2.13.0` at merge commit `86efc5c6c78fc5269c1bcb96f03beeb565a778f3`.
-- **PUBLICATION_STATUS:** PUBLISHED AND INDEPENDENTLY VERIFIED — PR #25 merged; protected release run `33191196529` passed; the macOS, Windows, and Linux customer ZIPs match the published `SHA256SUMS` and each archive reports the exact release commit, clean source, version 2.13.0, and channel `release`.
-- **LIVE_RUNTIME:** Installation or upgrade of a user's local runtime remains a separate operator action; repository publication does not mutate it.
+- **RELEASE_TARGET:** v2.14.0, with the customer contract listed in §2.2.
+- **PUBLISHED_PRODUCT:** v2.13.0 remains public until the v2.14.0 product gate and protected publication complete.
+- **PUBLICATION_STATUS:** EVIDENCE BLOCKED at the explicit §11 customer-product gate; source and package automation are necessary but insufficient.
+- **LIVE_RUNTIME:** Exact clean candidate `1c86bcd18edbaafd9b4ede98997b3a713be97b4c` is installed with verified rollback; final versioned replacement remains pending.
 - **TASK_INTELLIGENCE:** representative multi-task lift and cross-class generalization are NOT PROVEN; the evaluation surface remains developer-only and default-off.
-- **PUBLICATION_AUTHORITY:** owner authorization covers this core release only. Website deployment and installed-runtime replacement remain separate operations.
+- **PUBLICATION_AUTHORITY:** owner authorization covers core publication, matching local installation, and website synchronization; missing product evidence remains missing until supplied or explicitly resolved at equal strictness.
 
 ---
 
@@ -722,12 +725,12 @@ This section is the chronological record of curation events, decisions, and abso
 
 | Metric | Current value | Source | Status |
 |--------|---------------|--------|--------|
-| Release target | **v2.13.0**, published 2026-08-28 from merge `86efc5c6c78fc5269c1bcb96f03beeb565a778f3` | `CHANGELOG.md`, §2.2, PR #25, annotated tag `v2.13.0`, protected release run `33191196529`, and published `SHA256SUMS` | Published and independently verified |
+| Release target | **v2.14.0** local memory control loop; v2.13.0 remains the public release | `CHANGELOG.md`, §2.2, PR #30, and the Section 11 product gate | Candidate; publication evidence blocked |
 | BUG/GAP count tracked | **68 distinct BUG records through BUG-070 + 9 GAPs** | `workspace/ISSUES.md` | Tracked; uniqueness and declared counts are source-guarded |
 | BUG recurrence rate (pre-distillation) | known per-row in `ISSUES.md` | `workspace/ISSUES.md` Recurrence column | Tracked |
 | BUG recurrence rate after current guards | `UNKNOWN` — needs sustained traffic across sessions | future `ISSUES.md` recurrence updates | Not measured |
 | Documentation guard | 49 tests pass | `tests/test_developer_routing.py` | Verified 2026-08-30; included in the 239-test focused four-action product suite |
-| Full repository regression suite | 978 passed, 9 skipped | Exact unreleased four-action tree run on 2026-08-30 | Verified locally; published v2.13.0 release evidence remains recorded separately above |
+| Full repository regression suite | 1,005 passed, 9 skipped | Exact pre-version PR #30 tree run on 2026-09-01 | Verified locally; the v2.14.0 exact-head CI rerun remains mandatory |
 | Task Intelligence evaluation corpus | 9 reviewed black-box canaries; 23 historical tasks ineligible; tasks 031 and 032 are consumed sealed-memory diagnostics | `workspace/proposals/retrieval-effectiveness.md` | Infrastructure verified; promotion blocked |
 | Task Intelligence outcome lift | Task 032 stopped at treatment 0/3 and control 0/2; no valid representative multi-task lift exists | `workspace/proposals/retrieval-effectiveness.md` | Not demonstrated; promotion blocked |
 | Token cost per `elefante-Memory(action="search")` | `TOKEN_STATS` is available per response; aggregate product effect is not measured | `src/mcp/server.py` | Partial |

@@ -1,7 +1,7 @@
 ---
 PROTOCOL: integration-inspector
 INVOKE: elefante-integration-inspector
-PROTOCOL_VERSION: 2.13.0
+PROTOCOL_VERSION: 2.14.0
 STATUS: MANUAL DEVELOPER PROTOCOL. Automated vendor-document drift checks are Upcoming.
 LOAD_WHEN: A developer explicitly audits `agents/manifests/ide-integration.yaml`, an adapter fails against a host contract, or a new host is proposed.
 DIAGNOSTIC_QUESTION: "Is the integration matrix still true against each vendor's live docs, and if not, what is the smallest maintained correction?"

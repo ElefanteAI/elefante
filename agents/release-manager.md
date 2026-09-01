@@ -1,7 +1,7 @@
 ---
 PROTOCOL: release-manager
 INVOKE: elefante-release-manager
-PROTOCOL_VERSION: 2.13.0
+PROTOCOL_VERSION: 2.14.0
 LOAD_WHEN: Version bump request, CHANGELOG entry needed, "ready to release", "tag X.Y.Z", "push to GitHub Releases".
 DIAGNOSTIC_QUESTION: "Is this an Add / Fix / Change, what semver bump does that imply, and is the CHANGELOG entry written before the bump?"
 AUTHORITY: This file owns the release pipeline. CONTRIBUTING.md release section forwards here.

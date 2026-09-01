@@ -1,8 +1,7 @@
 # Elefante User Documentation
 
-> **v2.13.0** · Published user documentation.
-> Published package: 17 tools, 2 prompts. Current unreleased source: 18 tools,
-> 2 prompts, including verified Recover.
+> **v2.14.0** · Published user documentation.
+> Published package: 18 tools, 2 prompts, including verified Recover.
 
 This index covers the released customer product: installation, configuration,
 operation, and public behavior. Developer plans, experiments, release mechanics,

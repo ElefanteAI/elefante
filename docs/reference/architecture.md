@@ -1,6 +1,6 @@
 # Elefante Architecture
 
-> **Release:** v2.13.0 · **Status:** released product contract
+> **Release:** v2.14.0 · **Status:** released product contract
 
 Elefante is a local persistent-memory service for AI agents. It stores semantic
 memory and explicit relationships, exposes them through MCP, and keeps the
@@ -12,7 +12,7 @@ released customer runtime separate from the developer repository.
 MCP-capable host
   -> native loopback HTTP or storage-free stdio bridge
   -> one user-level daemon at 127.0.0.1:8765
-  -> private Project Registry (local unreleased strict-isolation boundary)
+  -> private Project Registry (strict project-isolation boundary)
   -> MemoryOrchestrator
        -> SQLite vector store (default)
        -> Kuzu graph store
@@ -20,22 +20,21 @@ MCP-capable host
 ```
 
 - The customer installer places one stable account-level runtime. In the current
-  unreleased first-release contract, Codex is the required certified lane;
+  product contract, Codex is the required certified lane;
   explicitly selected additional hosts are non-blocking compatibility previews.
 - The daemon is loopback-only. Remote binding is rejected by default.
 - The stdio bridge forwards MCP JSON-RPC and does not open databases.
-- Current unreleased source hardening lets a long-lived bridge survive daemon
+- A long-lived bridge survives daemon
   replacement: only an HTTP 404 for its prior MCP session triggers one fresh
   initialization, one initialized-notification replay, and one retry of the
-  interrupted request. Other errors are returned unchanged. Published v2.13.0
-  still requires the host to reconnect after daemon replacement.
+  interrupted request. Other errors are returned unchanged.
 - Direct `python -m src.mcp.server` remains a source/developer compatibility
   path, not the customer-global topology.
 - Legacy ChromaDB stores are supported only when explicitly configured; normal
   fresh installations use SQLite.
 
-Current unreleased source resolves the host working directory through one
-private versioned Project Registry before a strict-mode Remember, Search, or
+The runtime resolves the host working directory through one private versioned
+Project Registry before a strict-mode Remember, Search, or
 Recall opens the stores. The unique deepest active registered root wins. A
 separate mode-0600 intent marker makes a missing, corrupt, conflicting, or
 downgraded registry fail closed instead of reverting to global compatibility.
@@ -63,7 +62,7 @@ memories and do not compete in similarity ranking. Active directives are
 attached to normal product-operation and error responses; management paths do
 not recursively inject them.
 
-### Project Registry (local unreleased source)
+### Project Registry
 
 The registry stores stable opaque project IDs, customer-visible names, canonical
 roots, and active state. New strict-mode memories carry the resolved project ID,
@@ -87,7 +86,7 @@ Writes use transaction-scoped ownership. `elefante-System(action="enable")`
 sets the logical mode and preloads the runtime; it is not a session-wide
 exclusive database-lock contract.
 
-## Correction path (local unreleased source)
+## Correction path
 
 `elefante-Memory(action="correct")` is the customer repair boundary. Edit,
 Replace, Archive, and Restore share a verified-operation contract; Resolve keeps
@@ -178,7 +177,7 @@ See [`token-intelligence.md`](token-intelligence.md) and
 
 - Dashboard inspection APIs read a redacted snapshot rather than opening live
   stores, and browser Reload cannot regenerate it.
-- Local unreleased Home controls expose only named Verified Correct, Verified
+- Local Home controls expose only named Verified Correct, Verified
   Resolve, and Project Registry operations through a short-lived origin-bound
   capability. Correction plan tickets contain only target/action/hashes and are
   one-use; proposed content stays in the dialog and is resent only for apply.
@@ -196,7 +195,7 @@ See [`token-intelligence.md`](token-intelligence.md) and
 - Migration of an existing legacy store is explicit, stopped-runtime,
   backup-gated support work.
 
-## Optional v2.13 local surfaces
+## Optional local surfaces
 
 - **Conflict repair:** a deterministic detector classifies only explicit
   same-proposition polarity or value contradictions. Ambiguous language
@@ -228,7 +227,7 @@ See [`token-intelligence.md`](token-intelligence.md) and
 The default-off Task Intelligence tool, causal evaluation ledger, benchmark,
 and automatic tool-response context pilot are developer surfaces. They have not
 established representative multi-task outcome lift and are not part of the
-17-tool customer profile. Automatic age-based forgetting, a background
+18-tool customer profile. Automatic age-based forgetting, a background
 Distiller service, cloud Team Sync transport, and vendor certification of host
 adapters are also not shipped claims.
 

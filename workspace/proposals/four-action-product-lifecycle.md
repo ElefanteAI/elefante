@@ -1397,11 +1397,10 @@ Diagnose -> inspect -> correct -> verify -> recover
 ```
 
 Verified Resolve, project isolation, complete Correct, and Recover exist in
-local source. The preservation-first six-workspace prototype now exists there
-as well. Isolated browser proof covers the light default, retained dark theme,
-all six workspaces, Library/Review, Decision Graph, and fail-closed read-only
-states against the deterministic showcase. The installed customer dashboard
-remains unchanged.
+the exact clean local candidate. Its installed dashboard confirms the light
+default, retained dark theme, all six workspaces, Library/Review, Decision
+Graph, and fail-closed read-only states. The published customer release remains
+unchanged until the product-release gate passes.
 
 The single next product move is **unfamiliar-operator validation of the source
 prototype**. Run the Section 9 golden path with three unfamiliar technical

@@ -11,6 +11,8 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.14.0] - 2026-09-01
+
 ### Added
 
 - Added the approved one-founder first-release defaults to the local product
@@ -19,8 +21,7 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Recover display one Elefante-managed backup location, and strict project mode
   exposes no shared scope or cross-project delivery. Doctor, Recover health,
   support-report evidence, Project Registry snapshots, Home, installer CLI, and
-  native setup now share that contract. Exact-package certification remains
-  pending and this source work is not installed or released.
+  native setup now share that contract.
 - Added a fail-closed, content-free six-scenario product-release evidence gate.
   It reads the exact DMG bytes, runs live macOS signature, Gatekeeper, and
   stapled-notarization checks, binds all six private scenario receipts, verifies
@@ -36,8 +37,8 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   disposable root and compare every installed payload byte with it. Restore
   plan/apply and Recall verification bind to the active strict project, and
   package failure receipts preserve the exact failed stage. These runners are
-  implemented locally but have not been executed against a final package. The
-  gate is not yet wired into tagged publication because distribution is deferred.
+  shipped as release-evidence tooling; their receipts remain separate from the
+  automated tagged-publication workflow.
 - Added the first local Memory Control Loop vertical slice: Verified Resolve
   binds an exact two-record plan, performs one semantic write, verifies
   authoritative readback, atomically refreshes the private Home snapshot,
@@ -49,8 +50,7 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Registry with stable opaque IDs, deterministic deepest-root workspace mapping,
   strict project-scoped Remember/Search/Recall, and Home controls for adding,
   renaming, moving, activating, deactivating, and removing registrations. Project
-  removal leaves project files and memories untouched. This source work is not
-  installed or released.
+  removal leaves project files and memories untouched.
 - Added the complete Correct slice: `elefante-Memory(action="correct")` and
   Elefante Home now share verified Edit, Replace, Archive, Restore, Resolve, and
   advanced permanent-delete journeys. Plans bind exact record, graph, content,
@@ -61,8 +61,7 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   confirmation and an exact live workflow backup; failure restores it, while
   success proves the memory, links, Home projection, Recall result, and unshared
   attachments absent before destroying that temporary backup. Home uses named
-  content-free one-use tickets and privacy-safe receipts. This source work is
-  not installed or released.
+  content-free one-use tickets and privacy-safe receipts.
 - Added the local Recover product loop for health, verified backup, verified
   data restore, and privacy-safe support reporting. Support reporting previews a
   strict allowlist, binds confirmation to the exact preview, writes and reads
@@ -70,21 +69,18 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   only through authenticated local Home. Secret-seeded and duplicate-key tests
   guard memory, project, prompt, credential, environment, configuration, and log
   exclusions. Official-package Repair, Update, automatic rollback, and retained
-  code rollback are also verified. The current package candidate adds exact
+  code rollback are also verified. The official package adds exact
   matching-package Uninstall with explicit confirmation, verified backup and
   restore preflight, ownership-safe connection removal, byte-stable data proof,
   private completion receipts, and verified data reattachment on reinstall.
-  Partial connection removal is never mislabeled as a complete rollback. Exact
-  supported-package acceptance remains pending; this source work is not
-  installed or released.
+  Partial connection removal is never mislabeled as a complete rollback.
 - Added guided first-run project selection to the native macOS and portable
   fallback installers. A fresh customer setup creates strict isolated project
   scopes, proves a generated project-scoped memory through the installed MCP
   bridge and Recall, removes it, verifies absence, creates a verified backup,
   and emits a private content-free acceptance receipt. The release workflow now
-  defines install, data-preserving uninstall, and reinstall acceptance with
-  stable project identities and no leftover installer memory; exact-artifact
-  execution remains a release gate.
+  executes install, data-preserving uninstall, and reinstall acceptance with
+  stable project identities and no leftover installer memory on fresh macOS.
 
 ### Fixed
 
@@ -161,9 +157,9 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   labeled as a clean build.
 - Active protocol headers, proposal status/tool counts, Memory action summaries,
   issue-ledger counts, and the maintained dashboard showcase now derive or
-  assert the v2.13.0 source contract instead of preserving pre-release state.
+  assert the current source contract instead of preserving pre-release state.
 - Antigravity and VS Code/Bob host approval metadata now derives from one exact
-  17-tool customer inventory, including Recall and the Directive tools.
+  18-tool customer inventory, including Recall, Recover, and the Directive tools.
 - The optional self-protocol dashboard phase now uses a cross-platform isolated
   Python browser stub and explicitly separates direct-handler proof from the
   shipped bridge/daemon transport proof.

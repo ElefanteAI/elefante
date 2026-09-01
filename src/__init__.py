@@ -5,7 +5,7 @@ A dual-database memory system combining embedded semantic search
 with structured knowledge graphs (Kuzu) for comprehensive AI memory.
 """
 
-__version__ = "2.13.0"
+__version__ = "2.14.0"
 __author__ = "Elefante Contributors"
 
 # Keep package import dependency-free. Installer preflight imports small,

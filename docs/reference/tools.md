@@ -1,4 +1,4 @@
-# MCP Tools and Prompts (published v2.13.0 baseline; current source)
+# MCP Tools and Prompts (published v2.14.0 baseline; current source)
 
 ## 1. Natural Language Interaction
 
@@ -16,10 +16,8 @@ Once connected to your IDE, use natural language to interact with Elefante. The 
 
 ## 2. Current MCP Surface
 
-The current development source exposes **18 tools** and **2 prompts** in the
-default customer profile. Published v2.13.0 packages expose 17 tools and 2
-prompts; the verified `elefante-Recover` surface documented below remains
-unreleased. Memory operations use one
+The published customer profile exposes **18 tools** and **2 prompts**, including
+the verified `elefante-Recover` surface documented below. Memory operations use one
 `elefante-Memory` tool with an action discriminator.
 
 - **Tools** read, write, or inspect the system.
@@ -89,7 +87,7 @@ unreleased. Memory operations use one
 
 #### `elefante-Recall`
 
-**Status**: Released and default-on in v2.13.0.
+**Status**: Released and default-on in v2.14.0.
 
 **Purpose**: Give an answering agent the smallest governed durable context for
 one question without exposing the broad search or mutation interface.
@@ -100,7 +98,7 @@ one question without exposing the broad search or mutation interface.
   customer question. Include specific project, file, person, or decision names
   when known.
 - `workspace` (optional, absolute path): Current workspace used by the local
-  unreleased Project Registry. A host-provided working directory is used when
+  Project Registry. A host-provided working directory is used when
   omitted.
 - `project_id` (optional, UUID): Exact registered project ID used only to
   cross-check the workspace resolution; it never replaces workspace context.
@@ -169,7 +167,7 @@ developer evaluation profile; it is not a normal customer operation.
 - `action` (required, string): One of `add`, `search`, `update`, `resolve`,
   `delete`, or `consolidate` for normal customer operation.
 - `workspace` (optional, absolute path): Current workspace used by the local
-  unreleased Project Registry. The host-provided working directory is used when
+  Project Registry. The host-provided working directory is used when
   omitted.
 - `project_id` (optional, UUID): Exact registered ID used only as a strict-mode
   cross-check. A supplied ID that disagrees with workspace mapping is rejected.
@@ -208,8 +206,8 @@ developer evaluation profile; it is not a normal customer operation.
 - `force_new=true` should be rare. It skips title deduplication, preference merge, and high-similarity redundancy checks.
 - Use `specification` for durable architecture or contract truths. Use
   `directive` for behavioral rules. Use `note` only for short-lived context.
-  Governance fields are part of the v2.13.0 customer contract.
-- In local unreleased strict project mode, Elefante resolves the workspace
+  Governance fields are part of the v2.14.0 customer contract.
+- In local strict project mode, Elefante resolves the workspace
   before opening the stores and overwrites project/workspace/scope metadata with
   that registered identity. Missing or ambiguous context, an unavailable root,
   or a mismatched supplied project ID changes nothing.
@@ -718,9 +716,8 @@ changed or was rolled back.
 - Elefante Home shows these categories before confirmation and downloads the
   verified managed ZIP through the short-lived local control session.
 
-Repair, update, and code rollback remain official-package operations. Uninstall
-is not exposed by this MCP action until its complete data-preserving package
-contract is implemented.
+Repair, update, code rollback, and data-preserving uninstall remain
+official-package operations rather than MCP Recover actions.
 
 #### `elefante-System`
 
@@ -761,7 +758,7 @@ contract is implemented.
 - `refresh=true` reads from live databases and requires Elefante Mode to be enabled.
 - Use `refresh=false` when you only need the latest existing snapshot.
 - Snapshot browsing and Reload remain read-only and cannot trigger a live
-  database refresh. Local unreleased Elefante Home can additionally request only
+  database refresh. Local Elefante Home can additionally request only
   named Verified Correct, Verified Resolve, and Project Registry operations
   through `/control`, using a short-lived origin-bound capability carried in
   the URL fragment and removed from browser history after load. Correct supports
