@@ -8,16 +8,27 @@ with structured knowledge graphs (Kuzu) for comprehensive AI memory.
 __version__ = "2.13.0"
 __author__ = "Elefante Contributors"
 
-# LAW #1 ENFORCEMENT: Do NOT import orchestrator at package level
-# This causes Kuzu initialization and database locking
-# Use lazy imports instead
-from src.models.memory import Memory, MemoryType
-from src.models.entity import Entity, Relationship
+# Keep package import dependency-free. Installer preflight imports small,
+# standard-library-only modules before the product environment exists.
+# Public conveniences remain available through lazy attribute loading.
+
+
+def __getattr__(name: str):
+    if name in {"Memory", "MemoryType"}:
+        from src.models.memory import Memory, MemoryType
+
+        return {"Memory": Memory, "MemoryType": MemoryType}[name]
+    if name in {"Entity", "Relationship"}:
+        from src.models.entity import Entity, Relationship
+
+        return {"Entity": Entity, "Relationship": Relationship}[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def get_orchestrator():
     """Lazy import to prevent database lock on package load"""
-    from src.core.orchestrator import MemoryOrchestrator, get_orchestrator as _get
+    from src.core.orchestrator import get_orchestrator as _get
+
     return _get()
 
 

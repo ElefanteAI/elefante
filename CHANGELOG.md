@@ -88,6 +88,9 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Clean customer installation can validate project setup before product
+  dependencies are installed. Package initializers now keep runtime-heavy
+  models and services lazy while preserving their public convenience imports.
 - Home refreshes its snapshot and clears stale memory selection immediately
   after a verified restore. Remember no longer pauses unrelated same-project
   prose on similarity alone: a non-duplicate, non-conflict candidate must share

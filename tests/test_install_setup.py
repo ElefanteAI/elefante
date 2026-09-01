@@ -100,6 +100,29 @@ def test_installer_entrypoint_starts_without_product_dependencies():
     assert "ModuleNotFoundError" not in result.stderr
 
 
+def test_project_registry_preflight_imports_without_product_dependencies():
+    """Clean-install project planning must run before Pydantic is installed."""
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-S",
+            "-c",
+            (
+                "from src.core.project_registry import "
+                "ProjectRegistry, ProjectRegistryError; "
+                "assert ProjectRegistry and ProjectRegistryError"
+            ),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "ModuleNotFoundError" not in result.stderr
+
+
 def test_client_health_checks_customer_baseline_without_developer_sdd(monkeypatch):
     from scripts.verify import verify_health
     from src.core.directive_store import CLIENT_SYSTEM_DIRECTIVE_DEFINITIONS
