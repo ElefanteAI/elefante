@@ -165,6 +165,100 @@ class TestMemoryPersistence:
         assert incoming is not None
         assert incoming.metadata.status == MemoryStatus.CONTRADICTORY.value
         assert incoming.metadata.conflict_ids == [existing.id]
+
+    @pytest.mark.asyncio
+    async def test_preference_reassertion_does_not_merge_into_another_memory_type(
+        self, orchestrator, monkeypatch
+    ):
+        """A close decision is related evidence, not an existing preference."""
+        class FixedEmbedding:
+            async def generate_embedding(self, _text):
+                return [1.0, 0.0, 0.0]
+
+        embedding = FixedEmbedding()
+        orchestrator.embedding_service = embedding
+        orchestrator.vector_store._embedding_service = embedding
+
+        existing = await orchestrator.add_memory(
+            content="Project Alpha uses local memory routing for agent decisions.",
+            memory_type="decision",
+            metadata={"title": "Existing routing decision"},
+        )
+        assert existing is not None
+
+        async def no_title_match(_title):
+            return None
+
+        async def close_non_preference(**_kwargs):
+            return [
+                SearchResult(
+                    memory=existing,
+                    score=0.99,
+                    vector_score=0.99,
+                    source="vector",
+                )
+            ]
+
+        monkeypatch.setattr(orchestrator.vector_store, "find_by_title", no_title_match)
+        monkeypatch.setattr(orchestrator.vector_store, "search", close_non_preference)
+
+        incoming = await orchestrator.add_memory(
+            content="Project Alpha prefers local memory routing for dashboard advice.",
+            memory_type="preference",
+            metadata={"title": "Incoming routing preference"},
+        )
+
+        assert incoming is not None
+        assert incoming.id != existing.id
+        assert str(incoming.metadata.memory_type) == "preference"
+
+    @pytest.mark.asyncio
+    async def test_preference_reassertion_still_merges_an_existing_preference(
+        self, orchestrator, monkeypatch
+    ):
+        """The cross-type guard must preserve genuine preference reinforcement."""
+        class FixedEmbedding:
+            async def generate_embedding(self, _text):
+                return [1.0, 0.0, 0.0]
+
+        embedding = FixedEmbedding()
+        orchestrator.embedding_service = embedding
+        orchestrator.vector_store._embedding_service = embedding
+
+        existing = await orchestrator.add_memory(
+            content="Project Alpha prefers local memory routing for agent advice.",
+            memory_type="preference",
+            metadata={"title": "Existing routing preference"},
+        )
+        assert existing is not None
+
+        async def no_title_match(_title):
+            return None
+
+        async def close_preference(**_kwargs):
+            return [
+                SearchResult(
+                    memory=existing,
+                    score=0.99,
+                    vector_score=0.99,
+                    source="vector",
+                )
+            ]
+
+        monkeypatch.setattr(orchestrator.vector_store, "find_by_title", no_title_match)
+        monkeypatch.setattr(orchestrator.vector_store, "search", close_preference)
+
+        incoming = await orchestrator.add_memory(
+            content="Project Alpha prefers local memory routing for dashboard advice.",
+            memory_type="preference",
+            metadata={"title": "Reasserted routing preference"},
+        )
+
+        assert incoming is not None
+        assert incoming.id == existing.id
+        persisted = await orchestrator.vector_store.get_memory(existing.id)
+        assert persisted is not None
+        assert "Reasserted" in persisted.content
     
     @pytest.mark.asyncio
     async def test_add_memory_persists_to_graph_store(self, orchestrator):
@@ -869,7 +963,7 @@ finally:
         repo_root = Path(__file__).resolve().parents[1]
         active_docs = [
             repo_root / "docs" / "how-to" / "kuzu-troubleshooting.md",
-            repo_root / "docs" / "how-to" / "view-dashboard.md",
+            repo_root / "docs" / "how-to" / "view-dashboard.html",
             repo_root / "docs" / "how-to" / "run-mcp-server.md",
         ]
 

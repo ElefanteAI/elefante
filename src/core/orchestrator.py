@@ -409,21 +409,24 @@ class MemoryOrchestrator:
             )
 
             if preference_candidates:
-                # Filter down to preference-like candidates after retrieval to avoid
-                # brittle Chroma where-clauses and to include self.constraints too.
+                # Filter down to actual preferences after retrieval to avoid brittle
+                # Chroma where-clauses. A close decision, constraint, or fact is
+                # related evidence; it must never be rewritten as a preference
+                # reassertion.
                 pref_like = [
                     r
                     for r in preference_candidates
                     if str(r.memory.metadata.memory_type).lower() == MemoryType.PREFERENCE.value
                 ]
 
-                if not pref_like:
-                    pref_like = preference_candidates
-
-                best_pref = pref_like[0]
+                best_pref = pref_like[0] if pref_like else None
 
                 # Merge only when we're confident it's the same preference.
-                if best_pref.score >= 0.40 and _has_meaningful_overlap(content, best_pref.memory.content):
+                if (
+                    best_pref is not None
+                    and best_pref.score >= 0.40
+                    and _has_meaningful_overlap(content, best_pref.memory.content)
+                ):
                     existing = best_pref.memory
                     now = datetime.utcnow()
 
