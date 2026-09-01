@@ -128,6 +128,9 @@ async def test_acceptance_recalls_exact_record_then_removes_private_content() ->
         ]
         assert len(acceptance) == 1
         assert acceptance[0].metadata.scope == PROJECT_SCOPE
+        assert acceptance[0].metadata.recall_cues == [question]
+        assert acceptance[0].metadata.trigger == [question]
+        assert acceptance[0].metadata.source_reliability == 1.0
         return [str(acceptance[0].id)]
 
     result = await InstallAcceptanceService(

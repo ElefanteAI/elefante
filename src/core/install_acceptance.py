@@ -216,6 +216,7 @@ class InstallAcceptanceService:
                         status=MemoryStatus.VERIFIED,
                         source=SourceType.SYSTEM_INFERRED,
                         source_detail="official_package_acceptance",
+                        source_reliability=1.0,
                         confidence=1.0,
                         verified=True,
                         tags=["installation-acceptance"],
@@ -225,6 +226,7 @@ class InstallAcceptanceService:
                         retention_policy=RetentionPolicy.EPHEMERAL,
                         injection_policy=InjectionPolicy.TRIGGERED,
                         trigger=[question],
+                        recall_cues=[question],
                         summary="Disposable Elefante installation acceptance record.",
                         custom_metadata={
                             "title": "Disposable installation acceptance",

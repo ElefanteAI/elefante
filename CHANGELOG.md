@@ -91,6 +91,10 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Clean customer installation can validate project setup before product
   dependencies are installed. Package initializers now keep runtime-heavy
   models and services lazy while preserving their public convenience imports.
+  Its disposable first-run proof now binds the exact generated question as a
+  project-scoped Recall cue and literal delivery trigger, so the real governed
+  Recall lane can retrieve and then verify deletion without relaxing retrieval
+  thresholds.
 - Home refreshes its snapshot and clears stale memory selection immediately
   after a verified restore. Remember no longer pauses unrelated same-project
   prose on similarity alone: a non-duplicate, non-conflict candidate must share
