@@ -13,6 +13,13 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Dashboard controls now share explicit expired-session and request-limit
+  recovery, without silently replaying operations. The reconnect action remains
+  visible above an open memory panel. Recall keeps its question and receipt
+  while inspecting records or switching tabs, clears private state on project
+  change or page reload, and discards stale results after new input or data.
+  Recover preserves its actual disconnect error; search evidence reports the
+  storage backend separately from the memory's content source.
 - Snapshot search with zero matches now shows zero memory rows instead of
   falling back to the browse list. Clearing the query restores browsing.
 - Home's recommended direct-signal review now opens Memory Intelligence on the

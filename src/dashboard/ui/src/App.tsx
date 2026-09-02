@@ -29,6 +29,8 @@ function App() {
   const controlConnecting = useDashboardStore((s) => s.controlConnecting);
   const controlEnabled = useDashboardStore((s) => s.controlEnabled);
   const controlAvailability = useDashboardStore((s) => s.controlAvailability);
+  const controlSessionError = useDashboardStore((s) => s.controlSessionError);
+  const activeProjectId = useDashboardStore((s) => s.activeProjectId);
   const snapshotContext = useDashboardStore((s) => s.snapshot?.snapshot_context);
   const initializeControlSession = useDashboardStore((s) => s.initializeControlSession);
   const surfaceLabel = snapshotContext?.mode === 'showcase'
@@ -116,6 +118,15 @@ function App() {
 
       {/* Tab Navigation */}
       <TabNav />
+
+      {controlSessionError && !controlEnabled && (
+        <div role="alert" className="relative z-[60] flex shrink-0 items-center justify-between gap-4 border-b border-amber-300/40 bg-slate-950 px-5 py-3 text-xs text-amber-200">
+          <span>{controlSessionError} No operation is retried automatically.</span>
+          <button type="button" disabled={controlConnecting} onClick={() => void initializeControlSession(activeProjectId ?? undefined)} className="min-h-10 shrink-0 border border-amber-300/50 px-4 disabled:opacity-40">
+            {controlConnecting ? 'Reconnecting…' : 'Reconnect Home'}
+          </button>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="flex-1 overflow-hidden">

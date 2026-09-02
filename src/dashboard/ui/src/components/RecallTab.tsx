@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useMemo } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -69,11 +69,12 @@ export function RecallTab() {
   const isRecallTesting = useDashboardStore((state) => state.isRecallTesting);
   const recallTestError = useDashboardStore((state) => state.recallTestError);
   const clearRecallTestError = useDashboardStore((state) => state.clearRecallTestError);
-  const getMemoryNodes = useDashboardStore((state) => state.getMemoryNodes);
+  const snapshot = useDashboardStore((state) => state.snapshot);
   const setActiveTab = useDashboardStore((state) => state.setActiveTab);
   const setInspectedMemoryId = useDashboardStore((state) => state.setInspectedMemoryId);
-  const [question, setQuestion] = useState('');
-  const [result, setResult] = useState<RecallTestResponse | null>(null);
+  const question = useDashboardStore((state) => state.recallQuestion);
+  const setQuestion = useDashboardStore((state) => state.setRecallQuestion);
+  const result = useDashboardStore((state) => state.recallResult);
 
   const activeProject = useMemo(
     () => (registry?.projects ?? []).find(
@@ -84,16 +85,15 @@ export function RecallTab() {
     [activeProjectId, registry],
   );
   const memoriesById = useMemo(
-    () => new Map(getMemoryNodes().map((memory) => [memory.id, memory])),
-    [getMemoryNodes],
+    () => new Map((snapshot?.nodes ?? []).filter((node) => node.type === 'memory').map((memory) => [memory.id, memory])),
+    [snapshot],
   );
   const selectedIds = result?.selected_memory_ids ?? [];
   const canRun = controlEnabled && Boolean(activeProject) && Boolean(question.trim());
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    const response = await testRecall(question.trim());
-    setResult(response);
+    await testRecall(question.trim());
   };
 
   const inspectMemory = (memoryId: string) => {
@@ -103,7 +103,7 @@ export function RecallTab() {
 
   const copy = result ? statusCopy(result) : null;
 
-  if (!controlEnabled) {
+  if (!controlEnabled && !question && !result) {
     return (
       <div className="h-full overflow-auto px-5 py-5 md:px-8 md:py-7">
         <div className="mx-auto max-w-[920px]">
@@ -180,7 +180,6 @@ export function RecallTab() {
               value={question}
               onChange={(event) => {
                 setQuestion(event.target.value);
-                setResult(null);
                 clearRecallTestError();
               }}
               minLength={1}

@@ -1,7 +1,11 @@
 """Regression checks for the dashboard retrieval-evidence presentation."""
 
 import re
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,11 +16,90 @@ def _read(relative_path: str) -> str:
     return (UI_SRC / relative_path).read_text(encoding="utf-8")
 
 
+def test_real_dashboard_store_preserves_recall_and_reconnects_without_replay() -> None:
+    node = shutil.which("node")
+    if not node or not (UI_SRC.parent / "node_modules/zustand").is_dir():
+        pytest.skip("Requires the dashboard's installed Node dependencies")
+    script = f"const storeUrl = {(UI_SRC / 'store.ts').as_uri()!r};\n" + r'''
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+import assert from 'node:assert/strict';
+const compiled = ts.transpileModule(readFileSync(new URL(storeUrl), 'utf8'), {
+  compilerOptions: {module:ts.ModuleKind.ESNext, target:ts.ScriptTarget.ES2022},
+}).outputText.replace("from 'zustand'", 'from ' + JSON.stringify(import.meta.resolve('zustand')));
+const {useDashboardStore:store} = await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'));
+const project = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const other = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const reply = (body, status = 200) => new Response(JSON.stringify(body), {status});
+const ready = () => store.setState({controlEnabled:true, controlAvailability:'available', controlToken:'test-capability-123', controlBaseUrl:'http://127.0.0.1:18765', activeProjectId:project});
+const result = {success:true, recall_status:'supplied', selected_memory_ids:['memory-a'], selected_count:1, conflict_count:0, memory_content_returned:false, project:{project_id:project,name:'Atlas'}};
+ready();
+store.getState().setRecallQuestion('Which database?');
+globalThis.fetch = async () => reply(result);
+await store.getState().testRecall('Which database?');
+store.getState().setActiveTab('memories');
+store.getState().setActiveTab('recall');
+assert.equal(store.getState().recallQuestion, 'Which database?');
+assert.deepEqual(store.getState().recallResult.selected_memory_ids, ['memory-a']);
+
+let calls = 0;
+globalThis.fetch = async () => { calls++; return reply({error:'Session expired'},401); };
+await store.getState().testRecall('Which database?');
+assert.equal(calls,1); // A failed operation is never replayed.
+assert.equal(store.getState().controlEnabled,false);
+assert.equal(store.getState().controlToken,null);
+assert.equal(store.getState().controlAvailability,'unavailable');
+assert.match(store.getState().controlSessionError,/expired/);
+assert.equal(store.getState().recallQuestion,'Which database?');
+
+globalThis.fetch = async (url) => {
+  calls++;
+  return reply(url === '/api/control-config'
+    ? {available:true,daemon_port:18765}
+    : {success:true,token:'renewed-capability-123',project_id:project});
+};
+await store.getState().initializeControlSession(project);
+assert.equal(calls,3); // Discovery + grant only, not a repeated Recall/write.
+assert.equal(store.getState().controlEnabled,true);
+assert.equal(store.getState().controlSessionError,null);
+assert.equal(store.getState().recallQuestion,'Which database?');
+
+globalThis.fetch = async () => reply({error:'Session request limit reached'},429);
+await store.getState().requestRecoveryPlan('backup');
+assert.equal(store.getState().controlEnabled,false);
+assert.match(store.getState().controlSessionError,/limit/);
+
+ready();
+let release;
+globalThis.fetch = () => new Promise(resolve => { release=resolve; });
+store.getState().setRecallQuestion('Old question');
+const pending = store.getState().testRecall('Old question');
+store.getState().setRecallQuestion('Different question');
+release(reply(result));
+await pending;
+assert.equal(store.getState().recallResult,null); // No stale answer under new input.
+
+globalThis.fetch = async (url) => reply(url === '/api/control-config'
+  ? {available:true,daemon_port:18765}
+  : {success:true,token:'other-capability-123',project_id:other});
+await store.getState().initializeControlSession(other);
+assert.equal(store.getState().recallQuestion,'');
+assert.equal(store.getState().recallResult,null);
+console.log('PASS: continuity, expiry, request limit, explicit reconnect, no replay, input race, project boundary');
+'''
+    result = subprocess.run(
+        [node, "--input-type=module", "-e", script],
+        cwd=UI_SRC.parent, capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASS: continuity" in result.stdout
+
+
 def test_retrieval_explanation_uses_only_dashboard_search_evidence() -> None:
     explanation = _read("components/RetrievalExplanation.tsx")
 
     assert "result.similarity" in explanation
-    assert "metadata.source" in explanation
+    assert "metadata.storage_backend" in explanation
     assert "metadata.health_status" in explanation
     assert "metadata.health_reason" in explanation
     assert "metadata.connection_count" in explanation
@@ -25,6 +108,31 @@ def test_retrieval_explanation_uses_only_dashboard_search_evidence() -> None:
     assert "The dashboard API does not expose the MCP retriever" in explanation
     assert "result.vector_score" not in explanation
     assert "result.concept_score" not in explanation
+
+
+def test_retrieval_storage_source_never_substitutes_content_provenance() -> None:
+    explanation = _read("components/RetrievalExplanation.tsx")
+
+    assert "metadata.storage_backend ?? memory.properties?.storage_backend" in explanation
+    assert "metadata.source ?? memory.properties?.source" not in explanation
+    assert "'Not reported'" in explanation
+
+
+def test_recovery_disconnect_keeps_error_and_explicit_reconnect_visible() -> None:
+    recover = _read("components/RecoverTab.tsx")
+    app = _read("App.tsx")
+    locked_start = recover.index("  if (!controlEnabled) {")
+    locked_view = recover[locked_start:recover.index("\n  return (", locked_start)]
+
+    assert "recoveryError" in locked_view
+    assert "'alert'" in locked_view
+    assert "Reconnect Home" in locked_view
+    assert "!controlSessionError" in locked_view
+    assert "window.location.reload()" in locked_view
+    assert "No operation is retried automatically" in locked_view
+    assert "No recovery check ran in this environment" not in locked_view
+    assert "applyPlan(" not in locked_view
+    assert 'relative z-[60]' in app  # Reconnect remains above the memory drawer (z-50).
 
 
 def test_search_selection_wires_rank_and_snapshot_relationships_to_detail_panel() -> None:
@@ -314,8 +422,8 @@ def test_projects_and_recover_explain_value_without_dead_controls_or_address_han
     assert "Projects prevent unrelated work from sharing Recall context" in projects
     assert "Overall memory inspection does not require a project" in projects
     assert "Protect Elefante before changing durable state." in recover
-    assert "No recovery evidence yet" in recover
-    assert "Capability is not presented as readiness" in recover
+    assert "Recovery controls are disconnected" in recover
+    assert "No active local session" in recover
     assert "Live control" in recover
     assert "Requires verified plan" in recover
     assert "Advanced: product maintenance" in recover

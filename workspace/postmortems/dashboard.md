@@ -187,6 +187,21 @@ Snapshot search also fell back to the browse list when it found zero matches.
 Select search rows by search mode alone; an empty result must stay empty until
 the query is cleared.
 
+The subsequent live audit found two more evidence-presentation defects. Recover's
+disconnected early return hid the expired-session error and falsely said no
+recovery check had run. Keep the actual error visible there and offer an explicit
+session reconnect, without replaying a mutation or relaxing expiry/confirmation
+gates. Retrieval Explanation read content provenance (`source`) under the
+Storage source label; read only `storage_backend`, with an honest missing-value
+fallback. Shared authenticated requests now invalidate the same session state
+on expiry or request exhaustion, never replaying an operation. Recall keeps
+page-only question/result state across tab inspection, invalidates old results
+on new input or snapshots, and clears it on a project change. A real expired
+archive plan changed no data; the open memory drawer covered the reconnect
+button, so that banner now renders above the drawer and below modal dialogs.
+Regressions cover these paths; browser acceptance exercises real expired
+sessions, changed Recall eligibility, and differing provenance/backend values.
+
 **Guard:** Dashboard, snapshot, Home-control, daemon, and routing regressions;
 the production UI build; and live deterministic-example acceptance across all
 six workspaces, both themes, desktop, and 390×844.

@@ -624,6 +624,10 @@ browser history before the page renders.</p>
 Resolve, and Recover routes. It is not a generic store, file, shell, MCP, or
 query proxy. Mutations retain their preview, explicit confirmation, one-use
 ticket, exact-state checks, postconditions, and rollback gates.</p>
+<p>If the session expires during Recover, its error remains visible with
+<strong>Reconnect Home</strong>. That button requests a new local session; it
+never retries a backup, restore, or report automatically. Inspect a
+new plan and confirm it before trying the operation again.</p>
 <p>If operational control is unavailable, the snapshot can remain inspectable while Home says exactly what is missing: <strong>No operational receipt in this environment</strong>. That is an evidence boundary, not a claim that Elefante itself failed.</p>
 <h2 id="the-dashboard-shell"><a class="heading-anchor" href="#the-dashboard-shell">The dashboard shell</a></h2>
 <h3 id="header"><a class="heading-anchor" href="#header">Header</a></h3>
@@ -839,6 +843,14 @@ question, write a memory, or create Recall history for dashboard convenience.</p
 <p>The receipt may also show conflict count, active project, and verification
 time. A selected ID can open that record in Memory Intelligence. The selected
 memory content remains in the agent delivery path and is not copied into Home.</p>
+<p>The current question and receipt stay available when you inspect a record
+and return. They live only in this page's memory, not saved history. Changing
+the question or loading a newer snapshot clears the receipt; changing project
+or reloading the page clears both.</p>
+<p>If the local session expires or reaches its request limit, use
+<strong>Reconnect Home</strong>. Your current question remains available, but
+Elefante does not rerun a check or repeat a change automatically. For a change,
+inspect a fresh plan and confirm it yourself.</p>
 <p>The current contract does <strong>not</strong> expose per-signal reasons, withheld IDs,
 historical trace, answer quality, or task-outcome evidence. A supplied bundle
 does not prove that an answer was correct; <code>no_match</code> can be a healthy result.</p>
@@ -1050,7 +1062,8 @@ search. It reports:</p>
 <ul>
 <li>lexical match percentage for the typed query;</li>
 <li>rank among the returned snapshot results;</li>
-<li>configured storage source recorded in the snapshot;</li>
+<li>configured storage backend recorded in the snapshot, such as SQLite;
+<strong>Not reported</strong> if absent—not the content's source, such as user input;</li>
 <li>health label and reason;</li>
 <li>explicit inbound/outbound relationships represented in the snapshot.</li>
 </ul>
