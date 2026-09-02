@@ -640,6 +640,71 @@ def test_v2_project_name_only_match_cannot_become_a_direct_answer() -> None:
     assert brief.selected_memory_ids == []
 
 
+def test_v2_identifier_question_does_not_fall_through_to_generic_active_memory() -> None:
+    archived_exact = _result(
+        (
+            "Dashboard acceptance fixture VISIBLE-V2-9202 uses verification "
+            "code COPPER-9203."
+        ),
+        memory_type=MemoryType.DECISION,
+        archived=True,
+        superseded_by_id=uuid4(),
+        score=0.68,
+        vector_score=0.97,
+    )
+    generic_active = _result(
+        (
+            "The canonical mission uses accepted task evidence, verification, "
+            "and code quality to improve intelligence per task."
+        ),
+        memory_type=MemoryType.DIRECTIVE,
+        score=0.60,
+        vector_score=0.86,
+    )
+    request = TaskBriefRequest(
+        task=(
+            "What verification code does dashboard acceptance fixture "
+            "VISIBLE-V2-9202 use?"
+        ),
+        profile=TaskBriefProfile.V2,
+    )
+    compiler = TaskBriefCompiler()
+    ranked = compiler._rank_candidates_v2(request, [archived_exact, generic_active])
+    by_id = {str(item.result.memory.id): item for item in ranked}
+    brief = compiler.compile(request, [archived_exact, generic_active])
+
+    generic = by_id[str(generic_active.memory.id)]
+    assert generic.retrieval_signals["query_identifiers"] >= 1
+    assert generic.retrieval_signals["matched_identifiers"] == 0
+    assert compiler._is_actionable(generic) is False
+    assert brief.abstained is True
+    assert brief.selected_memory_ids == []
+
+
+def test_v2_identifier_question_still_selects_matching_active_memory() -> None:
+    exact = _result(
+        "Dashboard acceptance fixture VISIBLE-V2-9202 uses verification code COPPER-9203.",
+        memory_type=MemoryType.DECISION,
+        score=0.68,
+        vector_score=0.97,
+    )
+    request = TaskBriefRequest(
+        task=(
+            "What verification code does dashboard acceptance fixture "
+            "VISIBLE-V2-9202 use?"
+        ),
+        profile=TaskBriefProfile.V2,
+    )
+    compiler = TaskBriefCompiler()
+    ranked = compiler._rank_candidates_v2(request, [exact])[0]
+    brief = compiler.compile(request, [exact])
+
+    assert ranked.retrieval_signals["matched_identifiers"] >= 1
+    assert compiler._is_actionable(ranked) is True
+    assert brief.selected_memory_ids == [str(exact.memory.id)]
+    assert brief.abstained is False
+
+
 def test_v2_selects_scoped_user_locked_directive_for_decision_paraphrase() -> None:
     mission = _result(
         (

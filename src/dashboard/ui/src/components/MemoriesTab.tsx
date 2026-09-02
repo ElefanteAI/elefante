@@ -44,7 +44,8 @@ export function MemoriesTab() {
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<'browse' | 'search'>('browse');
-  const [workspaceView, setWorkspaceView] = useState<'library' | 'review'>('library');
+  const workspaceView = useDashboardStore((s) => s.memoryWorkspaceView);
+  const setWorkspaceView = useDashboardStore((s) => s.setMemoryWorkspaceView);
   
   const isLoading = useDashboardStore((s) => s.isLoading);
   const inspectedMemoryId = useDashboardStore((s) => s.inspectedMemoryId);
@@ -77,7 +78,7 @@ export function MemoriesTab() {
   }, [query, search]);
 
   // Convert search results to memory-like format for table
-  const searchMemories: MemoryNode[] = mode === 'search' && results.length > 0
+  const searchMemories: MemoryNode[] = mode === 'search'
     ? results.map((r: SearchResult) => ({
         id: r.id,
         name: r.content.slice(0, 50),
@@ -199,6 +200,7 @@ export function MemoriesTab() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-400" size={16} />
             <input
               type="text"
+              aria-label="Search the current memory snapshot"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Snapshot search... (2+ characters)"
@@ -211,10 +213,12 @@ export function MemoriesTab() {
             )}
             {query && (
               <button
+                type="button"
+                aria-label="Clear snapshot search"
                 onClick={() => setQuery('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-700 rounded"
               >
-                <X size={14} className="text-slate-400" />
+                <X size={14} className="text-slate-400" aria-hidden="true" />
               </button>
             )}
           </div>

@@ -175,6 +175,18 @@ inside an actual result receipt. Put review priority in Memory Intelligence,
 stored vitality and explicit trails in Connections, and lifecycle proof in
 Recover. Keep host, port, and launch origin invisible as product concepts.
 
+**Follow-up recurrence:** Live use on 2026-09-02 proved that the dominant
+`Review N direct signals` action changed workspaces but left Memory Intelligence
+on Library; verified Remember refreshed the graph but not the header statistics;
+and connected control, Session Intelligence, Connections, and package
+maintenance still looked more capable than their evidence allowed. Route the
+recommendation to the actual Review subview, refresh all represented snapshot
+statistics after verified Remember, name control connectivity without claiming
+operation completion, and label view-only or installer-owned surfaces directly.
+Snapshot search also fell back to the browse list when it found zero matches.
+Select search rows by search mode alone; an empty result must stay empty until
+the query is cleared.
+
 **Guard:** Dashboard, snapshot, Home-control, daemon, and routing regressions;
 the production UI build; and live deterministic-example acceptance across all
 six workspaces, both themes, desktop, and 390×844.

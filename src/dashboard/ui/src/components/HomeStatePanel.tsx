@@ -89,6 +89,7 @@ export function HomeStatePanel() {
   const registry = useDashboardStore((state) => state.projectRegistry);
   const requestRecoveryPlan = useDashboardStore((state) => state.requestRecoveryPlan);
   const setActiveTab = useDashboardStore((state) => state.setActiveTab);
+  const setMemoryWorkspaceView = useDashboardStore((state) => state.setMemoryWorkspaceView);
   const [health, setHealth] = useState<RecoveryHealth | null>(null);
   const [memoryDialog, setMemoryDialog] = useState<'remember' | null>(null);
   const checkedToken = useRef<string | null>(null);
@@ -133,23 +134,30 @@ export function HomeStatePanel() {
     ? 'Example workspace'
     : 'Local memory snapshot';
   const operationalLabel = controlEnabled
-    ? 'Operational session verified'
+    ? 'Controls connected'
     : controlConnecting
       ? 'Checking operational session'
       : 'No operational receipt in this environment';
   const projectLabel = activeProject?.name || 'Not needed for global inspection';
   const recoveryLabel = health ? humanState(health.state) : 'Not checked';
 
-  let nextAction: { label: string; reason: string; tab: Tab } = {
+  let nextAction: {
+    label: string;
+    reason: string;
+    tab: Tab;
+    memoryView?: 'library' | 'review';
+  } = {
     label: 'Browse Memory Intelligence',
     reason: 'Start with the complete memory inventory and its direct review signals.',
     tab: 'memories',
+    memoryView: 'library',
   };
   if (reviewCount > 0) {
     nextAction = {
       label: `Review ${reviewCount} direct signal${reviewCount === 1 ? '' : 's'}`,
       reason: 'Inspection is warranted; correction is not implied.',
       tab: 'memories',
+      memoryView: 'review',
     };
   } else if (controlEnabled && !projectReady) {
     nextAction = {
@@ -164,6 +172,18 @@ export function HomeStatePanel() {
       tab: 'recall',
     };
   }
+
+  const openMemoryWorkspace = (view: 'library' | 'review') => {
+    setMemoryWorkspaceView(view);
+    setActiveTab('memories');
+  };
+
+  const continueToNext = () => {
+    if (nextAction.memoryView) {
+      setMemoryWorkspaceView(nextAction.memoryView);
+    }
+    setActiveTab(nextAction.tab);
+  };
 
   return (
     <section className="elefante-panel border-t-2 border-t-cyan-400/60 px-5 py-5 md:px-7 md:py-6" aria-labelledby="elefante-purpose-title">
@@ -188,7 +208,7 @@ export function HomeStatePanel() {
           <div className="text-[9px] text-cyan-300 elefante-mono uppercase tracking-[0.14em]">Recommended next</div>
           <strong className="mt-2 block text-lg font-medium text-slate-100">{nextAction.label}</strong>
           <p className="mt-2 text-xs leading-relaxed text-slate-500">{nextAction.reason}</p>
-          <button type="button" onClick={() => setActiveTab(nextAction.tab)} className="mt-4 min-h-11 border border-cyan-300/60 px-4 text-xs text-cyan-100 hover:bg-cyan-300/10">
+          <button type="button" onClick={continueToNext} className="mt-4 min-h-11 border border-cyan-300/60 px-4 text-xs text-cyan-100 hover:bg-cyan-300/10">
             Continue
           </button>
         </aside>
@@ -209,7 +229,7 @@ export function HomeStatePanel() {
           description="Inspect every represented memory, direct review signal, topic, stored vitality value, and explicit relationship. No project is required."
           status="Available from the current snapshot. Missing relationships and task relevance are never inferred."
         >
-          <button type="button" onClick={() => setActiveTab('memories')} className={laneButton}>Memory Intelligence</button>
+          <button type="button" onClick={() => openMemoryWorkspace('library')} className={laneButton}>Memory Intelligence</button>
           <button type="button" onClick={() => setActiveTab('explore')} className={laneButton}><Waypoints size={12} className="mr-1 inline" />Connections</button>
         </JobLane>
 
@@ -225,7 +245,7 @@ export function HomeStatePanel() {
             <button type="button" onClick={() => setMemoryDialog('remember')} className={laneButton}><Brain size={12} className="mr-1 inline" />Remember</button>
           )}
           <button type="button" onClick={() => setActiveTab('recall')} className={laneButton}><SearchCheck size={12} className="mr-1 inline" />Recall</button>
-          <button type="button" onClick={() => setActiveTab('memories')} className={laneButton}>Correct</button>
+          <button type="button" onClick={() => openMemoryWorkspace('library')} className={laneButton}>Correct</button>
         </JobLane>
 
         <JobLane

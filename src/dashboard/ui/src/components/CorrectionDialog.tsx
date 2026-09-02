@@ -268,8 +268,10 @@ export function CorrectionDialog({ memory }: { memory: MemoryNode }) {
   const availableActions = active
     ? ACTIONS.filter((candidate) => candidate.action !== 'restore')
     : manuallyArchived
-      ? ACTIONS.filter((candidate) => candidate.action === 'restore')
-      : [];
+      ? ACTIONS.filter(
+          (candidate) => candidate.action === 'restore' || candidate.action === 'permanent_delete',
+        )
+      : ACTIONS.filter((candidate) => candidate.action === 'permanent_delete');
   const requiresContent = action === 'edit' || action === 'replace';
   const permanentDelete = action === 'permanent_delete';
   const selectedDefinition = actionDefinition(action);

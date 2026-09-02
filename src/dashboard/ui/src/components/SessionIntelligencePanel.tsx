@@ -20,12 +20,12 @@ export function SessionIntelligencePanel() {
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div>
             <h3 className="text-[9px] text-slate-500 elefante-mono uppercase tracking-[0.16em]">
-              Session Intelligence
+              Session Intelligence · View only
             </h3>
             <p className="mt-2 text-sm text-slate-300">Off by default.</p>
           </div>
           <p className="max-w-2xl text-[11px] leading-relaxed text-slate-500 md:text-right">
-            Explicit local consent is required before metadata-only provider usage is persisted. Prompts, transcripts, responses, and employee surveillance are outside this surface.
+            The dashboard cannot grant consent or ingest usage. Explicit local consent is required before metadata-only provider usage is persisted. Prompts, transcripts, responses, and employee surveillance are outside this surface.
           </p>
         </div>
       </section>
@@ -50,7 +50,7 @@ export function SessionIntelligencePanel() {
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
         <div>
           <h3 className="text-[9px] text-cyan-400 elefante-mono uppercase tracking-[0.16em]">
-            Session Intelligence / Signal Card
+            Session Intelligence / Signal Card · View only
           </h3>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-300">{card.hypothesis}</p>
         </div>

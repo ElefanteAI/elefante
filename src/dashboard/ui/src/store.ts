@@ -1151,6 +1151,8 @@ interface DashboardStore {
   // Navigation
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
+  memoryWorkspaceView: 'library' | 'review';
+  setMemoryWorkspaceView: (view: 'library' | 'review') => void;
 
   // Data
   snapshot: Snapshot | null;
@@ -1295,6 +1297,8 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   // Navigation
   activeTab: 'overview',
   setActiveTab: (tab) => set({ activeTab: tab }),
+  memoryWorkspaceView: 'library',
+  setMemoryWorkspaceView: (view) => set({ memoryWorkspaceView: view }),
 
   // Data
   snapshot: null,
@@ -1805,7 +1809,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         return { success: false, plan_id: null, error };
       }
       if (rawStatus === 'VERIFIED_COMPLETE') {
-        await get().fetchSnapshot();
+        await get().refreshSnapshot();
         set({ rememberError: null });
       } else if (rawStatus !== 'NEEDS_HUMAN') {
         const error = result.error || controlErrorMessage(response, body, controlToken, 'remember');
@@ -1870,7 +1874,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
           error_code: safeOptionalText(body.error_code, controlToken),
         };
       }
-      await get().fetchSnapshot();
+      await get().refreshSnapshot();
       set({ rememberError: null });
       return {
         success: true,

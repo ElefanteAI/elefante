@@ -420,9 +420,9 @@ function ProductMaintenancePanel({ health }: { health: RecoveryHealth | null }) 
           <PackageCheck size={20} className="mt-0.5 shrink-0 text-cyan-300" aria-hidden="true" />
           <div>
             <div className="text-[9px] text-cyan-400 elefante-mono uppercase tracking-[0.16em]">Product maintenance</div>
-            <h2 id="product-maintenance-title" className="mt-2 text-lg font-medium text-slate-100">One safe package handoff.</h2>
+            <h2 id="product-maintenance-title" className="mt-2 text-lg font-medium text-slate-100">Installer actions — status only here.</h2>
             <p className="mt-2 max-w-3xl text-xs leading-relaxed text-slate-400">
-              Home protects data and shows proof. The exact official package changes product code, so the running app never replaces or removes itself.
+              One safe package handoff starts outside this dashboard. Home protects data and shows proof. The exact official package changes product code, so the running app never replaces or removes itself.
             </p>
           </div>
         </div>

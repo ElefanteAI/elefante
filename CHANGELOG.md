@@ -11,6 +11,26 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Snapshot search with zero matches now shows zero memory rows instead of
+  falling back to the browse list. Clearing the query restores browsing.
+- Home's recommended direct-signal review now opens Memory Intelligence on the
+  Review queue instead of silently landing on Library. Verified Remember also
+  refreshes header statistics with the regenerated snapshot, the header names
+  its action `Reload snapshot`, and the connected-control label no longer
+  implies that every operation was verified.
+- Identifier-bearing Recall questions now require identifier-bearing evidence
+  on ordinary text-only paths. If an exact matching record is archived or
+  superseded, Recall abstains instead of substituting a semantically related
+  active memory; exact Recall cues and explicit structural or governing paths
+  retain their separate guarded behavior.
+- Archived and superseded memories retain access to the verified permanent
+  deletion plan while only manually archived, non-superseded memories can be
+  restored. Connections, Session Intelligence, and package maintenance now
+  identify their read-only or external-action boundaries directly, and icon-only
+  memory controls have accessible names.
+
 ## [2.14.0] - 2026-09-01
 
 ### Added

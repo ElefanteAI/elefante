@@ -202,6 +202,62 @@ def test_home_leads_with_one_elefante_product_model_and_three_operator_jobs() ->
     assert "{ id: 'overview', label: 'Home' }" in tabs
 
 
+def test_home_routes_review_recommendations_to_review_and_refreshes_verified_writes() -> None:
+    home = _read("components/HomeStatePanel.tsx")
+    memories = _read("components/MemoriesTab.tsx")
+    store = _read("store.ts")
+    header = _read("components/HeaderBar.tsx")
+
+    assert "memoryView: 'review'" in home
+    assert "setMemoryWorkspaceView(nextAction.memoryView)" in home
+    assert "memoryWorkspaceView" in memories
+    assert "useState<'library' | 'review'>('library')" not in memories
+    assert "await get().refreshSnapshot();" in store[
+        store.index("remember: async"):store.index("isRecallTesting: false")
+    ]
+    assert "Reload snapshot" in header
+    assert "this does not regenerate memory data" in header
+    assert "Operational session verified" not in home
+
+
+def test_snapshot_search_keeps_zero_matches_empty_until_query_is_cleared() -> None:
+    memories = _read("components/MemoriesTab.tsx")
+
+    assert "const searchMemories: MemoryNode[] = mode === 'search'\n" in memories
+    assert "mode === 'search' && results.length > 0" not in memories
+    assert "if (query.trim().length >= 2)" in memories
+    assert "setMode('browse');" in memories
+
+
+def test_inactive_memories_keep_a_verified_permanent_delete_route() -> None:
+    correction = _read("components/CorrectionDialog.tsx")
+
+    assert "candidate.action === 'restore' || candidate.action === 'permanent_delete'" in correction
+    assert "candidate.action === 'permanent_delete'" in correction
+
+
+def test_status_only_surfaces_are_named_as_status_only() -> None:
+    connections = _read("components/ExploreTab.tsx")
+    session = _read("components/SessionIntelligencePanel.tsx")
+    recover = _read("components/RecoverTab.tsx")
+
+    assert "Read-only snapshot" in connections
+    assert "View only" in session
+    assert "Installer actions — status only here." in recover
+
+
+def test_memory_controls_have_names_and_do_not_render_an_empty_sort_button() -> None:
+    memories = _read("components/MemoriesTab.tsx")
+    table = _read("components/MemoryTable.tsx")
+
+    assert 'aria-label="Search the current memory snapshot"' in memories
+    assert 'aria-label="Clear snapshot search"' in memories
+    assert 'aria-label="Filter displayed memories"' in table
+    assert 'aria-label="Clear memory filter"' in table
+    assert "aria-label={`${row.getIsExpanded() ? 'Collapse' : 'Expand'}" in table
+    assert "header.column.getCanSort()" in table
+
+
 def test_dashboard_keeps_environment_state_as_evidence_not_a_second_product() -> None:
     home = _read("components/HomeStatePanel.tsx")
     store = _read("store.ts")
@@ -342,8 +398,8 @@ def test_dashboard_defaults_to_clear_light_and_preserves_dark_theme() -> None:
 def test_dashboard_html_guide_matches_the_source_prototype_boundary() -> None:
     guide = (ROOT / "docs" / "how-to" / "view-dashboard.html").read_text(encoding="utf-8")
 
-    assert "source prototype checked 2026-09-01" in guide
-    assert "This work did not replace the installed runtime or publish a package" in guide
+    assert "source prototype checked 2026-09-02" in guide
+    assert "Installing a local candidate does not publish a release" in guide
     assert "Home has six top-level workspaces" in guide
     assert "Recall: test governed selection" in guide
     assert "Make memory useful for the next task" in guide

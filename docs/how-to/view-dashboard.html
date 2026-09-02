@@ -471,7 +471,7 @@
           </div>
           <div class="proof-line" aria-label="Guide evidence status">
             <span>source checked</span>
-            <span>source prototype checked 2026-09-01</span>
+            <span>source prototype checked 2026-09-02</span>
             <span>one product / one dashboard</span>
           </div>
         </div>
@@ -538,8 +538,8 @@
 
     <main id="main-content" tabindex="-1">
       <article class="guide-body">
-        <section class="guide-preface" aria-labelledby="guide-purpose"><h2 class="visually-hidden" id="guide-purpose">What Elefante Home is for</h2><p class="guide-status"><span class="status-label">Applies to</span> the current Elefante Home source prototype, built and rendered with the deterministic showcase on 2026-09-01.</p>
-<p class="release-note"><span class="status-label">Release boundary</span> this guide documents the six-workspace source prototype. This work did not replace the installed runtime or publish a package. The local page always belongs to one Elefante product, but an installed package may contain an earlier dashboard build until this source prototype passes package acceptance.</p>
+        <section class="guide-preface" aria-labelledby="guide-purpose"><h2 class="visually-hidden" id="guide-purpose">What Elefante Home is for</h2><p class="guide-status"><span class="status-label">Applies to</span> the current Elefante Home source prototype, built and rendered against the current local snapshot on 2026-09-02.</p>
+<p class="release-note"><span class="status-label">Release boundary</span> this guide documents the six-workspace source prototype. Installing a local candidate does not publish a release. The installed package receipt identifies the exact build; source checks alone do not prove which dashboard is running.</p>
 <p>Elefante Home is the advanced local control room for three jobs:</p>
 <ol>
 <li><strong>Global understanding.</strong> Memory Intelligence and Connections inspect everything represented in the current snapshot; no project is required.</li>
@@ -557,7 +557,7 @@ available, Home binds it automatically. If several are active, Home asks which
 one should own this session's managed actions.</p>
 <p><code>elefante-DashboardOpen</code> remains an optional agent convenience; it is not the
 customer entry requirement. Its <code>refresh=true</code> option regenerates the dashboard
-snapshot before opening Home. The header's <strong>Reload</strong> button and a normal browser
+snapshot before opening Home. The header's <strong>Reload snapshot</strong> button and a normal browser
 reload only reread the snapshot that already exists.</p>
 <h2 id="choose-the-journey-that-matches-your-goal"><a class="heading-anchor" href="#choose-the-journey-that-matches-your-goal">Choose the journey that matches your goal</a></h2>
 <div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
@@ -660,7 +660,7 @@ ticket, exact-state checks, postconditions, and rollback gates.</p>
 <td>Snapshot is at least 60 minutes old, or its generation time is unavailable</td>
 </tr>
 <tr>
-<td>Reload</td>
+<td>Reload snapshot</td>
 <td>Rereads stats, Session Intelligence, and the existing snapshot; it does not regenerate live data</td>
 </tr>
 <tr>
@@ -705,12 +705,14 @@ understand, improve, and protect that system.</p>
 <tbody>
 <tr><td>Example workspace</td><td>The deterministic, disclosed example snapshot is loaded</td><td>No customer data, operation, or performance result</td></tr>
 <tr><td>Local memory snapshot</td><td>The dashboard loaded the represented local inspection file</td><td>Live product readiness or current Recall behavior</td></tr>
-<tr><td>Operational session verified</td><td>Named bounded management routes are available in this session</td><td>That any particular action has already succeeded</td></tr>
+<tr><td>Controls connected</td><td>Named bounded management routes are available in this session</td><td>That any particular action has already succeeded</td></tr>
 <tr><td>No operational receipt in this environment</td><td>No live management proof was returned here</td><td>That Elefante is broken or needs installation</td></tr>
 </tbody></table></div>
 <p>The <strong>Recommended next</strong> card always points to an action that is meaningful
 in the evidence currently available: review direct signals, browse the corpus,
 set a task boundary, or test Recall. It never sends the user to another Home.</p>
+<p>When direct signals exist, <strong>Continue</strong> opens Memory Intelligence on
+the counted <strong>Review</strong> queue—not the complete Library.</p>
 <h3 id="current-evidence"><a class="heading-anchor" href="#current-evidence">Current evidence</a></h3>
 <div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead><tr><th>Cell</th><th>Meaning</th></tr></thead>
@@ -767,6 +769,10 @@ selected memory's represented lifecycle state:</p>
 <tr><td>Restore</td><td>Return a manually archived, non-superseded record to Recall eligibility</td></tr>
 <tr><td>Delete permanently</td><td>Remove the memory and unshared attachments only after a temporary verified safety backup</td></tr>
 </tbody></table></div>
+<p>A manually archived, non-superseded record offers Restore and Delete
+permanently. Other represented inactive records, including superseded records,
+offer only Delete permanently. The no-write plan remains authoritative and can
+still block the operation when its safety conditions are not met.</p>
 <p>The managed flow is always: choose an action; explain why; provide a likely
 future Recall question; inspect a no-write plan; confirm its single-use ticket;
 apply once; verify store, graph, Home, and scoped Recall; then inspect the
@@ -856,7 +862,8 @@ the specialist workspace explains the evidence. <strong>No action</strong> remai
 valid conclusion when the represented evidence does not justify a change.</p>
 <h3 id="session-intelligence"><a class="heading-anchor" href="#session-intelligence">Session Intelligence</a></h3>
 <p>Session Intelligence remains on Home under the collapsed <strong>Advanced</strong>
-disclosure. It is <strong>off by default</strong>. Without explicit local consent and a
+disclosure. It is a <strong>view-only</strong> surface and is <strong>off by default</strong>.
+The dashboard cannot grant consent or ingest usage. Without explicit local consent and a
 derived metadata-only snapshot, Home shows only the disabled explanation.</p>
 <p>When evidence exists, the Signal Card can show event count, provider-actual
 input/output tokens, verified cost when known, accepted-outcome evidence,
@@ -894,12 +901,12 @@ necessary.</p>
 </tr>
 </tbody>
 </table></div>
-<p>Clearing Snapshot search returns to overall browsing. Clearing Filter preserves
+<p>Clearing Snapshot search returns to the current Library or Review view. Clearing Filter preserves
 the current Snapshot-search mode but removes the table-only filter.</p>
-<p>Current limitation: when Snapshot search reports zero results, the table can
-fall back to the browse rows. The <code>0 snapshot results</code> line is authoritative;
-those visible browse rows are not matches. Search failures also lack a dedicated
-visible error message in the current UI.</p>
+<p>When Snapshot search reports <code>0 snapshot results</code>, no memory rows
+are displayed. Clear the search to return to browsing.</p>
+<p>Current limitation: search failures lack a dedicated visible error message
+in the current UI.</p>
 <h3 id="table-columns"><a class="heading-anchor" href="#table-columns">Table columns</a></h3>
 <div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
@@ -1265,7 +1272,8 @@ privacy-safe support report. Two operations intentionally live elsewhere:</p>
 <li>product code changes belong to the exact official package.</li>
 </ul>
 <h3 id="product-maintenance-handoff"><a class="heading-anchor" href="#product-maintenance-handoff">Product maintenance handoff</a></h3>
-<p>Home explains, but does not execute, four package operations:</p>
+<p>Home shows status for, but does not execute, four package operations. These
+are installer actions, not dashboard controls:</p>
 <div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
 <tr>
@@ -1386,7 +1394,7 @@ product truth.</p>
 <h2 id="responsive-and-accessibility-behavior"><a class="heading-anchor" href="#responsive-and-accessibility-behavior">Responsive and accessibility behavior</a></h2>
 <ul>
 <li>At phone width, product identity and status controls occupy separate header
-rows; the example/status label can shrink while theme and Reload remain visible.</li>
+rows; the example/status label can shrink while theme and Reload snapshot remain visible.</li>
 <li>The top tab bar scrolls horizontally on narrow screens.</li>
 <li>The Memory Intelligence table hides secondary columns on narrow screens; the detail
 drawer becomes full-width.</li>
@@ -1440,7 +1448,7 @@ check requires one exact active project and one question. The page must not
 claim supplied, no match, blocked, or unavailable until that check returns.</p>
 <h3 id="snapshot-is-empty-or-stale"><a class="heading-anchor" href="#snapshot-is-empty-or-stale">Snapshot is empty or stale</a></h3>
 <p>Use <code>elefante-DashboardOpen(refresh=true)</code> from a connected agent to regenerate
-the snapshot, or use the source pipeline below. Header Reload alone cannot
+the snapshot, or use the source pipeline below. Header Reload snapshot alone cannot
 regenerate it.</p>
 <h3 id="graph-says-no-decision-trails-yet"><a class="heading-anchor" href="#graph-says-no-decision-trails-yet">Graph says No decision trails yet</a></h3>
 <p>Inspect Topics and Vitality first. The snapshot can contain many topic, entity,

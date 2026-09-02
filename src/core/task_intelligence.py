@@ -657,6 +657,9 @@ class TaskBriefCompiler:
         query_counts = self._canonical_term_counts(query_text)
         query_terms = set(query_counts)
         minimum_text_matches = min(2, len(query_terms))
+        query_identifiers = {
+            term for term in query_terms if any(character.isdigit() for character in term)
+        }
         anchor_terms = {term for term, count in query_counts.items() if count >= 2}
         query_intent = CognitiveRetriever.infer_intent(query_text)
         for result in candidates:
@@ -672,6 +675,7 @@ class TaskBriefCompiler:
             path = self._location_overlap(query_terms, path_terms)
             symbol = self._location_overlap(query_terms, symbol_terms)
             matched_terms = query_terms & (content_terms | path_terms | symbol_terms)
+            matched_identifiers = query_identifiers & matched_terms
             matched_anchors = anchor_terms & matched_terms
             relationships = [
                 str(item).upper() for item in result.relationship_path or []
@@ -743,6 +747,8 @@ class TaskBriefCompiler:
                 "specificity": round(specificity, 6),
                 "matched_terms": len(matched_terms),
                 "query_terms": len(query_terms),
+                "matched_identifiers": len(matched_identifiers),
+                "query_identifiers": len(query_identifiers),
                 "matched_anchors": len(matched_anchors),
                 "query_anchors": len(anchor_terms),
                 "query_coverage": round(
@@ -758,6 +764,7 @@ class TaskBriefCompiler:
                 semantic >= 0.78
                 and len(matched_terms) >= minimum_text_matches
                 and float(signals["query_coverage"]) >= 0.25
+                and (not query_identifiers or bool(matched_identifiers))
             )
             positive_signals = [
                 name
@@ -831,6 +838,14 @@ class TaskBriefCompiler:
         governing_directive = (
             float(signals.get("governing_directive", 0.0)) > 0.0
         )
+        if (
+            int(signals.get("query_identifiers", 0)) > 0
+            and int(signals.get("matched_identifiers", 0)) == 0
+            and float(signals.get("dependency", 0.0)) == 0.0
+            and not strong_location_match
+            and not governing_directive
+        ):
+            return False
         if (
             int(signals.get("matched_terms", 0)) < minimum_matches
             and float(signals.get("dependency", 0.0)) == 0.0

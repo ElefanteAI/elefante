@@ -81,9 +81,15 @@ export function HeaderBar({ theme, onToggleTheme }: HeaderBarProps) {
         </button>
 
         <button
+          type="button"
           onClick={() => refreshSnapshot()}
           disabled={isRefreshing}
-          title={isShowcase ? 'Reload the example snapshot' : 'Reload the current dashboard snapshot'}
+          title={
+            isShowcase
+              ? 'Reload the example snapshot'
+              : 'Reread the current dashboard snapshot; this does not regenerate memory data'
+          }
+          aria-label={isShowcase ? 'Reload example snapshot' : 'Reload dashboard snapshot'}
           className={
             'flex shrink-0 items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium border transition-colors ' +
             (isRefreshing
@@ -93,9 +99,9 @@ export function HeaderBar({ theme, onToggleTheme }: HeaderBarProps) {
               : 'bg-slate-800/40 elefante-hairline text-slate-400 hover:text-slate-100 hover:border-cyan-500/50')
           }
         >
-          <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} />
+          <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} aria-hidden="true" />
           <span className="hidden sm:inline">
-            {isRefreshing ? 'Reloading...' : isShowcase ? 'Reload example' : 'Reload'}
+            {isRefreshing ? 'Reloading...' : isShowcase ? 'Reload example' : 'Reload snapshot'}
           </span>
           <span className="sm:hidden">{isRefreshing ? 'Loading...' : 'Reload'}</span>
         </button>
