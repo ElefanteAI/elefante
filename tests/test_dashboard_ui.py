@@ -491,6 +491,78 @@ def test_connections_names_snapshot_metrics_without_truth_claims() -> None:
     assert "current truth won" not in graph
 
 
+def test_decision_graph_renders_exact_stored_edges_not_card_adjacency() -> None:
+    node = shutil.which("node")
+    if not node or not (UI_SRC.parent / "node_modules/react-dom").is_dir():
+        pytest.skip("Requires the dashboard's installed Node dependencies")
+    script = (
+        f"const graphUrl = {(UI_SRC / 'components/KnowledgeGraph.tsx').as_uri()!r};\n"
+        f"const typesUrl = {(UI_SRC / 'types.ts').as_uri()!r};\n"
+    ) + r'''
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+import assert from 'node:assert/strict';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+const moduleUrl = code => 'data:text/javascript;base64,' + Buffer.from(code).toString('base64');
+const compile = url => ts.transpileModule(readFileSync(new URL(url), 'utf8'), {
+  compilerOptions: {module:ts.ModuleKind.ESNext, target:ts.ScriptTarget.ES2022, jsx:ts.JsxEmit.ReactJSX},
+}).outputText;
+const storeUrl = moduleUrl('export const useDashboardStore = pick => pick(globalThis.graphState);');
+const graphCode = compile(graphUrl)
+  .replace("from '@/store'", 'from ' + JSON.stringify(storeUrl))
+  .replace("from '@/types'", 'from ' + JSON.stringify(moduleUrl(compile(typesUrl))))
+  .replace("from 'react'", 'from ' + JSON.stringify(import.meta.resolve('react')))
+  .replace('from "react/jsx-runtime"', 'from ' + JSON.stringify(import.meta.resolve('react/jsx-runtime')));
+const {KnowledgeGraph} = await import(moduleUrl(graphCode));
+const memories = ['a','b','c','d','unlinked'].map(id => ({
+  id, type:'memory', name:id, description:'Requirement ' + id,
+  properties:{title:id, score:80, memory_type:id === 'c' ? 'decision' : 'specification'},
+}));
+const render = edges => {
+  globalThis.graphState = {
+    getMemoryNodes:() => memories, snapshot:{edges},
+    setInspectedMemoryId:() => {}, setActiveTab:() => {},
+  };
+  return renderToStaticMarkup(React.createElement(KnowledgeGraph));
+};
+const drawnEdges = html => [...html.matchAll(/data-source="([^"]+)" data-target="([^"]+)" data-relationship="([^"]+)"/g)]
+  .map(match => match.slice(1).join(':')).sort();
+const branches = [
+  {from:'a', to:'c', label:'DEPENDS_ON', type:'graph'},
+  {from:'b', to:'c', label:'DEPENDS_ON', type:'graph'},
+  {from:'a', to:'d', label:'DEPENDS_ON', type:'graph'},
+];
+const branchHtml = render(branches);
+assert.deepEqual(drawnEdges(branchHtml), ['a:c:DEPENDS_ON','a:d:DEPENDS_ON','b:c:DEPENDS_ON']);
+assert.ok(!branchHtml.includes('>connected<')); // Neighbours are not edges.
+assert.ok(!branchHtml.includes('>unlinked<'));
+const cycleAndParallel = [...branches,
+  {source:'c', target:'a', label:'GOVERNS', type:'graph'},
+  {source:'a', target:'c', label:'GUARDED_BY', type:'graph'},
+];
+assert.deepEqual(drawnEdges(render(cycleAndParallel)), [
+  'a:c:DEPENDS_ON','a:c:GUARDED_BY','a:d:DEPENDS_ON','b:c:DEPENDS_ON','c:a:GOVERNS',
+]);
+assert.deepEqual(drawnEdges(render([...branches].reverse())), drawnEdges(branchHtml));
+const nonTrailEdges = [
+  {from:'a', to:'topic', label:'HAS_TOPIC', type:'signal'},
+  {from:'a', to:'b', label:'DEPENDS_ON', type:'semantic'},
+  {from:'a', to:'missing', label:'DEPENDS_ON', type:'graph'},
+];
+assert.deepEqual(drawnEdges(render([...branches, ...nonTrailEdges])), drawnEdges(branchHtml));
+assert.deepEqual(drawnEdges(render(nonTrailEdges)), []);
+assert.ok(render(nonTrailEdges).includes('No decision trails yet'));
+console.log('PASS: exact branches, direction, cycles, parallel labels, reordered input, excluded edges');
+'''
+    result = subprocess.run(
+        [node, "--input-type=module", "-e", script],
+        cwd=UI_SRC.parent, capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASS: exact branches" in result.stdout
+
+
 def test_dashboard_uses_the_preservation_first_six_workspace_navigation() -> None:
     app = _read("App.tsx")
     tabs = _read("components/TabNav.tsx")

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDashboardStore } from '@/store';
 import { edgeEndpoints, type GraphEdge, type MemoryNode } from '@/types';
 
@@ -390,22 +390,14 @@ export function KnowledgeGraph() {
               </span>
             </div>
 
-            <div className="flex min-w-max items-stretch overflow-x-auto pb-2">
+            <div className="flex items-stretch gap-4 overflow-x-auto pb-2">
               {selectedTrail.nodes.map((memory, index) => {
                 const role = roleFor(memory);
                 const active = memory.id === selectedMemory.id;
-                const nextMemory = selectedTrail.nodes[index + 1];
-                const connectingEdge = nextMemory
-                  ? selectedTrail.edges.find(
-                      (edge) =>
-                        (edge.source === memory.id && edge.target === nextMemory.id) ||
-                        (edge.target === memory.id && edge.source === nextMemory.id),
-                    )
-                  : undefined;
 
                 return (
-                  <Fragment key={memory.id}>
                     <button
+                      key={memory.id}
                       onClick={() => setSelectedMemoryId(memory.id)}
                       className={`w-[160px] shrink-0 border px-4 py-4 text-left transition-all 2xl:w-[178px] ${
                         active
@@ -428,22 +420,41 @@ export function KnowledgeGraph() {
                         {memoryTitle(memory)}
                       </strong>
                     </button>
-
-                    {nextMemory && (
-                      <div className="flex w-[68px] shrink-0 flex-col items-center justify-center 2xl:w-[92px]">
-                        <span className="elefante-mono mb-2 max-w-[64px] text-center text-[8px] uppercase tracking-[0.12em] text-violet-400 2xl:max-w-[84px]">
-                          {connectingEdge ? relationshipText(connectingEdge.label) : 'connected'}
-                        </span>
-                        <div className="flex w-full items-center">
-                          <span className="h-px flex-1 bg-cyan-600" />
-                          <span className="h-1.5 w-1.5 rotate-45 border-r border-t border-cyan-500" />
-                        </div>
-                      </div>
-                    )}
-                  </Fragment>
                 );
               })}
             </div>
+
+            <ul aria-label="Stored relationships" className="mt-4 space-y-2">
+              {selectedTrail.edges.map((edge) => {
+                const source = selectedTrail.nodes.find((node) => node.id === edge.source)!;
+                const target = selectedTrail.nodes.find((node) => node.id === edge.target)!;
+                return (
+                  <li
+                    key={`${edge.source}-${edge.target}-${edge.label}`}
+                    data-source={edge.source}
+                    data-target={edge.target}
+                    data-relationship={edge.label}
+                    className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-t border-slate-800 pt-2 text-[11px] leading-4"
+                  >
+                    <button
+                      onClick={() => setSelectedMemoryId(source.id)}
+                      className="text-left text-slate-400 hover:text-cyan-500"
+                    >
+                      {memoryTitle(source)}
+                    </button>
+                    <span className="elefante-mono max-w-[90px] text-center text-[9px] text-violet-400">
+                      {relationshipText(edge.label)} →
+                    </span>
+                    <button
+                      onClick={() => setSelectedMemoryId(target.id)}
+                      className="text-left text-slate-400 hover:text-cyan-500"
+                    >
+                      {memoryTitle(target)}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
 
           <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_280px]">

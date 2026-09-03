@@ -77,12 +77,21 @@ field renames.
 
 <a id="issue-8"></a>
 
-## Issue #8: Graph and Session Schema Contract Drift [FIXED, guarded]
+## Issue #8: Graph and Session Schema Contract Drift [PARTIAL, recurrence open]
 
 **Trigger:** `elefante-GraphConnect` fails creating `CREATED_IN` / `WORKS_ON` edges; `elefante-SessionsList` returns wrong shape.
 **Root cause:** Both surfaces assumed every relation table and every session-shaped entity shared one generic schema. (1) `graph_store.py` reused `RELATES_TO`'s `strength` injection pattern for relations that don't define that property. (2) `server.py` queried sessions as `Entity` rows, then ordered by `s.last_active` (no such top-level field) and accessed properties as Python attributes instead of JSON in `props`.
 **Solution:** Aligned both paths to the real schema — relation creation is whitelist-gated (`{"RELATES_TO"}` get `strength`, others don't); session listing orders by `created_at`, parses `props` JSON, falls back when `last_active` absent.
 **Guards:** `TestGraphToolContract` creates real `CREATED_IN` and `WORKS_ON` edges + statically guards `SessionsList` query shape.
+**Open recurrence, source audit 2026-09-03:** The public enum is broader than
+the named relationship-table mapping. For example, `GOVERNS` is accepted but
+stored as `RELATES_TO`; returned edge properties are not persisted. Existing
+UUID syntax is checked without proving that both graph rows exist. This audit
+did not write unsupported relationships to customer data. The curated dashboard
+example uses `DEPENDS_ON`, with both endpoints and all three stored edges read
+back. Close this separate authoring gap only with real isolated type/property
+round-trip and absent-endpoint tests; the dashboard-rendering repair does not
+claim to fix it.
 **Lesson:** Graph tools must target the concrete node and relation-table schema that exists, not a generic mental model. Code-review plausibility is not a substitute for live-surface verification.
 
 <a id="issue-9"></a>

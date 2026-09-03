@@ -202,6 +202,14 @@ button, so that banner now renders above the drawer and below modal dialogs.
 Regressions cover these paths; browser acceptance exercises real expired
 sessions, changed Recall eligibility, and differing provenance/backend values.
 
+**Graph recurrence, 2026-09-03:** Curating a small real memory set exposed a
+branching-graph defect hidden by the earlier linear showcase. The renderer
+placed arrows between consecutive sorted cards even when no edge joined them,
+and could reverse a stored edge's direction. Cards now remain selectable without
+implied adjacency; relationship rows render each actual source, label, and
+target. A regression renders the real React component with branches, cycles,
+parallel labels, reordered edges, and excluded semantic/dangling edges.
+
 **Guard:** Dashboard, snapshot, Home-control, daemon, and routing regressions;
 the production UI build; and live deterministic-example acceptance across all
 six workspaces, both themes, desktop, and 390×844.
