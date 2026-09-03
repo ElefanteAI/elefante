@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: locally-activated
 owner: Elefante development
 created: 2026-09-03
 ---
@@ -131,8 +131,8 @@ IDs; do not create parallel checklists or session reports.
 | SI-1 | Add one fail-first isolated test: normal MCP call → automatic event → real temporary ledger → snapshot → dashboard API. Inspect available host usage metadata separately. | Missing capture reproduced (no snapshot); regression passes after the hook. Real in-memory MCP protocol also records two distinct blocked invocations with no mocked handlers. Transport/client identity is available; provider token metadata is not present on this boundary. | PASS — source candidate, 2026-09-03 |
 | SI-2 | Connect the common capture path and minimum existing-panel evidence handling. | Bounded asynchronous persistence, consent/revocation, duplicate protection, capture health, safe error/interruption and mixed actual/estimated counts pass. Final combined regression: 340 passed / 13 deselected (slow/live paths outside this isolated gate); production UI build and scoped Ruff pass. | PASS — source candidate |
 | SI-3 | Exercise the existing panel in an isolated browser using those real calls and controlled failure cases. | Both themes: enabled-empty/unknown, off, incomplete capture and broken-snapshot states are readable. Real MCP calls, provider/cost fixture, causal fixture, hypotheses, reload, snapshot recovery, revoke/regrant, export and test-data deletion reconcile as detailed below. Customer data is not the fixture. | PASS — isolated browser, 2026-09-03 |
-| SI-4 | Prepare and activate the exact tested candidate in the owner's installation through the established install/operator workflow. | Verify source/package identity, recoverable baseline and data-preservation receipt. Explicitly grant the intended purposes using existing controls; verify effective state. No release/push implied. | IN PROGRESS — owner approved local production commit/install on 2026-09-03; exact-package rollback and installed readbacks remain gates |
-| SI-5 | Use Elefante on one real development task, then inspect Home → Advanced → Session Intelligence. | Automatic event delta, IDs/status/times, visible aggregates and any available actual source reconcile; reload adds no event. Record coverage/unknowns and confirm semantic memories/graph unchanged by capture. | NOT RUN |
+| SI-4 | Prepare and activate the exact tested candidate in the owner's installation through the established install/operator workflow. | Exact-package rollback passed in isolation. Official installation completed; all 105 installed payload files match candidate `4b17c63`. Doctor is ready; all three intended purposes are enabled; six memories and three stored relationships are preserved. | PASS — owner's local installation, 2026-09-03; no public release |
+| SI-5 | Use Elefante on one real development task, then inspect Home → Advanced → Session Intelligence. | The actual rollout-verification task captured two successful Codex MCP operations and three blocked diagnostic probes. The normal dashboard and ledger reconcile at five events; settled Reload remains five. Provider actuals, cost and task-value evidence remain unknown. | PASS — installed capture and visible readback, not task-quality or full-host accounting proof |
 
 For SI-4, retain the existing permission purposes: `usage_analytics` for local
 activity, `provider_usage` for actual provider metadata, and
@@ -189,8 +189,9 @@ fix the cause, rerun the failed stage and its neighboring checks.
 
 ### Implementation evidence and bounded clarifications — 2026-09-03
 
-- Candidate is the uncommitted working diff on baseline `6e91034`; installation,
-  collection in the owner's store, and real-host actual tokens are not yet proven.
+- Implementation is sealed as `4b17c63e986ab093274473147301a865ae9cc23b`
+  on baseline `6e91034`. The source/isolated evidence below is separate from
+  the subsequent local-installation readbacks recorded after it.
 - [Runtime regressions](../../tests/test_session_intelligence_runtime.py) exercise
   the real MCP protocol, automatic persistence, duplicate delivery, queue bound,
   revoked permission, simultaneous explicit ingress/capture, locked SQLite,
@@ -247,6 +248,40 @@ fix the cause, rerun the failed stage and its neighboring checks.
   unverified outcomes stay guarded. The owner subsequently approved committing
   and installing this candidate locally; approval does not establish installation.
 
+### Local activation evidence — 2026-09-03
+
+- The owner authorized local commit/install, not push, public release or website
+  deployment. Implementation commit: `4b17c63e986ab093274473147301a865ae9cc23b`;
+  installed version/channel: `2.14.0` / `candidate`. Later documentation-only
+  commits do not change the installed implementation identity.
+- The combined 340-test gate passed again (13 deselected), followed by 110
+  routing/installer/customer-package tests. Both exact clean-source packages
+  passed `verify_release_client.py`. Candidate archive SHA256:
+  `9692b0fae073b7793abef19961c2086bcc58097a6c8466b557679f70ee691e36`.
+- Isolated official payload swap/rollback preserved the full persisted fixture
+  memory/graph hash; capture added one event, revocation stopped new writes,
+  rollback retained that event, and both dashboard endpoints returned HTTP 200.
+  This is exact-package rollback proof, **not full machine Scenario D**.
+- The official installer completed at `2026-09-03T20:55:21.774612+00:00`.
+  Its receipt is `/Users/jay/.elefante/app/current/.elefante-package-receipt.json`
+  (`VERIFIED_COMPLETE`); all 105 payload files match the candidate. The installed
+  Doctor reports `customer_ready=true`, `ready=true`, zero diagnostics.
+- Existing consent controls enabled `usage_analytics`, `provider_usage` and
+  `enterprise_training`. The actual Codex SystemStatusGet and DashboardOpen
+  calls succeeded; three actual projectless Doctor Recall probes were blocked.
+  These five events completed between 20:58:00 and 20:58:29 UTC. The dashboard
+  displays five estimated events and zero provider-reported observations;
+  Reload after the probes finished adds none. These are operations, not five
+  completed tasks. Usage cost is unavailable; task result is not verified.
+- Customer preservation: six SQLite memories are byte-identical to the verified
+  preinstall backup; all six graph entities and three relationships match as
+  stored records. Kuzu file bytes changed, but persisted graph content did not.
+  Safety backup: `/Users/jay/.elefante/backups/elefante_data_backup_20260903_205348.zip`.
+  Prior runtime: `/Users/jay/.elefante/app/current.backup.20260903_165349`.
+- Exact candidate/baseline archives and content-free rollback/preservation
+  receipts are retained under the ignored build-output directory
+  `dist/local-rollouts/4b17c63/`; no new product-documentation surface was added.
+
 **Completion criterion:** automatic collection and understandable evidence are verified in the
 installed dashboard, with explicit coverage. Cost/outcome evidence may correctly
 remain unknown. An unavailable actual-usage adapter must remain explicitly
@@ -263,7 +298,8 @@ task quality. Never report every capability as proven from the basic path alone.
 | [Token reference](../../docs/reference/token-intelligence.md), [architecture](../../docs/reference/architecture.md) and [HTML dashboard guide](../../docs/how-to/view-dashboard.html#session-intelligence) | Actual behavior and user instructions | Update with verified implementation, including activation/control usage and all six values. Never describe this target as already shipped. |
 | [ISSUES](../ISSUES.md) and its existing postmortems | Defects and regression ownership | Record real failures there, not in another backlog. |
 
-**Immediate next action:** seal the approved candidate, rehearse its package and
-baseline rollback, then install locally and grant the authorized capture purposes.
-SI-4/SI-5 remain uncompleted until their actual readbacks. No customer activation,
-provider-actual coverage or public release is inferred from source tests.
+**Delivery state:** SI-1–SI-5 pass within their recorded boundaries. The owner can
+use Home → Advanced: Session Intelligence at `http://localhost:8000/`; normal MCP
+activity is recorded automatically and Reload rereads the snapshot. Provider
+actuals, billed cost, complete-host coverage and improved task quality remain
+unverified. Public publication is outside this completed local rollout.
