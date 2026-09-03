@@ -563,6 +563,7 @@ def compile_answer_context(
         TaskBriefCompiler,
         TaskBriefProfile,
         TaskBriefRequest,
+        TaskStage,
     )
 
     question_terms = _answer_terms(question)
@@ -580,17 +581,14 @@ def compile_answer_context(
             continue
         eligible.append(result)
 
-    planning_tokens = max(1, int(max_tokens * 0.30))
-    execution_tokens = max(1, int(max_tokens * 0.50))
-    validation_tokens = max_tokens - planning_tokens - execution_tokens
-    if validation_tokens < 1:
-        validation_tokens = 1
-        execution_tokens = max(1, max_tokens - planning_tokens - validation_tokens)
+    # Recall delivers one answer bundle. Task Intelligence's three-stage
+    # allocation stranded most of this budget when matching records shared a
+    # role, breaking Keep both despite enough room in the overall hard cap.
     budget = TaskBriefBudget(
         total_tokens=max_tokens,
-        planning_tokens=planning_tokens,
-        execution_tokens=execution_tokens,
-        validation_tokens=validation_tokens,
+        planning_tokens=1,
+        execution_tokens=max_tokens - 2,
+        validation_tokens=1,
         max_evidence_items=max_memories,
     )
     brief = TaskBriefCompiler().compile(
@@ -599,6 +597,7 @@ def compile_answer_context(
             project=project,
             workspace=workspace,
             profile=TaskBriefProfile.V2,
+            stage=TaskStage.EXECUTION,
             budget=budget,
         ),
         eligible,

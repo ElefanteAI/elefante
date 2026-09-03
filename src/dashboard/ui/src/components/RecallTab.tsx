@@ -32,15 +32,15 @@ function statusCopy(result: RecallTestResponse): {
   if (result.recall_status === 'supplied') {
     return {
       label: 'Bundle supplied',
-      summary: 'Governed Recall selected a bounded set of memories for this project question.',
+      summary: 'Recall selected these memories. Open each record to check whether it helps your task.',
       tone: 'border-emerald-400/45 bg-emerald-950/10',
       icon: <CheckCircle2 size={20} className="text-emerald-300" aria-hidden="true" />,
     };
   }
   if (result.recall_status === 'no_match') {
     return {
-      label: 'No match · safe abstention',
-      summary: 'Recall ran successfully and supplied no unrelated or ineligible memory.',
+      label: 'No memories selected',
+      summary: 'No eligible memory passed the matching rules. A relevant memory may still exist; inspect the library if you expected one.',
       tone: 'border-slate-700 bg-slate-900/35',
       icon: <CircleSlash2 size={20} className="text-slate-400" aria-hidden="true" />,
     };
@@ -72,6 +72,8 @@ export function RecallTab() {
   const snapshot = useDashboardStore((state) => state.snapshot);
   const setActiveTab = useDashboardStore((state) => state.setActiveTab);
   const setInspectedMemoryId = useDashboardStore((state) => state.setInspectedMemoryId);
+  const setSearchQuery = useDashboardStore((state) => state.setSearchQuery);
+  const setMemoryWorkspaceView = useDashboardStore((state) => state.setMemoryWorkspaceView);
   const question = useDashboardStore((state) => state.recallQuestion);
   const setQuestion = useDashboardStore((state) => state.setRecallQuestion);
   const result = useDashboardStore((state) => state.recallResult);
@@ -96,7 +98,9 @@ export function RecallTab() {
     await testRecall(question.trim());
   };
 
-  const inspectMemory = (memoryId: string) => {
+  const inspectMemory = (memoryId: string | null = null) => {
+    setSearchQuery('');
+    setMemoryWorkspaceView('library');
     setInspectedMemoryId(memoryId);
     setActiveTab('memories');
   };
@@ -120,7 +124,7 @@ export function RecallTab() {
             </div>
             <div className="grid gap-4 md:grid-cols-3">
               {[
-                ['1 · Confirm project', 'Bind one active registered project so unrelated work cannot enter the result.'],
+                ['1 · Memory scope', 'One registered memory boundary keeps unrelated work out of the result.'],
                 ['2 · Ask one question', 'Run one ephemeral, project-scoped Recall check.'],
                 ['3 · Inspect the receipt', 'Read status, selected IDs, conflicts, project, and verification time.'],
               ].map(([title, description]) => (
@@ -132,7 +136,7 @@ export function RecallTab() {
             </div>
             <div className="mt-5 flex flex-wrap gap-3">
               <button type="button" onClick={() => setActiveTab('projects')} className="min-h-11 border border-slate-700 px-4 text-xs text-slate-200 hover:border-cyan-400/60">Understand project boundaries</button>
-              <button type="button" onClick={() => setActiveTab('memories')} className="min-h-11 border border-slate-700 px-4 text-xs text-slate-200 hover:border-cyan-400/60">Inspect available memories</button>
+              <button type="button" onClick={() => inspectMemory()} className="min-h-11 border border-slate-700 px-4 text-xs text-slate-200 hover:border-cyan-400/60">Inspect available memories</button>
             </div>
           </section>
 
@@ -159,7 +163,7 @@ export function RecallTab() {
 
         <section className="grid gap-3 md:grid-cols-3" aria-label="Recall workflow">
           {[
-            ['1 · Confirm project', activeProject?.name ?? 'Choose one active project'],
+            ['1 · Memory scope', activeProject?.name ?? 'Choose one active project'],
             ['2 · Ask one question', 'The question is ephemeral and not stored here'],
             ['3 · Inspect the receipt', 'Status, selected IDs, conflicts, and time'],
           ].map(([title, description]) => (
@@ -173,7 +177,7 @@ export function RecallTab() {
         <section className="elefante-panel grid grid-cols-1 lg:grid-cols-[minmax(0,1.65fr)_minmax(280px,0.7fr)]">
           <form onSubmit={submit} className="p-5 md:p-7 lg:border-r elefante-hairline">
             <label htmlFor="recall-workspace-question" className="text-[10px] text-slate-400 elefante-mono uppercase tracking-[0.12em]">
-              Project question
+              Your question
             </label>
             <textarea
               id="recall-workspace-question"
@@ -212,7 +216,7 @@ export function RecallTab() {
           </form>
 
           <aside className="bg-slate-950/45 p-5 md:p-7">
-            <div className="text-[9px] text-slate-600 elefante-mono uppercase tracking-[0.14em]">Action scope</div>
+            <div className="text-[9px] text-slate-600 elefante-mono uppercase tracking-[0.14em]">Memory scope</div>
             <strong className="mt-2 block text-lg font-medium text-slate-100">
               {activeProject?.name ?? 'No active project bound'}
             </strong>
@@ -242,6 +246,15 @@ export function RecallTab() {
                 <div className="text-[9px] text-slate-500 elefante-mono uppercase tracking-[0.14em]">Current Recall Check</div>
                 <h2 className="mt-1 text-xl font-medium text-slate-100">{copy.label}</h2>
                 <p className="mt-2 text-sm leading-relaxed text-slate-400">{copy.summary}</p>
+                {result.recall_status === 'no_match' && (
+                  <button
+                    type="button"
+                    onClick={() => inspectMemory()}
+                    className="mt-3 min-h-11 border border-slate-700 px-4 text-xs text-slate-200 hover:border-cyan-400/60"
+                  >
+                    Inspect available memories
+                  </button>
+                )}
               </div>
             </div>
 

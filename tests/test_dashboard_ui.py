@@ -16,6 +16,22 @@ def _read(relative_path: str) -> str:
     return (UI_SRC / relative_path).read_text(encoding="utf-8")
 
 
+def test_memory_keyboard_controls_share_the_visible_state_and_respect_dialogs() -> None:
+    memories = _read("components/MemoriesTab.tsx")
+    app = _read("App.tsx")
+    assert "const query = useDashboardStore((s) => s.searchQuery)" in memories
+    assert "const selectedId = useDashboardStore((s) => s.inspectedMemoryId)" in memories
+    assert "[selectedId, setSelectedId] = useState" not in memories
+    assert "[query, setQuery] = useState" not in memories
+    assert "document.querySelector('[role=\"dialog\"]')" in app
+    assert app.index("if (e.key === 'Escape')") < app.index("target.tagName === 'INPUT'")
+    assert "searchError && mode === 'search'" in memories
+    detail = _read("components/MemoryDetailPanel.tsx")
+    assert 'className="absolute right-0 top-0' in detail
+    assert 'className="fixed right-0 top-0' not in detail
+    assert '!e.defaultPrevented' in detail
+
+
 def test_real_dashboard_store_preserves_recall_and_reconnects_without_replay() -> None:
     node = shutil.which("node")
     if not node or not (UI_SRC.parent / "node_modules/zustand").is_dir():
@@ -132,7 +148,10 @@ def test_recovery_disconnect_keeps_error_and_explicit_reconnect_visible() -> Non
     assert "No operation is retried automatically" in locked_view
     assert "No recovery check ran in this environment" not in locked_view
     assert "applyPlan(" not in locked_view
-    assert 'relative z-[60]' in app  # Reconnect remains above the memory drawer (z-50).
+    # The shell is an isolated stacking context; z-index alone cannot beat portals.
+    assert 'controlSessionError && !controlEnabled && (' in app
+    assert 'relative z-[80] flex shrink-0' in app
+    assert app.index('role="alert"') < app.index('className="elefante-shell')
 
 
 def test_search_selection_wires_rank_and_snapshot_relationships_to_detail_panel() -> None:
@@ -172,7 +191,8 @@ def test_home_correct_uses_named_verified_routes_and_customer_safe_lifecycle() -
     assert "temporary verified safety backup" in correction
     assert "Failure restores it; success destroys it" in correction
     assert "Type DELETE to continue" in correction
-    assert "This cannot be recovered after success" in correction
+    assert "The temporary safety backup is destroyed after success" in correction
+    assert "Older backups are not deleted and may still contain this memory." in correction
     assert "confirm_permanent: confirmPermanent" in store
     assert "verified_correction_history" in detail_panel
 
@@ -334,7 +354,9 @@ def test_snapshot_search_keeps_zero_matches_empty_until_query_is_cleared() -> No
     assert "const searchMemories: MemoryNode[] = mode === 'search'\n" in memories
     assert "mode === 'search' && results.length > 0" not in memories
     assert "if (query.trim().length >= 2)" in memories
-    assert "setMode('browse');" in memories
+    assert "const mode = query.trim().length >= 2 ? 'search' : 'browse';" in memories
+    assert "const currentResults = searchPending ? [] : results;" in memories
+    assert "setSelectedId(null);\n                setQuery(e.target.value);" in memories
 
 
 def test_inactive_memories_keep_a_verified_permanent_delete_route() -> None:
@@ -406,12 +428,34 @@ def test_recall_never_claims_proof_before_a_live_result_exists() -> None:
 
     assert "Prove what memory Elefante would supply." in recall
     assert "No Recall evidence yet" in recall
-    assert "1 · Confirm project" in recall
+    assert "1 · Memory scope" in recall
     assert "2 · Ask one question" in recall
     assert "3 · Inspect the receipt" in recall
     result_block = recall[recall.index("{result && copy && ("):]
     assert "What this proves" in result_block
     assert result_block.index("What this proves") < result_block.index("What it does not prove")
+
+
+def test_empty_recall_reports_observation_not_correctness() -> None:
+    recall = _read("components/RecallTab.tsx")
+
+    assert "No memories selected" in recall
+    assert "A relevant memory may still exist" in recall
+    assert "No match · safe abstention" not in recall
+    assert "supplied no unrelated or ineligible memory" not in recall
+    assert "Your question" in recall
+    dialog = _read("components/HomeMemoryDialog.tsx")
+    assert "No memories selected" in dialog
+    assert "Elefante returned no unrelated history" not in dialog
+
+
+def test_recall_inspection_clears_stale_library_scope() -> None:
+    recall = _read("components/RecallTab.tsx")
+    inspect = recall[recall.index("const inspectMemory ="):recall.index("const copy =")]
+    assert "setSearchQuery('')" in inspect
+    assert "setMemoryWorkspaceView('library')" in inspect
+    assert "setInspectedMemoryId(memoryId)" in inspect
+    assert "onClick={() => setActiveTab('memories')}" not in recall
 
 
 def test_projects_and_recover_explain_value_without_dead_controls_or_address_handoffs() -> None:

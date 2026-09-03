@@ -13,6 +13,16 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Recall distinguishes explicit requested facts from shared topics when using
+  saved questions, and recognizes supported paraphrases with the existing local
+  model. No new model, dependency, memory rewrite, or project-specific matcher
+  is introduced. Its single 450-token bundle can retain two eligible memories
+  instead of stranding capacity in unused task-stage quotas.
+- Memory search closes stale details, and Recall inspection opens an unfiltered
+  Library. Expired-session recovery stays visible above dialogs without covering
+  navigation; in-flight forms cannot be dismissed or changed. Both Recall views
+  describe an empty result honestly, and the selected boundary is named Memory
+  scope rather than requesting repeated project confirmation.
 - Dashboard controls now share explicit expired-session and request-limit
   recovery, without silently replaying operations. The reconnect action remains
   visible above an open memory panel. Recall keeps its question and receipt

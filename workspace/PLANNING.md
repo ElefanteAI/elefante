@@ -1,6 +1,6 @@
 ---
 status: living
-last_updated: 2026-09-01
+last_updated: 2026-09-03
 audience: developer-agents
 authority: state + roadmap + features + aspect-plans for Elefante development
 related:
@@ -119,21 +119,28 @@ Task Intelligence remains developer-only, default-off, and excluded from the
 
 ### §2.3 Current release state
 
+Publication, installed provenance and website identity below were verified on
+2026-09-02; they replace the pre-publication snapshot, not the outstanding
+customer-acceptance requirements in GAP-057.
+
 | Work | Current proof |
 |---|---|
-| Source integration | PR #30 carries the complete local product loop and dashboard curation. Exact-head CI at `1c86bcd18edbaafd9b4ede98997b3a713be97b4c` passed Python, dashboard, dependency, all-platform package, and clean macOS install/uninstall/reinstall lanes before the v2.14.0 version/documentation commit |
-| Local candidate proof | The complete source suite passed 1,005 tests with 9 skips; adjacent package regressions passed 158 tests; the exact clean macOS candidate installed locally and reports `customer_ready=true`, 18 tools, governed Recall ready, and the expected blocked probe without project context |
-| Publication | **EVIDENCE BLOCKED.** Owner authorization covers publication, but the approved product PRD §11 still requires final trusted-package A–F execution, seven native/accessibility evidence files, and three unfamiliar-user first-use receipts, or an equally strict explicit manual approval. A green tag workflow alone is not product-release approval |
-| Installed runtime | The exact clean candidate at `1c86bcd18edbaafd9b4ede98997b3a713be97b4c` is installed with verified safety backup and rollback; final v2.14.0 exact-commit replacement remains pending |
-| Website | Production remains v2.13.0 at `8bad7469bcb94c0ff8c40c51400d9b300e987151`; synchronization must follow an accepted core publication and pass maintained release/production plus rendered-state verification |
+| Source integration | PR #30 merged at `49bd6f552cad096751c879ad5aff74b0de491b88`. This branch carries the local dashboard/Recall repair beyond published v2.14.0; no new push or public release is authorized |
+| Local candidate proof | BUG-047 repair: all 39 cached-model selection regressions pass (the original 27 unchanged), together with 441 focused checks and 52/52 isolated MCP checks. Live browser receipts prove useful Recall, missing-fact abstention, Keep both, correction, Archive/Restore, backup, full data restore and reconnect; empty search leaves zero rows and no stale detail. Existing verified-operation suites cover the remaining controls. These are bounded functional proofs, not whole-product or task-value acceptance |
+| Publication | **v2.14.0 published** after the owner's explicit merge/publication approval. All three published archive checksums were verified. Publication does not prove the remaining native/accessibility/unfamiliar-user evidence tracked by GAP-057 |
+| Installed runtime | v2.14.0 customer candidate. The installed Doctor's `installation.source_commit` and `.elefante-install-summary.txt` are the authorities for the exact local build and completed installation, not the semantic version alone. Only a passing exact commit may replace the runtime; the three curated customer memories must remain unchanged |
+| Website | Production reports v2.14.0 at `3aad549d2e262caac196a042616852e5217f0124`; the maintained release/production verifiers passed in the 2026-09-02 audit. No website change belongs to the current Recall repair |
 
 ### §2.4 Approval gates
 
-The owner explicitly authorized the v2.14.0 commits, pushes, PR completion,
-merge, GitHub release, matching local-runtime replacement, and website
-synchronization. That authority does not fabricate or waive the product
-evidence gate. Durable-data migration, spending, credential rotation, and
-third-party contact remain outside scope.
+The owner explicitly approved merging PR #30 and publishing v2.14.0; those
+actions and website synchronization are completed history, not standing
+authority for another publication. Missing product evidence remains missing.
+The owner approved committing and installing the exact repair locally after
+tests and live acceptance pass. This does not authorize a push, release,
+website change or customer-memory mutation. Durable-data
+migration, spending, credential rotation and third-party contact remain outside
+scope.
 
 ### §2.5 Scope guard
 
@@ -157,12 +164,12 @@ Rejected alternatives remain closed without new evidence:
 ### §2.6 Resume verdict
 
 - **RESUME_SAFE:** YES — active state is here; defects/capability gaps are in [`workspace/ISSUES.md`](../workspace/ISSUES.md); integration truth is in [`agents/manifests/ide-integration.yaml`](../agents/manifests/ide-integration.yaml).
-- **RELEASE_TARGET:** v2.14.0, with the customer contract listed in §2.2.
-- **PUBLISHED_PRODUCT:** v2.13.0 remains public until the v2.14.0 product gate and protected publication complete.
-- **PUBLICATION_STATUS:** EVIDENCE BLOCKED at the explicit §11 customer-product gate; source and package automation are necessary but insufficient.
-- **LIVE_RUNTIME:** Exact clean candidate `1c86bcd18edbaafd9b4ede98997b3a713be97b4c` is installed with verified rollback; final versioned replacement remains pending.
+- **RELEASE_TARGET:** No new public release in the current step.
+- **PUBLISHED_PRODUCT:** v2.14.0 at `49bd6f552cad096751c879ad5aff74b0de491b88`.
+- **PUBLICATION_STATUS:** Published; GAP-057's missing acceptance evidence is not inferred from publication or a healthy daemon.
+- **LIVE_RUNTIME:** v2.14.0 customer candidate; resolve exact provenance from the installed Doctor and package acceptance receipt. BUG-047's source repair passes the bounded acceptance described above; local installation is a separately verified operation.
 - **TASK_INTELLIGENCE:** representative multi-task lift and cross-class generalization are NOT PROVEN; the evaluation surface remains developer-only and default-off.
-- **PUBLICATION_AUTHORITY:** owner authorization covers core publication, matching local installation, and website synchronization; missing product evidence remains missing until supplied or explicitly resolved at equal strictness.
+- **PUBLICATION_AUTHORITY:** No push or public release is authorized for the current Recall repair; historical approval does not authorize a new release.
 
 ---
 
@@ -575,6 +582,8 @@ This section is the chronological record of curation events, decisions, and abso
 
 | Date | Event | Driver | Measurement |
 |------|-------|--------|-------------|
+| 2026-09-03 | **BUG-047 focused repair passes source and live workflow acceptance.** Question targets constrain topic-only delivery; existing-model cue matching handles the missed paraphrases. Preserved the shared Recall budget and fixed stale detail/filter navigation, busy dialogs, reconnect layering and false abstention copy. | Repair the existing product one defect at a time, with no larger model, redesign, customer-memory rewrite or public release. Exact passing local commit/install is authorized. | 39/39 real cached-model selection cases (original 27 unchanged), 441 focused regressions and 52/52 isolated MCP checks pass. Browser proof includes useful/missing-fact Recall, Keep both supplying both records, Edit, Archive and explicit reconnect preserving the draft. The package receipt and installed Doctor remain the exact installation authorities; broader semantic accuracy and task-value lift are not claimed. |
+| 2026-09-02 | **BUG-047 remains open; concrete workflow repairs verified, relevance candidate rejected.** Fixed Recall's stranded stage budget without increasing its 450-token/three-memory caps; guarded in-flight dialogs; shared visible search/detail state; prevented stale search rows; kept navigation and reconnect accessible; corrected deletion/abstention claims. | The owner required real workflow outcomes and no installation of a failed candidate. No redesign, scope redesign, new model, or customer-memory mutation. | 313 focused tests and the UI build pass. Expanded Recall regressions: 16/27 pass; the original subset remains 8/15. Additional offline selectors failed and were removed from runtime code; 55 restoration guards pass. Larger-model evaluation awaits a resource-footprint decision. Isolated browser/SQLite/Kuzu checks proved Keep both before-fail/after-pass, Edit, Replace with old-record exclusion, Archive/Restore, permanent deletion and full backup restore (5 → 4 → 5 with exact record hashes), explicit conflict resolution with winner-only Recall, project registration lifecycle, private support ZIP, empty search, filtering/sorting, Connections trails, view-only Session Intelligence, theme persistence and busy-dialog guards. Expiry/reconnect above an open Edit form preserved its draft and version-1 record until explicit confirmation; Edit then updated the same ID to version 2. Prior legacy-assignment proof remains historical, not rerun here. No commit, install, push or release. |
 | 2026-09-02 | **Continuous dashboard workflow repair; no redesign.** Preserved the existing Review/search/Recall guards, unified expired-session and request-limit recovery without replay, retained page-only Recall question/receipt across inspection, and corrected Recover error visibility and storage-backend labeling. Reconnect stays above the memory drawer; project changes and newer data invalidate stale Recall state. | The owner required real workflow proof, not isolated successful clicks, and approved committing and installing only a tested local candidate. | The 165-test dashboard/snapshot/control/routing slice and production build passed. Real isolated browser use proved Remember, natural-question Recall, Edit, Replace, Archive with zero-match Recall, Restore, permanent deletion, backup and actual data restoration (5 records → 4 → 5), project add/rename/deactivate/reactivate/remove, explicit legacy assignment, and expiry/reconnect without replay. Database/registry readbacks matched the UI. User data was not used for destructive acceptance. Local installation requires exact committed-source/package verification and preservation of the three curated customer memories; no push or public release is authorized. |
 | 2026-09-02 | **Live dashboard use converted three misleading states into guarded behavior without removing capability.** Home's direct-signal recommendation now opens the counted Review queue; verified Remember refreshes header statistics as well as the graph; connection state no longer claims that operations were verified; archived and superseded records retain the verified permanent-delete route; Connections, Session Intelligence, and package maintenance identify their view-only or external-action boundaries. The same live run reproduced BUG-047: after the exact `VISIBLE-V2-9202` fixture became inactive, Recall substituted the canonical mission. Identifier-bearing questions now require identifier-bearing evidence on ordinary text-only delivery paths and otherwise abstain. | The owner required a binary product test: if a feature is visible, it must work or state exactly what it does. Browser evidence—not the existing source claims—showed that navigation, header refresh, correction reachability, and Recall abstention violated that contract. | Fail-first regressions covered Review routing, verified-write refresh, inactive correction reachability, status-only labels, identifier false-positive abstention, and the matching positive control. Focused dashboard, routing, Remember, Recall, Correct, Projects, and Recover suites passed after repair; the production UI build transformed 1,482 modules. A rendered source candidate opens Review 10/10 from Home and exposes accessible filter/row controls. Against the real fixture question, the repaired source returns `no_match`, zero selected IDs, one withheld conflict, and no memory content. The installed runtime, customer records, website, git index/history, remote, release, and deployment were not changed. |
 | 2026-09-01 | **The preservation-first Elefante Home source prototype now has one product purpose and an evidence-backed operator workflow without deleting advanced capability.** Home leads with “Make memory useful for the next task,” then Global understanding, Task intelligence, and Continuity. Recall claims governed selection only after a real receipt; Memory Intelligence owns Library and direct-signal Review; Connections owns Topics, stored Vitality, and explicit Decision Graph trails; Projects explains the isolation boundary without making overall inspection project-dependent; Recover separates capability from timestamped readiness evidence. Earlier Briefing ideas remain in those authoritative workspaces rather than a duplicated random-memory narrative. Host, port, and launch origin are transport only. BUG-070 records the recurrence. | The owner rejected a readiness-first dashboard, dead controls, unverified cards, hardcoded narrative, and the mistaken treatment of two local addresses as two product journeys. The required correction was stronger evidence and a clearer Elefante workflow—not another product rethink or feature deletion. | Current exact-source proof: 238 dashboard/Home/daemon/routing tests passed with 2 intentional deselections; the production UI build passed with 1,482 modules. Live browser acceptance exercised Home's recommended action, all six workspaces, Review's 2 direct signals, Vitality, 8 explicit Decision Graph trails, Recall/Projects/Recover no-receipt states, and light/dark at 1280×720 plus 390×844. The repaired phone header has no horizontal overflow; action contrast is explicit; browser console logs are empty. The existing HTML guide, PRD, issue ledger, and dashboard postmortem match this source contract. No customer data, installed runtime, website, git index/history, remote, release, or deployment changed. Next gates: three unfamiliar-operator trials, then one exact-package acceptance; website synchronization follows only the published capability. |

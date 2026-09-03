@@ -645,7 +645,7 @@ new plan and confirm it before trying the operation again.</p>
 </tr>
 <tr>
 <td>Memories</td>
-<td>Memory-node count in the current snapshot</td>
+<td>Total memory count reported by the local vector store statistics</td>
 </tr>
 <tr>
 <td>Entities</td>
@@ -687,15 +687,20 @@ store is stale or empty.</p>
 <li><strong>Recover</strong> — health, backup, restore, support report, and package handoff.</li>
 </ol>
 <p>The number keys <code>1</code> through <code>6</code> switch to those workspaces when focus is
-not inside a text field. <code>Escape</code> closes the open memory detail and clears its
-search state. Dialogs also support <code>Escape</code>; managed operations cannot be closed
-while their apply step is running.</p>
+not inside an editable control or dialog. <code>Escape</code> closes the open memory detail
+and clears snapshot search, including when search has focus. The detail panel stays
+inside the memory workspace and does not cover top navigation. Dialogs also support
+<code>Escape</code>; Remember and correction dialogs cannot be dismissed or changed
+while a managed operation is running.</p>
+<p>Starting a new snapshot search closes the previous memory detail, so an empty
+search does not leave an old record looking like a new result.</p>
 <h3 id="footer"><a class="heading-anchor" href="#footer">Footer</a></h3>
 <p>The footer repeats the product version and distinguishes:</p>
 <ul>
-<li><strong>local session active</strong> — named management routes are available;</li>
+<li><strong>live local session</strong> — named management routes are available;</li>
 <li><strong>connecting local service</strong> — the page is establishing its loopback session;</li>
 <li><strong>local snapshot</strong> — inspection is available, but management is not active.</li>
+<li><strong>read-only snapshot</strong> — this surface does not expose management controls.</li>
 </ul>
 <h2 id="home-purpose-evidence-next"><a class="heading-anchor" href="#home-purpose-evidence-next">Home: purpose, evidence, next action</a></h2>
 <p>Home begins with the product promise: <strong>Make memory useful for the next task.</strong>
@@ -781,8 +786,9 @@ still block the operation when its safety conditions are not met.</p>
 future Recall question; inspect a no-write plan; confirm its single-use ticket;
 apply once; verify store, graph, Home, and scoped Recall; then inspect the
 privacy-safe receipt. Protected memories add explicit acknowledgement. Permanent
-deletion adds exact <code>DELETE</code> confirmation and is not recoverable after all
-postconditions pass.</p>
+deletion adds exact <code>DELETE</code> confirmation. Its temporary safety backup is
+destroyed only after all postconditions pass. Older backups are not deleted and may
+still contain the memory; restoring one can bring that record back.</p>
 
 <h3 id="resolve"><a class="heading-anchor" href="#resolve">Resolve</a></h3>
 <p><strong>Verified Resolve</strong> appears only for a represented conflict pair. The
@@ -813,6 +819,9 @@ readiness evidence only after a timestamped check or verified operation receipt.
 question. The first version is deliberately narrow: one ephemeral question,
 one active registered project, and one read-only check. It does not answer the
 question, write a memory, or create Recall history for dashboard convenience.</p>
+<p><strong>Memory scope</strong> names the memories available to this check, not
+the subject you must ask about. A preselected boundary needs no repeated setup.
+Overall browsing remains available in the Library without a project.</p>
 <p><strong>Run Recall Check</strong> returns bounded proof, not private memory content:</p>
 <div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
@@ -828,7 +837,7 @@ question, write a memory, or create Recall history for dashboard convenience.</p
 </tr>
 <tr>
 <td><code>no_match</code></td>
-<td>Recall ran correctly and abstained because it found no eligible memory</td>
+<td>No memories passed the matching rules. A relevant memory may still exist; this is not proof that abstention was correct. Use <strong>Inspect available memories</strong> to check the library.</td>
 </tr>
 <tr>
 <td><code>blocked</code></td>
@@ -843,17 +852,22 @@ question, write a memory, or create Recall history for dashboard convenience.</p
 <p>The receipt may also show conflict count, active project, and verification
 time. A selected ID can open that record in Memory Intelligence. The selected
 memory content remains in the agent delivery path and is not copied into Home.</p>
+<p>Opening a selected record or <strong>Inspect available memories</strong>
+clears an old snapshot search and opens Library, so previous filters cannot
+hide the record you asked to inspect.</p>
 <p>The current question and receipt stay available when you inspect a record
 and return. They live only in this page's memory, not saved history. Changing
 the question or loading a newer snapshot clears the receipt; changing project
 or reloading the page clears both.</p>
 <p>If the local session expires or reaches its request limit, use
-<strong>Reconnect Home</strong>. Your current question remains available, but
-Elefante does not rerun a check or repeat a change automatically. For a change,
+<strong>Reconnect Home</strong>. The reconnect control stays above open dialogs
+without covering the header or navigation,
+and your current question or correction draft remains available. Elefante
+does not rerun a check or repeat a change automatically. For a change,
 inspect a fresh plan and confirm it yourself.</p>
 <p>The current contract does <strong>not</strong> expose per-signal reasons, withheld IDs,
 historical trace, answer quality, or task-outcome evidence. A supplied bundle
-does not prove that an answer was correct; <code>no_match</code> can be a healthy result.</p>
+does not prove that an answer was correct; <code>no_match</code> proves only that nothing was selected.</p>
 <p>If no active project or local management session is available, Recall fails
 closed and points to Projects or Home. It never converts the all-memory view
 into a global Recall scope.</p>

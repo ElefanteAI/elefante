@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   Brain,
@@ -75,16 +75,28 @@ export function HomeMemoryDialog({
   const [question, setQuestion] = useState('');
   const [rememberResult, setRememberResult] = useState<RememberResponse | null>(null);
   const [recallResult, setRecallResult] = useState<RecallTestResponse | null>(null);
+  const busy = mode === 'remember' ? isRemembering : isRecallTesting;
+  const title = mode === 'remember' ? 'Remember for this project' : 'Test Recall for this project';
+  const closeDialog = useCallback(() => {
+    if (busy) return;
+    onClose();
+  }, [busy, onClose]);
 
   useEffect(() => {
     clearRememberError();
     clearRecallTestError();
+  }, [clearRecallTestError, clearRememberError]);
+
+  useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      closeDialog();
     };
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [clearRecallTestError, clearRememberError, onClose]);
+  }, [closeDialog]);
 
   const selectedTitles = useMemo(() => {
     const names = new Map(getMemoryNodes().map((memory) => [memory.id, memory.name]));
@@ -116,21 +128,19 @@ export function HomeMemoryDialog({
   };
 
   const reviewOverlap = () => {
+    if (busy) return;
     const memoryId = rememberResult?.plan?.overlaps[0]?.memory_id;
     if (memoryId) setInspectedMemoryId(memoryId);
     setActiveTab('memories');
-    onClose();
+    closeDialog();
   };
-
-  const busy = mode === 'remember' ? isRemembering : isRecallTesting;
-  const title = mode === 'remember' ? 'Remember for this project' : 'Test Recall for this project';
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/85 px-3 py-6 backdrop-blur-sm md:items-center md:py-10"
       role="presentation"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget) closeDialog();
       }}
     >
       <section
@@ -158,7 +168,8 @@ export function HomeMemoryDialog({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={closeDialog}
+            disabled={busy}
             aria-label="Close dialog"
             className="min-h-10 min-w-10 border border-slate-800 text-slate-500 hover:border-slate-600 hover:text-slate-200"
           >
@@ -178,6 +189,7 @@ export function HomeMemoryDialog({
                         key={kind.value}
                         type="button"
                         onClick={() => setKnowledgeKind(kind.value)}
+                        disabled={busy}
                         aria-pressed={knowledgeKind === kind.value}
                         className={`min-h-20 border p-3 text-left transition-colors ${
                           knowledgeKind === kind.value
@@ -206,6 +218,7 @@ export function HomeMemoryDialog({
                   maxLength={8000}
                   rows={5}
                   required
+                  disabled={busy}
                   autoFocus
                   placeholder="Example: Use SQLite for the project index because local recovery is required."
                   className="mt-2 w-full resize-y border border-slate-700 bg-slate-900/80 px-3 py-3 text-sm leading-relaxed text-slate-100 outline-none placeholder:text-slate-700 focus:border-cyan-400/70"
@@ -224,6 +237,7 @@ export function HomeMemoryDialog({
                   minLength={1}
                   maxLength={1000}
                   required
+                  disabled={busy}
                   placeholder="Example: What database should the project index use?"
                   className="mt-2 min-h-11 w-full border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-700 focus:border-cyan-400/70"
                 />
@@ -251,16 +265,16 @@ export function HomeMemoryDialog({
                   ))}
                 </div>
                 <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <button type="button" onClick={reviewOverlap} className="min-h-11 border border-slate-700 px-3 text-xs text-slate-300 hover:border-cyan-400/60">
+                  <button type="button" onClick={reviewOverlap} disabled={busy} className="min-h-11 border border-slate-700 px-3 text-xs text-slate-300 hover:border-cyan-400/60">
                     Update existing
                   </button>
-                  <button type="button" onClick={reviewOverlap} className="min-h-11 border border-slate-700 px-3 text-xs text-slate-300 hover:border-cyan-400/60">
+                  <button type="button" onClick={reviewOverlap} disabled={busy} className="min-h-11 border border-slate-700 px-3 text-xs text-slate-300 hover:border-cyan-400/60">
                     Supersede existing
                   </button>
                   <button type="button" onClick={() => void keepBoth()} disabled={busy} className="min-h-11 border border-amber-300/50 px-3 text-xs text-amber-100 hover:bg-amber-950/20 disabled:opacity-50">
                     {busy ? 'Verifying…' : 'Keep both'}
                   </button>
-                  <button type="button" onClick={onClose} className="min-h-11 border border-slate-800 px-3 text-xs text-slate-500 hover:text-slate-200">
+                  <button type="button" onClick={closeDialog} disabled={busy} className="min-h-11 border border-slate-800 px-3 text-xs text-slate-500 hover:text-slate-200">
                     Cancel
                   </button>
                 </div>
@@ -299,7 +313,7 @@ export function HomeMemoryDialog({
             )}
 
             <div className="mt-5 flex justify-end gap-2 border-t border-slate-800 pt-4">
-              <button type="button" onClick={onClose} className="min-h-11 border border-slate-800 px-4 text-xs text-slate-500 hover:text-slate-200">
+              <button type="button" onClick={closeDialog} disabled={busy} className="min-h-11 border border-slate-800 px-4 text-xs text-slate-500 hover:text-slate-200">
                 {rememberResult?.remember_status === 'VERIFIED_COMPLETE' ? 'Done' : 'Close'}
               </button>
               {rememberResult?.remember_status !== 'VERIFIED_COMPLETE' && rememberResult?.remember_status !== 'NEEDS_HUMAN' && (
@@ -329,6 +343,7 @@ export function HomeMemoryDialog({
               minLength={1}
               maxLength={1000}
               required
+              disabled={busy}
               autoFocus
               placeholder="What decision should guide this work?"
               className="mt-2 min-h-12 w-full border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-700 focus:border-cyan-400/70"
@@ -351,7 +366,7 @@ export function HomeMemoryDialog({
                       {recallResult.recall_status === 'supplied'
                         ? `Recall supplied ${recallResult.selected_count ?? selectedTitles.length} project ${selectedTitles.length === 1 ? 'memory' : 'memories'}`
                         : recallResult.recall_status === 'no_match'
-                          ? 'No applicable project memory'
+                          ? 'No memories selected'
                           : recallResult.recall_status === 'blocked'
                             ? 'Recall stopped for conflict review'
                             : 'Recall test unavailable'}
@@ -359,7 +374,7 @@ export function HomeMemoryDialog({
                     <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
                       {recallResult.recall_status === 'supplied'
                         ? 'The governed Recall path selected these records. Their private content stayed in the agent path.'
-                        : recallResult.error || 'Elefante returned no unrelated history.'}
+                        : recallResult.error || 'No memory was supplied. This does not prove that the library contains no relevant information.'}
                     </p>
                   </div>
                 </div>
@@ -382,7 +397,7 @@ export function HomeMemoryDialog({
             )}
 
             <div className="mt-5 flex justify-end gap-2 border-t border-slate-800 pt-4">
-              <button type="button" onClick={onClose} className="min-h-11 border border-slate-800 px-4 text-xs text-slate-500 hover:text-slate-200">
+              <button type="button" onClick={closeDialog} disabled={busy} className="min-h-11 border border-slate-800 px-4 text-xs text-slate-500 hover:text-slate-200">
                 Close
               </button>
               <button

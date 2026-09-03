@@ -167,6 +167,8 @@ class TaskBriefCompiler:
     MIN_RETRIEVAL_SCORE = 0.3
     MIN_ROLE_ANCHOR_COVERAGE = 0.20
     MIN_GOVERNING_DIRECTIVE_SEMANTIC = 0.85
+    MIN_RECALL_CUE_SIMILARITY = 0.93
+    MIN_FOCUSED_CUE_SIMILARITY = 0.85
     _VALIDATION_MARKERS = (
         "acceptance",
         "assert",
@@ -691,6 +693,8 @@ class TaskBriefCompiler:
             )
             surface_match = float(bool(result.surface_matches))
             recall_cue_match = float(bool(result.recall_cue_match))
+            recall_cue_similarity = float(result.recall_cue_similarity or 0.0)
+            cue_focus = self._recall_cue_focus(query_text, memory)
             semantic = float(
                 0.0
                 if surface_match or recall_cue_match
@@ -736,7 +740,7 @@ class TaskBriefCompiler:
                     + 0.25 * specificity
                 )
             )
-            actionability = min(1.0, raw_actionability)
+            actionability = min(1.0, max(raw_actionability, recall_cue_similarity))
             signals = {
                 "semantic": round(semantic, 6),
                 "lexical": round(lexical, 6),
@@ -759,6 +763,9 @@ class TaskBriefCompiler:
                 "governing_directive": governing_directive,
                 "surface_match": surface_match,
                 "recall_cue_match": recall_cue_match,
+                "recall_cue_similarity": recall_cue_similarity,
+                "recall_cue_focus": cue_focus,
+                "recall_focus_similarity": float(result.recall_focus_similarity or 0.0),
             }
             signals["direct_answer"] = float(
                 semantic >= 0.78
@@ -777,6 +784,7 @@ class TaskBriefCompiler:
                 "governing_directive",
                 "surface_match",
                 "recall_cue_match",
+                "recall_cue_similarity",
             )
                 if float(signals[name]) > 0
             ]
@@ -838,6 +846,26 @@ class TaskBriefCompiler:
         governing_directive = (
             float(signals.get("governing_directive", 0.0)) > 0.0
         )
+        # Topic overlap cannot override a known mismatch between the fact
+        # requested and the questions this memory was saved to support.
+        # Structural and explicit governing evidence retain their own paths.
+        if (
+            (
+                signals.get("recall_cue_focus") == "different"
+                or (
+                    signals.get("recall_cue_focus") == "choice"
+                    and float(signals.get("recall_focus_similarity", 0.0)) < self.MIN_FOCUSED_CUE_SIMILARITY
+                )
+                or (
+                    signals.get("recall_cue_focus") == "property"
+                    and float(signals.get("recall_cue_similarity", 0.0)) < self.MIN_RECALL_CUE_SIMILARITY
+                )
+            )
+            and not strong_location_match
+            and not governing_directive
+            and float(signals.get("dependency", 0.0)) == 0.0
+        ):
+            return False
         if (
             int(signals.get("query_identifiers", 0)) > 0
             and int(signals.get("matched_identifiers", 0)) == 0
@@ -846,6 +874,20 @@ class TaskBriefCompiler:
             and not governing_directive
         ):
             return False
+        # The orchestrator compares complete saved questions, requires a clear
+        # margin over other memories, and never marks an ambiguous winner.
+        # Keep identifier and all earlier governance gates in front of it.
+        if (
+            float(signals.get("recall_cue_similarity", 0.0))
+            >= (
+                self.MIN_FOCUSED_CUE_SIMILARITY
+                if signals.get("recall_cue_focus") in {"same", "choice"}
+                else self.MIN_RECALL_CUE_SIMILARITY
+            )
+        ):
+            return int(signals.get("matched_identifiers", 0)) == int(
+                signals.get("query_identifiers", 0)
+            )
         if (
             int(signals.get("matched_terms", 0)) < minimum_matches
             and float(signals.get("dependency", 0.0)) == 0.0
@@ -904,6 +946,89 @@ class TaskBriefCompiler:
             and action_anchor
             and (direct_answer or item.actionability_score >= 0.3)
         )
+
+    @staticmethod
+    def _question_focus(text: str) -> str | None:
+        """Recognize explicit question targets, not subjects or product names.
+
+        This deliberately small English grammar distinguishes e.g. where from
+        when, and 'which airline' from 'which seat'. Unknown wording supplies
+        no evidence. There is no domain vocabulary or answer generation here.
+        """
+        text = " ".join(text.casefold().split())
+        auxiliary = r"(?:am|is|are|was|were|do|does|did|can|could|should|would|will|must|have|has)"
+        match = re.search(r"\b(where|when|who|why|how|what|which)\b", text)
+        if not match:
+            if re.match(auxiliary + r"\b", text) and " or " in text:
+                # For a closed choice, compare the requested property with the
+                # alternatives themselves, not the shared subject words.
+                before, after = text.rsplit(" or ", 1)
+                option = re.split(r"\b(?:in|with|by|as|using|choose|prefer|want)\b", before)[-1]
+                return "choice:" + (option.strip() + " or " + after).rstrip("?.!")
+            return None
+        word, rest = match[1], text[match.end():].strip()
+        if word in {"where", "when", "who", "why"}:
+            return {"where": "location", "when": "time", "who": "person", "why": "reason"}[word]
+        if word == "how":
+            measure = re.match(r"(many|much|long|often|old)\b(.*)", rest)
+            if measure:
+                kind, tail = measure.groups()
+                if kind in {"many", "much"} and re.match(
+                    r"\s+(?:time|seconds?|minutes?|hours?|days?|weeks?|months?|years?)\b", tail,
+                ):
+                    return "duration"
+                return {"many": "count", "much": "amount", "long": "duration", "often": "frequency", "old": "age"}[kind]
+            return "method" if re.match(auxiliary + r"\b", rest) else None
+        # A noun phrase before the auxiliary names the requested property.
+        # Bare 'what is X?' has no explicit property and remains unknown.
+        if re.match(auxiliary + r"\b", rest):
+            return None
+        phrase = re.match(r"(.+?)\s+" + auxiliary + r"\b", rest)
+        if not phrase:
+            return None
+        words = re.findall(r"[a-z]+", re.split(r"\b(?:of|for|in|on)\b", phrase[1])[0])
+        if not words:
+            return None
+        head = words[-1]
+        if head == "time":
+            return "time"
+        return "property:" + " ".join(words)
+
+    @classmethod
+    def _recall_cue_focus(cls, question: str, memory: Memory) -> str:
+        """Compare explicit targets; ambiguity neither proves nor vetoes fit."""
+        from src.utils.curation import canonicalize_recall_cues
+
+        target = cls._question_focus(question)
+        if target is None or not memory.metadata.recall_cues:
+            return "unknown"
+        focuses = [cls._question_focus(cue) for cue in canonicalize_recall_cues(memory.metadata.recall_cues)]
+        if not focuses:
+            return "unknown"
+        def key(focus: str | None) -> str | None:
+            if focus and focus.startswith("property:"):
+                return "property:" + focus.partition(":")[2].split()[-1]
+            return focus
+
+        if key(target) in [key(focus) for focus in focuses]:
+            return "same"
+        # Open-ended guidance can use constraints or facts saved under a more
+        # specific question. A different question form alone is not a veto.
+        if target in {"method", "reason"}:
+            return "unknown"
+        if None in focuses:
+            return "unknown"
+        # A named property present in the body may be covered by a broader
+        # saved question. Do not turn cues into an exhaustive whitelist.
+        if target.startswith("property:"):
+            if any(focus and focus.startswith("choice:") for focus in focuses):
+                return "choice"
+            head = target.partition(":")[2].split()[-1]
+            if head in cls._canonical_terms(memory.content):
+                return "unknown"
+            if any(focus and focus.startswith("property:") for focus in focuses):
+                return "property"
+        return "different"
 
     @staticmethod
     def _declared_scope_anchor(

@@ -76,6 +76,32 @@ def _context_result(
     )
 
 
+def test_answer_context_shares_its_budget_across_matching_memories():
+    """Recall is one answer bundle, not three mostly empty task-stage quotas."""
+    question = "Where is the rehearsal device battery pack stored?"
+    results = [
+        _context_result(
+            f"The rehearsal device stores its battery pack in the {colour} cabinet.",
+            memory_type=MemoryType.DECISION,
+        )
+        for colour in ("blue", "green")
+    ]
+    for result in results:
+        result.recall_cue_match = True
+        result.memory.metadata.project = "test"
+        result.memory.metadata.workspace = "/work/test"
+        result.memory.metadata.recall_cues = [question]
+    context = compile_answer_context(
+        question, results, project="test", workspace="/work/test", include_question=False,
+    )
+    assert set(context.selected_memory_ids) == {str(item.memory.id) for item in results}
+    assert estimate_tokens(context.text) <= 450
+    limited = compile_answer_context(
+        question, results, project="test", workspace="/work/test", max_memories=1,
+    )
+    assert limited.selected_count == 1
+
+
 def test_answer_context_selects_answer_bearing_memory_and_rejects_related_noise():
     relevant = _context_result(
         "Elefante customer installation uses one global runtime for every compatible IDE.",
@@ -2829,7 +2855,14 @@ async def test_memory_search_answer_context_blocks_digest_stale_locked_memory(
         async def search_memories(self, **_kwargs):
             return [stale]
 
+    from src.core.project_registry import ProjectRegistry
+
     server = ElefanteMCPServer()
+    server._project_registry = ProjectRegistry(tmp_path / "projects.json")
+    project = server._project_registry.register("Source validation", tmp_path)
+    server._project_registry.set_mode("strict")
+    stale.memory.metadata.project = project.project_id
+    stale.memory.metadata.workspace = project.root
     monkeypatch.setattr(
         server,
         "_request_provenance",
@@ -2876,7 +2909,14 @@ async def test_prompt_and_recall_block_digest_stale_locked_memory(
         async def search_memories(self, **_kwargs):
             return [stale]
 
+    from src.core.project_registry import ProjectRegistry
+
     server = ElefanteMCPServer()
+    server._project_registry = ProjectRegistry(tmp_path / "projects.json")
+    project = server._project_registry.register("Source validation", tmp_path)
+    server._project_registry.set_mode("strict")
+    stale.memory.metadata.project = project.project_id
+    stale.memory.metadata.workspace = project.root
     monkeypatch.setattr(
         server,
         "_request_provenance",

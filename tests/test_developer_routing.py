@@ -360,11 +360,10 @@ def test_living_plan_tracks_the_released_product_and_separate_client_candidate()
     assert "| OB4 |" not in planning
     assert "| OB5 |" not in planning
     assert "source-grounded" in planning
-    assert f"**RELEASE_TARGET:** v{version}" in planning
-    assert (
-        "**PUBLICATION_AUTHORITY:** owner authorization covers core publication, "
-        "matching local installation, and website synchronization"
-    ) in planning
+    assert f"**PUBLISHED_PRODUCT:** v{version}" in planning
+    assert "**LIVE_RUNTIME:**" in planning
+    assert "**PUBLICATION_AUTHORITY:**" in planning
+    assert "historical approval does not authorize a new release" in planning
 
 
 def test_active_scoring_reference_matches_runtime_contract() -> None:

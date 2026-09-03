@@ -41,45 +41,41 @@ function needsReview(memory: MemoryNode): boolean {
 }
 
 export function MemoriesTab() {
-  const [query, setQuery] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [mode, setMode] = useState<'browse' | 'search'>('browse');
+  const query = useDashboardStore((s) => s.searchQuery);
+  const setQuery = useDashboardStore((s) => s.setSearchQuery);
+  const selectedId = useDashboardStore((s) => s.inspectedMemoryId);
+  const setSelectedId = useDashboardStore((s) => s.setInspectedMemoryId);
+  const [searchedQuery, setSearchedQuery] = useState('');
+  const mode = query.trim().length >= 2 ? 'search' : 'browse';
   const workspaceView = useDashboardStore((s) => s.memoryWorkspaceView);
   const setWorkspaceView = useDashboardStore((s) => s.setMemoryWorkspaceView);
   
   const isLoading = useDashboardStore((s) => s.isLoading);
-  const inspectedMemoryId = useDashboardStore((s) => s.inspectedMemoryId);
-  const setInspectedMemoryId = useDashboardStore((s) => s.setInspectedMemoryId);
   const getMemoryNodes = useDashboardStore((s) => s.getMemoryNodes);
   const snapshot = useDashboardStore((s) => s.snapshot);
   const isShowcase = snapshot?.snapshot_context?.mode === 'showcase';
   const memories = getMemoryNodes();
 
-  // Auto-open detail panel from external navigation (e.g. ActivityFeed click)
-  useEffect(() => {
-    if (inspectedMemoryId) {
-      setSelectedId(inspectedMemoryId);
-    }
-  }, [inspectedMemoryId]);
-  
-  const { results, isSearching, search } = useSearch();
+  const { results, isSearching, searchError, search, clear } = useSearch();
   
   // Debounced search
   useEffect(() => {
+    clear();
     const timer = setTimeout(() => {
       if (query.trim().length >= 2) {
-        setMode('search');
-        search(query);
-      } else {
-        setMode('browse');
+        setSearchedQuery(query);
+        void search(query);
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [query, search]);
+  }, [query, search, clear]);
+
+  const searchPending = mode === 'search' && (searchedQuery !== query || isSearching);
+  const currentResults = searchPending ? [] : results;
 
   // Convert search results to memory-like format for table
   const searchMemories: MemoryNode[] = mode === 'search'
-    ? results.map((r: SearchResult) => ({
+    ? currentResults.map((r: SearchResult) => ({
         id: r.id,
         name: r.content.slice(0, 50),
         type: 'memory' as const,
@@ -160,7 +156,7 @@ export function MemoriesTab() {
         <div className="flex items-center gap-1 border border-slate-800 bg-slate-950/55 p-1" aria-label="Memory Intelligence view">
           <button
             type="button"
-            onClick={() => setWorkspaceView('library')}
+            onClick={() => { setSelectedId(null); setWorkspaceView('library'); }}
             aria-pressed={workspaceView === 'library'}
             className={`inline-flex min-h-9 items-center gap-2 px-3 text-xs ${
               workspaceView === 'library'
@@ -173,7 +169,7 @@ export function MemoriesTab() {
           </button>
           <button
             type="button"
-            onClick={() => setWorkspaceView('review')}
+            onClick={() => { setSelectedId(null); setWorkspaceView('review'); }}
             aria-pressed={workspaceView === 'review'}
             className={`inline-flex min-h-9 items-center gap-2 px-3 text-xs ${
               workspaceView === 'review'
@@ -202,11 +198,14 @@ export function MemoriesTab() {
               type="text"
               aria-label="Search the current memory snapshot"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setSelectedId(null);
+                setQuery(e.target.value);
+              }}
               placeholder="Snapshot search... (2+ characters)"
               className="w-full pl-10 pr-10 py-3 bg-slate-900/60 border border-slate-700/60 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/50"
             />
-            {isSearching && (
+            {searchPending && (
               <div className="absolute right-10 top-1/2 -translate-y-1/2">
                 <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
               </div>
@@ -222,9 +221,12 @@ export function MemoriesTab() {
               </button>
             )}
           </div>
-          {mode === 'search' && query.trim().length >= 2 && (
+          {searchError && mode === 'search' && (
+            <p role="alert" className="mt-2 text-xs text-amber-200">Snapshot search failed: {searchError}. Clear the search to browse your memories.</p>
+          )}
+          {!searchError && mode === 'search' && query.trim().length >= 2 && (
             <div className="mt-2 text-xs text-slate-500">
-              {isSearching ? 'Searching...' : `${results.length} snapshot results for "${query}"`}
+              {searchPending ? 'Searching...' : `${results.length} snapshot results for "${query}"`}
             </div>
           )}
         </div>
@@ -238,7 +240,6 @@ export function MemoriesTab() {
           onSelectMemory={(memory) => {
             const newId = selectedId === memory.id ? null : memory.id;
             setSelectedId(newId);
-            setInspectedMemoryId(newId);
           }}
         />
 
@@ -275,11 +276,9 @@ export function MemoriesTab() {
               } : undefined}
               onClose={() => {
                 setSelectedId(null);
-                setInspectedMemoryId(null);
               }}
               onNavigateToMemory={(id) => {
                 setSelectedId(id);
-                setInspectedMemoryId(id);
               }}
             />
           );

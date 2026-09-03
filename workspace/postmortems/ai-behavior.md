@@ -137,12 +137,112 @@
 
 <a id="issue-15"></a>
 
-## Issue #15: Search Ranking Was Mistaken for Answer Context [BUG-047, FIXED AGAIN, guarded]
+## Issue #15: Search Ranking Was Mistaken for Answer Context [BUG-047, FIXED locally]
 
 **Trigger:** `elefante-context` initially injected the raw top five search hits, and normal search told the agent that every result was authoritative. On 2026-08-14, a live replacement-task screen exposed a recurrence: Recall supplied unrelated SDD/developer-etiquette constraints for three real GitHub product questions instead of abstaining. A live positive control then caught the first repair rejecting the canonical mission on a paraphrased question. On 2026-08-15, the independently requested task `use Elefante to improve Elefante` exposed a narrower recurrence: generic Developer Etiquette was selected when `Elefante` was the only distinct matched term. On 2026-09-02, the exact question for archived fixture `VISIBLE-V2-9202` selected the unrelated canonical mission instead of returning `no_match`.
 **Root cause:** Retrieval and answer delivery were initially treated as one operation. The first v2 guard counted an intrinsic evidence role (`constraint`, `decision`, `failure`, or `safeguard`) as both independent relevance and a question-specific action anchor; one live false positive matched only 3 of 28 task terms (10.7%) but passed because it was classified as a constraint. Replacing that error with one absolute lexical threshold overfit the negative case and discarded an explicitly user-enforced governing directive. The remaining short-query path still treated one of three distinct terms as both a direct answer and a role-text anchor; repeating the product name raised its apparent coverage without adding task evidence. The identifier recurrence then showed that high semantic similarity plus generic words such as `verification`, `code`, and `acceptance` could satisfy the same threshold while ignoring the query's distinguishing identifier.
 **Solution:** Keep broad search for exploration and one fail-closed answer selector for delivery. Text-only evidence for a multi-term question requires at least two distinct matched terms before it can become a direct answer or ordinary role-text anchor. An identifier-bearing question additionally requires an identifier-bearing match on the ordinary text-only path. One-term factual questions remain eligible, and exact Recall cues, explicit path or graph evidence, mandatory governance, and semantically strong user-locked scoped directives retain their separate bounded paths. Broad search remains inspectable, while always-inject policy remains governed separately.
 **Lesson:** A retrieved role, project identity, or shared workflow vocabulary is not proof of task applicability, but explicit user governance is also not ordinary ranking metadata. Test false-positive abstention, the distinguishing identifier, genuine one-term facts, and the intended user-enforced decision path together.
+
+**2026-09-02 recurrence and candidate boundary:** The three curated customer
+memories are present; this is not missing ingestion. `What is Elefante for?`
+matches only `elefante` at the text gate, so the installed selector withholds
+the purpose memory. Dropping question words alone would also admit the two
+same-product distractors. An uncommitted candidate therefore compares the
+complete question with existing scoped Recall cues using the already loaded
+local model, without changing durable records or the ordinary lexical guard.
+The candidate's bounds and limitations are recorded in
+[`docs/reference/scoring.md`](../../docs/reference/scoring.md#recall-cue-candidate-not-accepted).
+
+**Acceptance result:** An isolated real SQLite/Kuzu dashboard selected the
+unchanged purpose body, preserved the dashboard and solo-operator results,
+and abstained on the unrelated sourdough question. Review and settled empty
+search also remained correct. The MCP self-protocol passed 52/52 checks.
+The initial positive saved-question checks passed only 5/6. Adding the frozen
+missing-fact controls gives **8/15 correct**: `Where are the backup batteries
+kept?` misses the recorded hall-cabinet location, while six questions asking
+for absent brands, quantities, prices or durations receive same-topic records.
+These expected results remain failing tests, not rewritten fixtures or claimed
+successful abstentions. The candidate is
+**not accepted for commit or installation**. Existing live memories and the
+installed runtime were not changed. This is functional evidence, not general
+retrieval effectiveness or task-value lift.
+
+The failed location question's measured cue cosine was `0.8730`, versus
+`0.7017` for the unrelated herb-watering cue. Its `0.1714` margin clears the
+candidate's separation guard but its score does not clear the `0.93` floor.
+One universal absolute cue threshold has not been calibrated across question
+types; a product-name success must not be presented as that calibration.
+
+**Proof repair:** Two pre-existing MCP stale-source tests also failed on the
+clean `9cbb3bb` baseline because their temporary workspace was unregistered.
+Their fixtures now register and bind that workspace so the unchanged
+assertions actually exercise stale-source blocking. All 24 targeted MCP
+Recall/answer-context tests pass; the semantic acceptance failures remain.
+
+**Root-cause follow-through:** The relevant battery body has raw cosine
+`0.8722` but only one literal term overlap; the old guard rejects it. An
+irrelevant dashboard-price question has raw cosine `0.8970` and two topic
+words, so the old guard admits it without the cue candidate. Topic similarity
+does not prove the requested fact exists. A model-free token-alignment probe
+also missed an ordinary staffing question and was discarded, not installed.
+Do not keep tuning example keywords or thresholds to call this solved.
+
+A separate live Keep both failure came from splitting Recall's 450-token
+answer budget into three stage quotas. Sharing that same bounded budget
+admits both eligible records; its fail-first regression and isolated browser
+Keep both, Edit, Replace, Archive/Restore, conflict Resolve and full backup
+restore passed. Full restore reproduced all five record hashes after 5→4→5.
+The browser also exposed a drawer blocking navigation and a reconnect banner
+trapped below portal dialogs; their repairs were verified with real clicks.
+Reconnect preserved the open correction draft and made no automatic write.
+These repairs do not clear the 8/15 relevance blocker or authorize installing
+the failed combined candidate.
+
+**Further bounded investigation (2026-09-02, rejected):** Coverage now includes
+27 fixed questions across ten everyday domains. The preserved lightweight
+candidate passes 16/27; its original 15-case subset remains 8/15. These reused
+cases are regressions, not an unseen holdout. No expectation or customer
+memory was changed to manufacture a pass.
+
+Offline MS MARCO MiniLM, SQuAD2 MiniLM, Qwen3 Reranker 0.6B, and Quora
+DistilRoBERTa probes did not meet the selection contract. Qwen3.5-2B variants
+also failed, including the actual staffing-constraint question; output-format
+guards did not establish semantic correctness. The experimental model hooks
+were removed, the preceding repairs restored, and 55 focused UI/Recall/embedding
+guards passed. No candidate was committed or installed. The rejected prototype
+and 5.9 GiB of downloaded test assets are recoverably isolated at
+`/tmp/elefante-rejected-recall.PqRtxE`, outside the source and active model cache.
+A larger-model experiment would change the product's resource footprint and
+requires the user's decision; it is not an established repair. Do not repeat
+these model/format probes or equate parser success with useful memory selection.
+
+**Focused repair (2026-09-03):** No larger model was added. The shared compiler
+now checks the explicit target of a saved question before accepting topic-only
+text evidence. A location is not a time, a quantity is not a choice, and a named
+property cannot be supplied solely by shared subject words. Matching targets
+permit bounded lower-cosine paraphrases; closed alternatives also compare the
+requested property separately from the subject. Unknown wording keeps the
+existing conservative path, and open-ended guidance is not restricted to the
+question form used when saving a constraint. Scope, privacy, source trust,
+identifiers, conflicts and lifecycle checks remain independent.
+
+The original 27 regression questions pass unchanged. Twelve added Elefante,
+alternatives and vocabulary checks bring the real cached-model result to 39/39; the focused
+dashboard/control/verified-operation/routing suite passes 441 checks and the
+real isolated MCP self-protocol passes 52/52. These cases establish bounded
+regression coverage, not universal language understanding or task-value lift.
+Live browser checks verified the original purpose question, missing price,
+two-memory Keep both delivery, Edit, Archive/Restore, verified backup and full
+data restore, and reconnect with an unchanged draft. The full restore recovered
+the archived record's version and lifecycle; an empty search showed zero rows
+without the old detail. UI follow-through cleared stale search/review filters on
+Recall inspection, closed old details when starting a new search, moved the
+reconnect banner outside the shell's stacking context without covering the
+header, and removed the second Recall dialog's unfounded abstention claim.
+The existing HTML guide and scoring reference describe the actual behavior.
+Local package installation requires the exact tested commit and a verified
+data-preserving installer receipt; no push or public release belongs here.
 
 <a id="issue-16"></a>
 

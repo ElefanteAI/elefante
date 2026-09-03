@@ -95,7 +95,7 @@ function parseListValue(value: unknown): string[] {
 export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], conflictMemories = [], onNavigateToMemory, health_status, retrievalEvidence }: MemoryDetailPanelProps) {
   // Escape to close
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') onClose();
+    if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('[role="dialog"]')) onClose();
   }, [onClose]);
 
   useEffect(() => {
@@ -142,7 +142,7 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], confl
   };
 
   return (
-    <div className="fixed right-0 top-0 h-full w-full sm:w-[420px] bg-slate-900/98 backdrop-blur border-l border-slate-700/60 shadow-2xl z-50 flex flex-col overflow-hidden">
+    <div className="absolute right-0 top-0 h-full w-full sm:w-[420px] bg-slate-900/98 backdrop-blur border-l border-slate-700/60 shadow-2xl z-50 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="px-5 py-4 border-b border-slate-700/60 bg-slate-800/40 flex-shrink-0">
         <div className="flex items-start justify-between gap-3">
@@ -284,7 +284,7 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], confl
           <div className="px-5 py-3 border-b border-slate-800/60">
             <div className="text-xs uppercase tracking-wider text-slate-500 mb-1">Recall questions</div>
             <p className="mb-2 text-[11px] leading-relaxed text-slate-500">
-              Exact project questions saved by Remember or Correct to find this knowledge later.
+              Saved questions that help Recall find this knowledge later, including supported paraphrases.
             </p>
             <div className="space-y-1.5">
               {recallCues.map((cue) => (

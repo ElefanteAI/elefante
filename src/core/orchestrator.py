@@ -55,6 +55,8 @@ logger = get_logger(__name__)
 REINFORCEMENT_THRESHOLD = 0.55
 SURFACE_SCAN_MAX_MEMORIES = 5000
 SURFACE_MAX_MEMORIES = 3
+RECALL_CUE_MAX_CANDIDATES = 12
+RECALL_CUE_MIN_MARGIN = 0.03
 
 SYSTEM_SPECIFICATIONS = (
     {
@@ -1016,6 +1018,9 @@ class MemoryOrchestrator:
                     for result in results
                     if self._matches_explicit_scope(result.memory, filters)
                 ]
+
+            if include_stored:
+                await self._match_recall_cue_paraphrases(query, results, filters=filters)
             
             # =============================================================
             # COGNITIVE SCORING - Multi-signal re-ranking
@@ -1294,6 +1299,115 @@ class MemoryOrchestrator:
         )
         return matches[:limit]
     
+    async def _match_recall_cue_paraphrases(
+        self,
+        question: str,
+        candidates: List[SearchResult],
+        *,
+        filters: Optional[SearchFilters] = None,
+    ) -> None:
+        """Mark one clear paraphrase of an existing scoped Recall cue, read-only.
+
+        Reuses the loaded local model and at most twelve retrieved memories;
+        does not scan, reindex, or change the durable corpus. Exact cues keep
+        their existing path. Weak or competing cue matches add no evidence.
+        """
+        for candidate in candidates:
+            candidate.recall_cue_similarity = None
+            candidate.recall_focus_similarity = None
+        if (
+            not question or not filters or not filters.project or not filters.workspace
+            or any(item.recall_cue_match for item in candidates)
+        ):
+            return
+
+        import numpy as np
+        from src.core.task_intelligence import TaskBriefCompiler, TaskBriefProfile, TaskBriefRequest
+        from src.modules.distiller.privacy import PrivacyFilter
+        from src.utils.curation import canonicalize_recall_cues
+
+        compiler = TaskBriefCompiler()
+        request = TaskBriefRequest(
+            task=question, project=filters.project, workspace=filters.workspace,
+            profile=TaskBriefProfile.V2,
+        )
+        cue_owners: list[SearchResult] = []
+        texts = [question]
+        for result in candidates[:RECALL_CUE_MAX_CANDIDATES]:
+            metadata = result.memory.metadata
+            if (
+                not self._matches_explicit_scope(result.memory, filters)
+                or str(metadata.injection_policy).casefold() != InjectionPolicy.RANKED.value
+                or compiler._exclusion_reason(request, result)
+                or compiler._conflict(result.memory) is not None
+            ):
+                continue
+            cues = canonicalize_recall_cues(metadata.recall_cues)
+            if PrivacyFilter().scrub_payload(cues)[1]:
+                continue
+            texts.extend(cues)
+            cue_owners.extend([result] * len(cues))
+        if not cue_owners:
+            return
+        try:
+            vectors = np.asarray(
+                await self.embedding_service.generate_embeddings_batch(texts), dtype=float,
+            )
+            if vectors.ndim != 2 or len(vectors) != len(texts) or not np.isfinite(vectors).all():
+                return
+            norms = np.linalg.norm(vectors, axis=1)
+            if np.any(norms == 0):
+                return
+            similarities = (vectors[1:] @ vectors[0]) / (norms[1:] * norms[0])
+            by_memory: dict[str, tuple[float, SearchResult]] = {}
+            for result, score in zip(cue_owners, similarities):
+                key = str(result.memory.id)
+                if key not in by_memory or score > by_memory[key][0]:
+                    by_memory[key] = (float(score), result)
+            ranked = sorted(by_memory.values(), key=lambda item: item[0], reverse=True)
+            # A closed choice declares alternatives, not a brand, price, count
+            # or other unstated property. Compare just that focused phrase.
+            target = compiler._question_focus(question)
+            if target and target.startswith("property:"):
+                options: list[str] = []
+                owners: list[SearchResult] = []
+                for _, candidate in ranked:
+                    if compiler._recall_cue_focus(question, candidate.memory) != "choice":
+                        continue
+                    for cue in canonicalize_recall_cues(candidate.memory.metadata.recall_cues):
+                        focus = compiler._question_focus(cue)
+                        if focus and focus.startswith("choice:"):
+                            options.append(focus.partition(":")[2])
+                            owners.append(candidate)
+                if options:
+                    focused = np.asarray(await self.embedding_service.generate_embeddings_batch(
+                        [target.partition(":")[2], *options],
+                    ), dtype=float)
+                    if focused.ndim != 2 or len(focused) != len(options) + 1 or not np.isfinite(focused).all():
+                        return
+                    lengths = np.linalg.norm(focused, axis=1)
+                    if np.any(lengths == 0):
+                        return
+                    scores = (focused[1:] @ focused[0]) / (lengths[1:] * lengths[0])
+                    for owner, score in zip(owners, scores):
+                        owner.recall_focus_similarity = max(owner.recall_focus_similarity or 0.0, min(1.0, float(score)))
+            best, result = ranked[0]
+            runner_up = ranked[1][0] if len(ranked) > 1 else 0.0
+            floor = (
+                compiler.MIN_FOCUSED_CUE_SIMILARITY
+                if (
+                    compiler._recall_cue_focus(question, result.memory) == "same"
+                    or (result.recall_focus_similarity or 0.0) >= compiler.MIN_FOCUSED_CUE_SIMILARITY
+                )
+                else compiler.MIN_RECALL_CUE_SIMILARITY
+            )
+            if best >= floor and best - runner_up >= RECALL_CUE_MIN_MARGIN:
+                result.recall_cue_similarity = min(1.0, best)
+        except Exception:
+            # Additive evidence only. Do not log question/cue content or turn
+            # an embedding failure into a different memory selection policy.
+            self.logger.warning("Recall cue paraphrase comparison unavailable")
+
     def _create_query_plan(
         self,
         query: str,

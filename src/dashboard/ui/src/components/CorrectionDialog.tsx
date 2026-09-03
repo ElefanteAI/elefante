@@ -573,9 +573,10 @@ export function CorrectionDialog({ memory }: { memory: MemoryNode }) {
                       <div className="flex items-start gap-2">
                         <Trash2 size={16} className="mt-0.5 flex-shrink-0 text-red-300" aria-hidden="true" />
                         <div>
-                          <div className="text-sm font-semibold text-red-100">This cannot be recovered after success</div>
+                          <div className="text-sm font-semibold text-red-100">The temporary safety backup is destroyed after success</div>
                           <p className="mt-1 text-xs leading-relaxed text-slate-400">
                             Elefante first verifies a temporary local backup. It restores that backup if deletion fails, and destroys it only after the memory, connections, Home, Recall, and unshared attachments are verified absent.
+                            {' '}Older backups are not deleted and may still contain this memory.
                           </p>
                         </div>
                       </div>
