@@ -253,6 +253,23 @@ continues using its existing tool-grouped aggregate.
 
 ---
 
+<a id="issue-18"></a>
+## Issue #18: Snapshot Age Misrepresented UTC [BUG-072, FIXED locally]
+
+**Evidence:** A Toronto browser read a UTC snapshot as four hours in the future
+and labelled it `current · just now`. The header did not update with elapsed time.
+
+**Root cause:** The producer omitted the timezone; JavaScript interpreted the
+timestamp as local time. Freshness was calculated only during incidental renders.
+
+**Repair:** Emit explicit UTC, interpret legacy zone-less snapshots as UTC, show
+unknown/future timestamps honestly and advance the display with a cleaned-up
+timer. Reload still only rereads the snapshot; it does not regenerate memory.
+`tests/test_dashboard_ui.py` and `tests/test_dashboard_serializer.py` own the
+regressions. Installed proof is a separate release gate.
+
+---
+
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
 1. **API working ≠ UI working** — test the complete user experience. Issues #2, #4, #5.

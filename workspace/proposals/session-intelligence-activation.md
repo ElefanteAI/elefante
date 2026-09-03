@@ -6,6 +6,12 @@ created: 2026-09-03
 
 # PRD: Activate Session Intelligence on real work
 
+Release follow-through: after local activation, the owner separately authorized
+a new coordinated public release on 2026-09-03. Its current version, publication,
+installed build and website proofs are maintained in
+[PLANNING §2.3](../PLANNING.md#23-current-release-state). The original bounded
+implementation scope below remains the historical acceptance contract.
+
 > **Question:** How do we make the existing Session Intelligence capability
 > collect useful evidence automatically and explain it honestly in Home?
 >

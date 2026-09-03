@@ -18,7 +18,7 @@ import asyncio
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
@@ -655,7 +655,7 @@ async def main():
                                 "name": f"Cluster {c:02d}",
                                 "type": "cluster",
                                 "description": "Embedding cluster (agnostic connectivity hub)",
-                                "created_at": datetime.utcnow().isoformat(),
+                                "created_at": datetime.now(timezone.utc).isoformat(),
                                 "properties": {
                                     "source": "snapshot",
                                     "cluster_id": c,
@@ -805,7 +805,7 @@ async def main():
                     "name": f"{kind}: {value}",
                     "type": "entity",
                     "description": f"signal hub ({kind})",
-                    "created_at": datetime.utcnow().isoformat(),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
                     "properties": {
                         "source": "snapshot",
                         "signal_type": kind,
@@ -940,8 +940,8 @@ async def main():
     snapshot = {
         "schema_version": 2,
         "generation_id": str(uuid4()),
-        "generated_at": datetime.utcnow().isoformat(),
-        "project_registry_generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "project_registry_generated_at": datetime.now(timezone.utc).isoformat(),
         "stats": {
             "total_nodes": len(nodes),
             "memories": sum(1 for n in nodes if n["type"] == "memory"),

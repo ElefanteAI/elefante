@@ -13,8 +13,8 @@
 > Task 032 implementation baseline: `7c705ca03371771be68460afb270fe0998f30231`.
 > Current development line: verify the exact branch and HEAD before work; the
 > 2026-08-28 Gauntlet line declares 2.13.0.
-> Published customer release: v2.13.0. This document authorizes neither merge
-> nor release and does not promote Task Intelligence.
+> Published customer release: see [the living release state](../PLANNING.md#23-current-release-state).
+> This document authorizes neither merge nor release and does not promote Task Intelligence.
 
 ## 0. Resume contract — do not restart the debate
 

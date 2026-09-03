@@ -11,9 +11,9 @@ on your machine, then supplies a small governed subset when an agent needs prior
 context. It works beside the AI tools you already use and gives their separate
 sessions one private, inspectable memory.
 
-**v2.14.0** — Current published release.
+**v2.15.0** — Current published release.
 
-Published v2.14.0: 18 tools · 2 prompts · Python 3.11–3.13 · MCP 1.28.1
+Published v2.15.0: 18 tools · 2 prompts · Python 3.11–3.13 · MCP 1.28.1
 
 ## What a user can do
 
@@ -33,9 +33,11 @@ Published v2.14.0: 18 tools · 2 prompts · Python 3.11–3.13 · MCP 1.28.1
 - Exchange an explicit allowlist of memories through signed, scope-bound local
   Team Sync bundles. Elefante provides the bundle contract, not a cloud sync
   transport.
-- Opt into a separate metadata-only Session Intelligence ledger for provider
-  usage, rate-card-backed cost calculation, outcome records, Signal Cards, and
-  aggregate training hypotheses. Unknown usage or pricing remains `UNKNOWN`.
+- Enable a separate metadata-only Session Intelligence ledger. With explicit
+  purpose consent, it automatically records MCP usage estimates; supplied
+  provider-reported usage stays separate. Rate-card-backed cost, outcome records,
+  Signal Cards, and aggregate hypotheses never turn missing evidence into zero
+  or a claim of improved task quality.
 - Feed bounded file, terminal-error, or conversation event envelopes to the
   local `/events/surface` endpoint for literal-trigger retrieval. Elefante does
   not silently intercept host activity or persist the event body.
@@ -80,7 +82,7 @@ verify the checksum, extract the archive, then use its single platform launcher:
 - Linux: run `chmod +x install.sh && ./install.sh`
 
 The published installer creates one stable per-user runtime and one local data
-root. Codex is the required certified lane; other detected hosts are optional
+root. Codex is the required validation target, not vendor-certified; other detected hosts are optional
 compatibility previews and cannot block customer readiness.
 
 - macOS/Linux runtime: `~/.elefante/app/current`
@@ -136,12 +138,15 @@ A customer-ready candidate reports `customer_ready=true`, a verified Codex
 connection and Recall path, and separately identifies any selected compatibility
 preview that was not connected or verified.
 
+Readiness proves connection health, not useful selection. Test Recall with one
+real question inside the intended memory scope and inspect what it supplies.
+
 ## Host coverage
 
-The v2.14.0 installer has ownership-safe, contract-tested adapters for VS Code
+The v2.15.0 installer has ownership-safe, contract-tested adapters for VS Code
 Copilot, Claude Code, Cursor, Kiro, Continue, Zed, Gemini CLI, Codex, and
 OpenClaw. In the current product contract, Codex is the sole
-required certification lane; the other adapters remain optional compatibility
+required validation target; the other adapters remain optional compatibility
 previews and do not expand the supported acceptance promise.
 
 IBM Bob and Antigravity remain preview integrations because their full host

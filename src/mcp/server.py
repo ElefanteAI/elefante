@@ -939,7 +939,7 @@ class ElefanteMCPServer:
             snapshot = {
                 "schema_version": 2,
                 "generation_id": str(uuid4()),
-                "generated_at": datetime.utcnow().isoformat(),
+                "generated_at": datetime.now(timezone.utc).isoformat(),
                 "stats": {
                     "total_nodes": 0,
                     "memories": 0,
@@ -953,7 +953,7 @@ class ElefanteMCPServer:
             }
         project_snapshot = self._project_registry_snapshot()
         snapshot["project_registry"] = project_snapshot
-        snapshot["project_registry_generated_at"] = datetime.utcnow().isoformat()
+        snapshot["project_registry_generated_at"] = datetime.now(timezone.utc).isoformat()
         write_json_atomically(output_path, snapshot, default=str)
         return project_snapshot
 
@@ -5227,7 +5227,7 @@ ritual for a self-contained question, and never store secrets or routine chat.""
             "selected_memory_ids": list(context.selected_memory_ids),
             "conflict_count": context.conflict_count,
             "delivery_blocked": context.delivery_blocked,
-            "verified_at": datetime.utcnow().isoformat(),
+            "verified_at": datetime.now(timezone.utc).isoformat(),
             "project": {
                 "project_id": project.project_id,
                 "name": project.name,
@@ -6555,7 +6555,7 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                     "name": f"{kind}: {value}",
                     "type": "entity",
                     "description": f"signal hub ({kind})",
-                    "created_at": datetime.utcnow().isoformat(),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
                     "properties": {
                         "source": "snapshot",
                         "signal_type": kind,
@@ -6707,9 +6707,9 @@ ritual for a self-contained question, and never store secrets or routine chat.""
         snapshot = {
             "schema_version": 2,
             "generation_id": generation_id,
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "project_registry": self._project_registry_snapshot(),
-            "project_registry_generated_at": datetime.utcnow().isoformat(),
+            "project_registry_generated_at": datetime.now(timezone.utc).isoformat(),
             "stats": {
                 "total_nodes": len(nodes),
                 "memories": sum(1 for n in nodes if n["type"] == "memory"),

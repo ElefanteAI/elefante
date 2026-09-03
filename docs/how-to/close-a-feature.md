@@ -1,6 +1,7 @@
 # Close an Elefante Development Change
 
-**Applies to:** current developer workflow; public release v2.13.0
+**Applies to:** current developer workflow; verify the published baseline via the
+[latest published release](https://github.com/ElefanteAI/elefante/releases/latest)
 
 This is a developer procedure, not customer documentation. `AGENTS.md` and
 `agents/orchestrator.md` define the governing workflow.

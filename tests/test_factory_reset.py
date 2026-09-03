@@ -35,10 +35,12 @@ from scripts.lifecycle.reset_factory import factory_reset, _targets, _backup_dir
 
 
 @pytest.fixture()
-def isolated_home(tmp_path):
+def isolated_home(tmp_path, monkeypatch):
     """Create a fake ~/.elefante/data with dummy databases."""
     fake_home = tmp_path / "fakehome"
     data_dir = fake_home / ".elefante" / "data"
+    monkeypatch.setenv("ELEFANTE_DATA_DIR", str(data_dir))
+    monkeypatch.delenv("ELEFANTE_CONFIG_PATH", raising=False)
     chroma_dir = data_dir / "chroma"
     kuzu_path = data_dir / "kuzu_db"
 

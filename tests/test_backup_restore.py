@@ -407,6 +407,7 @@ def test_kuzu_only_reset_targets_configured_graph_and_never_claims_rebuild(
     monkeypatch.setenv("HOME", str(tmp_path / "isolated-home"))
     monkeypatch.setenv("USERPROFILE", str(tmp_path / "isolated-home"))
     monkeypatch.setenv("ELEFANTE_CONFIG_PATH", str(config_path))
+    monkeypatch.setenv("ELEFANTE_DATA_DIR", str(data_dir))
     monkeypatch.setenv("ELEFANTE_PRIVILEGED", "1")
 
     assert nuclear_reset_kuzu(apply=False, confirm="") is True

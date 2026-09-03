@@ -1,7 +1,7 @@
 ---
 PROTOCOL: puppeteer
 INVOKE: elefante-puppeteer
-PROTOCOL_VERSION: 2.14.0
+PROTOCOL_VERSION: 2.15.0
 LOAD_WHEN: Dangerous control-plane surgery is required. Parameters, conditioned ideas, memory-governance rules, authority boundaries, acceptance thresholds, or rejection stance must be changed directly. Explicit user authorization plus `PRIVILEGED` mode are required.
 DIAGNOSTIC_QUESTION: "Am I changing Elefante's governing behavior itself rather than operating safely within it?"
 AUTHORITY: This file owns dangerous privileged meta-configuration. It sits above `agents/memory-janitor.md` for bounded control-plane overrides. It does not erase the janitor; it authorizes stronger janitorial power.

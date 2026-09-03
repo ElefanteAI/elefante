@@ -82,7 +82,7 @@ The non-negotiable product shape is:
 
 ---
 
-## §2 Release Contract: v2.14.0 Local Memory Control Loop
+## §2 Release Contract: v2.15.0 Local Memory Control Loop
 
 ### §2.1 Outcome
 
@@ -96,7 +96,7 @@ daily agent surface. It preserves the v2.13 governed-memory contract, adds
 strict project isolation and verified Remember/Correct/Recover operations, and
 does not claim representative Task Intelligence lift.
 
-### §2.2 Included in v2.14.0
+### §2.2 Included in v2.15.0
 
 | Surface | Customer contract |
 |---|---|
@@ -109,7 +109,7 @@ does not claim representative Task Intelligence lift.
 | Governed memory | Retention, injection policy, exact scope, user locks, current-source validation, conservative conflict detection, and dry-run-first reversible resolution |
 | Local media | Bounded content-addressed image/audio/video attachments with integrity metadata and no OCR, transcription, model call, or network upload |
 | Proactive ingress | Typed file, terminal-error, and conversation envelopes through loopback `/events/surface`; literal-trigger retrieval is read-only and the event body is not persisted |
-| Session Intelligence | Consent-gated metadata-only ledger, provider-actual versus estimated provenance, dated rate cards, outcome records, Signal Cards, aggregate training hypotheses, export, retention, and deletion |
+| Session Intelligence | Consent-gated automatic MCP usage estimates, bounded asynchronous capture, metadata-only ledger, provider-actual versus estimated provenance, dated rate cards, outcome records, Signal Cards, aggregate training hypotheses, export, retention, and deletion; incomplete capture remains visible |
 | Distiller and Team Sync | Foreground opt-in Distiller watch mode and signed exact-scope local Team Sync bundles; no background daemon or cloud transport claim |
 | Host coverage | Ownership-safe Continue and Zed adapters join the compatible tier; vendor certification remains separate |
 | Distribution | Exact source provenance in archives and installed state; checksummed ZIPs; signed native assets publish only when credential and trust gates pass |
@@ -119,28 +119,33 @@ Task Intelligence remains developer-only, default-off, and excluded from the
 
 ### §2.3 Current release state
 
-Publication, installed provenance and website identity below were verified on
-2026-09-02; they replace the pre-publication snapshot, not the outstanding
-customer-acceptance requirements in GAP-057.
+Release preparation verified on 2026-09-03. The owner explicitly authorized a
+coordinated new release across GitHub, the installed dashboard and elefante.ai.
+The next minor release adds consented automatic MCP usage estimates and includes
+the already-tested dashboard, graph and Recall repairs. No breaking surface is
+removed. Publication remains a postcondition, not an inference from a version bump.
+
+SemVer decision: minor. The advisor matched the word "migration" in the diff
+and suggested major; this is a keyword false positive, not a breaking contract.
+The existing graph upgrade is additive, retains old fields, and adds no removed
+API. The new consented capture capability justifies minor rather than patch.
 
 | Work | Current proof |
 |---|---|
-| Source integration | PR #30 merged at `49bd6f552cad096751c879ad5aff74b0de491b88`. This branch carries the local dashboard/Recall repair beyond published v2.14.0; no new push or public release is authorized |
+| Source integration | PR #30 merged at `49bd6f552cad096751c879ad5aff74b0de491b88`. Eight subsequent repair/activation commits through `e7262374e4b13e7ee8f378883b652ce08f4bc98b` are preserved for the authorized next release |
 | Local candidate proof | BUG-047 repair: all 39 cached-model selection regressions pass (the original 27 unchanged), together with 441 focused checks and 52/52 isolated MCP checks. Live browser receipts prove useful Recall, missing-fact abstention, Keep both, correction, Archive/Restore, backup, full data restore and reconnect; empty search leaves zero rows and no stale detail. Existing verified-operation suites cover the remaining controls. These are bounded functional proofs, not whole-product or task-value acceptance |
 | Publication | **v2.14.0 published** after the owner's explicit merge/publication approval. All three published archive checksums were verified. Publication does not prove the remaining native/accessibility/unfamiliar-user evidence tracked by GAP-057 |
-| Installed runtime | v2.14.0 customer candidate. The installed Doctor's `installation.source_commit` and `.elefante-install-summary.txt` are the authorities for the exact local build and completed installation, not the semantic version alone. Only a passing exact commit may replace the runtime; the three curated customer memories must remain unchanged |
-| Website | Production reports v2.14.0 at `3aad549d2e262caac196a042616852e5217f0124`; the maintained release/production verifiers passed in the 2026-09-02 audit. No website change belongs to the current Recall repair |
+| Installed runtime | Candidate source `4b17c63e986ab093274473147301a865ae9cc23b`; package update receipt `VERIFIED_COMPLETE`. Preserve all six curated memories, graph links and consent settings during the official package update |
+| Website | Production source `3aad549d2e262caac196a042616852e5217f0124`; product/claim corrections are prepared locally. Publish the new manifest, source-bound dashboard image and copy only after the matching core release exists |
 
 ### §2.4 Approval gates
 
-The owner explicitly approved merging PR #30 and publishing v2.14.0; those
-actions and website synchronization are completed history, not standing
-authority for another publication. Missing product evidence remains missing.
-The owner approved committing and installing the exact repair locally after
-tests and live acceptance pass. This does not authorize a push, release,
-website change or customer-memory mutation. Durable-data
-migration, spending, credential rotation and third-party contact remain outside
-scope.
+On 2026-09-03 the owner explicitly approved a new versioned release and updates
+to GitHub, the installed dashboard and website. Commit, push, merge, publish and
+install only the reviewed exact candidate after its relevant gates pass.
+Missing product evidence in GAP-057 remains missing. Memory content changes,
+destructive migration, spending, credential rotation and third-party contact
+remain outside scope.
 
 ### §2.5 Scope guard
 
@@ -164,12 +169,12 @@ Rejected alternatives remain closed without new evidence:
 ### §2.6 Resume verdict
 
 - **RESUME_SAFE:** YES — active state is here; defects/capability gaps are in [`workspace/ISSUES.md`](../workspace/ISSUES.md); integration truth is in [`agents/manifests/ide-integration.yaml`](../agents/manifests/ide-integration.yaml).
-- **RELEASE_TARGET:** No new public release in the current step.
+- **RELEASE_TARGET:** Next minor release for automatic MCP usage estimates and accumulated repairs; declared by the current CHANGELOG and version tool.
 - **PUBLISHED_PRODUCT:** v2.14.0 at `49bd6f552cad096751c879ad5aff74b0de491b88`.
 - **PUBLICATION_STATUS:** Published; GAP-057's missing acceptance evidence is not inferred from publication or a healthy daemon.
 - **LIVE_RUNTIME:** v2.14.0 customer candidate; resolve exact provenance from the installed Doctor and package acceptance receipt. BUG-047's source repair passes the bounded acceptance described above; local installation is a separately verified operation.
 - **TASK_INTELLIGENCE:** representative multi-task lift and cross-class generalization are NOT PROVEN; the evaluation surface remains developer-only and default-off.
-- **PUBLICATION_AUTHORITY:** No push or public release is authorized for the current Recall repair; historical approval does not authorize a new release.
+- **PUBLICATION_AUTHORITY:** Explicit owner authorization on 2026-09-03 for this coordinated release; exact-commit gates remain mandatory.
 
 ---
 
@@ -742,17 +747,17 @@ This section is the chronological record of curation events, decisions, and abso
 
 | Metric | Current value | Source | Status |
 |--------|---------------|--------|--------|
-| Release target | **v2.14.0** local memory control loop; v2.13.0 remains the public release | `CHANGELOG.md`, §2.2, PR #30, and the Section 11 product gate | Candidate; publication evidence blocked |
-| BUG/GAP count tracked | **68 distinct BUG records through BUG-070 + 9 GAPs** | `workspace/ISSUES.md` | Tracked; uniqueness and declared counts are source-guarded |
+| Release target | Next minor release; public baseline and exact installed/website identities are recorded in §2.3 | `CHANGELOG.md`, version tool, §2.3 | Authorized; exact candidate verification in progress |
+| BUG/GAP count tracked | **70 distinct BUG records through BUG-072 + 9 GAPs** | `workspace/ISSUES.md` | Tracked; uniqueness and declared counts are source-guarded |
 | BUG recurrence rate (pre-distillation) | known per-row in `ISSUES.md` | `workspace/ISSUES.md` Recurrence column | Tracked |
 | BUG recurrence rate after current guards | `UNKNOWN` — needs sustained traffic across sessions | future `ISSUES.md` recurrence updates | Not measured |
-| Documentation guard | 49 tests pass | `tests/test_developer_routing.py` | Verified 2026-08-30; included in the 239-test focused four-action product suite |
-| Full repository regression suite | 1,005 passed, 9 skipped | Exact pre-version PR #30 tree run on 2026-09-01 | Verified locally; the v2.14.0 exact-head CI rerun remains mandatory |
+| Documentation guard | 49 tests pass | `tests/test_developer_routing.py` | Verified 2026-09-03; current release fields, anchors and issue counts checked |
+| Full repository regression suite | 1,110 passed, 4 legacy skips; 2 additional slow tests passed; isolated MCP self-protocol 52/52 | Release candidate run on 2026-09-03 after timestamp and fixture-isolation repairs | Local proof; exact-commit GitHub Quality remains required before automatic publication |
 | Task Intelligence evaluation corpus | 9 reviewed black-box canaries; 23 historical tasks ineligible; tasks 031 and 032 are consumed sealed-memory diagnostics | `workspace/proposals/retrieval-effectiveness.md` | Infrastructure verified; promotion blocked |
 | Task Intelligence outcome lift | Task 032 stopped at treatment 0/3 and control 0/2; no valid representative multi-task lift exists | `workspace/proposals/retrieval-effectiveness.md` | Not demonstrated; promotion blocked |
 | Token cost per `elefante-Memory(action="search")` | `TOKEN_STATS` is available per response; aggregate product effect is not measured | `src/mcp/server.py` | Partial |
 | Session Intelligence companion | v2.13.0 contract provides an opt-in persistent metadata-only ledger, provider-actual versus estimated provenance, dated rate-card authority, Signal Cards, aggregate training hypotheses, explicit consent/export/delete controls, loopback usage ingress, and a read-only dashboard snapshot | `src/session_intelligence/`, `scripts/pipeline/session_intelligence.py`, `workspace/proposals/session-intelligence.md` | Shipped in v2.13.0; no provider billing or causal-value claim |
-| Website production state | Live commit `8bad7469bcb94c0ff8c40c51400d9b300e987151`, product version 2.13.0; production and online release-manifest verifiers pass | §2.3 and current production proof | Verified 2026-08-28 |
+| Website production state | Exact live identity and coordinated-release status are maintained in §2.3 | Live `/api/deployment` and production verifier | Reverify after the authorized deployment |
 
 Unknown and partial rows are explicit evidence gaps, not inferred success.
 

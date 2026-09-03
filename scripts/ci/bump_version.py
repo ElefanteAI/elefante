@@ -62,6 +62,53 @@ TARGETS = [
 # These are expanded at runtime and processed alongside TARGETS.
 GLOB_TARGETS = []
 
+# Publication claims are a separate, explicit release step. A normal version
+# bump must not announce an unpublished candidate as the current public product.
+RELEASE_DOC_TARGETS = [
+    ("README.md", r'(?m)^\*\*v[\d.]+\*\* — Current published release\.$', '**v{v}** — Current published release.'),
+    ("README.md", r'(?m)^Published v[\d.]+:', 'Published v{v}:'),
+    ("README.md", r'The v[\d.]+ installer has', 'The v{v} installer has'),
+    ("AGENTS.md", r'\*\*v[\d.]+\*\* is the latest published release\.', '**v{v}** is the latest published release.'),
+    ("AGENTS.md", r'Current published release: \*\*v[\d.]+\*\*\.', 'Current published release: **v{v}**.'),
+    ("docs/README.md", r'(?m)^> \*\*v[\d.]+\*\* · Published user documentation\.$', '> **v{v}** · Published user documentation.'),
+    ("docs/explanation/vision.md", r'(?m)^> Product explanation · Current published version: v[\d.]+$', '> Product explanation · Current published version: v{v}'),
+    ("docs/reference/architecture.md", r'(?m)^> \*\*Release:\*\* v[\d.]+', '> **Release:** v{v}'),
+    ("docs/reference/tools.md", r'(?m)^# MCP Tools and Prompts \(published v[\d.]+ baseline; current source\)', '# MCP Tools and Prompts (published v{v} baseline; current source)'),
+    ("docs/reference/tools.md", r'Released and default-on in v[\d.]+\.', 'Released and default-on in v{v}.'),
+    ("docs/reference/tools.md", r'Governance fields are part of the v[\d.]+ customer contract\.', 'Governance fields are part of the v{v} customer contract.'),
+    ("workspace/PLANNING.md", r'(?m)^## §2 Release Contract: v[\d.]+', '## §2 Release Contract: v{v}'),
+    ("workspace/PLANNING.md", r'(?m)^### §2.2 Included in v[\d.]+', '### §2.2 Included in v{v}'),
+]
+
+
+def sync_release_docs(*, check_only: bool = False) -> bool:
+    """Synchronize only declared current-publication fields, never history.
+
+    Use only in an explicitly authorized publication workflow. A dated
+    changelog is required; this is not proof that GitHub publication succeeded.
+    """
+    version = read_current_version()
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if not re.search(rf'^## \[{re.escape(version)}\] - \d{{4}}-\d{{2}}-\d{{2}}$', changelog, re.MULTILINE):
+        raise SystemExit("Publication documentation requires a dated release entry")
+    pending = {}
+    targets = list(RELEASE_DOC_TARGETS)
+    for path in sorted((ROOT / "agents").glob("*.md")):
+        if re.search(r'^PROTOCOL_VERSION:', path.read_text(encoding="utf-8"), re.MULTILINE):
+            targets.append((str(path.relative_to(ROOT)), r'(?m)^PROTOCOL_VERSION: [\d.]+$', 'PROTOCOL_VERSION: {v}'))
+    for rel_path, pattern, template in targets:
+        path = ROOT / rel_path
+        source = pending.get(path, path.read_text(encoding="utf-8"))
+        if len(re.findall(pattern, source)) != 1:
+            raise SystemExit(f"Publication field missing or ambiguous: {rel_path}: {pattern}")
+        pending[path] = re.sub(pattern, template.format(v=version), source)
+    drift = [path for path, content in pending.items() if path.read_text(encoding="utf-8") != content]
+    for path in drift:
+        if not check_only:
+            path.write_text(pending[path], encoding="utf-8")
+        print(f"  {'DRIFT' if check_only else 'SYNC'}  {path.relative_to(ROOT)}")
+    return not drift if check_only else True
+
 
 def _expand_glob_targets():
     """Expand GLOB_TARGETS into concrete (rel_path, pattern, template) tuples.
@@ -247,7 +294,11 @@ def main():
         sys.exit(1)
 
     arg = args[0]
-    if arg == "--check":
+    if arg in {"--sync-release-docs", "--check-release-docs"}:
+        if allow_rebaseline:
+            raise SystemExit("--allow-rebaseline cannot be used for release documentation")
+        sys.exit(0 if sync_release_docs(check_only=arg == "--check-release-docs") else 1)
+    elif arg == "--check":
         if allow_rebaseline:
             raise SystemExit("--allow-rebaseline cannot be used with --check")
         ok = check_versions()

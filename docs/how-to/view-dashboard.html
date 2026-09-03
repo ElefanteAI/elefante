@@ -471,7 +471,7 @@
           </div>
           <div class="proof-line" aria-label="Guide evidence status">
             <span>source checked</span>
-            <span>source prototype checked 2026-09-02</span>
+            <span>current six-workspace source</span>
             <span>one product / one dashboard</span>
           </div>
         </div>
@@ -538,8 +538,8 @@
 
     <main id="main-content" tabindex="-1">
       <article class="guide-body">
-        <section class="guide-preface" aria-labelledby="guide-purpose"><h2 class="visually-hidden" id="guide-purpose">What Elefante Home is for</h2><p class="guide-status"><span class="status-label">Applies to</span> the current Elefante Home source prototype, built and rendered against the current local snapshot on 2026-09-02.</p>
-<p class="release-note"><span class="status-label">Release boundary</span> this guide documents the six-workspace source prototype. Installing a local candidate does not publish a release. The installed package receipt identifies the exact build; source checks alone do not prove which dashboard is running.</p>
+        <section class="guide-preface" aria-labelledby="guide-purpose"><h2 class="visually-hidden" id="guide-purpose">What Elefante Home is for</h2><p class="guide-status"><span class="status-label">Applies to</span> the current six-workspace Elefante Home source and its installed package contract.</p>
+<p class="release-note"><span class="status-label">Release boundary</span> this guide documents the six-workspace Home. A locally installed candidate can be checked through its package receipt and Doctor; installing a source candidate does not publish a release, and source checks alone do not prove which dashboard package is running.</p>
 <p>Elefante Home is the advanced local control room for three jobs:</p>
 <ol>
 <li><strong>Global understanding.</strong> Memory Intelligence and Connections inspect everything represented in the current snapshot; no project is required.</li>
@@ -891,11 +891,13 @@ valid conclusion when the represented evidence does not justify a change.</p>
 disclosure. It is <strong>view-only</strong>: it explains observed usage, not whether
 Elefante improved a task. The owner requires this capability active, but collection
 still needs local, purpose-bound permission; the dashboard cannot grant it.</p>
-<p><strong>Source candidate, not an installed-version claim:</strong> the
-<a href="../../workspace/proposals/session-intelligence-activation.md">activation PRD</a>
-tracks automatic MCP capture, browser checks and local installation separately.
-After permission, ordinary MCP calls produce local estimates. Actual model usage
-still requires a verified provider adapter; it is not inferred from tool calls.</p>
+<p><strong>Consent and evidence boundary:</strong> automatic MCP capture starts
+only after the owner grants explicit approval for the <code>usage_analytics</code>
+purpose. Completed dispatches then produce local usage estimates; they are not
+provider or billing actuals. Approval for the <code>provider_usage</code> purpose
+is separate, and provider-reported actuals require a verified adapter rather than
+being inferred from tool calls. The <a href="../../workspace/proposals/session-intelligence-activation.md">activation PRD</a>
+tracks implementation evidence and local installation separately.</p>
 <div class="table-scroll" role="region" aria-label="Session Intelligence values" tabindex="0"><table>
 <thead><tr><th>Value</th><th>What it means</th></tr></thead>
 <tbody>
@@ -985,7 +987,7 @@ result. Clear the search to browse the loaded snapshot.</p>
 </tr>
 <tr>
 <td>Created</td>
-<td>Creation date</td>
+<td>Source <code>created_at</code>; missing legacy timestamps stay blank</td>
 </tr>
 <tr>
 <td>Vitality</td>
@@ -1487,12 +1489,13 @@ support-report destinations.</p>
 <h2 id="troubleshooting"><a class="heading-anchor" href="#troubleshooting">Troubleshooting</a></h2>
 <h3 id="i-see-an-older-or-simpler-dashboard"><a class="heading-anchor" href="#i-see-an-older-or-simpler-dashboard">I see an older or simpler dashboard</a></h3>
 <p>Confirm the installed build, not only the semantic version in the header. The
-six-workspace, light-default dashboard described here is currently a verified
-source prototype. This work did not replace the installed runtime or publish a
-package. If the dashboard does not show Home, Recall, Memory Intelligence,
-Connections, Projects, and Recover, the running package still owns earlier
-dashboard assets. This is a package-version boundary, not a second Elefante
-product.</p>
+six-workspace, light-default dashboard described here is the current source
+contract and has also been exercised in the local installed candidate. It is not
+proof that every package has the same assets. If the dashboard does not show
+Home, Recall, Memory Intelligence, Connections, Projects, and Recover, read the
+package receipt and Doctor result, then compare the running package with the
+published release it came from. This is a package-version boundary, not a second
+Elefante product.</p>
 <h3 id="home-has-no-operational-receipt"><a class="heading-anchor" href="#home-has-no-operational-receipt">Home has no operational receipt</a></h3>
 <p>Continue with Global understanding if the snapshot is available. If you expected
 live Recall or lifecycle controls, verify the installed Elefante service and use
@@ -1594,7 +1597,7 @@ those live and source-level proofs win; update this guide rather than inventing
 an explanation.</p>
 
         <footer class="doc-footer">
-          <strong>Evidence boundary.</strong> This guide explains current user-visible source and the installed local candidate checked on 2026-08-31. A live receipt and current source win if behavior changes.
+          <strong>Evidence boundary.</strong> This guide explains current user-visible source behavior and the installed local candidate when its receipt is available. A live receipt and current source win if behavior changes.
           <a class="back-to-top" href="#top">Back to top</a>
         </footer>
       </article>

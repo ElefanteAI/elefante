@@ -94,11 +94,12 @@ Estimated usage never becomes provider-actual usage. Dollar cost remains
 dated rate card is registered. Consent, export, retention, and deletion are
 explicit per purpose.
 
-### Automatic MCP capture — source candidate
+### Automatic MCP capture
 
-The activation candidate adds automatic capture at the shared MCP tool boundary.
-This is **not a claim that the installed or released package contains it**; see
-the [activation gates](../../workspace/proposals/session-intelligence-activation.md).
+The runtime supports automatic capture at the shared MCP tool boundary.
+Verify the installed build before expecting capture from an older package; see
+the [activation gates](../../workspace/proposals/session-intelligence-activation.md)
+and the current release notes.
 It reuses the v2.13.0 ledger, not a new analytics store.
 
 After local `usage_analytics` permission, each completed MCP dispatch queues one

@@ -46,6 +46,7 @@ jobs:
       - name: Verify release contracts
         run: |
           python scripts/ci/bump_version.py --check
+          python scripts/ci/bump_version.py --check-release-docs
           version="$(python scripts/ci/build_release_client.py --print-version)"
           python scripts/ci/render_release_notes.py "$version" --validate-only
           python scripts/ci/verify_task_intelligence_benchmark.py --verify-canaries

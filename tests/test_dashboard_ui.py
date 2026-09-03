@@ -190,8 +190,9 @@ const replaceImport = (code, name, target) => {
 };
 const storeUrl = moduleUrl('export const useDashboardStore = pick => pick(globalThis.dashboardState);');
 const iconsUrl = moduleUrl('export const Moon=()=>null; export const RefreshCw=()=>null; export const Sun=()=>null;');
+const reactUrl = import.meta.resolve('react');
 const runtimeUrl = import.meta.resolve('react/jsx-runtime');
-const headerCode = replaceImport(replaceImport(compile(headerUrl), '@/store', storeUrl), 'lucide-react', iconsUrl)
+const headerCode = replaceImport(replaceImport(replaceImport(compile(headerUrl), 'react', reactUrl), '@/store', storeUrl), 'lucide-react', iconsUrl)
   .replaceAll('from "react/jsx-runtime"', 'from ' + JSON.stringify(runtimeUrl))
   .replaceAll("from 'react/jsx-runtime'", 'from ' + JSON.stringify(runtimeUrl));
 const sessionCode = replaceImport(compile(sessionUrl), '@/store', storeUrl)
@@ -373,6 +374,137 @@ console.log('PASS: honest stats and Session Intelligence render states');
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "PASS: honest stats" in result.stdout
+
+
+def test_header_snapshot_age_parses_legacy_naive_utc_in_local_timezone() -> None:
+    node = shutil.which("node")
+    if not node or not (UI_SRC.parent / "node_modules/react").is_dir():
+        pytest.skip("Requires the dashboard's installed Node dependencies")
+    script = f"const headerUrl = {(UI_SRC / 'components/HeaderBar.tsx').as_uri()!r};\n" + r'''
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+import assert from 'node:assert/strict';
+process.env.TZ = 'America/Toronto';
+const moduleUrl = code => 'data:text/javascript;base64,' + Buffer.from(code).toString('base64');
+const compile = url => ts.transpileModule(readFileSync(new URL(url), 'utf8'), {
+  compilerOptions: {module:ts.ModuleKind.ESNext, target:ts.ScriptTarget.ES2022, jsx:ts.JsxEmit.ReactJSX},
+}).outputText;
+const replaceImport = (code, name, target) => {
+  const replacement = 'from ' + JSON.stringify(target);
+  return code.replaceAll(`from '${name}'`, replacement).replaceAll(`from "${name}"`, replacement);
+};
+const storeUrl = moduleUrl('export const useDashboardStore = pick => pick({});');
+const iconsUrl = moduleUrl('export const Moon=()=>null; export const RefreshCw=()=>null; export const Sun=()=>null;');
+const reactUrl = import.meta.resolve('react');
+const runtimeUrl = import.meta.resolve('react/jsx-runtime');
+let headerCode = compile(headerUrl);
+headerCode = replaceImport(headerCode, 'react', reactUrl);
+headerCode = replaceImport(headerCode, '@/store', storeUrl);
+headerCode = replaceImport(headerCode, 'lucide-react', iconsUrl);
+headerCode = headerCode.replaceAll('from "react/jsx-runtime"', 'from ' + JSON.stringify(runtimeUrl))
+  .replaceAll("from 'react/jsx-runtime'", 'from ' + JSON.stringify(runtimeUrl));
+const {formatSnapshotAge, parseSnapshotTimestamp} = await import(moduleUrl(headerCode));
+const now = Date.parse('2026-09-03T13:00:00.000Z');
+assert.equal(
+  parseSnapshotTimestamp('2026-09-03T12:03:00.123456'),
+  Date.parse('2026-09-03T12:03:00.123Z'),
+);
+assert.deepEqual(formatSnapshotAge('2026-09-03T12:03:00.000000', now), {
+  label:'57m ago', stale:false, status:'current',
+});
+assert.deepEqual(formatSnapshotAge('2026-09-03T13:01:00', now), {
+  label:'future', stale:true, status:'future',
+});
+assert.deepEqual(formatSnapshotAge('not-a-timestamp', now), {
+  label:'unknown', stale:true, status:'invalid',
+});
+console.log('PASS: legacy naive UTC, explicit timezone, future, and invalid snapshot timestamps');
+'''
+    result = subprocess.run(
+        [node, "--input-type=module", "-e", script],
+        cwd=UI_SRC.parent, capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASS: legacy naive UTC" in result.stdout
+
+
+def test_header_snapshot_age_ticks_without_regenerating_snapshot() -> None:
+    node = shutil.which("node")
+    if not node or not (UI_SRC.parent / "node_modules/react-dom").is_dir():
+        pytest.skip("Requires the dashboard's installed Node dependencies")
+    script = f"const headerUrl = {(UI_SRC / 'components/HeaderBar.tsx').as_uri()!r};\n" + r'''
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+import assert from 'node:assert/strict';
+import {renderToStaticMarkup} from 'react-dom/server';
+process.env.TZ = 'America/Toronto';
+const moduleUrl = code => 'data:text/javascript;base64,' + Buffer.from(code).toString('base64');
+const compile = url => ts.transpileModule(readFileSync(new URL(url), 'utf8'), {
+  compilerOptions: {module:ts.ModuleKind.ESNext, target:ts.ScriptTarget.ES2022, jsx:ts.JsxEmit.ReactJSX},
+}).outputText;
+const replaceImport = (code, name, target) => {
+  const replacement = 'from ' + JSON.stringify(target);
+  return code.replaceAll(`from '${name}'`, replacement).replaceAll(`from "${name}"`, replacement);
+};
+const fakeReactUrl = moduleUrl(`
+export const useState = initializer => {
+  if (!globalThis.ageStateReady) {
+    globalThis.ageState = typeof initializer === 'function' ? initializer() : initializer;
+    globalThis.ageStateReady = true;
+  }
+  return [globalThis.ageState, next => {
+    globalThis.ageState = typeof next === 'function' ? next(globalThis.ageState) : next;
+  }];
+};
+export const useEffect = effect => {
+  if (globalThis.ageEffectReady) return;
+  globalThis.ageEffectReady = true;
+  globalThis.ageCleanup = effect();
+};
+`);
+const storeUrl = moduleUrl('export const useDashboardStore = pick => pick(globalThis.dashboardState);');
+const iconsUrl = moduleUrl('export const Moon=()=>null; export const RefreshCw=()=>null; export const Sun=()=>null;');
+const runtimeUrl = import.meta.resolve('react/jsx-runtime');
+let headerCode = compile(headerUrl);
+headerCode = replaceImport(headerCode, 'react', fakeReactUrl);
+headerCode = replaceImport(headerCode, '@/store', storeUrl);
+headerCode = replaceImport(headerCode, 'lucide-react', iconsUrl);
+headerCode = headerCode.replaceAll('from "react/jsx-runtime"', 'from ' + JSON.stringify(runtimeUrl))
+  .replaceAll("from 'react/jsx-runtime'", 'from ' + JSON.stringify(runtimeUrl));
+const {HeaderBar} = await import(moduleUrl(headerCode));
+
+let clock = Date.parse('2026-09-03T13:00:00.000Z');
+Date.now = () => clock;
+let tick;
+let intervalDelay;
+let cleared;
+globalThis.window = {
+  setInterval: (callback, delay) => { tick = callback; intervalDelay = delay; return 42; },
+  clearInterval: id => { cleared = id; },
+};
+let reloads = 0;
+globalThis.dashboardState = {
+  stats:{vector_store:{total_memories:1}, graph_store:{total_entities:1, total_relationships:1}, snapshot:{generated_at:'2026-09-03T12:03:00.000000'}},
+  snapshot:null, statsError:null, isRefreshing:false, refreshSnapshot:()=>{reloads++;},
+};
+const renderHeader = () => renderToStaticMarkup(HeaderBar({theme:'dark', onToggleTheme:()=>{}}));
+assert.match(renderHeader(), /current · 57m ago/);
+assert.equal(intervalDelay, 30000);
+
+clock = Date.parse('2026-09-03T13:04:01.000Z');
+tick();
+assert.match(renderHeader(), /stale · 1h ago/);
+assert.equal(reloads, 0);
+globalThis.ageCleanup();
+assert.equal(cleared, 42);
+console.log('PASS: header age timer updates locally without snapshot regeneration');
+'''
+    result = subprocess.run(
+        [node, "--input-type=module", "-e", script],
+        cwd=UI_SRC.parent, capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASS: header age timer" in result.stdout
 
 
 def test_memory_detail_related_memories_render_as_named_buttons() -> None:
@@ -994,11 +1126,12 @@ def test_dashboard_defaults_to_clear_light_and_preserves_dark_theme() -> None:
     assert "200: token('violet-200')" in tailwind
 
 
-def test_dashboard_html_guide_matches_the_source_prototype_boundary() -> None:
+def test_dashboard_html_guide_matches_the_package_evidence_boundary() -> None:
     guide = (ROOT / "docs" / "how-to" / "view-dashboard.html").read_text(encoding="utf-8")
 
-    assert "source prototype checked 2026-09-02" in guide
-    assert "Installing a local candidate does not publish a release" in guide
+    assert "current six-workspace Elefante Home source and its installed package contract" in guide
+    assert "installing a source candidate does not publish a release" in guide
+    assert "source checks alone do not prove which dashboard package is running" in guide
     assert "Home has six top-level workspaces" in guide
     assert "Recall: test governed selection" in guide
     assert "Make memory useful for the next task" in guide

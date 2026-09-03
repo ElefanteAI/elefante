@@ -11,6 +11,8 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.15.0] - 2026-09-03
+
 ### Added
 
 - Consent-gated automatic MCP usage estimates reuse the existing Session
@@ -20,6 +22,12 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Dashboard snapshot age uses explicit UTC, accepts legacy UTC snapshots, and
+  advances while the page remains open instead of reporting stale data as current.
+- The MCP subprocess verification isolates its stores and bounds its timeout;
+  release checks cannot accidentally open the owner's memory database.
+- Current installation, dashboard, MCP, and release guidance distinguishes
+  shipped capabilities, source-only experiments, and verified publication.
 - Session Intelligence distinguishes unavailable actual usage from measured zero,
   exposes estimate/provenance and provisional-hypothesis details, and reports
   missing/broken snapshots and process capture failures without claiming current

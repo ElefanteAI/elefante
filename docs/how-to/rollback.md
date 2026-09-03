@@ -97,8 +97,11 @@ For a developer checkout:
 4. Use a separate worktree or detached checkout for the known-good tag; do not
    rewrite the branch containing current work.
 
-The currently published release is v2.13.0. A future rollback target must be
-selected from actual published tags, not copied from this document.
+Start with the [latest published release](https://github.com/ElefanteAI/elefante/releases/latest),
+then select the exact known-good tag from the published release list. A rollback
+target must come from an actual published tag, not from a version string copied
+from this document. Read the installed package version with the command in
+[Run and verify the MCP runtime](run-mcp-server.md#customer-runtime).
 
 ## 4. Verify
 
