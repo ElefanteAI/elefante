@@ -90,6 +90,8 @@ export function HomeStatePanel() {
   const requestRecoveryPlan = useDashboardStore((state) => state.requestRecoveryPlan);
   const setActiveTab = useDashboardStore((state) => state.setActiveTab);
   const setMemoryWorkspaceView = useDashboardStore((state) => state.setMemoryWorkspaceView);
+  const setSearchQuery = useDashboardStore((state) => state.setSearchQuery);
+  const setInspectedMemoryId = useDashboardStore((state) => state.setInspectedMemoryId);
   const [health, setHealth] = useState<RecoveryHealth | null>(null);
   const [memoryDialog, setMemoryDialog] = useState<'remember' | null>(null);
   const checkedToken = useRef<string | null>(null);
@@ -174,12 +176,16 @@ export function HomeStatePanel() {
   }
 
   const openMemoryWorkspace = (view: 'library' | 'review') => {
+    setSearchQuery('');
+    setInspectedMemoryId(null);
     setMemoryWorkspaceView(view);
     setActiveTab('memories');
   };
 
   const continueToNext = () => {
     if (nextAction.memoryView) {
+      setSearchQuery('');
+      setInspectedMemoryId(null);
       setMemoryWorkspaceView(nextAction.memoryView);
     }
     setActiveTab(nextAction.tab);

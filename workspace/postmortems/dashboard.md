@@ -214,6 +214,15 @@ The installed 499×694 panel also exposed a 460-pixel graph inside a
 The graph now fits its parent: one vertical scroll surface in narrow panels,
 with the existing split scroll layout retained on wide screens.
 
+**Continuous-workflow recurrence, 2026-09-03:** Returning from a snapshot search
+through Home's Review recommendation could hide the queue behind the old query
+and detail drawer. Both Home memory entry actions now reset those view filters.
+Related-memory links are native named buttons. Failed header/Session Intelligence
+reads show unavailability and clear stale data rather than suggesting zero
+memories or disabled consent. A later successful read clears only its own error.
+Graph cards show stored memory types; safeguard counts explicitly count links,
+and stored relationships are not presented as verified source truth.
+
 **Guard:** Dashboard, snapshot, Home-control, daemon, and routing regressions;
 the production UI build; and live deterministic-example acceptance across all
 six workspaces, both themes, desktop, and 390×844.

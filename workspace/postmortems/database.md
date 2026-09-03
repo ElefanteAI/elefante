@@ -77,21 +77,28 @@ field renames.
 
 <a id="issue-8"></a>
 
-## Issue #8: Graph and Session Schema Contract Drift [PARTIAL, recurrence open]
+## Issue #8: Graph and Session Schema Contract Drift [FIXED locally, guarded]
 
 **Trigger:** `elefante-GraphConnect` fails creating `CREATED_IN` / `WORKS_ON` edges; `elefante-SessionsList` returns wrong shape.
 **Root cause:** Both surfaces assumed every relation table and every session-shaped entity shared one generic schema. (1) `graph_store.py` reused `RELATES_TO`'s `strength` injection pattern for relations that don't define that property. (2) `server.py` queried sessions as `Entity` rows, then ordered by `s.last_active` (no such top-level field) and accessed properties as Python attributes instead of JSON in `props`.
 **Solution:** Aligned both paths to the real schema — relation creation is whitelist-gated (`{"RELATES_TO"}` get `strength`, others don't); session listing orders by `created_at`, parses `props` JSON, falls back when `last_active` absent.
 **Guards:** `TestGraphToolContract` creates real `CREATED_IN` and `WORKS_ON` edges + statically guards `SessionsList` query shape.
-**Open recurrence, source audit 2026-09-03:** The public enum is broader than
-the named relationship-table mapping. For example, `GOVERNS` is accepted but
-stored as `RELATES_TO`; returned edge properties are not persisted. Existing
-UUID syntax is checked without proving that both graph rows exist. This audit
-did not write unsupported relationships to customer data. The curated dashboard
-example uses `DEPENDS_ON`, with both endpoints and all three stored edges read
-back. Close this separate authoring gap only with real isolated type/property
-round-trip and absent-endpoint tests; the dashboard-rendering repair does not
-claim to fix it.
+**Recurrence repaired, 2026-09-03:** The public enum exceeded the six-table
+mapping, so `GOVERNS` became `RELATES_TO`; edge payloads and entity properties
+were lost, incoming reads reversed direction, and missing endpoints still
+returned success. GraphStore now creates or additively extends all 18 named
+tables, persists IDs/descriptions/timestamps/strength/JSON properties, and
+requires a returned edge row. Reads preserve actual direction, legacy native
+properties and stable identity; an unknown legacy timestamp remains unknown.
+Internal datetime-valued properties serialize through the model's JSON form.
+GraphConnect validates the whole input batch before writes, and identical
+entity/link requests reuse existing identities. This is input preflight plus
+single-writer ownership, not a claim of whole-batch transactional rollback.
+**New guards:** Real Kuzu tests cover all 18 types, full payloads, absent
+endpoints, incoming/outgoing/both reads, datetime properties, and reopening a
+genuinely old schema. Real GraphConnect handler tests cover repeated batches
+and invalid batches without orphan nodes. Correction/recovery/snapshot tests
+remain separate integration gates. No customer memories were rewritten.
 **Lesson:** Graph tools must target the concrete node and relation-table schema that exists, not a generic mental model. Code-review plausibility is not a substitute for live-surface verification.
 
 <a id="issue-9"></a>

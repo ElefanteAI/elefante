@@ -472,7 +472,7 @@ it must fail safely rather than bypass the verified product lifecycle.
 
 #### `elefante-GraphConnect`
 
-**Purpose**: Batch upsert entities and relationships in one call.
+**Purpose**: Find or create entities and create or reuse relationships in one call.
 
 **Why this exists**: Graph writes are safer and cheaper when the entire mini-topology is sent together. This reduces duplicate nodes and broken edges.
 
@@ -498,20 +498,30 @@ it must fail safely rather than bypass the verified product lifecycle.
   responses expose only redaction counts and detector types.
 - One transaction-scoped write lock covers every entity and relationship
   mutation. Optional system status is added after that graph ownership ends.
-- Use stable names and refs so repeated calls stay idempotent.
-- Use `id` when updating an existing entity rather than creating a near-duplicate.
-- Prefer enum-aligned values from `src/models/entity.py` such as `PERSON`, `PROJECT`, `FILE`, `CONCEPT`, `TECHNOLOGY`, `TASK`, `SPECIFICATION`, and `DIRECTIVE`. Common relationship values include `RELATES_TO`, `DEPENDS_ON`, `PART_OF`, `CREATED_BY`, `USES`, `BLOCKS`, `REFERENCES`, `WORKS_ON`, `GOVERNS`, `ENFORCES`, `SUPERSEDES`, and `CONTRADICTS`.
+- Stable entity names/types and identical relationship endpoints/type/properties
+  reuse existing IDs. Different relationship properties remain distinct links.
+- `id` references an existing entity; this path does not overwrite its fields.
+  Properties on a newly created entity are persisted.
+- Invalid refs, types and missing existing endpoints are rejected before the
+  first mutation. This is not a promise of rollback after every storage failure.
+- All 18 `RelationshipType` values retain their actual labels and properties.
+  Legacy schemas upgrade additively; old timestamps are not invented.
+- Entity types are lowercase enum values from `src/models/entity.py`, such as
+  `person`, `project`, `file`, `concept`, `technology`, `task`, `specification`,
+  and `directive`. Relationship values include `RELATES_TO`, `DEPENDS_ON`,
+  `PART_OF`, `CREATED_BY`, `USES`, `BLOCKS`, `REFERENCES`, `WORKS_ON`, `GOVERNS`,
+  `ENFORCES`, `SUPERSEDES`, and `CONTRADICTS`.
 
 **Example**:
 
 ```json
 {
   "entities": [
-    { "name": "Jay", "type": "PERSON", "ref": "user" },
-    { "name": "Elefante", "type": "PROJECT", "ref": "proj" }
+    { "name": "Jay", "type": "person", "ref": "user" },
+    { "name": "Elefante", "type": "project", "ref": "proj" }
   ],
   "relationships": [
-    { "from_ref": "user", "to_ref": "proj", "relationship_type": "CREATED_BY" }
+    { "from_ref": "proj", "to_ref": "user", "relationship_type": "CREATED_BY" }
   ]
 }
 ```

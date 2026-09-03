@@ -1175,6 +1175,8 @@ interface DashboardStore {
   snapshot: Snapshot | null;
   stats: StatsResponse | null;
   sessionIntelligence: SessionIntelligenceResponse | null;
+  statsError: string | null;
+  sessionIntelligenceError: string | null;
   isLoading: boolean;
   error: string | null;
 
@@ -1324,6 +1326,8 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   snapshot: null,
   stats: null,
   sessionIntelligence: null,
+  statsError: null,
+  sessionIntelligenceError: null,
   isLoading: false,
   isRefreshing: false,
   error: null,
@@ -2465,13 +2469,19 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         const res = await fetch('/api/stats');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        set({ stats: data });
+        if (isRecord(data) && typeof data.error === 'string') {
+          throw new Error(data.error);
+        }
+        set({ stats: data, statsError: null });
         return;
       } catch (e: any) {
         if (attempt < maxRetries) {
           await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
         } else {
-          console.error('Failed to fetch stats after retries:', e);
+          const error = e instanceof Error && e.message.trim()
+            ? e.message.trim()
+            : 'Could not read dashboard statistics.';
+          set({ stats: null, statsError: error });
         }
       }
     }
@@ -2482,9 +2492,15 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       const res = await fetch('/api/session-intelligence');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      set({ sessionIntelligence: data });
+      if (isRecord(data) && typeof data.error === 'string') {
+        throw new Error(data.error);
+      }
+      set({ sessionIntelligence: data, sessionIntelligenceError: null });
     } catch (e) {
-      console.error('Failed to fetch Session Intelligence snapshot:', e);
+      const error = e instanceof Error && e.message.trim()
+        ? e.message.trim()
+        : 'Could not read Session Intelligence snapshot.';
+      set({ sessionIntelligence: null, sessionIntelligenceError: error });
     }
   },
 

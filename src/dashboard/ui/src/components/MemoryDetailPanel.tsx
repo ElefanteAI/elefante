@@ -420,20 +420,25 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], confl
               Related ({relatedMemories.length})
             </div>
             <div className="space-y-1.5">
-              {relatedMemories.slice(0, 8).map((rm) => (
-                <div
-                  key={rm.id}
-                  className="px-3 py-2 bg-slate-800/40 rounded-lg border border-slate-700/40 hover:border-cyan-500/40 hover:bg-slate-800/70 transition-colors cursor-pointer"
-                  onClick={() => onNavigateToMemory?.(rm.id)}
-                >
-                  <div className="text-xs text-slate-200 truncate">
-                    {rm.properties.title || rm.properties.summary || rm.name}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    {formatLabel(String(rm.properties.topic || 'general'))} · {formatLabel(String(rm.properties.memory_type || 'unknown'))}
-                  </div>
-                </div>
-              ))}
+              {relatedMemories.slice(0, 8).map((rm) => {
+                const relatedLabel = String(rm.properties.title || rm.properties.summary || rm.name);
+                return (
+                  <button
+                    key={rm.id}
+                    type="button"
+                    aria-label={`Open related memory ${relatedLabel}`}
+                    className="block w-full appearance-none px-3 py-2 text-left bg-slate-800/40 rounded-lg border border-slate-700/40 hover:border-cyan-500/40 hover:bg-slate-800/70 transition-colors cursor-pointer"
+                    onClick={() => onNavigateToMemory?.(rm.id)}
+                  >
+                    <div className="text-xs text-slate-200 truncate">
+                      {relatedLabel}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">
+                      {formatLabel(String(rm.properties.topic || 'general'))} · {formatLabel(String(rm.properties.memory_type || 'unknown'))}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

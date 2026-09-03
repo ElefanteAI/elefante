@@ -733,7 +733,7 @@ class ElefanteMCPServer:
     - elefante-TaskIntelligence: Governed task context, use, outcome, and audit traces
     - elefante-GraphQuery: Execute read-only Cypher queries on knowledge graph
     - elefante-ContextGet: Retrieve session context
-    - elefante-GraphConnect: Batch upsert entities and relationships
+    - elefante-GraphConnect: Find/create entities and create/reuse relationships
     - elefante-SystemStatusGet: Get system status and statistics
     """
     
@@ -1939,7 +1939,7 @@ This development surface does not claim causal task improvement. Keep pilot deli
                 ),
                 types.Tool(
                     name="elefante-GraphConnect",
-                    description="Create a small, idempotent graph workflow in one call: upsert entities (by name+type) and create relationships between them. Designed to reduce tool-chaining and keep graph operations consistent.",
+                    description="Create a small, idempotent graph workflow in one call: find or create entities by name and type, or reference existing IDs, then create or reuse identical relationships. Referencing an existing entity does not overwrite its fields. Designed to reduce tool-chaining and keep graph operations consistent.",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -6813,6 +6813,40 @@ ritual for a self-contained question, and never store secrets or routine chat.""
             entities_input = safe_args.get("entities") or []
             relationships_input = safe_args.get("relationships") or []
             include_system_status = bool(safe_args.get("include_system_status", False))
+
+            # Reject invalid batches before the first graph mutation. A partial
+            # batch must not leave orphan entities behind for ordinary input errors.
+            from src.models.entity import EntityType
+            from src.utils.validators import validate_entity_name
+
+            declared_refs: set[str] = set()
+            existing_ids: set[UUID] = set()
+            for item in [*entities_input, *relationships_input]:
+                properties = item.get("properties")
+                if properties is not None:
+                    if not isinstance(properties, dict):
+                        raise ValueError("Graph properties must be a JSON object")
+                    json.dumps(properties, allow_nan=False)
+            for item in entities_input:
+                ref = item.get("ref")
+                if not isinstance(ref, str) or not ref.strip() or ref in declared_refs:
+                    raise ValueError("Entity refs must be non-empty and unique within the batch")
+                declared_refs.add(ref)
+                if item.get("id"):
+                    existing_ids.add(validate_uuid(item["id"]))
+                else:
+                    validate_entity_name(item.get("name"))
+                    EntityType(item.get("type"))
+            for rel in relationships_input:
+                RelationshipType(self._normalize_relationship_type(rel.get("relationship_type")))
+                for side in ("from", "to"):
+                    if rel.get(f"{side}_entity_id"):
+                        existing_ids.add(validate_uuid(rel[f"{side}_entity_id"]))
+                    elif rel.get(f"{side}_ref") not in declared_refs:
+                        raise ValueError("Relationship references must name a declared entity")
+            for entity_id in existing_ids:
+                if await orchestrator.graph_store.get_entity(entity_id) is None:
+                    raise ValueError("Graph entity does not exist; no connection changes were made")
 
             ref_to_entity_id: Dict[str, str] = {}
             created_entities = []

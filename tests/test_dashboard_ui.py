@@ -111,6 +111,183 @@ console.log('PASS: continuity, expiry, request limit, explicit reconnect, no rep
     assert "PASS: continuity" in result.stdout
 
 
+def test_real_dashboard_store_surfaces_stats_and_session_errors_and_clears_on_retry() -> None:
+    node = shutil.which("node")
+    if not node or not (UI_SRC.parent / "node_modules/zustand").is_dir():
+        pytest.skip("Requires the dashboard's installed Node dependencies")
+    script = f"const storeUrl = {(UI_SRC / 'store.ts').as_uri()!r};\n" + r'''
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+import assert from 'node:assert/strict';
+const compiled = ts.transpileModule(readFileSync(new URL(storeUrl), 'utf8'), {
+  compilerOptions: {module:ts.ModuleKind.ESNext, target:ts.ScriptTarget.ES2022},
+}).outputText.replace("from 'zustand'", 'from ' + JSON.stringify(import.meta.resolve('zustand')));
+const {useDashboardStore:store} = await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'));
+const oldStats = {elefante:{package_version:'old'}, vector_store:{total_memories:17}, graph_store:{total_entities:4, total_relationships:3}, snapshot:{generated_at:'old'}};
+const oldSession = {consent:{enabled:true}, signal_card:{hypothesis:'old signal'}};
+store.setState({stats:oldStats, sessionIntelligence:oldSession, statsError:null, sessionIntelligenceError:null});
+const realSetTimeout = globalThis.setTimeout;
+globalThis.setTimeout = callback => { callback(); return 0; };
+let statsAttempts = 0;
+try {
+  globalThis.fetch = async url => {
+    if (url === '/api/stats') {
+      statsAttempts++;
+      return new Response(JSON.stringify({error:'Snapshot unavailable'}));
+    }
+    return new Response(JSON.stringify({error:'Session snapshot unavailable'}), {status:503});
+  };
+  await store.getState().fetchStats();
+  assert.equal(statsAttempts, 5);
+  assert.equal(store.getState().stats, null);
+  assert.equal(store.getState().statsError, 'Snapshot unavailable');
+  await store.getState().fetchSessionIntelligence();
+  assert.equal(store.getState().sessionIntelligence, null);
+  assert.equal(store.getState().sessionIntelligenceError, 'HTTP 503');
+
+  const nextStats = {elefante:{package_version:'new'}, vector_store:{total_memories:18}, graph_store:{total_entities:5, total_relationships:4}, snapshot:{generated_at:'new'}};
+  const nextSession = {consent:{enabled:false}, signal_card:null};
+  globalThis.fetch = async url => new Response(JSON.stringify(url === '/api/stats' ? nextStats : nextSession));
+  await store.getState().fetchStats();
+  await store.getState().fetchSessionIntelligence();
+  assert.deepEqual(store.getState().stats, nextStats);
+  assert.equal(store.getState().statsError, null);
+  assert.deepEqual(store.getState().sessionIntelligence, nextSession);
+  assert.equal(store.getState().sessionIntelligenceError, null);
+} finally {
+  globalThis.setTimeout = realSetTimeout;
+}
+console.log('PASS: dashboard surface errors clear after successful retry');
+'''
+    result = subprocess.run(
+        [node, "--input-type=module", "-e", script],
+        cwd=UI_SRC.parent, capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASS: dashboard surface errors" in result.stdout
+
+
+def test_dashboard_error_surfaces_render_honest_states() -> None:
+    node = shutil.which("node")
+    if not node or not (UI_SRC.parent / "node_modules/react-dom").is_dir():
+        pytest.skip("Requires the dashboard's installed Node dependencies")
+    script = (
+        f"const headerUrl = {(UI_SRC / 'components/HeaderBar.tsx').as_uri()!r};\n"
+        f"const sessionUrl = {(UI_SRC / 'components/SessionIntelligencePanel.tsx').as_uri()!r};\n"
+    ) + r'''
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+import assert from 'node:assert/strict';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+const moduleUrl = code => 'data:text/javascript;base64,' + Buffer.from(code).toString('base64');
+const compile = url => ts.transpileModule(readFileSync(new URL(url), 'utf8'), {
+  compilerOptions: {module:ts.ModuleKind.ESNext, target:ts.ScriptTarget.ES2022, jsx:ts.JsxEmit.ReactJSX},
+}).outputText;
+const replaceImport = (code, name, target) => {
+  const replacement = 'from ' + JSON.stringify(target);
+  return code.replaceAll(`from '${name}'`, replacement).replaceAll(`from "${name}"`, replacement);
+};
+const storeUrl = moduleUrl('export const useDashboardStore = pick => pick(globalThis.dashboardState);');
+const iconsUrl = moduleUrl('export const Moon=()=>null; export const RefreshCw=()=>null; export const Sun=()=>null;');
+const runtimeUrl = import.meta.resolve('react/jsx-runtime');
+const headerCode = replaceImport(replaceImport(compile(headerUrl), '@/store', storeUrl), 'lucide-react', iconsUrl)
+  .replaceAll('from "react/jsx-runtime"', 'from ' + JSON.stringify(runtimeUrl))
+  .replaceAll("from 'react/jsx-runtime'", 'from ' + JSON.stringify(runtimeUrl));
+const sessionCode = replaceImport(compile(sessionUrl), '@/store', storeUrl)
+  .replaceAll('from "react/jsx-runtime"', 'from ' + JSON.stringify(runtimeUrl))
+  .replaceAll("from 'react/jsx-runtime'", 'from ' + JSON.stringify(runtimeUrl));
+const {HeaderBar} = await import(moduleUrl(headerCode));
+const {SessionIntelligencePanel} = await import(moduleUrl(sessionCode));
+
+globalThis.dashboardState = {
+  stats:{vector_store:{total_memories:17}, graph_store:{total_entities:4, total_relationships:3}, snapshot:{generated_at:'old'}},
+  statsError:'HTTP 503', snapshot:null, isRefreshing:false, refreshSnapshot:()=>{},
+};
+const headerHtml = renderToStaticMarkup(React.createElement(HeaderBar, {theme:'dark', onToggleTheme:()=>{}}));
+assert.match(headerHtml, /Stats unavailable/);
+assert.ok(!headerHtml.includes('17 memories'));
+assert.ok(!headerHtml.includes('4 entities'));
+assert.ok(!headerHtml.includes('3 links'));
+
+globalThis.dashboardState = {
+  sessionIntelligence:{consent:{enabled:true}, signal_card:{hypothesis:'old signal'}},
+  sessionIntelligenceError:'HTTP 503',
+};
+const failedSessionHtml = renderToStaticMarkup(React.createElement(SessionIntelligencePanel));
+assert.match(failedSessionHtml, /Session Intelligence snapshot unavailable/);
+assert.ok(!failedSessionHtml.includes('Off by default.'));
+
+globalThis.dashboardState = {
+  sessionIntelligence:{consent:{enabled:false}, signal_card:null},
+  sessionIntelligenceError:null,
+};
+const disabledSessionHtml = renderToStaticMarkup(React.createElement(SessionIntelligencePanel));
+assert.match(disabledSessionHtml, /Off by default\./);
+console.log('PASS: honest stats and Session Intelligence render states');
+'''
+    result = subprocess.run(
+        [node, "--input-type=module", "-e", script],
+        cwd=UI_SRC.parent, capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASS: honest stats" in result.stdout
+
+
+def test_memory_detail_related_memories_render_as_named_buttons() -> None:
+    node = shutil.which("node")
+    if not node or not (UI_SRC.parent / "node_modules/react-dom").is_dir():
+        pytest.skip("Requires the dashboard's installed Node dependencies")
+    script = f"const detailUrl = {(UI_SRC / 'components/MemoryDetailPanel.tsx').as_uri()!r};\n" + r'''
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+import assert from 'node:assert/strict';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+const moduleUrl = code => 'data:text/javascript;base64,' + Buffer.from(code).toString('base64');
+const compile = url => ts.transpileModule(readFileSync(new URL(url), 'utf8'), {
+  compilerOptions: {module:ts.ModuleKind.ESNext, target:ts.ScriptTarget.ES2022, jsx:ts.JsxEmit.ReactJSX},
+}).outputText;
+const replaceImport = (code, name, target) => {
+  const replacement = 'from ' + JSON.stringify(target);
+  return code.replaceAll(`from '${name}'`, replacement).replaceAll(`from "${name}"`, replacement);
+};
+const iconsUrl = moduleUrl('export const X=()=>null; export const Clock=()=>null; export const Tag=()=>null; export const Layers=()=>null; export const Brain=()=>null; export const Star=()=>null; export const Hash=()=>null; export const Globe=()=>null; export const User=()=>null; export const Check=()=>null;');
+const emptyComponentUrl = moduleUrl('export const RetrievalExplanation=()=>null; export const ResolveMemoryDialog=()=>null; export const CorrectionDialog=()=>null;');
+const runtimeUrl = import.meta.resolve('react/jsx-runtime');
+let detailCode = compile(detailUrl);
+detailCode = replaceImport(detailCode, 'lucide-react', iconsUrl);
+detailCode = replaceImport(detailCode, '@/components/RetrievalExplanation', emptyComponentUrl);
+detailCode = replaceImport(detailCode, '@/components/ResolveMemoryDialog', emptyComponentUrl);
+detailCode = replaceImport(detailCode, '@/components/CorrectionDialog', emptyComponentUrl);
+detailCode = detailCode.replaceAll('from "react"', 'from ' + JSON.stringify(import.meta.resolve('react')))
+  .replaceAll("from 'react'", 'from ' + JSON.stringify(import.meta.resolve('react')))
+  .replaceAll('from "react/jsx-runtime"', 'from ' + JSON.stringify(runtimeUrl))
+  .replaceAll("from 'react/jsx-runtime'", 'from ' + JSON.stringify(runtimeUrl));
+const {MemoryDetailPanel} = await import(moduleUrl(detailCode));
+const makeMemory = (id, title) => ({
+  id, name:title, type:'memory', description:'Content ' + title, created_at:'2026-09-03T12:00:00Z',
+  properties:{content:'Content ' + title, memory_type:'fact', score:80, tags:'', status:'active', archived:false, deprecated:false,
+    processing_status:'ready', namespace:'default', title, topic:'testing', summary:title, source:'test', access_count:0,
+    last_accessed:'2026-09-03T12:00:00Z'},
+});
+const html = renderToStaticMarkup(React.createElement(MemoryDetailPanel, {
+  memory:makeMemory('memory-a', 'Current memory'),
+  relatedMemories:[makeMemory('memory-b', 'Related memory')],
+  conflictMemories:[], onClose:()=>{}, onNavigateToMemory:()=>{},
+}));
+assert.match(html, /<button[^>]*type="button"/);
+assert.ok(html.includes('aria-label="Open related memory Related memory"'));
+console.log('PASS: related memories render as named native buttons');
+'''
+    result = subprocess.run(
+        [node, "--input-type=module", "-e", script],
+        cwd=UI_SRC.parent, capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASS: related memories" in result.stdout
+
+
 def test_retrieval_explanation_uses_only_dashboard_search_evidence() -> None:
     explanation = _read("components/RetrievalExplanation.tsx")
 
@@ -191,6 +368,8 @@ def test_home_correct_uses_named_verified_routes_and_customer_safe_lifecycle() -
     assert "temporary verified safety backup" in correction
     assert "Failure restores it; success destroys it" in correction
     assert "Type DELETE to continue" in correction
+    assert "Question that must not return this memory" in correction
+    assert "Recall question that currently finds this memory" not in correction
     assert "The temporary safety backup is destroyed after success" in correction
     assert "Older backups are not deleted and may still contain this memory." in correction
     assert "confirm_permanent: confirmPermanent" in store
@@ -338,6 +517,27 @@ def test_home_routes_review_recommendations_to_review_and_refreshes_verified_wri
 
     assert "memoryView: 'review'" in home
     assert "setMemoryWorkspaceView(nextAction.memoryView)" in home
+    continue_start = home.index("const continueToNext =")
+    continue_body = home[continue_start : home.index("\n\n  return (", continue_start)]
+    assert "setSearchQuery('');" in continue_body
+    assert "setInspectedMemoryId(null);" in continue_body
+    assert continue_body.index("setSearchQuery('');") < continue_body.index(
+        "setMemoryWorkspaceView(nextAction.memoryView);"
+    )
+    assert continue_body.index("setInspectedMemoryId(null);") < continue_body.index(
+        "setMemoryWorkspaceView(nextAction.memoryView);"
+    )
+    workspace_start = home.index("const openMemoryWorkspace =")
+    workspace_end = home.index("\n\n  const continueToNext =", workspace_start)
+    workspace_body = home[workspace_start:workspace_end]
+    assert "setSearchQuery('');" in workspace_body
+    assert "setInspectedMemoryId(null);" in workspace_body
+    assert workspace_body.index("setSearchQuery('');") < workspace_body.index(
+        "setMemoryWorkspaceView(view);"
+    )
+    assert workspace_body.index("setInspectedMemoryId(null);") < workspace_body.index(
+        "setMemoryWorkspaceView(view);"
+    )
     assert "memoryWorkspaceView" in memories
     assert "useState<'library' | 'review'>('library')" not in memories
     assert "await get().refreshSnapshot();" in store[
@@ -528,6 +728,32 @@ const render = edges => {
 };
 const drawnEdges = html => [...html.matchAll(/data-source="([^"]+)" data-target="([^"]+)" data-relationship="([^"]+)"/g)]
   .map(match => match.slice(1).join(':')).sort();
+const typedMemories = [
+  ['decision', 'Decision node', 'decision', 90],
+  ['specification', 'Specification node', 'specification', 80],
+  ['directive', 'Directive node', 'directive', 70],
+].map(([id, title, memoryType, score]) => ({
+  id, type:'memory', name:id, description:title,
+  properties:{title, score, memory_type:memoryType},
+}));
+const renderTyped = edges => {
+  globalThis.graphState = {
+    getMemoryNodes:() => typedMemories, snapshot:{edges},
+    setInspectedMemoryId:() => {}, setActiveTab:() => {},
+  };
+  return renderToStaticMarkup(React.createElement(KnowledgeGraph));
+};
+const typedHtml = renderTyped([
+  {from:'decision', to:'specification', label:'GOVERNS', type:'graph'},
+  {from:'decision', to:'directive', label:'GUARDED_BY', type:'graph'},
+  {from:'specification', to:'directive', label:'DEPENDS_ON', type:'graph'},
+]);
+assert.match(typedHtml, /· Specification/);
+assert.match(typedHtml, /· Directive/);
+assert.match(typedHtml, /<strong[^>]*>2<\/strong><span[^>]*>safeguard links<\/span>/);
+assert.ok(typedHtml.includes('3 explicit relationships'));
+assert.ok(typedHtml.includes('stored links'));
+assert.ok(!typedHtml.includes('source grounded'));
 const branches = [
   {from:'a', to:'c', label:'DEPENDS_ON', type:'graph'},
   {from:'b', to:'c', label:'DEPENDS_ON', type:'graph'},

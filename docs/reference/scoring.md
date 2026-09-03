@@ -82,8 +82,8 @@ and does not update access history or graph state.
 
 ## Recall selection: question focus and saved cues
 
-Topic similarity is not proof of the fact requested. For memories with saved
-Recall questions, a small English question-form check distinguishes explicit
+Topic similarity is not proof of the fact requested. A small English
+question-form check distinguishes explicit
 targets such as location, time, quantity, and a named property. A known target
 mismatch prevents the ordinary text/role path from supplying a same-topic
 memory. Open-ended guidance, unrecognized wording, and explicitly represented
@@ -91,6 +91,15 @@ additional body properties retain the existing conservative path. Cues are not
 an exhaustive whitelist of every use of a memory.
 Different property names are uncertain rather than automatically incompatible:
 they require the strong full-question cue match, not ordinary body overlap.
+Without a saved cue, an absent named property cannot be supplied merely by
+matching its subject. Quantity requests require numeric or number-word evidence
+unless a matching saved question establishes a separate path. Such evidence is
+necessary, not sufficient: the other relevance and governance gates still apply.
+
+Repeated question words help disambiguate generic context; they are not mandatory
+answer tokens. A direct answer or decision-bearing record that meets the existing
+text-coverage floor may pass without repeating those words. Independent relevance,
+scope, trust, privacy, lifecycle, identifier and conflict checks are unchanged.
 
 The bounded paraphrase path reuses the existing local embedding model over at
 most 12 retrieved memories and 5 cues per memory. A matching explicit target

@@ -244,6 +244,23 @@ The existing HTML guide and scoring reference describe the actual behavior.
 Local package installation requires the exact tested commit and a verified
 data-preserving installer receipt; no push or public release belongs here.
 
+**Natural-task recurrence, 2026-09-03:** The actual graph-repair question found
+the existing verification memory but repeated words became mandatory anchors
+and rejected it. Repetition now only disambiguates otherwise generic evidence;
+independent direct answers and decision-bearing records keep their existing
+coverage and relevance gates. A second, independent deployment case exercises
+the same rule without Elefante vocabulary.
+
+Negative tests and a live price/month question then exposed topic-only delivery
+when a memory had no cue or its cue had unknown focus. Explicit named properties
+must be represented in the body or supported by the existing cue path; quantity
+questions need quantitative evidence or a matching cue. Scope, privacy,
+identifiers, trust, conflicts and budgets are unchanged. Regressions include
+uncued positive facts and numeric/word quantities, not merely abstention tests.
+The focused Recall suites pass 116 tests, including the unchanged cached-model
+cases and the real price/month reproduction. This is bounded functional proof,
+not evidence of universal understanding or representative task-quality lift.
+
 <a id="issue-16"></a>
 
 ## Issue #16: Retrieval Exposure Was Mistaken for Memory Use [BUG-048, FIXED in development, guarded]

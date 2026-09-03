@@ -14,6 +14,20 @@ function outcomeLabel(value: boolean | null | undefined): string {
 
 export function SessionIntelligencePanel() {
   const data = useDashboardStore((state) => state.sessionIntelligence);
+  const error = useDashboardStore((state) => state.sessionIntelligenceError);
+  if (error) {
+    return (
+      <section className="border-t elefante-hairline pt-4 xl:col-span-2">
+        <h3 className="text-[9px] text-slate-500 elefante-mono uppercase tracking-[0.16em]">
+          Session Intelligence · View only
+        </h3>
+        <p role="alert" className="mt-2 text-xs text-amber-200">
+          Session Intelligence snapshot unavailable: {error}
+        </p>
+      </section>
+    );
+  }
+
   if (!data || !data.consent.enabled || !data.signal_card) {
     return (
       <section className="border-t elefante-hairline pt-4 xl:col-span-2">

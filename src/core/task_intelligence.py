@@ -895,14 +895,6 @@ class TaskBriefCompiler:
             and not governing_directive
         ):
             return False
-        if float(signals.get("specificity", 0.0)) == 0.0:
-            anchor_count = int(signals.get("query_anchors", 0))
-            minimum_anchors = min(2, anchor_count)
-            if (
-                minimum_anchors
-                and int(signals.get("matched_anchors", 0)) < minimum_anchors
-            ):
-                return False
         independent = sum(
             (
                 float(signals.get("semantic", 0.0)) >= 0.55,
@@ -925,6 +917,22 @@ class TaskBriefCompiler:
             and float(signals.get("query_coverage", 0.0))
             >= self.MIN_ROLE_ANCHOR_COVERAGE
         )
+        # Repeated words are useful for disambiguating generic context, not
+        # mandatory answer tokens. Preserve independently qualified answers
+        # and decision-bearing evidence with the existing coverage floor.
+        # The earlier scope, trust, focus, and identifier gates still apply.
+        if (
+            float(signals.get("specificity", 0.0)) == 0.0
+            and float(signals.get("direct_answer", 0.0)) == 0.0
+            and not role_text_anchor
+        ):
+            anchor_count = int(signals.get("query_anchors", 0))
+            minimum_anchors = min(2, anchor_count)
+            if (
+                minimum_anchors
+                and int(signals.get("matched_anchors", 0)) < minimum_anchors
+            ):
+                return False
         action_anchor = (
             float(signals.get("path", 0.0)) > 0.0
             or float(signals.get("symbol", 0.0)) > 0.0
@@ -1000,11 +1008,9 @@ class TaskBriefCompiler:
         from src.utils.curation import canonicalize_recall_cues
 
         target = cls._question_focus(question)
-        if target is None or not memory.metadata.recall_cues:
+        if target is None:
             return "unknown"
         focuses = [cls._question_focus(cue) for cue in canonicalize_recall_cues(memory.metadata.recall_cues)]
-        if not focuses:
-            return "unknown"
         def key(focus: str | None) -> str | None:
             if focus and focus.startswith("property:"):
                 return "property:" + focus.partition(":")[2].split()[-1]
@@ -1016,8 +1022,6 @@ class TaskBriefCompiler:
         # specific question. A different question form alone is not a veto.
         if target in {"method", "reason"}:
             return "unknown"
-        if None in focuses:
-            return "unknown"
         # A named property present in the body may be covered by a broader
         # saved question. Do not turn cues into an exhaustive whitelist.
         if target.startswith("property:"):
@@ -1028,6 +1032,28 @@ class TaskBriefCompiler:
                 return "unknown"
             if any(focus and focus.startswith("property:") for focus in focuses):
                 return "property"
+            # A shared subject cannot establish an absent requested property,
+            # including when no cue was saved. This uses the question's noun
+            # phrase, never a product-specific vocabulary.
+            return "different"
+        if target in {"amount", "count", "duration", "frequency", "age"}:
+            # Quantitative questions need quantitative evidence. A matching
+            # saved question above remains an independent path for values
+            # expressed in other forms; a generic cue supplies no such proof.
+            quantity_words = {
+                "zero", "one", "two", "three", "four", "five", "six", "seven",
+                "eight", "nine", "ten", "eleven", "twelve", "thirteen",
+                "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
+                "nineteen", "twenty", "thirty", "forty", "fifty", "sixty",
+                "seventy", "eighty", "ninety", "hundred", "thousand", "million",
+            }
+            if not (
+                re.search(r"\b(?:\d+(?:[.,]\d+)?|no|none)\b", memory.content, re.IGNORECASE)
+                or quantity_words & cls._canonical_terms(memory.content)
+            ):
+                return "different"
+        if not focuses or None in focuses:
+            return "unknown"
         return "different"
 
     @staticmethod

@@ -769,6 +769,84 @@ async def test_recall_cue_paraphrase_cold_domains(
 
 
 @pytest.mark.asyncio
+async def test_live_price_month_query_does_not_select_existing_purpose_memory(
+    cached_cue_embeddings,
+    monkeypatch,
+):
+    """A real cue paraphrase must not answer an unrecorded price question."""
+    import numpy as np
+
+    purpose_content, purpose_cue = next(
+        records[0]
+        for domain, records, _questions in _CUE_PARAPHRASE_CASES
+        if domain == "elefante"
+    )
+    purpose = _memory(
+        purpose_content,
+        project="elefante",
+        workspace="/work/elefante",
+        recall_cues=[purpose_cue],
+    )
+    question = "How much does Elefante cost per month?"
+    orchestrator = MemoryOrchestrator(
+        vector_store=_VectorStore([purpose]),
+        graph_store=object(),
+        embedding_service=cached_cue_embeddings,
+    )
+    before = purpose.model_dump()
+    filters = SearchFilters(project="elefante", workspace="/work/elefante")
+
+    async def semantic_results(query, *_args, **_kwargs):
+        vectors = np.asarray(
+            await cached_cue_embeddings.generate_embeddings_batch(
+                [query, purpose.content],
+            )
+        )
+        score = float(vectors[1] @ vectors[0])
+        return [
+            SearchResult(
+                memory=purpose,
+                source="vector",
+                score=score,
+                vector_score=score,
+            )
+        ]
+
+    monkeypatch.setattr(orchestrator, "_search_hybrid", semantic_results)
+    results = await orchestrator.search_memories(
+        query=question,
+        mode=QueryMode.HYBRID,
+        filters=filters,
+        include_conversation=False,
+        apply_temporal_decay=False,
+        reinforce_access=False,
+    )
+
+    assert len(results) == 1
+    candidate = results[0]
+    assert candidate.memory is purpose
+    assert candidate.recall_cue_match is False
+    assert purpose.metadata.recall_cues == [purpose_cue]
+    assert purpose.model_dump() == before
+
+    assert TaskBriefCompiler._question_focus(question) == "amount"
+    assert TaskBriefCompiler._recall_cue_focus(question, purpose) == "different"
+    brief = TaskBriefCompiler().compile(
+        TaskBriefRequest(
+            task=question,
+            project="elefante",
+            workspace="/work/elefante",
+            profile=TaskBriefProfile.V2,
+        ),
+        results,
+    )
+
+    assert brief.abstained is True
+    assert brief.selected_memory_ids == []
+    assert brief.omissions[0].reason == "insufficient-independent-relevance"
+
+
+@pytest.mark.asyncio
 async def test_memory_search_handler_forwards_surface_context_and_exposes_match(monkeypatch):
     memory = _memory(
         "The migration rollback note is in the customer handbook.",

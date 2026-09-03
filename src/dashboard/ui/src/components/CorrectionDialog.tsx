@@ -733,7 +733,7 @@ export function CorrectionDialog({ memory }: { memory: MemoryNode }) {
 
                   <div>
                     <label htmlFor="correction-question" className="mb-1.5 block text-xs font-medium text-slate-300">
-                      {permanentDelete ? 'Recall question that currently finds this memory' : 'Likely future Recall question'}
+                      {permanentDelete ? 'Question that must not return this memory' : 'Likely future Recall question'}
                     </label>
                     <textarea
                       id="correction-question"

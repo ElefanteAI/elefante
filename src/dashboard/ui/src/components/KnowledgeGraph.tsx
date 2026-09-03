@@ -90,7 +90,7 @@ function roleFor(memory: MemoryNode) {
     return { label: 'Evidence', color: type === 'fact' ? '#c8894d' : '#718d74' };
   }
   if (type === 'directive' || type === 'specification') {
-    return { label: 'Guard', color: '#8ea889' };
+    return { label: type === 'directive' ? 'Directive' : 'Specification', color: '#8ea889' };
   }
   return { label: type || 'Memory', color: '#b99473' };
 }
@@ -324,7 +324,7 @@ export function KnowledgeGraph() {
           <div>
             <strong className="block text-base font-medium text-emerald-400">{guardCount}</strong>
             <span className="elefante-mono text-[9px] uppercase tracking-[0.16em] text-slate-500">
-              safeguards
+              safeguard links
             </span>
           </div>
           <div>
@@ -386,7 +386,7 @@ export function KnowledgeGraph() {
                 </h3>
               </div>
               <span className="elefante-mono shrink-0 border border-amber-400/30 px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-amber-400">
-                source grounded
+                stored links
               </span>
             </div>
 

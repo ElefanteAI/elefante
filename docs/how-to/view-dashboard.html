@@ -931,8 +931,8 @@ necessary.</p>
 the current Snapshot-search mode but removes the table-only filter.</p>
 <p>When Snapshot search reports <code>0 snapshot results</code>, no memory rows
 are displayed. Clear the search to return to browsing.</p>
-<p>Current limitation: search failures lack a dedicated visible error message
-in the current UI.</p>
+<p>A failed Snapshot search shows an error message, not a successful empty
+result. Clear the search to browse the loaded snapshot.</p>
 <h3 id="table-columns"><a class="heading-anchor" href="#table-columns">Table columns</a></h3>
 <div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
@@ -1117,11 +1117,12 @@ relationships. Semantic similarity edges do not form reasoning trails.</p>
 <ul>
 <li>grounded trail count;</li>
 <li>old assumptions, derived from deprecated or superseded records;</li>
-<li>explicit safeguards in grounded trails;</li>
+<li>explicit safeguard links in grounded trails, not the number of specification cards;</li>
 <li>semantic topic bridges between memory nodes.</li>
 </ul>
 <p>Choose a trail in <strong>Preserved reasoning</strong>, then choose a memory card to inspect
-its role, source grounding, and named relationships. <strong>Open complete memory</strong>
+its stored type, source, and named relationships. Stored links do not verify a
+memory's truth. <strong>Open complete memory</strong>
 returns to the Memory Intelligence drawer.</p>
 <p>Card order does not imply a link. The relationship rows show each stored
 source → named relationship → target, including branches and circles.
@@ -1418,11 +1419,10 @@ action. Recent receipts shows at most five bounded lifecycle entries.</p>
 </table></div>
 <p>Do not interpret an empty or stale snapshot as proof that the live store is
 empty. Regeneration is a separate explicit action.</p>
-<p>Header-stat and Session Intelligence fetch failures currently log to the browser
-console without a dedicated visible error. Unexpected zero/unknown header
-values or an unexpected <strong>Off by default</strong> panel should therefore be verified
-against <code>/api/stats</code> or <code>/api/session-intelligence</code> before being treated as
-product truth.</p>
+<p>Header-stat failures show <strong>Stats unavailable</strong> instead of stale
+counts. Session Intelligence failures show an unavailable message instead of
+claiming consent is off. <strong>Reload snapshot</strong> retries these reads;
+a successful read clears its error. Other workspaces remain available.</p>
 <h2 id="responsive-and-accessibility-behavior"><a class="heading-anchor" href="#responsive-and-accessibility-behavior">Responsive and accessibility behavior</a></h2>
 <ul>
 <li>At phone width, product identity and status controls occupy separate header
@@ -1435,9 +1435,8 @@ theme control preserves an explicit dark choice in that browser.</li>
 <li>Project dialogs trap keyboard focus and return it to the prior control.</li>
 <li>Correction, Resolve, Remember, assignment, and project dialogs support
 <code>Escape</code>, subject to their in-progress safety locks.</li>
-<li>Current limitation: Related-memory cards in the detail drawer are clickable
-non-button elements, so complete keyboard behavior is not guaranteed by the
-source contract.</li>
+<li>Related-memory links in the detail drawer are named native buttons and can
+be focused and activated from the keyboard.</li>
 </ul>
 <h2 id="privacy-and-security-boundary"><a class="heading-anchor" href="#privacy-and-security-boundary">Privacy and security boundary</a></h2>
 <p>The snapshot is pattern-redacted, not anonymized. It can still contain private

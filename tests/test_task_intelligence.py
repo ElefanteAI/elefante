@@ -1146,3 +1146,377 @@ def test_v2_accepts_one_strong_symbol_anchor_with_semantic_corroboration() -> No
     assert brief.selected_memory_ids == [str(supported_hosts.memory.id)]
     evidence = next(item for packet in brief.packets for item in packet.evidence)
     assert evidence.retrieval_signals["symbol"] >= 0.5
+
+
+_RECALL_GRAPH_QUESTION = (
+    "For our ongoing Elefante dashboard development, what should guide the next "
+    "repair of the graph's relationship handling, and what evidence is needed "
+    "before we can call that repair complete?"
+)
+_RECALL_GRAPH_SHORT_QUESTION = (
+    "What should guide the next dashboard workflow repair, and what evidence "
+    "proves that workflow complete?"
+)
+_RECALL_DEPLOYMENT_LONG_QUESTION = (
+    "For our ongoing deployment development, what should guide the next repair "
+    "of smoke-test handling, and what evidence is needed before we can call that "
+    "repair complete?"
+)
+_RECALL_DEPLOYMENT_SHORT_QUESTION = (
+    "What should guide the next deployment repair, and what proves the smoke "
+    "test is complete?"
+)
+_RECALL_EXISTING_VERIFICATION_MEMORY = (
+    "Before declaring an Elefante dashboard feature working, test its documented "
+    "workflow live with a real example and inspect the actual result. A successful "
+    "click or a ready badge alone is not evidence that the feature delivers its "
+    "promised value."
+)
+_RECALL_EXISTING_DASHBOARD_MEMORY = (
+    "Elefante's dashboard is an internal tool for advanced users to understand "
+    "and manage memories, not a marketing page. Keep it clean and concise. "
+    "Explain each feature's use, behavior, and visible result in plain language, "
+    "with grounded documentation and real examples. A 'ready' badge alone does "
+    "not demonstrate value."
+)
+
+
+def _recall_selector_hard_negatives(content: str) -> dict[str, SearchResult]:
+    return {
+        "price": _result(
+            "Elefante pricing is not recorded in this memory; no verified "
+            "subscription amount is available.",
+            score=0.99,
+            vector_score=0.99,
+        ),
+        "version": _result(
+            "Elefante version information is not recorded in this memory; no "
+            "verified release number is available.",
+            score=0.99,
+            vector_score=0.99,
+        ),
+        "technical": _result(
+            "Elefante implementation details are not recorded in this memory; "
+            "no verified technical fact is available.",
+            score=0.99,
+            vector_score=0.99,
+        ),
+        "wrong-scope": _result(
+            content,
+            memory_type=MemoryType.SPECIFICATION,
+            project="another-development",
+            score=0.91,
+            vector_score=0.91,
+        ),
+        "conflict": _result(
+            content,
+            memory_type=MemoryType.SPECIFICATION,
+            conflict_ids=[uuid4()],
+            score=0.91,
+            vector_score=0.91,
+        ),
+        "secret": _result(
+            content,
+            memory_type=MemoryType.SPECIFICATION,
+            score=0.91,
+            vector_score=0.91,
+        ),
+    }
+
+
+@pytest.mark.parametrize(
+    (
+        "case",
+        "question",
+        "content",
+        "semantic",
+        "related_content",
+        "related_semantic",
+        "expected_direct_answer",
+        "expected_coverage",
+    ),
+    [
+        pytest.param(
+            "graph-long",
+            _RECALL_GRAPH_QUESTION,
+            _RECALL_EXISTING_VERIFICATION_MEMORY,
+            0.874230,
+            _RECALL_EXISTING_DASHBOARD_MEMORY,
+            0.883196,
+            0.0,
+            0.200000,
+            id="graph-long-exact-question",
+        ),
+        pytest.param(
+            "graph-short",
+            _RECALL_GRAPH_SHORT_QUESTION,
+            _RECALL_EXISTING_VERIFICATION_MEMORY,
+            0.866699,
+            _RECALL_EXISTING_DASHBOARD_MEMORY,
+            0.829102,
+            1.0,
+            0.333333,
+            id="graph-short-paraphrase",
+        ),
+        pytest.param(
+            "deployment-long",
+            _RECALL_DEPLOYMENT_LONG_QUESTION,
+            "Deployments require running the existing smoke tests first.",
+            0.927734,
+            "Persistent systems should remain reliable and easy to understand.",
+            0.920000,
+            0.0,
+            0.214286,
+            id="deployment-long-role-text",
+        ),
+        pytest.param(
+            "deployment-short",
+            _RECALL_DEPLOYMENT_SHORT_QUESTION,
+            "Deployments require running the existing smoke tests first.",
+            0.914062,
+            "Persistent systems should remain reliable and easy to understand.",
+            0.920000,
+            1.0,
+            0.333333,
+            id="deployment-short-paraphrase",
+        ),
+    ],
+)
+def test_v2_delivers_qualified_evidence_with_repeated_anchors(
+    case: str,
+    question: str,
+    content: str,
+    semantic: float,
+    related_content: str,
+    related_semantic: float,
+    expected_direct_answer: float,
+    expected_coverage: float,
+) -> None:
+    """A qualified answer must survive repeated discourse/content anchors."""
+    qualified = _result(
+        content,
+        memory_type=MemoryType.SPECIFICATION,
+        score=semantic,
+        vector_score=semantic,
+    )
+    related = _result(
+        related_content,
+        memory_type=(
+            MemoryType.SPECIFICATION
+            if related_content == _RECALL_EXISTING_DASHBOARD_MEMORY
+            else MemoryType.FACT
+        ),
+        score=related_semantic,
+        vector_score=related_semantic,
+    )
+    hard_negatives = _recall_selector_hard_negatives(content)
+    hard_negatives["secret"].memory.metadata.source_detail = "api_key=" + ("a" * 32)
+    candidates = [qualified, related, *hard_negatives.values()]
+    request = TaskBriefRequest(
+        task=question,
+        project="elefante",
+        workspace="/repo",
+        profile=TaskBriefProfile.V2,
+    )
+    compiler = TaskBriefCompiler()
+    ranked = compiler._rank_candidates_v2(request, candidates)
+    by_id = {str(item.result.memory.id): item for item in ranked}
+    qualified_item = by_id[str(qualified.memory.id)]
+    qualified_signals = qualified_item.retrieval_signals
+    related_signals = by_id[str(related.memory.id)].retrieval_signals
+
+    assert qualified_signals["semantic"] == pytest.approx(semantic)
+    assert qualified_signals["semantic"] >= 0.55
+    assert qualified_signals["lexical"] > 0.0
+    assert qualified_signals["matched_terms"] >= 2
+    assert qualified_signals["query_coverage"] == pytest.approx(expected_coverage)
+    assert qualified_signals["direct_answer"] == expected_direct_answer
+    assert qualified_signals["query_identifiers"] == 0
+    assert qualified_signals["specificity"] == 0.0
+    assert qualified_signals["recall_cue_match"] == 0.0
+    assert qualified_signals["query_anchors"] >= 1
+    assert qualified_signals["matched_anchors"] < qualified_signals["query_anchors"]
+    if expected_direct_answer == 0.0:
+        assert qualified_item.role == EvidenceRole.CONSTRAINT
+        assert qualified_signals["query_coverage"] >= compiler.MIN_ROLE_ANCHOR_COVERAGE
+    assert related_signals["semantic"] == pytest.approx(related_semantic)
+    assert related_signals["direct_answer"] == 0.0
+
+    brief = compiler.compile(request, candidates)
+    omission_reasons = {
+        item.memory_id: item.reason for item in brief.omissions
+    }
+    assert omission_reasons[str(related.memory.id)] == (
+        "insufficient-independent-relevance"
+    )
+    for label in ("price", "version", "technical"):
+        assert omission_reasons[str(hard_negatives[label].memory.id)] == (
+            "insufficient-independent-relevance"
+        ), case
+    assert omission_reasons[str(hard_negatives["wrong-scope"].memory.id)] == (
+        "cross-project"
+    )
+    assert omission_reasons[str(hard_negatives["conflict"].memory.id)] == (
+        "unresolved-conflict"
+    )
+    assert omission_reasons[str(hard_negatives["secret"].memory.id)] == (
+        "privacy-redaction"
+    )
+
+    assert compiler._is_actionable(qualified_item) is True
+    assert brief.abstained is False
+    assert brief.selected_memory_ids == [str(qualified.memory.id)]
+
+
+@pytest.mark.parametrize(
+    ("property_name", "question", "semantic_scores", "direct_answers"),
+    [
+        pytest.param(
+            "price",
+            "How much does Elefante's dashboard cost?",
+            (0.861328, 0.902832),
+            (1.0, 1.0),
+            id="unknown-price",
+        ),
+        pytest.param(
+            "version",
+            "What version is Elefante?",
+            (0.851562, 0.879883),
+            (0.0, 0.0),
+            id="unknown-version",
+        ),
+        pytest.param(
+            "technical-backend",
+            "Which technical backend does Elefante use?",
+            (0.852539, 0.884766),
+            (0.0, 1.0),
+            id="unknown-technical-backend",
+        ),
+    ],
+)
+def test_v2_abstains_for_unknown_same_product_properties_against_guidance_memories(
+    property_name: str,
+    question: str,
+    semantic_scores: tuple[float, float],
+    direct_answers: tuple[float, float],
+) -> None:
+    """Guidance about a product must not answer an unrecorded property question."""
+    memories = [
+        _result(
+            content,
+            memory_type=MemoryType.SPECIFICATION,
+            score=semantic,
+            vector_score=semantic,
+        )
+        for content, semantic in zip(
+            (_RECALL_EXISTING_VERIFICATION_MEMORY, _RECALL_EXISTING_DASHBOARD_MEMORY),
+            semantic_scores,
+        )
+    ]
+    request = TaskBriefRequest(
+        task=question,
+        project="elefante",
+        workspace="/repo",
+        profile=TaskBriefProfile.V2,
+    )
+    compiler = TaskBriefCompiler()
+    ranked = compiler._rank_candidates_v2(request, memories)
+    by_id = {str(item.result.memory.id): item for item in ranked}
+
+    assert property_name in {"price", "version", "technical-backend"}
+    for index, (result, expected_direct_answer) in enumerate(
+        zip(memories, direct_answers)
+    ):
+        item = by_id[str(result.memory.id)]
+        assert result.memory.metadata.recall_cues == []
+        assert item.retrieval_signals["semantic"] == pytest.approx(
+            semantic_scores[index]
+        )
+        assert item.retrieval_signals["specificity"] == 0.0
+        assert item.retrieval_signals["recall_cue_match"] == 0.0
+        assert item.retrieval_signals["direct_answer"] == expected_direct_answer, (
+            property_name
+        )
+
+    brief = compiler.compile(request, memories)
+
+    assert brief.abstained is True
+    assert brief.selected_memory_ids == []
+
+
+def test_v2_delivers_uncued_property_fact_when_requested_head_is_present() -> None:
+    """An uncued fact remains usable when its requested property is stated."""
+    question = "Which supplier should I use for event badges?"
+    fact = _result(
+        "The supplier for event badges is Northwind Print.",
+        memory_type=MemoryType.FACT,
+        score=0.8,
+        vector_score=0.8,
+    )
+    request = TaskBriefRequest(
+        task=question,
+        project="elefante",
+        workspace="/repo",
+        profile=TaskBriefProfile.V2,
+    )
+    compiler = TaskBriefCompiler()
+    ranked = compiler._rank_candidates_v2(request, [fact])
+
+    assert compiler._question_focus(question) == "property:supplier"
+    assert fact.memory.metadata.recall_cues == []
+    assert compiler._recall_cue_focus(question, fact.memory) == "unknown"
+    assert ranked[0].retrieval_signals["recall_cue_focus"] == "unknown"
+    assert ranked[0].retrieval_signals["direct_answer"] == 1.0
+
+    brief = compiler.compile(request, [fact])
+
+    assert brief.abstained is False
+    assert brief.selected_memory_ids == [str(fact.memory.id)]
+
+
+@pytest.mark.parametrize(
+    ("value_form", "content"),
+    [
+        pytest.param(
+            "numeric",
+            "The service retains logs for 14 days.",
+            id="numeric-value",
+        ),
+        pytest.param(
+            "word",
+            "The service retains logs for fourteen days.",
+            id="word-value",
+        ),
+    ],
+)
+def test_v2_delivers_uncued_quantitative_fact_when_value_is_present(
+    value_form: str,
+    content: str,
+) -> None:
+    """An uncued quantitative fact remains usable when it contains a value."""
+    question = "How many days are the service logs retained?"
+    fact = _result(
+        content,
+        memory_type=MemoryType.FACT,
+        score=0.8,
+        vector_score=0.8,
+    )
+    request = TaskBriefRequest(
+        task=question,
+        project="elefante",
+        workspace="/repo",
+        profile=TaskBriefProfile.V2,
+    )
+    compiler = TaskBriefCompiler()
+    ranked = compiler._rank_candidates_v2(request, [fact])
+
+    assert compiler._question_focus(question) == "duration", value_form
+    assert fact.memory.metadata.recall_cues == []
+    assert compiler._recall_cue_focus(question, fact.memory) == "unknown"
+    assert ranked[0].retrieval_signals["recall_cue_focus"] == "unknown"
+    assert ranked[0].retrieval_signals["direct_answer"] == 1.0
+
+    brief = compiler.compile(request, [fact])
+
+    assert brief.abstained is False
+    assert brief.selected_memory_ids == [str(fact.memory.id)]

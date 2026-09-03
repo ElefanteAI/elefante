@@ -2384,10 +2384,13 @@ class MemoryOrchestrator:
         )
         
         # Use idempotent creation (MERGE behavior)
-        await self.graph_store.create_or_get_entity(entity)
+        stored_id = await self.graph_store.create_or_get_entity(entity)
+        stored_entity = await self.graph_store.get_entity(stored_id)
+        if stored_entity is None:
+            raise RuntimeError("Created or reused graph entity could not be read back")
         self.logger.info(f"Entity created/retrieved: {name} ({entity_type})")
         
-        return entity
+        return stored_entity
     
     async def create_relationship(
         self,
@@ -2410,6 +2413,14 @@ class MemoryOrchestrator:
         """
         # Parse relationship type (STRICT)
         parsed_rel_type = RelationshipType(relationship_type)
+        # The public graph workflow is idempotent for an identical relationship.
+        for existing in await self.graph_store.get_relationships(from_entity_id, "outgoing"):
+            if (
+                existing.to_entity_id == to_entity_id
+                and existing.relationship_type == parsed_rel_type
+                and existing.properties == (properties or {})
+            ):
+                return existing
         
         relationship = Relationship(
             from_entity_id=from_entity_id,

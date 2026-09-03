@@ -13,6 +13,19 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- GraphConnect persists all advertised relationship types and complete edge
+  payloads. Missing endpoints and invalid batches fail before creating orphan
+  nodes; repeated identical calls reuse entity and edge identities. Additive
+  schema upgrades preserve legacy links, including native custom fields.
+- Recall no longer treats repeated question words as mandatory matches when
+  independent decision-bearing evidence already qualifies. Explicit property
+  and quantity requests cannot be satisfied by topic-only guidance, including
+  memories without saved questions. The existing model and thresholds remain.
+- Home's Review recommendation clears stale search and detail state. Graph
+  cards preserve stored memory types rather than calling every specification a
+  safeguard. Header and Session Intelligence failures are visible and do not
+  masquerade as zero counts or disabled consent; related-memory links use
+  keyboard-operable buttons.
 - Decision Graph draws only stored relationships, with their actual source,
   target, and direction. Adjacent memory cards no longer imply invented links;
   branching, circular, and multiple relationships remain inspectable.

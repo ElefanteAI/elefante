@@ -25,6 +25,7 @@ function formatSnapshotAge(generatedAt: string): { label: string; stale: boolean
 
 export function HeaderBar({ theme, onToggleTheme }: HeaderBarProps) {
   const stats = useDashboardStore((s) => s.stats);
+  const statsError = useDashboardStore((s) => s.statsError);
   const snapshotContext = useDashboardStore((s) => s.snapshot?.snapshot_context);
   const isRefreshing = useDashboardStore((s) => s.isRefreshing);
   const refreshSnapshot = useDashboardStore((s) => s.refreshSnapshot);
@@ -56,12 +57,25 @@ export function HeaderBar({ theme, onToggleTheme }: HeaderBarProps) {
       </div>
 
       <div className="flex w-full min-w-0 items-center justify-between gap-2 text-[10px] text-slate-500 elefante-mono uppercase tracking-[0.08em] sm:w-auto sm:justify-end sm:gap-3">
-        <span className="hidden lg:inline">{memories} memories</span>
-        <span className="hidden lg:inline text-slate-700">·</span>
-        <span className="hidden lg:inline">{entities} entities</span>
-        <span className="hidden lg:inline text-slate-700">·</span>
-        <span className="hidden md:inline">{relationships} links</span>
-        <span className="hidden md:inline text-slate-700">·</span>
+        {statsError ? (
+          <span
+            role="status"
+            aria-live="polite"
+            title={statsError}
+            className="text-amber-300"
+          >
+            Stats unavailable
+          </span>
+        ) : (
+          <>
+            <span className="hidden lg:inline">{memories} memories</span>
+            <span className="hidden lg:inline text-slate-700">·</span>
+            <span className="hidden lg:inline">{entities} entities</span>
+            <span className="hidden lg:inline text-slate-700">·</span>
+            <span className="hidden md:inline">{relationships} links</span>
+            <span className="hidden md:inline text-slate-700">·</span>
+          </>
+        )}
         <span
           className={`min-w-0 truncate ${isShowcase ? 'text-cyan-300' : stale ? 'text-amber-400/90' : 'text-emerald-400/90'}`}
           title={isShowcase ? 'Deterministic dashboard example' : `Snapshot generated: ${snapshotAt}`}
