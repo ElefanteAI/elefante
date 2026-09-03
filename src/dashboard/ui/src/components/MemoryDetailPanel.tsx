@@ -95,7 +95,7 @@ function parseListValue(value: unknown): string[] {
 export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], conflictMemories = [], onNavigateToMemory, health_status, retrievalEvidence }: MemoryDetailPanelProps) {
   // Escape to close
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') onClose();
+    if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('[role="dialog"]')) onClose();
   }, [onClose]);
 
   useEffect(() => {
@@ -142,7 +142,7 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], confl
   };
 
   return (
-    <div className="fixed right-0 top-0 h-full w-full sm:w-[420px] bg-slate-900/98 backdrop-blur border-l border-slate-700/60 shadow-2xl z-50 flex flex-col overflow-hidden">
+    <div className="absolute right-0 top-0 h-full w-full sm:w-[420px] bg-slate-900/98 backdrop-blur border-l border-slate-700/60 shadow-2xl z-50 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="px-5 py-4 border-b border-slate-700/60 bg-slate-800/40 flex-shrink-0">
         <div className="flex items-start justify-between gap-3">
@@ -284,7 +284,7 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], confl
           <div className="px-5 py-3 border-b border-slate-800/60">
             <div className="text-xs uppercase tracking-wider text-slate-500 mb-1">Recall questions</div>
             <p className="mb-2 text-[11px] leading-relaxed text-slate-500">
-              Exact project questions saved by Remember or Correct to find this knowledge later.
+              Saved questions that help Recall find this knowledge later, including supported paraphrases.
             </p>
             <div className="space-y-1.5">
               {recallCues.map((cue) => (
@@ -420,20 +420,25 @@ export function MemoryDetailPanel({ memory, onClose, relatedMemories = [], confl
               Related ({relatedMemories.length})
             </div>
             <div className="space-y-1.5">
-              {relatedMemories.slice(0, 8).map((rm) => (
-                <div
-                  key={rm.id}
-                  className="px-3 py-2 bg-slate-800/40 rounded-lg border border-slate-700/40 hover:border-cyan-500/40 hover:bg-slate-800/70 transition-colors cursor-pointer"
-                  onClick={() => onNavigateToMemory?.(rm.id)}
-                >
-                  <div className="text-xs text-slate-200 truncate">
-                    {rm.properties.title || rm.properties.summary || rm.name}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    {formatLabel(String(rm.properties.topic || 'general'))} · {formatLabel(String(rm.properties.memory_type || 'unknown'))}
-                  </div>
-                </div>
-              ))}
+              {relatedMemories.slice(0, 8).map((rm) => {
+                const relatedLabel = String(rm.properties.title || rm.properties.summary || rm.name);
+                return (
+                  <button
+                    key={rm.id}
+                    type="button"
+                    aria-label={`Open related memory ${relatedLabel}`}
+                    className="block w-full appearance-none px-3 py-2 text-left bg-slate-800/40 rounded-lg border border-slate-700/40 hover:border-cyan-500/40 hover:bg-slate-800/70 transition-colors cursor-pointer"
+                    onClick={() => onNavigateToMemory?.(rm.id)}
+                  >
+                    <div className="text-xs text-slate-200 truncate">
+                      {relatedLabel}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">
+                      {formatLabel(String(rm.properties.topic || 'general'))} · {formatLabel(String(rm.properties.memory_type || 'unknown'))}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

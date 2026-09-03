@@ -19,6 +19,7 @@ jobs:
   authorize:
     name: Validate, tag, and dispatch
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Checkout release commit
         uses: actions/checkout@v7
@@ -29,6 +30,24 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.11"
+
+      - name: Require Quality at the exact main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          quality_run=""
+          for attempt in {1..20}; do
+            quality_run="$(gh run list --workflow quality.yml --commit "$GITHUB_SHA" --event push --json databaseId --jq '.[0].databaseId // empty')"
+            if [[ -n "$quality_run" ]]; then break; fi
+            sleep 6
+          done
+          if [[ -z "$quality_run" ]]; then
+            echo "No Quality run exists for the exact release commit." >&2
+            exit 1
+          fi
+          gh run watch "$quality_run" --exit-status
 
       - name: Validate the authorized release
         id: release

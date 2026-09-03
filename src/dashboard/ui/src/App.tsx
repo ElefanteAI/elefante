@@ -29,6 +29,8 @@ function App() {
   const controlConnecting = useDashboardStore((s) => s.controlConnecting);
   const controlEnabled = useDashboardStore((s) => s.controlEnabled);
   const controlAvailability = useDashboardStore((s) => s.controlAvailability);
+  const controlSessionError = useDashboardStore((s) => s.controlSessionError);
+  const activeProjectId = useDashboardStore((s) => s.activeProjectId);
   const snapshotContext = useDashboardStore((s) => s.snapshot?.snapshot_context);
   const initializeControlSession = useDashboardStore((s) => s.initializeControlSession);
   const surfaceLabel = snapshotContext?.mode === 'showcase'
@@ -59,9 +61,16 @@ function App() {
 
   // Global keyboard shortcuts
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // Skip if user is typing in an input
+    // Dialogs own their keyboard handling, including busy-state dismissal.
+    if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || document.querySelector('[role="dialog"]')) return;
+    if (e.key === 'Escape') {
+      setInspectedMemoryId(null);
+      setSearchQuery('');
+      return;
+    }
+    // Keep navigation shortcuts out of editable controls.
     const target = e.target as HTMLElement;
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable) return;
 
     const tabMap: Record<string, Tab> = {
       '1': 'overview',
@@ -76,10 +85,6 @@ function App() {
       return;
     }
 
-    if (e.key === 'Escape') {
-      setInspectedMemoryId(null);
-      setSearchQuery('');
-    }
   }, [setActiveTab, setInspectedMemoryId, setSearchQuery]);
 
   useEffect(() => {
@@ -107,7 +112,18 @@ function App() {
   };
 
   return (
-    <div className="elefante-shell w-full h-screen bg-slate-950 text-slate-100 overflow-hidden flex flex-col">
+    <div className="w-full h-screen bg-slate-950 text-slate-100 overflow-hidden flex flex-col">
+      {/* Outside the shell's isolation: visible above dialogs, in normal flow
+          so reconnect never covers the header or navigation. */}
+      {controlSessionError && !controlEnabled && (
+        <div role="alert" className="relative z-[80] flex shrink-0 items-center justify-between gap-4 border-b border-amber-300/40 bg-slate-950 px-5 py-3 text-xs text-amber-200">
+          <span>{controlSessionError} No operation is retried automatically.</span>
+          <button type="button" disabled={controlConnecting} onClick={() => void initializeControlSession(activeProjectId ?? undefined)} className="min-h-10 shrink-0 border border-amber-300/50 px-4 disabled:opacity-40">
+            {controlConnecting ? 'Reconnecting…' : 'Reconnect Home'}
+          </button>
+        </div>
+      )}
+    <div className="elefante-shell w-full flex-1 min-h-0 overflow-hidden flex flex-col">
       {/* Header */}
       <HeaderBar
         theme={theme}
@@ -156,6 +172,7 @@ function App() {
           <span className="text-slate-600">· 1/2/3/4/5/6 to switch views</span>
         </span>
       </footer>
+    </div>
     </div>
   );
 }

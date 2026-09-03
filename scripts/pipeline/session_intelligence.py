@@ -133,7 +133,7 @@ def _parser() -> argparse.ArgumentParser:
     enterprise = commands.add_parser(
         "enterprise", help="Build aggregate, anti-surveillance training hypotheses"
     )
-    enterprise.add_argument("--group-by", choices=("tool", "client", "status"), default="tool")
+    enterprise.add_argument("--group-by", choices=("tool", "client", "day"), default="tool")
 
     export = commands.add_parser("export", help="Export metadata-only ledger records")
     export.add_argument("output", type=Path)

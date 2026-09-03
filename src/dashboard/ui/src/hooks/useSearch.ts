@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { SearchResult } from '@/types';
 
 interface UseSearchReturn {
@@ -39,22 +39,26 @@ export function useSearch(): UseSearchReturn {
 
       if (!data.success) throw new Error(data.error || 'Search failed');
 
-      setResults(data.results || []);
+      if (abortRef.current === controller) setResults(data.results || []);
     } catch (e: any) {
-      if (e.name !== 'AbortError') {
+      if (e.name !== 'AbortError' && abortRef.current === controller) {
         setSearchError(e.message);
         setResults([]);
       }
     } finally {
-      setIsSearching(false);
+      if (abortRef.current === controller) setIsSearching(false);
     }
   }, []);
 
   const clear = useCallback(() => {
     abortRef.current?.abort();
+    abortRef.current = null;
     setResults([]);
     setSearchError(null);
+    setIsSearching(false);
   }, []);
+
+  useEffect(() => () => { abortRef.current?.abort(); }, []);
 
   return { results, isSearching, searchError, search, clear };
 }

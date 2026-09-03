@@ -44,7 +44,10 @@ def test_promotion_ready_mode_fails_closed_for_historical_benchmark(capsys) -> N
     assert report["invalid_tasks"][0]["reasons"] == ["missing-contract"]
 
 
-def test_black_box_canary_verifier_proves_base_and_known_fix(capsys) -> None:
+def test_black_box_canary_verifier_proves_base_and_known_fix(capsys, monkeypatch) -> None:
+    # Historical black-box fixtures choose their own isolated data roots.
+    # An enclosing developer run must not override that controlled input.
+    monkeypatch.delenv("ELEFANTE_DATA_DIR", raising=False)
     result = benchmark.main(["--manifest", str(MANIFEST), "--verify-canaries"])
     report = json.loads(capsys.readouterr().out)
 

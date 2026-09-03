@@ -76,6 +76,32 @@ def _context_result(
     )
 
 
+def test_answer_context_shares_its_budget_across_matching_memories():
+    """Recall is one answer bundle, not three mostly empty task-stage quotas."""
+    question = "Where is the rehearsal device battery pack stored?"
+    results = [
+        _context_result(
+            f"The rehearsal device stores its battery pack in the {colour} cabinet.",
+            memory_type=MemoryType.DECISION,
+        )
+        for colour in ("blue", "green")
+    ]
+    for result in results:
+        result.recall_cue_match = True
+        result.memory.metadata.project = "test"
+        result.memory.metadata.workspace = "/work/test"
+        result.memory.metadata.recall_cues = [question]
+    context = compile_answer_context(
+        question, results, project="test", workspace="/work/test", include_question=False,
+    )
+    assert set(context.selected_memory_ids) == {str(item.memory.id) for item in results}
+    assert estimate_tokens(context.text) <= 450
+    limited = compile_answer_context(
+        question, results, project="test", workspace="/work/test", max_memories=1,
+    )
+    assert limited.selected_count == 1
+
+
 def test_answer_context_selects_answer_bearing_memory_and_rejects_related_noise():
     relevant = _context_result(
         "Elefante customer installation uses one global runtime for every compatible IDE.",
@@ -2136,7 +2162,7 @@ async def test_graph_connect_scrubs_properties_and_holds_lock_through_writes(mon
                 {
                     "ref": "decision",
                     "name": "Local memory",
-                    "type": "decision",
+                    "type": "memory",
                 },
             ],
             "relationships": [
@@ -2154,6 +2180,98 @@ async def test_graph_connect_scrubs_properties_and_holds_lock_through_writes(mon
     assert secret not in json.dumps(captured, default=str)
     assert secret not in json.dumps(result, default=str)
     assert result["privacy_redactions"] == 2
+
+
+@pytest.fixture
+def isolated_graph_tool_server(monkeypatch, tmp_path):
+    """Run the real graph methods without starting memory or customer services."""
+    from src.core.graph_store import GraphStore
+    from src.core.orchestrator import MemoryOrchestrator
+    @asynccontextmanager
+    async def isolated_lock():
+        yield SimpleNamespace(acquired=True)
+
+    store = GraphStore(database_path=str(tmp_path / "graph"))
+    orchestrator = MemoryOrchestrator.__new__(MemoryOrchestrator)
+    orchestrator.graph_store = store
+    orchestrator.logger = SimpleNamespace(info=lambda *args, **kwargs: None)
+    server = ElefanteMCPServer.__new__(ElefanteMCPServer)
+    monkeypatch.setattr(server, "_write_operation", isolated_lock)
+    monkeypatch.setattr(server, "_check_compliance_gate", lambda _: None)
+    monkeypatch.setattr(server, "_get_orchestrator", lambda: _async_value(orchestrator))
+    try:
+        yield server, store
+    finally:
+        store.close()
+
+
+@pytest.mark.asyncio
+async def test_graph_connect_real_payloads_and_repeat_are_idempotent(isolated_graph_tool_server):
+    from src.models.entity import RelationshipType
+    from uuid import UUID
+
+    server, store = isolated_graph_tool_server
+    properties = {"evidence": "stored readback", "checks": ["type", "properties"]}
+    request = {
+        "entities": [
+            {"ref": "rule", "name": "Verify the stored result", "type": "memory", "properties": properties},
+            {"ref": "task", "name": "Graph repair acceptance", "type": "memory"},
+        ],
+        "relationships": [
+            {"from_ref": "rule", "to_ref": "task", "relationship_type": kind.value.lower(), "properties": properties}
+            for kind in RelationshipType
+        ],
+    }
+    first = await server._handle_set_elefante_connection(request)
+    assert first["success"] is True
+    source_id = UUID(first["entity_ref_map"]["rule"])
+    stored_source = await store.get_entity(source_id)
+    assert stored_source is not None
+    assert stored_source.properties == properties
+    original_edges = await store.get_relationships(source_id, "outgoing")
+    assert len(original_edges) == len(RelationshipType)
+    assert {edge.relationship_type for edge in original_edges} == set(RelationshipType)
+    assert all(edge.properties == properties for edge in original_edges)
+
+    second = await server._handle_set_elefante_connection(request)
+    assert second["success"] is True
+    assert second["entity_ref_map"] == first["entity_ref_map"]
+    repeated_edges = await store.get_relationships(source_id, "outgoing")
+    assert {edge.id for edge in repeated_edges} == {edge.id for edge in original_edges}
+    assert len(repeated_edges) == len(RelationshipType)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("invalid", [
+    "missing_endpoint", "unknown_ref", "invalid_type", "duplicate_ref",
+    "entity_properties", "relationship_properties", "non_finite_properties",
+])
+async def test_graph_connect_invalid_batch_does_not_leave_entities(isolated_graph_tool_server, invalid):
+    server, store = isolated_graph_tool_server
+    request = {
+        "entities": [{"ref": "rule", "name": "Must not be left behind", "type": "memory"}],
+        "relationships": [{"from_ref": "rule", "to_ref": "rule", "relationship_type": "GOVERNS"}],
+    }
+    if invalid == "missing_endpoint":
+        request["relationships"][0].pop("to_ref")
+        request["relationships"][0]["to_entity_id"] = str(uuid4())
+    elif invalid == "unknown_ref":
+        request["relationships"][0]["to_ref"] = "absent"
+    elif invalid == "invalid_type":
+        request["relationships"][0]["relationship_type"] = "UNSUPPORTED_RELATIONSHIP"
+    elif invalid == "entity_properties":
+        request["entities"].append({
+            "ref": "later", "name": "Invalid later entity", "type": "memory", "properties": [],
+        })
+    elif invalid == "relationship_properties":
+        request["relationships"][0]["properties"] = []
+    elif invalid == "non_finite_properties":
+        request["relationships"][0]["properties"] = {"weight": float("nan")}
+    else:
+        request["entities"].append({"ref": "rule", "name": "Ambiguous replacement", "type": "memory"})
+    with pytest.raises(ValueError):
+        await server._handle_set_elefante_connection(request)
+    assert await store.execute_query("MATCH (e:Entity) RETURN e.id") == []
 
 
 @pytest.mark.asyncio
@@ -2829,7 +2947,14 @@ async def test_memory_search_answer_context_blocks_digest_stale_locked_memory(
         async def search_memories(self, **_kwargs):
             return [stale]
 
+    from src.core.project_registry import ProjectRegistry
+
     server = ElefanteMCPServer()
+    server._project_registry = ProjectRegistry(tmp_path / "projects.json")
+    project = server._project_registry.register("Source validation", tmp_path)
+    server._project_registry.set_mode("strict")
+    stale.memory.metadata.project = project.project_id
+    stale.memory.metadata.workspace = project.root
     monkeypatch.setattr(
         server,
         "_request_provenance",
@@ -2876,7 +3001,14 @@ async def test_prompt_and_recall_block_digest_stale_locked_memory(
         async def search_memories(self, **_kwargs):
             return [stale]
 
+    from src.core.project_registry import ProjectRegistry
+
     server = ElefanteMCPServer()
+    server._project_registry = ProjectRegistry(tmp_path / "projects.json")
+    project = server._project_registry.register("Source validation", tmp_path)
+    server._project_registry.set_mode("strict")
+    stale.memory.metadata.project = project.project_id
+    stale.memory.metadata.workspace = project.root
     monkeypatch.setattr(
         server,
         "_request_provenance",

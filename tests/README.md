@@ -1,7 +1,6 @@
 # Elefante Test Suite
 
-> **Scope:** v2.13.0 developer and release verification
-> **Last Updated:** 2026-08-30
+> **Scope:** current developer and release verification
 
 ## Quick Reference
 
@@ -34,7 +33,7 @@ pytest tests/test_integration_smoke.py -v
 ./.venv/bin/python scripts/ci/summarize_task_intelligence_evaluation.py
 ```
 
-The self-protocol runs against an isolated temporary Elefante home/data directory so it validates the direct live MCP handler workflow without polluting the user's durable memory store. It explicitly enables the default-off Task Intelligence development surface and verifies 18/19 source tools plus both prompts; `--with-dashboard-open` is opt-in because that tool binds fixed port 8000 and is not fully self-contained. The current unreleased customer profile exposes 18 tools and 2 prompts because verified Recover is present while Task Intelligence remains default-off; published v2.13.0 exposes 17 tools and 2 prompts. The customer bridge/daemon transport is a separate maintained proof in `tests/test_mcp_daemon.py`, including stale-session recovery; do not use the direct self-protocol alone as transport-topology evidence.
+The self-protocol runs against an isolated temporary Elefante home/data directory so it validates the direct live MCP handler workflow without polluting the user's durable memory store. It explicitly enables the default-off Task Intelligence development surface and verifies 18/19 source tools plus both prompts; `--with-dashboard-open` is opt-in because that tool binds fixed port 8000 and is not fully self-contained. The customer profile exposes 18 tools and 2 prompts, including Recover; Task Intelligence remains developer-only and default-off. The customer bridge/daemon transport is a separate maintained proof in `tests/test_mcp_daemon.py`, including stale-session recovery; do not use the direct self-protocol alone as transport-topology evidence.
 
 Use the existing tests in this file before writing any ad hoc validation script. If a listed test no longer reflects current behavior, update that test first. Parallel scratch tests are noise unless the existing suite cannot express the failure mode.
 
@@ -46,7 +45,7 @@ Use the existing tests in this file before writing any ad hoc validation script.
 
 | File | What It Tests | Why Critical |
 | ---- | ------------- | ------------ |
-| [test_memory_persistence.py](test_memory_persistence.py) | Memories persist, current Kuzu path/lock contract stays truthful, GraphStore close barrier works, live MCP shutdown regression stays alive | Without this, users lose memories, get routed through stale Kuzu recovery advice, or crash the server |
+| [test_memory_persistence.py](test_memory_persistence.py) | Memories persist, relationship payload/timestamp round-trips and legacy migration stay truthful, current Kuzu path/lock contract stays truthful, GraphStore close barrier works, live MCP shutdown regression stays alive | Without this, users lose memories, get routed through stale Kuzu recovery advice, or crash the server |
 | [test_memory_guard.py](test_memory_guard.py) | `[test]` tagged memories blocked by default | Prevents test data polluting real memory DB |
 | [test_autonomous_coactivation.py](test_autonomous_coactivation.py) | Legacy explicit reinforcement behavior, read-only retrieval boundary, built-in directive baseline, system specification bootstrap, entrypoint response-contract guard | Prevents retrieval exposure from mutating memory history and protects the embedded directive/specification baseline |
 | [test_task_intelligence_ledger.py](test_task_intelligence_ledger.py) | Session-bound prepare/use/outcome traces, metadata-only storage, idempotency, retraction, shadow default, and pilot kill switch | Prevents observational Task Intelligence data from leaking content, crossing sessions, or silently changing ranking |

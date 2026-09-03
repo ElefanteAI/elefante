@@ -126,7 +126,7 @@ class Relationship(BaseModel):
     description: Optional[str] = None
     
     # Metadata
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
     strength: float = Field(default=1.0, ge=0.0, le=1.0)  # Relationship strength
     
     # Properties (flexible key-value storage)
@@ -142,7 +142,7 @@ class Relationship(BaseModel):
             "to_entity_id": str(self.to_entity_id),
             "relationship_type": self.relationship_type.value,
             "description": self.description,
-            "created_at": self.created_at.isoformat(),
+            "created_at": self.created_at.isoformat() if self.created_at else None,
             "strength": self.strength,
             "properties": self.properties,
         }

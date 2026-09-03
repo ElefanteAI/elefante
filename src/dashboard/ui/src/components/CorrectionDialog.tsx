@@ -268,8 +268,10 @@ export function CorrectionDialog({ memory }: { memory: MemoryNode }) {
   const availableActions = active
     ? ACTIONS.filter((candidate) => candidate.action !== 'restore')
     : manuallyArchived
-      ? ACTIONS.filter((candidate) => candidate.action === 'restore')
-      : [];
+      ? ACTIONS.filter(
+          (candidate) => candidate.action === 'restore' || candidate.action === 'permanent_delete',
+        )
+      : ACTIONS.filter((candidate) => candidate.action === 'permanent_delete');
   const requiresContent = action === 'edit' || action === 'replace';
   const permanentDelete = action === 'permanent_delete';
   const selectedDefinition = actionDefinition(action);
@@ -571,9 +573,10 @@ export function CorrectionDialog({ memory }: { memory: MemoryNode }) {
                       <div className="flex items-start gap-2">
                         <Trash2 size={16} className="mt-0.5 flex-shrink-0 text-red-300" aria-hidden="true" />
                         <div>
-                          <div className="text-sm font-semibold text-red-100">This cannot be recovered after success</div>
+                          <div className="text-sm font-semibold text-red-100">The temporary safety backup is destroyed after success</div>
                           <p className="mt-1 text-xs leading-relaxed text-slate-400">
                             Elefante first verifies a temporary local backup. It restores that backup if deletion fails, and destroys it only after the memory, connections, Home, Recall, and unshared attachments are verified absent.
+                            {' '}Older backups are not deleted and may still contain this memory.
                           </p>
                         </div>
                       </div>
@@ -730,7 +733,7 @@ export function CorrectionDialog({ memory }: { memory: MemoryNode }) {
 
                   <div>
                     <label htmlFor="correction-question" className="mb-1.5 block text-xs font-medium text-slate-300">
-                      {permanentDelete ? 'Recall question that currently finds this memory' : 'Likely future Recall question'}
+                      {permanentDelete ? 'Question that must not return this memory' : 'Likely future Recall question'}
                     </label>
                     <textarea
                       id="correction-question"

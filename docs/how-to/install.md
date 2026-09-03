@@ -1,7 +1,7 @@
-# Install Elefante v2.13.0
+# Install Elefante
 
 Use the platform archive from the
-[v2.13.0 GitHub release](https://github.com/ElefanteAI/elefante/releases/tag/v2.13.0).
+[latest published GitHub release](https://github.com/ElefanteAI/elefante/releases/latest).
 This is the supported customer path.
 
 ## Requirements
@@ -199,12 +199,28 @@ Run the read-only doctor if the host does not answer correctly:
 A healthy customer candidate reports `ready=true`, `customer_ready=true`, a
 matching build identity, a healthy loopback daemon, a verified Codex connection
 and Recall path, and explicit preview-host coverage. An uncovered preview does
-not fail the certified lane. `doctor` is read-only: it does not start services,
+not fail the required Codex validation. `doctor` is read-only: it does not start services,
 rewrite host configuration, migrate data, or repair the installation.
+
+To print the installed package version without relying on a document header:
+
+```bash
+# macOS/Linux
+(
+  cd ~/.elefante/app/current
+  .venv/bin/python -c 'from src import __version__; print(__version__)'
+)
+```
+
+```powershell
+# Windows PowerShell
+Set-Location "$env:LOCALAPPDATA\Elefante\app\current"
+& .\.venv\Scripts\python.exe -c "from src import __version__; print(__version__)"
+```
 
 ## 5. Host coverage
 
-The v2.13.0 installer has ownership-safe, contract-tested adapters for:
+The supported installer has ownership-safe, contract-tested adapters for:
 
 - VS Code Copilot
 - Claude Code
@@ -216,9 +232,10 @@ The v2.13.0 installer has ownership-safe, contract-tested adapters for:
 - Codex
 - OpenClaw
 
-For the current unreleased first-release contract, Codex is the only required
-certification lane. All other adapters are optional compatibility previews and
-cannot make the customer installation ready by themselves. IBM Bob and
+For the supported release workflow, Codex is the required validation target.
+All other adapters are optional compatibility previews and cannot make the
+customer installation ready by themselves. Adapter coverage says nothing about
+task quality. IBM Bob and
 Antigravity remain preview integrations. Agent Zero is a documented community
 path. See [Configure a host](configure-ide.md) for exact status and manual
 fallbacks.
@@ -246,8 +263,8 @@ Common blockers:
   `doctor`.
 - **Kuzu ownership or lock error:** follow
   [Kuzu troubleshooting](kuzu-troubleshooting.md).
-- **Build identity mismatch:** reinstall the verified v2.13.0 archive; do not
-  edit identity files manually.
+- **Build identity mismatch:** reinstall the archive that matches the installed
+  build; do not edit identity files manually.
 
 ### Create a privacy-safe support report
 
@@ -275,13 +292,12 @@ analysis export. JSON supports additive memory migration but omits graph
 topology and is not a full backup. Use [Backup and rollback](rollback.md) for
 the checksummed binary path.
 
-The published v2.13.0 installed lifecycle uninstaller can detach only unchanged
+The installer-owned lifecycle uninstaller can detach only unchanged
 installer-owned service definitions, host entries, and Recall guidance. It
 preserves the app and data and is not a complete product uninstall.
 
-The current unreleased official-package candidate owns complete uninstall from
-outside the installed app. Use the package that exactly matches the installed
-build:
+The official-package uninstall flow owns complete uninstall from outside the
+installed app. Use the package that exactly matches the installed build:
 
 - macOS: open `Uninstall Elefante.command`;
 - Windows: open `Uninstall Elefante.bat`;
@@ -295,13 +311,13 @@ and writes a private completion receipt. Modified or unverified customer
 configuration is preserved. The durable data root is never deleted by this
 operation.
 
-If the customer later installs Elefante again, the verified installer
+If the customer later installs Elefante again, the matching installer
 reattaches the preserved data root and removes the temporary preservation
 pointer only after Doctor and a live Recall check pass. A stale plan, changed
 data, mismatched package, unsafe path, failed backup, or unverified removal
 fails closed or directs the customer to a privacy-safe support report. This
-source candidate still requires exact packaged install → uninstall → reinstall
-acceptance before release.
+package flow must pass exact packaged install → uninstall → reinstall acceptance
+before it is treated as a release.
 
 Developers reproducing or changing Elefante should start at
 [the repository developer entrypoint](../../AGENTS.md), not this customer

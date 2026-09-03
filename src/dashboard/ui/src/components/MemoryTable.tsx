@@ -51,13 +51,15 @@ export function MemoryTable({ memories, onSelectMemory, selectedId }: MemoryTabl
       header: () => null,
       cell: ({ row }) => (
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             row.toggleExpanded();
           }}
+          aria-label={`${row.getIsExpanded() ? 'Collapse' : 'Expand'} ${String(row.original.properties?.title || row.original.name || 'memory')}`}
           className="p-1 hover:bg-slate-700 rounded"
         >
-          {row.getIsExpanded() ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          {row.getIsExpanded() ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
         </button>
       ),
       size: 32,
@@ -196,6 +198,7 @@ export function MemoryTable({ memories, onSelectMemory, selectedId }: MemoryTabl
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
             <input
               type="text"
+              aria-label="Filter displayed memories"
               value={globalFilter}
               onChange={(e) => setGlobalFilter(e.target.value)}
               placeholder="Filter memories..."
@@ -203,10 +206,12 @@ export function MemoryTable({ memories, onSelectMemory, selectedId }: MemoryTabl
             />
             {globalFilter && (
               <button
+                type="button"
+                aria-label="Clear memory filter"
                 onClick={() => setGlobalFilter('')}
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-700 rounded"
               >
-                <X size={14} className="text-slate-400" />
+                <X size={14} className="text-slate-400" aria-hidden="true" />
               </button>
             )}
           </div>
@@ -228,8 +233,9 @@ export function MemoryTable({ memories, onSelectMemory, selectedId }: MemoryTabl
                     className={`px-3 py-2 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider ${responsiveColumnClass(header.column.id)}`}
                     style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}
                   >
-                    {header.isPlaceholder ? null : (
+                    {header.isPlaceholder ? null : header.column.getCanSort() ? (
                       <button
+                        type="button"
                         onClick={header.column.getToggleSortingHandler()}
                         className="flex items-center gap-1 hover:text-slate-200 transition-colors"
                       >
@@ -237,7 +243,7 @@ export function MemoryTable({ memories, onSelectMemory, selectedId }: MemoryTabl
                         {header.column.getIsSorted() === 'asc' && <ChevronUp size={12} />}
                         {header.column.getIsSorted() === 'desc' && <ChevronDown size={12} />}
                       </button>
-                    )}
+                    ) : flexRender(header.column.columnDef.header, header.getContext())}
                   </th>
                 ))}
               </tr>

@@ -1,7 +1,7 @@
 ---
 PROTOCOL: release-manager
 INVOKE: elefante-release-manager
-PROTOCOL_VERSION: 2.14.0
+PROTOCOL_VERSION: 2.15.0
 LOAD_WHEN: Version bump request, CHANGELOG entry needed, "ready to release", "tag X.Y.Z", "push to GitHub Releases".
 DIAGNOSTIC_QUESTION: "Is this an Add / Fix / Change, what semver bump does that imply, and is the CHANGELOG entry written before the bump?"
 AUTHORITY: This file owns the release pipeline. CONTRIBUTING.md release section forwards here.
@@ -38,7 +38,8 @@ Entry format: one line, past tense, names the artifact. No marketing prose.
 ./.venv/bin/python scripts/ci/advise_version_bump.py
 ```
 
-This reads CHANGELOG and proposes the semver bump. Strict semver per `docs/how-to/close-a-feature.md`:
+This classifies the staged diff; it does not replace review of the complete
+release entry or already-committed changes. Strict semver per `docs/how-to/close-a-feature.md`:
 
 - New `### Added` only → MINOR (`X.Y.0`)
 - Only `### Fixed` → PATCH (`X.Y.Z+1`)
@@ -58,6 +59,14 @@ preferred answer.
 ```
 
 `--check` confirms every version-bearing file picked up the new value. Failure here = tooling bug, not a manual-fix license.
+
+For an explicitly authorized publication, also run
+`scripts/ci/bump_version.py --sync-release-docs` and
+`scripts/ci/bump_version.py --check-release-docs`. This separate step updates
+only declared current-publication fields in the README, user index, vision and
+agent entry. It requires a dated changelog entry and leaves historical records
+unchanged. It prepares publication text; GitHub release verification still
+determines whether publication actually succeeded.
 
 ## Step 4 — Commit
 

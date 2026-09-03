@@ -1,6 +1,6 @@
 # Elefante User Documentation
 
-> **v2.14.0** · Published user documentation.
+> **v2.15.0** · Published user documentation.
 > Published package: 18 tools, 2 prompts, including verified Recover.
 
 This index covers the released customer product: installation, configuration,

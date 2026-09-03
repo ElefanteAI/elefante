@@ -82,6 +82,12 @@ class SearchResult(BaseModel):
     # True only when the complete scoped query matched a cue explicitly saved
     # by the customer through verified Remember/Correct.
     recall_cue_match: bool = False
+
+    # Question-to-question cosine, distinct from an exact cue match and from
+    # body/vector similarity. Set only by the bounded scoped paraphrase path.
+    recall_cue_similarity: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    # Optional property/alternatives comparison, never durable metadata.
+    recall_focus_similarity: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     
     # Context information
     matched_entities: List[UUID] = Field(default_factory=list)
@@ -104,6 +110,10 @@ class SearchResult(BaseModel):
             result["surface_matches"] = list(self.surface_matches)
         if self.recall_cue_match:
             result["recall_cue_match"] = True
+        if self.recall_cue_similarity is not None:
+            result["recall_cue_similarity"] = self.recall_cue_similarity
+        if self.recall_focus_similarity is not None:
+            result["recall_focus_similarity"] = self.recall_focus_similarity
         # Include explanation if present
         if self.explanation:
             result["explanation"] = self.explanation

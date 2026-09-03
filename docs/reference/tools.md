@@ -1,4 +1,4 @@
-# MCP Tools and Prompts (published v2.14.0 baseline; current source)
+# MCP Tools and Prompts (published v2.15.0 baseline; current source)
 
 ## 1. Natural Language Interaction
 
@@ -87,7 +87,7 @@ the verified `elefante-Recover` surface documented below. Memory operations use 
 
 #### `elefante-Recall`
 
-**Status**: Released and default-on in v2.14.0.
+**Status**: Released and default-on in v2.15.0.
 
 **Purpose**: Give an answering agent the smallest governed durable context for
 one question without exposing the broad search or mutation interface.
@@ -206,7 +206,7 @@ developer evaluation profile; it is not a normal customer operation.
 - `force_new=true` should be rare. It skips title deduplication, preference merge, and high-similarity redundancy checks.
 - Use `specification` for durable architecture or contract truths. Use
   `directive` for behavioral rules. Use `note` only for short-lived context.
-  Governance fields are part of the v2.14.0 customer contract.
+  Governance fields are part of the v2.15.0 customer contract.
 - In local strict project mode, Elefante resolves the workspace
   before opening the stores and overwrites project/workspace/scope metadata with
   that registered identity. Missing or ambiguous context, an unavailable root,
@@ -472,7 +472,7 @@ it must fail safely rather than bypass the verified product lifecycle.
 
 #### `elefante-GraphConnect`
 
-**Purpose**: Batch upsert entities and relationships in one call.
+**Purpose**: Find or create entities and create or reuse relationships in one call.
 
 **Why this exists**: Graph writes are safer and cheaper when the entire mini-topology is sent together. This reduces duplicate nodes and broken edges.
 
@@ -498,20 +498,30 @@ it must fail safely rather than bypass the verified product lifecycle.
   responses expose only redaction counts and detector types.
 - One transaction-scoped write lock covers every entity and relationship
   mutation. Optional system status is added after that graph ownership ends.
-- Use stable names and refs so repeated calls stay idempotent.
-- Use `id` when updating an existing entity rather than creating a near-duplicate.
-- Prefer enum-aligned values from `src/models/entity.py` such as `PERSON`, `PROJECT`, `FILE`, `CONCEPT`, `TECHNOLOGY`, `TASK`, `SPECIFICATION`, and `DIRECTIVE`. Common relationship values include `RELATES_TO`, `DEPENDS_ON`, `PART_OF`, `CREATED_BY`, `USES`, `BLOCKS`, `REFERENCES`, `WORKS_ON`, `GOVERNS`, `ENFORCES`, `SUPERSEDES`, and `CONTRADICTS`.
+- Stable entity names/types and identical relationship endpoints/type/properties
+  reuse existing IDs. Different relationship properties remain distinct links.
+- `id` references an existing entity; this path does not overwrite its fields.
+  Properties on a newly created entity are persisted.
+- Invalid refs, types and missing existing endpoints are rejected before the
+  first mutation. This is not a promise of rollback after every storage failure.
+- All 18 `RelationshipType` values retain their actual labels and properties.
+  Legacy schemas upgrade additively; old timestamps are not invented.
+- Entity types are lowercase enum values from `src/models/entity.py`, such as
+  `person`, `project`, `file`, `concept`, `technology`, `task`, `specification`,
+  and `directive`. Relationship values include `RELATES_TO`, `DEPENDS_ON`,
+  `PART_OF`, `CREATED_BY`, `USES`, `BLOCKS`, `REFERENCES`, `WORKS_ON`, `GOVERNS`,
+  `ENFORCES`, `SUPERSEDES`, and `CONTRADICTS`.
 
 **Example**:
 
 ```json
 {
   "entities": [
-    { "name": "Jay", "type": "PERSON", "ref": "user" },
-    { "name": "Elefante", "type": "PROJECT", "ref": "proj" }
+    { "name": "Jay", "type": "person", "ref": "user" },
+    { "name": "Elefante", "type": "project", "ref": "proj" }
   ],
   "relationships": [
-    { "from_ref": "user", "to_ref": "proj", "relationship_type": "CREATED_BY" }
+    { "from_ref": "proj", "to_ref": "user", "relationship_type": "CREATED_BY" }
   ]
 }
 ```

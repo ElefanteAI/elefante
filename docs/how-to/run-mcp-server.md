@@ -1,6 +1,7 @@
 # Run and Verify the Elefante MCP Runtime
 
-**Applies to:** v2.13.0
+**Applies to:** the current customer runtime. Select packages from the
+[latest published release](https://github.com/ElefanteAI/elefante/releases/latest).
 
 The released customer topology is one user-level daemon as the **one durable store owner**, plus a **transport-only** stdio bridge for each IDE or agent
 host. Direct database-owning MCP subprocesses are a developer compatibility
@@ -31,8 +32,25 @@ Run customer doctor for runtime, daemon, ownership, and host coverage:
 On Windows, use the equivalent runtime under
 `%LOCALAPPDATA%\Elefante\app\current` and `.venv\Scripts\python.exe`.
 
-If health or host coverage fails, rerun the same v2.13.0 platform installer.
+If health or host coverage fails, rerun the matching platform installer from the
+[latest published release](https://github.com/ElefanteAI/elefante/releases/latest).
 Do not configure a second daemon or point one host at a source checkout.
+
+To print the installed package version directly:
+
+```bash
+# macOS/Linux
+(
+  cd ~/.elefante/app/current
+  .venv/bin/python -c 'from src import __version__; print(__version__)'
+)
+```
+
+```powershell
+# Windows PowerShell
+Set-Location "$env:LOCALAPPDATA\Elefante\app\current"
+& .\.venv\Scripts\python.exe -c "from src import __version__; print(__version__)"
+```
 
 ## Developer source runtime
 
@@ -104,9 +122,11 @@ Available MCP Tools: 18 (default customer discovery)
 Available MCP Prompts: 2
 ```
 
-Published v2.13.0 packages remain at 17 customer tools. The additional current
-source declaration is the unreleased verified `elefante-Recover` candidate;
-`elefante-TaskIntelligence` remains default-off and developer-only.
+The customer profile exposes 18 tools and 2 prompts, including the verified
+`elefante-Recover` lifecycle surface. The source declaration inventory is 19
+tools because it also includes `elefante-TaskIntelligence`, which remains
+developer-only and default-off. The package version and build receipt determine
+what is installed; this source inventory does not certify an arbitrary package.
 
 The tools and prompts are enumerated in
 [`../reference/tools.md`](../reference/tools.md). Tool count alone is not a

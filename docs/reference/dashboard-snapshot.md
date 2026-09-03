@@ -14,7 +14,8 @@ This document defines the **required** and **optional** fields for the dashboard
 
 Required:
 
-- `generated_at`: ISO-8601 timestamp (string)
+- `generated_at`: ISO-8601 UTC timestamp with offset (string); legacy snapshots
+  without an offset are interpreted as UTC, not the browser's local time
 - `nodes`: array of node objects
 - `edges`: array of edge objects
 - `stats`: object with basic counts
@@ -23,7 +24,7 @@ Recommended:
 
 - `curation`: object capturing snapshot curation provenance
 
-The local unreleased Project Registry integration also writes:
+The local Project Registry integration also writes:
 
 - `project_registry_generated_at`: ISO-8601 generation timestamp
 - `project_registry`: a private Home projection of the registry state

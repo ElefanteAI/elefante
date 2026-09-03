@@ -49,6 +49,17 @@ def test_status_is_read_only_until_explicit_consent(tmp_path, capsys) -> None:
     assert not ledger.exists()
 
 
+def test_every_advertised_enterprise_group_is_supported(tmp_path, capsys) -> None:
+    common = ["--db", str(tmp_path / "usage.db"), "--snapshot", str(tmp_path / "snapshot.json")]
+    assert cli.main(common + ["consent", "--purpose", "enterprise_training", "--confirm", "ENABLE"]) == 0
+    _read_output(capsys)
+    subcommands = next(action for action in cli._parser()._actions if action.dest == "command")
+    group_argument = next(action for action in subcommands.choices["enterprise"]._actions if action.dest == "group_by")
+    for group_by in group_argument.choices:
+        assert cli.main(common + ["enterprise", "--group-by", group_by]) == 0
+        assert _read_output(capsys)["aggregation"] == group_by
+
+
 def test_consent_requires_exact_confirmation(tmp_path, capsys) -> None:
     ledger = tmp_path / "session.sqlite3"
     result = cli.main(

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useDashboardStore } from '@/store';
 import { Moon, RefreshCw, Sun } from 'lucide-react';
 
@@ -6,11 +7,39 @@ interface HeaderBarProps {
   onToggleTheme: () => void;
 }
 
-function formatSnapshotAge(generatedAt: string): { label: string; stale: boolean } {
-  if (!generatedAt || generatedAt === 'unknown') return { label: 'unknown', stale: true };
-  const then = new Date(generatedAt).getTime();
-  if (isNaN(then)) return { label: 'unknown', stale: true };
-  const diffMs = Date.now() - then;
+export const SNAPSHOT_AGE_REFRESH_MS = 30_000;
+
+type SnapshotAgeStatus = 'current' | 'stale' | 'future' | 'invalid';
+
+interface SnapshotAge {
+  label: string;
+  stale: boolean;
+  status: SnapshotAgeStatus;
+}
+
+export function parseSnapshotTimestamp(generatedAt: string | null | undefined): number | null {
+  if (typeof generatedAt !== 'string') return null;
+  const value = generatedAt.trim();
+  if (!value || value.toLowerCase() === 'unknown') return null;
+
+  // Python's legacy datetime.utcnow().isoformat() omitted its UTC offset. Treat
+  // only that legacy date-time shape as UTC; explicit offsets remain authoritative.
+  const hasExplicitTimezone = /(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(value);
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const parsed = new Date(
+    hasExplicitTimezone || isDateOnly ? value : `${value}Z`,
+  ).getTime();
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+export function formatSnapshotAge(
+  generatedAt: string | null | undefined,
+  now = Date.now(),
+): SnapshotAge {
+  const then = parseSnapshotTimestamp(generatedAt);
+  if (then === null) return { label: 'unknown', stale: true, status: 'invalid' };
+  const diffMs = now - then;
+  if (diffMs < 0) return { label: 'future', stale: true, status: 'future' };
   const minutes = Math.floor(diffMs / 60000);
   const hours = Math.floor(diffMs / 3600000);
   const days = Math.floor(diffMs / 86400000);
@@ -20,11 +49,12 @@ function formatSnapshotAge(generatedAt: string): { label: string; stale: boolean
   else if (minutes < 60) label = `${minutes}m ago`;
   else if (hours < 24) label = `${hours}h ago`;
   else label = `${days}d ago`;
-  return { label, stale };
+  return { label, stale, status: stale ? 'stale' : 'current' };
 }
 
 export function HeaderBar({ theme, onToggleTheme }: HeaderBarProps) {
   const stats = useDashboardStore((s) => s.stats);
+  const statsError = useDashboardStore((s) => s.statsError);
   const snapshotContext = useDashboardStore((s) => s.snapshot?.snapshot_context);
   const isRefreshing = useDashboardStore((s) => s.isRefreshing);
   const refreshSnapshot = useDashboardStore((s) => s.refreshSnapshot);
@@ -34,8 +64,28 @@ export function HeaderBar({ theme, onToggleTheme }: HeaderBarProps) {
   const entities = stats?.graph_store?.total_entities || 0;
   const relationships = stats?.graph_store?.total_relationships || 0;
   const snapshotAt = stats?.snapshot?.generated_at || 'unknown';
-  const { label: ageLabel, stale } = formatSnapshotAge(snapshotAt);
+  const [ageNow, setAgeNow] = useState(() => Date.now());
+  useEffect(() => {
+    setAgeNow(Date.now());
+    const timer = window.setInterval(
+      () => setAgeNow(Date.now()),
+      SNAPSHOT_AGE_REFRESH_MS,
+    );
+    return () => window.clearInterval(timer);
+  }, [snapshotAt]);
+
+  const { label: ageLabel, stale, status: ageStatus } = formatSnapshotAge(snapshotAt, ageNow);
   const isShowcase = snapshotContext?.mode === 'showcase';
+  const freshnessNeedsAttention = ageStatus !== 'current';
+  const freshnessLabel = isShowcase
+    ? 'Example workspace'
+    : ageStatus === 'invalid'
+      ? 'snapshot · timestamp unknown'
+      : ageStatus === 'future'
+        ? 'snapshot · future timestamp'
+        : stale
+          ? `stale · ${ageLabel}`
+          : `current · ${ageLabel}`;
 
   return (
     <header className="grid min-h-[104px] grid-cols-1 content-center gap-2 px-4 py-3 sm:min-h-[72px] sm:flex sm:items-center sm:justify-between sm:px-6 sm:py-0 md:px-8 bg-slate-950/90 backdrop-blur border-b elefante-hairline">
@@ -56,17 +106,30 @@ export function HeaderBar({ theme, onToggleTheme }: HeaderBarProps) {
       </div>
 
       <div className="flex w-full min-w-0 items-center justify-between gap-2 text-[10px] text-slate-500 elefante-mono uppercase tracking-[0.08em] sm:w-auto sm:justify-end sm:gap-3">
-        <span className="hidden lg:inline">{memories} memories</span>
-        <span className="hidden lg:inline text-slate-700">·</span>
-        <span className="hidden lg:inline">{entities} entities</span>
-        <span className="hidden lg:inline text-slate-700">·</span>
-        <span className="hidden md:inline">{relationships} links</span>
-        <span className="hidden md:inline text-slate-700">·</span>
+        {statsError ? (
+          <span
+            role="status"
+            aria-live="polite"
+            title={statsError}
+            className="text-amber-300"
+          >
+            Stats unavailable
+          </span>
+        ) : (
+          <>
+            <span className="hidden lg:inline">{memories} memories</span>
+            <span className="hidden lg:inline text-slate-700">·</span>
+            <span className="hidden lg:inline">{entities} entities</span>
+            <span className="hidden lg:inline text-slate-700">·</span>
+            <span className="hidden md:inline">{relationships} links</span>
+            <span className="hidden md:inline text-slate-700">·</span>
+          </>
+        )}
         <span
-          className={`min-w-0 truncate ${isShowcase ? 'text-cyan-300' : stale ? 'text-amber-400/90' : 'text-emerald-400/90'}`}
+          className={`min-w-0 truncate ${isShowcase ? 'text-cyan-300' : freshnessNeedsAttention ? 'text-amber-400/90' : 'text-emerald-400/90'}`}
           title={isShowcase ? 'Deterministic dashboard example' : `Snapshot generated: ${snapshotAt}`}
         >
-          {isShowcase ? 'Example workspace' : stale ? `stale · ${ageLabel}` : `current · ${ageLabel}`}
+          {freshnessLabel}
         </span>
 
         <button
@@ -81,21 +144,27 @@ export function HeaderBar({ theme, onToggleTheme }: HeaderBarProps) {
         </button>
 
         <button
+          type="button"
           onClick={() => refreshSnapshot()}
           disabled={isRefreshing}
-          title={isShowcase ? 'Reload the example snapshot' : 'Reload the current dashboard snapshot'}
+          title={
+            isShowcase
+              ? 'Reload the example snapshot'
+              : 'Reread the current dashboard snapshot; this does not regenerate memory data'
+          }
+          aria-label={isShowcase ? 'Reload example snapshot' : 'Reload dashboard snapshot'}
           className={
             'flex shrink-0 items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium border transition-colors ' +
             (isRefreshing
               ? 'bg-slate-800/40 elefante-hairline text-slate-600 cursor-not-allowed'
-              : stale
+              : freshnessNeedsAttention
               ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
               : 'bg-slate-800/40 elefante-hairline text-slate-400 hover:text-slate-100 hover:border-cyan-500/50')
           }
         >
-          <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} />
+          <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} aria-hidden="true" />
           <span className="hidden sm:inline">
-            {isRefreshing ? 'Reloading...' : isShowcase ? 'Reload example' : 'Reload'}
+            {isRefreshing ? 'Reloading...' : isShowcase ? 'Reload example' : 'Reload snapshot'}
           </span>
           <span className="sm:hidden">{isRefreshing ? 'Loading...' : 'Reload'}</span>
         </button>

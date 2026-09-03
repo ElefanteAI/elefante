@@ -168,6 +168,35 @@ def test_version_sync_tracks_release_identifiers_without_rewriting_history():
     assert f"**v{source_version}** — Current published release." in readme
 
 
+def test_explicit_release_doc_sync_is_scoped_and_preflighted(tmp_path, monkeypatch):
+    module = _load_module(ROOT / "scripts/ci/bump_version.py", "bump_release_docs")
+    for relative in {item[0] for item in module.RELEASE_DOC_TARGETS}:
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text((ROOT / relative).read_text(encoding="utf-8"), encoding="utf-8")
+    (tmp_path / "CHANGELOG.md").write_text("## [2.99.0] - 2026-09-03\n", encoding="utf-8")
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    monkeypatch.setattr(module, "read_current_version", lambda: "2.99.0")
+    readme = tmp_path / "README.md"
+    original = readme.read_text(encoding="utf-8") + "\nHistorical example: v2.13.0.\n"
+    readme.write_text(original, encoding="utf-8")
+    assert not module.sync_release_docs(check_only=True)
+    assert readme.read_text(encoding="utf-8") == original
+    vision = tmp_path / "docs/explanation/vision.md"
+    original_vision = vision.read_text(encoding="utf-8")
+    vision.write_text("Missing release field", encoding="utf-8")
+    with pytest.raises(SystemExit, match="missing or ambiguous"):
+        module.sync_release_docs()
+    assert readme.read_text(encoding="utf-8") == original
+    vision.write_text(original_vision, encoding="utf-8")
+    assert module.sync_release_docs()
+    assert module.sync_release_docs(check_only=True)
+    assert "Historical example: v2.13.0." in readme.read_text(encoding="utf-8")
+    (tmp_path / "CHANGELOG.md").write_text("## [2.99.0] — Release candidate\n", encoding="utf-8")
+    with pytest.raises(SystemExit, match="dated release entry"):
+        module.sync_release_docs()
+
+
 def test_version_advisor_accepts_candidate_changelog_entries():
     module = _load_module(
         ROOT / "scripts/ci/advise_version_bump.py", "advise_version_candidate"

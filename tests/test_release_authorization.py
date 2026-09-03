@@ -45,3 +45,6 @@ def test_authorized_release_request_is_validated_and_dispatched() -> None:
     assert 'gh workflow run build-binaries.yml --ref "$RELEASE_TAG"' in workflow
     assert "git tag -f" not in workflow
     assert "git push --force" not in workflow
+    assert '--workflow quality.yml --commit "$GITHUB_SHA" --event push' in workflow
+    assert 'gh run watch "$quality_run" --exit-status' in workflow
+    assert workflow.index("Require Quality at the exact main commit") < workflow.index("git tag -a")

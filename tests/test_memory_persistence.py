@@ -21,6 +21,7 @@ import pytest
 import asyncio
 import sys
 import threading
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 from pathlib import Path
 
@@ -1019,6 +1020,360 @@ class TestGraphToolContract:
                 row.get("a.id") == str(session_entity.id) and row.get("b.id") == str(project_entity.id)
                 for row in works_on_rows
             )
+        finally:
+            store.close()
+
+    @pytest.mark.asyncio
+    async def test_graph_relationship_all_advertised_types_round_trip_full_payload(self, tmp_path):
+        """Every public relationship enum must persist and read back its full payload."""
+        db_path = tmp_path / "kuzu_db"
+        store = GraphStore(database_path=str(db_path))
+        source = Entity(name="Relationship Source", type=EntityType.PROJECT)
+        target = Entity(name="Relationship Target", type=EntityType.CONCEPT)
+        expected_by_type = {}
+        base_created_at = datetime(
+            2026,
+            9,
+            3,
+            12,
+            34,
+            56,
+            789000,
+            tzinfo=timezone(timedelta(hours=-4)),
+        )
+
+        try:
+            await store.create_entity(source)
+            await store.create_entity(target)
+
+            for index, relationship_type in enumerate(RelationshipType):
+                relationship = Relationship(
+                    id=uuid4(),
+                    from_entity_id=source.id,
+                    to_entity_id=target.id,
+                    relationship_type=relationship_type,
+                    description=f"Description for {relationship_type.value}",
+                    created_at=base_created_at + timedelta(microseconds=index),
+                    strength=round((index + 1) / (len(RelationshipType) + 1), 6),
+                    properties={
+                        "custom_key": f"custom-{relationship_type.value}",
+                        "ordinal": index,
+                        "nested": {"relationship_type": relationship_type.value},
+                    },
+                )
+                assert await store.create_relationship(relationship) == relationship.id
+                expected_by_type[relationship_type] = relationship
+
+            actual_relationships = await store.get_relationships(source.id, "outgoing")
+            assert len(actual_relationships) == len(expected_by_type)
+            actual_by_type = {relationship.relationship_type: relationship for relationship in actual_relationships}
+            assert set(actual_by_type) == set(expected_by_type)
+
+            for relationship_type, expected in expected_by_type.items():
+                actual = actual_by_type[relationship_type]
+                assert actual.id == expected.id
+                assert actual.from_entity_id == expected.from_entity_id
+                assert actual.to_entity_id == expected.to_entity_id
+                assert actual.relationship_type == expected.relationship_type
+                assert actual.description == expected.description
+                assert actual.properties == expected.properties
+                assert actual.created_at == expected.created_at
+                assert actual.strength == expected.strength
+        finally:
+            store.close()
+
+    @pytest.mark.asyncio
+    async def test_graph_relationship_created_in_datetime_property_round_trips_as_iso(self, tmp_path):
+        """The real CREATED_IN caller's datetime property is JSON-encoded and readable."""
+        db_path = tmp_path / "kuzu_db"
+        store = GraphStore(database_path=str(db_path))
+        memory_entity = Entity(name="Datetime Memory", type=EntityType.MEMORY)
+        session_entity = Entity(name="Datetime Session", type=EntityType.SESSION)
+        property_created_at = datetime(2026, 9, 3, 14, 15, 16, 123456)
+        relationship = Relationship(
+            id=uuid4(),
+            from_entity_id=memory_entity.id,
+            to_entity_id=session_entity.id,
+            relationship_type=RelationshipType.CREATED_IN,
+            properties={"created_at": property_created_at},
+        )
+
+        try:
+            await store.create_entity(memory_entity)
+            await store.create_entity(session_entity)
+            assert await store.create_relationship(relationship) == relationship.id
+
+            raw_rows = await store.execute_query(
+                """
+                MATCH (fromNode:Entity)-[r:CREATED_IN]->(toNode:Entity)
+                WHERE fromNode.id = $from_id AND toNode.id = $to_id
+                RETURN r.props AS props
+                """,
+                {"from_id": str(memory_entity.id), "to_id": str(session_entity.id)},
+            )
+            assert len(raw_rows) == 1
+            expected_properties = {"created_at": property_created_at.isoformat()}
+            assert json.loads(raw_rows[0]["props"]) == expected_properties
+
+            actual = await store.get_relationships(session_entity.id, "incoming")
+            assert len(actual) == 1
+            assert actual[0].properties == expected_properties
+        finally:
+            store.close()
+
+    @pytest.mark.asyncio
+    async def test_graph_relationship_missing_endpoints_fail_without_edges_for_all_types(self, tmp_path):
+        """No advertised relationship type may report success for absent endpoints."""
+        db_path = tmp_path / "kuzu_db"
+        store = GraphStore(database_path=str(db_path))
+        source = Entity(name="Existing Source", type=EntityType.PROJECT)
+        target = Entity(name="Existing Target", type=EntityType.CONCEPT)
+
+        try:
+            await store.create_entity(source)
+            await store.create_entity(target)
+            missing_endpoint_cases = (
+                (uuid4(), target.id),
+                (source.id, uuid4()),
+                (uuid4(), uuid4()),
+            )
+
+            for from_entity_id, to_entity_id in missing_endpoint_cases:
+                for relationship_type in RelationshipType:
+                    with pytest.raises(ValueError):
+                        await store.create_relationship(
+                            Relationship(
+                                id=uuid4(),
+                                from_entity_id=from_entity_id,
+                                to_entity_id=to_entity_id,
+                                relationship_type=relationship_type,
+                            )
+                        )
+
+                    assert await store.get_relationships(source.id, "both") == []
+                    assert await store.get_relationships(target.id, "both") == []
+                    rows = await store.execute_query(
+                        "MATCH (a:Entity)-[r]->(b:Entity) RETURN a.id, b.id, label(r)"
+                    )
+                    assert rows == []
+        finally:
+            store.close()
+
+    @pytest.mark.asyncio
+    async def test_graph_relationship_reads_preserve_direction_and_skip_internal_edges(self, tmp_path):
+        """Incoming and both-direction reads expose one public edge in its stored direction."""
+        db_path = tmp_path / "kuzu_db"
+        store = GraphStore(database_path=str(db_path))
+        source = Entity(name="Directional Source", type=EntityType.PROJECT)
+        target = Entity(name="Directional Target", type=EntityType.CONCEPT)
+        relationship = Relationship(
+            id=uuid4(),
+            from_entity_id=source.id,
+            to_entity_id=target.id,
+            relationship_type=RelationshipType.GOVERNS,
+            description="Governing edge",
+            created_at=datetime(2026, 9, 3, 13, 14, 15, 123456, tzinfo=timezone.utc),
+            strength=0.73,
+            properties={"source": "contract-test", "ordinal": 1},
+        )
+
+        try:
+            await store.create_entity(source)
+            await store.create_entity(target)
+            await store.create_relationship(relationship)
+            await store.execute_query(
+                """
+                MATCH (fromNode:Entity), (toNode:Entity)
+                WHERE fromNode.id = $from_id AND toNode.id = $to_id
+                CREATE (fromNode)-[r:CO_ACTIVATED {
+                    strength: $strength,
+                    last_coactivated: $last_coactivated
+                }]->(toNode)
+                """,
+                {
+                    "from_id": str(source.id),
+                    "to_id": str(target.id),
+                    "strength": 0.5,
+                    "last_coactivated": "contract-test",
+                },
+            )
+
+            incoming = await store.get_relationships(target.id, "incoming")
+            both = await store.get_relationships(target.id, "both")
+            outgoing = await store.get_relationships(source.id, "outgoing")
+
+            for actual_relationships in (incoming, both, outgoing):
+                assert len(actual_relationships) == 1
+                actual = actual_relationships[0]
+                assert actual.id == relationship.id
+                assert actual.from_entity_id == source.id
+                assert actual.to_entity_id == target.id
+                assert actual.relationship_type is RelationshipType.GOVERNS
+                assert actual.description == relationship.description
+                assert actual.properties == relationship.properties
+                assert actual.created_at == relationship.created_at
+                assert actual.strength == relationship.strength
+        finally:
+            store.close()
+
+    @pytest.mark.asyncio
+    async def test_graph_relationship_legacy_rows_survive_reopen_with_stable_read_identity(self, tmp_path):
+        """A genuinely old schema upgrades additively without changing legacy rows."""
+        db_path = tmp_path / "kuzu_db"
+        source = Entity(name="Legacy Source", type=EntityType.PROJECT)
+        target = Entity(name="Legacy Target", type=EntityType.CONCEPT)
+        legacy_strength = 0.41
+
+        class LegacyGraphStore(GraphStore):
+            """Seed the pre-repair relationship schema without migration."""
+
+            def _ensure_relationship_schema(self) -> None:
+                pass
+
+        seed_store = LegacyGraphStore(database_path=str(db_path))
+        try:
+            await seed_store.create_entity(source)
+            await seed_store.create_entity(target)
+            legacy_schema_rows = await seed_store.execute_query(
+                "CALL table_info('RELATES_TO') RETURN *"
+            )
+            legacy_schema_columns = {row["name"] for row in legacy_schema_rows}
+            assert "id" not in legacy_schema_columns
+            assert "props" not in legacy_schema_columns
+            await seed_store.execute_query(
+                """
+                MATCH (fromNode:Entity), (toNode:Entity)
+                WHERE fromNode.id = $from_id AND toNode.id = $to_id
+                CREATE (fromNode)-[r:RELATES_TO {strength: $strength}]->(toNode)
+                """,
+                {
+                    "from_id": str(source.id),
+                    "to_id": str(target.id),
+                    "strength": legacy_strength,
+                },
+            )
+        finally:
+            seed_store.close()
+
+        store = GraphStore(database_path=str(db_path))
+        try:
+            raw_rows = await store.execute_query(
+                """
+                MATCH (fromNode:Entity)-[r:RELATES_TO]->(toNode:Entity)
+                WHERE fromNode.id = $from_id AND toNode.id = $to_id
+                RETURN fromNode.id AS from_id,
+                       toNode.id AS to_id,
+                       label(r) AS relationship_type,
+                       r.id AS relationship_id,
+                       r.description AS description,
+                       r.created_at AS created_at,
+                       r.strength AS strength,
+                       r.props AS props
+                """,
+                {"from_id": str(source.id), "to_id": str(target.id)},
+            )
+            upgraded_schema_rows = await store.execute_query(
+                "CALL table_info('RELATES_TO') RETURN *"
+            )
+            upgraded_schema_columns = {row["name"] for row in upgraded_schema_rows}
+            assert {"id", "props"}.issubset(upgraded_schema_columns)
+            assert len(raw_rows) == 1
+            raw = raw_rows[0]
+            assert raw["from_id"] == str(source.id)
+            assert raw["to_id"] == str(target.id)
+            assert raw["relationship_type"] == RelationshipType.RELATES_TO.value
+            assert raw["relationship_id"] is None
+            assert raw["description"] is None
+            assert raw["created_at"] is None
+            assert raw["strength"] == legacy_strength
+            assert raw["props"] is None
+
+            incoming = await store.get_relationships(target.id, "incoming")
+            both = await store.get_relationships(target.id, "both")
+            assert len(incoming) == 1
+            assert len(both) == 1
+            legacy = incoming[0]
+            assert legacy.id is not None
+            assert legacy.id.version == 5
+            assert both[0].id == legacy.id
+            assert legacy.from_entity_id == source.id
+            assert legacy.to_entity_id == target.id
+            assert legacy.relationship_type is RelationshipType.RELATES_TO
+            assert legacy.description is None
+            assert legacy.properties == {}
+            assert legacy.created_at is None
+            assert legacy.strength == legacy_strength
+            legacy_read_identity = legacy.id
+        finally:
+            store.close()
+
+        reopened = GraphStore(database_path=str(db_path))
+        try:
+            after_reopen = await reopened.get_relationships(target.id, "incoming")
+            assert len(after_reopen) == 1
+            assert after_reopen[0].id == legacy_read_identity
+            assert after_reopen[0].from_entity_id == source.id
+            assert after_reopen[0].to_entity_id == target.id
+            assert after_reopen[0].created_at is None
+            assert after_reopen[0].strength == legacy_strength
+        finally:
+            reopened.close()
+
+    @pytest.mark.asyncio
+    async def test_graph_relationship_legacy_type_specific_properties_survive_migration(self, tmp_path):
+        """Old table-specific relationship fields remain public properties after upgrade."""
+        db_path = tmp_path / "kuzu_db"
+        source = Entity(name="Legacy Reference Source", type=EntityType.PROJECT)
+        target = Entity(name="Legacy Reference Target", type=EntityType.CONCEPT)
+        legacy_reference_type = "legacy-citation"
+
+        class LegacyGraphStore(GraphStore):
+            """Seed the pre-repair relationship schema without migration."""
+
+            def _ensure_relationship_schema(self) -> None:
+                pass
+
+        seed_store = LegacyGraphStore(database_path=str(db_path))
+        try:
+            await seed_store.create_entity(source)
+            await seed_store.create_entity(target)
+            legacy_schema_rows = await seed_store.execute_query(
+                "CALL table_info('REFERENCES') RETURN *"
+            )
+            legacy_schema_columns = {row["name"] for row in legacy_schema_rows}
+            assert "reference_type" in legacy_schema_columns
+            assert "id" not in legacy_schema_columns
+            assert "props" not in legacy_schema_columns
+            await seed_store.execute_query(
+                """
+                MATCH (fromNode:Entity), (toNode:Entity)
+                WHERE fromNode.id = $from_id AND toNode.id = $to_id
+                CREATE (fromNode)-[r:REFERENCES {reference_type: $reference_type}]->(toNode)
+                """,
+                {
+                    "from_id": str(source.id),
+                    "to_id": str(target.id),
+                    "reference_type": legacy_reference_type,
+                },
+            )
+        finally:
+            seed_store.close()
+
+        store = GraphStore(database_path=str(db_path))
+        try:
+            upgraded_schema_rows = await store.execute_query(
+                "CALL table_info('REFERENCES') RETURN *"
+            )
+            upgraded_schema_columns = {row["name"] for row in upgraded_schema_rows}
+            assert {"reference_type", "id", "props"}.issubset(upgraded_schema_columns)
+
+            relationships = await store.get_relationships(target.id, "incoming")
+            assert len(relationships) == 1
+            legacy = relationships[0]
+            assert legacy.from_entity_id == source.id
+            assert legacy.to_entity_id == target.id
+            assert legacy.relationship_type is RelationshipType.REFERENCES
+            assert legacy.properties == {"reference_type": legacy_reference_type}
         finally:
             store.close()
 

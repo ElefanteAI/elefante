@@ -1,7 +1,7 @@
 # IDE and Agent Integration Surface
 
 > **Status:** PARTIALLY IMPLEMENTED. The v2.12.2 customer-global runtime and
-> detected-host adapters are retained in the current v2.13.0 release, which
+> detected-host adapters are retained in the current published release, which
 > also includes ownership-safe Zed and Continue adapters at the Compatible
 > tier. Additional host certification,
 > extension-managed surfaces, and automated documentation-drift inspection are

@@ -14,5 +14,6 @@ def test_get_config_honors_config_path_set_after_import(monkeypatch, tmp_path: P
     )
 
     monkeypatch.setenv("ELEFANTE_CONFIG_PATH", str(config_path))
+    monkeypatch.delenv("ELEFANTE_DATA_DIR", raising=False)
 
     assert Path(get_config().elefante.data_dir) == data_dir

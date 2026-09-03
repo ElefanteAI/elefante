@@ -1,7 +1,7 @@
 ---
 PROTOCOL: restarter
 INVOKE: elefante-restarter
-PROTOCOL_VERSION: 2.14.0
+PROTOCOL_VERSION: 2.15.0
 LOAD_WHEN: MCP tools not surfacing in IDE, server stuck, dashboard returns 500, `elefante-*` tools absent from tool list, IDE shows "MCP connection failed", post-install verification step fails.
 DIAGNOSTIC_QUESTION: "Is the MCP server alive over stdio JSON-RPC, and is the IDE actually connecting to it?"
 AUTHORITY: This file owns the restart and recovery protocol. Scattered restart instructions in older docs are forwarding only.

@@ -155,11 +155,43 @@ def _read_session_intelligence_snapshot() -> dict[str, Any] | None:
     """Load the derived metadata-only snapshot without opening its SQLite ledger."""
     snapshot_path = _session_intelligence_snapshot_path()
     if not snapshot_path.is_file():
+        ledger_override = os.environ.get("ELEFANTE_SESSION_INTELLIGENCE_DB", "").strip()
+        ledger_path = (
+            Path(ledger_override).expanduser()
+            if ledger_override
+            else Path(get_config().elefante.data_dir) / "session_intelligence.db"
+        )
+        if snapshot_path.exists() or ledger_path.exists():
+            raise ValueError("Session Intelligence exists but its snapshot is unavailable")
         return None
     with snapshot_path.open("r", encoding="utf-8") as snapshot_file:
         snapshot = json.load(snapshot_file)
     if not isinstance(snapshot, dict):
         raise ValueError("Session Intelligence snapshot must contain a JSON object")
+    consent = snapshot.get("consent")
+    if not isinstance(consent, dict) or not isinstance(consent.get("enabled"), bool):
+        raise ValueError("Session Intelligence snapshot has invalid consent state")
+    card = snapshot.get("signal_card")
+    if card is not None:
+        if not isinstance(card, dict) or any(
+            not isinstance(card.get(key), dict)
+            for key in ("scope", "usage", "cost", "accepted_outcome_evidence")
+        ):
+            raise ValueError("Session Intelligence snapshot has an invalid Signal Card")
+        if not isinstance(card.get("unknowns"), list) or not isinstance(card.get("hypothesis"), str):
+            raise ValueError("Session Intelligence snapshot has invalid evidence labels")
+        if any(not isinstance(card["usage"].get(key), dict) for key in ("actual", "estimated")):
+            raise ValueError("Session Intelligence snapshot has invalid usage evidence")
+    report = snapshot.get("enterprise_report")
+    if report is not None and (
+        not isinstance(report, dict)
+        or any(not isinstance(report.get(key), list) for key in ("groups", "hypotheses"))
+        or any(
+            not isinstance(item, dict) or not isinstance(item.get("basis"), dict)
+            for item in report.get("hypotheses", [])
+        )
+    ):
+        raise ValueError("Session Intelligence snapshot has an invalid aggregate report")
     return snapshot
 
 
@@ -401,9 +433,11 @@ async def get_stats():
 
 @app.get("/api/session-intelligence")
 async def get_session_intelligence():
-    """Read the derived, metadata-only Session Intelligence product surface."""
+    """Read the usage snapshot plus content-free health of the owning process."""
     try:
         data = _read_session_intelligence_snapshot()
+        status_reader = getattr(app.state, "session_intelligence_capture_status", None)
+        capture_status = status_reader() if callable(status_reader) else None
         if data is None:
             return {
                 "schema_version": 1,
@@ -420,6 +454,8 @@ async def get_session_intelligence():
                     "sensitive_trait_inference": False,
                 },
             }
+        if capture_status is not None:
+            data = {**data, "capture": capture_status}
         return data
     except Exception as error:
         logger.error(f"Failed to read Session Intelligence snapshot: {error}")

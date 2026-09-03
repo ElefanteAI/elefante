@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
@@ -168,6 +168,7 @@ export function ResolveMemoryDialog({ memory, conflictMemories }: ResolveMemoryD
   const [applyResponse, setApplyResponse] = useState<ResolveApplyResponse | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const peerSelectRef = useRef<HTMLSelectElement>(null);
+  const busy = isResolvePlanning || isResolveApplying;
 
   const selectedPeer = conflictMemories.find((candidate) => candidate.id === peerId);
   const losingMemory = winnerId
@@ -185,6 +186,11 @@ export function ResolveMemoryDialog({ memory, conflictMemories }: ResolveMemoryD
       verificationQuestion.trim() &&
       (!losingMemoryIsProtected || protectedConfirmed),
   );
+
+  const closeDialog = useCallback(() => {
+    if (busy) return;
+    setIsOpen(false);
+  }, [busy]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -207,12 +213,12 @@ export function ResolveMemoryDialog({ memory, conflictMemories }: ResolveMemoryD
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
-        setIsOpen(false);
+        closeDialog();
       }
     };
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [isOpen]);
+  }, [closeDialog, isOpen]);
 
   if (conflictMemories.length === 0) return null;
 
@@ -271,7 +277,17 @@ export function ResolveMemoryDialog({ memory, conflictMemories }: ResolveMemoryD
     setApplyResponse(response);
   };
 
-  const closeDialog = () => setIsOpen(false);
+  const editPlan = () => {
+    if (busy) return;
+    setPlan(null);
+    setPlanId(null);
+    setLocalError(null);
+  };
+  const reloadAfterReceipt = () => {
+    if (busy) return;
+    closeDialog();
+    void refreshSnapshot();
+  };
   const resolution = plan?.resolution;
   const winner = resolution?.winner_memory_id === memory.id
     ? memory
@@ -332,6 +348,7 @@ export function ResolveMemoryDialog({ memory, conflictMemories }: ResolveMemoryD
               <button
                 type="button"
                 onClick={closeDialog}
+                disabled={busy}
                 className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100"
                 aria-label="Close correction flow"
               >
@@ -347,10 +364,8 @@ export function ResolveMemoryDialog({ memory, conflictMemories }: ResolveMemoryD
                   applyResponse.resolution_status === 'FAILED_ROLLED_BACK' ? (
                     <button
                       type="button"
-                      onClick={() => {
-                        setIsOpen(false);
-                        void refreshSnapshot();
-                      }}
+                      onClick={reloadAfterReceipt}
+                      disabled={busy}
                       className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-600 bg-slate-800/80 px-3 py-2.5 text-xs font-semibold text-slate-100 transition-colors hover:bg-slate-700"
                     >
                       <RotateCcw size={13} />
@@ -360,6 +375,7 @@ export function ResolveMemoryDialog({ memory, conflictMemories }: ResolveMemoryD
                     <button
                       type="button"
                       onClick={closeDialog}
+                      disabled={busy}
                       className="inline-flex w-full items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-2.5 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-800"
                     >
                       Close receipt
@@ -400,7 +416,7 @@ export function ResolveMemoryDialog({ memory, conflictMemories }: ResolveMemoryD
                       <button
                         type="button"
                         onClick={handleApply}
-                        disabled={isResolveApplying}
+                        disabled={busy}
                         aria-busy={isResolveApplying}
                         className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber-500/85 px-3 py-2.5 text-xs font-semibold text-slate-950 transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
                       >
@@ -418,12 +434,8 @@ export function ResolveMemoryDialog({ memory, conflictMemories }: ResolveMemoryD
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setPlan(null);
-                      setPlanId(null);
-                      setLocalError(null);
-                    }}
-                    disabled={isResolveApplying}
+                    onClick={editPlan}
+                    disabled={busy}
                     className="inline-flex items-center gap-2 text-xs text-slate-400 transition-colors hover:text-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <RotateCcw size={13} />
@@ -443,7 +455,7 @@ export function ResolveMemoryDialog({ memory, conflictMemories }: ResolveMemoryD
                         setWinnerId('');
                         setProtectedConfirmed(false);
                       }}
-                      disabled={isResolvePlanning}
+                      disabled={busy}
                       className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-slate-200 focus:border-amber-400/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <option value="">Choose a memory…</option>
@@ -453,7 +465,7 @@ export function ResolveMemoryDialog({ memory, conflictMemories }: ResolveMemoryD
                     </select>
                   </div>
 
-                  <fieldset disabled={isResolvePlanning}>
+                  <fieldset disabled={busy}>
                     <legend className="mb-2 text-xs font-medium text-slate-300">Authoritative winner</legend>
                     <div className="space-y-2">
                       {[memory, ...(selectedPeer ? [selectedPeer] : [])].map((candidate) => (
@@ -494,6 +506,7 @@ export function ResolveMemoryDialog({ memory, conflictMemories }: ResolveMemoryD
                           type="checkbox"
                           checked={protectedConfirmed}
                           onChange={(event) => setProtectedConfirmed(event.target.checked)}
+                          disabled={busy}
                           className="mt-0.5 accent-amber-400"
                         />
                         <span>I understand this correction may supersede a protected memory.</span>
@@ -509,7 +522,7 @@ export function ResolveMemoryDialog({ memory, conflictMemories }: ResolveMemoryD
                       onChange={(event) => setReason(event.target.value)}
                       maxLength={240}
                       rows={2}
-                      disabled={isResolvePlanning}
+                      disabled={busy}
                       placeholder="Why is this memory authoritative?"
                       className="w-full resize-y rounded-md border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:border-amber-400/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                     />
@@ -524,7 +537,7 @@ export function ResolveMemoryDialog({ memory, conflictMemories }: ResolveMemoryD
                       onChange={(event) => setVerificationQuestion(event.target.value)}
                       maxLength={240}
                       rows={2}
-                      disabled={isResolvePlanning}
+                      disabled={busy}
                       placeholder="What might you ask later to verify this correction?"
                       className="w-full resize-y rounded-md border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:border-amber-400/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                     />
@@ -535,7 +548,7 @@ export function ResolveMemoryDialog({ memory, conflictMemories }: ResolveMemoryD
 
                   <button
                     type="submit"
-                    disabled={isResolvePlanning || !canRequestPlan}
+                    disabled={busy || !canRequestPlan}
                     aria-busy={isResolvePlanning}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-amber-400/40 bg-amber-500/15 px-3 py-2.5 text-xs font-semibold text-amber-100 transition-colors hover:bg-amber-500/25 disabled:cursor-not-allowed disabled:opacity-45"
                   >
@@ -552,6 +565,7 @@ export function ResolveMemoryDialog({ memory, conflictMemories }: ResolveMemoryD
                 <button
                   type="button"
                   onClick={closeDialog}
+                  disabled={busy}
                   className="rounded-md border border-slate-600/70 px-3 py-1.5 text-xs text-slate-300 transition-colors hover:border-slate-400 hover:text-white"
                 >
                   Close

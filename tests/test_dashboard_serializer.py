@@ -58,6 +58,16 @@ def _load_showcase_builder():
     return module.build_showcase_snapshot
 
 
+def _load_dashboard_pipeline():
+    repo_root = Path(__file__).resolve().parents[1]
+    script_path = repo_root / "scripts" / "pipeline" / "update_dashboard_data.py"
+    spec = importlib.util.spec_from_file_location("update_dashboard_data_timestamp", script_path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _sample_raw_metadata() -> dict:
     return {
         "memory_type": "preference",
@@ -444,6 +454,10 @@ async def test_live_dashboard_refresh_includes_usage_summary(monkeypatch, tmp_pa
     snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
     assert snapshot["schema_version"] == 2
     assert snapshot["generation_id"] == result["generation_id"]
+    for field in ("generated_at", "project_registry_generated_at"):
+        timestamp = datetime.fromisoformat(snapshot[field])
+        assert timestamp.tzinfo is not None
+        assert timestamp.utcoffset() == timedelta(0)
     assert snapshot["project_registry"] == {
         "status": "ready",
         "schema_version": 1,
@@ -470,6 +484,53 @@ async def test_live_dashboard_refresh_includes_usage_summary(monkeypatch, tmp_pa
         "label": "RELATES_TO",
         "type": "graph",
     } in snapshot["edges"]
+
+
+@pytest.mark.asyncio
+async def test_standalone_dashboard_snapshot_emits_utc_aware_timestamps(tmp_path, monkeypatch):
+    module = _load_dashboard_pipeline()
+    config = SimpleNamespace(
+        elefante=SimpleNamespace(
+            data_dir=str(tmp_path),
+            vector_store=SimpleNamespace(type="sqlite"),
+            graph_store=SimpleNamespace(database_path=str(tmp_path / "graph")),
+        )
+    )
+
+    async def empty_records(*_args, **_kwargs):
+        return {"ids": [], "documents": [], "metadatas": []}
+
+    class EmptyGraphStore:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        async def execute_query(self, _query):
+            return []
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(module, "get_config", lambda: config)
+    monkeypatch.setattr(module, "_configured_vector_records", empty_records)
+    monkeypatch.setattr(module, "GraphStore", EmptyGraphStore)
+
+    await module.main()
+
+    snapshot = json.loads((tmp_path / "dashboard_snapshot.json").read_text(encoding="utf-8"))
+    for field in ("generated_at", "project_registry_generated_at"):
+        timestamp = datetime.fromisoformat(snapshot[field])
+        assert timestamp.tzinfo is not None
+        assert timestamp.utcoffset() == timedelta(0)
+
+
+def test_dashboard_timestamp_producers_do_not_emit_naive_utc_strings():
+    repo_root = Path(__file__).resolve().parents[1]
+    server_source = (repo_root / "src" / "mcp" / "server.py").read_text(encoding="utf-8")
+    pipeline_source = (repo_root / "scripts" / "pipeline" / "update_dashboard_data.py").read_text(encoding="utf-8")
+
+    for source in (server_source, pipeline_source):
+        assert "datetime.utcnow().isoformat()" not in source
+        assert "datetime.now(timezone.utc).isoformat()" in source
 
 
 def test_dashboard_frontend_retries_stats_and_snapshot_fetches():

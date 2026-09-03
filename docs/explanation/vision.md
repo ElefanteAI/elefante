@@ -1,6 +1,6 @@
 # Elefante Vision
 
-> Product explanation · Current published version: v2.14.0
+> Product explanation · Current published version: v2.15.0
 
 ## The Thesis
 
@@ -8,9 +8,9 @@ Elefante is a local-first persistent memory engine for AI agents. It maximizes
 signal per token by carrying durable decisions, preferences, facts, and lessons
 across sessions without making one model provider the owner of that memory.
 
-Every new AI session otherwise starts from zero. The user repeats context, the
-agent rediscovers decisions, and the context window fills with history instead
-of the evidence needed for the next action. Elefante provides a persistent,
+Across separate tools or sessions, durable decisions can be unavailable or
+buried in history. The user repeats context and the agent rediscovers decisions.
+Elefante provides a persistent,
 inspectable memory layer so an agent can retrieve the smallest useful context
 at the moment of work.
 

@@ -646,9 +646,87 @@ export interface StatsResponse {
   };
 }
 
+export interface SessionIntelligenceScope {
+  session_id: string | null;
+  client_name: string | null;
+  window_start: string | null;
+  window_end: string | null;
+}
+
+export interface SessionIntelligenceActualUsage {
+  event_count: number;
+  input_tokens: number;
+  cached_input_tokens: number;
+  uncached_input_tokens: number;
+  output_tokens: number;
+  evidence_class: string;
+  providers: Array<{ provider: string; model: string }>;
+}
+
+export interface SessionIntelligenceEstimatedUsage {
+  event_count: number;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  overhead_tokens: number | null;
+  average_signal_ratio: number | null;
+  evidence_class: string;
+}
+
+export interface SessionIntelligenceHypothesisBasis {
+  event_count: number;
+  actual_event_count: number;
+  estimated_event_count: number;
+  accepted_outcome: string | boolean | null;
+}
+
+export interface SessionIntelligenceHypothesis {
+  hypothesis_id: string;
+  aggregate_key: string;
+  statement: string;
+  basis: SessionIntelligenceHypothesisBasis;
+  evidence_classes: string[];
+  hypothesis_only: boolean;
+}
+
+export interface SessionIntelligenceEnterpriseGroup {
+  aggregate_key: string;
+  event_count: number;
+  actual_event_count: number;
+  estimated_event_count: number;
+  actual_input_tokens: number;
+  actual_output_tokens: number;
+  estimated_input_tokens: number;
+  estimated_output_tokens: number;
+  unknown_cost_events: number;
+  evidence_boundary: string;
+}
+
+export interface SessionIntelligenceEnterpriseReport {
+  purpose: string;
+  aggregation: string;
+  scope: SessionIntelligenceScope;
+  groups: SessionIntelligenceEnterpriseGroup[];
+  hypotheses: SessionIntelligenceHypothesis[];
+  hypotheses_only: boolean;
+  employee_ranking: boolean;
+  sensitive_trait_inference: boolean;
+}
+
+export interface SessionIntelligenceCaptureHealth {
+  state: 'idle' | 'observing' | 'permission_required' | 'partial';
+  since: string;
+  pending_count: number;
+  persisted_count: number;
+  failed_count: number;
+  dropped_count: number;
+  last_error_code: string | null;
+  coverage: string;
+}
+
 export interface SessionIntelligenceResponse {
   schema_version: number;
   generated_at: string | null;
+  capture?: SessionIntelligenceCaptureHealth;
   consent: {
     schema_version: number;
     enabled: boolean;
@@ -656,13 +734,13 @@ export interface SessionIntelligenceResponse {
   };
   signal_card: null | {
     card_id: string;
-    scope: Record<string, any>;
+    scope: SessionIntelligenceScope;
     usage: {
       event_count: number;
       session_count: number;
       statuses: Record<string, number>;
-      actual: Record<string, any>;
-      estimated: Record<string, any>;
+      actual: SessionIntelligenceActualUsage;
+      estimated: SessionIntelligenceEstimatedUsage;
     };
     cost: {
       status: string;
@@ -681,14 +759,7 @@ export interface SessionIntelligenceResponse {
     unknowns: string[];
     hypothesis: string;
   };
-  enterprise_report: null | {
-    aggregation: string;
-    groups: Array<Record<string, any>>;
-    hypotheses: Array<Record<string, any>>;
-    hypotheses_only: boolean;
-    employee_ranking: boolean;
-    sensitive_trait_inference: boolean;
-  };
+  enterprise_report: SessionIntelligenceEnterpriseReport | null;
   privacy: {
     metadata_only: boolean;
     prompts_stored: boolean;

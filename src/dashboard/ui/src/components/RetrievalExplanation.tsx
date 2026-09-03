@@ -97,8 +97,8 @@ export function RetrievalExplanation({ memory, evidence }: RetrievalExplanationP
   const healthStatus = typeof rawHealth === 'string' && rawHealth.trim() ? rawHealth : null;
   const healthLabel = healthStatus ? (healthLabels[healthStatus] || formatLabel(healthStatus)) : 'Not reported';
   const healthReason = String(metadata.health_reason ?? memory.properties?.health_reason ?? 'No health reason in this snapshot.');
-  const source = metadata.source ?? memory.properties?.source;
-  const sourceLabel = source ? formatLabel(String(source)) : 'Not reported';
+  const source = metadata.storage_backend ?? memory.properties?.storage_backend;
+  const sourceLabel = source === 'sqlite' ? 'SQLite' : source ? formatLabel(String(source)) : 'Not reported';
   const rankLabel = `#${Math.max(1, Math.round(finiteNumber(rank, 1)))} of ${Math.max(1, Math.round(finiteNumber(total, 1)))}`;
   const title = memory.properties?.title || memory.name || 'Selected memory';
 

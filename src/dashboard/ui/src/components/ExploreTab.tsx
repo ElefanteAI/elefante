@@ -44,7 +44,10 @@ export function ExploreTab() {
     <div className="h-full flex flex-col">
       <header className="flex flex-col gap-3 border-b border-slate-700/60 bg-slate-900/35 px-5 py-4 lg:flex-row lg:items-end lg:justify-between lg:px-7">
         <div>
-          <div className="text-[10px] text-cyan-400 elefante-mono uppercase tracking-[0.18em]">Connections</div>
+          <div className="flex items-center gap-2 text-[10px] text-cyan-400 elefante-mono uppercase tracking-[0.18em]">
+            <span>Connections</span>
+            <span className="border border-slate-700 px-2 py-0.5 text-[8px] text-slate-500">Read-only snapshot</span>
+          </div>
           <h1 className="mt-1 text-2xl font-medium tracking-[-0.025em] text-slate-100">Understand what is represented between memories.</h1>
         </div>
         <p className="max-w-lg text-[11px] leading-relaxed text-slate-500 lg:text-right">
@@ -59,7 +62,9 @@ export function ExploreTab() {
             {vizOptions.map((opt) => (
               <button
                 key={opt.id}
+                type="button"
                 onClick={() => setActiveViz(opt.id)}
+                aria-pressed={activeViz === opt.id}
                 className={
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ' +
                   (activeViz === opt.id

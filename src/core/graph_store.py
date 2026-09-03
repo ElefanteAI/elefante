@@ -3,8 +3,8 @@
 # PURPOSE : Kuzu graph database wrapper for entity/relationship storage.
 # ROLE    : Core persistence layer 2 of 2 (graph/relational side).
 # TOUCHED : When changing graph schema (node types, relationship types, properties),
-#           or when Kuzu version is upgraded. Schema changes here require a Kuzu
-#           reset (reset_kuzu_nuclear.py) on existing installs.
+#           or when Kuzu version is upgraded. Compatible schema additions must
+#           preserve existing rows; never require a reset for an additive repair.
 # ─────────────────────────────────────────────────────────────────────────────
 """
 Graph store implementation using Kuzu
@@ -16,7 +16,7 @@ Supports Cypher-like queries for deterministic fact retrieval.
 import asyncio
 import hashlib
 from typing import List, Optional, Dict, Any, Tuple
-from uuid import UUID, uuid4
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 from datetime import datetime
 from pathlib import Path
 
@@ -294,6 +294,9 @@ class GraphStore:
     
     def _initialize_schema(self):
         """Initialize Kuzu schema (node and relationship tables)"""
+        if self.read_only:
+            self._schema_initialized = True
+            return
         try:
             # Create node tables (Kuzu 0.1.0 doesn't support IF NOT EXISTS)
             # We'll catch exceptions for already-existing tables
@@ -454,6 +457,8 @@ class GraphStore:
                 self._conn.execute("ALTER TABLE Task ADD output STRING DEFAULT ''")
             except Exception:
                 pass  # Column already exists or table doesn't exist yet
+
+            self._ensure_relationship_schema()
             
             self._schema_initialized = True
             logger.info("kuzu_schema_initialized")
@@ -461,6 +466,35 @@ class GraphStore:
         except Exception as e:
             logger.error("failed_to_initialize_schema", error=str(e))
             raise
+
+    def _ensure_relationship_schema(self) -> None:
+        """Add the public relationship contract without rewriting legacy edges."""
+        fields = {
+            "id": "STRING",
+            "description": "STRING",
+            "created_at": "STRING",
+            "strength": "DOUBLE",
+            "props": "STRING",
+        }
+        definitions = ", ".join(f"{name} {kind}" for name, kind in fields.items())
+        for relationship_type in RelationshipType:
+            # Table identifiers come only from the enum, never caller input.
+            table = relationship_type.value
+            try:
+                self._execute_query_sync(
+                    f"CREATE REL TABLE {table}(FROM Entity TO Entity, {definitions})"
+                )
+            except RuntimeError as error:
+                if "already exists" not in str(error).lower():
+                    raise
+            columns, rows = self._execute_query_sync(
+                f"CALL table_info('{table}') RETURN *"
+            )
+            name_index = columns.index("name")
+            existing = {row[name_index] for row in rows}
+            for name, kind in fields.items():
+                if name not in existing:
+                    self._execute_query_sync(f"ALTER TABLE {table} ADD {name} {kind}")
 
     @staticmethod
     def _source_id(source: Dict[str, Any]) -> str:
@@ -658,35 +692,8 @@ class GraphStore:
                 )
                 return existing_id
             
-            # Entity doesn't exist, create it
-            query_create = """
-                CREATE (e:Entity {
-                    id: $id,
-                    name: $name,
-                    type: $type,
-                    description: $description,
-                    created_at: $created_at
-                })
-            """
-            
-            params = {
-                "id": str(entity.id),
-                "name": entity.name,
-                "type": entity.type.value,
-                "description": entity.description or "",
-                "created_at": entity.created_at
-            }
-            
-            await self._run_query(query_create, params)
-            
-            logger.info(
-                "entity_created",
-                entity_id=str(entity.id),
-                name=entity.name,
-                type=entity.type.value
-            )
-            
-            return entity.id
+            # Reuse the complete writer so this path cannot drop properties.
+            return await self.create_entity(entity)
             
         except Exception as e:
             logger.error(
@@ -803,41 +810,41 @@ class GraphStore:
         """
         self._initialize_connection()
         
-        # Map relationship type to Kuzu relationship table
-        rel_type_map = {
-            RelationshipType.RELATES_TO: "RELATES_TO",
-            RelationshipType.PART_OF: "PART_OF",
-            RelationshipType.DEPENDS_ON: "DEPENDS_ON",
-            RelationshipType.REFERENCES: "REFERENCES",
-            RelationshipType.CREATED_IN: "CREATED_IN",
-            RelationshipType.WORKS_ON: "WORKS_ON",
-        }
-        
-        rel_table = rel_type_map.get(relationship.relationship_type, "RELATES_TO")
-        rel_tables_with_strength = {"RELATES_TO"}
+        import json
 
-        # Kuzu requires relationship properties to match the rel-table schema exactly.
-        # Do not inject `strength` for tables like CREATED_IN or WORKS_ON that do not define it.
-        if rel_table in rel_tables_with_strength:
-            create_clause = f"CREATE (fromNode)-[r:{rel_table} {{strength: $strength}}]->(toNode)"
-        else:
-            create_clause = f"CREATE (fromNode)-[r:{rel_table}]->(toNode)"
+        rel_table = RelationshipType(relationship.relationship_type).value
 
         query = f"""
             MATCH (fromNode:Entity), (toNode:Entity)
             WHERE fromNode.id = $from_id AND toNode.id = $to_id
-            {create_clause}
+            CREATE (fromNode)-[r:{rel_table} {{
+                id: $id,
+                description: $description,
+                created_at: $created_at,
+                strength: $strength,
+                props: $props
+            }}]->(toNode)
+            RETURN r.id
         """
 
         params = {
             "from_id": str(relationship.from_entity_id),
             "to_id": str(relationship.to_entity_id),
+            "id": str(relationship.id),
+            "description": relationship.description,
+            "created_at": relationship.created_at.isoformat() if relationship.created_at else None,
+            "strength": relationship.strength,
+            "props": json.dumps(
+                relationship.model_dump(mode="json")["properties"],
+                ensure_ascii=False,
+                allow_nan=False,
+            ),
         }
-        if rel_table in rel_tables_with_strength:
-            params["strength"] = relationship.strength
         
         try:
-            await self._run_query(query, params)
+            _, rows = await self._run_query(query, params)
+            if not rows or str(rows[0][0]) != str(relationship.id):
+                raise ValueError("Relationship endpoints must both exist; no relationship was created")
             
             logger.info(
                 "relationship_created",
@@ -868,34 +875,56 @@ class GraphStore:
         """
         self._initialize_connection()
         
-        if direction == "outgoing":
-            query = """
-                MATCH (fromNode:Entity)-[r]->(toNode:Entity)
-                WHERE fromNode.id = $id
-                RETURN fromNode.id, toNode.id, label(r)
-            """
-        elif direction == "incoming":
-            query = """
-                MATCH (fromNode:Entity)-[r]->(toNode:Entity)
-                WHERE toNode.id = $id
-                RETURN fromNode.id, toNode.id, label(r)
-            """
-        else:  # both
-            query = """
-                MATCH (e1:Entity)-[r]-(e2:Entity)
-                WHERE e1.id = $id OR e2.id = $id
-                RETURN e1.id, e2.id, label(r)
-            """
+        import json
+
+        predicates = {
+            "outgoing": "fromNode.id = $id",
+            "incoming": "toNode.id = $id",
+            "both": "fromNode.id = $id OR toNode.id = $id",
+        }
+        if direction not in predicates:
+            raise ValueError("Relationship direction must be outgoing, incoming, or both")
+        query = f"""
+            MATCH (fromNode:Entity)-[r]->(toNode:Entity)
+            WHERE {predicates[direction]}
+            RETURN fromNode.id, toNode.id, label(r), r
+        """
         
         try:
             relationships = []
             _, rows = await self._run_query(query, {"id": str(entity_id)})
             for row in rows:
+                if row[2] not in RelationshipType._value2member_map_:
+                    # Internal maintenance edges are not public Relationship objects.
+                    continue
+                stored = row[3]
+                stored_id = stored.get("id")
+                legacy_identity = json.dumps(stored.get("_id"), sort_keys=True)
+                created_at = stored.get("created_at")
+                # Older tables stored type-specific fields as native columns.
+                # Preserve them while allowing the new JSON payload to win.
+                legacy_properties = {
+                    key: value
+                    for key, value in stored.items()
+                    if not key.startswith("_")
+                    and key not in {"id", "description", "created_at", "strength", "props"}
+                    and value is not None
+                }
                 rel = Relationship(
+                    id=UUID(stored_id) if stored_id else uuid5(
+                        NAMESPACE_URL,
+                        f"elefante:legacy-edge:{row[0]}:{row[2]}:{row[1]}:{legacy_identity}",
+                    ),
                     from_entity_id=UUID(row[0]),
                     to_entity_id=UUID(row[1]),
                     relationship_type=RelationshipType(row[2]),
-                    strength=row[3] if len(row) > 3 else 1.0
+                    description=stored.get("description"),
+                    created_at=created_at,
+                    strength=stored["strength"] if stored.get("strength") is not None else 1.0,
+                    properties={
+                        **legacy_properties,
+                        **json.loads(stored.get("props") or "{}"),
+                    },
                 )
                 relationships.append(rel)
             

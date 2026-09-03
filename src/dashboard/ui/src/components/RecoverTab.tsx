@@ -420,9 +420,9 @@ function ProductMaintenancePanel({ health }: { health: RecoveryHealth | null }) 
           <PackageCheck size={20} className="mt-0.5 shrink-0 text-cyan-300" aria-hidden="true" />
           <div>
             <div className="text-[9px] text-cyan-400 elefante-mono uppercase tracking-[0.16em]">Product maintenance</div>
-            <h2 id="product-maintenance-title" className="mt-2 text-lg font-medium text-slate-100">One safe package handoff.</h2>
+            <h2 id="product-maintenance-title" className="mt-2 text-lg font-medium text-slate-100">Installer actions — status only here.</h2>
             <p className="mt-2 max-w-3xl text-xs leading-relaxed text-slate-400">
-              Home protects data and shows proof. The exact official package changes product code, so the running app never replaces or removes itself.
+              One safe package handoff starts outside this dashboard. Home protects data and shows proof. The exact official package changes product code, so the running app never replaces or removes itself.
             </p>
           </div>
         </div>
@@ -509,6 +509,7 @@ function ProductMaintenancePanel({ health }: { health: RecoveryHealth | null }) 
 
 export function RecoverTab() {
   const controlEnabled = useDashboardStore((state) => state.controlEnabled);
+  const controlSessionError = useDashboardStore((state) => state.controlSessionError);
   const setActiveTab = useDashboardStore((state) => state.setActiveTab);
   const isPlanning = useDashboardStore((state) => state.isRecoveryPlanning);
   const isApplying = useDashboardStore((state) => state.isRecoveryApplying);
@@ -603,9 +604,19 @@ export function RecoverTab() {
           </p>
 
           <section className="mt-6 border border-slate-800 bg-slate-950/55 p-5">
-            <div className="border-l-2 border-amber-300/60 pl-3">
-              <strong className="block text-sm font-medium text-slate-100">No recovery evidence yet</strong>
-              <p className="mt-1 text-xs leading-relaxed text-slate-500">No recovery check ran in this environment. Capability is not presented as readiness.</p>
+            <div role={recoveryError ? 'alert' : undefined} className="border-l-2 border-amber-300/60 pl-3">
+              <strong className="block text-sm font-medium text-slate-100">Recovery controls are disconnected</strong>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                {recoveryError || 'No active local session. Reconnect Home to run recovery checks.'}
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                No operation is retried automatically. Reconnect, then inspect a new plan before confirming any change.
+              </p>
+              {!controlSessionError && (
+                <button type="button" onClick={() => window.location.reload()} className="mt-3 min-h-11 border border-amber-300/60 px-4 text-xs text-slate-200 hover:border-amber-300">
+                  Reconnect Home
+                </button>
+              )}
             </div>
             <div className="mt-5 text-[9px] text-slate-600 elefante-mono uppercase tracking-[0.15em]">Evidence required for each operation</div>
             <div className="mt-4 grid gap-4 md:grid-cols-2">

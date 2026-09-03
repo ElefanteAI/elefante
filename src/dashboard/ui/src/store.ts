@@ -49,6 +49,23 @@ import type {
   SnapshotContext,
 } from './types';
 
+// All named controls share one fail-closed session state. Never replay a request.
+async function fetchControl(url: string, init: RequestInit): Promise<Response> {
+  const response = await fetch(url, init);
+  const state = useDashboardStore.getState();
+  if ((response.status === 401 || response.status === 429)
+    && new Headers(init.headers).get('Authorization') === `Bearer ${state.controlToken}`) {
+    useDashboardStore.setState({
+      controlEnabled: false, controlBaseUrl: null, controlToken: null,
+      controlAvailability: 'unavailable',
+      controlSessionError: response.status === 401
+        ? 'Local session expired. Reconnect Home to continue.'
+        : 'Local session request limit reached. Reconnect Home to continue.',
+    });
+  }
+  return response;
+}
+
 const CONTROL_TOKEN_MIN_LENGTH = 12;
 const CONTROL_TOKEN_MAX_LENGTH = 256;
 const RESOLVE_TERMINAL_STATUSES: readonly ResolveTerminalStatus[] = [
@@ -1151,11 +1168,15 @@ interface DashboardStore {
   // Navigation
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
+  memoryWorkspaceView: 'library' | 'review';
+  setMemoryWorkspaceView: (view: 'library' | 'review') => void;
 
   // Data
   snapshot: Snapshot | null;
   stats: StatsResponse | null;
   sessionIntelligence: SessionIntelligenceResponse | null;
+  statsError: string | null;
+  sessionIntelligenceError: string | null;
   isLoading: boolean;
   error: string | null;
 
@@ -1237,6 +1258,9 @@ interface DashboardStore {
     verificationQuestion: string,
   ) => Promise<RememberResponse>;
   isRecallTesting: boolean;
+  recallQuestion: string;
+  recallResult: RecallTestResponse | null;
+  setRecallQuestion: (question: string) => void;
   recallTestError: string | null;
   clearRecallTestError: () => void;
   testRecall: (question: string) => Promise<RecallTestResponse>;
@@ -1295,11 +1319,15 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   // Navigation
   activeTab: 'overview',
   setActiveTab: (tab) => set({ activeTab: tab }),
+  memoryWorkspaceView: 'library',
+  setMemoryWorkspaceView: (view) => set({ memoryWorkspaceView: view }),
 
   // Data
   snapshot: null,
   stats: null,
   sessionIntelligence: null,
+  statsError: null,
+  sessionIntelligenceError: null,
   isLoading: false,
   isRefreshing: false,
   error: null,
@@ -1366,6 +1394,10 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       get().controlEnabled
       && (!requestedProjectId || requestedProjectId === get().activeProjectId)
     ) return;
+
+    if (requestedProjectId && requestedProjectId !== get().activeProjectId) {
+      set({ recallQuestion: '', recallResult: null, recallTestError: null });
+    }
 
     set({
       controlConnecting: true,
@@ -1500,7 +1532,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     set({ isProjectManaging: true, projectError: null });
     let response: Response | null = null;
     try {
-      response = await fetch(`${controlBaseUrl}/control/projects/manage`, {
+      response = await fetchControl(`${controlBaseUrl}/control/projects/manage`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${controlToken}`,
@@ -1524,9 +1556,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
 
       if (!response.ok || body.success !== true) {
         const error = controlErrorMessage(response, body, controlToken, 'project');
-        if (response.status === 401) {
-          set({ controlEnabled: false, controlBaseUrl: null, controlToken: null });
-        }
         set({ projectError: error });
         return {
           success: false,
@@ -1568,7 +1597,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     set({ isProjectReviewLoading: true, projectReviewError: null });
     let response: Response | null = null;
     try {
-      response = await fetch(`${controlBaseUrl}/control/projects/unscoped/list`, {
+      response = await fetchControl(`${controlBaseUrl}/control/projects/unscoped/list`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${controlToken}`,
@@ -1580,9 +1609,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       const review = normalizeProjectReview(body, controlToken);
       if (!response.ok || !review) {
         const error = controlErrorMessage(response, body, controlToken, 'project');
-        if (response.status === 401) {
-          set({ controlEnabled: false, controlBaseUrl: null, controlToken: null });
-        }
         set({ projectReviewError: error, projectReview: null });
         return null;
       }
@@ -1611,7 +1637,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     set({ isProjectAssigning: true, projectReviewError: null });
     let response: Response | null = null;
     try {
-      response = await fetch(`${controlBaseUrl}/control/projects/unscoped/plan`, {
+      response = await fetchControl(`${controlBaseUrl}/control/projects/unscoped/plan`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${controlToken}`,
@@ -1630,9 +1656,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         : null;
       if (!response.ok || planBody.success !== true || !plan) {
         const error = controlErrorMessage(response, planBody, controlToken, 'project');
-        if (response.status === 401) {
-          set({ controlEnabled: false, controlBaseUrl: null, controlToken: null });
-        }
         set({ projectReviewError: error });
         return {
           success: false,
@@ -1655,7 +1678,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         };
       }
 
-      response = await fetch(`${controlBaseUrl}/control/projects/unscoped/apply`, {
+      response = await fetchControl(`${controlBaseUrl}/control/projects/unscoped/apply`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${controlToken}`,
@@ -1667,9 +1690,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       const rawStatus = body.assignment_status ?? body.status;
       if (!isResolveTerminalStatus(rawStatus)) {
         const error = controlErrorMessage(response, body, controlToken, 'project');
-        if (response.status === 401) {
-          set({ controlEnabled: false, controlBaseUrl: null, controlToken: null });
-        }
         set({ projectReviewError: error });
         return { success: false, plan_id: null, plan, error };
       }
@@ -1748,7 +1768,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     set({ isRemembering: true, rememberError: null });
     let response: Response | null = null;
     try {
-      response = await fetch(`${controlBaseUrl}/control/remember`, {
+      response = await fetchControl(`${controlBaseUrl}/control/remember`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${controlToken}`,
@@ -1767,9 +1787,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         : null;
       if (!isRememberTerminalStatus(rawStatus)) {
         const error = controlErrorMessage(response, body, controlToken, 'remember');
-        if (response.status === 401) {
-          set({ controlEnabled: false, controlBaseUrl: null, controlToken: null });
-        }
         set({ rememberError: error });
         return {
           success: false,
@@ -1805,7 +1822,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         return { success: false, plan_id: null, error };
       }
       if (rawStatus === 'VERIFIED_COMPLETE') {
-        await get().fetchSnapshot();
+        await get().refreshSnapshot();
         set({ rememberError: null });
       } else if (rawStatus !== 'NEEDS_HUMAN') {
         const error = result.error || controlErrorMessage(response, body, controlToken, 'remember');
@@ -1831,7 +1848,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     set({ isRemembering: true, rememberError: null });
     let response: Response | null = null;
     try {
-      response = await fetch(`${controlBaseUrl}/control/remember/apply`, {
+      response = await fetchControl(`${controlBaseUrl}/control/remember/apply`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${controlToken}`,
@@ -1849,9 +1866,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       const rawStatus = body.remember_status ?? body.status;
       if (!isRememberTerminalStatus(rawStatus)) {
         const error = controlErrorMessage(response, body, controlToken, 'remember');
-        if (response.status === 401) {
-          set({ controlEnabled: false, controlBaseUrl: null, controlToken: null });
-        }
         set({ rememberError: error });
         return { success: false, plan_id: null, error };
       }
@@ -1870,7 +1884,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
           error_code: safeOptionalText(body.error_code, controlToken),
         };
       }
-      await get().fetchSnapshot();
+      await get().refreshSnapshot();
       set({ rememberError: null });
       return {
         success: true,
@@ -1888,19 +1902,29 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     }
   },
   isRecallTesting: false,
+  recallQuestion: '',
+  recallResult: null,
+  setRecallQuestion: (question) => set({ recallQuestion: question, recallResult: null, recallTestError: null }),
   recallTestError: null,
   clearRecallTestError: () => set({ recallTestError: null }),
   testRecall: async (question) => {
     const { controlEnabled, controlBaseUrl, controlToken } = get();
+    const projectId = get().activeProjectId;
+    const finish = (result: RecallTestResponse) => {
+      if (get().recallQuestion.trim() === question && get().activeProjectId === projectId) {
+        set({ recallResult: result });
+      }
+      return result;
+    };
     if (!controlEnabled || !controlBaseUrl || !controlToken) {
       const error = 'Local session is not active. Reload Home to reconnect.';
       set({ recallTestError: error });
-      return { success: false, recall_status: 'unavailable', error };
+      return finish({ success: false, recall_status: 'unavailable', error });
     }
     set({ isRecallTesting: true, recallTestError: null });
     let response: Response | null = null;
     try {
-      response = await fetch(`${controlBaseUrl}/control/recall/test`, {
+      response = await fetchControl(`${controlBaseUrl}/control/recall/test`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${controlToken}`,
@@ -1913,12 +1937,12 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       if (!['supplied', 'no_match', 'blocked', 'unavailable'].includes(String(status))) {
         const error = controlErrorMessage(response, body, controlToken, 'recall');
         set({ recallTestError: error });
-        return { success: false, recall_status: 'unavailable', error };
+        return finish({ success: false, recall_status: 'unavailable', error });
       }
       if (body.memory_content_returned !== false) {
         const error = 'Recall test rejected an unsafe response containing unverified content.';
         set({ recallTestError: error });
-        return { success: false, recall_status: 'unavailable', error };
+        return finish({ success: false, recall_status: 'unavailable', error });
       }
       const selectedIds = Array.isArray(body.selected_memory_ids)
         ? body.selected_memory_ids
@@ -1951,18 +1975,15 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         error: safeOptionalText(body.error, controlToken),
         error_code: safeOptionalText(body.error_code, controlToken),
       };
-      if (response.status === 401) {
-        set({ controlEnabled: false, controlBaseUrl: null, controlToken: null });
-      }
       if (!response.ok && status !== 'blocked') {
         result.error = result.error || controlErrorMessage(response, body, controlToken, 'recall');
       }
       set({ recallTestError: result.error || null });
-      return result;
+      return finish(result);
     } catch {
       const error = controlErrorMessage(response, {}, controlToken, 'recall');
       set({ recallTestError: error });
-      return { success: false, recall_status: 'unavailable', error };
+      return finish({ success: false, recall_status: 'unavailable', error });
     } finally {
       set({ isRecallTesting: false });
     }
@@ -1982,7 +2003,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     set({ isResolvePlanning: true, resolveError: null });
     let response: Response | null = null;
     try {
-      response = await fetch(`${controlBaseUrl}/control/resolve/plan`, {
+      response = await fetchControl(`${controlBaseUrl}/control/resolve/plan`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${controlToken}`,
@@ -2000,9 +2021,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       const planId = body.plan_id === null || typeof body.plan_id === 'string' ? body.plan_id : null;
       if (!response.ok || body.success !== true || !plan) {
         const error = controlErrorMessage(response, body, controlToken, 'plan');
-        if (response.status === 401) {
-          set({ controlEnabled: false, controlBaseUrl: null, controlToken: null });
-        }
         set({ resolveError: error });
         return { success: false, plan_id: null, error, error_code: safeOptionalText(body.error_code, controlToken) };
       }
@@ -2027,7 +2045,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     set({ isResolveApplying: true, resolveError: null });
     let response: Response | null = null;
     try {
-      response = await fetch(`${controlBaseUrl}/control/resolve/apply`, {
+      response = await fetchControl(`${controlBaseUrl}/control/resolve/apply`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${controlToken}`,
@@ -2046,9 +2064,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         const error = response.ok
           ? 'The control service did not return a terminal resolution status.'
           : controlErrorMessage(response, body, controlToken, 'apply');
-        if (response.status === 401) {
-          set({ controlEnabled: false, controlBaseUrl: null, controlToken: null });
-        }
         set({ resolveError: error });
         return { success: false, error, error_code: safeOptionalText(body.error_code, controlToken) };
       }
@@ -2097,7 +2112,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       };
       if (content !== undefined) payload.content = content;
 
-      response = await fetch(`${controlBaseUrl}/control/corrections/plan`, {
+      response = await fetchControl(`${controlBaseUrl}/control/corrections/plan`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${controlToken}`,
@@ -2110,9 +2125,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       const planId = body.plan_id === null || typeof body.plan_id === 'string' ? body.plan_id : null;
       if (!response.ok || body.success !== true || !plan) {
         const error = controlErrorMessage(response, body, controlToken, 'plan');
-        if (response.status === 401) {
-          set({ controlEnabled: false, controlBaseUrl: null, controlToken: null });
-        }
         set({ correctionError: error });
         return {
           success: false,
@@ -2157,7 +2169,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       };
       if (content !== undefined) payload.content = content;
 
-      response = await fetch(`${controlBaseUrl}/control/corrections/apply`, {
+      response = await fetchControl(`${controlBaseUrl}/control/corrections/apply`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${controlToken}`,
@@ -2171,9 +2183,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         const error = response.ok
           ? 'The control service did not return a terminal correction status.'
           : controlErrorMessage(response, body, controlToken, 'apply');
-        if (response.status === 401) {
-          set({ controlEnabled: false, controlBaseUrl: null, controlToken: null });
-        }
         set({ correctionError: error });
         return {
           success: false,
@@ -2220,7 +2229,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     set({ isRecoveryPlanning: true, recoveryError: null });
     let response: Response | null = null;
     try {
-      response = await fetch(`${controlBaseUrl}/control/recovery/plan`, {
+      response = await fetchControl(`${controlBaseUrl}/control/recovery/plan`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${controlToken}`,
@@ -2254,9 +2263,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         || (requiresHealth && !health)
       ) {
         const error = controlErrorMessage(response, body, controlToken, 'recovery');
-        if (response.status === 401) {
-          set({ controlEnabled: false, controlBaseUrl: null, controlToken: null });
-        }
         set({ recoveryError: error });
         return {
           success: false,
@@ -2296,7 +2302,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     set({ isRecoveryApplying: true, recoveryError: null });
     let response: Response | null = null;
     try {
-      response = await fetch(`${controlBaseUrl}/control/recovery/apply`, {
+      response = await fetchControl(`${controlBaseUrl}/control/recovery/apply`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${controlToken}`,
@@ -2315,9 +2321,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       const rawStatus = body.recovery_status ?? body.status;
       if (!isRecoveryTerminalStatus(rawStatus)) {
         const error = controlErrorMessage(response, body, controlToken, 'recovery');
-        if (response.status === 401) {
-          set({ controlEnabled: false, controlBaseUrl: null, controlToken: null });
-        }
         set({ recoveryError: error });
         return {
           success: false,
@@ -2368,7 +2371,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     }
     let response: Response | null = null;
     try {
-      response = await fetch(`${controlBaseUrl}/control/recovery/support-report/download`, {
+      response = await fetchControl(`${controlBaseUrl}/control/recovery/support-report/download`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${controlToken}`,
@@ -2379,9 +2382,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       if (!response.ok) {
         const body = await readJson(response);
         const error = controlErrorMessage(response, body, controlToken, 'recovery');
-        if (response.status === 401) {
-          set({ controlEnabled: false, controlBaseUrl: null, controlToken: null });
-        }
         set({ recoveryError: error });
         return { success: false, error };
       }
@@ -2433,6 +2433,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         const data = await res.json();
         const projectRegistry = normalizeProjectRegistry(data.project_registry, get().controlToken);
         const snapshotContext = normalizeSnapshotContext(data.snapshot_context);
+        if (get().snapshot?.generated_at !== data.generated_at) set({ recallResult: null });
         set({ 
           snapshot: { 
             nodes: data.nodes || [], 
@@ -2468,13 +2469,19 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         const res = await fetch('/api/stats');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        set({ stats: data });
+        if (isRecord(data) && typeof data.error === 'string') {
+          throw new Error(data.error);
+        }
+        set({ stats: data, statsError: null });
         return;
       } catch (e: any) {
         if (attempt < maxRetries) {
           await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
         } else {
-          console.error('Failed to fetch stats after retries:', e);
+          const error = e instanceof Error && e.message.trim()
+            ? e.message.trim()
+            : 'Could not read dashboard statistics.';
+          set({ stats: null, statsError: error });
         }
       }
     }
@@ -2485,9 +2492,15 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       const res = await fetch('/api/session-intelligence');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      set({ sessionIntelligence: data });
+      if (isRecord(data) && typeof data.error === 'string') {
+        throw new Error(data.error);
+      }
+      set({ sessionIntelligence: data, sessionIntelligenceError: null });
     } catch (e) {
-      console.error('Failed to fetch Session Intelligence snapshot:', e);
+      const error = e instanceof Error && e.message.trim()
+        ? e.message.trim()
+        : 'Could not read Session Intelligence snapshot.';
+      set({ sessionIntelligence: null, sessionIntelligenceError: error });
     }
   },
 

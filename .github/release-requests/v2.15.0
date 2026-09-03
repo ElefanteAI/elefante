@@ -1,0 +1,6 @@
+Owner explicitly authorized a new versioned release on 2026-09-03:
+GitHub publication, installed dashboard update and elefante.ai alignment.
+Release scope: consented automatic MCP usage estimates and accumulated
+dashboard, Recall, graph, freshness and documentation repairs.
+Publish only after Quality passes at the exact merged commit.
+No breaking public API, user-memory mutation, credential rotation or DNS change.

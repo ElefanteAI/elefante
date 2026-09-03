@@ -175,6 +175,54 @@ inside an actual result receipt. Put review priority in Memory Intelligence,
 stored vitality and explicit trails in Connections, and lifecycle proof in
 Recover. Keep host, port, and launch origin invisible as product concepts.
 
+**Follow-up recurrence:** Live use on 2026-09-02 proved that the dominant
+`Review N direct signals` action changed workspaces but left Memory Intelligence
+on Library; verified Remember refreshed the graph but not the header statistics;
+and connected control, Session Intelligence, Connections, and package
+maintenance still looked more capable than their evidence allowed. Route the
+recommendation to the actual Review subview, refresh all represented snapshot
+statistics after verified Remember, name control connectivity without claiming
+operation completion, and label view-only or installer-owned surfaces directly.
+Snapshot search also fell back to the browse list when it found zero matches.
+Select search rows by search mode alone; an empty result must stay empty until
+the query is cleared.
+
+The subsequent live audit found two more evidence-presentation defects. Recover's
+disconnected early return hid the expired-session error and falsely said no
+recovery check had run. Keep the actual error visible there and offer an explicit
+session reconnect, without replaying a mutation or relaxing expiry/confirmation
+gates. Retrieval Explanation read content provenance (`source`) under the
+Storage source label; read only `storage_backend`, with an honest missing-value
+fallback. Shared authenticated requests now invalidate the same session state
+on expiry or request exhaustion, never replaying an operation. Recall keeps
+page-only question/result state across tab inspection, invalidates old results
+on new input or snapshots, and clears it on a project change. A real expired
+archive plan changed no data; the open memory drawer covered the reconnect
+button, so that banner now renders above the drawer and below modal dialogs.
+Regressions cover these paths; browser acceptance exercises real expired
+sessions, changed Recall eligibility, and differing provenance/backend values.
+
+**Graph recurrence, 2026-09-03:** Curating a small real memory set exposed a
+branching-graph defect hidden by the earlier linear showcase. The renderer
+placed arrows between consecutive sorted cards even when no edge joined them,
+and could reverse a stored edge's direction. Cards now remain selectable without
+implied adjacency; relationship rows render each actual source, label, and
+target. A regression renders the real React component with branches, cycles,
+parallel labels, reordered edges, and excluded semantic/dangling edges.
+The installed 499×694 panel also exposed a 460-pixel graph inside a
+226-pixel clipped parent, leaving only 34 pixels of its detail scroller visible.
+The graph now fits its parent: one vertical scroll surface in narrow panels,
+with the existing split scroll layout retained on wide screens.
+
+**Continuous-workflow recurrence, 2026-09-03:** Returning from a snapshot search
+through Home's Review recommendation could hide the queue behind the old query
+and detail drawer. Both Home memory entry actions now reset those view filters.
+Related-memory links are native named buttons. Failed header/Session Intelligence
+reads show unavailability and clear stale data rather than suggesting zero
+memories or disabled consent. A later successful read clears only its own error.
+Graph cards show stored memory types; safeguard counts explicitly count links,
+and stored relationships are not presented as verified source truth.
+
 **Guard:** Dashboard, snapshot, Home-control, daemon, and routing regressions;
 the production UI build; and live deterministic-example acceptance across all
 six workspaces, both themes, desktop, and 390×844.
@@ -183,6 +231,42 @@ six workspaces, both themes, desktop, and 390×844.
 transport is not product hierarchy. Stronger evidence usually requires fewer
 authoritative panels, not more status cards. Preserve developed ideas by giving
 each one a real evidence owner instead of duplicating it on Home.
+
+---
+
+<a id="issue-17"></a>
+## Issue #17: Session Intelligence Advertised an Unsupported Group [BUG-071, FIXED LOCALLY]
+
+**Trigger:** Exercise every advertised `enterprise --group-by` option during
+Session Intelligence activation acceptance.
+
+**Root cause:** The CLI allowed `status`; its existing ledger only allows `tool`,
+`client`, and `day`. Default-only tests did not cover this contract mismatch.
+
+**Solution:** Match the CLI choices to the existing ledger. No new grouping
+engine or dashboard control. The regression enumerates advertised choices and
+requires each to return the requested aggregate. It failed on `status` before
+the one-line fix. Test: `tests/test_session_intelligence_cli.py`.
+
+**Boundary:** Local source repair, not installed/released evidence. The dashboard
+continues using its existing tool-grouped aggregate.
+
+---
+
+<a id="issue-18"></a>
+## Issue #18: Snapshot Age Misrepresented UTC [BUG-072, FIXED locally]
+
+**Evidence:** A Toronto browser read a UTC snapshot as four hours in the future
+and labelled it `current · just now`. The header did not update with elapsed time.
+
+**Root cause:** The producer omitted the timezone; JavaScript interpreted the
+timestamp as local time. Freshness was calculated only during incidental renders.
+
+**Repair:** Emit explicit UTC, interpret legacy zone-less snapshots as UTC, show
+unknown/future timestamps honestly and advance the display with a cleaned-up
+timer. Reload still only rereads the snapshot; it does not regenerate memory.
+`tests/test_dashboard_ui.py` and `tests/test_dashboard_serializer.py` own the
+regressions. Installed proof is a separate release gate.
 
 ---
 

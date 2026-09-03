@@ -78,6 +78,59 @@ terminal-error, conversation, or query context that matches a memory with
 `injection_policy="triggered"`. The path returns at most three governed matches
 and does not update access history or graph state.
 
+<a id="recall-cue-candidate-not-accepted"></a>
+
+## Recall selection: question focus and saved cues
+
+Topic similarity is not proof of the fact requested. A small English
+question-form check distinguishes explicit
+targets such as location, time, quantity, and a named property. A known target
+mismatch prevents the ordinary text/role path from supplying a same-topic
+memory. Open-ended guidance, unrecognized wording, and explicitly represented
+additional body properties retain the existing conservative path. Cues are not
+an exhaustive whitelist of every use of a memory.
+Different property names are uncertain rather than automatically incompatible:
+they require the strong full-question cue match, not ordinary body overlap.
+Without a saved cue, an absent named property cannot be supplied merely by
+matching its subject. Quantity requests require numeric or number-word evidence
+unless a matching saved question establishes a separate path. Such evidence is
+necessary, not sufficient: the other relevance and governance gates still apply.
+
+Repeated question words help disambiguate generic context; they are not mandatory
+answer tokens. A direct answer or decision-bearing record that meets the existing
+text-coverage floor may pass without repeating those words. Independent relevance,
+scope, trust, privacy, lifecycle, identifier and conflict checks are unchanged.
+
+The bounded paraphrase path reuses the existing local embedding model over at
+most 12 retrieved memories and 5 cues per memory. A matching explicit target
+requires question cosine at least `0.85`; an unclassified target still requires
+`0.93`. Both require a `0.03` lead over competing memories' cues. For closed
+alternatives, the requested property is also compared with the alternatives
+at `0.85`, without the shared subject words. Multiple cues on one memory count
+as one candidate. This adds no corpus scan, index, durable write, model
+download, external call, or dependency.
+
+`recall_cue_similarity` and `recall_focus_similarity` are ephemeral evidence,
+not body similarity or an exact `recall_cue_match`. Exact cues and explicit
+governing/structural paths keep their bounded behavior. Scope, trust,
+current-source, privacy, conflicts, lifecycle and query identifiers remain
+independent gates. Weak, tied, unavailable or non-finite model evidence adds
+no paraphrase match; unknown syntax is not certified understanding.
+
+The repair passes 39 real cached-model selection regressions, including all
+27 preceding cases, the unchanged Elefante memory bodies, missing-fact checks,
+alternatives and different words for the same property. These are bounded regression results,
+not a general semantic-accuracy or task-value guarantee. Publication and the
+exact installed build are separate from this source contract; see
+[BUG-047](../../workspace/ISSUES.md).
+
+Recall compiles one answer bundle, using the execution stage and its existing
+450-token, three-memory cap. Splitting this small budget across planning,
+execution and validation incorrectly dropped a second eligible memory even
+when the whole bundle fit. The local repair shares the answer budget; Task
+Intelligence's separate multi-stage allocation is unchanged. This budget fix
+does not establish semantic relevance.
+
 ## Dashboard score
 
 The dashboard uses a separate display score:

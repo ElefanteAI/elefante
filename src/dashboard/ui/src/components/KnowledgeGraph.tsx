@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDashboardStore } from '@/store';
 import { edgeEndpoints, type GraphEdge, type MemoryNode } from '@/types';
 
@@ -90,7 +90,7 @@ function roleFor(memory: MemoryNode) {
     return { label: 'Evidence', color: type === 'fact' ? '#c8894d' : '#718d74' };
   }
   if (type === 'directive' || type === 'specification') {
-    return { label: 'Guard', color: '#8ea889' };
+    return { label: type === 'directive' ? 'Directive' : 'Specification', color: '#8ea889' };
   }
   return { label: type || 'Memory', color: '#b99473' };
 }
@@ -298,8 +298,8 @@ export function KnowledgeGraph() {
   );
 
   return (
-    <div className="flex h-full min-h-[460px] flex-col overflow-hidden bg-slate-950">
-      <div className="grid grid-cols-[1fr_auto] border-b border-slate-700 px-6 py-4">
+    <div className="h-full min-h-0 overflow-y-auto bg-slate-950 lg:flex lg:flex-col lg:overflow-hidden">
+      <div className="grid grid-cols-[1fr_auto] border-b border-slate-700 px-6 py-4 lg:shrink-0">
         <div>
           <div className="elefante-mono mb-1 text-[10px] uppercase tracking-[0.24em] text-cyan-500">
             Decision graph
@@ -324,7 +324,7 @@ export function KnowledgeGraph() {
           <div>
             <strong className="block text-base font-medium text-emerald-400">{guardCount}</strong>
             <span className="elefante-mono text-[9px] uppercase tracking-[0.16em] text-slate-500">
-              safeguards
+              safeguard links
             </span>
           </div>
           <div>
@@ -336,8 +336,8 @@ export function KnowledgeGraph() {
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[286px_minmax(0,1fr)]">
-        <aside className="min-h-0 overflow-y-auto border-b border-slate-700 lg:border-b-0 lg:border-r">
+      <div className="lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[286px_minmax(0,1fr)]">
+        <aside className="border-b border-slate-700 lg:min-h-0 lg:overflow-y-auto lg:border-b-0 lg:border-r">
           <div className="elefante-mono border-b border-slate-800 px-5 py-3 text-[9px] uppercase tracking-[0.2em] text-slate-500">
             Preserved reasoning
           </div>
@@ -374,7 +374,7 @@ export function KnowledgeGraph() {
           })}
         </aside>
 
-        <section className="min-h-0 overflow-y-auto">
+        <section className="lg:min-h-0 lg:overflow-y-auto">
           <div className="border-b border-slate-700 px-5 py-5 sm:px-7">
             <div className="mb-4 flex items-start justify-between gap-6">
               <div>
@@ -386,26 +386,18 @@ export function KnowledgeGraph() {
                 </h3>
               </div>
               <span className="elefante-mono shrink-0 border border-amber-400/30 px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-amber-400">
-                source grounded
+                stored links
               </span>
             </div>
 
-            <div className="flex min-w-max items-stretch overflow-x-auto pb-2">
+            <div className="flex items-stretch gap-4 overflow-x-auto pb-2">
               {selectedTrail.nodes.map((memory, index) => {
                 const role = roleFor(memory);
                 const active = memory.id === selectedMemory.id;
-                const nextMemory = selectedTrail.nodes[index + 1];
-                const connectingEdge = nextMemory
-                  ? selectedTrail.edges.find(
-                      (edge) =>
-                        (edge.source === memory.id && edge.target === nextMemory.id) ||
-                        (edge.target === memory.id && edge.source === nextMemory.id),
-                    )
-                  : undefined;
 
                 return (
-                  <Fragment key={memory.id}>
                     <button
+                      key={memory.id}
                       onClick={() => setSelectedMemoryId(memory.id)}
                       className={`w-[160px] shrink-0 border px-4 py-4 text-left transition-all 2xl:w-[178px] ${
                         active
@@ -428,22 +420,41 @@ export function KnowledgeGraph() {
                         {memoryTitle(memory)}
                       </strong>
                     </button>
-
-                    {nextMemory && (
-                      <div className="flex w-[68px] shrink-0 flex-col items-center justify-center 2xl:w-[92px]">
-                        <span className="elefante-mono mb-2 max-w-[64px] text-center text-[8px] uppercase tracking-[0.12em] text-violet-400 2xl:max-w-[84px]">
-                          {connectingEdge ? relationshipText(connectingEdge.label) : 'connected'}
-                        </span>
-                        <div className="flex w-full items-center">
-                          <span className="h-px flex-1 bg-cyan-600" />
-                          <span className="h-1.5 w-1.5 rotate-45 border-r border-t border-cyan-500" />
-                        </div>
-                      </div>
-                    )}
-                  </Fragment>
                 );
               })}
             </div>
+
+            <ul aria-label="Stored relationships" className="mt-4 space-y-2">
+              {selectedTrail.edges.map((edge) => {
+                const source = selectedTrail.nodes.find((node) => node.id === edge.source)!;
+                const target = selectedTrail.nodes.find((node) => node.id === edge.target)!;
+                return (
+                  <li
+                    key={`${edge.source}-${edge.target}-${edge.label}`}
+                    data-source={edge.source}
+                    data-target={edge.target}
+                    data-relationship={edge.label}
+                    className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-t border-slate-800 pt-2 text-[11px] leading-4"
+                  >
+                    <button
+                      onClick={() => setSelectedMemoryId(source.id)}
+                      className="text-left text-slate-400 hover:text-cyan-500"
+                    >
+                      {memoryTitle(source)}
+                    </button>
+                    <span className="elefante-mono max-w-[90px] text-center text-[9px] text-violet-400">
+                      {relationshipText(edge.label)} →
+                    </span>
+                    <button
+                      onClick={() => setSelectedMemoryId(target.id)}
+                      className="text-left text-slate-400 hover:text-cyan-500"
+                    >
+                      {memoryTitle(target)}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
 
           <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_280px]">

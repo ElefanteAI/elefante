@@ -103,8 +103,8 @@ def test_active_proposals_do_not_restate_pre_v213_product_state() -> None:
         assert f"{tool_count} tools and {prompt_count} prompts" in document
         assert "16 tools and 2 prompts" not in document
     assert "SHIPPED IN v2.13.0" in session
-    assert "current v2.13.0 release" in integration
-    assert "Published customer release: v2.13.0" in north_star
+    assert "current published release" in integration
+    assert "Published customer release: see [the living release state]" in north_star
     assert "four-action-product-lifecycle.md" in proposal_index
     assert "APPROVED / LOCAL PRODUCT LOOP IMPLEMENTED" in proposal_index
     assert "PROPOSED — one-operator self-service product shell" not in proposal_index
@@ -360,11 +360,12 @@ def test_living_plan_tracks_the_released_product_and_separate_client_candidate()
     assert "| OB4 |" not in planning
     assert "| OB5 |" not in planning
     assert "source-grounded" in planning
-    assert f"**RELEASE_TARGET:** v{version}" in planning
-    assert (
-        "**PUBLICATION_AUTHORITY:** owner authorization covers core publication, "
-        "matching local installation, and website synchronization"
-    ) in planning
+    # A dated release entry prepares a tag; it is not live publication proof.
+    assert "**PUBLISHED_PRODUCT:**" in planning
+    assert "Publication remains a postcondition" in planning
+    assert "**LIVE_RUNTIME:**" in planning
+    assert "**PUBLICATION_AUTHORITY:**" in planning
+    assert "exact-commit gates remain mandatory" in planning
 
 
 def test_active_scoring_reference_matches_runtime_contract() -> None:

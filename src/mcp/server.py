@@ -27,7 +27,7 @@ from contextlib import asynccontextmanager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Sequence
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from mcp.server import Server
@@ -66,6 +66,7 @@ from src.core.task_intelligence_ledger import (
     canonical_digest,
 )
 from src.modules.distiller.privacy import PrivacyFilter
+from src.session_intelligence import EventStatus, InvocationEvent, RuntimeUsageCapture
 from src.core.orchestrator import get_orchestrator, reset_orchestrator
 from src.core.verified_operation import VerifiedOperationCheck
 from src.core.directive_store import get_directive_store
@@ -87,6 +88,16 @@ from src.utils.token_counter import (
 
 # Global flag to track dashboard status
 DASHBOARD_STARTED = False
+
+
+@dataclass(frozen=True)
+class _UsageCaptureContext:
+    event_id: str
+    invocation_id: str
+    session_id: str
+    client_name: str
+    started_at: datetime
+    started_monotonic: float
 
 logger = get_logger(__name__)
 
@@ -563,6 +574,7 @@ def compile_answer_context(
         TaskBriefCompiler,
         TaskBriefProfile,
         TaskBriefRequest,
+        TaskStage,
     )
 
     question_terms = _answer_terms(question)
@@ -580,17 +592,14 @@ def compile_answer_context(
             continue
         eligible.append(result)
 
-    planning_tokens = max(1, int(max_tokens * 0.30))
-    execution_tokens = max(1, int(max_tokens * 0.50))
-    validation_tokens = max_tokens - planning_tokens - execution_tokens
-    if validation_tokens < 1:
-        validation_tokens = 1
-        execution_tokens = max(1, max_tokens - planning_tokens - validation_tokens)
+    # Recall delivers one answer bundle. Task Intelligence's three-stage
+    # allocation stranded most of this budget when matching records shared a
+    # role, breaking Keep both despite enough room in the overall hard cap.
     budget = TaskBriefBudget(
         total_tokens=max_tokens,
-        planning_tokens=planning_tokens,
-        execution_tokens=execution_tokens,
-        validation_tokens=validation_tokens,
+        planning_tokens=1,
+        execution_tokens=max_tokens - 2,
+        validation_tokens=1,
         max_evidence_items=max_memories,
     )
     brief = TaskBriefCompiler().compile(
@@ -599,6 +608,7 @@ def compile_answer_context(
             project=project,
             workspace=workspace,
             profile=TaskBriefProfile.V2,
+            stage=TaskStage.EXECUTION,
             budget=budget,
         ),
         eligible,
@@ -734,7 +744,7 @@ class ElefanteMCPServer:
     - elefante-TaskIntelligence: Governed task context, use, outcome, and audit traces
     - elefante-GraphQuery: Execute read-only Cypher queries on knowledge graph
     - elefante-ContextGet: Retrieve session context
-    - elefante-GraphConnect: Batch upsert entities and relationships
+    - elefante-GraphConnect: Find/create entities and create/reuse relationships
     - elefante-SystemStatusGet: Get system status and statistics
     """
     
@@ -753,6 +763,7 @@ class ElefanteMCPServer:
 
         # Token intelligence ledger (per server lifecycle)
         self._token_ledger = SessionTokenLedger()
+        self._session_intelligence_capture = RuntimeUsageCapture()
         # A daemon is one async process serving many MCP sessions. Serialize
         # mutations here before entering the cross-process file lock; otherwise
         # a synchronous lock wait can block the event loop that must complete
@@ -928,7 +939,7 @@ class ElefanteMCPServer:
             snapshot = {
                 "schema_version": 2,
                 "generation_id": str(uuid4()),
-                "generated_at": datetime.utcnow().isoformat(),
+                "generated_at": datetime.now(timezone.utc).isoformat(),
                 "stats": {
                     "total_nodes": 0,
                     "memories": 0,
@@ -942,7 +953,7 @@ class ElefanteMCPServer:
             }
         project_snapshot = self._project_registry_snapshot()
         snapshot["project_registry"] = project_snapshot
-        snapshot["project_registry_generated_at"] = datetime.utcnow().isoformat()
+        snapshot["project_registry_generated_at"] = datetime.now(timezone.utc).isoformat()
         write_json_atomically(output_path, snapshot, default=str)
         return project_snapshot
 
@@ -1517,6 +1528,7 @@ class ElefanteMCPServer:
         self._task_intelligence_ledger = None
         if ledger is not None:
             ledger.close()
+        await self._session_intelligence_capture.close()
     
     def _register_handlers(self):
         """Register all MCP tool handlers"""
@@ -1940,7 +1952,7 @@ This development surface does not claim causal task improvement. Keep pilot deli
                 ),
                 types.Tool(
                     name="elefante-GraphConnect",
-                    description="Create a small, idempotent graph workflow in one call: upsert entities (by name+type) and create relationships between them. Designed to reduce tool-chaining and keep graph operations consistent.",
+                    description="Create a small, idempotent graph workflow in one call: find or create entities by name and type, or reference existing IDs, then create or reuse identical relationships. Referencing an existing entity does not overwrite its fields. Designed to reduce tool-chaining and keep graph operations consistent.",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -2431,6 +2443,24 @@ ritual for a self-contained question, and never store secrets or routine chat.""
         @self.server.call_tool()
         async def call_tool(name: str, arguments: Dict[str, Any]) -> Sequence[TextContent | ImageContent | EmbeddedResource]:
             """Handle tool calls"""
+            try:
+                capture_context = self._new_usage_capture_context()
+            except Exception as error:
+                capture_context = None
+                self._session_intelligence_capture.failed_count += 1
+                self._session_intelligence_capture.last_error_code = type(error).__name__
+
+            def record_token_stats(
+                result: Dict[str, Any], *, include_in_payload: bool = True
+            ) -> Dict[str, Any]:
+                return self._record_and_inject_token_stats(
+                    result,
+                    name,
+                    input_tokens,
+                    include_in_payload=include_in_payload,
+                    capture_context=capture_context,
+                )
+
             # Tool arguments may contain task text, memory content, or secrets.
             # Log only bounded routing metadata; handlers scrub before storage.
             self.logger.info(
@@ -2452,38 +2482,38 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                     else:
                         result = await self._handle_enable_elefante(arguments)
                     if isinstance(result, dict):
-                        result = self._record_and_inject_token_stats(result, name, input_tokens)
+                        result = record_token_stats(result)
                     return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
                 elif name == "elefante-SystemStatusGet":
                     result = await self._handle_get_system_status(arguments)
                     if isinstance(result, dict):
-                        result = self._record_and_inject_token_stats(result, name, input_tokens)
+                        result = record_token_stats(result)
                     return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
                 elif name == "elefante-DashboardOpen":
                     result = await self._handle_get_elefante_dashboard(arguments)
                     if isinstance(result, dict):
-                        result = self._record_and_inject_token_stats(result, name, input_tokens)
+                        result = record_token_stats(result)
                     return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
                 elif name == "elefante-Recover":
                     result = await self._handle_recover(arguments)
                     if isinstance(result, dict):
-                        result = self._record_and_inject_token_stats(result, name, input_tokens)
+                        result = record_token_stats(result)
                     return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
                 # Directive tools — safe, no DB locks needed
                 elif name == "elefante-DirectiveAdd":
                     result = self._handle_directive_add(arguments)
                     if isinstance(result, dict):
-                        result = self._record_and_inject_token_stats(result, name, input_tokens)
+                        result = record_token_stats(result)
                     return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
                 elif name == "elefante-DirectiveList":
                     result = self._handle_directive_list(arguments)
                     if isinstance(result, dict):
-                        result = self._record_and_inject_token_stats(result, name, input_tokens)
+                        result = record_token_stats(result)
                     return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
                 elif name == "elefante-DirectiveRemove":
                     result = self._handle_directive_remove(arguments)
                     if isinstance(result, dict):
-                        result = self._record_and_inject_token_stats(result, name, input_tokens)
+                        result = record_token_stats(result)
                     return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
                 
                 # Mode check removed - operations auto-acquire/release locks
@@ -2562,18 +2592,13 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                 # INJECT CONTEXT + PITFALLS + DIRECTIVES
                 if isinstance(result, dict):
                     if name in self._MINIMAL_RESPONSE_TOOLS:
-                        result = self._record_and_inject_token_stats(
-                            result,
-                            name,
-                            input_tokens,
-                            include_in_payload=False,
-                        )
+                        result = record_token_stats(result, include_in_payload=False)
                     else:
                         result = await self._inject_context(result, name, arguments)
                         result = self._inject_pitfalls(result, name)
                         result = self._inject_entrypoint_protocol(result)
                         result = self._inject_directives(result)
-                        result = self._record_and_inject_token_stats(result, name, input_tokens)
+                        result = record_token_stats(result)
 
                 rendered_result = (
                     _render_recall_payload(result)
@@ -2582,6 +2607,10 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                 )
                 return [TextContent(type="text", text=rendered_result)]
                 
+            except asyncio.CancelledError:
+                self._session_intelligence_capture.dropped_count += 1
+                self._session_intelligence_capture.last_error_code = "invocation_interrupted"
+                raise
             except Exception as e:
                 self.logger.error(f"Tool execution failed: {name}", error=str(e), exc_info=True)
                 # Surface compendium citation for database-class errors
@@ -2598,11 +2627,8 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                         ),
                         delivery_blocked=False,
                     )
-                    error_payload = self._record_and_inject_token_stats(
-                        error_payload,
-                        name,
-                        input_tokens,
-                        include_in_payload=False,
+                    error_payload = record_token_stats(
+                        error_payload, include_in_payload=False
                     )
                 else:
                     error_payload = {
@@ -2613,7 +2639,7 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                     error_payload = self._inject_pitfalls(error_payload, name)
                     error_payload = self._inject_entrypoint_protocol(error_payload)
                     error_payload = self._inject_directives(error_payload)
-                    error_payload = self._record_and_inject_token_stats(error_payload, name, input_tokens)
+                    error_payload = record_token_stats(error_payload)
                 rendered_error = (
                     _render_recall_payload(error_payload)
                     if name in self._MINIMAL_RESPONSE_TOOLS
@@ -5201,7 +5227,7 @@ ritual for a self-contained question, and never store secrets or routine chat.""
             "selected_memory_ids": list(context.selected_memory_ids),
             "conflict_count": context.conflict_count,
             "delivery_blocked": context.delivery_blocked,
-            "verified_at": datetime.utcnow().isoformat(),
+            "verified_at": datetime.now(timezone.utc).isoformat(),
             "project": {
                 "project_id": project.project_id,
                 "name": project.name,
@@ -6529,7 +6555,7 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                     "name": f"{kind}: {value}",
                     "type": "entity",
                     "description": f"signal hub ({kind})",
-                    "created_at": datetime.utcnow().isoformat(),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
                     "properties": {
                         "source": "snapshot",
                         "signal_type": kind,
@@ -6681,9 +6707,9 @@ ritual for a self-contained question, and never store secrets or routine chat.""
         snapshot = {
             "schema_version": 2,
             "generation_id": generation_id,
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "project_registry": self._project_registry_snapshot(),
-            "project_registry_generated_at": datetime.utcnow().isoformat(),
+            "project_registry_generated_at": datetime.now(timezone.utc).isoformat(),
             "stats": {
                 "total_nodes": len(nodes),
                 "memories": sum(1 for n in nodes if n["type"] == "memory"),
@@ -6814,6 +6840,40 @@ ritual for a self-contained question, and never store secrets or routine chat.""
             entities_input = safe_args.get("entities") or []
             relationships_input = safe_args.get("relationships") or []
             include_system_status = bool(safe_args.get("include_system_status", False))
+
+            # Reject invalid batches before the first graph mutation. A partial
+            # batch must not leave orphan entities behind for ordinary input errors.
+            from src.models.entity import EntityType
+            from src.utils.validators import validate_entity_name
+
+            declared_refs: set[str] = set()
+            existing_ids: set[UUID] = set()
+            for item in [*entities_input, *relationships_input]:
+                properties = item.get("properties")
+                if properties is not None:
+                    if not isinstance(properties, dict):
+                        raise ValueError("Graph properties must be a JSON object")
+                    json.dumps(properties, allow_nan=False)
+            for item in entities_input:
+                ref = item.get("ref")
+                if not isinstance(ref, str) or not ref.strip() or ref in declared_refs:
+                    raise ValueError("Entity refs must be non-empty and unique within the batch")
+                declared_refs.add(ref)
+                if item.get("id"):
+                    existing_ids.add(validate_uuid(item["id"]))
+                else:
+                    validate_entity_name(item.get("name"))
+                    EntityType(item.get("type"))
+            for rel in relationships_input:
+                RelationshipType(self._normalize_relationship_type(rel.get("relationship_type")))
+                for side in ("from", "to"):
+                    if rel.get(f"{side}_entity_id"):
+                        existing_ids.add(validate_uuid(rel[f"{side}_entity_id"]))
+                    elif rel.get(f"{side}_ref") not in declared_refs:
+                        raise ValueError("Relationship references must name a declared entity")
+            for entity_id in existing_ids:
+                if await orchestrator.graph_store.get_entity(entity_id) is None:
+                    raise ValueError("Graph entity does not exist; no connection changes were made")
 
             ref_to_entity_id: Dict[str, str] = {}
             created_entities = []
@@ -7064,6 +7124,25 @@ ritual for a self-contained question, and never store secrets or routine chat.""
             return estimate_tokens_json(ctx)
         return 0
 
+    def _new_usage_capture_context(self) -> _UsageCaptureContext:
+        """Bind telemetry to transport identity, never to task text or a project."""
+        source = self._request_provenance()
+        session_material = ":".join(
+            source[key] for key in ("transport", "instance_id", "session_id")
+        )
+        session_id = "mcp-" + hashlib.sha256(session_material.encode()).hexdigest()
+        # Every actual dispatch consumes work, even when a client repeats a
+        # JSON-RPC id. Retries of this event retain its generated identity.
+        invocation_id = uuid4().hex
+        return _UsageCaptureContext(
+            event_id=f"mcp-{invocation_id}",
+            invocation_id=f"mcp-{invocation_id}",
+            session_id=session_id,
+            client_name=source["tool"],
+            started_at=datetime.now(timezone.utc),
+            started_monotonic=time.monotonic(),
+        )
+
     def _record_and_inject_token_stats(
         self,
         result: Dict[str, Any],
@@ -7071,6 +7150,7 @@ ritual for a self-contained question, and never store secrets or routine chat.""
         input_tokens: int,
         *,
         include_in_payload: bool = True,
+        capture_context: _UsageCaptureContext | None = None,
     ) -> Dict[str, Any]:
         """Measure output tokens, record in ledger, inject stats into response.
         
@@ -7104,6 +7184,43 @@ ritual for a self-contained question, and never store secrets or routine chat.""
             context_tokens=context,
         )
         self._token_ledger.record(snapshot)
+
+        if capture_context is not None:
+            status = EventStatus.SUCCESS
+            if result.get("status") == "blocked" or result.get("gate_status") == "BLOCKED":
+                status = EventStatus.BLOCKED
+            elif result.get("status") == "ignored":
+                status = EventStatus.IGNORED
+            elif result.get("success") is False or "error" in result:
+                status = EventStatus.ERROR
+            count = result.get("supplied_count", 0)
+            if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+                count = 0
+            try:
+                event = InvocationEvent.estimated(
+                    event_id=capture_context.event_id,
+                    invocation_id=capture_context.invocation_id,
+                    session_id=capture_context.session_id,
+                    client_name=capture_context.client_name,
+                    tool_name=tool_name,
+                    started_at=capture_context.started_at,
+                    finished_at=datetime.now(timezone.utc),
+                    duration_ms=max(
+                        0,
+                        int((time.monotonic() - capture_context.started_monotonic) * 1000),
+                    ),
+                    status=status,
+                    result_count=count,
+                    input_tokens=snapshot.input_tokens,
+                    output_tokens=snapshot.output_tokens,
+                    overhead_tokens=snapshot.overhead_tokens,
+                    estimator="elefante-mcp-character-ratio",
+                )
+                self._session_intelligence_capture.submit(event)
+            except Exception as error:
+                # Never expose raw telemetry errors or alter the user's result.
+                self._session_intelligence_capture.failed_count += 1
+                self._session_intelligence_capture.last_error_code = type(error).__name__
 
         if include_in_payload:
             result["TOKEN_STATS"] = {

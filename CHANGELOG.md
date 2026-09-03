@@ -11,6 +11,84 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.15.0] - 2026-09-03
+
+### Added
+
+- Consent-gated automatic MCP usage estimates reuse the existing Session
+  Intelligence ledger and snapshot. A bounded asynchronous writer keeps SQLite
+  waits outside tool responses and exposes incomplete capture without replaying
+  the user's operation. No host/provider usage scraping or semantic-memory writes.
+
+### Fixed
+
+- Dashboard snapshot age uses explicit UTC, accepts legacy UTC snapshots, and
+  advances while the page remains open instead of reporting stale data as current.
+- The MCP subprocess verification isolates its stores and bounds its timeout;
+  release checks cannot accidentally open the owner's memory database.
+- Current installation, dashboard, MCP, and release guidance distinguishes
+  shipped capabilities, source-only experiments, and verified publication.
+- Session Intelligence distinguishes unavailable actual usage from measured zero,
+  exposes estimate/provenance and provisional-hypothesis details, and reports
+  missing/broken snapshots and process capture failures without claiming current
+  complete totals. Three readable summary cards lead; token/provenance details and
+  suggestions expand on demand. All six values and Home's Advanced placement remain.
+- Session Intelligence's aggregate-report CLI now advertises the ledger's
+  supported `tool`, `client`, and `day` groups instead of a nonfunctional `status`
+  option. Every advertised grouping has a regression check.
+- GraphConnect persists all advertised relationship types and complete edge
+  payloads. Missing endpoints and invalid batches fail before creating orphan
+  nodes; repeated identical calls reuse entity and edge identities. Additive
+  schema upgrades preserve legacy links, including native custom fields.
+- Recall no longer treats repeated question words as mandatory matches when
+  independent decision-bearing evidence already qualifies. Explicit property
+  and quantity requests cannot be satisfied by topic-only guidance, including
+  memories without saved questions. The existing model and thresholds remain.
+- Home's Review recommendation clears stale search and detail state. Graph
+  cards preserve stored memory types rather than calling every specification a
+  safeguard. Header and Session Intelligence failures are visible and do not
+  masquerade as zero counts or disabled consent; related-memory links use
+  keyboard-operable buttons.
+- Decision Graph draws only stored relationships, with their actual source,
+  target, and direction. Adjacent memory cards no longer imply invented links;
+  branching, circular, and multiple relationships remain inspectable.
+  Narrow panels scroll the entire graph instead of clipping its fixed-height
+  body below the visible dashboard.
+- Recall distinguishes explicit requested facts from shared topics when using
+  saved questions, and recognizes supported paraphrases with the existing local
+  model. No new model, dependency, memory rewrite, or project-specific matcher
+  is introduced. Its single 450-token bundle can retain two eligible memories
+  instead of stranding capacity in unused task-stage quotas.
+- Memory search closes stale details, and Recall inspection opens an unfiltered
+  Library. Expired-session recovery stays visible above dialogs without covering
+  navigation; in-flight forms cannot be dismissed or changed. Both Recall views
+  describe an empty result honestly, and the selected boundary is named Memory
+  scope rather than requesting repeated project confirmation.
+- Dashboard controls now share explicit expired-session and request-limit
+  recovery, without silently replaying operations. The reconnect action remains
+  visible above an open memory panel. Recall keeps its question and receipt
+  while inspecting records or switching tabs, clears private state on project
+  change or page reload, and discards stale results after new input or data.
+  Recover preserves its actual disconnect error; search evidence reports the
+  storage backend separately from the memory's content source.
+- Snapshot search with zero matches now shows zero memory rows instead of
+  falling back to the browse list. Clearing the query restores browsing.
+- Home's recommended direct-signal review now opens Memory Intelligence on the
+  Review queue instead of silently landing on Library. Verified Remember also
+  refreshes header statistics with the regenerated snapshot, the header names
+  its action `Reload snapshot`, and the connected-control label no longer
+  implies that every operation was verified.
+- Identifier-bearing Recall questions now require identifier-bearing evidence
+  on ordinary text-only paths. If an exact matching record is archived or
+  superseded, Recall abstains instead of substituting a semantically related
+  active memory; exact Recall cues and explicit structural or governing paths
+  retain their separate guarded behavior.
+- Archived and superseded memories retain access to the verified permanent
+  deletion plan while only manually archived, non-superseded memories can be
+  restored. Connections, Session Intelligence, and package maintenance now
+  identify their read-only or external-action boundaries directly, and icon-only
+  memory controls have accessible names.
+
 ## [2.14.0] - 2026-09-01
 
 ### Added

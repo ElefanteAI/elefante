@@ -471,7 +471,7 @@
           </div>
           <div class="proof-line" aria-label="Guide evidence status">
             <span>source checked</span>
-            <span>source prototype checked 2026-09-01</span>
+            <span>current six-workspace source</span>
             <span>one product / one dashboard</span>
           </div>
         </div>
@@ -538,8 +538,8 @@
 
     <main id="main-content" tabindex="-1">
       <article class="guide-body">
-        <section class="guide-preface" aria-labelledby="guide-purpose"><h2 class="visually-hidden" id="guide-purpose">What Elefante Home is for</h2><p class="guide-status"><span class="status-label">Applies to</span> the current Elefante Home source prototype, built and rendered with the deterministic showcase on 2026-09-01.</p>
-<p class="release-note"><span class="status-label">Release boundary</span> this guide documents the six-workspace source prototype. This work did not replace the installed runtime or publish a package. The local page always belongs to one Elefante product, but an installed package may contain an earlier dashboard build until this source prototype passes package acceptance.</p>
+        <section class="guide-preface" aria-labelledby="guide-purpose"><h2 class="visually-hidden" id="guide-purpose">What Elefante Home is for</h2><p class="guide-status"><span class="status-label">Applies to</span> the current six-workspace Elefante Home source and its installed package contract.</p>
+<p class="release-note"><span class="status-label">Release boundary</span> this guide documents the six-workspace Home. A locally installed candidate can be checked through its package receipt and Doctor; installing a source candidate does not publish a release, and source checks alone do not prove which dashboard package is running.</p>
 <p>Elefante Home is the advanced local control room for three jobs:</p>
 <ol>
 <li><strong>Global understanding.</strong> Memory Intelligence and Connections inspect everything represented in the current snapshot; no project is required.</li>
@@ -557,7 +557,7 @@ available, Home binds it automatically. If several are active, Home asks which
 one should own this session's managed actions.</p>
 <p><code>elefante-DashboardOpen</code> remains an optional agent convenience; it is not the
 customer entry requirement. Its <code>refresh=true</code> option regenerates the dashboard
-snapshot before opening Home. The header's <strong>Reload</strong> button and a normal browser
+snapshot before opening Home. The header's <strong>Reload snapshot</strong> button and a normal browser
 reload only reread the snapshot that already exists.</p>
 <h2 id="choose-the-journey-that-matches-your-goal"><a class="heading-anchor" href="#choose-the-journey-that-matches-your-goal">Choose the journey that matches your goal</a></h2>
 <div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
@@ -624,6 +624,10 @@ browser history before the page renders.</p>
 Resolve, and Recover routes. It is not a generic store, file, shell, MCP, or
 query proxy. Mutations retain their preview, explicit confirmation, one-use
 ticket, exact-state checks, postconditions, and rollback gates.</p>
+<p>If the session expires during Recover, its error remains visible with
+<strong>Reconnect Home</strong>. That button requests a new local session; it
+never retries a backup, restore, or report automatically. Inspect a
+new plan and confirm it before trying the operation again.</p>
 <p>If operational control is unavailable, the snapshot can remain inspectable while Home says exactly what is missing: <strong>No operational receipt in this environment</strong>. That is an evidence boundary, not a claim that Elefante itself failed.</p>
 <h2 id="the-dashboard-shell"><a class="heading-anchor" href="#the-dashboard-shell">The dashboard shell</a></h2>
 <h3 id="header"><a class="heading-anchor" href="#header">Header</a></h3>
@@ -641,7 +645,7 @@ ticket, exact-state checks, postconditions, and rollback gates.</p>
 </tr>
 <tr>
 <td>Memories</td>
-<td>Memory-node count in the current snapshot</td>
+<td>Total memory count reported by the local vector store statistics</td>
 </tr>
 <tr>
 <td>Entities</td>
@@ -660,7 +664,7 @@ ticket, exact-state checks, postconditions, and rollback gates.</p>
 <td>Snapshot is at least 60 minutes old, or its generation time is unavailable</td>
 </tr>
 <tr>
-<td>Reload</td>
+<td>Reload snapshot</td>
 <td>Rereads stats, Session Intelligence, and the existing snapshot; it does not regenerate live data</td>
 </tr>
 <tr>
@@ -683,15 +687,20 @@ store is stale or empty.</p>
 <li><strong>Recover</strong> — health, backup, restore, support report, and package handoff.</li>
 </ol>
 <p>The number keys <code>1</code> through <code>6</code> switch to those workspaces when focus is
-not inside a text field. <code>Escape</code> closes the open memory detail and clears its
-search state. Dialogs also support <code>Escape</code>; managed operations cannot be closed
-while their apply step is running.</p>
+not inside an editable control or dialog. <code>Escape</code> closes the open memory detail
+and clears snapshot search, including when search has focus. The detail panel stays
+inside the memory workspace and does not cover top navigation. Dialogs also support
+<code>Escape</code>; Remember and correction dialogs cannot be dismissed or changed
+while a managed operation is running.</p>
+<p>Starting a new snapshot search closes the previous memory detail, so an empty
+search does not leave an old record looking like a new result.</p>
 <h3 id="footer"><a class="heading-anchor" href="#footer">Footer</a></h3>
 <p>The footer repeats the product version and distinguishes:</p>
 <ul>
-<li><strong>local session active</strong> — named management routes are available;</li>
+<li><strong>live local session</strong> — named management routes are available;</li>
 <li><strong>connecting local service</strong> — the page is establishing its loopback session;</li>
 <li><strong>local snapshot</strong> — inspection is available, but management is not active.</li>
+<li><strong>read-only snapshot</strong> — this surface does not expose management controls.</li>
 </ul>
 <h2 id="home-purpose-evidence-next"><a class="heading-anchor" href="#home-purpose-evidence-next">Home: purpose, evidence, next action</a></h2>
 <p>Home begins with the product promise: <strong>Make memory useful for the next task.</strong>
@@ -705,12 +714,14 @@ understand, improve, and protect that system.</p>
 <tbody>
 <tr><td>Example workspace</td><td>The deterministic, disclosed example snapshot is loaded</td><td>No customer data, operation, or performance result</td></tr>
 <tr><td>Local memory snapshot</td><td>The dashboard loaded the represented local inspection file</td><td>Live product readiness or current Recall behavior</td></tr>
-<tr><td>Operational session verified</td><td>Named bounded management routes are available in this session</td><td>That any particular action has already succeeded</td></tr>
+<tr><td>Controls connected</td><td>Named bounded management routes are available in this session</td><td>That any particular action has already succeeded</td></tr>
 <tr><td>No operational receipt in this environment</td><td>No live management proof was returned here</td><td>That Elefante is broken or needs installation</td></tr>
 </tbody></table></div>
 <p>The <strong>Recommended next</strong> card always points to an action that is meaningful
 in the evidence currently available: review direct signals, browse the corpus,
 set a task boundary, or test Recall. It never sends the user to another Home.</p>
+<p>When direct signals exist, <strong>Continue</strong> opens Memory Intelligence on
+the counted <strong>Review</strong> queue—not the complete Library.</p>
 <h3 id="current-evidence"><a class="heading-anchor" href="#current-evidence">Current evidence</a></h3>
 <div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead><tr><th>Cell</th><th>Meaning</th></tr></thead>
@@ -767,12 +778,17 @@ selected memory's represented lifecycle state:</p>
 <tr><td>Restore</td><td>Return a manually archived, non-superseded record to Recall eligibility</td></tr>
 <tr><td>Delete permanently</td><td>Remove the memory and unshared attachments only after a temporary verified safety backup</td></tr>
 </tbody></table></div>
+<p>A manually archived, non-superseded record offers Restore and Delete
+permanently. Other represented inactive records, including superseded records,
+offer only Delete permanently. The no-write plan remains authoritative and can
+still block the operation when its safety conditions are not met.</p>
 <p>The managed flow is always: choose an action; explain why; provide a likely
 future Recall question; inspect a no-write plan; confirm its single-use ticket;
 apply once; verify store, graph, Home, and scoped Recall; then inspect the
 privacy-safe receipt. Protected memories add explicit acknowledgement. Permanent
-deletion adds exact <code>DELETE</code> confirmation and is not recoverable after all
-postconditions pass.</p>
+deletion adds exact <code>DELETE</code> confirmation. Its temporary safety backup is
+destroyed only after all postconditions pass. Older backups are not deleted and may
+still contain the memory; restoring one can bring that record back.</p>
 
 <h3 id="resolve"><a class="heading-anchor" href="#resolve">Resolve</a></h3>
 <p><strong>Verified Resolve</strong> appears only for a represented conflict pair. The
@@ -803,6 +819,9 @@ readiness evidence only after a timestamped check or verified operation receipt.
 question. The first version is deliberately narrow: one ephemeral question,
 one active registered project, and one read-only check. It does not answer the
 question, write a memory, or create Recall history for dashboard convenience.</p>
+<p><strong>Memory scope</strong> names the memories available to this check, not
+the subject you must ask about. A preselected boundary needs no repeated setup.
+Overall browsing remains available in the Library without a project.</p>
 <p><strong>Run Recall Check</strong> returns bounded proof, not private memory content:</p>
 <div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
@@ -818,7 +837,7 @@ question, write a memory, or create Recall history for dashboard convenience.</p
 </tr>
 <tr>
 <td><code>no_match</code></td>
-<td>Recall ran correctly and abstained because it found no eligible memory</td>
+<td>No memories passed the matching rules. A relevant memory may still exist; this is not proof that abstention was correct. Use <strong>Inspect available memories</strong> to check the library.</td>
 </tr>
 <tr>
 <td><code>blocked</code></td>
@@ -833,9 +852,22 @@ question, write a memory, or create Recall history for dashboard convenience.</p
 <p>The receipt may also show conflict count, active project, and verification
 time. A selected ID can open that record in Memory Intelligence. The selected
 memory content remains in the agent delivery path and is not copied into Home.</p>
+<p>Opening a selected record or <strong>Inspect available memories</strong>
+clears an old snapshot search and opens Library, so previous filters cannot
+hide the record you asked to inspect.</p>
+<p>The current question and receipt stay available when you inspect a record
+and return. They live only in this page's memory, not saved history. Changing
+the question or loading a newer snapshot clears the receipt; changing project
+or reloading the page clears both.</p>
+<p>If the local session expires or reaches its request limit, use
+<strong>Reconnect Home</strong>. The reconnect control stays above open dialogs
+without covering the header or navigation,
+and your current question or correction draft remains available. Elefante
+does not rerun a check or repeat a change automatically. For a change,
+inspect a fresh plan and confirm it yourself.</p>
 <p>The current contract does <strong>not</strong> expose per-signal reasons, withheld IDs,
 historical trace, answer quality, or task-outcome evidence. A supplied bundle
-does not prove that an answer was correct; <code>no_match</code> can be a healthy result.</p>
+does not prove that an answer was correct; <code>no_match</code> proves only that nothing was selected.</p>
 <p>If no active project or local management session is available, Recall fails
 closed and points to Projects or Home. It never converts the all-memory view
 into a global Recall scope.</p>
@@ -856,13 +888,41 @@ the specialist workspace explains the evidence. <strong>No action</strong> remai
 valid conclusion when the represented evidence does not justify a change.</p>
 <h3 id="session-intelligence"><a class="heading-anchor" href="#session-intelligence">Session Intelligence</a></h3>
 <p>Session Intelligence remains on Home under the collapsed <strong>Advanced</strong>
-disclosure. It is <strong>off by default</strong>. Without explicit local consent and a
-derived metadata-only snapshot, Home shows only the disabled explanation.</p>
-<p>When evidence exists, the Signal Card can show event count, provider-actual
-input/output tokens, verified cost when known, accepted-outcome evidence,
-training hypotheses, and explicit unknowns. Provider-actual and estimated usage
-remain separate. Prompts, transcripts, responses, employee ranking, and
-sensitive-trait inference are outside this surface.</p>
+disclosure. It is <strong>view-only</strong>: it explains observed usage, not whether
+Elefante improved a task. The owner requires this capability active, but collection
+still needs local, purpose-bound permission; the dashboard cannot grant it.</p>
+<p><strong>Consent and evidence boundary:</strong> automatic MCP capture starts
+only after the owner grants explicit approval for the <code>usage_analytics</code>
+purpose. Completed dispatches then produce local usage estimates; they are not
+provider or billing actuals. Approval for the <code>provider_usage</code> purpose
+is separate, and provider-reported actuals require a verified adapter rather than
+being inferred from tool calls. The <a href="../../workspace/proposals/session-intelligence-activation.md">activation PRD</a>
+tracks implementation evidence and local installation separately.</p>
+<div class="table-scroll" role="region" aria-label="Session Intelligence values" tabindex="0"><table>
+<thead><tr><th>Value</th><th>What it means</th></tr></thead>
+<tbody>
+<tr><td>Recorded events</td><td>Observed activity, including blocked and failed calls. Actual and estimated observations have separate counts. Not a count of tasks or model turns; Reload adds none.</td></tr>
+<tr><td>Usage cost</td><td>Calculated only from complete actual usage and compatible dated rates. Otherwise says Unavailable, not zero.</td></tr>
+<tr><td>Task result</td><td>Accepted or rejected only from comparable causal-outcome evidence. Otherwise says Not verified. Normal usage or a successful Recall does not prove benefit.</td></tr>
+<tr><td>Usage details → actual input / output tokens</td><td>Provider-reported counts. Cached input is already included. A measured zero is zero; missing evidence is UNKNOWN. Local estimates stay separate.</td></tr>
+<tr><td>Suggestions</td><td>Expand to read provisional statements and their supporting counts. An unavailable report is not zero suggestions. Nothing trains a model.</td></tr>
+</tbody></table></div>
+<p>Three summary cards lead. <strong>Usage details</strong> holds token counts,
+estimates, exact cost/outcome evidence, coverage, timestamps and technical reasons.
+<strong>Suggestions</strong> holds the existing hypotheses. Both sections start
+closed; collection failures and pending writes stay visible. Scope is shown above
+the cards: all retained sessions does not mean only this conversation.</p>
+<p><strong>States:</strong> collection off; enabled with no observations;
+estimates-only; unavailable snapshot; pending writes; incomplete capture; or
+permission required. A snapshot-write failure can leave saved events absent from
+the displayed totals. Process health covers only the current owning daemon and
+resets on restart; a standalone snapshot has no live capture-health proof.</p>
+<p>Controls remain in the existing local operator CLI: grant/revoke permission,
+refresh, export, prune and explicitly delete usage. See the
+<a href="../reference/token-intelligence.md#existing-local-controls">control instructions</a>.
+Revocation stops new collection without erasing retained evidence. Prompts,
+transcripts, responses, employee ranking and sensitive-trait inference are excluded.
+Semantic memories and graph data are not changed by usage capture.</p>
 <h2 id="memories-browse-understand-and-correct"><a class="heading-anchor" href="#memories-browse-understand-and-correct">Memory Intelligence: inspect and review</a></h2>
 <p>Memory Intelligence presents every memory node returned from the current snapshot. The
 default graph response is bounded to 1,000 total nodes, so “overall” means the
@@ -894,12 +954,12 @@ necessary.</p>
 </tr>
 </tbody>
 </table></div>
-<p>Clearing Snapshot search returns to overall browsing. Clearing Filter preserves
+<p>Clearing Snapshot search returns to the current Library or Review view. Clearing Filter preserves
 the current Snapshot-search mode but removes the table-only filter.</p>
-<p>Current limitation: when Snapshot search reports zero results, the table can
-fall back to the browse rows. The <code>0 snapshot results</code> line is authoritative;
-those visible browse rows are not matches. Search failures also lack a dedicated
-visible error message in the current UI.</p>
+<p>When Snapshot search reports <code>0 snapshot results</code>, no memory rows
+are displayed. Clear the search to return to browsing.</p>
+<p>A failed Snapshot search shows an error message, not a successful empty
+result. Clear the search to browse the loaded snapshot.</p>
 <h3 id="table-columns"><a class="heading-anchor" href="#table-columns">Table columns</a></h3>
 <div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
@@ -927,7 +987,7 @@ visible error message in the current UI.</p>
 </tr>
 <tr>
 <td>Created</td>
-<td>Creation date</td>
+<td>Source <code>created_at</code>; missing legacy timestamps stay blank</td>
 </tr>
 <tr>
 <td>Vitality</td>
@@ -1043,7 +1103,8 @@ search. It reports:</p>
 <ul>
 <li>lexical match percentage for the typed query;</li>
 <li>rank among the returned snapshot results;</li>
-<li>configured storage source recorded in the snapshot;</li>
+<li>configured storage backend recorded in the snapshot, such as SQLite;
+<strong>Not reported</strong> if absent—not the content's source, such as user input;</li>
 <li>health label and reason;</li>
 <li>explicit inbound/outbound relationships represented in the snapshot.</li>
 </ul>
@@ -1083,12 +1144,18 @@ relationships. Semantic similarity edges do not form reasoning trails.</p>
 <ul>
 <li>grounded trail count;</li>
 <li>old assumptions, derived from deprecated or superseded records;</li>
-<li>explicit safeguards in grounded trails;</li>
+<li>explicit safeguard links in grounded trails, not the number of specification cards;</li>
 <li>semantic topic bridges between memory nodes.</li>
 </ul>
 <p>Choose a trail in <strong>Preserved reasoning</strong>, then choose a memory card to inspect
-its role, source grounding, and named relationships. <strong>Open complete memory</strong>
+its stored type, source, and named relationships. Stored links do not verify a
+memory's truth. <strong>Open complete memory</strong>
 returns to the Memory Intelligence drawer.</p>
+<p>Card order does not imply a link. The relationship rows show each stored
+source → named relationship → target, including branches and circles.
+Click either memory in a row to inspect it.</p>
+<p>In narrow panels, scroll the graph as one surface to reach every card,
+relationship, and the complete-memory action.</p>
 <p><strong>No decision trails yet</strong> does not mean there are no links. It means the
 snapshot has no qualifying explicit memory-to-memory decision/evidence/guard
 component. Topic/entity links and semantic bridges can still exist.</p>
@@ -1265,7 +1332,8 @@ privacy-safe support report. Two operations intentionally live elsewhere:</p>
 <li>product code changes belong to the exact official package.</li>
 </ul>
 <h3 id="product-maintenance-handoff"><a class="heading-anchor" href="#product-maintenance-handoff">Product maintenance handoff</a></h3>
-<p>Home explains, but does not execute, four package operations:</p>
+<p>Home shows status for, but does not execute, four package operations. These
+are installer actions, not dashboard controls:</p>
 <div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
 <tr>
@@ -1378,15 +1446,14 @@ action. Recent receipts shows at most five bounded lifecycle entries.</p>
 </table></div>
 <p>Do not interpret an empty or stale snapshot as proof that the live store is
 empty. Regeneration is a separate explicit action.</p>
-<p>Header-stat and Session Intelligence fetch failures currently log to the browser
-console without a dedicated visible error. Unexpected zero/unknown header
-values or an unexpected <strong>Off by default</strong> panel should therefore be verified
-against <code>/api/stats</code> or <code>/api/session-intelligence</code> before being treated as
-product truth.</p>
+<p>Header-stat failures show <strong>Stats unavailable</strong> instead of stale
+counts. Session Intelligence failures show an unavailable message instead of
+claiming consent is off. <strong>Reload snapshot</strong> retries these reads;
+a successful read clears its error. Other workspaces remain available.</p>
 <h2 id="responsive-and-accessibility-behavior"><a class="heading-anchor" href="#responsive-and-accessibility-behavior">Responsive and accessibility behavior</a></h2>
 <ul>
 <li>At phone width, product identity and status controls occupy separate header
-rows; the example/status label can shrink while theme and Reload remain visible.</li>
+rows; the example/status label can shrink while theme and Reload snapshot remain visible.</li>
 <li>The top tab bar scrolls horizontally on narrow screens.</li>
 <li>The Memory Intelligence table hides secondary columns on narrow screens; the detail
 drawer becomes full-width.</li>
@@ -1395,9 +1462,8 @@ theme control preserves an explicit dark choice in that browser.</li>
 <li>Project dialogs trap keyboard focus and return it to the prior control.</li>
 <li>Correction, Resolve, Remember, assignment, and project dialogs support
 <code>Escape</code>, subject to their in-progress safety locks.</li>
-<li>Current limitation: Related-memory cards in the detail drawer are clickable
-non-button elements, so complete keyboard behavior is not guaranteed by the
-source contract.</li>
+<li>Related-memory links in the detail drawer are named native buttons and can
+be focused and activated from the keyboard.</li>
 </ul>
 <h2 id="privacy-and-security-boundary"><a class="heading-anchor" href="#privacy-and-security-boundary">Privacy and security boundary</a></h2>
 <p>The snapshot is pattern-redacted, not anonymized. It can still contain private
@@ -1423,12 +1489,13 @@ support-report destinations.</p>
 <h2 id="troubleshooting"><a class="heading-anchor" href="#troubleshooting">Troubleshooting</a></h2>
 <h3 id="i-see-an-older-or-simpler-dashboard"><a class="heading-anchor" href="#i-see-an-older-or-simpler-dashboard">I see an older or simpler dashboard</a></h3>
 <p>Confirm the installed build, not only the semantic version in the header. The
-six-workspace, light-default dashboard described here is currently a verified
-source prototype. This work did not replace the installed runtime or publish a
-package. If the dashboard does not show Home, Recall, Memory Intelligence,
-Connections, Projects, and Recover, the running package still owns earlier
-dashboard assets. This is a package-version boundary, not a second Elefante
-product.</p>
+six-workspace, light-default dashboard described here is the current source
+contract and has also been exercised in the local installed candidate. It is not
+proof that every package has the same assets. If the dashboard does not show
+Home, Recall, Memory Intelligence, Connections, Projects, and Recover, read the
+package receipt and Doctor result, then compare the running package with the
+published release it came from. This is a package-version boundary, not a second
+Elefante product.</p>
 <h3 id="home-has-no-operational-receipt"><a class="heading-anchor" href="#home-has-no-operational-receipt">Home has no operational receipt</a></h3>
 <p>Continue with Global understanding if the snapshot is available. If you expected
 live Recall or lifecycle controls, verify the installed Elefante service and use
@@ -1440,7 +1507,7 @@ check requires one exact active project and one question. The page must not
 claim supplied, no match, blocked, or unavailable until that check returns.</p>
 <h3 id="snapshot-is-empty-or-stale"><a class="heading-anchor" href="#snapshot-is-empty-or-stale">Snapshot is empty or stale</a></h3>
 <p>Use <code>elefante-DashboardOpen(refresh=true)</code> from a connected agent to regenerate
-the snapshot, or use the source pipeline below. Header Reload alone cannot
+the snapshot, or use the source pipeline below. Header Reload snapshot alone cannot
 regenerate it.</p>
 <h3 id="graph-says-no-decision-trails-yet"><a class="heading-anchor" href="#graph-says-no-decision-trails-yet">Graph says No decision trails yet</a></h3>
 <p>Inspect Topics and Vitality first. The snapshot can contain many topic, entity,
@@ -1530,7 +1597,7 @@ those live and source-level proofs win; update this guide rather than inventing
 an explanation.</p>
 
         <footer class="doc-footer">
-          <strong>Evidence boundary.</strong> This guide explains current user-visible source and the installed local candidate checked on 2026-08-31. A live receipt and current source win if behavior changes.
+          <strong>Evidence boundary.</strong> This guide explains current user-visible source behavior and the installed local candidate when its receipt is available. A live receipt and current source win if behavior changes.
           <a class="back-to-top" href="#top">Back to top</a>
         </footer>
       </article>
