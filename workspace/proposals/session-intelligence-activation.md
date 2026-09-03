@@ -1,5 +1,5 @@
 ---
-status: locally-activated
+status: released
 owner: Elefante development
 created: 2026-09-03
 ---
@@ -7,7 +7,8 @@ created: 2026-09-03
 # PRD: Activate Session Intelligence on real work
 
 Release follow-through: after local activation, the owner separately authorized
-a new coordinated public release on 2026-09-03. Its current version, publication,
+the coordinated v2.15.0 release on 2026-09-03; publication and installation are
+verified. Its current version, publication,
 installed build and website proofs are maintained in
 [PLANNING §2.3](../PLANNING.md#23-current-release-state). The original bounded
 implementation scope below remains the historical acceptance contract.
@@ -301,11 +302,29 @@ task quality. Never report every capability as proven from the basic path alone.
 | This PRD | Activation requirements, stages and acceptance evidence | Follow it; change requirements explicitly, not through silent implementation drift. |
 | [PLANNING §4.2 and §10](../PLANNING.md) | Status pointer and significant decision/history | Link here; do not duplicate this plan or test logs. |
 | [Proposal index](README.md) and [retained PRD](session-intelligence.md) | Discovery and historical rationale | Link to this active delivery plan; preserve prior implemented boundaries. |
-| [Token reference](../../docs/reference/token-intelligence.md), [architecture](../../docs/reference/architecture.md) and [HTML dashboard guide](../../docs/how-to/view-dashboard.html#session-intelligence) | Actual behavior and user instructions | Update with verified implementation, including activation/control usage and all six values. Never describe this target as already shipped. |
+| [Token reference](../../docs/reference/token-intelligence.md), [architecture](../../docs/reference/architecture.md) and [HTML dashboard guide](../../docs/how-to/view-dashboard.html#session-intelligence) | Actual behavior and user instructions | Update with verified implementation, including activation/control usage and all six values. Describe it as shipped only after verified publication. |
 | [ISSUES](../ISSUES.md) and its existing postmortems | Defects and regression ownership | Record real failures there, not in another backlog. |
+
+### Official release follow-through — 2026-09-03
+
+The original local-only acceptance above is retained as history. The separately
+authorized v2.15.0 release is public and its official macOS package is installed
+at source `2092916e30a3d46dc2e6190dceaed05653b769ed`, channel `release`.
+The verified package receipt completed at `2026-09-03T23:44:53.758788+00:00`;
+Doctor is ready with no diagnostics. Six memories, six graph entities and three
+explicit memory relationships remain represented. Consent remains active.
+
+Real MCP activity appeared in the installed dashboard's local estimate ledger;
+the settled report showed 23 estimated events and zero supplied provider
+observations. Another Reload left 23 events. This is capture/read-only reload
+proof, not 23 completed tasks, complete host usage or measured task benefit.
+The safety backup `elefante_data_backup_20260903_234320.zip` and previous runtime
+`current.backup.20260903_194320` remain available. Publication and cross-surface
+identities are indexed only in [PLANNING §2.3](../PLANNING.md#23-current-release-state).
 
 **Delivery state:** SI-1–SI-5 pass within their recorded boundaries. The owner can
 use Home → Advanced: Session Intelligence at `http://localhost:8000/`; normal MCP
 activity is recorded automatically and Reload rereads the snapshot. Provider
 actuals, billed cost, complete-host coverage and improved task quality remain
-unverified. Public publication is outside this completed local rollout.
+unverified. The separately authorized public release is complete; the original
+local implementation scope was not silently expanded.
