@@ -888,14 +888,39 @@ the specialist workspace explains the evidence. <strong>No action</strong> remai
 valid conclusion when the represented evidence does not justify a change.</p>
 <h3 id="session-intelligence"><a class="heading-anchor" href="#session-intelligence">Session Intelligence</a></h3>
 <p>Session Intelligence remains on Home under the collapsed <strong>Advanced</strong>
-disclosure. It is a <strong>view-only</strong> surface and is <strong>off by default</strong>.
-The dashboard cannot grant consent or ingest usage. Without explicit local consent and a
-derived metadata-only snapshot, Home shows only the disabled explanation.</p>
-<p>When evidence exists, the Signal Card can show event count, provider-actual
-input/output tokens, verified cost when known, accepted-outcome evidence,
-training hypotheses, and explicit unknowns. Provider-actual and estimated usage
-remain separate. Prompts, transcripts, responses, employee ranking, and
-sensitive-trait inference are outside this surface.</p>
+disclosure. It is <strong>view-only</strong>: it explains observed usage, not whether
+Elefante improved a task. The owner requires this capability active, but collection
+still needs local, purpose-bound permission; the dashboard cannot grant it.</p>
+<p><strong>Source candidate, not an installed-version claim:</strong> the
+<a href="../../workspace/proposals/session-intelligence-activation.md">activation PRD</a>
+tracks automatic MCP capture, browser checks and local installation separately.
+After permission, ordinary MCP calls produce local estimates. Actual model usage
+still requires a verified provider adapter; it is not inferred from tool calls.</p>
+<div class="table-scroll" role="region" aria-label="Session Intelligence values" tabindex="0"><table>
+<thead><tr><th>Value</th><th>What it means</th></tr></thead>
+<tbody>
+<tr><td>Recorded events</td><td>Observed activity, including blocked and failed calls. Actual and estimated observations have separate counts. Not a count of tasks or model turns; Reload adds none.</td></tr>
+<tr><td>Usage cost</td><td>Calculated only from complete actual usage and compatible dated rates. Otherwise says Unavailable, not zero.</td></tr>
+<tr><td>Task result</td><td>Accepted or rejected only from comparable causal-outcome evidence. Otherwise says Not verified. Normal usage or a successful Recall does not prove benefit.</td></tr>
+<tr><td>Usage details → actual input / output tokens</td><td>Provider-reported counts. Cached input is already included. A measured zero is zero; missing evidence is UNKNOWN. Local estimates stay separate.</td></tr>
+<tr><td>Suggestions</td><td>Expand to read provisional statements and their supporting counts. An unavailable report is not zero suggestions. Nothing trains a model.</td></tr>
+</tbody></table></div>
+<p>Three summary cards lead. <strong>Usage details</strong> holds token counts,
+estimates, exact cost/outcome evidence, coverage, timestamps and technical reasons.
+<strong>Suggestions</strong> holds the existing hypotheses. Both sections start
+closed; collection failures and pending writes stay visible. Scope is shown above
+the cards: all retained sessions does not mean only this conversation.</p>
+<p><strong>States:</strong> collection off; enabled with no observations;
+estimates-only; unavailable snapshot; pending writes; incomplete capture; or
+permission required. A snapshot-write failure can leave saved events absent from
+the displayed totals. Process health covers only the current owning daemon and
+resets on restart; a standalone snapshot has no live capture-health proof.</p>
+<p>Controls remain in the existing local operator CLI: grant/revoke permission,
+refresh, export, prune and explicitly delete usage. See the
+<a href="../reference/token-intelligence.md#existing-local-controls">control instructions</a>.
+Revocation stops new collection without erasing retained evidence. Prompts,
+transcripts, responses, employee ranking and sensitive-trait inference are excluded.
+Semantic memories and graph data are not changed by usage capture.</p>
 <h2 id="memories-browse-understand-and-correct"><a class="heading-anchor" href="#memories-browse-understand-and-correct">Memory Intelligence: inspect and review</a></h2>
 <p>Memory Intelligence presents every memory node returned from the current snapshot. The
 default graph response is bounded to 1,000 total nodes, so “overall” means the

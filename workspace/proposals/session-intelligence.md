@@ -17,6 +17,13 @@
 > outcome. Raw prompts, responses, transcripts, and hidden reasoning are not
 > stored by default.
 
+**Active delivery plan:** [Session Intelligence activation](session-intelligence-activation.md)
+owns the owner's required-capability rollout and its end-to-end acceptance gates.
+This file remains the retained design record for the implemented foundation;
+[the token reference](../../docs/reference/token-intelligence.md) and current
+source own actual behavior. The activation plan does not make collection enabled
+or alter other users' consent by itself.
+
 ---
 
 ## Question This Spec Answers

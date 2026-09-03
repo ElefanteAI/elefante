@@ -1,8 +1,7 @@
 """Local, privacy-bounded Session Intelligence primitives.
 
-The package is intentionally not wired into the MCP server.  Callers must
-construct a :class:`SessionIntelligenceLedger`, grant an explicit purpose, and
-then submit metadata-only events.
+The MCP server may submit local estimates only after a user-created consent
+ledger exists. Provider-actual events remain explicit host/operator input.
 """
 
 from .ledger import (
@@ -48,7 +47,9 @@ from .ledger import (
     fingerprint_query,
 )
 from .runtime import (
+    DEFAULT_CAPTURE_PENDING_LIMIT,
     DEFAULT_SNAPSHOT_NAME,
+    RuntimeUsageCapture,
     SESSION_DB_ENV,
     SESSION_SNAPSHOT_ENV,
     build_runtime_snapshot,
@@ -64,6 +65,7 @@ __all__ = [
     "ConsentRequiredError",
     "CostResult",
     "DEFAULT_DB_PATH",
+    "DEFAULT_CAPTURE_PENDING_LIMIT",
     "DEFAULT_RETENTION_DAYS",
     "DEFAULT_SNAPSHOT_NAME",
     "EnterpriseReport",
@@ -85,6 +87,7 @@ __all__ = [
     "RateCard",
     "RateCardAuthority",
     "RateCardSnapshot",
+    "RuntimeUsageCapture",
     "SCHEMA_VERSION",
     "SESSION_DB_ENV",
     "SESSION_SNAPSHOT_ENV",

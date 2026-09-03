@@ -19,6 +19,18 @@ def allow_test_memories(monkeypatch):
     monkeypatch.setenv("ELEFANTE_ALLOW_TEST_MEMORIES", "1")
 
 
+@pytest.fixture(autouse=True)
+def isolate_automatic_usage_capture(tmp_path, monkeypatch):
+    """Tests must never append telemetry to a consented customer ledger."""
+    monkeypatch.setenv(
+        "ELEFANTE_SESSION_INTELLIGENCE_DB", str(tmp_path / "unused-session.sqlite3")
+    )
+    monkeypatch.setenv(
+        "ELEFANTE_SESSION_INTELLIGENCE_SNAPSHOT",
+        str(tmp_path / "unused-session-snapshot.json"),
+    )
+
+
 @pytest.fixture
 def isolated_orchestrator(tmp_path, monkeypatch):
     """

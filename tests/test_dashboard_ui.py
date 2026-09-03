@@ -219,11 +219,152 @@ assert.match(failedSessionHtml, /Session Intelligence snapshot unavailable/);
 assert.ok(!failedSessionHtml.includes('Off by default.'));
 
 globalThis.dashboardState = {
-  sessionIntelligence:{consent:{enabled:false}, signal_card:null},
+  sessionIntelligence:{consent:{enabled:false}, signal_card:null, capture:{state:'permission_required', since:'2026-09-03T11:59:00Z', pending_count:0, persisted_count:0, failed_count:0, dropped_count:0, last_error_code:null, coverage:'permission_required'}},
   sessionIntelligenceError:null,
 };
 const disabledSessionHtml = renderToStaticMarkup(React.createElement(SessionIntelligencePanel));
-assert.match(disabledSessionHtml, /Off by default\./);
+assert.match(disabledSessionHtml, /Collection is off\./);
+assert.match(disabledSessionHtml, /Enable local usage permission outside this dashboard/);
+assert.match(disabledSessionHtml, /A previous usage write lacked permission/);
+assert.ok(!disabledSessionHtml.includes('Off by default.'));
+
+const baseSession = {
+  schema_version:1,
+  generated_at:'2026-09-03T12:00:00Z',
+  consent:{enabled:true},
+  signal_card:{
+    card_id:'card-1',
+    scope:{session_id:null, client_name:'Codex', window_start:'2026-09-03T11:00:00Z', window_end:'2026-09-03T12:00:00Z'},
+    usage:{
+      event_count:3,
+      session_count:1,
+      statuses:{success:3},
+      actual:{event_count:0, input_tokens:0, cached_input_tokens:0, uncached_input_tokens:0, output_tokens:0, evidence_class:'UNKNOWN', providers:[]},
+      estimated:{event_count:3, input_tokens:120, output_tokens:45, overhead_tokens:8, average_signal_ratio:0.5, evidence_class:'estimated'},
+    },
+    cost:{status:'unknown', amount:'0', currency:null, evidence_class:'UNKNOWN'},
+    accepted_outcome_evidence:{accepted:null, accepted_outcome_status:'unknown', evidence_class:'UNKNOWN', accepted_count:0, rejected_count:0},
+    unknowns:['Provider actual usage unavailable'],
+    hypothesis:'Investigate repeated context retrieval.',
+  },
+  enterprise_report:null,
+  privacy:{metadata_only:true},
+};
+globalThis.dashboardState = {sessionIntelligence:baseSession, sessionIntelligenceError:null};
+const unknownUsageHtml = renderToStaticMarkup(React.createElement(SessionIntelligencePanel));
+// Keep the default panel short; provenance remains available on demand.
+const summaryHtml = unknownUsageHtml.replace(/<details\b[\s\S]*?<\/details>/g, '');
+assert.match(summaryHtml, /Recorded events/);
+assert.match(summaryHtml, /Usage cost/);
+assert.match(summaryHtml, /Task result/);
+assert.equal((summaryHtml.match(/<strong\b/g) || []).length, 3);
+assert.ok(!summaryHtml.includes('UNKNOWN'));
+assert.ok(!summaryHtml.includes('2026-09-03T'));
+assert.ok(!summaryHtml.includes('Investigate repeated context retrieval.'));
+assert.ok(summaryHtml.replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length <= 80);
+assert.match(unknownUsageHtml, /<details[^>]*><summary[^>]*>Usage details/);
+assert.match(unknownUsageHtml, /<details[^>]*><summary[^>]*>Suggestions/);
+assert.ok(!unknownUsageHtml.includes('<details open'));
+assert.match(unknownUsageHtml, />UNKNOWN<\/strong><span[^>]*>actual input tokens/);
+assert.match(unknownUsageHtml, /Estimated input tokens: 120/);
+assert.match(unknownUsageHtml, /Estimated output tokens: 45/);
+assert.match(unknownUsageHtml, /Estimated overhead tokens: 8/);
+assert.match(unknownUsageHtml, /Scope: All retained sessions/);
+assert.match(unknownUsageHtml, /Window: 2026-09-03T11:00:00.000Z → 2026-09-03T12:00:00.000Z/);
+assert.match(unknownUsageHtml, /Snapshot generated: 2026-09-03T12:00:00.000Z/);
+assert.match(unknownUsageHtml, /No suggestion report available\./);
+assert.ok(!unknownUsageHtml.includes('0</strong><span'));
+assert.ok(!unknownUsageHtml.includes('session-id'));
+assert.match(unknownUsageHtml, /Observation counts: 3 combined · 0 actual · 3 estimated/);
+const allClientsSession = structuredClone(baseSession);
+allClientsSession.signal_card.scope.client_name = null;
+globalThis.dashboardState = {sessionIntelligence:allClientsSession, sessionIntelligenceError:null};
+assert.match(renderToStaticMarkup(React.createElement(SessionIntelligencePanel)), /Client: All observed clients/);
+assert.match(unknownUsageHtml, /<span[^>]*>Recorded events/);
+assert.match(unknownUsageHtml, /Suggestions · unavailable/);
+assert.match(unknownUsageHtml, /No suggestion report available\./);
+assert.ok(!unknownUsageHtml.includes('Statement:'));
+
+const zeroUsageSession = structuredClone(baseSession);
+zeroUsageSession.signal_card.scope.session_id = 'session-id-must-not-render';
+zeroUsageSession.signal_card.usage.estimated.event_count = 2;
+zeroUsageSession.signal_card.usage.actual = {
+  event_count:1, input_tokens:0, cached_input_tokens:0, uncached_input_tokens:0,
+  output_tokens:0, evidence_class:'provider_actual', providers:[{provider:'provider', model:'model'}],
+};
+zeroUsageSession.signal_card.accepted_outcome_evidence = {
+  accepted:true, accepted_outcome_status:'known', evidence_class:'provider_actual', accepted_count:1, rejected_count:0,
+};
+zeroUsageSession.enterprise_report = {
+  purpose:'enterprise_training', aggregation:'tool',
+  scope:{session_id:null, client_name:'Codex', window_start:'2026-09-03T11:00:00Z', window_end:'2026-09-03T12:00:00Z'},
+  groups:[], hypotheses:[], hypotheses_only:true,
+  employee_ranking:false, sensitive_trait_inference:false,
+};
+globalThis.dashboardState = {sessionIntelligence:zeroUsageSession, sessionIntelligenceError:null};
+const zeroUsageHtml = renderToStaticMarkup(React.createElement(SessionIntelligencePanel));
+assert.match(zeroUsageHtml, />0<\/strong><span[^>]*>actual input tokens/);
+assert.match(zeroUsageHtml, />0<\/strong><span[^>]*>actual output tokens/);
+assert.match(zeroUsageHtml, /Suggestions \(0\)/);
+assert.match(zeroUsageHtml, /Causal outcome: UNKNOWN/);
+assert.match(zeroUsageHtml, />Not verified<\/strong><span[^>]*>Task result/);
+assert.match(zeroUsageHtml, /Scope: Selected session/);
+assert.ok(!zeroUsageHtml.includes('session-id-must-not-render'));
+assert.match(zeroUsageHtml, /No suggestions in this report\./);
+
+const hypothesisSession = structuredClone(zeroUsageSession);
+hypothesisSession.signal_card.accepted_outcome_evidence = {
+  accepted:true, accepted_outcome_status:'known', evidence_class:'causally_evaluated', accepted_count:1, rejected_count:0,
+};
+hypothesisSession.enterprise_report.hypotheses = [{
+  hypothesis_id:'hypothesis-id-must-not-render', aggregate_key:'tool-must-not-render',
+  statement:'Aggregate activity may indicate a training opportunity; validate with users before acting.',
+  basis:{event_count:3, actual_event_count:1, estimated_event_count:2, accepted_outcome:'UNKNOWN'},
+  evidence_classes:['provider_actual','local_estimated','UNKNOWN'], hypothesis_only:true,
+}];
+globalThis.dashboardState = {sessionIntelligence:hypothesisSession, sessionIntelligenceError:null};
+const hypothesisHtml = renderToStaticMarkup(React.createElement(SessionIntelligencePanel));
+assert.match(hypothesisHtml, />Accepted<\/strong><span[^>]*>Task result/);
+assert.match(hypothesisHtml, /Suggestions \(1\)/);
+assert.match(hypothesisHtml, /Statement:<\/span> Aggregate activity may indicate a training opportunity; validate with users before acting\./);
+assert.match(hypothesisHtml, /Basis:<\/span> events 3 · provider actual 1 · estimated 2 · accepted outcome UNKNOWN/);
+assert.match(hypothesisHtml, /Observation counts: 3 combined · 1 actual · 2 estimated/);
+assert.ok(!hypothesisHtml.includes('hypothesis-id-must-not-render'));
+assert.ok(!hypothesisHtml.includes('tool-must-not-render'));
+
+const measuredSession = structuredClone(hypothesisSession);
+measuredSession.signal_card.cost = {status:'known', amount:'0', currency:'USD'};
+measuredSession.signal_card.accepted_outcome_evidence.accepted = false;
+globalThis.dashboardState = {sessionIntelligence:measuredSession, sessionIntelligenceError:null};
+const measuredHtml = renderToStaticMarkup(React.createElement(SessionIntelligencePanel));
+assert.match(measuredHtml, />USD 0<\/strong><span[^>]*>Usage cost/);
+assert.match(measuredHtml, />Rejected<\/strong><span[^>]*>Task result/);
+
+const partialSession = structuredClone(baseSession);
+partialSession.capture = {state:'partial', since:'2026-09-03T11:59:00Z', pending_count:0, persisted_count:1, failed_count:2, dropped_count:3, last_error_code:'CAPTURE_FAILED', coverage:'partial'};
+globalThis.dashboardState = {sessionIntelligence:partialSession, sessionIntelligenceError:null};
+const partialHtml = renderToStaticMarkup(React.createElement(SessionIntelligencePanel));
+assert.match(partialHtml, /Capture health: partial · coverage partial · since 2026-09-03T11:59:00.000Z/);
+assert.match(partialHtml, /role="alert"[^>]*>Usage capture or snapshot refresh failed; displayed totals may be incomplete\. Failed: 2 · Dropped: 3\./);
+assert.match(partialHtml.replace(/<details\b[\s\S]*?<\/details>/g, ''), /role="alert"/);
+
+const pendingSession = structuredClone(baseSession);
+pendingSession.capture = {state:'observing', since:'2026-09-03T11:59:00Z', pending_count:2, persisted_count:1, failed_count:0, dropped_count:0, last_error_code:null, coverage:'observing'};
+globalThis.dashboardState = {sessionIntelligence:pendingSession, sessionIntelligenceError:null};
+const pendingHtml = renderToStaticMarkup(React.createElement(SessionIntelligencePanel));
+assert.match(pendingHtml, /Capture health: observing · coverage observing · since 2026-09-03T11:59:00.000Z/);
+assert.match(pendingHtml, /Pending MCP usage: 2 events awaiting persistence; displayed totals are not current until persisted\./);
+assert.match(pendingHtml.replace(/<details\b[\s\S]*?<\/details>/g, ''), /Pending MCP usage: 2/);
+assert.ok(!pendingHtml.includes('Snapshot current'));
+
+const permissionSession = structuredClone(baseSession);
+permissionSession.capture = {state:'permission_required', since:'2026-09-03T11:59:00Z', pending_count:0, persisted_count:0, failed_count:0, dropped_count:0, last_error_code:null, coverage:'permission_required'};
+globalThis.dashboardState = {sessionIntelligence:permissionSession, sessionIntelligenceError:null};
+const permissionHtml = renderToStaticMarkup(React.createElement(SessionIntelligencePanel));
+assert.match(permissionHtml, /Capture health: last write lacked permission · coverage permission_required · since 2026-09-03T11:59:00.000Z/);
+assert.match(permissionHtml, /A previous usage write lacked permission\. Each new call rechecks consent; displayed totals may be incomplete\./);
+assert.match(permissionHtml.replace(/<details\b[\s\S]*?<\/details>/g, ''), /A previous usage write lacked permission/);
+assert.ok(!permissionHtml.includes('Collection is off.'));
 console.log('PASS: honest stats and Session Intelligence render states');
 '''
     result = subprocess.run(

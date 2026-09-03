@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import asyncio
 import json
 import hashlib
 import os
@@ -203,12 +204,21 @@ def create_app(*, elefante: ElefanteMCPServer | None = None) -> Starlette:
     @asynccontextmanager
     async def lifespan(app: Starlette):
         app.state.elefante_server = elefante
+        from src.dashboard.server import app as dashboard_app
+
+        previous_capture_status = getattr(
+            dashboard_app.state, "session_intelligence_capture_status", None
+        )
+        dashboard_app.state.session_intelligence_capture_status = (
+            elefante._session_intelligence_capture.status
+        )
         try:
             async with sessions.run():
                 logger.info("elefante_daemon_started", transport="streamable-http")
                 yield
         finally:
             await elefante.close()
+            dashboard_app.state.session_intelligence_capture_status = previous_capture_status
             logger.info("elefante_daemon_stopped")
 
     async def health(_: Request) -> JSONResponse:
@@ -244,7 +254,7 @@ def create_app(*, elefante: ElefanteMCPServer | None = None) -> Starlette:
             payload = json.loads(body.decode("utf-8"))
             if not isinstance(payload, dict):
                 raise ValueError("Usage event must be a JSON object")
-            result = ingest_runtime_usage(payload)
+            result = await asyncio.to_thread(ingest_runtime_usage, payload)
         except ConsentRequiredError as error:
             return JSONResponse(
                 {"success": False, "error": str(error), "consent_required": True},

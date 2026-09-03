@@ -11,8 +11,23 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Consent-gated automatic MCP usage estimates reuse the existing Session
+  Intelligence ledger and snapshot. A bounded asynchronous writer keeps SQLite
+  waits outside tool responses and exposes incomplete capture without replaying
+  the user's operation. No host/provider usage scraping or semantic-memory writes.
+
 ### Fixed
 
+- Session Intelligence distinguishes unavailable actual usage from measured zero,
+  exposes estimate/provenance and provisional-hypothesis details, and reports
+  missing/broken snapshots and process capture failures without claiming current
+  complete totals. Three readable summary cards lead; token/provenance details and
+  suggestions expand on demand. All six values and Home's Advanced placement remain.
+- Session Intelligence's aggregate-report CLI now advertises the ledger's
+  supported `tool`, `client`, and `day` groups instead of a nonfunctional `status`
+  option. Every advertised grouping has a regression check.
 - GraphConnect persists all advertised relationship types and complete edge
   payloads. Missing endpoints and invalid batches fail before creating orphan
   nodes; repeated identical calls reuse entity and edge identities. Additive

@@ -234,6 +234,25 @@ each one a real evidence owner instead of duplicating it on Home.
 
 ---
 
+<a id="issue-17"></a>
+## Issue #17: Session Intelligence Advertised an Unsupported Group [BUG-071, FIXED LOCALLY]
+
+**Trigger:** Exercise every advertised `enterprise --group-by` option during
+Session Intelligence activation acceptance.
+
+**Root cause:** The CLI allowed `status`; its existing ledger only allows `tool`,
+`client`, and `day`. Default-only tests did not cover this contract mismatch.
+
+**Solution:** Match the CLI choices to the existing ledger. No new grouping
+engine or dashboard control. The regression enumerates advertised choices and
+requires each to return the requested aggregate. It failed on `status` before
+the one-line fix. Test: `tests/test_session_intelligence_cli.py`.
+
+**Boundary:** Local source repair, not installed/released evidence. The dashboard
+continues using its existing tool-grouped aggregate.
+
+---
+
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
 1. **API working ≠ UI working** — test the complete user experience. Issues #2, #4, #5.
