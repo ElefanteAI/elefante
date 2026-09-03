@@ -16,6 +16,8 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Decision Graph draws only stored relationships, with their actual source,
   target, and direction. Adjacent memory cards no longer imply invented links;
   branching, circular, and multiple relationships remain inspectable.
+  Narrow panels scroll the entire graph instead of clipping its fixed-height
+  body below the visible dashboard.
 - Recall distinguishes explicit requested facts from shared topics when using
   saved questions, and recognizes supported paraphrases with the existing local
   model. No new model, dependency, memory rewrite, or project-specific matcher

@@ -298,8 +298,8 @@ export function KnowledgeGraph() {
   );
 
   return (
-    <div className="flex h-full min-h-[460px] flex-col overflow-hidden bg-slate-950">
-      <div className="grid grid-cols-[1fr_auto] border-b border-slate-700 px-6 py-4">
+    <div className="h-full min-h-0 overflow-y-auto bg-slate-950 lg:flex lg:flex-col lg:overflow-hidden">
+      <div className="grid grid-cols-[1fr_auto] border-b border-slate-700 px-6 py-4 lg:shrink-0">
         <div>
           <div className="elefante-mono mb-1 text-[10px] uppercase tracking-[0.24em] text-cyan-500">
             Decision graph
@@ -336,8 +336,8 @@ export function KnowledgeGraph() {
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[286px_minmax(0,1fr)]">
-        <aside className="min-h-0 overflow-y-auto border-b border-slate-700 lg:border-b-0 lg:border-r">
+      <div className="lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[286px_minmax(0,1fr)]">
+        <aside className="border-b border-slate-700 lg:min-h-0 lg:overflow-y-auto lg:border-b-0 lg:border-r">
           <div className="elefante-mono border-b border-slate-800 px-5 py-3 text-[9px] uppercase tracking-[0.2em] text-slate-500">
             Preserved reasoning
           </div>
@@ -374,7 +374,7 @@ export function KnowledgeGraph() {
           })}
         </aside>
 
-        <section className="min-h-0 overflow-y-auto">
+        <section className="lg:min-h-0 lg:overflow-y-auto">
           <div className="border-b border-slate-700 px-5 py-5 sm:px-7">
             <div className="mb-4 flex items-start justify-between gap-6">
               <div>

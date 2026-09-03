@@ -209,6 +209,10 @@ and could reverse a stored edge's direction. Cards now remain selectable without
 implied adjacency; relationship rows render each actual source, label, and
 target. A regression renders the real React component with branches, cycles,
 parallel labels, reordered edges, and excluded semantic/dangling edges.
+The installed 499×694 panel also exposed a 460-pixel graph inside a
+226-pixel clipped parent, leaving only 34 pixels of its detail scroller visible.
+The graph now fits its parent: one vertical scroll surface in narrow panels,
+with the existing split scroll layout retained on wide screens.
 
 **Guard:** Dashboard, snapshot, Home-control, daemon, and routing regressions;
 the production UI build; and live deterministic-example acceptance across all

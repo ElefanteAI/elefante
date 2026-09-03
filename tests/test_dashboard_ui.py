@@ -563,6 +563,14 @@ console.log('PASS: exact branches, direction, cycles, parallel labels, reordered
     assert "PASS: exact branches" in result.stdout
 
 
+def test_decision_graph_scrolls_as_one_surface_in_narrow_panels() -> None:
+    graph = _read("components/KnowledgeGraph.tsx")
+    assert 'className="h-full min-h-0 overflow-y-auto' in graph
+    assert "min-h-[460px]" not in graph
+    assert 'className="lg:grid lg:min-h-0 lg:flex-1' in graph
+    assert '<section className="lg:min-h-0 lg:overflow-y-auto">' in graph
+
+
 def test_dashboard_uses_the_preservation_first_six_workspace_navigation() -> None:
     app = _read("App.tsx")
     tabs = _read("components/TabNav.tsx")
