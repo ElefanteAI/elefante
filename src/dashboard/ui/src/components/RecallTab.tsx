@@ -12,7 +12,7 @@ import type { RecallTestResponse } from '@/types';
 function formatVerifiedAt(value: string | undefined): string {
   if (!value) return 'Not verified';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Verified';
+  if (Number.isNaN(date.getTime())) return 'Not verified';
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -23,13 +23,19 @@ function shortId(value: string): string {
   return value.length > 16 ? `${value.slice(0, 8)}…${value.slice(-6)}` : value;
 }
 
+function recallCompleted(result: RecallTestResponse | null): boolean {
+  return result?.recall_status === 'blocked'
+    || (result?.success === true
+      && (result.recall_status === 'supplied' || result.recall_status === 'no_match'));
+}
+
 function statusCopy(result: RecallTestResponse): {
   label: string;
   summary: string;
   tone: string;
   icon: React.ReactNode;
 } {
-  if (result.recall_status === 'supplied') {
+  if (result.success && result.recall_status === 'supplied') {
     return {
       label: 'Bundle supplied',
       summary: 'Recall selected these memories. Open each record to check whether it helps your task.',
@@ -37,7 +43,7 @@ function statusCopy(result: RecallTestResponse): {
       icon: <CheckCircle2 size={20} className="text-emerald-300" aria-hidden="true" />,
     };
   }
-  if (result.recall_status === 'no_match') {
+  if (result.success && result.recall_status === 'no_match') {
     return {
       label: 'No memories selected',
       summary: 'No eligible memory passed the matching rules. A relevant memory may still exist; inspect the library if you expected one.',
@@ -90,7 +96,8 @@ export function RecallTab() {
     () => new Map((snapshot?.nodes ?? []).filter((node) => node.type === 'memory').map((memory) => [memory.id, memory])),
     [snapshot],
   );
-  const selectedIds = result?.selected_memory_ids ?? [];
+  const recallRan = recallCompleted(result);
+  const selectedIds = recallRan ? result?.selected_memory_ids ?? [] : [];
   const canRun = controlEnabled && Boolean(activeProject) && Boolean(question.trim());
 
   const submit = async (event: FormEvent) => {
@@ -260,10 +267,10 @@ export function RecallTab() {
 
             <div className="mt-5 grid grid-cols-2 border-l border-t elefante-hairline md:grid-cols-4">
               {[
-                [String(result.selected_count ?? selectedIds.length), 'selected memories'],
-                [String(result.conflict_count ?? 0), 'withheld conflicts'],
-                [result.project?.name ?? activeProject?.name ?? 'Unavailable', 'project'],
-                [formatVerifiedAt(result.verified_at), 'verified at'],
+                [recallRan ? String(result.selected_count ?? (result.selected_memory_ids ? selectedIds.length : 'Not reported')) : 'Not reported', 'selected memories'],
+                [recallRan ? String(result.conflict_count ?? 'Not reported') : 'Not reported', 'withheld conflicts'],
+                [recallRan ? result.project?.name ?? 'Not reported' : 'Not verified', 'project'],
+                [recallRan ? formatVerifiedAt(result.verified_at) : 'Not verified', 'verified at'],
               ].map(([value, label]) => (
                 <div key={label} className="min-h-[82px] border-b border-r elefante-hairline p-3">
                   <strong className="block text-sm font-medium text-slate-100">{value}</strong>
@@ -301,7 +308,9 @@ export function RecallTab() {
             <div>
               <h2 className="text-[10px] text-cyan-400 elefante-mono uppercase tracking-[0.14em]">What this proves</h2>
               <p className="mt-2 text-sm leading-relaxed text-slate-400">
-                The current governed Recall path ran for one project and returned the status, selected count and IDs, conflict count, and verification time shown above.
+                {recallRan
+                  ? 'Recall ran for the selected memory scope. This receipt reports selection, not answer quality or task improvement.'
+                  : 'No completed Recall check was verified. Reconnect Home if needed, then run the check again. This is not a no-match result.'}
               </p>
             </div>
             <div>

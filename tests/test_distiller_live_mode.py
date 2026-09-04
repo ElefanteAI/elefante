@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from src.modules.distiller import __main__ as distiller_cli
+from src.modules.distiller.privacy import PrivacyFilter
 from src.modules.distiller.scanner import (
     MAX_WATCH_INTERVAL,
     MIN_WATCH_INTERVAL,
@@ -28,6 +29,38 @@ def _session_info(path: str, *, mtime: float = 1.0, size: int = 1) -> SessionInf
         size_bytes=size,
         modified_at=datetime.fromtimestamp(mtime, tz=timezone.utc),
     )
+
+
+@pytest.mark.parametrize("field", [
+    "api_key", "password", "client_secret", "AWS_SECRET_ACCESS_KEY", "clientSecret",
+    "accessToken", "secret_token", "access_key", "AWS_ACCESS_KEY_ID",
+])
+def test_privacy_scrubs_explicit_secret_fields_before_ingestion(field):
+    secret = "synthetic-credential-" + "x" * 32
+    payload = {"nested": [{field: secret}], "token_count": 42, "public_key": "public fixture"}
+    scrubbed, count, _ = PrivacyFilter().scrub_payload(payload)
+    assert secret not in str(scrubbed)
+    assert count == 1
+    assert scrubbed["token_count"] == 42
+    assert scrubbed["public_key"] == "public fixture"
+    assert payload["nested"][0][field] == secret
+    assert PrivacyFilter().scrub_payload(scrubbed)[:2] == (scrubbed, 0)
+
+
+@pytest.mark.parametrize("prefix", ["sk-", "sk-proj-", "sk-admin-"])
+def test_privacy_scrubs_prefixed_tokens_in_free_text(prefix, caplog):
+    token = prefix + "x" * 40
+    scrubbed, result = PrivacyFilter().scrub("Temporary credential: " + token)
+    assert token not in scrubbed
+    assert result.redactions == 1
+    assert token not in caplog.text
+
+
+def test_privacy_redaction_types_reconcile_across_nested_fields():
+    payload = {"api_key": "x" * 40, "nested": [{"password": "y" * 40}, {"clientSecret": "z" * 40}]}
+    _, count, kinds = PrivacyFilter().scrub_payload(payload)
+    assert count == 3
+    assert kinds == ["CREDENTIAL_FIELD(3)"]
 
 
 def test_watch_detects_new_session_outside_recent_item_cap(tmp_path, monkeypatch):

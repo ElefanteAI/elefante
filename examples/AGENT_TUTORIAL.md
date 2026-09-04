@@ -1,9 +1,9 @@
 # Elefante Agent Tutorial
 
-> **Release:** v2.13.0
+> **Release:** v2.15.1
 > **Audience:** AI agents connected through MCP
 
-Elefante exposes 17 customer tools and 2 lowercase prompts. Tools use
+Elefante exposes 18 customer tools and 2 lowercase prompts. Tools use
 `elefante-PascalCase`; prompts are `elefante-context` and
 `elefante-grounding`.
 
@@ -40,9 +40,13 @@ Compliance Gate.
 
 ## 3. Add durable knowledge
 
+Use this example only if the user has actually confirmed the preference and
+authorized saving it. Search first; do not ingest tutorial text as user knowledge.
+
 ```json
 {
   "action": "add",
+  "invocation_mode": "user_directed",
   "content": "The user prefers concise release updates with verification evidence.",
   "memory_type": "preference",
   "domain": "personal",
@@ -59,13 +63,20 @@ concept, co-activation, authority, and temporal signals.
 Store only information that is durable, attributable, and likely to matter
 again. Do not store secrets, unsupported conclusions, temporary progress, or a
 second copy of existing memory.
+After a successful write, run Recall with a likely future question, such as
+“How should I present a release update?” Report selection or abstention honestly.
+Use the host's exact project/workspace boundary; never invent a prose scope.
 
 ## 4. Update or remove
 
-- Update: `elefante-Memory` with `action="update"`, `memory_id`, and only the
-  fields that should change. Use `supersedes_id` when a newer decision replaces
-  an older one.
-- Delete: `elefante-Memory` with `action="delete"`, `memory_id`, and a reason.
+- Correct: use `elefante-Memory(action="correct")`, the exact `memory_id`, and
+  `correction="edit"`, `"replace"`, `"archive"`, `"restore"`, `"resolve"`, or
+  `"permanent_delete"`. Inspect with `apply=false` first. On authorized apply,
+  supply its exact hashes, reason and verification question. Inspect the final
+  receipt; a planned or attempted write is not completion.
+- Prefer Archive for recoverable removal. Permanent deletion requires separate
+  confirmation and a verified safety backup. Legacy content/lifecycle update
+  and delete calls are not substitutes for this verified correction boundary.
 - Consolidate: start with `action="consolidate"` and `force=false`. Current
   consolidation is deterministic duplicate cleanup, not general automatic
   forgetting.
@@ -83,6 +94,11 @@ second copy of existing memory.
   grounded, mark that claim UNKNOWN.
 
 ## 6. Verify the live surface
+
+In the installed customer product, use a fresh configured host to list its MCP
+tools and call `elefante-SystemStatusGet`, then run a read-only Recall check.
+The following **development-checkout** commands inspect source declarations and
+an isolated protocol handshake; they do not prove that a customer host is connected:
 
 ```bash
 ./.venv/bin/python scripts/ci/list_mcp_tools.py

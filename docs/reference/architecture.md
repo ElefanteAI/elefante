@@ -1,6 +1,6 @@
 # Elefante Architecture
 
-> **Release:** v2.15.0 · **Status:** released product contract
+> **Release:** v2.15.1 · **Status:** released product contract
 
 Elefante is a local persistent-memory service for AI agents. It stores semantic
 memory and explicit relationships, exposes them through MCP, and keeps the
@@ -215,7 +215,7 @@ See [`token-intelligence.md`](token-intelligence.md) and
   `/events/usage`. It supports dated rate cards, outcome records, Signal Cards,
   aggregate training hypotheses, retention, export, and deletion. Prompts,
   transcripts, responses, hidden reasoning, and credentials are invalid input.
-  The [activation source candidate](../../workspace/proposals/session-intelligence-activation.md)
+  The [released activation path](../../workspace/proposals/session-intelligence-activation.md)
   adds a bounded asynchronous writer at the shared MCP boundary after permission;
   it captures local estimates, not provider model usage. Home still reads a
   snapshot, with content-free process health supplied by its owning daemon.

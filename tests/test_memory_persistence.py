@@ -778,6 +778,53 @@ async def test_live_mcp_server_survives_shutdown_regression(tmp_path):
 
 class TestAbsolutePathResolution:
     """Test that absolute paths prevent database amnesia"""
+
+    @pytest.mark.parametrize("selection", ["yaml", "environment"])
+    def test_auxiliary_state_follows_configured_data_root(self, tmp_path, monkeypatch, selection):
+        from src.core import directive_store
+        from src.mcp.server import ElefanteMCPServer
+        from src.utils import config
+        from src.utils.logger import get_logger
+
+        untouched = tmp_path / "account-default"
+        untouched.mkdir()
+        history_name = ElefanteMCPServer._SESSION_HISTORY_FILE
+        original = json.dumps({"kind": "explicit-use-v1", "ids": ["unrelated"]})
+        (untouched / history_name).write_text(original)
+        monkeypatch.setattr(config, "DATA_DIR", untouched)
+        monkeypatch.setattr(directive_store, "DIRECTIVES_FILE", untouched / "directives.json")
+        monkeypatch.setattr(directive_store, "_store", None)
+        monkeypatch.setattr(config, "_config_instance", None)
+        monkeypatch.setattr(config.Config, "_instance", None)
+        monkeypatch.setattr(config.Config, "_config", None)
+        server = object.__new__(ElefanteMCPServer)
+        server.logger = get_logger(__name__)
+
+        for name in ("first", "second"):
+            active = tmp_path / name / "data"
+            configuration = tmp_path / f"{name}.yaml"
+            configuration.write_text(json.dumps({"elefante": {"data_dir": str(active)}}))
+            monkeypatch.setenv("ELEFANTE_CONFIG_PATH", str(configuration))
+            if selection == "environment":
+                configuration.write_text("elefante: {}\n")
+                monkeypatch.setenv("ELEFANTE_DATA_DIR", str(active))
+            else:
+                monkeypatch.delenv("ELEFANTE_DATA_DIR", raising=False)
+            store = directive_store.DirectiveStore(profile="client")
+            assert store._path == active / "directives.json"
+            assert store.user_count() == 0
+            store.add(f"Keep {name} separate")
+            assert directive_store.DirectiveStore(profile="client").user_count() == 1
+            assert directive_store.get_directive_store()._path == active / "directives.json"
+            assert directive_store.get_directive_store().user_count() == 1
+            assert server._load_session_history() == []
+            server._session_usage_history = [name]
+            server._save_session_history()
+            assert server._load_session_history() == [name]
+            assert json.loads((active / history_name).read_text())["ids"] == [name]
+
+        assert (untouched / history_name).read_text() == original
+        assert not (untouched / "directives.json").exists()
     
     def test_config_uses_absolute_paths(self):
         """Verify that config.py uses absolute paths for databases"""

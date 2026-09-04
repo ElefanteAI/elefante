@@ -223,6 +223,36 @@ memories or disabled consent. A later successful read clears only its own error.
 Graph cards show stored memory types; safeguard counts explicitly count links,
 and stored relationships are not presented as verified source truth.
 
+**Failed-Recall receipt recurrence, 2026-09-03:** A result object existed after
+session expiry or request failure, so the Inspector's unconditional proof text
+claimed Recall had run and its missing counts became zero. The presentation now
+distinguishes a completed selection (including withheld conflicts) from an
+unavailable attempt: failed checks show no selection proof, no selected-record
+links, and unreported rather than zero counts. Invalid verification timestamps
+remain unverified. The rendered-component regression
+`test_recall_receipt_renders_only_observed_execution_evidence` covers supplied,
+no-match, blocked, failed, contradictory, missing-time and invalid-time receipts;
+it failed on the original unavailable state before the repair. All 41 dashboard
+UI tests pass locally. Installation and publication are still separate gates.
+
+**First-use recurrence, 2026-09-03:** Registering a project and enabling strict
+mode left the already-open session unbound; Projects had no control for the
+explicit choice its Recall screen demanded. Add `Use for actions` through the
+existing exact-project session grant, with disabled inactive/missing-folder and
+read-only states. Scope changes clear old Recall input and receipts without
+replaying actions or moving memories. Empty Home now recommends Remember, and
+the empty library links back to it. The real-store session-switch regression,
+first-use UI guard, and isolated browser readbacks own proof; no scope rule or
+retrieval threshold changed for this repair.
+
+**Narrow-panel recurrence, 2026-09-04:** At a 319 × 694 CSS viewport a wrapped
+title exhausted the table-height detail panel; its correction controls existed
+in the DOM but could not be reached. The narrow detail panel now uses the whole
+Memory Intelligence tab as its containing block, while desktop retains its
+table-side panel and the global navigation/reconnect controls remain outside it.
+The existing keyboard/layout guard checks both containing blocks; live acceptance
+must verify positive body height and an actual correction dialog, not DOM presence.
+
 **Guard:** Dashboard, snapshot, Home-control, daemon, and routing regressions;
 the production UI build; and live deterministic-example acceptance across all
 six workspaces, both themes, desktop, and 390×844.

@@ -1386,13 +1386,13 @@ class ElefanteMCPServer:
     _SESSION_HISTORY_KIND = "explicit-use-v1"
 
     def _load_session_history(self) -> list[str]:
-        """Load persisted session usage history from DATA_DIR.
+        """Load persisted session usage history from the configured data directory.
 
         Prunes entries older than _SESSION_HISTORY_MAX_AGE_DAYS.
         Returns an empty list on any failure (cold-start safe).
         """
-        from src.utils.config import DATA_DIR
-        path = DATA_DIR / self._SESSION_HISTORY_FILE
+        from src.utils.config import get_config
+        path = Path(get_config().elefante.data_dir).expanduser() / self._SESSION_HISTORY_FILE
         if not path.exists():
             return []
         try:
@@ -1422,9 +1422,9 @@ class ElefanteMCPServer:
             return []
 
     def _save_session_history(self) -> None:
-        """Persist current session usage history to DATA_DIR."""
-        from src.utils.config import DATA_DIR
-        path = DATA_DIR / self._SESSION_HISTORY_FILE
+        """Persist usage history inside the active configured data installation."""
+        from src.utils.config import get_config
+        path = Path(get_config().elefante.data_dir).expanduser() / self._SESSION_HISTORY_FILE
         try:
             payload = {
                 "kind": self._SESSION_HISTORY_KIND,
@@ -3168,11 +3168,11 @@ ritual for a self-contained question, and never store secrets or routine chat.""
                     "memory_written": False,
                 }
             if raw_attachments:
-                from src.utils.config import DATA_DIR
+                from src.utils.config import get_config
 
                 try:
                     attachment_descriptors = AttachmentStore(
-                        DATA_DIR / "attachments"
+                        Path(get_config().elefante.data_dir).expanduser() / "attachments"
                     ).ingest_many(raw_attachments)
                 except AttachmentValidationError as error:
                     return {
@@ -3680,12 +3680,19 @@ ritual for a self-contained question, and never store secrets or routine chat.""
     
     async def _handle_query_graph(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Handle a read-only elefante-GraphQuery tool call."""
-        validate_cypher_query(args["cypher_query"])
+        if not isinstance(args, dict):
+            raise ValueError("GraphQuery arguments must be an object")
+
+        cypher_query = args.get("cypher_query")
+        validate_cypher_query(cypher_query)
+        parameters = args.get("parameters")
+        if parameters is not None and not isinstance(parameters, dict):
+            raise ValueError("GraphQuery parameters must be an object")
+
         # The daemon owns one graph-store instance. Opening the module-level
         # singleton here creates a second handle to the same Kuzu file.
         graph_store = (await self._get_orchestrator()).graph_store
-        # Note: Kuzu doesn't support parameterized queries in current implementation.
-        results = await graph_store.execute_query(args["cypher_query"])
+        results = await graph_store.execute_query(cypher_query, parameters)
         
         return {
             "success": True,

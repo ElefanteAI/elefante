@@ -1,6 +1,6 @@
 # Connect IDEs and Agent Hosts
 
-**Applies to:** v2.13.0
+**Applies to:** v2.15.1
 
 The release installer is the configuration authority. It detects compatible
 hosts and connects all of them to one user-level Elefante daemon. Rerun the
@@ -114,7 +114,7 @@ store every conversation. The maintained repository example is
    ```
 
 2. Restart the host.
-3. Confirm it lists Elefante's 17 tools and 2 prompts.
+3. Confirm it lists Elefante's 18 tools and 2 prompts.
 4. Call `elefante-System(action="status")`.
 5. Run a read-only memory search.
 

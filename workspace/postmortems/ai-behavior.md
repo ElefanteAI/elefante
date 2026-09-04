@@ -126,6 +126,8 @@
 **Solution:** Reconciled release and protocol entrypoints with the published tag, derived the showcase baseline from `src.__version__`, replaced scoring prose from source formulas, labeled dashboard search as snapshot-only, distinguished triggered delivery from general ranking, corrected shipped proposal status/tool counts and Distiller paths, and extended maintained regressions across all affected surfaces. The live HTML-guide recurrence added direct source-checkout subprocess coverage: dashboard scripts bootstrap the repository root, the pipeline parses `--help` before data access, and the generated showcase must pass the maintained strict verifier. The source dashboard now separates a maintenance-only Briefing from the project-scoped Recall Inspector, follows explicit graph edges only, labels Library/Review without grading truth or utility, supports No action, and regression-checks the removed inference copy.
 **Lesson:** Contract tests must reject obsolete claims, not merely freeze yesterday's claim. Publication truth, source behavior, UI language, and reference documentation must agree.
 
+**User-guide recurrence (2026-09-03):** The published documentation entry was a catalogue, and its dashboard link opened HTML source on GitHub. The detailed guide also conflated Home with Recall results, hidden with disabled project controls, and missing with observed provider usage. The correction makes the existing `docs/README.md` a workflow-first user guide, retains and clarifies the HTML reference, explains how to open it, and removes internal-plan/owner-specific wording. Source review and `test_user_guide_explains_the_workflow_before_technical_reference` plus `test_dashboard_user_guide_links_resolve_without_internal_plans` guard the entry flow, all six dashboard sections, local links and anchors. The frozen v2.15.0 tag is not rewritten; the authorized correction's publication state lives in `PLANNING.md §2.7`. Local HTML rendering was blocked by browser policy, so it is not claimed as visually verified.
+
 <a id="issue-14"></a>
 
 ## Issue #14: Task Intelligence Judge Encoded Hidden Implementation Shape [BUG-046, MITIGATED, guarded]
@@ -261,6 +263,23 @@ The focused Recall suites pass 116 tests, including the unchanged cached-model
 cases and the real price/month reproduction. This is bounded functional proof,
 not evidence of universal understanding or representative task-quality lift.
 
+**First-use paraphrase recurrence, 2026-09-03:** A release rule passed its saved
+question and a new “How do we…” question but failed “What checks are needed…”.
+The grammar mistook a procedural noun for an absent factual property. Classify
+procedural questions as methods; recognize single-noun subject questions without
+an auxiliary so an unrecorded supplier is not returned from shared topic words.
+Specification/directive metadata can establish that a record is a rule or
+constraint, but cannot establish an unrelated requested fact. No embedding,
+margin, scope, privacy or conflict threshold changed. Four of eight preregistered
+release/import cases failed before the correction; all eight pass afterwards,
+with the prior selection suite unchanged. Independent review caught plural
+category handling; the full suite then caught an overbroad category exception.
+A type label establishes only an unqualified rule/constraint category, not a
+qualified property such as staffing constraints. The final 150 focused tests
+(56 cached-model cases) preserve the failed cases and eight singular/plural
+positive/negative checks. These consumed regressions are not a new holdout or
+outcome-lift claim.
+
 <a id="issue-16"></a>
 
 ## Issue #16: Retrieval Exposure Was Mistaken for Memory Use [BUG-048, FIXED in development, guarded]
@@ -353,6 +372,16 @@ not evidence of universal understanding or representative task-quality lift.
 **Solution:** Scrub the complete GraphConnect request before any entity or relationship write, scrub the complete ETLProcess result before it leaves the server, and scrub every ETLClassify enrichment field before persistence. Return only redaction counts and detector types so clients can see that filtering occurred without receiving the secret.
 **Guard:** `pytest tests/test_mcp_daemon.py -k "graph_connect_scrubs or etl_process_scrubs or etl_classify_scrubs" -q` proves response, persistence, nested-property, and metadata behavior with adversarial positive controls.
 **Lesson:** Privacy is an end-to-end data-flow property. Every ingress, persistence, and egress boundary must scrub the complete nested payload, including old records and agent-authored metadata.
+
+**Detector recurrence, 2026-09-03:** Traversing nested values removed the field
+name needed to identify an unprefixed credential; the token expression also
+missed hyphenated project/admin tokens. Explicit secret-field detection now
+preserves key context, accepts common separator/CamelCase forms, and leaves
+benign counters and public-key fields unchanged. Nested redaction-type counts
+reconcile with the total, and a second scrub is idempotent. Thirteen added
+synthetic regressions and seven existing MCP privacy-boundary tests pass.
+This is bounded pattern detection, not a guarantee for every secret format;
+users must still never submit credentials as memories.
 
 <a id="issue-26"></a>
 

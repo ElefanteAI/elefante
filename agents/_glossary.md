@@ -1,6 +1,6 @@
 ---
 PROTOCOL: glossary
-PROTOCOL_VERSION: 2.15.0
+PROTOCOL_VERSION: 2.15.1
 LOAD_WHEN: Resolving a codename used in any `agents/*.md` protocol.
 DIAGNOSTIC_QUESTION: "What real operation does this codename map to?"
 LAYER: 1 (friction, not security — see workspace/PLANNING.md §2.5)

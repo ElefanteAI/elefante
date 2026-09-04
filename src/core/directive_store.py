@@ -15,7 +15,7 @@ Active directives are injected into normal product-operation responses.
 System, dashboard, and directive-management responses use a minimal path and
 do not recursively inject them.
 
-Storage: ~/.elefante/data/directives.json (simple JSON file).
+Storage: directives.json inside the configured Elefante data directory.
 Loaded once at server init, cached in memory, persisted on mutation.
 """
 
@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from src.utils.config import DATA_DIR
+from src.utils.config import DATA_DIR, get_config
 from src.utils.logger import get_logger
 from src.utils.runtime_profile import CLIENT_PROFILE, runtime_profile
 
@@ -164,7 +164,7 @@ class DirectiveStore:
     """
 
     def __init__(self, path: Optional[Path] = None, *, profile: Optional[str] = None):
-        self._path = path or DIRECTIVES_FILE
+        self._path = Path(path) if path is not None else Path(get_config().elefante.data_dir).expanduser() / "directives.json"
         self._profile = profile or runtime_profile()
         self._directives: List[Directive] = []
         self._system_directives: List[Directive] = self._build_system_directives()
@@ -294,8 +294,9 @@ _store: Optional[DirectiveStore] = None
 
 
 def get_directive_store() -> DirectiveStore:
-    """Get the global DirectiveStore singleton."""
+    """Get the singleton for the active configured data installation."""
     global _store
-    if _store is None:
+    expected_path = Path(get_config().elefante.data_dir).expanduser() / "directives.json"
+    if _store is None or _store._path != expected_path:
         _store = DirectiveStore()
     return _store

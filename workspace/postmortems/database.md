@@ -111,6 +111,12 @@ remain separate integration gates. No customer memories were rewritten.
 **Guard:** `pytest tests/test_dashboard_serializer.py -k "graph_query_validator" -v`.
 **Lesson:** Enforce capability policy at the client boundary; enforcing it in a shared internal primitive silently breaks legitimate maintenance work.
 
+**Parameter recurrence, 2026-09-03:** The tool schema advertised parameters but
+the handler discarded them. It now validates the parameter object and forwards
+it to the owning graph store without interpolation. The real temporary-Kuzu
+regression `test_graph_query_forwards_parameters_and_preserves_read_only_boundary`
+selects the requested ID and verifies that a mutation attempt leaves one node.
+
 <a id="issue-10"></a>
 
 ## Issue #10: Fresh Runner Test Required a Retired Chroma Directory [BUG-036, FIXED, guarded]

@@ -49,6 +49,7 @@ export function MemoriesTab() {
   const mode = query.trim().length >= 2 ? 'search' : 'browse';
   const workspaceView = useDashboardStore((s) => s.memoryWorkspaceView);
   const setWorkspaceView = useDashboardStore((s) => s.setMemoryWorkspaceView);
+  const setActiveTab = useDashboardStore((s) => s.setActiveTab);
   
   const isLoading = useDashboardStore((s) => s.isLoading);
   const getMemoryNodes = useDashboardStore((s) => s.getMemoryNodes);
@@ -132,15 +133,18 @@ export function MemoriesTab() {
         <div className="text-center max-w-md">
           <h2 className="text-xl font-semibold text-slate-200 mb-2">No memories</h2>
           <p className="text-slate-400 text-sm">
-            Add memories via your IDE or MCP tool to see them here.
+            Use Remember on Home, or ask your connected agent to save one useful decision.
           </p>
+          <button type="button" onClick={() => setActiveTab('overview')} className="mt-4 min-h-11 border border-cyan-400/60 px-4 text-xs text-cyan-100">
+            Open Home
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="relative h-full flex flex-col">
       <header className="flex flex-col gap-4 border-b border-slate-700/60 bg-slate-900/35 px-5 py-4 lg:flex-row lg:items-end lg:justify-between lg:px-7">
         <div>
           <div className="text-[10px] text-cyan-400 elefante-mono uppercase tracking-[0.18em]">Memory Intelligence</div>
@@ -233,7 +237,7 @@ export function MemoriesTab() {
       </div>
 
       {/* Memory Table + Detail Panel */}
-      <div className="flex-1 overflow-hidden relative">
+      <div className="flex-1 overflow-hidden sm:relative">
         <MemoryTable
           memories={visibleMemories}
           selectedId={selectedId}

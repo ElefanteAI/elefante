@@ -29,6 +29,10 @@ def test_memory_keyboard_controls_share_the_visible_state_and_respect_dialogs() 
     detail = _read("components/MemoryDetailPanel.tsx")
     assert 'className="absolute right-0 top-0' in detail
     assert 'className="fixed right-0 top-0' not in detail
+    # At narrow widths the panel must use the whole tab, not the remaining
+    # table height: a wrapped title can otherwise leave its body zero-height.
+    assert 'className="relative h-full flex flex-col"' in memories
+    assert 'className="flex-1 overflow-hidden sm:relative"' in memories
     assert '!e.defaultPrevented' in detail
 
 
@@ -896,6 +900,81 @@ def test_home_summary_is_compact_snapshot_evidence_not_a_random_memory_story() -
     assert "Snapshot evidence" not in overview
 
 
+def test_recall_receipt_renders_only_observed_execution_evidence() -> None:
+    node = shutil.which("node")
+    if not node or not (UI_SRC.parent / "node_modules/react-dom").is_dir():
+        pytest.skip("Requires the dashboard's installed Node dependencies")
+    script = f"const recallUrl = {(UI_SRC / 'components/RecallTab.tsx').as_uri()!r};\n" + r'''
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+import assert from 'node:assert/strict';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+const moduleUrl = code => 'data:text/javascript;base64,' + Buffer.from(code).toString('base64');
+const replaceImport = (code, name, target) => code
+  .replaceAll(`from '${name}'`, 'from ' + JSON.stringify(target))
+  .replaceAll(`from "${name}"`, 'from ' + JSON.stringify(target));
+let compiled = ts.transpileModule(readFileSync(new URL(recallUrl), 'utf8'), {
+  compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX},
+}).outputText;
+compiled = replaceImport(compiled, 'react', import.meta.resolve('react'));
+compiled = replaceImport(compiled, 'react/jsx-runtime', import.meta.resolve('react/jsx-runtime'));
+compiled = replaceImport(compiled, '@/store', moduleUrl('export const useDashboardStore = pick => pick(globalThis.recallState);'));
+compiled = replaceImport(compiled, 'lucide-react', moduleUrl('export const AlertTriangle=()=>null, CheckCircle2=()=>null, CircleSlash2=()=>null, Loader2=()=>null, SearchCheck=()=>null;'));
+const {RecallTab} = await import(moduleUrl(compiled));
+const project = {project_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',name:'Atlas',active:true,root_status:'available'};
+const render = result => {
+  globalThis.recallState = {
+    controlEnabled:true,activeProjectId:project.project_id,projectRegistry:{projects:[project]},
+    snapshot:{nodes:[{id:'decision-a',type:'memory',name:'Stored decision'}]},
+    recallQuestion:'Which decision applies?',recallResult:result,
+  };
+  return renderToStaticMarkup(React.createElement(RecallTab));
+};
+const observed = {
+  success:true,recall_status:'supplied',project,verified_at:'2026-09-03T12:00:00Z',
+  selected_count:1,selected_memory_ids:['decision-a'],conflict_count:0,
+};
+const supplied = render(observed);
+assert.match(supplied, /Bundle supplied/);
+assert.match(supplied, /Stored decision/);
+assert.match(supplied, /Recall(?: path)? ran/);
+const empty = render({...observed,recall_status:'no_match',selected_count:0,selected_memory_ids:[]});
+assert.match(empty, /No memories selected/);
+assert.match(empty, /A relevant memory may still exist/);
+assert.match(empty, /Recall(?: path)? ran/);
+const blocked = render({...observed,success:false,recall_status:'blocked',selected_count:0,selected_memory_ids:[],conflict_count:2});
+assert.match(blocked, /Delivery blocked/);
+assert.match(blocked, /Recall(?: path)? ran/); // A withheld bundle is still a completed selection.
+for (const failure of [
+  {success:false,recall_status:'unavailable',error:'Session expired'},
+  {...observed,success:false,recall_status:'unavailable',error:'Request unavailable'},
+  {...observed,success:false,error:'Request failed'},
+]) {
+  const html = render(failure);
+  assert.match(html, /Recall unavailable/);
+  assert.match(html, /No completed Recall check was verified/);
+  assert.doesNotMatch(html, /Recall(?: path)? ran|Selected records|Stored decision|Bundle supplied/);
+  assert.match(html, /Not verified/);
+  assert.match(html, /Not reported/);
+  assert.doesNotMatch(html, />0<|>1<|>2</); // Failure is not a measured zero.
+}
+const invalidTime = render({...observed,verified_at:'not-a-date'});
+assert.match(invalidTime, /Not verified/);
+assert.doesNotMatch(invalidTime, />Verified</);
+const noTime = render({...observed,verified_at:undefined});
+assert.match(noTime, /Not verified/);
+const noResult = render(null);
+assert.doesNotMatch(noResult, /Current Recall Check|What this proves/);
+console.log('PASS: Recall execution, absence, conflict, failure and missing-time evidence');
+'''
+    result = subprocess.run(
+        [node, "--input-type=module", "-e", script],
+        cwd=UI_SRC.parent, capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_recall_never_claims_proof_before_a_live_result_exists() -> None:
     recall = _read("components/RecallTab.tsx")
 
@@ -957,6 +1036,9 @@ def test_connections_names_snapshot_metrics_without_truth_claims() -> None:
     assert "label: 'Vitality'" in connections
     assert "Stored vitality & type breakdown" in connections
     assert "Stored vitality distribution" in vitality
+    assert "0–100 snapshot score combining age, memory type and recorded use" in vitality
+    assert "does not measure truth or usefulness for your task" in vitality
+    assert "does not require a correction or delete a memory" in vitality
     assert "Highest vitality memories" in vitality
     assert "avg vitality" in topics
     assert "avg score" not in topics
@@ -1202,6 +1284,22 @@ def test_direct_localhost_home_establishes_its_own_bounded_session() -> None:
     assert "browser connector" not in (home + store + app).casefold()
     assert "8000" not in home + app
     assert "8001" not in home + app
+
+
+def test_first_use_has_an_explicit_scope_and_empty_memory_route() -> None:
+    projects = _read("components/ProjectsTab.tsx")
+    memories = _read("components/MemoriesTab.tsx")
+    home = _read("components/HomeStatePanel.tsx")
+    assert "initializeControlSession(selected.project_id)" in projects
+    assert "registry?.mode === 'strict' && !isManaging && !controlConnecting" in projects
+    assert "!canUse || isCurrent || !project.active || project.root_status === 'missing'" in projects
+    assert "Current scope' : 'Use for actions" in projects
+    assert "This does not move memories" in projects
+    assert "Use Remember on Home" in memories
+    assert "onClick={() => setActiveTab('overview')}" in memories
+    assert "projectReady && memories.length === 0" in home
+    assert "Remember one useful decision" in home
+    assert "if (nextAction.remember)" in home
 
 
 def test_home_remember_and_manual_recall_are_project_safe_verified_actions() -> None:

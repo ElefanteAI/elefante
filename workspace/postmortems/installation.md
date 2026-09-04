@@ -359,6 +359,47 @@ Arbitrary names, free text, paths, and next actions remain excluded; interrupted
 **Lesson:** A privacy projection must be tested with the real producer output.
 An allowlisted receipt is not product proof if valid fields disappear silently.
 
+## Issue #28: Historical MCP Canary Used An Unsequenced Handshake
+
+**Trigger:** PR #33 passed the maintained suite but its separate historical
+task-032 known-fix canary failed. The original fixture also passed six local
+repetitions, so the CI failure alone did not establish a product regression.
+**Harness defect:** The fixture piped initialization, the initialized notification,
+and tool discovery together, then closed stdin before awaiting responses. This
+violates the intended handshake order and permits startup/EOF races. The exact
+discarded CI subprocess failure is unknown; do not present that inference as a
+captured traceback.
+**Correction:** Use the existing MCP SDK client to await initialization, await
+tool discovery, and only then close the transport. Keep the 30-second bound,
+real server, isolated home, setup/uninstall commands, and every product assertion.
+The fixture digest and review are renewed; historical consumed outcomes are not
+rescored or promoted by this harness correction.
+**Guard:** All nine historical canaries must still reject their base and accept
+their exact known fix. Exact-head CI remains the publication gate.
+**Prevention:** Test a stateful protocol in its valid message order. A working
+local run does not excuse an invalid test client or prove clean-runner behavior.
+
+## Issue #29: CI Repeated Model Metadata Requests Until Rate-Limited
+
+**Trigger:** The second PR #33 Python run remained in the test suite for ten
+minutes. Its captured output showed repeated Hugging Face HTTP 429 responses
+and exponential retries while loading the same `thenlper/gte-base` model.
+**Root cause:** Real-model tests repeatedly checked remote metadata; test success
+and duration depended on a shared runner's external rate limit.
+**Correction:** CI loads the actual configured model once into an explicit
+runner-local cache, then runs the unchanged tests and canaries offline. Download
+failure remains a failure, not a skip; preload and test phases are time-bounded.
+No customer runtime or model was replaced with a fixture.
+The job-level cache path uses `github.workspace`; `runner.temp` is unavailable
+in that expression scope. Valid YAML alone does not prove an Actions workflow
+can compile. The corrected workflow passes Actionlint 1.7.12; the release
+pipeline's 22 regression tests pass without changing the offline model contract.
+**Guard:** `test_quality_loads_real_model_once_before_offline_tests` enforces the
+single network-enabled preload before the real offline suite. Exact-head CI
+must still pass; upstream model availability is not inferred from a local cache.
+**Prevention:** Separate dependency acquisition from behavioral tests. A green
+local cache is not permission to ignore hosted-runner network failures.
+
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
 The five most-recurring rules from the issues above:

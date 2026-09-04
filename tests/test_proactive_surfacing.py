@@ -568,6 +568,26 @@ def cached_cue_embeddings():
 # legitimately inform a dinner recommendation. Expected IDs were fixed before
 # running the model; do not rewrite the cues to make a failed question pass.
 _CUE_PARAPHRASE_CASES = [
+    # First-use browser recurrence: procedural questions were mistaken for
+    # missing factual properties. Keep the original cue and negative controls.
+    (
+        "release-workflow",
+        [("Elefante release artifacts must be built from a clean source commit, verified against published checksums, and installed through the package installer. Never patch the installed runtime as source.",
+          "How should we verify and install an Elefante release?")],
+        [("What checks are needed before replacing our installed Elefante package?", [0]),
+         ("How do we safely upgrade Elefante from the official release archives?", [0]),
+         ("What price is charged for an Elefante release?", []),
+         ("Who approves the Elefante release artifacts?", [])],
+    ),
+    (
+        "import-workflow",
+        [("Before importing survey responses, validate the CSV headers and reject rows with missing participant identifiers.",
+          "How should survey responses be validated before import?")],
+        [("Which checks should we perform before importing survey responses?", [0]),
+         ("What steps should we follow to validate survey CSV rows?", [0]),
+         ("Which supplier provides our survey responses?", []),
+         ("How many survey responses were imported yesterday?", [])],
+    ),
     (
         "cooking",
         [
@@ -692,11 +712,22 @@ _CUE_PARAPHRASE_CASES = [
           "scope; favor small, useful changes that reduce recurring effort.",
           "What staffing and maintenance constraints should shape Elefante's next feature?")],
         [("What is Elefante for?", [0]),
+         ("How does Elefante improve the work an AI agent does?", [0]),
+         ("What does Elefante bring to an agent's current task?", [0]),
+         ("Explain how Elefante improves task quality.", [0]),
          ("How should Elefante's dashboard help its users, and what should it avoid?", [1]),
          ("What staffing and maintenance constraints should shape Elefante's next feature?", [2]),
          ("How much does Elefante's dashboard cost?", []),
          ("Where is Elefante's dashboard hosted?", []),
          ("How do I bake sourdough bread?", [])],
+    ),
+    (
+        "coffee-process",
+        [("Aster reduces coffee waste by weighing each dose before brewing.",
+          "How does Aster prevent wasted coffee?"),
+         ("Aster's coffee waste report uses the copper template for the accounts team.",
+          "Which template should the coffee waste report use?")],
+        [("How does Aster reduce coffee waste?", [0])],
     ),
     (
         "tickets",
@@ -706,6 +737,31 @@ _CUE_PARAPHRASE_CASES = [
           "When does the concert start?")],
         [("Which ticket format do I prefer?", [0]),
          ("What ticket price do I usually pay?", [])],
+    ),
+    (
+        "index-mechanism",
+        [("The event index persists records by validating each event and writing the normalized row to SQLite before the query layer reads it.",
+          "Which database should the event index use?")],
+        [("How does the event index persist records?", [0])],
+    ),
+    (
+        "import-mechanism",
+        [("The event import processes CSV records by parsing each row, normalizing fields, and rejecting malformed rows.",
+          "Which format should the event import accept?")],
+        [("How does the event import process CSV records?", [0])],
+    ),
+    (
+        "schema-mechanism",
+        [("The event index enforces its schema by validating fields before writing normalized rows to SQLite.",
+          "Which schema should the event index use?")],
+        [("How does the event index enforce its schema?", [0])],
+    ),
+    (
+        "property-only",
+        [("Use SQLite for the event index.", "Which database should the event index use?"),
+         ("The event import accepts CSV format.", "Which format should the event import accept?")],
+        [("How does the event index persist records?", []),
+         ("How does the event import process CSV records?", [])],
     ),
     (
         "vocabulary",

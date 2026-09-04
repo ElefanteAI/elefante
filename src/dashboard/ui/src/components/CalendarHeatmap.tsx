@@ -109,6 +109,11 @@ export function CalendarHeatmap() {
         {/* Score Stats + Distribution */}
         <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-5 space-y-4">
           <h3 className="text-sm font-semibold text-slate-200">Stored vitality distribution</h3>
+          <p className="text-xs leading-relaxed text-slate-400">
+            A 0–100 snapshot score combining age, memory type and recorded use.
+            It does not measure truth or usefulness for your task. A low score alone
+            does not require a correction or delete a memory.
+          </p>
 
           {/* KPI row */}
           <div className="grid grid-cols-3 gap-3">

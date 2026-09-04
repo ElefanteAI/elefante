@@ -1,4 +1,4 @@
-# MCP Tools and Prompts (published v2.15.0 baseline; current source)
+# MCP Tools and Prompts (published v2.15.1 baseline; current source)
 
 ## 1. Natural Language Interaction
 
@@ -87,7 +87,7 @@ the verified `elefante-Recover` surface documented below. Memory operations use 
 
 #### `elefante-Recall`
 
-**Status**: Released and default-on in v2.15.0.
+**Status**: Released and default-on in v2.15.1.
 
 **Purpose**: Give an answering agent the smallest governed durable context for
 one question without exposing the broad search or mutation interface.
@@ -206,7 +206,7 @@ developer evaluation profile; it is not a normal customer operation.
 - `force_new=true` should be rare. It skips title deduplication, preference merge, and high-similarity redundancy checks.
 - Use `specification` for durable architecture or contract truths. Use
   `directive` for behavioral rules. Use `note` only for short-lived context.
-  Governance fields are part of the v2.15.0 customer contract.
+  Governance fields are part of the v2.15.1 customer contract.
 - In local strict project mode, Elefante resolves the workspace
   before opening the stores and overwrites project/workspace/scope metadata with
   that registered identity. Missing or ambiguous context, an unavailable root,

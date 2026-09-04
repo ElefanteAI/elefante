@@ -140,6 +140,9 @@ function ProjectRow({
   onEdit,
   onToggle,
   onRemove,
+  onUse,
+  isCurrent,
+  canUse,
 }: {
   project: RegisteredProject;
   canManage: boolean;
@@ -147,6 +150,9 @@ function ProjectRow({
   onEdit: (project: RegisteredProject) => void;
   onToggle: (project: RegisteredProject) => void;
   onRemove: (project: RegisteredProject) => void;
+  onUse: (project: RegisteredProject) => void;
+  isCurrent: boolean;
+  canUse: boolean;
 }) {
   const actionDisabled = !canManage || isManaging;
   const activationDisabled = actionDisabled
@@ -185,7 +191,16 @@ function ProjectRow({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 sm:flex sm:shrink-0">
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:flex-wrap">
+        <button
+          type="button"
+          onClick={() => onUse(project)}
+          disabled={!canUse || isCurrent || !project.active || project.root_status === 'missing'}
+          aria-label={isCurrent ? `${project.name} is the current action scope` : `Use ${project.name} for actions`}
+          className="min-h-10 border border-cyan-500/50 px-3 py-2 text-[10px] text-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {isCurrent ? 'Current scope' : 'Use for actions'}
+        </button>
         <button
           type="button"
           onClick={() => onEdit(project)}
@@ -232,6 +247,9 @@ export function ProjectsTab() {
   const registry = useDashboardStore((state) => state.projectRegistry);
   const snapshotContext = useDashboardStore((state) => state.snapshot?.snapshot_context);
   const controlEnabled = useDashboardStore((state) => state.controlEnabled);
+  const controlConnecting = useDashboardStore((state) => state.controlConnecting);
+  const activeProjectId = useDashboardStore((state) => state.activeProjectId);
+  const initializeControlSession = useDashboardStore((state) => state.initializeControlSession);
   const setActiveTab = useDashboardStore((state) => state.setActiveTab);
   const isManaging = useDashboardStore((state) => state.isProjectManaging);
   const projectError = useDashboardStore((state) => state.projectError);
@@ -511,7 +529,7 @@ export function ProjectsTab() {
           <div className="flex flex-col gap-2 border-b elefante-hairline px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div>
               <h2 className="text-[10px] text-slate-200 elefante-mono uppercase tracking-[0.16em]">Registered projects</h2>
-              <p className="mt-1 text-[11px] text-slate-600">Stable identity follows the registration through a rename or move.</p>
+              <p className="mt-1 text-[11px] text-slate-600">After enabling strict mode, choose Use for actions to bind this session. This does not move memories.</p>
             </div>
             {isManaging && <span className="text-[9px] text-amber-300 elefante-mono uppercase tracking-[0.12em]">Saving…</span>}
           </div>
@@ -537,6 +555,9 @@ export function ProjectsTab() {
                   onEdit={openForm}
                   onToggle={toggleProject}
                   onRemove={openRemove}
+                  onUse={(selected) => void initializeControlSession(selected.project_id)}
+                  isCurrent={controlEnabled && activeProjectId === project.project_id}
+                  canUse={canManage && registry?.mode === 'strict' && !isManaging && !controlConnecting}
                 />
               ))}
             </div>

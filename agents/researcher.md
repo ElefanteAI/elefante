@@ -1,7 +1,7 @@
 ---
 PROTOCOL: researcher
 INVOKE: elefante-researcher
-PROTOCOL_VERSION: 2.15.0
+PROTOCOL_VERSION: 2.15.1
 LOAD_WHEN: The current **line of attack** is suspect — illogical, premature, overfit, or under-evidenced. Explicit mode declaration "RESEARCH mode on". A failed sanity check on the *approach itself*, not on a single step within it.
 DIAGNOSTIC_QUESTION: "Is the current line of attack actually grounded, or am I overfitting to a weak assumption?"
 AUTHORITY: This file owns RESEARCH mode. No version bump, release claim, or "done" claim may emerge from this mode.

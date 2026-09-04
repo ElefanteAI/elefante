@@ -148,6 +148,7 @@ export function HomeStatePanel() {
     reason: string;
     tab: Tab;
     memoryView?: 'library' | 'review';
+    remember?: boolean;
   } = {
     label: 'Browse Memory Intelligence',
     reason: 'Start with the complete memory inventory and its direct review signals.',
@@ -167,6 +168,13 @@ export function HomeStatePanel() {
       reason: 'Global inspection works now. A project is required only for task-scoped Recall and changes.',
       tab: 'projects',
     };
+  } else if (projectReady && memories.length === 0) {
+    nextAction = {
+      label: 'Remember one useful decision',
+      reason: 'Save durable guidance, then verify that Recall can supply it.',
+      tab: 'overview',
+      remember: true,
+    };
   } else if (projectReady) {
     nextAction = {
       label: 'Test Recall for one task',
@@ -183,6 +191,10 @@ export function HomeStatePanel() {
   };
 
   const continueToNext = () => {
+    if (nextAction.remember) {
+      setMemoryDialog('remember');
+      return;
+    }
     if (nextAction.memoryView) {
       setSearchQuery('');
       setInspectedMemoryId(null);

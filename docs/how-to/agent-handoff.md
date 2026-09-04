@@ -3,13 +3,13 @@
 This procedure connects an existing MCP-capable agent host to Elefante. The
 host owns the model-driven goal, planning, tool choice, observation, reflection,
 stopping, cost, and approval decisions; Elefante supplies the persistent memory
-layer. Released customers should use the v2.13.0 platform installer; source and
+layer. Released customers should use the v2.15.1 platform installer; source and
 Docker instructions are separate developer/community paths.
 
 ## Customer path
 
-1. Download the v2.13.0 archive for the customer's platform from the
-   [GitHub release](https://github.com/ElefanteAI/elefante/releases/tag/v2.13.0).
+1. Download the v2.15.1 archive for the customer's platform from the
+   [GitHub release](https://github.com/ElefanteAI/elefante/releases/tag/v2.15.1).
 2. Verify the archive against `SHA256SUMS` from the same release.
 3. Extract it and run the platform launcher described in
    [`install.md`](install.md).
@@ -22,7 +22,7 @@ storage-free bridge are the supported customer topology.
 
 ## Verify the connection
 
-Ask the host to list Elefante's MCP surface. The released contract is 17 tools
+Ask the host to list Elefante's MCP surface. The released contract is 18 tools
 and 2 prompts; see [`../reference/tools.md`](../reference/tools.md).
 
 Then perform a non-destructive check:

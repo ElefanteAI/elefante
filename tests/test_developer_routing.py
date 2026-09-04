@@ -106,7 +106,7 @@ def test_active_proposals_do_not_restate_pre_v213_product_state() -> None:
     assert "current published release" in integration
     assert "Published customer release: see [the living release state]" in north_star
     assert "four-action-product-lifecycle.md" in proposal_index
-    assert "APPROVED / LOCAL PRODUCT LOOP IMPLEMENTED" in proposal_index
+    assert "SHIPPED CORE / FULL ACCEPTANCE PENDING" in proposal_index
     assert "PROPOSED — one-operator self-service product shell" not in proposal_index
 
 
@@ -309,7 +309,7 @@ def test_released_installer_record_is_not_active_task_context() -> None:
     proposals_index = _read("workspace/proposals/README.md")
     tasks = _read("benchmarks/task_intelligence/tasks.json")
 
-    design_section = planning.split("### §4.2 In design", 1)[1].split("### §4.3", 1)[0]
+    design_section = planning.split("### §4.2 Feature status index", 1)[1].split("### §4.3", 1)[0]
     shipped_section = planning.split("### §4.4 Shipped", 1)[1].split("### §4.5", 1)[0]
     assert "installer-procedure.md" not in design_section
     assert "Customer-global installer" in shipped_section
@@ -616,6 +616,60 @@ def test_active_markdown_internal_anchors_resolve() -> None:
                 line = text.count("\n", 0, match.start()) + 1
                 violations.append(f"{path.relative_to(ROOT)}:{line}: {raw_target}")
 
+    assert not violations, "\n".join(violations)
+
+
+def test_user_guide_explains_the_workflow_before_technical_reference() -> None:
+    guide = _read("docs/README.md")
+    first_use, dashboard, troubleshooting, reference = (
+        guide.index(f"## {heading}")
+        for heading in ("First use", "Dashboard", "Troubleshooting", "Reference")
+    )
+    assert first_use < dashboard < troubleshooting < reference
+    dashboard_guide = guide[dashboard:troubleshooting]
+    for tab in ("Home", "Recall", "Memory Intelligence", "Connections", "Projects", "Recover"):
+        assert f"### {tab}\n" in dashboard_guide
+    assert "### Session Intelligence\n" in dashboard_guide
+    for control in ("Run Recall Check", "Inspect available memories", "Snapshot search", "Reconnect Home"):
+        assert control in dashboard_guide
+    assert "GitHub displays HTML source" in guide
+    assert "Download raw file" in guide
+    assert "docs/README.md#dashboard" in _read("README.md")
+
+
+def test_installer_guidance_does_not_expect_a_permanent_acceptance_seed() -> None:
+    for path in ("agents/installer.md", "agents/operator.md"):
+        guidance = " ".join(_read(path).split())
+        assert "disposable acceptance" in guidance
+        assert "not expect a permanent test passcode" in guidance
+        assert "What is my Elefante test passcode?" not in guidance
+
+
+def test_dashboard_user_guide_links_resolve_without_internal_plans() -> None:
+    path = ROOT / "docs/how-to/view-dashboard.html"
+    guide = path.read_text(encoding="utf-8")
+    assert "../../workspace/" not in guide
+    assert "The owner requires this capability active" not in guide
+    violations: list[str] = []
+    for target in re.findall(r'(?:href|src)="([^"]+)"', guide):
+        if target.startswith(("https://", "http://", "mailto:", "data:")):
+            continue
+        file_name, _, fragment = target.partition("#")
+        resolved = (path.parent / unquote(file_name or path.name)).resolve()
+        if not resolved.is_file():
+            violations.append(f"Missing file: {target}")
+            continue
+        if not fragment or resolved.suffix.lower() not in {".md", ".html"}:
+            continue
+        content = resolved.read_text(encoding="utf-8")
+        anchors = set(re.findall(r'\bid=["\']([^"\']+)', content))
+        if resolved.suffix.lower() == ".md":
+            anchors.update(
+                _markdown_heading_slug(heading)
+                for heading in re.findall(r"^#{1,6}\s+(.+?)\s*$", content, re.MULTILINE)
+            )
+        if unquote(fragment) not in anchors:
+            violations.append(f"Missing section: {target}")
     assert not violations, "\n".join(violations)
 
 
