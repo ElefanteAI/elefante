@@ -1,4 +1,4 @@
-# Elefante Agent Tutorial
+# Advanced Elefante Agent Integration
 
 > **Release:** v2.15.2
 > **Audience:** AI agents connected through MCP
@@ -97,7 +97,7 @@ Use the host's exact project/workspace boundary; never invent a prose scope.
 
 In the installed customer product, use a fresh configured host to list its MCP
 tools and call `elefante-SystemStatusGet`, then run a read-only Recall check.
-The following **development-checkout** commands inspect source declarations and
+The following **developer-only checkout commands** inspect source declarations and
 an isolated protocol handshake; they do not prove that a customer host is connected:
 
 ```bash

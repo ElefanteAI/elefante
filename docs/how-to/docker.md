@@ -1,6 +1,7 @@
-# Running Elefante in Docker (Beginner)
+# Docker and Agent Zero (Advanced Community Setup)
 
-This guide shows how to run Elefante in a clean Docker environment.
+This is not the normal customer installer path. It shows advanced operators how
+to run Elefante in a clean Docker environment.
 
 If you are an autonomous agent operating inside an Agent Zero / A0 project
 layout, read [`agent-handoff.md`](agent-handoff.md) first.

@@ -215,11 +215,11 @@ See [`token-intelligence.md`](token-intelligence.md) and
   `/events/usage`. It supports dated rate cards, outcome records, Signal Cards,
   aggregate training hypotheses, retention, export, and deletion. Prompts,
   transcripts, responses, hidden reasoning, and credentials are invalid input.
-  The [released activation path](../../workspace/proposals/session-intelligence-activation.md)
-  adds a bounded asynchronous writer at the shared MCP boundary after permission;
-  it captures local estimates, not provider model usage. Home still reads a
-  snapshot, with content-free process health supplied by its owning daemon.
-  See [capture, evidence and control boundaries](token-intelligence.md#persistent-session-intelligence).
+  After permission, the released runtime uses a bounded asynchronous writer at
+  the shared MCP boundary; it captures local estimates, not provider model
+  usage. Home still reads a snapshot, with content-free process health supplied
+  by its owning daemon. See
+  [capture, evidence and control boundaries](token-intelligence.md#persistent-session-intelligence).
 - **Team Sync:** signed, exact-scope local bundles export only an explicit
   memory-ID allowlist. Imports are additive, dry-run-first, conflict-withholding,
   and backup-gated for non-empty stores. Elefante provides no cloud transport.

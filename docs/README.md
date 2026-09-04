@@ -11,9 +11,12 @@ Use your connected agent for everyday work. Use the **local dashboard** to inspe
 correct, and protect the memory behind that work. You do not need to keep the
 dashboard open for your agent to use Elefante.
 
-**In this guide:** [First use](#first-use) · [Everyday use](#everyday-use) ·
-[Dashboard](#dashboard) · [Troubleshooting](#troubleshooting) ·
-[Detailed dashboard guide](#detailed-dashboard-guide) · [Reference](#reference)
+**Start with the [five-minute real-memory demo](../examples/README.md).** Then use
+this guide for [first use](#first-use), [everyday use](#everyday-use), the
+[dashboard](#dashboard), [all released features](#all-released-features),
+[troubleshooting](#troubleshooting), and the [advanced reference](#advanced-reference).
+
+For the product purpose and boundaries, read [Why Elefante exists](explanation/vision.md).
 
 ## First use
 
@@ -41,12 +44,12 @@ scope in this release.
 
 ### 2. Remember one useful decision
 
-Choose a real rule or decision you will need again. For example, **only if this
-is your actual rule**, ask your connected agent:
+Choose a real rule or decision you will need again. The
+[five-minute demo](../examples/README.md) walks through the complete loop. For
+example, **only if this is your actual rule**, ask your connected agent:
 
-> Remember for this project: before calling a dashboard feature finished,
-> verify that its visible result matches its documented purpose, not just that
-> its button can be clicked.
+> Remember for this project: every customer-facing change must be checked on
+> desktop and mobile before release.
 
 Check the returned result: was a record saved, was an existing record found, or
 was the write blocked? Do not assume a request to remember succeeded. If you
@@ -57,13 +60,14 @@ Home recommends saving one useful decision before testing Recall.
 
 ### 3. Check that the memory helps a task
 
-Ask your agent to use Elefante Recall for a question that needs the decision:
+In a later conversation or task, ask your agent to use Elefante Recall for a
+question that needs the decision:
 
-> What should I verify before calling this dashboard feature finished?
+> What must I verify before releasing this customer-facing change?
 
-Inspect the selected memory and the agent's answer. The remembered rule should
-be relevant and should change what the agent checks. A selected record or a
-green status alone does not prove a useful answer.
+Inspect the selected memory and the agent's answer. The answer should include
+desktop and mobile checking. A selected record or a green status alone does not
+prove that the agent used the memory well.
 
 For a direct inspection, open the dashboard's **Recall** tab, enter the question,
 and select **Run Recall Check**. Open a returned record to read it. If a known
@@ -227,6 +231,36 @@ For permission, export, retention, and deletion, use the
 Do not confuse activity recorded by Session Intelligence with durable memories
 in the Library.
 
+## All released features
+
+Every released feature belongs to the same purpose: preserve useful knowledge,
+select it safely for a later task, or let the user inspect and protect that
+process. Optional and advanced features do not run merely because they exist.
+
+| Feature | How you use it | What it does |
+|---|---|---|
+| Remember and Library | Ask the connected agent to remember durable knowledge, or use **Home → Remember**; inspect it in **Memory Intelligence** | Searches before writing, stores an attributable record, and shows the explicit result |
+| Bounded Recall | Ask one real task question through the agent, or run the dashboard Recall check | Supplies a small eligible memory bundle, or returns no match, blocked, or unavailable |
+| Project isolation | Choose a specific registered folder for actions | Keeps new memory and Recall inside that boundary; it does not scan the folder or make Elefante a project manager |
+| Verified correction | Use Edit, Replace, Archive, Restore, Resolve, or permanent deletion from a record | Plans the change, asks for confirmation, and verifies its postconditions |
+| Conflict safety | Inspect a represented conflict before Resolve or Smart Merge | Can withhold conflicting records; the user chooses authority when no protected winner is unambiguous |
+| Connections | Open Topics, Vitality, or Decision Graph | Shows represented subjects, maintenance scores, and explicit stored relationships without editing them |
+| Recover | Check health, back up, preview/confirm restore, or create a support report | Performs bounded local recovery operations and returns a verification receipt |
+| Elefante Home | Open `http://localhost:8000` on the installed computer | Provides the local maintenance dashboard; it is not the everyday chat surface |
+| Session Intelligence | Give purpose-specific permission with the installed local controls; inspect **Home → Advanced** | Records metadata-only MCP activity and usage evidence without prompts, transcripts, or response content |
+| Session Distiller | Run the foreground distiller or opt-in watch mode | Processes supported session files serially; it stores nothing unless storage is explicitly enabled |
+| Team Sync | Use the advanced local CLI with an explicit memory-ID allowlist and user-chosen transport | Creates or imports signed, scope-bound bundles; Elefante does not provide cloud synchronization |
+| Local media | Attach a bounded local image, audio, or video file through a memory operation | Stores and integrity-checks the file locally; it does not perform OCR, transcription, model analysis, or upload |
+| Private host events | Send a typed file, terminal-error, or conversation envelope to the local event endpoint | Requests literal-trigger retrieval after privacy scrubbing; Elefante does not silently intercept activity or retain the event body |
+| Context and sessions | Use the advanced Context and Sessions MCP tools | Retrieves a broader graph-connected bundle or lists time-based work sessions |
+| Persistent task graph | Use Task Create, Update, and Graph from an orchestrating agent | Preserves structured task hierarchy, dependencies, status, and output; it is separate from project memory isolation |
+| ETL enrichment | Use the advanced Process/Classify pair | Adds bounded summaries, concepts, and trigger metadata to stored memories |
+| Directives | Add, list, or remove an explicit persistent directive | Keeps always-on behavioral constraints separate from relevance-ranked memories |
+
+The published interface exposes 18 tools and 2 prompts. Most customers use
+natural language through their connected agent; exact parameters, response
+contracts, permissions, and limits are in the [advanced tool reference](reference/tools.md).
+
 ## Troubleshooting
 
 | What you see | What to check first |
@@ -244,20 +278,22 @@ memories, edit database files, or remove locks as a first response.
 
 ## Detailed dashboard guide
 
-The [complete dashboard guide](how-to/view-dashboard.html) covers every section,
-control, score, confirmation, receipt, and safety boundary in more detail.
-**GitHub displays HTML source, not the rendered guide.** Open that file, use
-**Download raw file**, and open the downloaded HTML file in your browser. Keep it
-inside the downloaded repository if you also need its relative reference links.
-The guide itself works offline and loads no external scripts, fonts, or trackers.
+The [first-party website guide](https://elefante.ai/docs#dashboard) explains the
+dashboard in a normal browser. The [complete offline dashboard reference](how-to/view-dashboard.html)
+covers every section, control, score, confirmation, receipt, and safety boundary.
+**GitHub displays HTML source**, not the rendered guide. Choose **Download raw file**
+and open it locally when you need the standalone reference. It loads no
+external scripts, fonts, or trackers.
 
 If you stay on GitHub, this page is the readable starting guide. Technical
 references below also render directly as Markdown.
 
-## Reference
+<a id="advanced-reference"></a>
+
+## Reference — advanced and operator
 
 <details>
-<summary>Installation, operation, and technical detail</summary>
+<summary>Advanced, operator, and technical guides</summary>
 
 The published MCP interface exposes 18 tools, 2 prompts. You do not need to learn
 their API names to begin using Elefante through your connected agent.
@@ -266,10 +302,10 @@ their API names to begin using Elefante through your connected agent.
 |---|---|
 | [Install Elefante](how-to/install.md) | Requirements, checksums, setup, repair, upgrade, or uninstall |
 | [Configure a host](how-to/configure-ide.md) | Compatible adapters, preview/community tiers, or manual connection |
-| [Run the MCP server](how-to/run-mcp-server.md) | Manual startup and connection checks |
+| [Run the MCP server — developer](how-to/run-mcp-server.md) | Source-checkout startup and full-surface proof |
 | [Restart](how-to/restart.md) | Graceful service restart |
 | [Backup and rollback](how-to/rollback.md) | Detailed backup and recovery procedures |
-| [Docker](how-to/docker.md) | Container operation |
+| [Docker and Agent Zero — advanced community setup](how-to/docker.md) | Container or Agent Zero operation outside the normal installer path |
 | [Kuzu troubleshooting](how-to/kuzu-troubleshooting.md) | Graph ownership or locking problems |
 | [Agent handoff](how-to/agent-handoff.md) | Connecting an existing MCP-capable agent |
 | [Tools and prompts](reference/tools.md) | Exact parameters, results, and safety rules |
@@ -280,6 +316,7 @@ their API names to begin using Elefante through your connected agent.
 | [Token Intelligence](reference/token-intelligence.md) | Estimates, provider-reported usage, and local controls |
 | [Architecture](reference/architecture.md) | Local daemon, MCP, SQLite vectors, and Kuzu |
 | [Product vision](explanation/vision.md) | Product purpose and boundaries |
+| [Agent integration examples](../examples/AGENT_TUTORIAL.md) | Exact Recall, write, correction, and host-instruction behavior |
 
 </details>
 

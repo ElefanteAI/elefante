@@ -11,6 +11,14 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- The GitHub front door and customer guide now lead through one real-memory
+  workflow before technical detail. The examples index is a five-minute
+  Remember → Recall → inspect → back up demo; agent integration and legacy
+  showcase material are explicitly advanced or historical. All released
+  feature groups remain documented with their use and behavior.
+
 ## [2.15.2] - 2026-09-04
 
 ### Fixed

@@ -127,6 +127,8 @@ current-source, privacy, conflicts, lifecycle and query identifiers remain
 independent gates. Weak, tied, unavailable or non-finite model evidence adds
 no paraphrase match; unknown syntax is not certified understanding.
 
+### Developer verification evidence
+
 The repair passes 56 real cached-model selection regressions, including all
 27 preceding cases, the unchanged Elefante memory bodies, missing-fact checks,
 alternatives, different words for the same property, and independent body evidence
@@ -181,7 +183,7 @@ Retention, scope, trigger, and user-lock governance run before task-specific
 ranking. Protected memories are not silently archived. Automatic ephemeral
 expiry and general age-based pruning are not implemented.
 
-## Verification
+## Developer verification
 
 ```bash
 pytest tests/test_scoring.py tests/test_autonomous_coactivation.py \

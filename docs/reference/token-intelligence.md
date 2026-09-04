@@ -82,7 +82,8 @@ systems.
 
 ## Persistent Session Intelligence
 
-v2.13.0 adds a separate, consent-gated, metadata-only SQLite ledger operated by
+The current release includes a separate, consent-gated, metadata-only SQLite
+ledger, introduced in v2.13.0 and operated by
 `scripts/pipeline/session_intelligence.py` or the loopback `/events/usage`
 endpoint. It can retain provider-actual or estimated usage provenance, bounded
 outcome records, dated rate cards, Signal Cards, and aggregate training
@@ -97,9 +98,8 @@ explicit per purpose.
 ### Automatic MCP capture
 
 The runtime supports automatic capture at the shared MCP tool boundary.
-Verify the installed build before expecting capture from an older package; see
-the [activation gates](../../workspace/proposals/session-intelligence-activation.md)
-and the current release notes.
+Verify the installed build before expecting capture from an older package; use
+the current release notes and the status command below.
 It reuses the v2.13.0 ledger, not a new analytics store.
 
 After local `usage_analytics` permission, each completed MCP dispatch queues one
