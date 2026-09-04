@@ -359,6 +359,26 @@ Arbitrary names, free text, paths, and next actions remain excluded; interrupted
 **Lesson:** A privacy projection must be tested with the real producer output.
 An allowlisted receipt is not product proof if valid fields disappear silently.
 
+## Issue #28: Historical MCP Canary Used An Unsequenced Handshake
+
+**Trigger:** PR #33 passed the maintained suite but its separate historical
+task-032 known-fix canary failed. The original fixture also passed six local
+repetitions, so the CI failure alone did not establish a product regression.
+**Harness defect:** The fixture piped initialization, the initialized notification,
+and tool discovery together, then closed stdin before awaiting responses. This
+violates the intended handshake order and permits startup/EOF races. The exact
+discarded CI subprocess failure is unknown; do not present that inference as a
+captured traceback.
+**Correction:** Use the existing MCP SDK client to await initialization, await
+tool discovery, and only then close the transport. Keep the 30-second bound,
+real server, isolated home, setup/uninstall commands, and every product assertion.
+The fixture digest and review are renewed; historical consumed outcomes are not
+rescored or promoted by this harness correction.
+**Guard:** All nine historical canaries must still reject their base and accept
+their exact known fix. Exact-head CI remains the publication gate.
+**Prevention:** Test a stateful protocol in its valid message order. A working
+local run does not excuse an invalid test client or prove clean-runner behavior.
+
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
 The five most-recurring rules from the issues above:

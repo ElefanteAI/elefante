@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-import json
+import asyncio
 import os
 import subprocess
 import sys
 from pathlib import Path
+
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -73,27 +76,9 @@ raise SystemExit(2)
 
 def _live_mcp_tools(environment: dict[str, str]) -> list[dict]:
     """List tools through the real stdio protocol without importing product code."""
-    requests = (
-        {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "AcceptanceJudge", "version": "1.0"},
-            },
-        },
-        {
-            "jsonrpc": "2.0",
-            "method": "notifications/initialized",
-            "params": {},
-        },
-        {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
-    )
-    server = subprocess.run(
-        [
-            sys.executable,
+    server = StdioServerParameters(
+        command=sys.executable,
+        args=[
             "-c",
             "import asyncio; from src.mcp.server import main; asyncio.run(main())",
         ],
@@ -104,22 +89,22 @@ def _live_mcp_tools(environment: dict[str, str]) -> list[dict]:
             "HF_HUB_OFFLINE": "1",
             "TRANSFORMERS_OFFLINE": "1",
         },
-        input="\n".join(json.dumps(request) for request in requests) + "\n",
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=30,
     )
-    assert server.returncode == 0, server.stderr[-2000:]
-    responses = [
-        json.loads(line)
-        for line in server.stdout.splitlines()
-        if line.lstrip().startswith("{")
-    ]
-    tool_response = next((response for response in responses if response.get("id") == 2), None)
-    assert tool_response is not None, server.stderr[-2000:]
-    assert "error" not in tool_response, tool_response
-    return tool_response["result"]["tools"]
+
+    async def discover() -> list[dict]:
+        # Discovery must follow the completed handshake, and the transport must
+        # stay open until its response arrives. Piping all requests plus EOF can
+        # race server initialization/response delivery on a clean CI runner.
+        async with stdio_client(server) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                response = await session.list_tools()
+                return [tool.model_dump(by_alias=True) for tool in response.tools]
+
+    async def bounded_discovery() -> list[dict]:
+        return await asyncio.wait_for(discover(), timeout=30)
+
+    return asyncio.run(bounded_discovery())
 
 
 def test_codex_setup_routes_recall_without_owning_user_instructions(tmp_path) -> None:
