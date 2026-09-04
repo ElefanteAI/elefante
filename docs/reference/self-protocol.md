@@ -100,9 +100,9 @@ The authoritative harness verifies these phases in order:
 1. **Handshake and inventory**
    The real MCP server boots, completes `initialize`, and exposes the expected
    opt-in 19-tool plus 2-prompt development surface. Current-source customer
-   discovery exposes 18 tools and 2 prompts; the extra Task Intelligence tool
-   remains default-off and developer-only. Published v2.13.0 remains at 17
-   customer tools because verified Recover is not released yet.
+   discovery and the current published customer profile expose 18 tools and 2
+   prompts, including verified `elefante-Recover`. The extra Task Intelligence
+   tool remains default-off and developer-only.
 2. **Answer context and prompt retrieval**
    `elefante-Recall` returns its seven-field bounded read-only payload without
    an echoed question, internal IDs, or generic protocol wrappers. The governed

@@ -1,7 +1,7 @@
 ---
 PROTOCOL: release-manager
 INVOKE: elefante-release-manager
-PROTOCOL_VERSION: 2.15.0
+PROTOCOL_VERSION: 2.15.1
 LOAD_WHEN: Version bump request, CHANGELOG entry needed, "ready to release", "tag X.Y.Z", "push to GitHub Releases".
 DIAGNOSTIC_QUESTION: "Is this an Add / Fix / Change, what semver bump does that imply, and is the CHANGELOG entry written before the bump?"
 AUTHORITY: This file owns the release pipeline. CONTRIBUTING.md release section forwards here.
@@ -75,7 +75,19 @@ One commit, one concern. Subject line format:
 - `chore: bump to vX.Y.Z` (when the work was committed earlier and this is just the bump)
 - `feat: <description> (vX.Y.Z)` (when the bump rides with the feature commit)
 
-## Step 5 — Tag and Push
+## Step 5 — Reviewed publication request
+
+For the maintained GitHub workflow, add one authorization marker at
+`.github/release-requests/vX.Y.Z` with the user's approved scope. Merge it only
+after the exact reviewed candidate passes its required checks. The authorization
+workflow waits for Quality at the exact merged commit, validates the marker
+against the package version, creates an immutable tag, and dispatches the
+publication pipeline. A marker alone is not publication evidence.
+
+Do not both dispatch this path and independently create a competing release.
+The commands below are the manual path only when that workflow is not used.
+
+## Manual tag path
 
 Only after explicit authorization, run the commands against the approved
 commit and target branch:

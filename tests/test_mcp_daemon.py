@@ -2206,6 +2206,54 @@ def isolated_graph_tool_server(monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_graph_query_forwards_parameters_and_preserves_read_only_boundary(
+    isolated_graph_tool_server,
+):
+    server, store = isolated_graph_tool_server
+    created = await server._handle_set_elefante_connection(
+        {
+            "entities": [
+                {"ref": "memory", "name": "Parameterized graph proof", "type": "memory"},
+            ],
+            "relationships": [],
+        }
+    )
+    memory_id = created["entity_ref_map"]["memory"]
+
+    result = await server._handle_query_graph(
+        {
+            "cypher_query": (
+                "MATCH (e:Entity) WHERE e.id = $entity_id "
+                "RETURN e.id AS id"
+            ),
+            "parameters": {"entity_id": memory_id},
+        }
+    )
+
+    assert result["success"] is True
+    assert result["results"][0]["id"] == memory_id
+
+    with pytest.raises(ValueError, match="parameters must be an object"):
+        await server._handle_query_graph(
+            {
+                "cypher_query": "MATCH (e:Entity) RETURN e.id",
+                "parameters": [],
+            }
+        )
+
+    from src.utils.validators import ValidationError
+
+    with pytest.raises(ValidationError, match="read-only"):
+        await server._handle_query_graph(
+            {
+                "cypher_query": "CREATE (e:Entity {id: 'must-not-write'}) RETURN e",
+                "parameters": {},
+            }
+        )
+    assert len(await store.execute_query("MATCH (e:Entity) RETURN e.id")) == 1
+
+
+@pytest.mark.asyncio
 async def test_graph_connect_real_payloads_and_repeat_are_idempotent(isolated_graph_tool_server):
     from src.models.entity import RelationshipType
     from uuid import UUID
@@ -2410,7 +2458,11 @@ async def test_memory_add_persists_portable_attachment_descriptors(
             captured.update(kwargs)
             return Memory(content="diagram", metadata=MemoryMetadata())
 
-    monkeypatch.setattr("src.utils.config.DATA_DIR", data_dir)
+    monkeypatch.setattr("src.utils.config.DATA_DIR", tmp_path / "unused-default")
+    configuration = tmp_path / "attachment-config.yaml"
+    configuration.write_text(json.dumps({"elefante": {"data_dir": str(data_dir)}}))
+    monkeypatch.setenv("ELEFANTE_CONFIG_PATH", str(configuration))
+    monkeypatch.delenv("ELEFANTE_DATA_DIR", raising=False)
     server = ElefanteMCPServer()
     monkeypatch.setattr(server, "_check_compliance_gate", lambda _: None)
     monkeypatch.setattr(
@@ -2444,6 +2496,7 @@ async def test_memory_add_persists_portable_attachment_descriptors(
     stored = data_dir / descriptor["storage_path"]
     assert stored.read_bytes() == source.read_bytes()
     assert stored.stat().st_mode & 0o777 == 0o600
+    assert not (tmp_path / "unused-default" / "attachments").exists()
 
 
 @pytest.mark.asyncio

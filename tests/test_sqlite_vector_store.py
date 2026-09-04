@@ -48,6 +48,178 @@ class CloseTrackingGraphStore:
         self.closed = True
 
 
+@pytest.mark.asyncio
+async def test_legacy_chroma_wrapper_honors_zero_threshold_and_filters_before_limit():
+    orthogonal_id = str(uuid4())
+    excluded_id = str(uuid4())
+    matching_id = str(uuid4())
+    related_entity_id = str(uuid4())
+    now = datetime.utcnow().isoformat()
+
+    def row(memory_id, category, tags, created_at, distance):
+        return {
+            "id": memory_id,
+            "document": memory_id,
+            "metadata": {
+                "created_at": created_at,
+                "created_by": "user",
+                "memory_type": "fact",
+                "domain": "reference",
+                "category": category,
+                "score": 90,
+                "confidence": 0.7,
+                "tags": tags,
+                "related_entities": related_entity_id if memory_id == matching_id else "",
+                "source": "user_input",
+                "last_accessed": now,
+                "last_modified": now,
+            },
+            "distance": distance,
+        }
+
+    orthogonal = row(orthogonal_id, "orthogonal", "", now, 1.0)
+    excluded = row(excluded_id, "operations", "wrong", "2020-01-01T00:00:00", 0.0)
+    matching = row(matching_id, "operations", "wanted", "2024-06-01T00:00:00", 0.01)
+
+    class Collection:
+        def query(self, *, n_results, where, **_kwargs):
+            rows = [orthogonal] if where == {"category": "orthogonal"} else [excluded, matching]
+            rows = rows[:n_results]
+            return {
+                "ids": [[item["id"] for item in rows]],
+                "documents": [[item["document"] for item in rows]],
+                "metadatas": [[item["metadata"] for item in rows]],
+                "distances": [[item["distance"] for item in rows]],
+            }
+
+        def get(self, *, where, **_kwargs):
+            rows = [orthogonal] if where == {"category": "orthogonal"} else [excluded, matching]
+            return {
+                "ids": [item["id"] for item in rows],
+                "documents": [item["document"] for item in rows],
+                "metadatas": [item["metadata"] for item in rows],
+            }
+
+    store = VectorStore.__new__(VectorStore)
+    store._client = object()
+    store._collection = Collection()
+    store._embedding_service = FakeEmbeddingService()
+    store.config = SimpleNamespace(
+        elefante=SimpleNamespace(
+            orchestrator=SimpleNamespace(min_similarity=0.3),
+            temporal_decay=SimpleNamespace(
+                enabled=False,
+                semantic_weight=0.7,
+                temporal_weight=0.3,
+            ),
+        )
+    )
+
+    zero_threshold = await store.search(
+        "database",
+        limit=1,
+        filters=SearchFilters(category="orthogonal"),
+        min_similarity=0.0,
+        apply_temporal_decay=False,
+    )
+    filtered = await store.search(
+        "database",
+        limit=1,
+        filters=SearchFilters(
+            category="operations",
+            tags=["wanted"],
+            min_score=80,
+            start_date=datetime(2024, 1, 1),
+            end_date=datetime(2025, 1, 1),
+            related_entities=[related_entity_id],
+        ),
+        min_similarity=0.0,
+        apply_temporal_decay=False,
+    )
+
+    assert [str(result.memory.id) for result in zero_threshold] == [orthogonal_id]
+    assert zero_threshold[0].score == pytest.approx(0.0)
+    assert [str(result.memory.id) for result in filtered] == [matching_id]
+    assert [str(entity_id) for entity_id in filtered[0].memory.related_entities] == [related_entity_id]
+
+    paginated = await store.get_all(
+        limit=1,
+        filters=SearchFilters(
+            category="operations",
+            tags=["wanted"],
+            start_date=datetime(2024, 1, 1),
+            end_date=datetime(2025, 1, 1),
+        ),
+    )
+    assert [str(memory.id) for memory in paginated] == [matching_id]
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(not CHROMADB_AVAILABLE, reason="legacy ChromaDB migration dependency absent")
+async def test_legacy_chroma_honors_zero_threshold_and_filters_before_limit(tmp_path):
+    store = VectorStore(
+        collection_name="memories",
+        persist_directory=str(tmp_path / "chroma"),
+    )
+    store._embedding_service = FakeEmbeddingService()
+    orthogonal = Memory(
+        content="Orthogonal legacy candidate",
+        embedding=[0.0, 1.0, 0.0],
+        metadata=MemoryMetadata(category="orthogonal", score=90),
+    )
+    excluded = Memory(
+        content="Higher ranked but wrong legacy candidate",
+        embedding=[1.0, 0.0, 0.0],
+        metadata=MemoryMetadata(
+            category="operations",
+            tags=["wrong"],
+            score=90,
+            created_at=datetime(2020, 1, 1),
+        ),
+    )
+    matching = Memory(
+        content="Lower ranked matching legacy candidate",
+        embedding=[0.99, 0.1, 0.0],
+        metadata=MemoryMetadata(
+            category="operations",
+            tags=["wanted"],
+            score=90,
+            created_at=datetime(2024, 6, 1),
+        ),
+    )
+
+    try:
+        for memory in (orthogonal, excluded, matching):
+            await store.add_memory(memory)
+
+        zero_threshold = await store.search(
+            "database",
+            limit=1,
+            filters=SearchFilters(category="orthogonal"),
+            min_similarity=0.0,
+            apply_temporal_decay=False,
+        )
+        assert [result.memory.id for result in zero_threshold] == [orthogonal.id]
+        assert zero_threshold[0].score == pytest.approx(0.0)
+
+        filtered = await store.search(
+            "database",
+            limit=1,
+            filters=SearchFilters(
+                category="operations",
+                tags=["wanted"],
+                min_score=80,
+                start_date=datetime(2024, 1, 1),
+                end_date=datetime(2025, 1, 1),
+            ),
+            min_similarity=0.0,
+            apply_temporal_decay=False,
+        )
+        assert [result.memory.id for result in filtered] == [matching.id]
+    finally:
+        _close_chroma_snapshot(store)
+
+
 async def _write_chroma_migration_fixture(vector_directory):
     store = VectorStore(collection_name="memories", persist_directory=str(vector_directory))
     memories = [

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from datetime import datetime
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
@@ -11,7 +13,7 @@ from src.core.orchestrator import MemoryOrchestrator
 from src.core.project_registry import ProjectRegistry
 from src.mcp.server import AnswerContext, ElefanteMCPServer
 from src.models.memory import Memory, MemoryMetadata
-from src.models.query import SearchFilters
+from src.models.query import QueryMode, SearchFilters
 
 
 def test_context_prompt_resolves_the_strict_project_before_recall() -> None:
@@ -412,6 +414,157 @@ def test_explicit_project_filter_rejects_unscoped_and_cross_project_results():
     assert MemoryOrchestrator._matches_explicit_scope(matching, filters) is True
     assert MemoryOrchestrator._matches_explicit_scope(unscoped, filters) is False
     assert MemoryOrchestrator._matches_explicit_scope(wrong, filters) is False
+
+
+@pytest.mark.asyncio
+async def test_structured_search_filters_graph_candidates_before_limit():
+    matching_id = uuid4()
+    excluded_id = uuid4()
+    related_entity_id = uuid4()
+    matching = Memory(
+        id=matching_id,
+        content="The matching structured memory",
+        metadata=MemoryMetadata(
+            memory_type="fact",
+            tags=["wanted"],
+            score=90,
+            created_at=datetime(2024, 6, 1),
+        ),
+        related_entities=[related_entity_id],
+    )
+    excluded = Memory(
+        id=excluded_id,
+        content="The excluded structured memory",
+        metadata=MemoryMetadata(
+            memory_type="fact",
+            tags=["wrong"],
+            score=10,
+            created_at=datetime(2020, 6, 1),
+        ),
+    )
+
+    class Graph:
+        def __init__(self):
+            self.query = None
+
+        async def execute_query(self, query):
+            self.query = query
+            return [
+                {"m": {"id": str(excluded_id), "props": json.dumps({"score": 10})}},
+                {"m": {"id": str(matching_id), "props": json.dumps({"score": 90})}},
+            ]
+
+    class Vectors:
+        async def get_memory(self, memory_id):
+            return {matching_id: matching, excluded_id: excluded}.get(memory_id)
+
+    graph = Graph()
+    orchestrator = MemoryOrchestrator.__new__(MemoryOrchestrator)
+    orchestrator.graph_store = graph
+    orchestrator.vector_store = Vectors()
+    filters = SearchFilters(
+        memory_type="fact",
+        tags=["wanted"],
+        min_score=80,
+        start_date=datetime(2024, 1, 1),
+        end_date=datetime(2025, 1, 1),
+        related_entities=[related_entity_id],
+    )
+    plan = orchestrator._create_query_plan(
+        "structured proof",
+        QueryMode.STRUCTURED,
+        limit=1,
+        filters=filters,
+        min_similarity=0.0,
+    )
+
+    results = await orchestrator._search_structured(
+        "structured proof",
+        plan,
+        apply_temporal_decay=False,
+        reinforce_access=False,
+        filters=filters,
+    )
+
+    assert "m.memory_type" not in graph.query
+    assert "LIMIT 10" in graph.query
+    assert [result.memory.id for result in results] == [matching_id]
+    assert results[0].memory.related_entities == [related_entity_id]
+
+
+@pytest.mark.asyncio
+async def test_structured_search_pages_past_nonmatching_window():
+    matching_id = uuid4()
+    excluded_ids = [uuid4() for _ in range(10)]
+    matching = Memory(
+        id=matching_id,
+        content="The eleventh structured memory matches",
+        metadata=MemoryMetadata(
+            tags=["wanted"],
+            score=90,
+            created_at=datetime(2024, 6, 1),
+        ),
+    )
+    excluded = {
+        memory_id: Memory(
+            id=memory_id,
+            content="An excluded structured memory",
+            metadata=MemoryMetadata(
+                tags=["wrong"],
+                score=10,
+                created_at=datetime(2020, 1, 1),
+            ),
+        )
+        for memory_id in excluded_ids
+    }
+    memories = {**excluded, matching_id: matching}
+    queries = []
+
+    class Graph:
+        async def execute_query(self, query):
+            queries.append(query)
+            offset = int(query.split("SKIP ", 1)[1].split(" ", 1)[0])
+            limit = int(query.rsplit("LIMIT ", 1)[1])
+            ids = excluded_ids + [matching_id]
+            page = ids[offset:offset + limit]
+            return [
+                {"m": {"id": str(memory_id), "props": json.dumps({"score": memories[memory_id].metadata.score})}}
+                for memory_id in page
+            ]
+
+    class Vectors:
+        async def get_memory(self, memory_id):
+            return memories.get(memory_id)
+
+    orchestrator = MemoryOrchestrator.__new__(MemoryOrchestrator)
+    orchestrator.graph_store = Graph()
+    orchestrator.vector_store = Vectors()
+    filters = SearchFilters(
+        tags=["wanted"],
+        min_score=80,
+        start_date=datetime(2024, 1, 1),
+        end_date=datetime(2025, 1, 1),
+    )
+    plan = orchestrator._create_query_plan(
+        "structured page proof",
+        QueryMode.STRUCTURED,
+        limit=1,
+        filters=filters,
+        min_similarity=0.0,
+    )
+
+    results = await orchestrator._search_structured(
+        "structured page proof",
+        plan,
+        apply_temporal_decay=False,
+        reinforce_access=False,
+        filters=filters,
+    )
+
+    assert [result.memory.id for result in results] == [matching_id]
+    assert len(queries) == 2
+    assert "SKIP 0" in queries[0] and "LIMIT 10" in queries[0]
+    assert "SKIP 10" in queries[1] and "LIMIT 10" in queries[1]
 
 
 @pytest.mark.asyncio

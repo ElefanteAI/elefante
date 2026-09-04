@@ -18,7 +18,7 @@ import hashlib
 import json
 from typing import List, Optional, Dict, Any
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from src.models.memory import (
@@ -54,6 +54,62 @@ def _parse_system_metadata(metadata: Dict[str, Any], custom_metadata: Dict[str, 
         except Exception:
             pass
     return {}
+
+
+def _matches_search_filters(memory: Memory, filters: Optional[SearchFilters]) -> bool:
+    """Apply the documented metadata filter contract to one reconstructed memory."""
+    if filters is None:
+        return True
+
+    metadata = memory.metadata
+
+    def enum_value(value: Any) -> Any:
+        return getattr(value, "value", value)
+
+    exact_values = {
+        "memory_type": enum_value(metadata.memory_type),
+        "domain": enum_value(metadata.domain),
+        "category": metadata.category,
+        "source": enum_value(metadata.source),
+        "project": metadata.project or "",
+        "workspace": metadata.workspace or "",
+        "file_path": metadata.file_path or "",
+        "session_id": str(metadata.session_id) if metadata.session_id else "",
+    }
+    for name in exact_values:
+        expected = getattr(filters, name, None)
+        if expected is not None and str(exact_values[name]) != str(expected):
+            return False
+
+    if filters.min_score is not None and metadata.score < filters.min_score:
+        return False
+    if filters.max_score is not None and metadata.score > filters.max_score:
+        return False
+
+    if filters.tags:
+        available_tags = {str(tag).strip() for tag in (metadata.tags or [])}
+        requested_tags = {str(tag).strip() for tag in filters.tags}
+        if not requested_tags.issubset(available_tags):
+            return False
+
+    if filters.related_entities:
+        available_entities = {str(entity_id) for entity_id in memory.related_entities}
+        requested_entities = {str(entity_id) for entity_id in filters.related_entities}
+        if not requested_entities.issubset(available_entities):
+            return False
+
+    def utc_naive(value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+    created_at = utc_naive(metadata.created_at)
+    if filters.start_date is not None and created_at < utc_naive(filters.start_date):
+        return False
+    if filters.end_date is not None and created_at > utc_naive(filters.end_date):
+        return False
+
+    return True
 
 
 class VectorStore:
@@ -129,6 +185,11 @@ class VectorStore:
         except Exception as e:
             logger.error("failed_to_initialize_chromadb", error=str(e))
             raise
+
+    @staticmethod
+    def _matches_filters(memory: Memory, filters: Optional[SearchFilters]) -> bool:
+        """Evaluate filters after Chroma reconstructs its primitive metadata."""
+        return _matches_search_filters(memory, filters)
     
     async def add_memory(self, memory: Memory) -> str:
         """
@@ -172,6 +233,7 @@ class VectorStore:
             "relationship_type": memory.metadata.relationship_type.value if getattr(memory.metadata, "relationship_type", None) else "",
             "parent_id": str(memory.metadata.parent_id) if memory.metadata.parent_id else "",
             "related_memory_ids": ",".join(str(x) for x in (memory.metadata.related_memory_ids or [])),
+            "related_entities": ",".join(str(x) for x in (memory.related_entities or [])),
             "conflict_ids": ",".join(str(x) for x in (memory.metadata.conflict_ids or [])),
             "supersedes_id": str(memory.metadata.supersedes_id) if memory.metadata.supersedes_id else "",
             "superseded_by_id": str(memory.metadata.superseded_by_id) if memory.metadata.superseded_by_id else "",
@@ -304,7 +366,11 @@ class VectorStore:
         
         # Validate inputs
         limit = validate_limit(limit)
-        min_similarity = min_similarity or self.config.elefante.orchestrator.min_similarity
+        min_similarity = (
+            self.config.elefante.orchestrator.min_similarity
+            if min_similarity is None
+            else min_similarity
+        )
         
         # Check if temporal decay is enabled in config
         temporal_enabled = (
@@ -315,6 +381,11 @@ class VectorStore:
         
         # Get more results if temporal decay is enabled (for re-ranking)
         search_limit = limit * 2 if temporal_enabled else limit
+        if filters is not None or where_override:
+            # Chroma can apply only the primitive portion of SearchFilters in
+            # its query. Fetch a bounded candidate window before evaluating
+            # tags, dates, relationships, and the remaining fields locally.
+            search_limit = max(search_limit, max(limit * 3, 10))
         
         # Deterministic query expansion to improve semantic recall for novel phrasings
         def _expand_query_text(q: str) -> str:
@@ -402,6 +473,8 @@ class VectorStore:
                     
                     # Reconstruct memory object
                     memory = self._reconstruct_memory(memory_id, content, metadata_dict)
+                    if not self._matches_filters(memory, filters):
+                        continue
                     memory.similarity_score = similarity
                     
                     # Apply temporal decay if enabled
@@ -436,7 +509,7 @@ class VectorStore:
             # Re-sort by final score if temporal decay was applied
             if temporal_enabled:
                 search_results.sort(key=lambda x: x.score, reverse=True)
-                search_results = search_results[:limit]
+            search_results = search_results[:limit]
             
             logger.info(
                 "search_completed",
@@ -459,22 +532,22 @@ class VectorStore:
         """Build ChromaDB where clause from filters"""
         where = {}
         
-        if filters.memory_type:
+        if filters.memory_type is not None:
             where["memory_type"] = filters.memory_type
         
-        if filters.domain:
+        if filters.domain is not None:
             where["domain"] = filters.domain
         
-        if filters.category:
+        if filters.category is not None:
             where["category"] = filters.category
         
-        if filters.source:
+        if filters.source is not None:
             where["source"] = filters.source
         
-        if filters.project:
+        if filters.project is not None:
             where["project"] = filters.project
 
-        if filters.workspace:
+        if filters.workspace is not None:
             where["workspace"] = filters.workspace
         
         if filters.min_score is not None:
@@ -509,7 +582,7 @@ class VectorStore:
             "created_at", "timestamp", "created_by", "domain",
             "category", "memory_type", "subcategory", "score", "importance",
             "confidence", "tags", "keywords", "status", "parent_id",
-            "relationship_type", "related_memory_ids", "conflict_ids", "supersedes_id", "superseded_by_id",
+            "relationship_type", "related_memory_ids", "related_entities", "conflict_ids", "supersedes_id", "superseded_by_id",
             "source", "source_reliability", "verified", "project", "workspace", "file_path",
             "session_id", "last_accessed", "last_modified", "access_count", "version", "deprecated", "archived",
             # Cognitive Retrieval
@@ -724,7 +797,8 @@ class VectorStore:
         memory = Memory(
             id=UUID(memory_id),
             content=content,
-            metadata=memory_metadata
+            metadata=memory_metadata,
+            related_entities=parse_uuid_list(metadata.get("related_entities")),
         )
 
         return memory
@@ -1023,8 +1097,20 @@ class VectorStore:
                 logger.info("no_memories_found")
                 return []
             
-            # Apply pagination
-            total_count = len(all_results['ids'])
+            # Reconstruct and apply the complete filter contract before
+            # pagination. Chroma's where clause does not cover tags, dates,
+            # relationships, or every SearchFilters field.
+            memories = []
+            for i, memory_id in enumerate(all_results['ids']):
+                memory = self._reconstruct_memory(
+                    memory_id,
+                    all_results['documents'][i],
+                    all_results['metadatas'][i],
+                )
+                if self._matches_filters(memory, filters):
+                    memories.append(memory)
+
+            total_count = len(memories)
             start_idx = offset
             end_idx = min(offset + limit, total_count)
             
@@ -1032,20 +1118,7 @@ class VectorStore:
                 logger.info("offset_exceeds_total", offset=offset, total=total_count)
                 return []
             
-            # Slice results for pagination
-            paginated_ids = all_results['ids'][start_idx:end_idx]
-            paginated_docs = all_results['documents'][start_idx:end_idx]
-            paginated_metadata = all_results['metadatas'][start_idx:end_idx]
-            
-            # Reconstruct memory objects
-            memories = []
-            for i, memory_id in enumerate(paginated_ids):
-                memory = self._reconstruct_memory(
-                    memory_id,
-                    paginated_docs[i],
-                    paginated_metadata[i]
-                )
-                memories.append(memory)
+            memories = memories[start_idx:end_idx]
             
             logger.info(
                 "retrieved_all_memories",

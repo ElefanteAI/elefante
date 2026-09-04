@@ -16,9 +16,8 @@ task outcomes enough to justify a breaking public-contract change?
 
 ## Current truth
 
-The published v2.13.0 surface is 17 tools and 2 prompts. The current development
-source exposes 18 tools and 2 prompts because verified Recover is an unreleased
-candidate. Memory CRUD/search is already consolidated under
+The current published customer surface is 18 tools and 2 prompts, including
+verified `elefante-Recover`. Memory CRUD/search is already consolidated under
 `elefante-Memory(action=...)`. No further tool consolidation is approved,
 implemented, assigned to a version, or promised.
 

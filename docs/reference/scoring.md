@@ -91,6 +91,16 @@ additional body properties retain the existing conservative path. Cues are not
 an exhaustive whitelist of every use of a memory.
 Different property names are uncertain rather than automatically incompatible:
 they require the strong full-question cue match, not ordinary body overlap.
+An explanatory question cannot select a different saved property using only a
+shared subject or memory-type label. Independently strong body evidence can
+still qualify: it must cover substantive terms from the question beyond those
+in the saved cue. Task success criteria are not mechanism-answer evidence.
+Procedural questions such as “Which checks should we perform?” are method
+requests, not missing named facts. A simple subject question still asks for its
+named property. Specification/directive metadata can establish an unqualified
+rule or constraint category, not a specific kind of rule. All normal topic and
+relevance checks still apply.
+Leading presentation instructions such as “explain” do not count as topic matches.
 Without a saved cue, an absent named property cannot be supplied merely by
 matching its subject. Quantity requests require numeric or number-word evidence
 unless a matching saved question establishes a separate path. Such evidence is
@@ -117,9 +127,11 @@ current-source, privacy, conflicts, lifecycle and query identifiers remain
 independent gates. Weak, tied, unavailable or non-finite model evidence adds
 no paraphrase match; unknown syntax is not certified understanding.
 
-The repair passes 39 real cached-model selection regressions, including all
+The repair passes 56 real cached-model selection regressions, including all
 27 preceding cases, the unchanged Elefante memory bodies, missing-fact checks,
-alternatives and different words for the same property. These are bounded regression results,
+alternatives, different words for the same property, and independent body evidence
+beyond a saved example question, procedural questions and simple subject
+questions. These are bounded regression results,
 not a general semantic-accuracy or task-value guarantee. Publication and the
 exact installed build are separate from this source contract; see
 [BUG-047](../../workspace/ISSUES.md).

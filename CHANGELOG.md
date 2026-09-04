@@ -11,6 +11,37 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.15.1] - 2026-09-03
+
+### Fixed
+
+- Recall distinguished mechanism evidence from unrelated same-topic rules while
+  retaining qualifying memory content beyond its saved example question.
+  Presentation instructions and separate success criteria no longer supply false
+  matching evidence. Existing scope, privacy, conflict and similarity gates remain.
+- GraphQuery forwarded validated parameters to the single owning graph store.
+  Structured search enforced metadata filters before its result limit, including
+  matches beyond the first page; the legacy vector adapter respected explicit
+  zero similarity and complete metadata filtering.
+- Privacy scrubbing covered explicit credential fields in nested ingestion
+  payloads and project-prefixed tokens without changing benign counters or
+  public-key fields. Repeated scrubbing remained idempotent.
+- Directives, explicit-use history and memory attachments followed the configured
+  data installation instead of silently reading or writing the account default.
+- Unavailable Recall receipts stopped implying successful execution, zero
+  matches or verified time. Vitality explained its age/type/use basis and its
+  limits without implying truth, task usefulness or automatic deletion.
+- First-use project setup gained the missing explicit action-scope selection.
+  Empty Home and library states lead to Remember instead of an unproductive
+  Recall check or an IDE-only instruction.
+- Narrow-screen memory details used the full tab height so wrapped titles could
+  not hide their scrollable content and correction controls.
+- The published documentation index became a user guide to first use, all six
+  dashboard tabs, Session Intelligence, failure states and recovery. Active
+  instructions reflected the shipped tool surface, disposable installer checks
+  and current release; release synchronization covered the remaining active
+  install, Docker and restart examples without rewriting history.
+
 ## [2.15.0] - 2026-09-03
 
 ### Added

@@ -12,9 +12,9 @@ daemon's write and provenance controls.
 ## Current safe path
 
 - Elefante stores semantic memory in SQLite and relationships in Kuzu.
-- The published v2.13.0 MCP surface is 17 tools and 2 prompts. Current
-  development source exposes 18 tools and 2 prompts because verified Recover
-  is an unreleased candidate. Memory CRUD/search uses the consolidated
+- The current published MCP surface is 18 tools and 2 prompts, including
+  verified `elefante-Recover`. The separate default-off Task Intelligence
+  evaluation surface is developer-only. Memory CRUD/search uses the consolidated
   `elefante-Memory(action=...)` tool.
 - A container connects to the host runtime only through an explicitly configured
   local boundary. Do not expose the dashboard or MCP service publicly.

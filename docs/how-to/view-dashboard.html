@@ -456,23 +456,23 @@
 
   <header class="masthead">
     <div class="masthead-inner">
-      <div class="wordmark"><span class="wordmark-mark">E</span><span>Elefante / local memory authority</span></div>
+      <div class="wordmark"><span class="wordmark-mark">E</span><span>Elefante / user documentation</span></div>
       <div class="hero-grid">
         <div>
-          <p class="eyebrow">Complete dashboard field guide</p>
-          <h1>Make memory useful for the next task.</h1>
+          <p class="eyebrow">Usage, results, and safety</p>
+          <h1>Elefante dashboard guide.</h1>
         </div>
         <div class="hero-copy">
-          <p>A source-backed explanation of <strong>every visible state, view, score, control, receipt, and safety boundary</strong>—written for the first time you open the product.</p>
-          <p>The short version: use Home to understand the whole memory system, improve what Elefante supplies to a task, and protect continuity. A project is required only when Recall or a durable change needs an exact task boundary.</p>
+          <p>Learn <strong>what each control does, what its result means, and when to leave a memory unchanged</strong>.</p>
+          <p>Work with your connected agent. Use the dashboard to inspect, correct, and protect its memory. Browsing needs no project; Recall and memory changes need one exact memory boundary.</p>
           <div class="hero-actions">
             <a class="button button-primary" href="http://localhost:8000/">Open Elefante dashboard</a>
-            <a class="button" href="#choose-the-journey-that-matches-your-goal">Choose your path</a>
+            <a class="button" href="#open-home">Start here</a>
           </div>
           <div class="proof-line" aria-label="Guide evidence status">
-            <span>source checked</span>
-            <span>current six-workspace source</span>
-            <span>one product / one dashboard</span>
+            <span>local dashboard</span>
+            <span>six main sections</span>
+            <span>read · check · decide</span>
           </div>
         </div>
       </div>
@@ -481,26 +481,26 @@
 
   <section class="journey-map" aria-labelledby="journey-map-title">
     <div class="journey-heading">
-      <h2 id="journey-map-title">The product in three journeys</h2>
-      <p>Start with your question, not with a feature.</p>
+      <h2 id="journey-map-title">What do you need to do?</h2>
+      <p>Choose the section that answers your question.</p>
     </div>
     <div class="journey-grid">
       <article class="journey">
         <small>01 / no project needed</small>
-        <h3>Global understanding</h3>
-        <p>Browse the complete local snapshot, see themes, inspect health, and follow evidence-backed relationships.</p>
+        <h3>Understand your memories</h3>
+        <p>Browse the loaded memories, inspect their health, and follow stored relationships.</p>
         <div class="journey-path">Memory Intelligence → Connections</div>
       </article>
       <article class="journey">
         <small>02 / project bound</small>
-        <h3>Task intelligence</h3>
-        <p>Bind the exact project, preserve durable guidance, and verify what governed Recall supplies for one real task.</p>
-        <div class="journey-path">Project → Remember or Recall → receipt</div>
+        <h3>Check memory for a task</h3>
+        <p>Confirm the memory scope, ask a real question, and inspect the records Recall selects.</p>
+        <div class="journey-path">Recall → question → selected records</div>
       </article>
       <article class="journey">
         <small>03 / product-wide</small>
-        <h3>Continuity</h3>
-        <p>Check health, protect data, restore safely, and inspect receipts instead of trusting a success label.</p>
+        <h3>Protect your data</h3>
+        <p>Check health, create a verified backup, or review a restore plan before confirming it.</p>
         <div class="journey-path">Recover → timestamped evidence</div>
       </article>
     </div>
@@ -520,7 +520,7 @@
 <a class="toc-link" href="#home-purpose-evidence-next" data-section="home-purpose-evidence-next"><span>05</span>Home: purpose, evidence, next action</a>
 <a class="toc-link" href="#home-s-three-operator-jobs" data-section="home-s-three-operator-jobs"><span>06</span>Home's three operator jobs</a>
 <a class="toc-link" href="#recall-inspector" data-section="recall-inspector"><span>07</span>Recall: test governed selection</a>
-<a class="toc-link" href="#where-the-briefing-ideas-live" data-section="where-the-briefing-ideas-live"><span>08</span>Where the Briefing ideas live</a>
+<a class="toc-link" href="#where-the-briefing-ideas-live" data-section="where-the-briefing-ideas-live"><span>08</span>Evidence and Session Intelligence</a>
 <a class="toc-link" href="#memories-browse-understand-and-correct" data-section="memories-browse-understand-and-correct"><span>09</span>Memory Intelligence: inspect and review</a>
 <a class="toc-link" href="#connections-understand-relationships-across-memories" data-section="connections-understand-relationships-across-memories"><span>10</span>Connections: understand represented relationships</a>
 <a class="toc-link" href="#projects-define-where-managed-memory-belongs" data-section="projects-define-where-managed-memory-belongs"><span>11</span>Projects: define where managed memory belongs</a>
@@ -540,6 +540,7 @@
       <article class="guide-body">
         <section class="guide-preface" aria-labelledby="guide-purpose"><h2 class="visually-hidden" id="guide-purpose">What Elefante Home is for</h2><p class="guide-status"><span class="status-label">Applies to</span> the current six-workspace Elefante Home source and its installed package contract.</p>
 <p class="release-note"><span class="status-label">Release boundary</span> this guide documents the six-workspace Home. A locally installed candidate can be checked through its package receipt and Doctor; installing a source candidate does not publish a release, and source checks alone do not prove which dashboard package is running.</p>
+<p>New to Elefante? Start with the <a href="../README.md">user guide</a> for installation, your first useful memory, and the everyday workflow. This page is the detailed dashboard reference. On GitHub it appears as HTML source: use <strong>Download raw file</strong> and open the downloaded file in a browser to read this layout.</p>
 <p>Elefante Home is the advanced local control room for three jobs:</p>
 <ol>
 <li><strong>Global understanding.</strong> Memory Intelligence and Connections inspect everything represented in the current snapshot; no project is required.</li>
@@ -661,7 +662,23 @@ new plan and confirm it before trying the operation again.</p>
 </tr>
 <tr>
 <td><code>stale</code></td>
-<td>Snapshot is at least 60 minutes old, or its generation time is unavailable</td>
+<td>Snapshot is at least 60 minutes old</td>
+</tr>
+<tr>
+<td><code>snapshot · timestamp unknown</code></td>
+<td>The generation time is missing or invalid; freshness cannot be established</td>
+</tr>
+<tr>
+<td><code>snapshot · future timestamp</code></td>
+<td>The recorded generation time is ahead of the current clock; it is not treated as current</td>
+</tr>
+<tr>
+<td>Stats unavailable</td>
+<td>The statistics request failed; missing counts are not shown as verified zeros</td>
+</tr>
+<tr>
+<td>Example workspace</td>
+<td>A disclosed example snapshot is loaded; its timestamp and counts are not live customer evidence</td>
 </tr>
 <tr>
 <td>Reload snapshot</td>
@@ -731,9 +748,10 @@ the counted <strong>Review</strong> queue—not the complete Library.</p>
 <tr><td>Task boundary</td><td>The bound project when a verified task action is available; otherwise global inspection remains available without one</td></tr>
 <tr><td>Recovery evidence</td><td>The latest health receipt returned in this session, or <strong>Not checked</strong></td></tr>
 </tbody></table></div>
-<p>Home never fills missing proof with <strong>Available</strong>, <strong>Ready</strong>, or
-<strong>Not verified</strong> placeholders. It names the evidence it has and the check
-needed to establish more.</p>
+<p>Read each Current evidence cell as the named observation: a snapshot count,
+the active boundary, or the latest health check. None certifies memory accuracy
+or answer quality. Session Intelligence separately shows <strong>Not verified</strong>
+when task-outcome evidence is absent.</p>
 
 <h2 id="home-s-three-operator-jobs"><a class="heading-anchor" href="#home-s-three-operator-jobs">Home's three operator jobs</a></h2>
 <div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
@@ -782,10 +800,12 @@ selected memory's represented lifecycle state:</p>
 permanently. Other represented inactive records, including superseded records,
 offer only Delete permanently. The no-write plan remains authoritative and can
 still block the operation when its safety conditions are not met.</p>
-<p>The managed flow is always: choose an action; explain why; provide a likely
-future Recall question; inspect a no-write plan; confirm its single-use ticket;
+<p>The managed flow is: choose an action; explain why; provide the verification
+question requested by the form; inspect a no-write plan; confirm its single-use ticket;
 apply once; verify store, graph, Home, and scoped Recall; then inspect the
-privacy-safe receipt. Protected memories add explicit acknowledgement. Permanent
+privacy-safe receipt. Most corrections ask for a <strong>Likely future Recall question</strong>;
+permanent deletion asks for a <strong>Question that must not return this memory</strong>.
+Protected memories add explicit acknowledgement. Permanent
 deletion adds exact <code>DELETE</code> confirmation. Its temporary safety backup is
 destroyed only after all postconditions pass. Older backups are not deleted and may
 still contain the memory; restoring one can bring that record back.</p>
@@ -815,14 +835,15 @@ is never presented as completion.</p>
 <a href="#recover-health-backup-restore-and-support">Recover</a>. Its controls become
 readiness evidence only after a timestamped check or verified operation receipt.</p>
 <h2 id="recall-inspector"><a class="heading-anchor" href="#recall-inspector">Recall: test governed selection</a></h2>
-<p>Recall is the truthful place to test what Elefante would supply for one real
-question. The first version is deliberately narrow: one ephemeral question,
-one active registered project, and one read-only check. It does not answer the
+<p>Use Recall to inspect the memories Elefante selects for one real
+question. The check requires connected controls, an active registered project
+with an available folder, and a nonblank question. It uses one read-only call and does not answer the
 question, write a memory, or create Recall history for dashboard convenience.</p>
 <p><strong>Memory scope</strong> names the memories available to this check, not
 the subject you must ask about. A preselected boundary needs no repeated setup.
 Overall browsing remains available in the Library without a project.</p>
-<p><strong>Run Recall Check</strong> returns bounded proof, not private memory content:</p>
+<p><strong>Run Recall Check</strong> returns a receipt with the result, selected
+record identifiers and titles, not a generated answer:</p>
 <div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
 <tr>
@@ -833,7 +854,7 @@ Overall browsing remains available in the Library without a project.</p>
 <tbody>
 <tr>
 <td><code>supplied</code></td>
-<td>Governed Recall selected one or more project memories; Home shows selected count plus bounded IDs and titles</td>
+<td>Governed Recall selected one or more project memories; the Recall Inspector shows the selected count, record identifiers, and available titles</td>
 </tr>
 <tr>
 <td><code>no_match</code></td>
@@ -852,6 +873,10 @@ Overall browsing remains available in the Library without a project.</p>
 <p>The receipt may also show conflict count, active project, and verification
 time. A selected ID can open that record in Memory Intelligence. The selected
 memory content remains in the agent delivery path and is not copied into Home.</p>
+<p>An unavailable or failed check shows <strong>Not reported</strong> for counts
+and <strong>Not verified</strong> for scope and time. It proves neither a completed
+check nor zero matches. Reconnect if needed, then run the check again; old selected
+records are not presented as a new result.</p>
 <p>Opening a selected record or <strong>Inspect available memories</strong>
 clears an old snapshot search and opens Library, so previous filters cannot
 hide the record you asked to inspect.</p>
@@ -871,40 +896,40 @@ does not prove that an answer was correct; <code>no_match</code> proves only tha
 <p>If no active project or local management session is available, Recall fails
 closed and points to Projects or Home. It never converts the all-memory view
 into a global Recall scope.</p>
-<h2 id="where-the-briefing-ideas-live"><a class="heading-anchor" href="#where-the-briefing-ideas-live">Where the Briefing ideas live</a></h2>
-<p>The earlier Memory Maintenance Briefing combined useful ideas in one crowded
-Home panel, but its featured-memory narrative was not bound to a real task. The
-ideas remain; each now appears where its evidence is authoritative:</p>
+<h2 id="where-the-briefing-ideas-live"><a class="heading-anchor" href="#where-the-briefing-ideas-live">Evidence and Session Intelligence</a></h2>
+<p>Different dashboard sections answer different questions. Use the evidence
+for the decision it can actually support:</p>
 <div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
-<thead><tr><th>Developed idea</th><th>Current home</th><th>Evidence boundary</th></tr></thead>
+<thead><tr><th>Your question</th><th>Where to look</th><th>What the evidence means</th></tr></thead>
 <tbody>
 <tr><td>Records that deserve inspection</td><td>Memory Intelligence -&gt; Review</td><td>Direct health or lifecycle signals; review is not a correction verdict</td></tr>
 <tr><td>Topic, vitality, use, health, and lifecycle distributions</td><td>Memory Intelligence and Connections</td><td>Snapshot diagnostics; not task relevance or outcome quality</td></tr>
 <tr><td>Old assumption -&gt; evidence -&gt; decision -&gt; guard</td><td>Connections -&gt; Decision Graph</td><td>Only explicit represented edges; no chain inferred from topic or row order</td></tr>
 <tr><td>What shaped one task</td><td>Recall, after a real check</td><td>Only the returned status, project, selected IDs, conflicts, and verification time</td></tr>
 </tbody></table></div>
-<p>This removes unsupported duplication, not capability. Home chooses the job;
-the specialist workspace explains the evidence. <strong>No action</strong> remains a
-valid conclusion when the represented evidence does not justify a change.</p>
+<p><strong>No action</strong> is a valid conclusion when the evidence does not
+justify changing a memory. A review signal, a relationship, and a selected
+memory are different kinds of evidence; none alone proves a better answer.</p>
 <h3 id="session-intelligence"><a class="heading-anchor" href="#session-intelligence">Session Intelligence</a></h3>
 <p>Session Intelligence remains on Home under the collapsed <strong>Advanced</strong>
-disclosure. It is <strong>view-only</strong>: it explains observed usage, not whether
-Elefante improved a task. The owner requires this capability active, but collection
-still needs local, purpose-bound permission; the dashboard cannot grant it.</p>
+disclosure. It is <strong>view-only</strong>: it explains observed usage. Collection
+needs explicit local permission; the dashboard cannot grant it. Usage activity
+alone does not show whether Elefante improved a task.</p>
 <p><strong>Consent and evidence boundary:</strong> automatic MCP capture starts
 only after the owner grants explicit approval for the <code>usage_analytics</code>
 purpose. Completed dispatches then produce local usage estimates; they are not
 provider or billing actuals. Approval for the <code>provider_usage</code> purpose
 is separate, and provider-reported actuals require a verified adapter rather than
-being inferred from tool calls. The <a href="../../workspace/proposals/session-intelligence-activation.md">activation PRD</a>
-tracks implementation evidence and local installation separately.</p>
+being inferred from tool calls. Follow the
+<a href="../reference/token-intelligence.md#existing-local-controls">local permission and usage controls</a>
+to configure collection or inspect retained evidence.</p>
 <div class="table-scroll" role="region" aria-label="Session Intelligence values" tabindex="0"><table>
 <thead><tr><th>Value</th><th>What it means</th></tr></thead>
 <tbody>
 <tr><td>Recorded events</td><td>Observed activity, including blocked and failed calls. Actual and estimated observations have separate counts. Not a count of tasks or model turns; Reload adds none.</td></tr>
 <tr><td>Usage cost</td><td>Calculated only from complete actual usage and compatible dated rates. Otherwise says Unavailable, not zero.</td></tr>
 <tr><td>Task result</td><td>Accepted or rejected only from comparable causal-outcome evidence. Otherwise says Not verified. Normal usage or a successful Recall does not prove benefit.</td></tr>
-<tr><td>Usage details → actual input / output tokens</td><td>Provider-reported counts. Cached input is already included. A measured zero is zero; missing evidence is UNKNOWN. Local estimates stay separate.</td></tr>
+<tr><td>Usage details → actual input / output tokens</td><td>Provider-reported counts, shown only when at least one provider-actual observation exists. Cached input is already included. Observed token counts can be zero; without those observations the display is UNKNOWN. Local estimates stay separate.</td></tr>
 <tr><td>Suggestions</td><td>Expand to read provisional statements and their supporting counts. An unavailable report is not zero suggestions. Nothing trains a model.</td></tr>
 </tbody></table></div>
 <p>Three summary cards lead. <strong>Usage details</strong> holds token counts,
@@ -1164,8 +1189,14 @@ component. Topic/entity links and semantic bridges can still exist.</p>
 the overall snapshot.</p>
 <p>In the disclosed Example workspace, Projects explains this boundary and links
 back to Memory Intelligence or Recall; it does not simulate registration or
-claim that a project was changed. The controls below appear only when a verified
-local management session returns a real registry.</p>
+claim that a project was changed. In a read-only registry view, controls such as
+<strong>Add project</strong> and row actions remain visible but locked.
+They become usable only when the local session and registry satisfy their
+safety conditions; <strong>Enable strict</strong> also requires completed legacy review.</p>
+<p>After strict-mode setup, select <strong>Use for actions</strong> beside an active
+project. <strong>Current scope</strong> identifies the session's boundary. Changing
+it clears the previous Recall question and receipt without moving memories or
+replaying any operation. Inactive or missing-folder registrations cannot be selected.</p>
 <h3 id="registry-state"><a class="heading-anchor" href="#registry-state">Registry state</a></h3>
 <div class="table-scroll" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
@@ -1175,6 +1206,10 @@ local management session returns a real registry.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>Registry unavailable</td>
+<td>No Project Registry state was included in the current snapshot; this is not an empty registry</td>
+</tr>
 <tr>
 <td>Compatibility</td>
 <td>Existing unscoped behavior remains available while legacy memory is reviewed</td>
@@ -1420,7 +1455,8 @@ action. Recent receipts shows at most five bounded lifecycle entries.</p>
 </tr>
 <tr>
 <td>No memories</td>
-<td>The current snapshot contains no memory nodes</td>
+<td>The current snapshot contains no memory nodes. Open Home to use Remember;
+a ready empty Home recommends saving one useful decision before testing Recall.</td>
 </tr>
 <tr>
 <td>No data to visualise</td>
@@ -1488,14 +1524,12 @@ snapshot, open the stores, run arbitrary tools, or select arbitrary backup or
 support-report destinations.</p>
 <h2 id="troubleshooting"><a class="heading-anchor" href="#troubleshooting">Troubleshooting</a></h2>
 <h3 id="i-see-an-older-or-simpler-dashboard"><a class="heading-anchor" href="#i-see-an-older-or-simpler-dashboard">I see an older or simpler dashboard</a></h3>
-<p>Confirm the installed build, not only the semantic version in the header. The
-six-workspace, light-default dashboard described here is the current source
-contract and has also been exercised in the local installed candidate. It is not
-proof that every package has the same assets. If the dashboard does not show
+<p>Confirm the installed build, not only the semantic version in the header.
+Use the package receipt and Doctor to compare it with the published release
+you installed. If the dashboard does not show
 Home, Recall, Memory Intelligence, Connections, Projects, and Recover, read the
-package receipt and Doctor result, then compare the running package with the
-published release it came from. This is a package-version boundary, not a second
-Elefante product.</p>
+<a href="install.md#4-verify-the-installation">installation verification steps</a>.
+An old page is not a reason to create a second installation or reset memories.</p>
 <h3 id="home-has-no-operational-receipt"><a class="heading-anchor" href="#home-has-no-operational-receipt">Home has no operational receipt</a></h3>
 <p>Continue with Global understanding if the snapshot is available. If you expected
 live Recall or lifecycle controls, verify the installed Elefante service and use

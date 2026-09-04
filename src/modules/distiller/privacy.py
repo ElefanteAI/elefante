@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 import logging
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, List, Tuple
 
@@ -43,7 +44,7 @@ _PATTERNS: List[Tuple[str, re.Pattern, str]] = [
     ("GITHUB_TOKEN", re.compile(r"(?:ghp_|gho_|ghu_|ghs_|ghr_)[A-Za-z0-9_]{36,}"), "[REDACTED:GITHUB_TOKEN]"),
 
     # OpenAI keys
-    ("OPENAI_KEY", re.compile(r"sk-[A-Za-z0-9]{20,}"), "[REDACTED:OPENAI_KEY]"),
+    ("OPENAI_KEY", re.compile(r"sk-(?!ant-)[A-Za-z0-9_\-]{20,}"), "[REDACTED:OPENAI_KEY]"),
 
     # Anthropic keys
     ("ANTHROPIC_KEY", re.compile(r"sk-ant-[A-Za-z0-9\-]{20,}"), "[REDACTED:ANTHROPIC_KEY]"),
@@ -63,6 +64,24 @@ _PATTERNS: List[Tuple[str, re.Pattern, str]] = [
     # IP addresses with ports (likely internal servers)
     ("INTERNAL_IP", re.compile(r"\b(?:10|172\.(?:1[6-9]|2\d|3[01])|192\.168)\.\d{1,3}\.\d{1,3}:\d{2,5}\b"), "[REDACTED:INTERNAL_IP]"),
 ]
+
+# Structured payloads lose the ``key=value`` context used by text patterns.
+# Match explicit credential field names, not benign counters or public keys.
+_SECRET_FIELD = re.compile(
+    r"(?:[a-z0-9]+[_-])*(?:api[_-]?key|secret|secret[_-]?key|secret[_-]access[_-]key|"
+    r"access[_-]token|auth[_-]token|refresh[_-]token|secret[_-]token|"
+    r"access[_-]key(?:[_-]id)?|password|passwd|pwd|"
+    r"private[_-]key|credentials?|authorization)", re.IGNORECASE,
+)
+_REDACTED_VALUE = re.compile(r"\[REDACTED:[A-Z_]+\]")
+
+
+def _merge_redaction_types(kinds: List[str]) -> List[str]:
+    totals: Counter[str] = Counter()
+    for kind in kinds:
+        name, _, count = kind.rpartition("(")
+        totals[name] += int(count.removesuffix(")"))
+    return [f"{name}({totals[name]})" for name in sorted(totals)]
 
 
 class PrivacyFilter:
@@ -121,15 +140,25 @@ class PrivacyFilter:
                 output.append(clean)
                 count += item_count
                 kinds.extend(item_kinds)
-            return output, count, sorted(set(kinds))
+            return output, count, _merge_redaction_types(kinds)
         if isinstance(value, dict):
             output_dict: dict[Any, Any] = {}
             count = 0
             kinds: list[str] = []
             for key, item in value.items():
+                field_name = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key) if isinstance(key, str) else ""
+                if (
+                    _SECRET_FIELD.fullmatch(field_name)
+                    and item is not None and item != ""
+                    and not (isinstance(item, str) and _REDACTED_VALUE.fullmatch(item))
+                ):
+                    output_dict[key] = "[REDACTED:CREDENTIAL_FIELD]"
+                    count += 1
+                    kinds.append("CREDENTIAL_FIELD(1)")
+                    continue
                 clean, item_count, item_kinds = self.scrub_payload(item)
                 output_dict[key] = clean
                 count += item_count
                 kinds.extend(item_kinds)
-            return output_dict, count, sorted(set(kinds))
+            return output_dict, count, _merge_redaction_types(kinds)
         return value, 0, []

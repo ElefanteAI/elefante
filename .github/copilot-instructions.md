@@ -91,9 +91,10 @@ calculator, document generator, transaction authority, or provider-billing API.
 
 ## Current MCP surface
 
-Published Elefante v2.13.0 exposes 17 customer tools and 2 prompts. The source
-also contains a default-off developer-only Task Intelligence evaluation tool;
-do not present it as part of the customer surface or as proof of outcome lift.
+The current published customer profile exposes 18 tools and 2 prompts, including
+the verified `elefante-Recover` lifecycle surface. The source also contains a
+default-off developer-only Task Intelligence evaluation tool; do not present it
+as part of the customer surface or as proof of outcome lift.
 
 - Memory: `elefante-Recall`, `elefante-Memory`
 - Context and graph: `elefante-ContextGet`, `elefante-GraphQuery`,
@@ -103,7 +104,7 @@ do not present it as part of the customer surface or as proof of outcome lift.
 - Optional agent ETL: `elefante-ETLProcess`, `elefante-ETLClassify`
 - Directives: `elefante-DirectiveAdd`, `elefante-DirectiveList`,
   `elefante-DirectiveRemove`
-- Runtime: `elefante-System`, `elefante-SystemStatusGet`,
+- Runtime: `elefante-Recover`, `elefante-System`, `elefante-SystemStatusGet`,
   `elefante-DashboardOpen`
 - Prompts: `elefante-grounding`, `elefante-context`
 

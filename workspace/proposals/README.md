@@ -15,9 +15,9 @@ planning/retrieval, and defer to the released `docs/` contract.
 | [`session-intelligence-activation.md`](session-intelligence-activation.md) | RELEASED AND INSTALLED — SI-1–SI-5 pass within recorded boundaries; official v2.15.0 records consented MCP estimates. No provider-billing or task-value claim | Existing token/architecture references and HTML dashboard guide own behavior; this PRD preserves local acceptance and links to the verified release follow-through |
 | [`retrieval-effectiveness.md`](retrieval-effectiveness.md) | NORTH STAR — one bounded causal-repair experiment; the first evidenced failed stage chooses the implementation; representative lift and customer promotion remain gated | `docs/reference/task-intelligence.md` when shipped |
 | [`memory-identity.md`](memory-identity.md) | DEFERRED DESIGN REFERENCE — no schema work unless a bounded experiment proves state/scope ambiguity causes task failure and read-only resolution improves it | `docs/reference/memory-identity.md` when shipped |
-| [`four-action-product-lifecycle.md`](four-action-product-lifecycle.md) | APPROVED / LOCAL PRODUCT LOOP IMPLEMENTED — product defaults, complete six-scenario exact-package execution, and release evidence remain gated | Product and operating references when the exact artifact is accepted and shipped |
+| [`four-action-product-lifecycle.md`](four-action-product-lifecycle.md) | APPROVED — SHIPPED CORE / FULL ACCEPTANCE PENDING — product defaults, complete six-scenario exact-package execution, and release evidence remain gated | Product and operating references when the exact artifact is accepted and shipped |
 | [`integrations/agent-zero.md`](integrations/agent-zero.md) | Integration target draft | `docs/reference/integrations/agent-zero.md` if shipped |
-| [`tool-consolidation.md`](tool-consolidation.md) | EXPLORING — unversioned 17 → smaller-surface hypothesis; no approval or implementation | `docs/reference/tools.md` only if later proved and shipped |
+| [`tool-consolidation.md`](tool-consolidation.md) | EXPLORING — current 18-tool customer surface → smaller-surface hypothesis; no approval or implementation | `docs/reference/tools.md` only if later proved and shipped |
 
 ## Lifecycle
 

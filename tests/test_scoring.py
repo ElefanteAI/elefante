@@ -108,6 +108,19 @@ def test_correct_decay_rates_are_defined():
     assert TYPE_DECAY_RATES["preference"] > 0
 
 
+@pytest.mark.parametrize("memory_type", ["specification", "directive"])
+def test_zero_type_decay_still_respects_last_access_freshness(memory_type):
+    now = datetime(2026, 1, 15)
+    memory = _make_memory(memory_type=memory_type, age_days=365, access_count=1)
+    memory.metadata.created_at = now - timedelta(days=365)
+    memory.metadata.last_accessed = now
+    before = memory.model_dump()
+    assert memory.metadata.decay_rate == 0.0
+    assert memory.calculate_relevance_score(now) == pytest.approx(1.0)
+    assert memory.calculate_relevance_score(now + timedelta(days=10)) == pytest.approx(math.exp(-0.05))
+    assert memory.model_dump() == before
+
+
 
 
 

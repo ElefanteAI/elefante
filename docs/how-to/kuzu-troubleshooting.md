@@ -1,6 +1,6 @@
 # Troubleshoot Kuzu Safely
 
-**Applies to:** v2.13.0
+**Applies to:** the current published customer runtime and supported legacy stores
 
 Kuzu stores Elefante's entities and relationships. The normal customer runtime
 has one daemon owner; IDE bridges never open Kuzu directly.

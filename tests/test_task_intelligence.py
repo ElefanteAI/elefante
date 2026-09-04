@@ -640,6 +640,94 @@ def test_v2_project_name_only_match_cannot_become_a_direct_answer() -> None:
     assert brief.selected_memory_ids == []
 
 
+@pytest.mark.parametrize(
+    ("question", "answer", "answer_cue", "noise", "noise_cue"),
+    [
+        (
+            "How does Elefante improve the work an AI agent does?",
+            "Elefante should turn relevant memories into useful advice that improves "
+            "the current task. Judge its value by measurable task results and accepted "
+            "task value per total token. Token savings and additional infrastructure "
+            "are means, not the product goal.",
+            "What is Elefante's core purpose, and how should we judge its value?",
+            "Elefante's founder is the sole operator across development, operations, "
+            "marketing, the website, and business. Plan work that one person can "
+            "maintain. Reuse completed work and existing documentation before adding "
+            "scope; favor small, useful changes that reduce recurring effort.",
+            "What staffing and maintenance constraints should shape Elefante's next feature?",
+        ),
+        (
+            "How does Aster reduce coffee waste?",
+            "Aster reduces coffee waste by weighing each dose before brewing.",
+            "How does Aster prevent wasted coffee?",
+            "Aster's coffee waste report uses the copper template for the accounts team.",
+            "Which template should the coffee waste report use?",
+        ),
+    ],
+)
+def test_v2_explanatory_question_does_not_select_a_different_saved_property(
+    question, answer, answer_cue, noise, noise_cue,
+) -> None:
+    relevant = _result(answer, memory_type=MemoryType.DECISION, vector_score=0.89)
+    irrelevant = _result(noise, memory_type=MemoryType.SPECIFICATION, vector_score=0.99)
+    relevant.memory.metadata.recall_cues = [answer_cue]
+    irrelevant.memory.metadata.recall_cues = [noise_cue]
+    request = TaskBriefRequest(task=question, profile=TaskBriefProfile.V2)
+    compiler = TaskBriefCompiler()
+
+    # Topic similarity and the specification label cannot prove this property.
+    assert compiler.compile(request, [irrelevant, relevant]).selected_memory_ids == [str(relevant.memory.id)]
+    assert compiler.compile(request, [irrelevant]).abstained is True
+
+
+@pytest.mark.parametrize(
+    ("question", "body", "cue", "expected"),
+    [
+        ("How does the event index persist records?",
+         "The event index persists records by validating each event and writing the normalized row to SQLite before the query layer reads it.",
+         "Which database should the event index use?", True),
+        ("How does the event import process CSV records?",
+         "The event import processes CSV records by parsing each row, normalizing fields, and rejecting malformed rows.",
+         "Which format should the event import accept?", True),
+        ("How does the event index enforce its schema?",
+         "The event index enforces its schema by validating fields before writing normalized rows to SQLite.",
+         "Which schema should the event index use?", True),
+        ("How does the event index persist records?", "Use SQLite for the event index.",
+         "Which database should the event index use?", False),
+        ("How does the event index persist records?",
+         "The event index persists records by validating each event and writing the normalized row to SQLite before the query layer reads it.",
+         "How does the event index store records?", True),
+        ("How does the event import process CSV records?", "The event import accepts CSV format.",
+         "Which format should the event import accept?", False),
+    ],
+    ids=["database-mechanism", "format-mechanism", "schema-mechanism",
+         "database-only", "mechanism-cue", "format-only"],
+)
+def test_v2_saved_cues_do_not_exhaust_independent_body_evidence(question, body, cue, expected):
+    candidate = _result(body, vector_score=0.9)
+    candidate.memory.metadata.recall_cues = [cue]
+    before = candidate.memory.model_dump()
+    brief = TaskBriefCompiler().compile(
+        TaskBriefRequest(task=question, profile=TaskBriefProfile.V2), [candidate],
+    )
+    assert brief.selected_memory_ids == ([str(candidate.memory.id)] if expected else [])
+    assert candidate.memory.model_dump() == before
+
+
+def test_v2_success_criteria_are_not_mechanism_answer_evidence():
+    candidate = _result(
+        "Use SQLite for the event index. The API contract is stable.", vector_score=0.9,
+    )
+    candidate.memory.metadata.recall_cues = ["Which database should the event index use?"]
+    brief = TaskBriefCompiler().compile(
+        TaskBriefRequest(
+            task="How does the event index persist records?", profile=TaskBriefProfile.V2,
+            success_criteria=["Preserve the current API contract."],
+        ), [candidate],
+    )
+    assert brief.abstained is True
+
+
 def test_v2_identifier_question_does_not_fall_through_to_generic_active_memory() -> None:
     archived_exact = _result(
         (
@@ -846,6 +934,29 @@ def test_v2_selects_a_constraint_with_a_question_specific_text_anchor() -> None:
     assert compiler._is_actionable(ranked[0]) is True
     assert brief.abstained is False
     assert brief.selected_memory_ids == [str(relevant_constraint.memory.id)]
+
+
+@pytest.mark.parametrize("noun", ["constraint", "constraints", "rule", "rules"])
+@pytest.mark.parametrize("memory_type", [MemoryType.SPECIFICATION, MemoryType.DIRECTIVE])
+def test_v2_rule_category_requires_independent_topic_evidence(noun, memory_type):
+    relevant = _result(
+        "Customer retrieval explanations must expose only verified signals "
+        "and must not fabricate missing score components.",
+        memory_type=memory_type, vector_score=0.70,
+    )
+    unrelated = _result(
+        "Package installation must preserve existing user data.",
+        memory_type=memory_type, vector_score=0.99,
+    )
+    for candidate in (relevant, unrelated):
+        candidate.memory.metadata.recall_cues = ["How should the next task proceed?"]
+    compiler = TaskBriefCompiler()
+    request = TaskBriefRequest(
+        task=f"What {noun} should govern customer retrieval explanations and score signals?",
+        profile=TaskBriefProfile.V2,
+    )
+    assert compiler.compile(request, [unrelated, relevant]).selected_memory_ids == [str(relevant.memory.id)]
+    assert compiler.compile(request, [unrelated]).abstained is True
 
 
 def test_v2_accepts_strong_direct_answer_without_implementation_signals() -> None:

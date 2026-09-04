@@ -1,7 +1,7 @@
 ---
 PROTOCOL: orchestrator
 INVOKE: elefante-orchestrator
-PROTOCOL_VERSION: 2.15.0
+PROTOCOL_VERSION: 2.15.1
 LOAD_WHEN: Building or debugging Elefante itself (DEVELOPER mode).
 DIAGNOSTIC_QUESTION: "Am I changing src/, fixing a regression, or shipping a release?"
 AUTHORITY: AGENTS.md (universal entry, repo root) → README.md → this file → everything else.

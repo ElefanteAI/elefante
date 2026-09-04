@@ -1,7 +1,7 @@
 ---
 PROTOCOL: installer
 INVOKE: elefante-installer
-PROTOCOL_VERSION: 2.15.0
+PROTOCOL_VERSION: 2.15.1
 LOAD_WHEN: Fresh install, broken venv, install failure, repair request, "install.sh failed", "install.bat failed", `.elefante-install-summary.txt` reports failure.
 DIAGNOSTIC_QUESTION: "What state is broken in the install pipeline, and which of the four venv paths does it call for?"
 AUTHORITY: This file owns the install protocol. Inline install troubleshooting in README/docs is forwarding only.
@@ -59,6 +59,10 @@ Anything outside `scripts/setup/` requires a different agent.
 
 After successful repair:
 
-1. Re-run the IDE proof-of-work: ask the AI `What is my Elefante test passcode?` — must return the seed.
+1. Verify the installer's `VERIFIED_COMPLETE` receipt and customer Doctor, then
+   use a fresh configured host to Recall one known eligible memory. If there is
+   no such memory, report execution and safe abstention separately from useful
+   selection. The installer removes its disposable acceptance record; do not
+   expect a permanent test passcode or create a replacement seed.
 2. Update `workspace/ISSUES.md` Known Issues row if a recurring failure mode was encountered.
 3. If a new failure class was discovered, append to `workspace/postmortems/installation.md`.

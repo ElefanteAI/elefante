@@ -656,8 +656,18 @@ class TaskBriefCompiler:
     ) -> list[_RankedEvidence]:
         unique: dict[str, _RankedEvidence] = {}
         query_text = " ".join([request.task, *request.success_criteria])
-        query_counts = self._canonical_term_counts(query_text)
+        # A request to explain or summarize is not evidence that a record
+        # containing that presentation instruction answers the actual topic.
+        lexical_query = re.sub(
+            r"^\s*(?:please\s+)?(?:explain|describe|summari[sz]e|tell\s+me|show\s+me)\b[:\s]*",
+            "", query_text, count=1, flags=re.IGNORECASE,
+        )
+        query_counts = self._canonical_term_counts(lexical_query)
         query_terms = set(query_counts)
+        mechanism = re.search(
+            r"\bhow\s+(?:do|does|did)\s+(.+)", request.task.partition("?")[0], re.IGNORECASE,
+        )
+        mechanism_terms = self._canonical_terms(mechanism[1]) if mechanism else set()
         minimum_text_matches = min(2, len(query_terms))
         query_identifiers = {
             term for term in query_terms if any(character.isdigit() for character in term)
@@ -773,6 +783,17 @@ class TaskBriefCompiler:
                 and float(signals["query_coverage"]) >= 0.25
                 and (not query_identifiers or bool(matched_identifiers))
             )
+            # A saved example question is not an exhaustive content boundary.
+            # Require independent body terms beyond that cue's shared topic;
+            # high semantic similarity or a role label alone is insufficient.
+            body_only_terms = mechanism_terms - self._canonical_terms(
+                " ".join(memory.metadata.recall_cues)
+            )
+            signals["mechanism_body_evidence"] = float(
+                signals["direct_answer"]
+                and bool(body_only_terms)
+                and len(body_only_terms & content_terms) >= min(2, len(body_only_terms))
+            )
             positive_signals = [
                 name
                 for name in (
@@ -859,6 +880,7 @@ class TaskBriefCompiler:
                 or (
                     signals.get("recall_cue_focus") == "property"
                     and float(signals.get("recall_cue_similarity", 0.0)) < self.MIN_RECALL_CUE_SIMILARITY
+                    and not float(signals.get("mechanism_body_evidence", 0.0))
                 )
             )
             and not strong_location_match
@@ -986,14 +1008,23 @@ class TaskBriefCompiler:
                 ):
                     return "duration"
                 return {"many": "count", "much": "amount", "long": "duration", "often": "frequency", "old": "age"}[kind]
+            if re.match(r"(?:do|does|did)\b", rest):
+                return "mechanism"
             return "method" if re.match(auxiliary + r"\b", rest) else None
         # A noun phrase before the auxiliary names the requested property.
         # Bare 'what is X?' has no explicit property and remains unknown.
         if re.match(auxiliary + r"\b", rest):
             return None
+        # Procedural nouns ask how to act, not for an absent named fact.
+        # This changes intent classification only, never the relevance gates.
+        if re.match(r"(?:steps?|checks?|actions?|procedures?|precautions?)\s+" + auxiliary + r"\b", rest):
+            return "method"
         phrase = re.match(r"(.+?)\s+" + auxiliary + r"\b", rest)
         if not phrase:
-            return None
+            # Subject questions can use a simple verb without an auxiliary:
+            # "Which supplier provides ...?" still requests the supplier.
+            subject = re.match(r"([a-z]+)\s+[a-z]+(?:s|ed)\s+", rest)
+            return "property:" + subject[1] if subject else None
         words = re.findall(r"[a-z]+", re.split(r"\b(?:of|for|in|on)\b", phrase[1])[0])
         if not words:
             return None
@@ -1012,15 +1043,24 @@ class TaskBriefCompiler:
             return "unknown"
         focuses = [cls._question_focus(cue) for cue in canonicalize_recall_cues(memory.metadata.recall_cues)]
         def key(focus: str | None) -> str | None:
+            if focus in {"method", "mechanism"}:
+                return "method"
             if focus and focus.startswith("property:"):
                 return "property:" + focus.partition(":")[2].split()[-1]
             return focus
 
         if key(target) in [key(focus) for focus in focuses]:
             return "same"
+        # Describing how something works is not a request for every rule about
+        # its topic. A different named property needs the existing strong cue
+        # evidence; the specification label and shared subject do not prove it.
+        if target == "mechanism" and any(
+            focus and focus.startswith("property:") for focus in focuses
+        ):
+            return "property"
         # Open-ended guidance can use constraints or facts saved under a more
         # specific question. A different question form alone is not a veto.
-        if target in {"method", "reason"}:
+        if target in {"method", "mechanism", "reason"}:
             return "unknown"
         # A named property present in the body may be covered by a broader
         # saved question. Do not turn cues into an exhaustive whitelist.
@@ -1028,6 +1068,12 @@ class TaskBriefCompiler:
             if any(focus and focus.startswith("choice:") for focus in focuses):
                 return "choice"
             head = target.partition(":")[2].split()[-1]
+            # A type label establishes only the generic category, not a
+            # qualified property such as staffing or privacy constraints.
+            if cls._canonical_terms(target.partition(":")[2]) in ({"constraint"}, {"rule"}) and str(memory.metadata.memory_type).casefold() in {
+                MemoryType.SPECIFICATION.value, MemoryType.DIRECTIVE.value,
+            }:
+                return "unknown"
             if head in cls._canonical_terms(memory.content):
                 return "unknown"
             if any(focus and focus.startswith("property:") for focus in focuses):

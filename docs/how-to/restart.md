@@ -41,7 +41,7 @@ it does not manage the customer daemon:
 
 ```bash
 ./.venv/bin/python scripts/lifecycle/restart_elefante.py --verify
-./.venv/bin/python scripts/lifecycle/restart_elefante.py --verify --version 2.13.0
+./.venv/bin/python scripts/lifecycle/restart_elefante.py --verify --version 2.15.1
 ```
 
 Verification waits for a private receipt written by the launched process and

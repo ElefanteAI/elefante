@@ -1,7 +1,7 @@
 ---
 PROTOCOL: operator
 INVOKE: elefante-operator
-PROTOCOL_VERSION: 2.15.0
+PROTOCOL_VERSION: 2.15.1
 LOAD_WHEN: Backup, restore, factory reset, dashboard pipeline refresh, planned downtime, any destructive op against a live install.
 DIAGNOSTIC_QUESTION: "Is the backup current AND is the server stopped before any file-level operation?"
 AUTHORITY: This file owns OPERATOR mode. Backup-first is non-negotiable.
@@ -18,8 +18,8 @@ Before any destructive or database file-level operation in this file:
 1. **Backup is current.** `./.venv/bin/python scripts/lifecycle/backup_elefante_data.py`. Verify the backup file exists and is non-empty.
 2. **Store owner is stopped** (for file-level ops). For an installer-owned
    customer daemon, preview then apply
-   `scripts/lifecycle/daemon_service.py uninstall`; this removes the owned
-   service registration, not memory data. For a direct source server, stop the
+   `scripts/lifecycle/daemon_service.py stop`, then `stop --apply`; this pauses
+   the unchanged owned service without deleting its registration file. For a direct source server, stop the
    exact process gracefully. Confirm port 8765 and direct database owners are
    inactive before continuing.
 
@@ -70,8 +70,9 @@ broader diagnostic bundle.
 
 1. Stop the server.
 2. Preflight with `./.venv/bin/python scripts/lifecycle/restore_elefante_data.py --archive <backup-path>` (or `--latest`), then repeat with `--apply`.
-3. Reinstall/start an installer-owned daemon with a dry run followed by
-   `./.venv/bin/python scripts/lifecycle/daemon_service.py install --apply`.
+3. Restart an unchanged installer-owned daemon with `daemon_service.py start`,
+   then `start --apply`. Use the install/repair path only when registration
+   itself needs repair.
 4. Verify with `./.venv/bin/python scripts/verify/verify_health.py`.
 5. After the customer daemon is healthy, refresh through
    `elefante-DashboardOpen(refresh=true)`. From a stopped source/developer
@@ -118,13 +119,18 @@ seed path. Used for:
 Procedure:
 
 1. **Backup** (non-negotiable).
-2. **Confirm intent.** This is irreversible; the user must explicitly authorize.
+2. **Confirm intent.** This changes the active memory state and requires explicit
+   authorization. Preserved backup/quarantine data can support recovery; reset
+   is not a secure-erasure guarantee.
 3. Stop server.
 4. Review `./.venv/bin/python scripts/lifecycle/reset_factory.py`, then apply
    with `--apply --confirm DELETE`.
 5. Run `./.venv/bin/python -m pytest tests/test_factory_reset.py -v` to confirm clean state.
 6. Start server.
-7. Re-run install seed verification: ask AI `What is my Elefante test passcode?`.
+7. Verify Doctor, the expected post-reset inventory and a fresh configured
+   client's Recall execution. The installer removes its disposable acceptance
+   record; do not expect a permanent test passcode. Empty-store abstention is
+   execution proof, not evidence of useful selection.
 
 ## PRIVILEGED Sub-mode
 

@@ -16,9 +16,10 @@ facts, decisions, and specifications from prior work.
 2. Treat retrieved memories as evidence, not unquestionable truth. Check the
    workspace and current source when facts can drift. If evidence conflicts,
    expose the conflict or say UNKNOWN.
-3. Before a write, run the required search. Store only durable, reusable
-   knowledge. Do not store secrets, transient chatter, guesses, or duplicate
-   content.
+3. Before an authorized write, run the required search. Store only durable,
+   reusable knowledge. Do not infer a write request from ordinary conversation.
+   After a successful write, verify Recall using a likely future question.
+   Do not store secrets, transient chatter, guesses, or duplicate content.
 4. Follow explicit user instructions about retention or delivery. User locks
    and mandatory-governance fields override autonomous maintenance; never
    invent user authority.
@@ -29,7 +30,9 @@ facts, decisions, and specifications from prior work.
    `specification`, or `directive`.
 
 The public memory tools are `elefante-Recall` and `elefante-Memory` with
-`action=add|search|update|delete|consolidate|resolve`.
+`action=add|search|correct|update|delete|consolidate|resolve`. Use the verified
+`correct` plan/apply path for content and lifecycle changes; legacy update/delete
+are not bypasses. Apply only with explicit authority and the inspected hashes.
 Use `elefante-SystemStatusGet` for health, `elefante-ContextGet` for broader
 context, and graph/task/directive tools only for their documented purpose.
 

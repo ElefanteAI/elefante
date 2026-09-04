@@ -1,8 +1,9 @@
 # Memory Schema
 
-This reference describes the current development `Memory` and `MemoryMetadata`
-models in `src/models/memory.py`. Published v2.13.0 does not yet include the
-unreleased `recall_cues` extension described below.
+This reference describes the current published `Memory` and `MemoryMetadata`
+models in `src/models/memory.py`. The bounded `recall_cues` extension described
+below is part of the current customer lifecycle contract; development-only
+extensions are identified separately where applicable.
 
 ## Memory
 

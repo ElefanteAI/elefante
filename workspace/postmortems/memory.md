@@ -25,6 +25,18 @@ record from the configured vector-store adapter without a retrieval threshold.
 **Solution:** Use the configured vector-store API for memory operations and the graph-store API for relationship operations.
 **Lesson:** Vector records are memories; Kuzu nodes and edges represent entities and relationships. Verify the intended data source before debugging the data flow.
 
+**Structured-search recurrence (BUG-073, 2026-09-03):** The search plan held
+filters that the graph path discarded; it also queried `m.memory_type` although
+that metadata lives in JSON or the authoritative vector record. Filtering an
+oversampled first page still falsely omitted later matches. The correction
+hydrates each record, applies its complete metadata contract, and reads stable
+bounded graph pages until the requested qualifying count or end. A regression
+places the sole matching record eleventh with a requested limit of one. Scope,
+tags, date, score and related-entity tests verify meaning, not just nonempty output.
+The legacy Chroma wrapper also distinguishes an explicit zero threshold from
+an absent setting and filters before list pagination. Its nearest-neighbor
+search still uses a bounded candidate window; fresh customers use SQLite.
+
 <a id="issue-3"></a>
 
 ## Issue #3: Memory Not Used for Decision Making [DOCUMENTED, behavioral]
@@ -125,6 +137,22 @@ reversible rather than always active. (Cross-bug with ai-behavior #6.)
 **Solution:** Intent-gated spec override — boost applied only when query intent is `developer-process` or `system-rule`. For factual / conversational / preference queries, specs compete on merit.
 **Lesson:** A boost without intent gating becomes a default. Override should fire only when the query asks for what the boosted type provides. (Cross-bug with #11 — empirical validation.)
 
+**Recall recurrence (BUG-047, 2026-09-03):** A real explanation request selected
+the product purpose and an unrelated staffing rule. Strong vector similarity,
+a specification label and shared topic words had stood in for answer evidence.
+Question focus now distinguishes a mechanism request from a saved property;
+leading presentation instructions are not topic matches. Independent review then
+exposed the opposite error: a property cue vetoed text that genuinely described
+the mechanism. The exception requires strong body evidence plus substantive
+question terms absent from the saved cue; separate success criteria cannot supply
+those terms. Fail-first regressions preserve both errors, two property-only
+negatives and the success-criteria boundary. Cached-model coverage retains the
+original corpus and adds independent cases without rewriting user memories or
+changing similarity thresholds. Publication remains a separate gate in
+[`PLANNING.md §2.7`](../PLANNING.md#27-whole-product-acceptance-checklist-current-gate).
+**Prevention:** Test both unrelated same-topic retrieval and valid content beyond
+its saved example question. A green count is not a general relevance guarantee.
+
 <a id="issue-13"></a>
 
 ## Issue #13: Co-Activation Cold-Start [BUG-018, FIXED v2.7.0]
@@ -186,6 +214,16 @@ populate ranking history or co-activation input.
 **Solution:** Add a private versioned Project Registry with stable opaque IDs and deterministic deepest-root mapping. Persist strict intent in a separate mode-0600 marker written before the strict registry transition; a missing, corrupt, conflicting, or downgraded state now fails closed. Resolve project context before opening stores, stamp every new memory with the resolved ID/root/scope, and force Search and Recall through that same scope. Publish the registry, intent marker, and Home snapshot as one checked operation with exact byte-and-mode rollback. Preserve unavailable or invalid projection state instead of fabricating compatibility, and derive the write-lock directory from the configured data installation.
 **Guard:** `pytest tests/test_atomic_json.py tests/test_write_lock_isolation.py tests/test_project_registry.py tests/test_project_scoping.py tests/test_home_control.py tests/test_dashboard_serializer.py tests/test_dashboard_snapshot_verifier.py tests/test_install_setup.py tests/test_mcp_daemon.py -m "not integration and not slow" -q`; `npm run build` in `src/dashboard/ui`.
 **Lesson:** Fail-closed intent must survive loss of its primary state. Every projection must preserve unknown or invalid status, coupled control files require one rollback boundary, and test isolation includes locks as well as data.
+
+**Configured-root recurrence, 2026-09-03:** A real isolated dashboard launch
+still loaded account-default directives and exposure history. No browser
+mutations ran; both real files subsequently matched their verified backup hashes.
+Directives (including the singleton), explicit-use history and attachment
+ingestion now resolve the active configured data directory. Two fail-first
+configuration tests cover YAML and environment selection across separate roots;
+the attachment test verifies bytes under the configured root and absence under
+the old default. All three pass. Isolation must include auxiliary state, not
+only databases and locks.
 
 <a id="issue-19"></a>
 

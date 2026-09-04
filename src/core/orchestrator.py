@@ -26,7 +26,7 @@ import json
 from difflib import SequenceMatcher
 from typing import List, Optional, Dict, Any
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.models.memory import (
     Memory, MemoryType, MemoryMetadata, MemoryStatus,
@@ -949,6 +949,7 @@ class MemoryOrchestrator:
                         plan,
                         apply_temporal_decay,
                         reinforce_access,
+                        filters=filters,
                     )
                 else:  # HYBRID
                     stored_results = await self._search_hybrid(
@@ -1671,113 +1672,36 @@ class MemoryOrchestrator:
         plan: QueryPlan,
         apply_temporal_decay: bool = True,
         reinforce_access: bool = True,
+        filters: Optional[SearchFilters] = None,
     ) -> List[SearchResult]:
         """Execute structured search via graph store with optional temporal decay"""
-        # Build Cypher query based on filters
-        # Note: Entity node stores score in JSON 'props', not as a direct column
-        cypher_parts = ["MATCH (m:Entity {type: 'memory'})"]
-        where_clauses = []
-        
-        if plan.memory_types:
-            where_clauses.append(f"m.memory_type IN {plan.memory_types}")
-        
-        if where_clauses:
-            cypher_parts.append("WHERE " + " AND ".join(where_clauses))
-        
-        cypher_parts.append(f"RETURN m LIMIT {plan.limit}")
-        cypher_query = " ".join(cypher_parts)
-        
-        # Execute query
-        graph_results = await self.graph_store.execute_query(cypher_query)
-        
-        # Convert to SearchResult objects
-        # Note: Graph results don't have similarity scores, so we use score as a proxy.
-        import json
-
+        # Entity metadata is stored in JSON ``props`` rather than dedicated
+        # Kuzu columns. Page the deterministic graph relation and stop only
+        # after enough qualifying memories are reconstructed or Kuzu reaches
+        # the end of the relation. This keeps filtering before the final limit
+        # without materializing an unbounded graph result in memory.
+        structured_page_size = max(plan.limit * 3, 10)
+        structured_offset = 0
         results: List[SearchResult] = []
-        for row in graph_results:
-            entity = row.get("m")
-            if not entity:
-                continue
-
-            # Kuzu may return a Node-like object (with `.properties`) or a plain dict.
-            entity_props: Dict[str, Any]
-            if hasattr(entity, "properties"):
-                entity_props = getattr(entity, "properties")
-            elif isinstance(entity, dict):
-                entity_props = entity
-            else:
-                entity_props = {}
-
-            raw_props = entity_props.get("props")
-            extra: Dict[str, Any] = {}
-            if isinstance(raw_props, str) and raw_props.strip():
-                try:
-                    extra = json.loads(raw_props)
-                except Exception:
-                    extra = {}
-
-            memory_id_value = entity_props.get("id") or extra.get("memory_id")
-            memory_id: Optional[UUID] = None
-            try:
-                if isinstance(memory_id_value, str) and memory_id_value:
-                    memory_id = UUID(memory_id_value)
-            except Exception:
-                memory_id = None
-
-            # Try to load the authoritative Memory from the vector store when possible.
-            memory: Optional[Memory] = None
-            vector_backed = False
-            if memory_id is not None:
-                memory = await self.vector_store.get_memory(memory_id)
-                vector_backed = memory is not None
-
-            score_val = extra.get("score")
-            if score_val is None:
-                score_val = extra.get("importance")  # Backward compat
-            if score_val is None:
-                score_val = entity_props.get("score") or entity_props.get("importance")
-            try:
-                score_int = int(score_val) if score_val is not None else 100
-            except Exception:
-                score_int = 100
-
-            score = max(0.0, min(1.0, score_int / 100.0))
-
-            if memory is None:
-                # Fallback: construct a minimal Memory object from graph metadata.
-                memory_type_str = extra.get("memory_type") or entity_props.get("memory_type") or "conversation"
-                try:
-                    mem_type = MemoryType(memory_type_str)
-                except Exception:
-                    mem_type = MemoryType.CONVERSATION
-
-                memory_metadata = MemoryMetadata(
-                    memory_type=mem_type,
-                    score=score_int,
-                )
-
-                memory = Memory(
-                    id=memory_id or uuid4(),
-                    content=extra.get("content") or entity_props.get("description") or "",
-                    metadata=memory_metadata,
-                )
-
-            # Mark whether this result is backed by an actual vector-store record.
-            try:
-                memory.metadata.custom_metadata["_vector_backed"] = vector_backed
-            except Exception:
-                pass
-
-            results.append(
-                SearchResult(
-                    memory=memory,
-                    score=score,
-                    source="graph",
-                    vector_score=None,
-                    graph_score=score,
-                )
+        while len(results) < plan.limit:
+            cypher_query = (
+                "MATCH (m:Entity {type: 'memory'}) "
+                f"RETURN m ORDER BY m.id SKIP {structured_offset} LIMIT {structured_page_size}"
             )
+            graph_results = await self.graph_store.execute_query(cypher_query)
+            if not graph_results:
+                break
+
+            for row in graph_results:
+                result = await self._hydrate_structured_result(row, filters, plan)
+                if result is not None:
+                    results.append(result)
+                if len(results) >= plan.limit:
+                    break
+
+            structured_offset += len(graph_results)
+            if len(graph_results) < structured_page_size:
+                break
         
         # Apply Temporal Decay & Reinforcement (Read-Side Plasticity)
         if apply_temporal_decay:
@@ -1803,7 +1727,181 @@ class MemoryOrchestrator:
             # Re-sort after decay application
             results.sort(key=lambda r: r.score, reverse=True)
 
-        return results
+        return results[:plan.limit]
+
+    async def _hydrate_structured_result(
+        self,
+        row: Dict[str, Any],
+        filters: Optional[SearchFilters],
+        plan: QueryPlan,
+    ) -> Optional[SearchResult]:
+        """Reconstruct one graph row and apply its filters before selection."""
+        entity = row.get("m")
+        if not entity:
+            return None
+
+        # Kuzu may return a Node-like object (with `.properties`) or a plain dict.
+        entity_props: Dict[str, Any]
+        if hasattr(entity, "properties"):
+            entity_props = getattr(entity, "properties")
+        elif isinstance(entity, dict):
+            entity_props = entity
+        else:
+            entity_props = {}
+
+        raw_props = entity_props.get("props")
+        extra: Dict[str, Any] = {}
+        if isinstance(raw_props, str) and raw_props.strip():
+            try:
+                extra = json.loads(raw_props)
+            except Exception:
+                extra = {}
+
+        memory_id_value = entity_props.get("id") or extra.get("memory_id")
+        memory_id: Optional[UUID] = None
+        try:
+            if isinstance(memory_id_value, str) and memory_id_value:
+                memory_id = UUID(memory_id_value)
+        except Exception:
+            memory_id = None
+
+        # Try to load the authoritative Memory from the vector store when possible.
+        memory: Optional[Memory] = None
+        vector_backed = False
+        if memory_id is not None:
+            memory = await self.vector_store.get_memory(memory_id)
+            vector_backed = memory is not None
+
+        score_val = extra.get("score")
+        if score_val is None:
+            score_val = extra.get("importance")  # Backward compat
+        if score_val is None:
+            score_val = entity_props.get("score") or entity_props.get("importance")
+        try:
+            score_int = int(score_val) if score_val is not None else 100
+        except Exception:
+            score_int = 100
+
+        score = max(0.0, min(1.0, score_int / 100.0))
+
+        if memory is None:
+            # Fallback: construct a minimal Memory object from graph metadata.
+            memory_type_str = extra.get("memory_type") or entity_props.get("memory_type") or "conversation"
+            try:
+                mem_type = MemoryType(memory_type_str)
+            except Exception:
+                mem_type = MemoryType.CONVERSATION
+
+            created_at_value = (
+                extra.get("created_at")
+                or extra.get("timestamp")
+                or entity_props.get("created_at")
+            )
+            if isinstance(created_at_value, str):
+                try:
+                    created_at_value = datetime.fromisoformat(created_at_value)
+                except ValueError:
+                    created_at_value = None
+
+            raw_related_entities = extra.get("related_entities", [])
+            if isinstance(raw_related_entities, str):
+                try:
+                    parsed_related_entities = json.loads(raw_related_entities)
+                except Exception:
+                    parsed_related_entities = raw_related_entities.split(",")
+            else:
+                parsed_related_entities = raw_related_entities
+            related_entities = []
+            if isinstance(parsed_related_entities, list):
+                for entity_id in parsed_related_entities:
+                    try:
+                        related_entities.append(UUID(str(entity_id)))
+                    except (ValueError, TypeError):
+                        continue
+
+            memory_metadata = MemoryMetadata(
+                created_at=created_at_value or datetime.min,
+                domain=extra.get("domain") or DomainType.REFERENCE,
+                category=extra.get("category") or "general",
+                memory_type=mem_type,
+                score=score_int,
+                tags=(
+                    [tag.strip() for tag in extra["tags"].split(",") if tag.strip()]
+                    if isinstance(extra.get("tags"), str)
+                    else extra.get("tags", []) or []
+                ),
+                source=extra.get("source") or SourceType.USER_INPUT,
+                project=extra.get("project"),
+                workspace=extra.get("workspace"),
+                file_path=extra.get("file_path"),
+                custom_metadata=extra.get("custom_metadata", {}) or {},
+            )
+
+            memory = Memory(
+                id=memory_id or uuid4(),
+                content=extra.get("content") or entity_props.get("description") or "",
+                metadata=memory_metadata,
+                related_entities=related_entities,
+            )
+
+        # Mark whether this result is backed by an actual vector-store record.
+        try:
+            memory.metadata.custom_metadata["_vector_backed"] = vector_backed
+        except Exception:
+            pass
+
+        if not self._matches_structured_filters(memory, filters, plan):
+            return None
+
+        return SearchResult(
+            memory=memory,
+            score=score,
+            source="graph",
+            vector_score=None,
+            graph_score=score,
+        )
+
+    @staticmethod
+    def _matches_structured_filters(
+        memory: Memory,
+        filters: Optional[SearchFilters],
+        plan: QueryPlan,
+    ) -> bool:
+        """Enforce SearchFilters and their QueryPlan projection before limit."""
+        if filters is not None and not VectorStore._matches_filters(memory, filters):
+            return False
+
+        memory_type = getattr(memory.metadata.memory_type, "value", memory.metadata.memory_type)
+        if plan.memory_types and str(memory_type) not in {str(item) for item in plan.memory_types}:
+            return False
+
+        if plan.tags:
+            available_tags = {str(tag).strip() for tag in (memory.metadata.tags or [])}
+            if not {str(tag).strip() for tag in plan.tags}.issubset(available_tags):
+                return False
+
+        if plan.min_score is not None and memory.metadata.score < plan.min_score:
+            return False
+
+        if plan.date_range:
+            start = plan.date_range.get("start")
+            end = plan.date_range.get("end")
+            def utc_naive(value: datetime) -> datetime:
+                if value.tzinfo is None:
+                    return value
+                return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+            created_at = utc_naive(memory.metadata.created_at)
+            if start is not None:
+                start = utc_naive(start)
+            if end is not None:
+                end = utc_naive(end)
+            if start is not None and created_at < start:
+                return False
+            if end is not None and created_at > end:
+                return False
+
+        return True
     
     async def _search_hybrid(
         self,
@@ -1836,6 +1934,7 @@ class MemoryOrchestrator:
             plan,
             apply_temporal_decay,
             reinforce_access=False,
+            filters=filters,
         )
         
         semantic_results, structured_results = await asyncio.gather(
