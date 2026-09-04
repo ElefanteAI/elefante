@@ -11,6 +11,17 @@ Project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.15.2] - 2026-09-04
+
+### Fixed
+
+- Secret-token detection no longer starts inside ordinary words such as
+  `task-intelligence-program`. This preserves exact workspace and provenance
+  metadata during retrieval, so eligible memories are not rejected because
+  privacy filtering changed their scope. Standalone OpenAI and Anthropic keys,
+  including quoted and path-delimited keys, remain scrubbed. No matching
+  threshold, stored memory, or project-isolation rule changed.
+
 ## [2.15.1] - 2026-09-03
 
 ### Fixed

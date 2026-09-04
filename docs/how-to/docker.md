@@ -75,8 +75,8 @@ Use one of these two safe patterns instead.
 cd /a0/usr/projects/elefante
 git clone --depth 1 https://github.com/ElefanteAI/elefante elefante-repo-files
 cd elefante-repo-files
-git fetch --depth 1 origin tag v2.15.1
-git checkout --detach v2.15.1
+git fetch --depth 1 origin tag v2.15.2
+git checkout --detach v2.15.2
 docker compose up -d --build
 ```
 
@@ -90,7 +90,7 @@ cd /a0/usr/projects/elefante
 # Initialize git in-place (safe when .a0proj exists)
 git init
 git remote add origin https://github.com/ElefanteAI/elefante || true
-git fetch --depth 1 origin tag v2.15.1
+git fetch --depth 1 origin tag v2.15.2
 git checkout --detach FETCH_HEAD
 
 docker compose up -d --build

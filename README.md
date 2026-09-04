@@ -11,9 +11,9 @@ on your machine, then supplies a small governed subset when an agent needs prior
 context. It works beside the AI tools you already use and gives their separate
 sessions one private, inspectable memory.
 
-**v2.15.1** — Current published release.
+**v2.15.2** — Current published release.
 
-Published v2.15.1: 18 tools · 2 prompts · Python 3.11–3.13 · MCP 1.28.1
+Published v2.15.2: 18 tools · 2 prompts · Python 3.11–3.13 · MCP 1.28.1
 
 ## What a user can do
 
@@ -143,7 +143,7 @@ real question inside the intended memory scope and inspect what it supplies.
 
 ## Host coverage
 
-The v2.15.1 installer has ownership-safe, contract-tested adapters for VS Code
+The v2.15.2 installer has ownership-safe, contract-tested adapters for VS Code
 Copilot, Claude Code, Cursor, Kiro, Continue, Zed, Gemini CLI, Codex, and
 OpenClaw. In the current product contract, Codex is the sole
 required validation target; the other adapters remain optional compatibility

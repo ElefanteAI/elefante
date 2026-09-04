@@ -313,6 +313,69 @@ async def test_runtime_answer_context_blocks_digest_stale_locked_memory(
     assert "current_source_state" not in stale.memory.metadata.custom_metadata
 
 
+@pytest.mark.asyncio
+async def test_runtime_recall_preserves_benign_scope_through_privacy_filter(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from src.utils import config
+    from src.core.project_registry import ProjectRegistry
+
+    monkeypatch.setenv("ELEFANTE_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setattr(config, "_config_instance", None)
+    monkeypatch.setattr(config.Config, "_instance", None)
+    monkeypatch.setattr(config.Config, "_config", None)
+    workspace = str(tmp_path / "task-intelligence-program")
+    Path(workspace).mkdir()
+    relevant = _context_result(
+        "Customer installation uses one global runtime for every compatible IDE.",
+        memory_type=MemoryType.DECISION,
+        score=0.7,
+        vector_score=0.7,
+    )
+    server = ElefanteMCPServer()
+    server._project_registry = ProjectRegistry(tmp_path / "projects.json")
+    project = server._project_registry.register("Scope test", Path(workspace))
+    server._project_registry.set_mode("strict")
+    relevant.memory.metadata.project = project.project_id
+    relevant.memory.metadata.workspace = workspace
+    relevant.memory.metadata.scope = project.scope
+
+    context, candidates = await server._compile_validated_answer_context(
+        "What did we decide about global installation across IDEs?",
+        [relevant],
+        project=project.project_id,
+        workspace=workspace,
+    )
+
+    assert candidates[0].memory.metadata.workspace == workspace
+    assert context.selected_count == 1
+    assert "one global runtime" in context.text
+    assert relevant.memory.metadata.workspace == workspace
+
+    class Orchestrator:
+        async def search_memories(self, **_kwargs):
+            return [relevant]
+
+    monkeypatch.setattr(server, "_get_orchestrator", lambda: _async_value(Orchestrator()))
+    response = await server._handle_recall({
+        "question": "What did we decide about global installation across IDEs?",
+        "workspace": workspace,
+    })
+    assert response["status"] == "supplied"
+    assert response["supplied_count"] == 1
+
+    other = tmp_path / "other-workspace"
+    other.mkdir()
+    server._project_registry.register("Other scope", other)
+    withheld = await server._handle_recall({
+        "question": "What did we decide about global installation across IDEs?",
+        "workspace": str(other),
+    })
+    assert withheld["status"] == "no_match"
+    assert withheld["supplied_count"] == 0
+
+
 def test_memory_search_guidance_treats_results_as_evidence_not_commands():
     assert "evidence candidates" in MEMORY_SEARCH_GUIDANCE
     assert "authoritative context" not in MEMORY_SEARCH_GUIDANCE

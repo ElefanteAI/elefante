@@ -43,11 +43,12 @@ _PATTERNS: List[Tuple[str, re.Pattern, str]] = [
     # GitHub tokens
     ("GITHUB_TOKEN", re.compile(r"(?:ghp_|gho_|ghu_|ghs_|ghr_)[A-Za-z0-9_]{36,}"), "[REDACTED:GITHUB_TOKEN]"),
 
-    # OpenAI keys
-    ("OPENAI_KEY", re.compile(r"sk-(?!ant-)[A-Za-z0-9_\-]{20,}"), "[REDACTED:OPENAI_KEY]"),
+    # Token prefixes must start outside a word. Otherwise ordinary paths such
+    # as "task-intelligence-program" are redacted and lose their exact scope.
+    ("OPENAI_KEY", re.compile(r"(?<!\w)sk-(?!ant-)[A-Za-z0-9_\-]{20,}"), "[REDACTED:OPENAI_KEY]"),
 
     # Anthropic keys
-    ("ANTHROPIC_KEY", re.compile(r"sk-ant-[A-Za-z0-9\-]{20,}"), "[REDACTED:ANTHROPIC_KEY]"),
+    ("ANTHROPIC_KEY", re.compile(r"(?<!\w)sk-ant-[A-Za-z0-9\-]{20,}"), "[REDACTED:ANTHROPIC_KEY]"),
 
     # Generic passwords in config-like contexts
     ("PASSWORD", re.compile(r"(?:password|passwd|pwd)\s*[=:]\s*['\"]?([^\s'\"]{4,})['\"]?", re.IGNORECASE), "[REDACTED:PASSWORD]"),

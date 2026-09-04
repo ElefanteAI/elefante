@@ -1,6 +1,6 @@
 # Connect IDEs and Agent Hosts
 
-**Applies to:** v2.15.1
+**Applies to:** v2.15.2
 
 The release installer is the configuration authority. It detects compatible
 hosts and connects all of them to one user-level Elefante daemon. Rerun the

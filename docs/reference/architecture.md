@@ -1,6 +1,6 @@
 # Elefante Architecture
 
-> **Release:** v2.15.1 · **Status:** released product contract
+> **Release:** v2.15.2 · **Status:** released product contract
 
 Elefante is a local persistent-memory service for AI agents. It stores semantic
 memory and explicit relationships, exposes them through MCP, and keeps the
