@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
-      HF_HOME: ${{ runner.temp }}/elefante-model-cache
+      HF_HOME: ${{ github.workspace }}/../elefante-model-cache
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
     steps:

@@ -390,6 +390,10 @@ and duration depended on a shared runner's external rate limit.
 runner-local cache, then runs the unchanged tests and canaries offline. Download
 failure remains a failure, not a skip; preload and test phases are time-bounded.
 No customer runtime or model was replaced with a fixture.
+The job-level cache path uses `github.workspace`; `runner.temp` is unavailable
+in that expression scope. Valid YAML alone does not prove an Actions workflow
+can compile. The corrected workflow passes Actionlint 1.7.12; the release
+pipeline's 22 regression tests pass without changing the offline model contract.
 **Guard:** `test_quality_loads_real_model_once_before_offline_tests` enforces the
 single network-enabled preload before the real offline suite. Exact-head CI
 must still pass; upstream model availability is not inferred from a local cache.

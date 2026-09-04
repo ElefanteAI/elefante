@@ -432,7 +432,7 @@ def test_release_client_candidate_workflow_is_validation_only():
 def test_quality_loads_real_model_once_before_offline_tests():
     workflow = yaml.safe_load((ROOT / ".github/workflows/quality.yml").read_text())
     job = workflow["jobs"]["python"]
-    assert job["env"]["HF_HOME"] == "${{ runner.temp }}/elefante-model-cache"
+    assert job["env"]["HF_HOME"] == "${{ github.workspace }}/../elefante-model-cache"
     assert job["env"]["HF_HUB_OFFLINE"] == "1"
     assert job["env"]["TRANSFORMERS_OFFLINE"] == "1"
     steps = job["steps"]
