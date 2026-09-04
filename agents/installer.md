@@ -1,7 +1,7 @@
 ---
 PROTOCOL: installer
 INVOKE: elefante-installer
-PROTOCOL_VERSION: 2.15.1
+PROTOCOL_VERSION: 2.15.2
 LOAD_WHEN: Fresh install, broken venv, install failure, repair request, "install.sh failed", "install.bat failed", `.elefante-install-summary.txt` reports failure.
 DIAGNOSTIC_QUESTION: "What state is broken in the install pipeline, and which of the four venv paths does it call for?"
 AUTHORITY: This file owns the install protocol. Inline install troubleshooting in README/docs is forwarding only.

@@ -1,6 +1,6 @@
 # Elefante User Guide
 
-> **v2.15.1** · Published user documentation.
+> **v2.15.2** · Published user documentation.
 
 Elefante gives your AI agent relevant memories for the task at hand: decisions,
 preferences, constraints, facts, and lessons you chose to keep. Your agent still

@@ -1,7 +1,7 @@
 ---
 PROTOCOL: memory-janitor
 INVOKE: elefante-memory-janitor
-PROTOCOL_VERSION: 2.15.1
+PROTOCOL_VERSION: 2.15.2
 LOAD_WHEN: Before any `elefante-Memory(action="add")`, `elefante-Memory(action="update")`, `elefante-Memory(action="delete")`, or deletion of a released script/doc/file in this repo.
 DIAGNOSTIC_QUESTION: "Did this change leave the memory and documentation system cleaner than I found it?"
 SUPERSEDES: agents/orchestrator.md § Memory Janitor Mandate

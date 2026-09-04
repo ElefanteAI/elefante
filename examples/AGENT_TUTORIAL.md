@@ -1,6 +1,6 @@
 # Elefante Agent Tutorial
 
-> **Release:** v2.15.1
+> **Release:** v2.15.2
 > **Audience:** AI agents connected through MCP
 
 Elefante exposes 18 customer tools and 2 lowercase prompts. Tools use

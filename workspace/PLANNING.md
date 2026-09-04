@@ -1,6 +1,6 @@
 ---
 status: living
-last_updated: 2026-09-03
+last_updated: 2026-09-04
 audience: developer-agents
 authority: state + roadmap + features + aspect-plans for Elefante development
 related:
@@ -82,7 +82,7 @@ The non-negotiable product shape is:
 
 ---
 
-## §2 Release Contract: v2.15.1 Local Memory Control Loop
+## §2 Release Contract: v2.15.2 Local Memory Control Loop
 
 ### §2.1 Outcome
 
@@ -96,7 +96,7 @@ daily agent surface. It preserves the v2.13 governed-memory contract, adds
 strict project isolation and verified Remember/Correct/Recover operations, and
 does not claim representative Task Intelligence lift.
 
-### §2.2 Included in v2.15.1
+### §2.2 Included in v2.15.2
 
 | Surface | Customer contract |
 |---|---|
@@ -118,6 +118,13 @@ Task Intelligence remains developer-only, default-off, and excluded from the
 18-tool customer profile because representative multi-task lift is not proven.
 
 ### §2.3 Current release state
+
+As of 2026-09-04, v2.15.1 is published at `682a0ac`, but its live
+privacy/scope regression blocks completion. The installed runtime has been
+safely rolled back to v2.15.0, and the website remains on v2.15.0.
+The v2.15.2 repair and its remaining publication gates are tracked in §2.7.
+
+#### Previous verified customer baseline — v2.15.0
 
 Publication and official local installation verified on 2026-09-03, following
 the owner's explicit coordinated-release authorization. The minor release adds
@@ -171,22 +178,37 @@ Rejected alternatives remain closed without new evidence:
 ### §2.6 Resume verdict
 
 - **RESUME_SAFE:** YES — active state is here; defects/capability gaps are in [`workspace/ISSUES.md`](../workspace/ISSUES.md); integration truth is in [`agents/manifests/ide-integration.yaml`](../agents/manifests/ide-integration.yaml).
-- **RELEASE_TARGET:** The owner authorized whole-product curation and publication. The nonbreaking repair candidate is v2.15.1; exact acceptance and publication are tracked in §2.7.
-- **PUBLISHED_PRODUCT:** v2.15.0 at `2092916e30a3d46dc2e6190dceaed05653b769ed`.
-- **PUBLICATION_STATUS:** Published; GAP-057's missing acceptance evidence is not inferred from publication or a healthy daemon.
-- **LIVE_RUNTIME:** Official v2.15.0, source `2092916`, installed and independently verified on 2026-09-03. Recheck Doctor and the package receipt before future current-state claims.
+- **RELEASE_TARGET:** The owner authorized whole-product curation and publication. The nonbreaking repair candidate is v2.15.2; exact acceptance and publication are tracked in §2.7.
+- **PUBLISHED_PRODUCT:** v2.15.1 at `682a0ac239d26d7bb39389e6d71e143cad4943fb`.
+- **PUBLICATION_STATUS:** v2.15.1 is published but its live scope/privacy regression prevents goal completion. GAP-057's separate missing certification evidence is not inferred from publication or a healthy daemon.
+- **LIVE_RUNTIME:** Rolled back to official v2.15.0, source `2092916`, on 2026-09-04. The package rollback receipt is `VERIFIED_COMPLETE`; fresh-client purpose Recall supplies the correct memory. Six-memory and directive hashes remain unchanged. Recheck before future current-state claims.
 - **TASK_INTELLIGENCE:** representative multi-task lift and cross-class generalization are NOT PROVEN; the evaluation surface remains developer-only and default-off.
 - **PUBLICATION_AUTHORITY:** Explicit owner authorization on 2026-09-03 for this coordinated release; exact-commit gates remain mandatory.
 
 ### §2.7 Whole-product acceptance checklist (current gate)
 
-The current nonbreaking repair candidate is v2.15.1 on
-`codex/product-curation-v2.15.1`, based on public main `6fdedaf`. It adds no public
-tool, schema migration or feature removal. The version advisor's MAJOR suggestion
-matched historical migration wording, not a breaking change. The approved
-release marker is present; publication still requires exact merged-head Quality.
+The current nonbreaking repair candidate is v2.15.2 on
+`codex/privacy-scope-boundary-v2.15.2`, based on public v2.15.1 `682a0ac`.
+PR #33, exact merged-head Quality, all three platform packages and the release
+audit passed; v2.15.1 published at `2026-09-04T05:16:55Z`. All downloaded ZIPs
+matched checksums and clean release identity. Official installation completed
+at `2026-09-04T05:19:23.691125+00:00`; six-memory and directive hashes remained
+unchanged. However, meaningful live Recall failed: the privacy detector changed
+`task-intelligence-program` inside workspace metadata. This is BUG-056, not a
+matching-model or missing-memory defect. Completion is unclaimed.
 
-Current local proof (2026-09-04): **1,171 default tests passed, 5 legacy skips,
+The v2.15.2 candidate changes only two token-boundary expressions, regression
+coverage and release/documentation records. Five new tests reproduced the
+failure; 50 privacy/Recall cases pass after the correction, including real keys
+at common delimiters and public strict-scope delivery/abstention. Independent
+Luna Max review approved the detector boundary. Full tests, exact-commit
+publication and meaningful installed Recall must still pass. The previous
+official runtime was restored with verified rollback at
+`2026-09-04T05:32:47.955616+00:00`; fresh-client purpose Recall works and both
+data hashes are unchanged. No public tool,
+matching threshold, schema migration or feature removal is introduced.
+
+Recorded v2.15.1 local proof (2026-09-04): **1,171 default tests passed, 5 legacy skips,
 2 slow cases deselected**; both slow bridge cases passed separately. The real
 isolated MCP self-protocol passed **52/52**. Recall's focused suites passed
 **150**, including **56 cached-model cases**; the dashboard's **42 tests**,
@@ -204,11 +226,11 @@ understanding, native vendor certification or representative task-value lift.
 | Gate | Status | Current exact evidence / open boundary |
 |---|---|---|
 | Inventory and history | PASS — accounted | 381 first-party tracked files before the release marker: source 112, tests 79, scripts 63, workspace 32, docs 32, agents 12, workflows 12, benchmarks 13, examples 3, assets 4, root 19. Generated/vendor/package evidence is separated. Archives, deferred ideas and rejected experiments are preserved; accounting is not behavior proof. |
-| Backend / MCP | PASS — local candidate | Full suite and direct/bridge proofs above cover governed writes, retrieval, graph, privacy, recovery and usage. Real Kuzu proves bound parameters/non-write queries and filtering beyond the first page. The configured-root recurrence has YAML/environment/default-isolation tests. Five Chroma-dependent cases are outside fresh SQLite customer dependencies; no new Chroma migration claim is made. |
+| Backend / MCP | LIVE REGRESSION — candidate repair | The previous broad suite and bridge evidence remains valid for unchanged behavior. BUG-056 needs the new privacy-to-scope regression and official-package Recall before this gate can pass. Real Kuzu parameter/pagination, configured-root, recovery and usage proofs are retained. Five Chroma-dependent cases remain outside fresh SQLite customer dependencies. |
 | All dashboard actions | PASS — scoped candidate | Isolated browser actions and authoritative readbacks cover Remember, unseen Recall/absent facts, Edit, Archive/Restore, Replace, superseded/active deletion, Home → Review, real graph edges, vitality, verified backup → deletion → full restore, private support ZIP and consented usage. Explicit scope switching excludes the other project's memory and clears old receipts; registration rename/move/activate/deactivate/remove preserves IDs, folders and records. Zero search/filter results stay empty; sorting/expansion recover normally. Empty Library → Home → Continue opens Remember. A 319 × 694 CSS viewport exposed and then verified the narrow-detail repair (292 px body, reachable correction); desktop behavior is preserved. Existing expired-session, conflict, rollback and busy-dialog proofs remain valid. GAP-057's native/unfamiliar-user certification is separate. |
 | User documentation | PASS — local; publication pending | Existing README, Markdown user guide, HTML dashboard reference, examples, current references and agent routes agree with source; no parallel guide hierarchy. Historical versions remain historical. The current browser rejects local HTML file navigation; published GitHub Markdown is the readable user entry point, and the HTML guide is an explicitly downloadable reference. |
 | Website and brand | IN PROGRESS | Existing website QA passed before the new release manifest. Final source-bound capture, release hashes, full QA and exact Vercel deployment are separate required gates. Canonical brand pixels remain unchanged; mocked contact tests do not prove external email delivery. |
-| Publication, install, and data preservation | PENDING | Core PR #33 is awaiting exact-head CI; website changes remain local. Official v2.15.0 remains the last installed/public release (§2.3). A fresh verified pre-curation backup protects all six real memories and consent. The disposable browser-test environment was removed after acceptance; real memory contents have a pre-upgrade checksum. No real semantic memory writes are authorized. |
+| Publication, install, and data preservation | INCOMPLETE — live defect found | v2.15.1 is immutable and public at `682a0ac`. Its installed source/Doctor/backup receipt and unchanged data hashes pass, but meaningful Recall does not. v2.15.2 must complete release and live acceptance before website promotion. Website remains on v2.15.0; its 13 unit and 33 browser checks pass. No real semantic memory writes are authorized. |
 
 ---
 

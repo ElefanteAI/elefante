@@ -47,13 +47,28 @@ def test_privacy_scrubs_explicit_secret_fields_before_ingestion(field):
     assert PrivacyFilter().scrub_payload(scrubbed)[:2] == (scrubbed, 0)
 
 
-@pytest.mark.parametrize("prefix", ["sk-", "sk-proj-", "sk-admin-"])
-def test_privacy_scrubs_prefixed_tokens_in_free_text(prefix, caplog):
+@pytest.mark.parametrize("prefix", ["sk-", "sk-proj-", "sk-admin-", "sk-ant-"])
+@pytest.mark.parametrize("delimiter", ["", " ", "\n", "=", "/", '"', "prefix-"])
+def test_privacy_scrubs_prefixed_tokens_in_free_text(prefix, delimiter, caplog):
     token = prefix + "x" * 40
-    scrubbed, result = PrivacyFilter().scrub("Temporary credential: " + token)
+    scrubbed, result = PrivacyFilter().scrub(delimiter + token)
     assert token not in scrubbed
     assert result.redactions == 1
     assert token not in caplog.text
+
+
+@pytest.mark.parametrize("value", [
+    "/work/task-intelligence-program",
+    r"C:\work\task-intelligence-program",
+    "ask-about-release-verification-first",
+    "/work/task-ant-development-protocol",
+])
+def test_privacy_preserves_token_prefixes_inside_benign_words(value):
+    payload = {"workspace": value, "nested": [{"source_detail": value}]}
+    clean, count, kinds = PrivacyFilter().scrub_payload(payload)
+    assert clean == payload
+    assert count == 0
+    assert kinds == []
 
 
 def test_privacy_redaction_types_reconcile_across_nested_fields():

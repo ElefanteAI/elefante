@@ -383,6 +383,30 @@ synthetic regressions and seven existing MCP privacy-boundary tests pass.
 This is bounded pattern detection, not a guarantee for every secret format;
 users must still never submit credentials as memories.
 
+**Scope recurrence, 2026-09-04 (v2.15.1 live acceptance):** The expanded `sk-`
+pattern began inside ordinary words. `/work/task-intelligence-program` became
+`/work/ta[REDACTED:OPENAI_KEY]` during read-side sanitization. Search found the
+stored memories, but governed delivery rejected their changed workspace. The
+stored six-memory and directive hashes were unchanged. Isolated tests had used
+paths without the ambiguous prefix, so their passing results missed this
+cross-boundary regression.
+
+The v2.15.2 repair requires a token boundary before OpenAI/Anthropic prefixes;
+it does not whitelist Elefante, a project path, or a question. Five new cases
+failed before the repair and pass afterward, including Windows/POSIX paths,
+ordinary prose, and the real privacy-to-scoped-Recall compilation path. Existing
+secret-field checks plus 28 standalone-key/delimiter combinations remain
+required. The new runtime test uses a disposable data root and also checks the
+public Recall handler with a strict registry: the owning scope supplies the
+memory and a different registered scope abstains.
+
+**Prevention:** Test privacy false positives as well as secret removal, and
+assert that benign governance/provenance identifiers survive the whole delivery
+path unchanged. A green retrieval unit test or installer handshake does not
+replace meaningful official-package Recall. The existing official v2.15.1 tag
+must not be rewritten; publication and installed proof are tracked in §2.7 of
+PLANNING.md.
+
 <a id="issue-26"></a>
 
 ## Issue #26: Task Intelligence Used a Non-Canonical Project Root [BUG-066, FIXED LOCALLY, guarded]
