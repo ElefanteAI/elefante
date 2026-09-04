@@ -140,7 +140,9 @@ routing and release tests pass 75 checks. The website candidate passes its
 content contract, lint, 13 unit tests, production and compatibility builds,
 21 route checks, 17 accessibility checks, and 13 visual checks. Fresh
 desktop/phone and light/dark browser inspection found no clipping or hierarchy
-defect. This is local candidate evidence, not GitHub or Vercel publication.
+defect. Core PR #36 published the GitHub documentation as `5407049`; website
+PR #29 published the first-party guide and passed exact-live Vercel verification
+as `8e87458`. The v2.15.2 release and installed runtime were not changed.
 
 <a id="issue-14"></a>
 
