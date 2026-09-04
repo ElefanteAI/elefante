@@ -9,6 +9,11 @@ on:
 jobs:
   python:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      HF_HOME: ${{ runner.temp }}/elefante-model-cache
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
     steps:
       - uses: actions/checkout@v7
         with:
@@ -41,7 +46,14 @@ jobs:
             uv pip compile --universal --generate-hashes --python-version 3.11 requirements.client.txt -o requirements.client.lock
           )
           cmp requirements.client.lock "$RUNNER_TEMP/elefante-client-lock-check/requirements.client.lock"
+      - name: Load the real embedding model once
+        timeout-minutes: 5
+        env:
+          HF_HUB_OFFLINE: "0"
+          TRANSFORMERS_OFFLINE: "0"
+        run: python -c "from src.core.embeddings import get_embedding_service; get_embedding_service()._load_model()"
       - run: python -m pytest tests -q
+        timeout-minutes: 10
       - run: python -m pytest tests -m slow -q
       - name: Verify release contracts
         run: |

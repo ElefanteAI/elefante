@@ -186,11 +186,17 @@ tool, schema migration or feature removal. The version advisor's MAJOR suggestio
 matched historical migration wording, not a breaking change. The approved
 release marker is present; publication still requires exact merged-head Quality.
 
-Current local proof (2026-09-04): **1,170 default tests passed, 5 legacy skips,
+Current local proof (2026-09-04): **1,171 default tests passed, 5 legacy skips,
 2 slow cases deselected**; both slow bridge cases passed separately. The real
 isolated MCP self-protocol passed **52/52**. Recall's focused suites passed
 **150**, including **56 cached-model cases**; the dashboard's **42 tests**,
 TypeScript/Vite build, release-doc sync, Ruff and all **9 canaries** passed.
+The full suite also passes with the real cached model offline (193.84 seconds).
+PR #33's unsequenced historical MCP canary received a transport-only correction
+and independent approval. A subsequent CI run exposed repeated HTTP 429 model
+metadata requests; CI now loads the real model once before offline tests, with
+bounded acquisition and test phases. Both lessons are in the installation
+postmortem; exact-head CI must pass before merge.
 The earlier missing host list and missing release-marker failures are corrected,
 not waived. These are bounded regression proofs, not universal language
 understanding, native vendor certification or representative task-value lift.
@@ -202,7 +208,7 @@ understanding, native vendor certification or representative task-value lift.
 | All dashboard actions | PASS — scoped candidate | Isolated browser actions and authoritative readbacks cover Remember, unseen Recall/absent facts, Edit, Archive/Restore, Replace, superseded/active deletion, Home → Review, real graph edges, vitality, verified backup → deletion → full restore, private support ZIP and consented usage. Explicit scope switching excludes the other project's memory and clears old receipts; registration rename/move/activate/deactivate/remove preserves IDs, folders and records. Zero search/filter results stay empty; sorting/expansion recover normally. Empty Library → Home → Continue opens Remember. A 319 × 694 CSS viewport exposed and then verified the narrow-detail repair (292 px body, reachable correction); desktop behavior is preserved. Existing expired-session, conflict, rollback and busy-dialog proofs remain valid. GAP-057's native/unfamiliar-user certification is separate. |
 | User documentation | PASS — local; publication pending | Existing README, Markdown user guide, HTML dashboard reference, examples, current references and agent routes agree with source; no parallel guide hierarchy. Historical versions remain historical. The current browser rejects local HTML file navigation; published GitHub Markdown is the readable user entry point, and the HTML guide is an explicitly downloadable reference. |
 | Website and brand | IN PROGRESS | Existing website QA passed before the new release manifest. Final source-bound capture, release hashes, full QA and exact Vercel deployment are separate required gates. Canonical brand pixels remain unchanged; mocked contact tests do not prove external email delivery. |
-| Publication, install, and data preservation | PENDING | Core/website branches are local candidates. Official v2.15.0 remains the last installed/public release (§2.3). A fresh verified pre-curation backup protects all six real memories and consent. All mutating browser acceptance uses a disposable configured data root. No real semantic memory writes are authorized. |
+| Publication, install, and data preservation | PENDING | Core PR #33 is awaiting exact-head CI; website changes remain local. Official v2.15.0 remains the last installed/public release (§2.3). A fresh verified pre-curation backup protects all six real memories and consent. The disposable browser-test environment was removed after acceptance; real memory contents have a pre-upgrade checksum. No real semantic memory writes are authorized. |
 
 ---
 

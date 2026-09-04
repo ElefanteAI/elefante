@@ -20,6 +20,7 @@ import tarfile
 from pathlib import Path
 
 import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -426,6 +427,23 @@ def test_release_client_candidate_workflow_is_validation_only():
     assert "if manifest_path.exists():" in workflow
     assert "softprops/action-gh-release" not in workflow
     assert "candidate-not-for-public-download" not in workflow
+
+
+def test_quality_loads_real_model_once_before_offline_tests():
+    workflow = yaml.safe_load((ROOT / ".github/workflows/quality.yml").read_text())
+    job = workflow["jobs"]["python"]
+    assert job["env"]["HF_HOME"] == "${{ runner.temp }}/elefante-model-cache"
+    assert job["env"]["HF_HUB_OFFLINE"] == "1"
+    assert job["env"]["TRANSFORMERS_OFFLINE"] == "1"
+    steps = job["steps"]
+    loader = next(step for step in steps if step.get("name") == "Load the real embedding model once")
+    tests = next(step for step in steps if step.get("run") == "python -m pytest tests -q")
+    assert "get_embedding_service()._load_model()" in loader["run"]
+    assert loader["env"] == {"HF_HUB_OFFLINE": "0", "TRANSFORMERS_OFFLINE": "0"}
+    assert loader["timeout-minutes"] == 5
+    assert steps.index(loader) < steps.index(tests)
+    assert tests["timeout-minutes"] == 10
+    assert all("HF_HUB_OFFLINE" not in step.get("env", {}) for step in steps if step is not loader)
 
 
 def test_release_workflow_publishes_verified_sha256sums():

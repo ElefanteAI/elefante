@@ -379,6 +379,23 @@ their exact known fix. Exact-head CI remains the publication gate.
 **Prevention:** Test a stateful protocol in its valid message order. A working
 local run does not excuse an invalid test client or prove clean-runner behavior.
 
+## Issue #29: CI Repeated Model Metadata Requests Until Rate-Limited
+
+**Trigger:** The second PR #33 Python run remained in the test suite for ten
+minutes. Its captured output showed repeated Hugging Face HTTP 429 responses
+and exponential retries while loading the same `thenlper/gte-base` model.
+**Root cause:** Real-model tests repeatedly checked remote metadata; test success
+and duration depended on a shared runner's external rate limit.
+**Correction:** CI loads the actual configured model once into an explicit
+runner-local cache, then runs the unchanged tests and canaries offline. Download
+failure remains a failure, not a skip; preload and test phases are time-bounded.
+No customer runtime or model was replaced with a fixture.
+**Guard:** `test_quality_loads_real_model_once_before_offline_tests` enforces the
+single network-enabled preload before the real offline suite. Exact-head CI
+must still pass; upstream model availability is not inferred from a local cache.
+**Prevention:** Separate dependency acquisition from behavioral tests. A green
+local cache is not permission to ignore hosted-runner network failures.
+
 ## Cross-bug pattern (extracted to `../lessons.md`)
 
 The five most-recurring rules from the issues above:
