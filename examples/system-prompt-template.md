@@ -1,6 +1,7 @@
-# Elefante System Prompt Template
+# Advanced Elefante System-Prompt Fallback
 
-Use this template only for an MCP client that has no equivalent workspace or
+This is an integration reference, not a customer onboarding step. Use the
+template only for an MCP client that has no equivalent workspace or
 global instructions. Do not install duplicate copies into a host that already
 loads Elefante guidance.
 

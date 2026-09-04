@@ -128,6 +128,20 @@
 
 **User-guide recurrence (2026-09-03):** The published documentation entry was a catalogue, and its dashboard link opened HTML source on GitHub. The detailed guide also conflated Home with Recall results, hidden with disabled project controls, and missing with observed provider usage. The correction makes the existing `docs/README.md` a workflow-first user guide, retains and clarifies the HTML reference, explains how to open it, and removes internal-plan/owner-specific wording. Source review and `test_user_guide_explains_the_workflow_before_technical_reference` plus `test_dashboard_user_guide_links_resolve_without_internal_plans` guard the entry flow, all six dashboard sections, local links and anchors. The frozen v2.15.0 tag is not rewritten; the authorized correction's publication state lives in `PLANNING.md §2.7`. Local HTML rendering was blocked by browser policy, so it is not claimed as visually verified.
 
+**Demo and website-routing recurrence (2026-09-04):** The GitHub front door again
+mixed first-use guidance with optional operator surfaces, while `examples/`
+contained only agent-integration Markdown and no customer demo. The website had
+a complete-looking guide but ended in three GitHub documentation exits, so the
+customer journey and the technical source competed. The local repair preserves
+all advanced and historical material, makes one real-memory loop the common
+entry, adds explicit Use and Behavior evidence for every published capability,
+and leaves one footer exit to exact source and deep technical reference. Core
+routing and release tests pass 75 checks. The website candidate passes its
+content contract, lint, 13 unit tests, production and compatibility builds,
+21 route checks, 17 accessibility checks, and 13 visual checks. Fresh
+desktop/phone and light/dark browser inspection found no clipping or hierarchy
+defect. This is local candidate evidence, not GitHub or Vercel publication.
+
 <a id="issue-14"></a>
 
 ## Issue #14: Task Intelligence Judge Encoded Hidden Implementation Shape [BUG-046, MITIGATED, guarded]

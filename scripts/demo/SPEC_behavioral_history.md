@@ -1,8 +1,9 @@
-# SPEC: Behavioral History Pass for Elefante History Demo Dataset
+# Legacy Spec: Behavioral History Pass for the 100-Memory Benchmark
 
-> **Status:** Implemented and verified (8/8 criteria pass)
+> **Status:** Historical, implemented, and verified (8/8 criteria pass)
 > **Traces to:** `src/models/memory.py` (MemoryMetadata fields), `src/core/vector_store.py` (update_memory, replace_memory)
-> **Implements:** Dashboard demo completeness by making 100 real Elefante-history memories look like a real 6-month workspace
+> **Current showcase:** use `generate_showcase_snapshot.py`; it writes no durable store.
+> **Historical purpose:** make the legacy 100-memory Chroma/Kuzu benchmark resemble a six-month workspace.
 
 ---
 

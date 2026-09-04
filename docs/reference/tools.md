@@ -10,7 +10,7 @@ Once connected to your IDE, use natural language to interact with Elefante. The 
 - **Retrieve context**: "What do you know about my coding preferences?"
 - **Graph query**: "Show me all technologies related to the Elefante project."
 - **Browse sessions**: "Show me my recent work sessions."
-- **Open dashboard**: "Open the knowledge graph dashboard."
+- **Open Home**: "Open Elefante Home at http://localhost:8000."
 
 ---
 

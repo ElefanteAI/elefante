@@ -78,7 +78,7 @@ RELEASE_DOC_TARGETS = [
     ("docs/how-to/docker.md", r'git fetch --depth 1 origin tag v[\d.]+\ngit checkout --detach v[\d.]+', 'git fetch --depth 1 origin tag v{v}\ngit checkout --detach v{v}'),
     ("docs/how-to/docker.md", r'git fetch --depth 1 origin tag v[\d.]+\ngit checkout --detach FETCH_HEAD', 'git fetch --depth 1 origin tag v{v}\ngit checkout --detach FETCH_HEAD'),
     ("docs/how-to/restart.md", r'(?m)^\./\.venv/bin/python scripts/lifecycle/restart_elefante\.py --verify --version [\d.]+$', './.venv/bin/python scripts/lifecycle/restart_elefante.py --verify --version {v}'),
-    ("examples/README.md", r'(?m)^> Applies to v[\d.]+ · Audience: agents connected through MCP$', '> Applies to v{v} · Audience: agents connected through MCP'),
+    ("examples/README.md", r'(?m)^> Applies to v[\d.]+ · Audience: first-time users and connected agents$', '> Applies to v{v} · Audience: first-time users and connected agents'),
     ("examples/AGENT_TUTORIAL.md", r'(?m)^> \*\*Release:\*\* v[\d.]+$', '> **Release:** v{v}'),
     ("docs/explanation/vision.md", r'(?m)^> Product explanation · Current published version: v[\d.]+$', '> Product explanation · Current published version: v{v}'),
     ("docs/reference/architecture.md", r'(?m)^> \*\*Release:\*\* v[\d.]+', '> **Release:** v{v}'),

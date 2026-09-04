@@ -103,7 +103,9 @@ only explicitly requested durable information, after searching first.
 
 Do not demand a memory search for every self-contained question, and do not
 store every conversation. The maintained repository example is
-`.github/copilot-instructions.md`.
+`.github/copilot-instructions.md`. If a host has no equivalent instruction
+surface, use the [advanced system-prompt fallback](../../examples/system-prompt-template.md)
+once instead of installing duplicate guidance.
 
 ## Verify any host
 
@@ -116,7 +118,8 @@ store every conversation. The maintained repository example is
 2. Restart the host.
 3. Confirm it lists Elefante's 18 tools and 2 prompts.
 4. Call `elefante-System(action="status")`.
-5. Run a read-only memory search.
+5. Ask one real question that needs a known memory, run `elefante-Recall` once,
+   and inspect the selected context or explicit abstention.
 
 If one host shows different memories, it is probably connected to a different
 runtime. Repair the customer installation; do not copy databases between

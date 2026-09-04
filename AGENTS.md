@@ -95,7 +95,7 @@ elefante/
 │   └── test_developer_routing.py  ← active enforcement (BUG-026 + BUG-007 guards)
 ├── scripts/                     ← installer, verify, lifecycle, ci, debug, privileged
 ├── src/                         ← core engine, MCP server, dashboard
-└── examples/                    ← integration examples
+└── examples/                    ← first-use demo + advanced agent integration
 ```
 
 ---

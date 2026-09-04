@@ -15,43 +15,61 @@ sessions one private, inspectable memory.
 
 Published v2.15.2: 18 tools · 2 prompts · Python 3.11–3.13 · MCP 1.28.1
 
-## What a user can do
+## Install
 
-- Recall relevant prior context with one bounded, read-only `elefante-Recall`
-  call. Irrelevant or unsafe candidates produce an explicit abstention.
-- Remember, search, correct, archive, restore, and resolve durable knowledge
-  with search-before-write protection and user-governed retention rules. Home
-  also offers an advanced backup-bound permanent-delete flow.
-- Connect memories to entities and relationships in a local knowledge graph.
-- Attach bounded local image, audio, and video files. Elefante stores and
-  integrity-checks them locally; it does not perform OCR, transcription, model
-  analysis, or network upload.
-- Inspect memory health, relationships, retrieval evidence, usage summaries,
-  and Signal Cards in a loopback-only, snapshot-driven dashboard.
-- Run the Session Distiller in the foreground, including an opt-in watch mode
-  for new or changed supported chat-session files.
-- Exchange an explicit allowlist of memories through signed, scope-bound local
-  Team Sync bundles. Elefante provides the bundle contract, not a cloud sync
-  transport.
-- Enable a separate metadata-only Session Intelligence ledger. With explicit
-  purpose consent, it automatically records MCP usage estimates; supplied
-  provider-reported usage stays separate. Rate-card-backed cost, outcome records,
-  Signal Cards, and aggregate hypotheses never turn missing evidence into zero
-  or a claim of improved task quality.
-- Feed bounded file, terminal-error, or conversation event envelopes to the
-  local `/events/surface` endpoint for literal-trigger retrieval. Elefante does
-  not silently intercept host activity or persist the event body.
+1. Download the matching installer ZIP from the
+   [latest release](https://github.com/ElefanteAI/elefante/releases/latest),
+   verify its SHA-256, and extract it.
+2. Open `Install Elefante.command` on macOS. If macOS asks, Control-click it,
+   choose **Open**, then **Open** again. Administrator access and Terminal
+   commands are not required. On Windows, open `Install Elefante.bat`; on Linux,
+   run `chmod +x install.sh && ./install.sh`.
+3. Choose the project folder whose memories must stay isolated, finish the
+   installer checks, and restart your connected agent.
 
-## How it works
+For source installation, checksums, repair, migration, upgrade, and uninstall,
+use the [installation guide](docs/how-to/install.md).
 
-```text
-MCP host
-   │  local HTTP or storage-free stdio bridge
-   ▼
-Elefante daemon ── governed retrieval ── SQLite vectors
-   │                                  └─ Kuzu relationships
-   └─ redacted snapshot ───────────────► local dashboard
-```
+The dashboard is included. Git, Node.js, a source checkout, and a browser
+extension are not required for a customer installation.
+
+Signed native packages are published only when credential-gated notarization or Authenticode verification
+succeeds; an unsigned substitute is never presented
+as a release asset.
+
+**If installation fails:** read the paths printed by the installer in this order:
+
+1. `.elefante-install-summary.txt`
+2. `.elefante-install-status.txt`
+3. `.elefante-install.log`
+
+Do not delete the data root or edit host configuration by guesswork.
+
+## Verify the installation
+
+The v2.15.2 installer has a disposable real-MCP acceptance check and a verified
+baseline backup. Installation does not succeed unless that private check passes.
+Readiness proves connection health; useful selection still requires one real
+question.
+
+1. Follow the [five-minute real-memory demo](examples/README.md). It uses one
+   decision that matters to your work—never a preloaded fake conversation.
+2. Open the [customer guide](docs/README.md) for everyday use, every dashboard
+   feature, recovery, and troubleshooting.
+
+## The product loop
+
+| Action | What you do | What Elefante does |
+|---|---|---|
+| **Remember** | Ask your connected agent to keep one durable decision, preference, constraint, fact, or lesson | Searches before writing and returns an explicit result |
+| **Recall** | Ask a real task question | Supplies a small eligible context bundle, or explicitly abstains |
+| **Correct** | Review outdated or conflicting knowledge | Plans and verifies Edit, Replace, Archive, Restore, Resolve, or permanent deletion |
+| **Understand** | Open the local dashboard | Shows sources, health, topics, explicit relationships, and usage evidence |
+| **Recover** | Check health, back up, restore, or create a support report | Uses verified, rollback-protected local operations |
+
+The AI tool continues to do the work. Elefante retrieves durable context before
+or during a task and preserves verified outcomes only when the user or workflow
+explicitly asks it to write.
 
 ```text
 Goal → Perceive → Plan → Act → Observe → Update → Repeat
@@ -60,161 +78,50 @@ Goal → Perceive → Plan → Act → Observe → Update → Repeat
           └──────────── Elefante ────────────┘
 ```
 
-The AI tool continues to do the work. Elefante participates at two points: it
-retrieves durable context before or during a task, and it preserves verified
-outcomes when the user or workflow explicitly asks it to write.
-
-Normal retrieval is read-only. Search exposure does not reinforce ranking or
-prove that a memory improved a task. Conflicting evidence is withheld until it
-is resolved; Smart Merge is dry-run-first and requires explicit authority when
-there is no unambiguous protected winner.
-
-## Install
-
-Download the matching `elefante-installer-<OS>.zip` and `SHA256SUMS` from the
-[latest GitHub release](https://github.com/ElefanteAI/elefante/releases/latest),
-verify the checksum, extract the archive, then use its single platform launcher:
-
-- macOS: open `Install Elefante.command`. If macOS asks for confirmation,
-  Control-click it, choose **Open**, then choose **Open** again. Administrator
-  access and Terminal commands are not required.
-- Windows: open `Install Elefante.bat`
-- Linux: run `chmod +x install.sh && ./install.sh`
-
-The published installer creates one stable per-user runtime and one local data
-root. Codex is the required validation target, not vendor-certified; other detected hosts are optional
-compatibility previews and cannot block customer readiness.
-
-- macOS/Linux runtime: `~/.elefante/app/current`
-- Windows runtime: `%LOCALAPPDATA%\Elefante\app\current`
-
-ZIP installers are the universal release contract. A signed/notarized macOS
-DMG or Authenticode-verified Windows EXE is published only when the release
-workflow completes credential-gated notarization or Authenticode verification;
-an unsigned native package is never substituted as a release asset.
-
-For source installation, repair, checksum commands, and uninstall details, see
-the [installation guide](docs/how-to/install.md).
-
-The published package also carries its own data-preserving
-uninstall launcher (`Uninstall Elefante.command`, `Uninstall Elefante.bat`, or
-`uninstall.sh`). It requires the official package matching the installed build,
-creates and verifies a backup first, removes the active app and only unchanged
-Elefante-owned connections, and leaves memories available for a later reinstall.
-
-**If installation fails:** read the persisted recovery files in this order:
-
-1. `.elefante-install-summary.txt`
-2. `.elefante-install-status.txt`
-3. `.elefante-install.log`
-
-The installer prints their exact location. Do not delete the data root or edit
-host configuration by guesswork.
-
-## Verify the installation
-
-The installer already performs a disposable acceptance check through the real
-MCP connection. It creates a generated project-scoped memory, proves Recall,
-removes the memory, verifies that it is gone, and creates a verified local
-backup. Installation does not succeed unless that private check passes.
-
-Restart the host, then begin with a real decision from the selected project:
-
 ```text
-Remember that this project's release owner is the founder.
+Connected agent ── Remember / Recall ──► local Elefante daemon
+                                             │
+                              SQLite vectors + Kuzu relationships
+                                             │
+                              local maintenance dashboard
 ```
 
-In a later session, ask the agent who owns the release. This verifies useful
-continuity without leaving permanent demo content in the customer's memory.
+Read-only Recall never edits a memory and a selected record does not prove that
+an answer is good. Conflicting or ineligible evidence can be withheld. The user
+remains responsible for deciding what is true and what should be kept.
 
-The installed runtime also provides a read-only doctor:
+## Documentation map
 
-```bash
-cd ~/.elefante/app/current
-./.venv/bin/python scripts/lifecycle/doctor.py --json
-```
+| If you are… | Start here | Continue with |
+|---|---|---|
+| Trying Elefante for the first time | [Five-minute demo](examples/README.md) | [Complete customer guide](docs/README.md) |
+| Installing or repairing it | [Installation guide](docs/how-to/install.md) | [Host configuration](docs/how-to/configure-ide.md) |
+| Learning the dashboard | [Dashboard guide](docs/README.md#dashboard) | [Detailed offline dashboard reference](docs/how-to/view-dashboard.html) |
+| Operating advanced features | [Advanced guide index](docs/README.md#advanced-reference) | [Tools and prompts](docs/reference/tools.md) · [Architecture](docs/reference/architecture.md) |
+| Integrating an agent | [Advanced agent tutorial](examples/AGENT_TUTORIAL.md) | [System-prompt fallback](examples/system-prompt-template.md) |
+| Developing Elefante | [Developer entrypoint](AGENTS.md) | [Plan](workspace/PLANNING.md) · [Issues](workspace/ISSUES.md) · [Tests](tests/README.md) |
 
-A customer-ready candidate reports `customer_ready=true`, a verified Codex
-connection and Recall path, and separately identifies any selected compatibility
-preview that was not connected or verified.
+Customer guidance describes released behavior. Developer plans, experiments,
+postmortems, and Task Intelligence evaluation are separate and do not expand the
+published product contract.
 
-Readiness proves connection health, not useful selection. Test Recall with one
-real question inside the intended memory scope and inspect what it supplies.
+## Published boundary
 
-## Host coverage
+The v2.15.2 customer profile exposes 18 MCP tools and 2 prompts. The local
+daemon owns embedded SQLite vectors and Kuzu relationships; connected hosts use
+local HTTP or a storage-free stdio bridge. Memory, graph, media, dashboard, and
+consented Session Intelligence data stay local by default. Elefante has no
+product telemetry.
 
-The v2.15.2 installer has ownership-safe, contract-tested adapters for VS Code
-Copilot, Claude Code, Cursor, Kiro, Continue, Zed, Gemini CLI, Codex, and
-OpenClaw. In the current product contract, Codex is the sole
-required validation target; the other adapters remain optional compatibility
-previews and do not expand the supported acceptance promise.
+Advanced released capabilities include local media attachments, the foreground
+Session Distiller, signed scope-bound Team Sync bundles, private host-event
+retrieval, and consented metadata-only Session Intelligence. Their exact use,
+limits, and safety boundaries are in the [customer guide](docs/README.md#all-released-features)
+and [technical reference](docs/README.md#advanced-reference).
 
-IBM Bob and Antigravity remain preview integrations because their full host
-lifecycle has not been independently certified. Agent Zero remains a documented
-community path. Planned hosts are not advertised as supported.
-
-## Public MCP surface
-
-The published customer profile exposes 18 tools + 2 prompts, including the
-verified `elefante-Recover` lifecycle surface.
-
-| Area | Surface |
-|---|---|
-| Recall | `elefante-Recall` |
-| Memory | `elefante-Memory` |
-| Recover | `elefante-Recover` |
-| Graph | `elefante-GraphConnect`, `elefante-GraphQuery` |
-| Context | `elefante-ContextGet`, `elefante-SessionsList` |
-| Tasks | `elefante-TaskCreate`, `elefante-TaskUpdate`, `elefante-TaskGraph` |
-| ETL | `elefante-ETLProcess`, `elefante-ETLClassify` |
-| Directives | `elefante-DirectiveAdd`, `elefante-DirectiveList`, `elefante-DirectiveRemove` |
-| System | `elefante-System`, `elefante-SystemStatusGet`, `elefante-DashboardOpen` |
-| Prompts | `elefante-context`, `elefante-grounding` |
-
-See the [tool and prompt reference](docs/reference/tools.md) for parameters,
-result contracts, and safety rules.
-
-## Privacy and product boundaries
-
-- Memory, graph, media, Session Intelligence, and dashboard data stay local by
-  default. Elefante has no product telemetry.
-- The daemon and dashboard bind to loopback. Exposing either over a network is
-  an operator decision that requires a separately authenticated boundary.
-- Context intentionally sent to an AI host remains subject to that provider's
-  policy.
-- Token estimates are local heuristics. Dollar cost is authoritative only when
-  provider-actual usage and a matching dated rate card are both present.
-- Task Intelligence evaluation exists for developers, remains default-off, and
-  has not established representative multi-task outcome lift. It is not part
-  of the 18-tool development customer profile or a public performance claim.
-
-## Documentation
-
-Elefante keeps user and developer documentation separate.
-
-### User documentation
-
-- [User guide — first use, everyday memory, and troubleshooting](docs/README.md)
-- [Install and repair](docs/how-to/install.md)
-- [Configure a host](docs/how-to/configure-ide.md)
-- [Tool reference](docs/reference/tools.md)
-- [Architecture](docs/reference/architecture.md)
-- [Dashboard explained](docs/README.md#dashboard)
-- [Complete dashboard guide — downloadable HTML](docs/how-to/view-dashboard.html)
-
-### Developer documentation
-
-- [Repository entrypoint](AGENTS.md)
-- [Developer constitution](agents/orchestrator.md)
-- [Living product plan](workspace/PLANNING.md)
-- [Issue and gap ledger](workspace/ISSUES.md)
-- [Script catalog](scripts/README.md)
-- [Test catalog](tests/README.md)
-- [Release history](CHANGELOG.md)
-
-Developer plans, experiments, postmortems, and release procedures do not define
-the shipped customer contract. Current source, tagged artifacts, and exact-head
-release verification remain authoritative.
+Task Intelligence evaluation remains developer-only and default-off. It has not
+established representative multi-task outcome lift and is not a public product
+performance claim.
 
 ## License
 
