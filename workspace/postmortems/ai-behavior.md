@@ -407,6 +407,14 @@ replace meaningful official-package Recall. The existing official v2.15.1 tag
 must not be rewritten; publication and installed proof are tracked in §2.7 of
 PLANNING.md.
 
+**Released verification (2026-09-04):** v2.15.2 source `f04cd615` passes the
+50 focused privacy/Recall cases and the 1,201-test local suite. The official
+package's fresh bridge and visible dashboard supply the pre-existing purpose
+memory and abstain for an absent revenue fact. Semantic-memory, directive and
+consent hashes are unchanged. Exact receipts and publication links are in
+[PLANNING §2.3](../PLANNING.md#23-current-release-state); the old tag and assets
+remain intact.
+
 <a id="issue-26"></a>
 
 ## Issue #26: Task Intelligence Used a Non-Canonical Project Root [BUG-066, FIXED LOCALLY, guarded]
